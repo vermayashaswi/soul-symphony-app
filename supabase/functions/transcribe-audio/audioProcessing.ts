@@ -54,10 +54,10 @@ export function processBase64Chunks(base64String: string, chunkSize = 32768): Ui
       offset += chunk.length;
     }
 
-    // If the resulting array is very small or empty, add padding
+    // If the resulting array is very small or empty, add significant padding
     if (result.length < 1000) {
-      console.log("Audio data very small, adding padding");
-      const paddedResult = new Uint8Array(result.length + 16384); // Add 16KB padding
+      console.log("Audio data very small, adding significant padding");
+      const paddedResult = new Uint8Array(result.length + 65536); // Add 64KB padding
       paddedResult.set(result);
       // Fill the rest with silence (0s)
       for (let i = result.length; i < paddedResult.length; i++) {
@@ -70,7 +70,7 @@ export function processBase64Chunks(base64String: string, chunkSize = 32768): Ui
   } catch (error) {
     console.error('Error processing base64 chunks:', error);
     // Return at least an empty but valid audio file
-    const emptyAudio = new Uint8Array(8192).fill(0);
+    const emptyAudio = new Uint8Array(65536).fill(0); // 64KB of silence
     return emptyAudio;
   }
 }
@@ -130,13 +130,13 @@ export function ensureValidAudioData(data: Uint8Array, fileType: string): Uint8A
     
     // Create different padding based on file type
     if (fileType === 'wav') {
-      // Create minimal valid WAV file (8KB of silence)
-      const silence = new Uint8Array(8192).fill(0);
+      // Create minimal valid WAV file (64KB of silence)
+      const silence = new Uint8Array(65536).fill(0);
       
       // WAV header (44 bytes)
       const header = new Uint8Array([
         0x52, 0x49, 0x46, 0x46, // "RIFF"
-        0x24, 0x20, 0x00, 0x00, // Chunk size (8KB + 36)
+        0x24, 0x20, 0x00, 0x00, // Chunk size (64KB + 36)
         0x57, 0x41, 0x56, 0x45, // "WAVE"
         0x66, 0x6D, 0x74, 0x20, // "fmt "
         0x10, 0x00, 0x00, 0x00, // Subchunk1 size (16)
@@ -147,7 +147,7 @@ export function ensureValidAudioData(data: Uint8Array, fileType: string): Uint8A
         0x02, 0x00, // Block align
         0x10, 0x00, // Bits per sample (16)
         0x64, 0x61, 0x74, 0x61, // "data"
-        0x00, 0x20, 0x00, 0x00  // Subchunk2 size (8KB)
+        0x00, 0x20, 0x00, 0x00  // Subchunk2 size (64KB)
       ]);
       
       const result = new Uint8Array(header.length + silence.length);
@@ -156,9 +156,8 @@ export function ensureValidAudioData(data: Uint8Array, fileType: string): Uint8A
       
       return result;
     } else {
-      // For WebM or other formats, just return padding
-      // (real headers are more complex)
-      return new Uint8Array(16384).fill(0); 
+      // For WebM or other formats, return a larger padding
+      return new Uint8Array(65536).fill(0); // 64KB of silence
     }
   }
   

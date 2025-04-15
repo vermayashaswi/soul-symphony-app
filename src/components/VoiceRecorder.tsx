@@ -55,12 +55,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     maxDuration: 300
   });
   
-  // When audioBlob changes, create a playable version
+  // When audioBlob changes, create a playable version with extra padding
   useEffect(() => {
     if (audioBlob) {
       try {
         console.log('[VoiceRecorder] Creating playable version of the blob');
-        const playable = createPlayableAudioBlob(audioBlob);
+        // Add extra padding for more reliable playback
+        const normalizedBlob = normalizeAudioBlob(audioBlob);
+        const playable = createPlayableAudioBlob(normalizedBlob);
         setPlayableBlob(playable);
         console.log('[VoiceRecorder] Created playable blob:', playable.size, playable.type);
       } catch (err) {
@@ -130,10 +132,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   useEffect(() => {
     if (playableBlob && !audioPrepared) {
       console.log('[VoiceRecorder] New playable blob detected, preparing audio...');
-      prepareAudio().then(duration => {
-        console.log('[VoiceRecorder] Audio prepared with duration:', duration);
-        setAudioPrepared(true);
-      });
+      // Force a timeout before preparing audio to allow browser to process
+      setTimeout(() => {
+        prepareAudio(true).then(duration => {
+          console.log('[VoiceRecorder] Audio prepared with duration:', duration);
+          setAudioPrepared(true);
+        });
+      }, 300);
     }
   }, [playableBlob, audioPrepared, prepareAudio]);
   

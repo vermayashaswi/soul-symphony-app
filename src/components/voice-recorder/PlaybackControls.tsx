@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,18 +36,28 @@ export function PlaybackControls({
   const [sliderValue, setSliderValue] = useState(0);
   const [isTouchActive, setIsTouchActive] = useState(false);
   const { isMobile } = useIsMobile();
+  const lastDurationRef = useRef<number>(0);
   
   // Fix for zero duration audio - use a minimum valid duration
-  const effectiveDuration = audioDuration <= 0 ? 0.1 : audioDuration;
+  const effectiveDuration = audioDuration <= 0 ? 1 : audioDuration;
   
-  // Update slider and current time based on playback progress
+  // Anti-flicker mechanism - only update duration if it's stable
+  const stableDuration = useRef<number>(effectiveDuration);
+  
   useEffect(() => {
-    if (!isTouchActive && playbackProgress !== undefined) {
-      const timeInSeconds = (playbackProgress * effectiveDuration);
+    if (Math.abs(effectiveDuration - lastDurationRef.current) > 0.1) {
+      lastDurationRef.current = effectiveDuration;
+    }
+  }, [effectiveDuration]);
+  
+  // Update slider and current time based on playback progress, with anti-flicker
+  useEffect(() => {
+    if (!isTouchActive && playbackProgress !== undefined && lastDurationRef.current > 0) {
+      const timeInSeconds = (playbackProgress * lastDurationRef.current);
       setCurrentTime(timeInSeconds);
       setSliderValue(playbackProgress * 100);
     }
-  }, [playbackProgress, effectiveDuration, isTouchActive]);
+  }, [playbackProgress, isTouchActive]);
   
   // Force update the slider position during playback with requestAnimationFrame
   useEffect(() => {
@@ -58,12 +68,12 @@ export function PlaybackControls({
         setSliderValue(prev => {
           // Only update if there's a real change to prevent unnecessary renders
           const newValue = playbackProgress * 100;
-          if (Math.abs(prev - newValue) > 0.1) {
+          if (Math.abs(prev - newValue) > 0.5) {
             return newValue;
           }
           return prev;
         });
-        setCurrentTime(playbackProgress * effectiveDuration);
+        setCurrentTime(playbackProgress * lastDurationRef.current);
         animationFrameId = requestAnimationFrame(updateSlider);
       };
       
@@ -75,16 +85,16 @@ export function PlaybackControls({
         cancelAnimationFrame(animationFrameId);
       }
     };
-  }, [isPlaying, playbackProgress, effectiveDuration, isTouchActive]);
+  }, [isPlaying, playbackProgress, isTouchActive]);
   
   const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(effectiveDuration);
+  const formattedDuration = formatTime(lastDurationRef.current);
   
   const handleSliderChange = (value: number[]) => {
     if (onSeek) {
       const position = value[0] / 100;
       setSliderValue(value[0]);
-      setCurrentTime(position * effectiveDuration);
+      setCurrentTime(position * lastDurationRef.current);
       onSeek(position);
     }
   };

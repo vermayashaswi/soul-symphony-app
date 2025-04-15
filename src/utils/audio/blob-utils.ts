@@ -46,12 +46,11 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
 export function normalizeAudioBlob(audioBlob: Blob): Blob {
   console.log(`[blob-utils] Normalizing audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
   
-  // If the blob is very small, add padding to prevent "too short" errors
-  // Even more permissive - process files as small as 20 bytes
+  // If the blob is very small, add significant padding to prevent playback issues
   if (audioBlob.size < 500) {
     console.log('[blob-utils] Adding padding to small audio blob');
-    // Create a larger padding for very small files (16KB)
-    const padding = new Uint8Array(16384).fill(0);
+    // Create a larger padding for very small files (32KB)
+    const padding = new Uint8Array(32768).fill(0);
     return new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
   }
   
@@ -125,6 +124,22 @@ export function extractAudioData(blob: Blob): Promise<ArrayBuffer> {
  * This helps with browser compatibility issues
  */
 export function createPlayableAudioBlob(originalBlob: Blob): Blob {
+  // For very small blobs, add significant padding
+  if (originalBlob.size < 1000) {
+    console.log('[blob-utils] Creating significantly padded playable blob');
+    // Add 64KB of padding for very small files
+    const padding = new Uint8Array(65536).fill(0);
+    
+    // Try to use WAV format for better browser compatibility
+    if (MediaRecorder.isTypeSupported('audio/wav')) {
+      return new Blob([originalBlob, padding], { type: 'audio/wav' });
+    }
+    
+    return new Blob([originalBlob, padding], { 
+      type: 'audio/webm;codecs=opus' 
+    });
+  }
+  
   // If the original blob is already a playable format, return it
   const playableTypes = [
     'audio/wav',
@@ -144,15 +159,6 @@ export function createPlayableAudioBlob(originalBlob: Blob): Blob {
   // If it's a known playable type, use it
   if (playableTypes.some(type => originalBlob.type.includes(type))) {
     return originalBlob;
-  }
-  
-  // For small blobs, add padding to help playback
-  if (originalBlob.size < 1000) {
-    console.log('[blob-utils] Creating padded playable blob');
-    const padding = new Uint8Array(16384).fill(0);
-    return new Blob([originalBlob, padding], { 
-      type: 'audio/webm;codecs=opus' 
-    });
   }
   
   // For other formats, try converting to WebM

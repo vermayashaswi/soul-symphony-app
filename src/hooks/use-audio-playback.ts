@@ -21,6 +21,8 @@ export function useAudioPlayback({
   const objectUrlRef = useRef<string | null>(null);
   const animationFrameRef = useRef<number | null>(null);
   const playAttemptCountRef = useRef(0);
+  const stableDurationRef = useRef<number>(1); // Start with a minimum of 1 second
+  const audioReadyRef = useRef(false);
 
   // Clean up function to reset all state
   const reset = useCallback(() => {
@@ -42,6 +44,7 @@ export function useAudioPlayback({
     setPlaybackProgress(0);
     setHasError(false);
     playAttemptCountRef.current = 0;
+    audioReadyRef.current = false;
     
     if (animationFrameRef.current) {
       cancelAnimationFrame(animationFrameRef.current);
@@ -61,8 +64,14 @@ export function useAudioPlayback({
       const currentTime = audioRef.current.currentTime;
       const duration = audioRef.current.duration;
       
+      // Use stable duration reference to prevent flickering
+      if (Math.abs(duration - stableDurationRef.current) > 0.5) {
+        stableDurationRef.current = duration;
+        setAudioDuration(duration);
+      }
+      
       // Calculate progress ratio (0 to 1)
-      const progress = Math.min(1, Math.max(0, currentTime / duration));
+      const progress = Math.min(1, Math.max(0, currentTime / stableDurationRef.current));
       setPlaybackProgress(progress);
       
       // Continue updating if still playing
@@ -91,12 +100,12 @@ export function useAudioPlayback({
       }
     } else {
       // Ensure audio element is ready for playback
-      if (!audioRef.current || audioRef.current.readyState < 2) {
+      if (!audioRef.current || audioRef.current.readyState < 2 || !audioReadyRef.current) {
         console.log('[useAudioPlayback] Audio not ready for playback, loading...');
         setIsLoading(true);
         
         // Force reload the audio source
-        prepareAudio().then(() => {
+        prepareAudio(true).then(() => {
           setTimeout(() => attemptPlayback(), 100); // Short delay to ensure audio is prepared
         });
       } else {
@@ -125,6 +134,13 @@ export function useAudioPlayback({
       console.warn('[useAudioPlayback] Could not seek to beginning:', err);
     }
     
+    // Set a minimum default duration to prevent flicker
+    if (audioRef.current.duration <= 0 || isNaN(audioRef.current.duration)) {
+      console.log('[useAudioPlayback] Using default duration of 1 second for empty audio');
+      setAudioDuration(1);
+      stableDurationRef.current = 1;
+    }
+    
     const playPromise = audioRef.current.play();
     if (playPromise !== undefined) {
       playPromise
@@ -145,40 +161,35 @@ export function useAudioPlayback({
           setIsLoading(false);
           setHasError(true);
           
-          // Retry with user interaction for mobile browsers
+          // Retry with different approach for mobile browsers
           if (playAttemptCountRef.current < 3) {
-            console.log('[useAudioPlayback] Retrying with user interaction helper');
-            
-            const handleUserInteraction = () => {
+            console.log('[useAudioPlayback] Trying fallback playback method');
+            setTimeout(() => {
               if (!audioRef.current) return;
               
-              console.log('[useAudioPlayback] User interaction detected, retrying playback');
-              const retry = audioRef.current.play();
-              if (retry !== undefined) {
-                retry
-                  .then(() => {
-                    setIsPlaying(true);
-                    setHasError(false);
-                    if (onPlaybackStart) onPlaybackStart();
-                    animationFrameRef.current = requestAnimationFrame(updateProgress);
-                  })
-                  .catch(e => {
-                    console.error('[useAudioPlayback] Retry failed:', e);
-                    // Last resort - regenerate audio element completely
-                    if (playAttemptCountRef.current === 2) {
-                      console.log('[useAudioPlayback] Final attempt - recreating audio element');
-                      recreateAudioElement();
-                    }
-                  });
-              }
+              // For mobile browsers: recreate the audio element entirely
+              recreateAudioElement();
               
-              // Clean up listeners 
-              document.removeEventListener('touchend', handleUserInteraction);
-              document.removeEventListener('click', handleUserInteraction);
-            };
-            
-            document.addEventListener('touchend', handleUserInteraction, { once: true });
-            document.addEventListener('click', handleUserInteraction, { once: true });
+              setTimeout(() => {
+                if (audioRef.current) {
+                  console.log('[useAudioPlayback] Attempting play after recreation');
+                  audioRef.current.play()
+                    .then(() => {
+                      setIsPlaying(true);
+                      setHasError(false);
+                      
+                      if (onPlaybackStart) onPlaybackStart();
+                      animationFrameRef.current = requestAnimationFrame(updateProgress);
+                    })
+                    .catch(e => {
+                      console.error('[useAudioPlayback] Final playback attempt failed:', e);
+                      setIsPlaying(false);
+                      setIsLoading(false);
+                      setHasError(true);
+                    });
+                }
+              }, 200);
+            }, 200);
           }
         });
     } else {
@@ -208,7 +219,7 @@ export function useAudioPlayback({
     setupAudioListeners();
     
     // Re-prepare the audio
-    prepareAudio().then(() => {
+    prepareAudio(true).then(() => {
       console.log('[useAudioPlayback] Audio element recreated and prepared');
     });
   }, []);
@@ -217,7 +228,8 @@ export function useAudioPlayback({
   const seekTo = useCallback((position: number) => {
     if (!audioRef.current || position < 0 || position > 1) return;
     
-    const newTime = position * (audioRef.current.duration || 0);
+    // Use stable duration to prevent flicker
+    const newTime = position * stableDurationRef.current;
     
     try {
       audioRef.current.currentTime = newTime;
@@ -260,7 +272,13 @@ export function useAudioPlayback({
     // Time update fallback in case requestAnimationFrame doesn't work
     const handleTimeUpdate = () => {
       if (audio && !isNaN(audio.duration) && audio.duration > 0) {
-        const progress = audio.currentTime / audio.duration;
+        // Use stable duration to prevent flicker
+        if (Math.abs(audio.duration - stableDurationRef.current) > 0.5) {
+          stableDurationRef.current = audio.duration;
+          setAudioDuration(audio.duration);
+        }
+        
+        const progress = audio.currentTime / stableDurationRef.current;
         setPlaybackProgress(progress);
       }
     };
@@ -275,28 +293,50 @@ export function useAudioPlayback({
       setIsLoading(false);
     };
     
+    // Ensure we have a duration even if metadata doesn't load
+    const handleCanPlay = () => {
+      console.log(`[useAudioPlayback] Audio can play, duration: ${audio.duration}`);
+      audioReadyRef.current = true;
+      
+      if (isNaN(audio.duration) || audio.duration <= 0) {
+        console.log('[useAudioPlayback] Setting fallback duration');
+        setAudioDuration(1);
+        stableDurationRef.current = 1;
+      } else {
+        stableDurationRef.current = audio.duration;
+        setAudioDuration(audio.duration);
+      }
+      
+      setIsLoading(false);
+    };
+    
     // Attach event listeners
     audio.addEventListener('ended', handleEnded);
     audio.addEventListener('timeupdate', handleTimeUpdate);
     audio.addEventListener('error', handleError);
+    audio.addEventListener('canplay', handleCanPlay);
     
     // Return cleanup function
     return () => {
       audio.removeEventListener('ended', handleEnded);
       audio.removeEventListener('timeupdate', handleTimeUpdate);
       audio.removeEventListener('error', handleError);
+      audio.removeEventListener('canplay', handleCanPlay);
     };
   }, [onPlaybackEnd]);
 
   // Prepare audio for playback
-  const prepareAudio = useCallback(() => {
+  const prepareAudio = useCallback((forceReload = false) => {
     return new Promise<number>((resolve) => {
-      reset();
+      if (forceReload) {
+        reset();
+      }
       
       if (!audioBlob) {
         console.log('[useAudioPlayback] No audio blob provided');
-        setAudioDuration(0);
-        resolve(0);
+        setAudioDuration(1); // Use minimum default duration
+        stableDurationRef.current = 1;
+        resolve(1);
         return;
       }
       
@@ -316,11 +356,11 @@ export function useAudioPlayback({
       
       // For very small blobs, add padding to prevent playback issues
       let blobToUse = audioBlob;
-      if (audioBlob.size < 200) {
-        console.log('[useAudioPlayback] Audio blob is very small, adding padding');
-        const padding = new Uint8Array(8192).fill(0);
+      if (audioBlob.size < 1000) {
+        console.log('[useAudioPlayback] Audio blob is very small, adding significant padding');
+        const padding = new Uint8Array(65536).fill(0); // 64KB padding
         blobToUse = new Blob([audioBlob, padding], { 
-          type: audioBlob.type || 'audio/webm;codecs=opus' 
+          type: audioBlob.type || 'audio/wav' 
         });
       }
       
@@ -334,14 +374,19 @@ export function useAudioPlayback({
       audio.src = '';
       audio.load();
       
-      // Set up event listeners
+      // Set preload attribute for better performance
+      audio.preload = 'auto';
+      
+      // Set up event listeners for loading
       const loadHandler = () => {
         const duration = isNaN(audio.duration) || !isFinite(audio.duration) 
-          ? 0.1 // Fallback duration for empty/invalid audio
+          ? 1 // Fallback duration for empty/invalid audio
           : audio.duration;
         
         console.log(`[useAudioPlayback] Audio loaded: duration=${duration}s, type=${blobToUse.type}`);
         setAudioDuration(duration);
+        stableDurationRef.current = duration;
+        audioReadyRef.current = true;
         setIsLoading(false);
         resolve(duration);
       };
@@ -363,8 +408,10 @@ export function useAudioPlayback({
           audio.src = newUrl;
           audio.load();
         } else {
-          setAudioDuration(0.1); // Set minimal fallback duration
-          resolve(0.1);
+          // Set minimum duration as fallback
+          setAudioDuration(1);
+          stableDurationRef.current = 1;
+          resolve(1);
         }
       };
       
@@ -372,23 +419,24 @@ export function useAudioPlayback({
       audio.addEventListener('loadedmetadata', loadHandler);
       audio.addEventListener('error', errorHandler as EventListener);
       
-      // Set preload attribute for better performance
-      audio.preload = 'auto';
+      // Set src after event listeners are added
       audio.src = objectUrl;
       
       // Safety timeout in case metadata never loads
       const timeout = setTimeout(() => {
         if (isLoading) {
           console.warn('[useAudioPlayback] Audio metadata loading timed out, using fallback');
-          setAudioDuration(0.1); // Set minimal duration
+          setAudioDuration(1); // Set minimal duration
+          stableDurationRef.current = 1;
+          audioReadyRef.current = true;
           setIsLoading(false);
-          resolve(0.1);
+          resolve(1);
           
           // Remove event listeners that won't fire
           audio.removeEventListener('loadedmetadata', loadHandler);
           audio.removeEventListener('error', errorHandler as EventListener);
         }
-      }, 3000);
+      }, 2000);
       
       // Handle cleanup
       return () => {
@@ -423,7 +471,7 @@ export function useAudioPlayback({
   return {
     isPlaying,
     playbackProgress,
-    audioDuration,
+    audioDuration: stableDurationRef.current, // Use stable duration reference
     isLoading,
     hasError,
     togglePlayback,
