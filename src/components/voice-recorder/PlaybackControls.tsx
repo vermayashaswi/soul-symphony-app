@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
@@ -6,7 +7,7 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { clearAllToasts } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useDebugLog } from '@/hooks/use-debug-log';
+import { useDebugLog } from '@/utils/debug/DebugContext';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -36,7 +37,7 @@ export function PlaybackControls({
   const [sliderValue, setSliderValue] = useState(0);
   const [isTouchActive, setIsTouchActive] = useState(false);
   const { isMobile } = useIsMobile();
-  const { addEvent } = useDebugLog ? useDebugLog() : { addEvent: console.log };
+  const { addEvent } = useDebugLog();
   
   useEffect(() => {
     if (!isTouchActive && playbackProgress !== undefined) {
@@ -94,7 +95,9 @@ export function PlaybackControls({
     addEvent('ProcessingFlow', 'Save entry initiated', 'info');
     
     if (!audioBlob || audioBlob.size < 100) {
-      addEvent('ProcessingFlow', 'Invalid audio blob for saving', 'error', { size: audioBlob?.size });
+      addEvent('ProcessingFlow', 'Invalid audio blob for saving', 'error', { 
+        size: audioBlob?.size 
+      });
       return;
     }
     
