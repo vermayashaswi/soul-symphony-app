@@ -15,7 +15,7 @@ import {
 } from './audio/processing-state';
 import { validateInitialState, setupProcessingTimeout } from './audio/recording-validation';
 import { processRecordingInBackground } from './audio/background-processor';
-import { blobToBase64, validateAudioBlob } from './audio/blob-utils';
+import { blobToBase64 } from './audio/blob-utils';
 
 /**
  * Processes an audio recording for transcription and analysis
