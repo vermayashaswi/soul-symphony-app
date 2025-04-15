@@ -11,7 +11,7 @@ interface JournalEntryLoadingSkeletonProps {
 
 export default function JournalEntryLoadingSkeleton({ count = 1 }: JournalEntryLoadingSkeletonProps) {
   return (
-    <div className="space-y-4">
+    <div className="space-y-4 relative z-10">
       {Array.from({ length: count }).map((_, index) => (
         <motion.div
           key={`skeleton-${index}`}
@@ -20,7 +20,7 @@ export default function JournalEntryLoadingSkeleton({ count = 1 }: JournalEntryL
           transition={{ duration: 0.3, delay: index * 0.1 }}
           className="overflow-hidden"
         >
-          <Card className="p-4 bg-card border border-primary/10 shadow-sm">
+          <Card className="p-4 bg-card border-2 border-primary/20 shadow-md relative">
             <div className="flex justify-between items-start mb-4">
               <div>
                 <ShimmerSkeleton className="h-5 w-32 mb-2" />

@@ -2,6 +2,7 @@
 import React from 'react';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
+import { Loader } from 'lucide-react';
 
 export function LoadingEntryContent() {
   return (
@@ -23,7 +24,8 @@ export function LoadingEntryContent() {
       <ShimmerSkeleton className="h-4 w-1/2" />
       
       <div className="flex items-center mt-4 justify-center">
-        <div className="text-xs text-muted-foreground animate-pulse">
+        <div className="flex items-center gap-2 text-xs text-muted-foreground animate-pulse">
+          <Loader className="h-3 w-3 animate-spin" />
           Processing with AI...
         </div>
       </div>

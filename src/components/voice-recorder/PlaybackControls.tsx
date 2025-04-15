@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
@@ -102,6 +103,7 @@ export function PlaybackControls({
     const tempId = 'temp-' + Date.now();
     console.log('[PlaybackControls] Dispatching immediate processing event with tempId:', tempId);
     
+    // Create a processing entry state first
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
       detail: { 
         entries: [tempId], 
@@ -110,6 +112,7 @@ export function PlaybackControls({
       }
     }));
     
+    // Store in localStorage right away for persistence
     try {
       const existingEntries = JSON.parse(localStorage.getItem('processingEntries') || '[]');
       if (!existingEntries.includes(tempId)) {
@@ -120,6 +123,7 @@ export function PlaybackControls({
       console.error('[PlaybackControls] Error updating localStorage:', e);
     }
     
+    // Send another event after a short delay to ensure the UI catches it
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { 
@@ -129,6 +133,17 @@ export function PlaybackControls({
         }
       }));
     }, 50);
+    
+    // And a third time just to be sure
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { 
+          entries: [tempId], 
+          lastUpdate: Date.now(),
+          forceUpdate: true 
+        }
+      }));
+    }, 200);
     
     setTimeout(() => {
       setIsClearingToasts(false);
