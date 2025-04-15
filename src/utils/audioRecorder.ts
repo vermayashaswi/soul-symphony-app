@@ -14,17 +14,17 @@ export const recordAudio = async () => {
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
-      sampleRate: 44100, // Standard sample rate for better compatibility
-      channelCount: 1    // Mono for smaller file size and better compatibility
+      sampleRate: 44100,
+      channelCount: 1
     }
   });
   
-  // Try multiple MIME types in order of preference
+  // Find the first supported MIME type
   const mimeTypes = [
-    'audio/webm;codecs=opus', // Best quality and compression
-    'audio/mp4',              // Good iOS support
-    'audio/ogg;codecs=opus',  // Good quality fallback
-    'audio/wav'               // Universal compatibility 
+    'audio/wav',              // Try WAV first as it's more reliable for duration
+    'audio/webm;codecs=opus', // Second choice
+    'audio/mp4',              
+    'audio/ogg;codecs=opus',  
   ];
   
   // Find the first supported MIME type
@@ -79,69 +79,67 @@ export const recordAudio = async () => {
     }
   });
   
-  // Start recording and immediately request first data chunk
-  mediaRecorder.start(100); // Use 100ms timeslice to get frequent chunks
+  // Start recording immediately with smaller timeslice for mobile
+  // Smaller timeslice ensures we get data quicker and more frequently
+  mediaRecorder.start(100);
   
   // Define the stop method that will return a Promise with the audio URL
   const stop = () => {
     return new Promise<{ audioUrl: string, blob: Blob }>((resolve) => {
       mediaRecorder.addEventListener('stop', () => {
-        // Calculate precise duration
+        // Calculate precise duration in seconds
         const actualDuration = (Date.now() - startTime - totalPausedTime) / 1000;
         console.log(`[audioRecorder] Calculated audio duration: ${actualDuration.toFixed(3)}s`);
         
-        // Create audio blob with proper MIME type ensuring it's a format browsers can play
+        // Create a new blob combining all chunks - use WAV if possible for better duration support
         let mimeTypeToUse = mediaRecorder.mimeType;
         
-        // Ensure MIME type is valid and well-supported
-        if (!mimeTypeToUse || mimeTypeToUse === 'audio/webm;codecs=opus') {
-          // WebM is well-supported in most browsers but sometimes has duration issues
-          // Force to mp3 or wav if WebM was used but had issues
-          if (actualDuration < 0.5 && MediaRecorder.isTypeSupported('audio/wav')) {
-            mimeTypeToUse = 'audio/wav';
-          } else if (MediaRecorder.isTypeSupported('audio/mp3') || MediaRecorder.isTypeSupported('audio/mpeg')) {
-            mimeTypeToUse = MediaRecorder.isTypeSupported('audio/mp3') ? 'audio/mp3' : 'audio/mpeg';
-          }
+        if (MediaRecorder.isTypeSupported('audio/wav')) {
+          mimeTypeToUse = 'audio/wav';
         }
         
         console.log(`[audioRecorder] Creating blob with type: ${mimeTypeToUse}`);
         const audioBlob = new Blob(audioChunks, { type: mimeTypeToUse });
         
-        // Create a new Blob with an explicit duration property
-        const audioUrl = URL.createObjectURL(audioBlob);
+        // Force create a new blob and immediately set duration property
+        const blobWithDuration = new Blob([audioBlob], { type: mimeTypeToUse });
         
-        // Explicitly set the duration on the blob using defineProp since it won't be accessible otherwise
-        Object.defineProperty(audioBlob, 'duration', {
-          value: actualDuration,
+        // Explicitly set the duration on the blob using defineProp
+        // This is the crucial part that needs to work properly
+        Object.defineProperty(blobWithDuration, 'duration', {
+          value: Math.max(0.5, actualDuration), // Ensure minimum duration of 0.5s
           writable: false,
           configurable: true,
-          enumerable: true // Make it enumerable so it shows up in logs
+          enumerable: true
         });
         
-        console.log(`[audioRecorder] Audio blob created: ${audioBlob.size} bytes, type: ${audioBlob.type}, duration: ${(audioBlob as any).duration}s`);
+        // Double check the duration was set
+        const durationSet = (blobWithDuration as any).duration;
+        console.log(`[audioRecorder] Audio blob created: ${blobWithDuration.size} bytes, type: ${blobWithDuration.type}, duration: ${durationSet}s`);
         
-        // Verify the duration was set correctly
-        if ((audioBlob as any).duration !== actualDuration) {
-          console.warn('[audioRecorder] Duration property was not set correctly on the blob');
-        }
-        
-        // Release microphone
-        stream.getTracks().forEach(track => track.stop());
-        
-        // Check if duration was properly set before resolving
-        if ((audioBlob as any).duration === undefined || (audioBlob as any).duration === null) {
-          console.warn('[audioRecorder] Duration was not set on blob, attempting to set it again');
-          // Try once more with different approach
-          const blobWithDuration = new Blob([audioBlob], { type: audioBlob.type });
-          Object.defineProperty(blobWithDuration, 'duration', {
-            value: actualDuration,
-            writable: false,
-            configurable: true,
-            enumerable: true
-          });
-          resolve({ audioUrl, blob: blobWithDuration });
+        if (durationSet === undefined || durationSet < 0.1) {
+          console.warn('[audioRecorder] Failed to set duration directly, trying another approach');
+          
+          // Alternative approach
+          const finalBlob = new Blob([blobWithDuration], { type: mimeTypeToUse });
+          // Set duration using a different approach
+          (finalBlob as any).duration = Math.max(0.5, actualDuration);
+          
+          console.log(`[audioRecorder] Second attempt to set duration: ${(finalBlob as any).duration}s`);
+          const audioUrl = URL.createObjectURL(finalBlob);
+          
+          // Release microphone
+          stream.getTracks().forEach(track => track.stop());
+          
+          resolve({ audioUrl, blob: finalBlob });
         } else {
-          resolve({ audioUrl, blob: audioBlob });
+          // Success case
+          const audioUrl = URL.createObjectURL(blobWithDuration);
+          
+          // Release microphone
+          stream.getTracks().forEach(track => track.stop());
+          
+          resolve({ audioUrl, blob: blobWithDuration });
         }
       });
       

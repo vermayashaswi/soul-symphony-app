@@ -98,8 +98,9 @@ export function useVoiceRecorder({
     setStatus("stopping");
     console.log('Stopping audio recording');
     
-    // Store final recording duration in seconds
+    // Store final recording duration in seconds - this is critical
     const finalRecordingDuration = recordingDurationRef.current / 1000;
+    console.log(`Final recording UI duration: ${finalRecordingDuration} seconds`);
     
     try {
       recorderInstance.stop()
@@ -110,21 +111,24 @@ export function useVoiceRecorder({
           const existingDuration = (blob as any).duration;
           console.log(`Blob received with duration: ${existingDuration !== undefined ? existingDuration : 'not set'}`);
           
-          // If duration is missing or invalid (less than 0.1s), set it explicitly
-          if (existingDuration === undefined || existingDuration === null || existingDuration < 0.1) {
-            console.log(`Setting blob duration explicitly to ${finalRecordingDuration}s`);
-            Object.defineProperty(blob, 'duration', {
-              value: finalRecordingDuration,
-              writable: false,
-              configurable: true,
-              enumerable: true
-            });
-          }
+          // Always override the duration property to ensure it's correct
+          let blobToUse = blob;
           
-          // Verify duration is now set
-          console.log(`Final blob duration: ${(blob as any).duration}s`);
+          // Create a new blob to ensure the duration property sticks
+          const newBlob = new Blob([blob], { type: blob.type });
+          Object.defineProperty(newBlob, 'duration', {
+            value: Math.max(0.5, finalRecordingDuration),
+            writable: false,
+            configurable: true,
+            enumerable: true
+          });
           
-          setRecordingBlob(blob);
+          // Verify duration is set correctly
+          const newDuration = (newBlob as any).duration;
+          console.log(`Final blob duration after explicit setting: ${newDuration}s`);
+          blobToUse = newBlob;
+          
+          setRecordingBlob(blobToUse);
           
           if (mediaStream) {
             mediaStream.getTracks().forEach((track) => track.stop());
@@ -139,30 +143,50 @@ export function useVoiceRecorder({
           setStatus("idle");
           
           // Even if blob is small, try to process it
-          if (blob) {
+          if (blobToUse) {
             const tempId = generateTempId();
             
             // Verify duration before passing to callback
-            const blobDuration = (blob as any).duration;
-            console.log(`Processing audio blob: ${formatBytes(blob.size)}, UI duration: ${formatTime(elapsedTime)}, blob.duration: ${blobDuration}s`);
+            const blobDuration = (blobToUse as any).duration;
+            console.log(`Processing audio blob: ${formatBytes(blobToUse.size)}, UI duration: ${formatTime(elapsedTime)}, blob.duration: ${blobDuration}s`);
             
-            // Final check and explicit duration override if needed
+            // Make one final check to ensure duration meets minimum requirement
             if (blobDuration === undefined || blobDuration < 0.1) {
               console.warn(`Audio duration missing or too short (${blobDuration}s), enforcing minimum duration`);
               
-              // Create a new blob with the duration properly set
-              const newBlob = new Blob([blob], { type: blob.type });
-              Object.defineProperty(newBlob, 'duration', {
-                value: Math.max(0.5, finalRecordingDuration),
-                writable: false,
-                configurable: true,
-                enumerable: true
-              });
+              // One last attempt with a completely new blob
+              const finalBlob = new Blob([blobToUse], { type: blobToUse.type });
+              // Use a different technique for setting the duration
+              (finalBlob as any).duration = Math.max(0.5, finalRecordingDuration);
+              console.log(`Created final blob with forced duration: ${(finalBlob as any).duration}s`);
               
-              console.log(`Created new blob with enforced duration: ${(newBlob as any).duration}s`);
-              onRecordingComplete(newBlob, tempId);
+              // Double check one last time
+              if ((finalBlob as any).duration >= 0.5) {
+                onRecordingComplete(finalBlob, tempId);
+              } else {
+                // Last resort - add duration in a way that's hard to ignore
+                const lastResortBlob = new Blob([blobToUse], { type: blobToUse.type });
+                Object.defineProperties(lastResortBlob, {
+                  'duration': {
+                    value: Math.max(0.5, finalRecordingDuration),
+                    enumerable: true,
+                    configurable: false,
+                    writable: false
+                  },
+                  '_duration': {
+                    value: Math.max(0.5, finalRecordingDuration),
+                    enumerable: true
+                  },
+                  'recordingDuration': {
+                    value: Math.max(0.5, finalRecordingDuration), 
+                    enumerable: true
+                  }
+                });
+                console.log(`LAST RESORT: Created blob with multiple duration properties: ${(lastResortBlob as any).duration}s`);
+                onRecordingComplete(lastResortBlob, tempId);
+              }
             } else {
-              onRecordingComplete(blob, tempId);
+              onRecordingComplete(blobToUse, tempId);
             }
           } else {
             console.error("Recording failed: no blob");

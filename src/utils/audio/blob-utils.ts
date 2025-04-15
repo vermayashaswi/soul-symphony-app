@@ -48,11 +48,9 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
   // Check for duration property
   const blobDuration = (audioBlob as any).duration;
   if (blobDuration === undefined || blobDuration === null) {
-    console.warn('[blob-utils] Audio blob has no duration property');
-    // Still consider it valid, we'll set duration later
+    console.warn('[blob-utils] Audio blob has no duration property - will be fixed in normalization');
   } else if (blobDuration < 0.1) {
-    console.warn('[blob-utils] Audio blob has very short duration:', blobDuration);
-    // Still consider it valid, we'll enforce minimum duration later
+    console.warn('[blob-utils] Audio blob has very short duration:', blobDuration, '- will be fixed in normalization');
   } else {
     console.log(`[blob-utils] Audio blob has valid duration: ${blobDuration}s`);
   }
@@ -74,9 +72,22 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
   
   // If no duration is set or it's too small, try to estimate a reasonable one
   let effectiveDuration = originalDuration;
-  if (effectiveDuration === undefined || effectiveDuration === null || effectiveDuration < 0.1) {
+  if (effectiveDuration === undefined || effectiveDuration === null || effectiveDuration < 0.5) {
     // Estimate based on audio size (rough approximation)
-    const estimatedDuration = Math.max(0.5, audioBlob.size / 16000);
+    // For WAV files, approximately 172KB per second for 44.1kHz, 16-bit stereo
+    // For compressed formats, use a different estimation
+    let estimatedDuration: number;
+    
+    if (audioBlob.type.includes('wav')) {
+      estimatedDuration = Math.max(0.5, audioBlob.size / 172000);
+    } else if (audioBlob.type.includes('webm') || audioBlob.type.includes('ogg')) {
+      // WebM/Opus and Ogg have much better compression - roughly 16KB per second
+      estimatedDuration = Math.max(0.5, audioBlob.size / 16000);
+    } else {
+      // For MP3 and other formats - roughly 32KB per second at 128kbps
+      estimatedDuration = Math.max(0.5, audioBlob.size / 32000);
+    }
+    
     console.log(`[blob-utils] Estimated duration from size: ${estimatedDuration.toFixed(2)}s`);
     effectiveDuration = estimatedDuration;
   }
@@ -84,10 +95,10 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
   // If the blob is very small, add significant padding
   let resultBlob: Blob;
   
-  if (audioBlob.size < 1000) {
+  if (audioBlob.size < 5000) {
     console.log('[blob-utils] Adding padding to small audio blob');
-    // Create a larger padding for very small files (128KB)
-    const padding = new Uint8Array(131072).fill(0);
+    // Create a larger padding for very small files (256KB)
+    const padding = new Uint8Array(262144).fill(0);
     resultBlob = new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
     console.log('[blob-utils] After padding:', resultBlob.size, 'bytes, type:', resultBlob.type);
   } else if (!audioBlob.type.includes('audio/')) {
@@ -95,25 +106,51 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
     resultBlob = new Blob([audioBlob], { type: getProperMimeType(audioBlob) });
     console.log('[blob-utils] Fixed MIME type:', resultBlob.type);
   } else {
-    resultBlob = audioBlob;
+    resultBlob = new Blob([audioBlob], { type: audioBlob.type });
   }
   
-  // Ensure duration is explicitly set on the result blob
-  Object.defineProperty(resultBlob, 'duration', {
+  // ALWAYS ensure duration is explicitly set on the result blob
+  // Create a new blob to ensure the duration property sticks
+  const finalBlob = new Blob([resultBlob], { type: resultBlob.type });
+  
+  // Try multiple approaches to set the duration property
+  
+  // Method 1: defineProperty
+  Object.defineProperty(finalBlob, 'duration', {
     value: effectiveDuration,
     writable: false,
     configurable: true,
     enumerable: true
   });
   
-  console.log(`[blob-utils] Final normalized blob: ${resultBlob.size} bytes, type: ${resultBlob.type}, duration: ${(resultBlob as any).duration}s`);
-  return resultBlob;
+  // Method 2: Direct assignment (as backup)
+  (finalBlob as any).duration = effectiveDuration;
+  
+  // Method 3: Add additional properties that might be checked
+  (finalBlob as any)._duration = effectiveDuration;
+  (finalBlob as any).recordingDuration = effectiveDuration;
+  
+  // Verify the duration was set
+  const finalDuration = (finalBlob as any).duration;
+  console.log(`[blob-utils] Final normalized blob: ${finalBlob.size} bytes, type: ${finalBlob.type}, duration: ${finalDuration}s`);
+  
+  if (finalDuration === undefined || finalDuration < 0.1) {
+    console.warn('[blob-utils] Warning: Duration still not properly set on normalized blob!');
+  }
+  
+  return finalBlob;
 }
 
 /**
  * Determines the proper MIME type for an audio blob based on size and content
  */
 export function getProperMimeType(blob: Blob): string {
+  // WAV is much more reliable for duration detection
+  if (MediaRecorder.isTypeSupported('audio/wav')) {
+    console.log('[blob-utils] Using WAV format for better duration support');
+    return 'audio/wav';
+  }
+  
   // If the blob already has an audio MIME type, use it
   if (blob.type.includes('audio/')) {
     // If it's webm but doesn't specify codec, add it
@@ -128,12 +165,17 @@ export function getProperMimeType(blob: Blob): string {
   
   // Check for browser support
   if (typeof MediaRecorder !== 'undefined') {
-    // Use a broad compatibility approach - try mp3 first as it's widely supported
+    // First try WAV as it has better duration support
+    if (MediaRecorder.isTypeSupported('audio/wav')) {
+      console.log('[blob-utils] Using WAV format for better duration support');
+      return 'audio/wav';
+    }
+    
+    // Then try other formats
     const types = [
+      'audio/webm;codecs=opus',
       'audio/mpeg',
       'audio/mp3',
-      'audio/wav',
-      'audio/webm;codecs=opus',
       'audio/webm',
       'audio/mp4',
       'audio/ogg;codecs=opus'
@@ -147,9 +189,9 @@ export function getProperMimeType(blob: Blob): string {
     }
   }
   
-  // Final fallback to mp3 which is widely supported for playback
-  console.log('[blob-utils] Using fallback MIME type: audio/mpeg');
-  return 'audio/mpeg';
+  // Final fallback to wav which has better metadata support
+  console.log('[blob-utils] Using fallback MIME type: audio/wav');
+  return 'audio/wav';
 }
 
 /**

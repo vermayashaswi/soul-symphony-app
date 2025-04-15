@@ -22,6 +22,7 @@ export function RecordingStatus({ isRecording, recordingTime, isProcessing = fal
       animate={{ opacity: 1, y: 0 }}
       exit={{ opacity: 0, y: -10 }}
       className="flex items-center gap-2 mt-4"
+      data-testid="recording-status"
     >
       <motion.div 
         className="w-4 h-4 rounded-full bg-red-500"
@@ -36,6 +37,7 @@ export function RecordingStatus({ isRecording, recordingTime, isProcessing = fal
         }}
       />
       <span className="text-xl font-medium">{displayTime}</span>
+      {isProcessing && <span className="text-sm text-gray-500 ml-2">(Processing...)</span>}
     </motion.div>
   );
 }
