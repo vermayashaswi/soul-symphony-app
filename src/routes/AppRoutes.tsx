@@ -11,7 +11,6 @@ import ProtectedRoute from './ProtectedRoute';
 import MobileNavigation from './MobileNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import LandingPage from '@/pages/landing/LandingPage';
 import HomePage from '@/pages/website/HomePage';
 import { isAppSubdomain } from './RouteHelpers';
 
