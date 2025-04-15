@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
 import Journal from '@/pages/Journal';
@@ -11,7 +10,7 @@ import ProtectedRoute from './ProtectedRoute';
 import MobileNavigation from './MobileNavigation';
 import { useAuth } from '@/contexts/AuthContext';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import LandingPage from '@/pages/landing/LandingPage';
+import HomePage from '@/pages/website/HomePage';
 
 const AppRoutes = () => {
   const { user } = useAuth();
@@ -38,9 +37,9 @@ const AppRoutes = () => {
           <Route path="/app/onboarding" element={<OnboardingScreen />} />
         )}
         
-        {/* Website routes */}
+        {/* Website routes - use the modern HomePage */}
         {!isAppSubdomain && (
-          <Route path="/" element={<LandingPage />} />
+          <Route path="/" element={<HomePage />} />
         )}
         
         {/* App routes with domain-specific paths */}
