@@ -19,10 +19,10 @@ export const recordAudio = async () => {
     }
   });
   
-  // Find the first supported MIME type
+  // Find the first supported MIME type - prioritize WAV format
   const mimeTypes = [
-    'audio/wav',              // Try WAV first as it's more reliable for duration
-    'audio/webm;codecs=opus', // Second choice
+    'audio/wav',              // WAV format is most reliable for duration
+    'audio/webm;codecs=opus', 
     'audio/mp4',              
     'audio/ogg;codecs=opus',  
   ];
@@ -40,7 +40,7 @@ export const recordAudio = async () => {
   
   // Set up MediaRecorder with best supported options
   const options: MediaRecorderOptions = {
-    audioBitsPerSecond: 128000 // Consistent bitrate for better compatibility
+    audioBitsPerSecond: 128000 
   };
   
   // Only add mime type if we found a supported one
@@ -71,6 +71,7 @@ export const recordAudio = async () => {
   let startTime = Date.now();
   let pauseTime = 0;
   let totalPausedTime = 0;
+  let isRecording = true; // Track recording state
   
   // Add data to chunks when available
   mediaRecorder.addEventListener('dataavailable', (event) => {
@@ -80,20 +81,39 @@ export const recordAudio = async () => {
   });
   
   // Start recording immediately with smaller timeslice for mobile
-  // Smaller timeslice ensures we get data quicker and more frequently
   mediaRecorder.start(100);
   
   // Define the stop method that will return a Promise with the audio URL
   const stop = () => {
     return new Promise<{ audioUrl: string, blob: Blob }>((resolve) => {
+      if (!isRecording) {
+        console.warn('[audioRecorder] Stop called but recorder is not in recording state');
+        // If already stopped, create an empty blob to prevent hanging
+        const emptyBlob = new Blob([], { type: mediaRecorder.mimeType });
+        resolve({ audioUrl: URL.createObjectURL(emptyBlob), blob: emptyBlob });
+        return;
+      }
+      
+      isRecording = false; // Mark as not recording immediately
+      
+      // Create a safety timeout to ensure we don't hang if stop event doesn't fire
+      const stopTimeout = setTimeout(() => {
+        console.warn('[audioRecorder] Stop event timed out, forcing cleanup');
+        // Force cleanup and resolve with what we have
+        const finalBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+        stream.getTracks().forEach(track => track.stop());
+        resolve({ audioUrl: URL.createObjectURL(finalBlob), blob: finalBlob });
+      }, 3000);
+      
       mediaRecorder.addEventListener('stop', () => {
+        clearTimeout(stopTimeout);
+        
         // Calculate precise duration in seconds
         const actualDuration = (Date.now() - startTime - totalPausedTime) / 1000;
         console.log(`[audioRecorder] Calculated audio duration: ${actualDuration.toFixed(3)}s`);
         
-        // Create a new blob combining all chunks - use WAV if possible for better duration support
+        // Use WAV if possible for better duration support
         let mimeTypeToUse = mediaRecorder.mimeType;
-        
         if (MediaRecorder.isTypeSupported('audio/wav')) {
           mimeTypeToUse = 'audio/wav';
         }
@@ -101,15 +121,23 @@ export const recordAudio = async () => {
         console.log(`[audioRecorder] Creating blob with type: ${mimeTypeToUse}`);
         const audioBlob = new Blob(audioChunks, { type: mimeTypeToUse });
         
-        // Force create a new blob and immediately set duration property
+        // Force create a new blob and set duration property
         const blobWithDuration = new Blob([audioBlob], { type: mimeTypeToUse });
         
-        // Explicitly set the duration on the blob using defineProp
-        // This is the crucial part that needs to work properly
+        // Set the duration in multiple ways to ensure it sticks
+        // First as a direct property
         Object.defineProperty(blobWithDuration, 'duration', {
-          value: Math.max(0.5, actualDuration), // Ensure minimum duration of 0.5s
+          value: Math.max(0.5, actualDuration),
           writable: false,
           configurable: true,
+          enumerable: true
+        });
+        
+        // Also as a data attribute
+        Object.defineProperty(blobWithDuration, '_audioDuration', {
+          value: Math.max(0.5, actualDuration),
+          writable: false,
+          configurable: true, 
           enumerable: true
         });
         
@@ -117,34 +145,37 @@ export const recordAudio = async () => {
         const durationSet = (blobWithDuration as any).duration;
         console.log(`[audioRecorder] Audio blob created: ${blobWithDuration.size} bytes, type: ${blobWithDuration.type}, duration: ${durationSet}s`);
         
-        if (durationSet === undefined || durationSet < 0.1) {
-          console.warn('[audioRecorder] Failed to set duration directly, trying another approach');
-          
-          // Alternative approach
-          const finalBlob = new Blob([blobWithDuration], { type: mimeTypeToUse });
-          // Set duration using a different approach
-          (finalBlob as any).duration = Math.max(0.5, actualDuration);
-          
-          console.log(`[audioRecorder] Second attempt to set duration: ${(finalBlob as any).duration}s`);
-          const audioUrl = URL.createObjectURL(finalBlob);
-          
-          // Release microphone
-          stream.getTracks().forEach(track => track.stop());
-          
-          resolve({ audioUrl, blob: finalBlob });
-        } else {
-          // Success case
-          const audioUrl = URL.createObjectURL(blobWithDuration);
-          
-          // Release microphone
-          stream.getTracks().forEach(track => track.stop());
-          
-          resolve({ audioUrl, blob: blobWithDuration });
-        }
+        // Create the audio URL
+        const audioUrl = URL.createObjectURL(blobWithDuration);
+        
+        // Ensure all tracks are properly stopped
+        stream.getTracks().forEach(track => {
+          if (track.readyState === 'live') {
+            console.log(`[audioRecorder] Stopping track: ${track.kind}`);
+            track.stop();
+          }
+        });
+        
+        resolve({ audioUrl, blob: blobWithDuration });
       });
       
-      if (mediaRecorder.state === 'recording') {
-        mediaRecorder.stop();
+      if (mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused') {
+        console.log('[audioRecorder] Stopping MediaRecorder');
+        try {
+          mediaRecorder.stop();
+        } catch (e) {
+          console.error('[audioRecorder] Error stopping MediaRecorder', e);
+          // Force cleanup in case of error
+          stream.getTracks().forEach(track => track.stop());
+          const finalBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+          resolve({ audioUrl: URL.createObjectURL(finalBlob), blob: finalBlob });
+        }
+      } else {
+        console.warn(`[audioRecorder] MediaRecorder in unexpected state: ${mediaRecorder.state}`);
+        // Force cleanup in case of unexpected state
+        stream.getTracks().forEach(track => track.stop());
+        const finalBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType });
+        resolve({ audioUrl: URL.createObjectURL(finalBlob), blob: finalBlob });
       }
     });
   };
@@ -152,14 +183,14 @@ export const recordAudio = async () => {
   // Return an object with methods to control the recorder
   return {
     start: () => {
-      if (mediaRecorder.state !== 'recording') {
+      if (mediaRecorder.state !== 'recording' && isRecording) {
         startTime = Date.now() - totalPausedTime; // Adjust start time if there were pauses
         mediaRecorder.start(100);
       }
     },
     stop,
     pause: () => {
-      if (mediaRecorder.state === 'recording') {
+      if (mediaRecorder.state === 'recording' && isRecording) {
         pauseTime = Date.now();
         mediaRecorder.pause();
         return true;
@@ -167,7 +198,7 @@ export const recordAudio = async () => {
       return false;
     },
     resume: () => {
-      if (mediaRecorder.state === 'paused') {
+      if (mediaRecorder.state === 'paused' && isRecording) {
         totalPausedTime += (Date.now() - pauseTime);
         mediaRecorder.resume();
         return true;
@@ -175,6 +206,17 @@ export const recordAudio = async () => {
       return false;
     },
     stream,
-    getState: () => mediaRecorder.state
+    getState: () => mediaRecorder.state,
+    forceStop: () => {
+      isRecording = false;
+      if (mediaRecorder.state === 'recording' || mediaRecorder.state === 'paused') {
+        try {
+          mediaRecorder.stop();
+        } catch (e) {
+          console.warn('[audioRecorder] Error in forceStop', e);
+        }
+      }
+      stream.getTracks().forEach(track => track.stop());
+    }
   };
 };

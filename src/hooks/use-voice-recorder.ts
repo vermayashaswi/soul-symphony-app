@@ -21,9 +21,48 @@ export function useVoiceRecorder({
   const [elapsedTime, setElapsedTime] = useState<number>(0);
   const timerInterval = useRef<ReturnType<typeof setInterval> | null>(null);
   const recordingDurationRef = useRef<number>(0);
+  const isMounted = useRef<boolean>(true);
+  const stopTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Cleanup function
+  const cleanupResources = useCallback(() => {
+    if (timerInterval.current) {
+      clearInterval(timerInterval.current);
+      timerInterval.current = null;
+    }
+
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+      stopTimeoutRef.current = null;
+    }
+    
+    if (mediaStream) {
+      mediaStream.getTracks().forEach((track) => {
+        if (track.readyState === 'live') {
+          console.log(`[useVoiceRecorder] Stopping track: ${track.kind}`);
+          track.stop();
+        }
+      });
+      setMediaStream(null);
+    }
+    
+    if (recorderInstance) {
+      try {
+        if (recorderInstance.forceStop) {
+          recorderInstance.forceStop();
+        }
+      } catch (e) {
+        console.error('[useVoiceRecorder] Error cleaning up recorder:', e);
+      }
+      setRecorderInstance(null);
+    }
+  }, [mediaStream, recorderInstance]);
 
   const startRecording = useCallback(async () => {
     try {
+      // Ensure we're clean before starting
+      cleanupResources();
+      
       // Dispatch operation start event for debugging
       const event = new CustomEvent('journalOperationStart', {
         detail: {
@@ -34,10 +73,17 @@ export function useVoiceRecorder({
       const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
       
       setStatus("acquiring_media");
-      console.log('Starting audio recording - acquiring media');
+      console.log('[useVoiceRecorder] Starting audio recording - acquiring media');
       
       // Use our custom recorder instead of RecordRTC
       const recorder = await recordAudio();
+      
+      if (!isMounted.current) {
+        console.log('[useVoiceRecorder] Component unmounted during media acquisition');
+        recorder.forceStop();
+        return;
+      }
+      
       setRecorderInstance(recorder);
       setMediaStream(recorder.stream);
       
@@ -45,10 +91,19 @@ export function useVoiceRecorder({
       const now = Date.now();
       setStartTime(now);
       setStatus("recording");
-      console.log('Audio recording started successfully at', now);
+      console.log('[useVoiceRecorder] Audio recording started successfully at', new Date(now).toISOString());
       
       // Update timer at regular intervals
+      if (timerInterval.current) {
+        clearInterval(timerInterval.current);
+      }
+      
       timerInterval.current = setInterval(() => {
+        if (!isMounted.current) {
+          clearInterval(timerInterval.current!);
+          return;
+        }
+        
         const newElapsedTime = Date.now() - startTime;
         setElapsedTime(newElapsedTime);
         // Store in ref for access during stopRecording
@@ -64,7 +119,7 @@ export function useVoiceRecorder({
         }));
       }
     } catch (err) {
-      console.error("Error starting recording:", err);
+      console.error("[useVoiceRecorder] Error starting recording:", err);
       setStatus("idle");
       if (onError) onError(err);
       
@@ -78,11 +133,11 @@ export function useVoiceRecorder({
         }
       }));
     }
-  }, []);
+  }, [cleanupResources, onError]);
 
   const stopRecording = useCallback(() => {
     if (!recorderInstance) {
-      console.error('No recorder instance to stop');
+      console.error('[useVoiceRecorder] No recorder instance to stop');
       return;
     }
     
@@ -96,105 +151,92 @@ export function useVoiceRecorder({
     const opId = window.dispatchEvent(event) ? (event as any).detail?.id : null;
 
     setStatus("stopping");
-    console.log('Stopping audio recording');
+    console.log('[useVoiceRecorder] Stopping audio recording');
     
     // Store final recording duration in seconds - this is critical
     const finalRecordingDuration = recordingDurationRef.current / 1000;
-    console.log(`Final recording UI duration: ${finalRecordingDuration} seconds`);
+    console.log(`[useVoiceRecorder] Final recording UI duration: ${finalRecordingDuration} seconds`);
+    
+    // Set a timeout to prevent hanging if something goes wrong
+    if (stopTimeoutRef.current) {
+      clearTimeout(stopTimeoutRef.current);
+    }
+    
+    stopTimeoutRef.current = setTimeout(() => {
+      console.warn('[useVoiceRecorder] Stop timeout triggered - forcing cleanup');
+      cleanupResources();
+      setStatus("idle");
+    }, 5000);
     
     try {
       recorderInstance.stop()
         .then(({ blob }: { blob: Blob }) => {
-          console.log(`Recording stopped, blob size: ${blob.size}, type: ${blob.type}`);
+          if (stopTimeoutRef.current) {
+            clearTimeout(stopTimeoutRef.current);
+            stopTimeoutRef.current = null;
+          }
+          
+          if (!isMounted.current) {
+            console.log('[useVoiceRecorder] Component unmounted during stop');
+            return;
+          }
+          
+          console.log(`[useVoiceRecorder] Recording stopped, blob size: ${blob.size}, type: ${blob.type}`);
           
           // Check for existing duration property
           const existingDuration = (blob as any).duration;
-          console.log(`Blob received with duration: ${existingDuration !== undefined ? existingDuration : 'not set'}`);
+          console.log(`[useVoiceRecorder] Blob received with duration: ${existingDuration !== undefined ? existingDuration : 'not set'}`);
           
-          // Always override the duration property to ensure it's correct
-          let blobToUse = blob;
+          // Always create a new blob to ensure the duration property sticks
+          let blobToUse: Blob;
           
-          // Create a new blob to ensure the duration property sticks
-          const newBlob = new Blob([blob], { type: blob.type });
-          Object.defineProperty(newBlob, 'duration', {
-            value: Math.max(0.5, finalRecordingDuration),
-            writable: false,
-            configurable: true,
-            enumerable: true
-          });
+          if (!existingDuration || existingDuration < 0.1) {
+            console.log('[useVoiceRecorder] Setting missing duration property');
+            
+            // Create a new blob to ensure the duration property sticks
+            const newBlob = new Blob([blob], { type: blob.type });
+            Object.defineProperty(newBlob, 'duration', {
+              value: Math.max(0.5, finalRecordingDuration),
+              writable: false,
+              configurable: true,
+              enumerable: true
+            });
+            
+            // Also set with a different name to make sure at least one works
+            Object.defineProperty(newBlob, '_audioDuration', {
+              value: Math.max(0.5, finalRecordingDuration),
+              writable: false,
+              configurable: true,
+              enumerable: true
+            });
+            
+            blobToUse = newBlob;
+          } else {
+            blobToUse = blob;
+          }
           
           // Verify duration is set correctly
-          const newDuration = (newBlob as any).duration;
-          console.log(`Final blob duration after explicit setting: ${newDuration}s`);
-          blobToUse = newBlob;
+          const newDuration = (blobToUse as any).duration;
+          console.log(`[useVoiceRecorder] Final blob duration after explicit setting: ${newDuration}s`);
           
           setRecordingBlob(blobToUse);
           
-          if (mediaStream) {
-            mediaStream.getTracks().forEach((track) => track.stop());
-            setMediaStream(null);
-          }
-          
-          if (timerInterval.current) {
-            clearInterval(timerInterval.current);
-            timerInterval.current = null;
-          }
-          
+          cleanupResources();
           setStatus("idle");
           
-          // Even if blob is small, try to process it
-          if (blobToUse) {
-            const tempId = generateTempId();
-            
-            // Verify duration before passing to callback
-            const blobDuration = (blobToUse as any).duration;
-            console.log(`Processing audio blob: ${formatBytes(blobToUse.size)}, UI duration: ${formatTime(elapsedTime)}, blob.duration: ${blobDuration}s`);
-            
-            // Make one final check to ensure duration meets minimum requirement
-            if (blobDuration === undefined || blobDuration < 0.1) {
-              console.warn(`Audio duration missing or too short (${blobDuration}s), enforcing minimum duration`);
-              
-              // One last attempt with a completely new blob
-              const finalBlob = new Blob([blobToUse], { type: blobToUse.type });
-              // Use a different technique for setting the duration
-              (finalBlob as any).duration = Math.max(0.5, finalRecordingDuration);
-              console.log(`Created final blob with forced duration: ${(finalBlob as any).duration}s`);
-              
-              // Double check one last time
-              if ((finalBlob as any).duration >= 0.5) {
-                onRecordingComplete(finalBlob, tempId);
-              } else {
-                // Last resort - add duration in a way that's hard to ignore
-                const lastResortBlob = new Blob([blobToUse], { type: blobToUse.type });
-                Object.defineProperties(lastResortBlob, {
-                  'duration': {
-                    value: Math.max(0.5, finalRecordingDuration),
-                    enumerable: true,
-                    configurable: false,
-                    writable: false
-                  },
-                  '_duration': {
-                    value: Math.max(0.5, finalRecordingDuration),
-                    enumerable: true
-                  },
-                  'recordingDuration': {
-                    value: Math.max(0.5, finalRecordingDuration), 
-                    enumerable: true
-                  }
-                });
-                console.log(`LAST RESORT: Created blob with multiple duration properties: ${(lastResortBlob as any).duration}s`);
-                onRecordingComplete(lastResortBlob, tempId);
-              }
-            } else {
-              onRecordingComplete(blobToUse, tempId);
-            }
-          } else {
-            console.error("Recording failed: no blob");
-            if (onError) onError(new Error("Recording failed: no blob"));
-          }
+          // Generate a temporary ID
+          const tempId = generateTempId();
+          
+          // Verify duration before passing to callback
+          const blobDuration = (blobToUse as any).duration;
+          console.log(`[useVoiceRecorder] Processing audio blob: ${formatBytes(blobToUse.size)}, UI duration: ${formatTime(elapsedTime)}, blob.duration: ${blobDuration}s`);
+          
+          // Call the completion callback
+          onRecordingComplete(blobToUse, tempId);
         })
         .catch((err: any) => {
-          console.error("Error stopping recording:", err);
+          console.error("[useVoiceRecorder] Error stopping recording:", err);
+          cleanupResources();
           setStatus("idle");
           
           if (opId) {
@@ -211,7 +253,8 @@ export function useVoiceRecorder({
           if (onError) onError(err);
         });
     } catch (err) {
-      console.error("Error in stop recording process:", err);
+      console.error("[useVoiceRecorder] Error in stop recording process:", err);
+      cleanupResources();
       setStatus("idle");
       
       if (opId) {
@@ -227,7 +270,7 @@ export function useVoiceRecorder({
       
       if (onError) onError(err);
     }
-  }, [recorderInstance, mediaStream, elapsedTime, onRecordingComplete, onError]);
+  }, [recorderInstance, elapsedTime, onRecordingComplete, onError, cleanupResources]);
 
   const clearRecording = () => {
     setRecordingBlob(null);
@@ -237,26 +280,13 @@ export function useVoiceRecorder({
 
   // Clean up on unmount
   useEffect(() => {
+    isMounted.current = true;
+    
     return () => {
-      if (timerInterval.current) {
-        clearInterval(timerInterval.current);
-      }
-      
-      if (mediaStream) {
-        mediaStream.getTracks().forEach(track => track.stop());
-      }
-      
-      if (recorderInstance) {
-        try {
-          if (recorderInstance.getState() === 'recording') {
-            recorderInstance.stop();
-          }
-        } catch (e) {
-          console.error('Error cleaning up recorder:', e);
-        }
-      }
+      isMounted.current = false;
+      cleanupResources();
     };
-  }, [mediaStream, recorderInstance]);
+  }, [cleanupResources]);
 
   return {
     status,

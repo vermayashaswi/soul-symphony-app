@@ -27,11 +27,11 @@ export function RecordingStatus({ isRecording, recordingTime, isProcessing = fal
       <motion.div 
         className="w-4 h-4 rounded-full bg-red-500"
         animate={{ 
-          opacity: [1, 0.4, 1],
-          scale: [1, 1.1, 1]
+          opacity: isRecording ? [1, 0.4, 1] : 1,
+          scale: isRecording ? [1, 1.1, 1] : 1
         }}
         transition={{ 
-          repeat: Infinity, 
+          repeat: isRecording ? Infinity : 0, 
           duration: 1.2,
           ease: "easeInOut"
         }}
