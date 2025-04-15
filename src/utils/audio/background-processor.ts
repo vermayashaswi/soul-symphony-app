@@ -23,6 +23,11 @@ export async function processRecordingInBackground(
       throw new Error('No audio data to process');
     }
     
+    // Ensure the audioBlob has a duration property
+    if (!('duration' in audioBlob) || (audioBlob as any).duration <= 0) {
+      console.warn('[BackgroundProcessor] Audio blob missing duration property, using default');
+    }
+    
     // Log the audio details
     console.log('[BackgroundProcessor] Audio blob details:', {
       size: audioBlob.size,

@@ -43,6 +43,13 @@ export function PlaybackControls({
       const timeInSeconds = (playbackProgress * audioDuration);
       setCurrentTime(timeInSeconds);
       setSliderValue(playbackProgress * 100);
+      
+      console.log('[PlaybackControls] Progress update:', {
+        progress: playbackProgress,
+        timeInSeconds,
+        audioDuration,
+        sliderValue: playbackProgress * 100
+      });
     }
   }, [playbackProgress, audioDuration, isTouchActive]);
   
@@ -59,6 +66,12 @@ export function PlaybackControls({
     const newPosition = value[0] / 100;
     setSliderValue(value[0]);
     setCurrentTime(newPosition * audioDuration);
+    
+    console.log('[PlaybackControls] Slider changed:', {
+      value: value[0],
+      newPosition,
+      newTimeInSeconds: newPosition * audioDuration
+    });
     
     if (onSeek) {
       onSeek(newPosition);
@@ -79,6 +92,20 @@ export function PlaybackControls({
     setTimeout(() => {
       setIsTouchActive(false);
     }, 100);
+  };
+  
+  // Handle save entry with better toast cleaning
+  const handleSaveEntry = async () => {
+    console.log('[PlaybackControls] Save entry initiated');
+    
+    setIsClearingToasts(true);
+    await clearAllToasts();
+    
+    setTimeout(() => {
+      setIsClearingToasts(false);
+      console.log('[PlaybackControls] Calling onSaveEntry callback');
+      onSaveEntry();
+    }, 150);
   };
   
   return (
@@ -136,14 +163,7 @@ export function PlaybackControls({
           <Button 
             variant="default" 
             className="rounded-full bg-green-600 hover:bg-green-700"
-            onClick={async () => {
-              setIsClearingToasts(true);
-              await clearAllToasts();
-              setTimeout(() => {
-                setIsClearingToasts(false);
-                onSaveEntry();
-              }, 100);
-            }}
+            onClick={handleSaveEntry}
             disabled={isProcessing || isClearingToasts}
           >
             {isProcessing || isClearingToasts ? (

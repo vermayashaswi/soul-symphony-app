@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -17,17 +16,19 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentAvailableRef = useRef(false);
   
-  // Add new logging for debugging
+  // Debug logging
   useEffect(() => {
-    console.log('[EntryContent] Received content update:', {
+    console.log('[EntryContent] State update:', {
       contentLength: content?.length || 0,
       isProcessing,
       isExpanded,
-      contentIsEmpty: !content || content === "Processing entry..." || content.trim() === "" || content === "Loading..."
+      showLoading,
+      contentEmpty: !content || content === "Processing entry..." || content.trim() === "" || content === "Loading...",
+      stableContentSet: stableContent === content
     });
-  }, [content, isProcessing, isExpanded]);
+  }, [content, isProcessing, isExpanded, showLoading, stableContent]);
   
-  // Detect when content is actually available and worth showing
+  // Handle content and loading state transitions
   useEffect(() => {
     const contentIsLoading = isProcessing || 
                           !content || 
@@ -38,8 +39,8 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     console.log('[EntryContent] Content status check:', {
       contentIsLoading,
       isProcessing,
-      content: content?.substring(0, 20) + (content?.length > 20 ? '...' : ''),
-      currentlyShowingLoader: showLoading
+      contentSample: content?.substring(0, 20) + (content?.length > 20 ? '...' : ''),
+      showLoading
     });
     
     // Clear any existing timeout to prevent race conditions
@@ -47,32 +48,31 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       clearTimeout(timeoutRef.current);
     }
     
-    // IMPROVED FIX: Better content loading state handling
     if (contentIsLoading) {
+      // Show loading state
       setShowLoading(true);
       contentAvailableRef.current = false;
     } else if (!contentAvailableRef.current) {
-      // Only when transitioning from loading to content-available
+      // Content is now available - transition from loading to content display
       contentAvailableRef.current = true;
       
-      // IMPORTANT: Ensure loading state persists longer for a better transition experience
+      // Keep loading state visible for a moment for better UX
+      const delayTime = prevProcessingRef.current && !isProcessing ? 2000 : 1000;
+      
+      console.log(`[EntryContent] Content available, will show after ${delayTime}ms delay`);
+      
       timeoutRef.current = setTimeout(() => {
-        if (prevProcessingRef.current && !isProcessing) {
-          // If transitioning from processing to done, delay a bit longer
-          timeoutRef.current = setTimeout(() => {
-            console.log('[EntryContent] Transitioning from loading to content display after delay');
-            setShowLoading(false);
-            setStableContent(content);
-          }, 1800); // Increased from 1200ms to 1800ms for a smoother experience
-        } else {
-          console.log('[EntryContent] Setting content directly after processing check');
-          setShowLoading(false);
-          setStableContent(content);
-        }
-      }, 2000); // Increased from 1500ms to 2000ms to ensure loading state visibility
+        console.log('[EntryContent] Transitioning from loading to content display');
+        setShowLoading(false);
+        setStableContent(content);
+      }, delayTime);
+    } else if (content !== stableContent && !showLoading) {
+      // Content has changed while already displaying content (not during loading)
+      console.log('[EntryContent] Content updated while already showing content');
+      setStableContent(content);
     }
     
-    // Update refs
+    // Update refs for next comparison
     prevProcessingRef.current = isProcessing;
     prevContentRef.current = content;
     
@@ -81,7 +81,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         clearTimeout(timeoutRef.current);
       }
     };
-  }, [content, isProcessing, showLoading]);
+  }, [content, isProcessing, showLoading, stableContent]);
 
   return (
     <AnimatePresence mode="wait">
