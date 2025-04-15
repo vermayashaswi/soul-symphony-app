@@ -40,6 +40,13 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     return { success: false, error: 'Recording too short or empty' };
   }
   
+  // Validate duration is set
+  const blobDuration = (audioBlob as any)?.duration;
+  if (blobDuration === undefined || blobDuration === null || blobDuration < 0.1) {
+    console.error('[AudioProcessing] Audio blob has invalid duration:', blobDuration);
+    return { success: false, error: 'Recording duration too short or missing' };
+  }
+  
   // Clear all toasts to ensure UI is clean before processing
   await clearAllToasts();
   

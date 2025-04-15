@@ -41,9 +41,10 @@ export function useVoiceRecorder({
       setMediaStream(recorder.stream);
       
       // Start timer
-      setStartTime(Date.now());
+      const now = Date.now();
+      setStartTime(now);
       setStatus("recording");
-      console.log('Audio recording started successfully');
+      console.log('Audio recording started successfully at', now);
       
       // Update timer at regular intervals
       timerInterval.current = setInterval(() => {
@@ -97,6 +98,18 @@ export function useVoiceRecorder({
       recorderInstance.stop()
         .then(({ blob }: { blob: Blob }) => {
           console.log(`Recording stopped, blob size: ${blob.size}, type: ${blob.type}`);
+          
+          // Ensure duration is set on the blob
+          const recordingDuration = elapsedTime / 1000;
+          if (!(blob as any).duration || (blob as any).duration < 0.1) {
+            console.log(`Setting blob duration explicitly to ${recordingDuration}s`);
+            Object.defineProperty(blob, 'duration', {
+              value: recordingDuration,
+              writable: false
+            });
+          }
+          
+          console.log(`Final blob duration: ${(blob as any).duration}s`);
           setRecordingBlob(blob);
           
           if (mediaStream) {
@@ -114,7 +127,7 @@ export function useVoiceRecorder({
           // Even if blob is small, try to process it
           if (blob) {
             const tempId = generateTempId();
-            console.log(`Processing audio blob: ${formatBytes(blob.size)}, duration: ${formatTime(elapsedTime)}`);
+            console.log(`Processing audio blob: ${formatBytes(blob.size)}, duration: ${formatTime(elapsedTime)}, blob.duration: ${(blob as any).duration}s`);
             onRecordingComplete(blob, tempId);
             
             if (opId) {
@@ -123,7 +136,7 @@ export function useVoiceRecorder({
                   id: opId,
                   status: 'success',
                   message: 'Recording completed',
-                  details: `Audio size: ${formatBytes(blob.size)}, Duration: ${formatTime(elapsedTime)}, TempID: ${tempId}`
+                  details: `Audio size: ${formatBytes(blob.size)}, Duration: ${formatTime(elapsedTime)}, Blob duration: ${(blob as any).duration}s, TempID: ${tempId}`
                 }
               }));
             }
@@ -178,7 +191,7 @@ export function useVoiceRecorder({
       
       if (onError) onError(err);
     }
-  }, [recorderInstance, mediaStream, elapsedTime, onRecordingComplete, onError]);
+  }, [recorderInstance, mediaStream, elapsedTime, onRecordingComplete, onError, startTime]);
 
   const clearRecording = () => {
     setRecordingBlob(null);

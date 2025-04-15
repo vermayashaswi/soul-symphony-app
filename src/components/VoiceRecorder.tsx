@@ -64,21 +64,24 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         console.log('[VoiceRecorder] Creating playable version of the blob');
         const normalizedBlob = normalizeAudioBlob(audioBlob);
         
-        if (recordingTime && recordingTime > 0) {
-          const durationInSeconds = recordingTime / 1000;
+        const recordingDurationSec = recordingTime / 1000;
+        
+        const existingDuration = (normalizedBlob as any).duration;
+        if (!existingDuration || existingDuration < 0.1) {
+          console.log(`[VoiceRecorder] Setting blob duration explicitly to ${recordingDurationSec}s (was: ${existingDuration})`);
           Object.defineProperty(normalizedBlob, 'duration', {
-            value: durationInSeconds,
+            value: recordingDurationSec,
             writable: false
           });
-          console.log('[VoiceRecorder] Added duration to blob:', durationInSeconds, 'seconds');
+        } else {
+          console.log(`[VoiceRecorder] Blob already has duration: ${existingDuration}s`);
         }
         
         const playable = createPlayableAudioBlob(normalizedBlob);
         
-        if (recordingTime && recordingTime > 0) {
-          const durationInSeconds = recordingTime / 1000;
+        if (!(playable as any).duration || (playable as any).duration < 0.1) {
           Object.defineProperty(playable, 'duration', {
-            value: durationInSeconds,
+            value: recordingDurationSec,
             writable: false
           });
         }
@@ -87,6 +90,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         console.log('[VoiceRecorder] Created playable blob:', playable.size, playable.type, 'duration:', (playable as any).duration);
       } catch (err) {
         console.error('[VoiceRecorder] Error creating playable blob:', err);
+        if (audioBlob && (!(audioBlob as any).duration || (audioBlob as any).duration < 0.1)) {
+          Object.defineProperty(audioBlob, 'duration', {
+            value: recordingTime / 1000,
+            writable: false
+          });
+        }
         setPlayableBlob(audioBlob);
       }
     } else {
@@ -173,20 +182,28 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasAudioBlob: !!audioBlob,
       audioSize: audioBlob?.size || 0,
       playableBlobSize: playableBlob?.size || 0,
+      audioBlobDuration: (audioBlob as any)?.duration || 'not set',
+      playableBlobDuration: (playableBlob as any)?.duration || 'not set',
       isRecording,
       hasPermission,
       audioDuration,
+      recordingTime: recordingTime,
       hasSaved,
       hasPlayedOnce,
       audioPrepared,
       waitingForClear,
-      toastsCleared,
-      recordingTime
+      toastsCleared
     });
     
-    const effectiveDuration = audioDuration && audioDuration > 0.5 
+    const blobDuration = (audioBlob as any)?.duration;
+    const playableDuration = (playableBlob as any)?.duration;
+    const effectiveDuration = audioDuration && audioDuration > 0.1
       ? audioDuration 
-      : recordingTime / 1000;
+      : (blobDuration && blobDuration > 0.1)
+        ? blobDuration
+        : (playableDuration && playableDuration > 0.1)
+          ? playableDuration
+          : recordingTime / 1000;
     
     const newDebugInfo = {
       status: isRecording 
@@ -226,9 +243,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       return;
     }
     
-    const hasDuration = (audioBlob as any).duration > 0.1 || recordingTime > 100;
+    let blobDuration = (audioBlob as any).duration;
+    if (!blobDuration || blobDuration < 0.1) {
+      blobDuration = recordingTime / 1000;
+      console.log(`[VoiceRecorder] Setting missing blob duration to ${blobDuration}s before saving`);
+      Object.defineProperty(audioBlob, 'duration', {
+        value: blobDuration,
+        writable: false
+      });
+    }
+    
+    const hasDuration = blobDuration > 0.1 || recordingTime > 100;
     if (!hasDuration) {
-      console.error('[VoiceRecorder] Recording has invalid duration:', (audioBlob as any).duration, 'recordingTime:', recordingTime);
+      console.error('[VoiceRecorder] Recording has invalid duration:', blobDuration, 'recordingTime:', recordingTime);
       setRecordingError("Recording duration is too short");
       return;
     }
@@ -273,12 +300,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
 
       const effectiveDuration = audioDuration && audioDuration > 0.5 
         ? audioDuration 
-        : recordingTime / 1000;
+        : (audioBlob as any).duration > 0.1
+          ? (audioBlob as any).duration
+          : recordingTime / 1000;
         
       console.log('[VoiceRecorder] Processing audio:', {
         originalType: audioBlob.type,
         originalSize: audioBlob.size,
-        originalDuration: (audioBlob as any).duration,
+        blobDuration: (audioBlob as any).duration,
         audioDuration: audioDuration,
         recordingTime: recordingTime,
         effectiveDuration: effectiveDuration,
@@ -289,10 +318,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       const normalizedBlob = normalizeAudioBlob(audioBlob);
       console.log('[VoiceRecorder] Normalized blob:', normalizedBlob.size, normalizedBlob.type);
       
-      Object.defineProperty(normalizedBlob, 'duration', {
-        value: effectiveDuration,
-        writable: false
-      });
+      if (!(normalizedBlob as any).duration || (normalizedBlob as any).duration < 0.1) {
+        Object.defineProperty(normalizedBlob, 'duration', {
+          value: effectiveDuration,
+          writable: false
+        });
+      }
       
       console.log('[VoiceRecorder] Final blob for processing:', {
         size: normalizedBlob.size,
@@ -408,71 +439,85 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               }}
               audioLevel={audioLevel}
               showAnimation={false}
-              audioBlob={audioBlob}
+              ripples={ripples}
             />
           </div>
-
+          
+          <div className="flex flex-col items-center mt-4">
+            <RecordingStatus
+              isRecording={isRecording}
+              recordingTime={recordingTime}
+              isProcessing={isProcessing}
+            />
+          </div>
+          
           <AnimatePresence mode="wait">
-            {isRecording ? (
-              <RecordingStatus 
-                isRecording={isRecording} 
-                recordingTime={recordingTime} 
-              />
-            ) : audioBlob ? (
-              <div className="flex flex-col items-center w-full relative z-10 mt-auto mb-8">
-                <PlaybackControls
-                  audioBlob={playableBlob}
-                  isPlaying={isPlaying}
-                  isProcessing={isProcessing || waitingForClear}
-                  playbackProgress={playbackProgress}
-                  audioDuration={audioDuration}
-                  onTogglePlayback={async () => {
-                    console.log('[VoiceRecorder] Toggle playback clicked');
-                    await ensureAllToastsCleared();
-                    togglePlayback();
-                  }}
-                  onSaveEntry={handleSaveEntry}
-                  onRestart={handleRestart}
-                  onSeek={seekTo}
-                />
-              </div>
-            ) : hasPermission === false ? (
-              <motion.p
-                key="permission"
-                initial={{ opacity: 0, y: 10 }}
+            {!isRecording && audioBlob && (
+              <motion.div
+                initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: -10 }}
-                className="text-center text-muted-foreground relative z-10 mt-auto mb-8"
+                exit={{ opacity: 0, y: -20 }}
+                transition={{ duration: 0.3 }}
+                className="mt-6 w-full max-w-md"
               >
-                Microphone access is required for recording
-              </motion.p>
-            ) : (
-              <></>
+                <PlaybackControls
+                  isPlaying={isPlaying}
+                  playbackProgress={playbackProgress}
+                  audioDuration={audioDuration || recordingTime / 1000}
+                  togglePlayback={togglePlayback}
+                  seekTo={seekTo}
+                />
+                
+                <div className="flex justify-between mt-16 space-x-4 px-4">
+                  <button
+                    onClick={handleRestart}
+                    disabled={isProcessing}
+                    className="px-4 py-2 rounded-lg border border-gray-200 dark:border-gray-700 text-sm font-medium hover:bg-gray-100 dark:hover:bg-gray-800 transition-colors flex-1"
+                  >
+                    {isProcessing ? (
+                      <span className="flex items-center justify-center">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </span>
+                    ) : (
+                      "Discard & Restart"
+                    )}
+                  </button>
+                  
+                  <button
+                    onClick={handleSaveEntry}
+                    disabled={isProcessing || hasSaved}
+                    className="px-4 py-2 rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 text-sm font-medium transition-colors flex-1 disabled:opacity-50 disabled:pointer-events-none"
+                  >
+                    {isProcessing ? (
+                      <span className="flex items-center justify-center">
+                        <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                        Processing...
+                      </span>
+                    ) : hasSaved ? (
+                      "Saved!"
+                    ) : (
+                      "Save Recording"
+                    )}
+                  </button>
+                </div>
+                
+                {recordingError && (
+                  <div className="mt-4 px-4">
+                    <div className="bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg p-3 flex items-start">
+                      <AlertTriangle className="text-red-500 dark:text-red-400 w-4 h-4 mt-0.5 mr-2 flex-shrink-0" />
+                      <div className="text-red-800 dark:text-red-300 text-sm">{recordingError}</div>
+                    </div>
+                  </div>
+                )}
+              </motion.div>
             )}
           </AnimatePresence>
-          
-          {recordingError && (
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              className="mt-3 p-2 bg-red-50 border border-red-200 rounded-lg text-red-700 text-sm flex items-start gap-2 relative z-10 absolute bottom-8"
-            >
-              <AlertTriangle className="w-4 h-4 mt-0.5 flex-shrink-0" />
-              <div>{recordingError}</div>
-            </motion.div>
-          )}
-          
-          {(isProcessing || waitingForClear) && (
-            <div className="flex items-center gap-2 mt-3 text-sm text-muted-foreground relative z-10 absolute bottom-4">
-              <Loader2 className="w-4 h-4 animate-spin" />
-              <span>{waitingForClear ? "Preparing..." : "Processing..."}</span>
-            </div>
-          )}
         </div>
       </div>
       
       <RecordingDebugger 
-        currentStatus={debugInfo.status} 
+        currentStatus={debugInfo.status}
         audioDuration={debugInfo.duration}
         audioBlob={audioBlob}
       />

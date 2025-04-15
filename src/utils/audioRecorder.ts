@@ -69,6 +69,7 @@ export const recordAudio = async () => {
   }
   
   const audioChunks: BlobPart[] = [];
+  let startTime = Date.now();
   
   // Add data to chunks when available
   mediaRecorder.addEventListener('dataavailable', (event) => {
@@ -109,7 +110,17 @@ export const recordAudio = async () => {
         const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm;codecs=opus' });
         const audioUrl = URL.createObjectURL(audioBlob);
         
-        console.log(`[audioRecorder] Audio blob created: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
+        // Calculate and store duration directly on the blob
+        const duration = (Date.now() - startTime) / 1000;
+        console.log(`[audioRecorder] Calculated duration: ${duration} seconds`);
+        
+        // Set duration property on the blob
+        Object.defineProperty(audioBlob, 'duration', {
+          value: duration,
+          writable: false
+        });
+        
+        console.log(`[audioRecorder] Audio blob created: ${audioBlob.size} bytes, type: ${audioBlob.type}, duration: ${duration}s`);
         
         // Release microphone
         stream.getTracks().forEach(track => track.stop());
@@ -136,26 +147,11 @@ export const recordAudio = async () => {
     });
   };
   
-  const pause = () => {
-    if (mediaRecorder.state === 'recording') {
-      mediaRecorder.pause();
-      return true;
-    }
-    return false;
-  };
-  
-  const resume = () => {
-    if (mediaRecorder.state === 'paused') {
-      mediaRecorder.resume();
-      return true;
-    }
-    return false;
-  };
-  
   // Return an object with methods to control the recorder
   return {
     start: () => {
       if (mediaRecorder.state !== 'recording') {
+        startTime = Date.now(); // Reset start time when recording is started
         mediaRecorder.start(100);
         console.log('[audioRecorder] MediaRecorder started');
       }

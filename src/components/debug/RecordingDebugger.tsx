@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Bug, ChevronDown, ChevronUp, X, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -36,10 +35,10 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
     blobDuration: number | null;
     isValid: boolean;
     isEmpty: boolean;
+    meetsRequirements: boolean;
   } | null>(null);
   const { addEvent, isEnabled, toggleEnabled } = useDebugLog();
   
-  // Update actual audio duration when audioDuration changes and is valid
   useEffect(() => {
     if (audioDuration && audioDuration > 0.1) {
       console.log('[RecordingDebugger] Setting actual audio duration:', audioDuration);
@@ -47,15 +46,17 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
     }
   }, [audioDuration]);
   
-  // Update blob details when audioBlob changes
   useEffect(() => {
     if (audioBlob) {
+      const blobDuration = (audioBlob as any).duration || null;
+      
       const details = {
         size: audioBlob.size,
         type: audioBlob.type || 'unknown',
-        blobDuration: (audioBlob as any).duration || null,
+        blobDuration: blobDuration,
         isValid: audioBlob.size > 100,
-        isEmpty: audioBlob.size <= 100
+        isEmpty: audioBlob.size <= 100,
+        meetsRequirements: audioBlob.size > 100 && (blobDuration !== null && blobDuration > 0.1)
       };
       setBlobDetails(details);
       console.log('[RecordingDebugger] Blob details:', details);
@@ -67,7 +68,6 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
   useEffect(() => {
     if (!currentStatus) return;
     
-    // Only process if status actually changed
     if (currentStatus === prevStatus) return;
     
     const now = Date.now();
@@ -108,18 +108,22 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
         };
       }
       
-      // Calculate the most reliable duration to use
-      const durationToUse = actualAudioDuration || audioDuration || 
+      const blobDuration = audioBlob ? (audioBlob as any).duration : null;
+      const durationToUse = blobDuration && blobDuration > 0.1 ? blobDuration : 
+                           (actualAudioDuration || audioDuration || 
                            (recordingStepIndex >= 0 ? 
-                            (now - updatedSteps[recordingStepIndex].timestamp) / 1000 : 0);
+                            (now - updatedSteps[recordingStepIndex].timestamp) / 1000 : 0));
       
       console.log('[RecordingDebugger] Using duration:', durationToUse, 
+                 'blob duration:', blobDuration,
                  'actual:', actualAudioDuration, 
                  'prop:', audioDuration, 
                  'calculated:', recordingStepIndex >= 0 ? 
                                (now - updatedSteps[recordingStepIndex].timestamp) / 1000 : 0);
       
       const hasValidBlob = audioBlob && audioBlob.size > 100;
+      const hasValidDuration = durationToUse > 0.1;
+      const meetsRequirements = hasValidBlob && hasValidDuration;
       
       updatedSteps.push(
         {
@@ -133,20 +137,30 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
         }
       );
       
-      if (hasValidBlob) {
+      updatedSteps.push(
+        {
+          step: 'Duration Detection',
+          status: hasValidDuration ? 'completed' : 'error',
+          timestamp: now + 50,
+          details: `Detected duration: ${formatTime(durationToUse)}s${!hasValidDuration ? ' (ERROR: Too short)' : ''}`,
+          duration: 50
+        }
+      );
+      
+      if (hasValidBlob && hasValidDuration) {
         updatedSteps.push(
           {
             step: 'Playback Ready',
-            status: durationToUse > 0.1 ? 'completed' : 'error',
-            timestamp: now + 100,
-            details: `Audio duration: ${formatTime(durationToUse)}${durationToUse < 0.1 ? ' (ERROR: Too short)' : ''}`,
+            status: 'completed',
+            timestamp: now + 150,
+            details: `Audio can be played (${formatBytes(audioBlob.size)}, ${formatTime(durationToUse)}s)`,
             duration: 200
           },
           {
             step: 'Ready for Save',
-            status: 'in-progress',
+            status: 'completed',
             timestamp: now + 300,
-            details: 'Audio can be saved when duration > 0.1s and blob size > 100 bytes'
+            details: 'All requirements met: size > 100 bytes, duration > 0.1s'
           }
         );
       } else {
@@ -155,7 +169,9 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
             step: 'Error',
             status: 'error',
             timestamp: now + 100,
-            details: `Invalid audio recording: ${audioBlob ? 'Size too small' : 'No audio data'}`
+            details: !hasValidBlob 
+              ? `Invalid audio blob: Size too small (${audioBlob?.size || 0} bytes)` 
+              : `Invalid duration: Too short (${durationToUse}s)`
           }
         );
       }
@@ -165,20 +181,18 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
         duration: durationToUse,
         blobSize: audioBlob?.size || 0,
         blobType: audioBlob?.type || 'unknown',
-        isValid: hasValidBlob
+        blobDuration: blobDuration,
+        isValid: hasValidBlob && hasValidDuration
       });
     }
     
-    // Save the current status as previous for the next update
     setPrevStatus(currentStatus);
   }, [currentStatus, audioDuration, audioBlob, addEvent, steps, prevStatus, actualAudioDuration, blobDetails]);
   
   const handleDebugButtonClick = () => {
     if (!isEnabled) {
-      // Enable debug mode when clicked
       toggleEnabled();
     }
-    // Toggle panel state regardless of debug mode
     setIsOpen(!isOpen);
   };
   
@@ -266,7 +280,10 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
                 <ul className="text-xs space-y-1 text-gray-500">
                   <li className="flex justify-between">
                     <span>Size:</span> 
-                    <span className={blobDetails.size < 100 ? 'text-red-500 font-medium' : ''}>{formatBytes(blobDetails.size)}</span>
+                    <span className={blobDetails.size < 100 ? 'text-red-500 font-medium' : 'text-green-500 font-medium'}>
+                      {formatBytes(blobDetails.size)}
+                      {blobDetails.size < 100 ? ' ❌' : ' ✅'}
+                    </span>
                   </li>
                   <li className="flex justify-between">
                     <span>Type:</span> 
@@ -274,17 +291,41 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
                   </li>
                   <li className="flex justify-between">
                     <span>Blob Duration:</span> 
-                    <span>{blobDetails.blobDuration !== null ? `${blobDetails.blobDuration.toFixed(2)}s` : 'Not set'}</span>
+                    <span className={
+                      blobDetails.blobDuration === null ? 'text-red-500 font-medium' : 
+                      (blobDetails.blobDuration !== null && blobDetails.blobDuration < 0.1) ? 'text-red-500 font-medium' : 
+                      'text-green-500 font-medium'
+                    }>
+                      {blobDetails.blobDuration !== null 
+                        ? `${blobDetails.blobDuration.toFixed(2)}s${blobDetails.blobDuration < 0.1 ? ' ❌' : ' ✅'}` 
+                        : 'Not set ❌'}
+                    </span>
                   </li>
                   <li className="flex justify-between">
                     <span>Valid for Processing:</span> 
-                    <span className={!blobDetails.isValid ? 'text-red-500 font-medium' : 'text-green-500'}>{blobDetails.isValid ? 'Yes' : 'No'}</span>
+                    <span className={!blobDetails.meetsRequirements ? 'text-red-500 font-medium' : 'text-green-500 font-medium'}>
+                      {blobDetails.meetsRequirements ? 'Yes ✅' : 'No ❌'}
+                    </span>
                   </li>
                 </ul>
-                {!blobDetails.isValid && (
-                  <div className="mt-1 text-xs flex items-center gap-1 text-red-500">
-                    <AlertCircle className="h-3 w-3" />
-                    <span>{blobDetails.isEmpty ? 'Audio blob too small or empty' : 'Audio blob invalid'}</span>
+                
+                {!blobDetails.meetsRequirements && (
+                  <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-md">
+                    <h5 className="text-xs font-medium mb-1 text-red-800 dark:text-red-300">Requirements to Save:</h5>
+                    <ul className="text-xs space-y-1 text-red-700 dark:text-red-300">
+                      <li className="flex justify-between">
+                        <span>Size &gt; 100 bytes:</span>
+                        <span>{blobDetails.size > 100 ? '✅ Met' : '❌ Not met'}</span>
+                      </li>
+                      <li className="flex justify-between">
+                        <span>Duration &gt; 0.1s:</span>
+                        <span>
+                          {blobDetails.blobDuration !== null && blobDetails.blobDuration > 0.1 
+                            ? '✅ Met' 
+                            : '❌ Not met'}
+                        </span>
+                      </li>
+                    </ul>
                   </div>
                 )}
               </div>
@@ -311,10 +352,18 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
                 </div>
               )}
               <div className="flex justify-between mt-1">
+                <span>Blob Duration:</span>
+                <span className="font-medium">
+                  {blobDetails?.blobDuration !== null 
+                    ? `${blobDetails.blobDuration.toFixed(2)}s` 
+                    : 'Not set'}
+                </span>
+              </div>
+              <div className="flex justify-between mt-1">
                 <span>Save Requirements:</span>
                 <span className="font-medium">
-                  {audioBlob && actualAudioDuration 
-                    ? (audioBlob.size > 100 && actualAudioDuration > 0.1 
+                  {blobDetails 
+                    ? (blobDetails.meetsRequirements 
                         ? '✅ All met' 
                         : '❌ Not met') 
                     : 'N/A'}
