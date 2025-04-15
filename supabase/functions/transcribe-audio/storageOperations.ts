@@ -1,56 +1,83 @@
 
-/**
- * Storage operations for the transcribe-audio function
- */
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.7.1';
 
 /**
- * Uploads audio to Supabase storage and returns the public URL
+ * Stores an audio file in Supabase storage
+ * @param supabase - Supabase client
+ * @param audioData - Binary audio data
+ * @param filename - Filename to use
+ * @param fileExtension - File extension (webm, mp4, etc)
  */
 export async function storeAudioFile(
-  supabase: any, 
-  binaryAudio: Uint8Array, 
-  filename: string, 
-  detectedFileType: string
+  supabase: any,
+  audioData: Uint8Array,
+  filename: string,
+  fileExtension: string
 ): Promise<string | null> {
   try {
-    const { data: buckets } = await supabase.storage.listBuckets();
-    const journalBucket = buckets?.find(b => b.name === 'journal-audio-entries');
+    console.log(`Storing audio file ${filename} with size ${audioData.length} bytes`);
     
-    if (!journalBucket) {
-      console.log('Creating journal-audio-entries bucket');
-      await supabase.storage.createBucket('journal-audio-entries', {
-        public: true
-      });
+    // Create a storage bucket if it doesn't exist
+    const { data: buckets, error: bucketsError } = await supabase
+      .storage
+      .listBuckets();
+      
+    if (bucketsError) {
+      console.error('Error listing buckets:', bucketsError);
+      throw bucketsError;
     }
     
-    let contentType = 'audio/webm';
-    if (detectedFileType === 'mp4') contentType = 'audio/mp4';
-    if (detectedFileType === 'wav') contentType = 'audio/wav';
+    // Check if journal-audio bucket exists
+    const bucketExists = buckets.some(bucket => bucket.name === 'journal-audio');
     
-    const { data: storageData, error: storageError } = await supabase
+    if (!bucketExists) {
+      console.log('Creating journal-audio bucket');
+      const { error: createError } = await supabase
+        .storage
+        .createBucket('journal-audio', { public: false });
+        
+      if (createError) {
+        console.error('Error creating bucket:', createError);
+        throw createError;
+      }
+    }
+
+    // Upload the file
+    const mimeType = 
+      fileExtension === 'webm' ? 'audio/webm' :
+      fileExtension === 'mp4' ? 'audio/mp4' :
+      fileExtension === 'wav' ? 'audio/wav' :
+      fileExtension === 'mp3' ? 'audio/mp3' :
+      'application/octet-stream';
+    
+    // Create a blob from the audio data
+    const blob = new Blob([audioData], { type: mimeType });
+    
+    // Upload the blob
+    console.log(`Uploading ${filename} to journal-audio bucket (${mimeType})`);
+    const { data, error } = await supabase
       .storage
-      .from('journal-audio-entries')
-      .upload(filename, binaryAudio, {
-        contentType,
-        cacheControl: '3600'
+      .from('journal-audio')
+      .upload(filename, blob, {
+        contentType: mimeType,
+        upsert: true
       });
       
-    if (storageError) {
-      console.error('Error uploading audio to storage:', storageError);
-      console.error('Storage error details:', JSON.stringify(storageError));
+    if (error) {
+      console.error('Error uploading file:', error);
       return null;
-    } else {
-      const { data: urlData } = await supabase
-        .storage
-        .from('journal-audio-entries')
-        .getPublicUrl(filename);
-        
-      const audioUrl = urlData?.publicUrl;
-      console.log("Audio stored successfully:", audioUrl);
-      return audioUrl;
     }
-  } catch (err) {
-    console.error("Storage error:", err);
+    
+    // Get the public URL for the file
+    const { data: urlData } = await supabase
+      .storage
+      .from('journal-audio')
+      .getPublicUrl(filename);
+      
+    console.log('File uploaded successfully:', urlData?.publicUrl);
+    return urlData?.publicUrl || null;
+  } catch (error) {
+    console.error('Error in storeAudioFile:', error);
     return null;
   }
 }

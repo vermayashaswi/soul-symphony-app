@@ -31,16 +31,23 @@ export async function sendAudioForTranscription(
     // Add more diagnostic info about the audio data being sent
     console.log('[TranscriptionService] Audio data sample (first 100 chars):', base64Audio.substring(0, 100));
     
-    // Call the Supabase edge function - Fixed: Remove options property and move timeout into body
+    // Make sure the base64 doesn't contain any URL encoding or header parts
+    // It should be a clean base64 string without "data:audio/webm;base64," prefix
+    let cleanBase64 = base64Audio;
+    if (cleanBase64.includes(',')) {
+      cleanBase64 = cleanBase64.split(',')[1];
+    }
+    
+    // Call the Supabase edge function with the properly formatted body
     console.log('[TranscriptionService] Invoking transcribe-audio edge function');
     const response = await supabase.functions.invoke('transcribe-audio', {
       body: {
-        audio: base64Audio,
+        audio: cleanBase64,
         userId: userId || null,
         directTranscription: directTranscription,
         highQuality: true,
-        recordingTime: (base64Audio.length > 1000) ? Math.floor(base64Audio.length / 700) : null, // Rough estimate of recording time
-        timeout: 60000 // Timeout value moved into the body object
+        recordingTime: (cleanBase64.length > 1000) ? Math.floor(cleanBase64.length / 700) : null,
+        timeout: 60000
       }
     });
 

@@ -1,215 +1,83 @@
 
 /**
- * Utility functions for working with audio blobs
+ * Utility functions for blob operations
  */
 
 /**
- * Converts a Blob to base64 string
+ * Converts a Blob to a base64 string
+ * @param blob - The blob to convert
+ * @returns Promise resolving to a base64 string
  */
-export function blobToBase64(blob: Blob): Promise<string> {
+export const blobToBase64 = (blob: Blob): Promise<string> => {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onloadend = () => {
-      // Ensure we have a valid result
-      if (typeof reader.result === 'string' && reader.result.length > 0) {
-        resolve(reader.result);
-      } else {
-        reject(new Error('Failed to convert audio to base64'));
-      }
+      // reader.result will be a data URL like "data:audio/webm;base64,SGVsbG8gd29ybGQ="
+      // We want to return the full string with the data URL prefix
+      resolve(reader.result as string);
     };
-    reader.onerror = () => reject(new Error('Error reading audio file'));
+    reader.onerror = reject;
     reader.readAsDataURL(blob);
   });
-}
+};
 
 /**
- * Gets the duration of an audio blob using the Audio API
+ * Normalizes an audio blob to ensure it has the correct type and format
+ * @param blob - The original audio blob
+ * @returns Promise resolving to a normalized blob
  */
-export function getAudioBlobDuration(blob: Blob): Promise<number> {
-  return new Promise((resolve) => {
-    // First check if duration property is already set on the blob
-    if ('duration' in blob && typeof (blob as any).duration === 'number') {
-      console.log('[getAudioBlobDuration] Using existing duration from blob:', (blob as any).duration);
-      resolve((blob as any).duration);
-      return;
-    }
-    
-    // Otherwise create an audio element to get the duration
-    const audio = new Audio();
-    const objectUrl = URL.createObjectURL(blob);
-    
-    const onLoadedMetadata = () => {
-      const duration = audio.duration;
-      URL.revokeObjectURL(objectUrl);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('error', onError);
-      console.log('[getAudioBlobDuration] Got duration from audio element:', duration);
-      resolve(isNaN(duration) || duration === Infinity ? 0 : duration);
-    };
-    
-    const onError = () => {
-      console.warn('[getAudioBlobDuration] Error getting audio duration from blob');
-      URL.revokeObjectURL(objectUrl);
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('error', onError);
-      resolve(0);
-    };
-    
-    audio.addEventListener('loadedmetadata', onLoadedMetadata);
-    audio.addEventListener('error', onError);
-    
-    // Set a timeout in case the metadata never loads
-    const timeout = setTimeout(() => {
-      console.warn('[getAudioBlobDuration] Timeout getting audio duration');
-      audio.removeEventListener('loadedmetadata', onLoadedMetadata);
-      audio.removeEventListener('error', onError);
-      URL.revokeObjectURL(objectUrl);
-      
-      // Try to estimate duration from blob size
-      let estimatedDuration = 0;
-      if (blob.size > 0) {
-        // Rough estimation: ~128kbps
-        estimatedDuration = blob.size / 16000;
-        console.log('[getAudioBlobDuration] Estimated duration from size:', estimatedDuration);
-      }
-      
-      resolve(estimatedDuration);
-    }, 5000);
-    
-    audio.addEventListener('loadedmetadata', () => clearTimeout(timeout));
-    audio.addEventListener('error', () => clearTimeout(timeout));
-    
-    // Start loading the audio
-    audio.preload = 'metadata';
-    audio.src = objectUrl;
-  });
-}
-
-/**
- * Validates that an audio blob meets minimum requirements
- */
-export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; errorMessage?: string } {
-  if (!audioBlob) {
-    return { isValid: false, errorMessage: 'No recording to process.' };
-  }
-  
-  // Minimum size check (increased to 1000 bytes for better validation)
-  if (audioBlob.size < 1000) {
-    return { isValid: false, errorMessage: 'Recording is too short. Please try again.' };
-  }
-  
-  // Check for supported MIME types
-  const supportedTypes = [
-    'audio/webm', 
-    'audio/mp4', 
-    'audio/ogg', 
-    'audio/wav', 
-    'audio/mpeg',
-    'audio/webm;codecs=opus'
-  ];
-  
-  // Use a fuzzy match to check for audio MIME type
-  const isAudioType = audioBlob.type.includes('audio/') || 
-                     supportedTypes.some(type => audioBlob.type.includes(type.split('/')[1]));
-  
-  if (!isAudioType) {
-    console.warn('[validateAudioBlob] Potentially unsupported audio format:', audioBlob.type);
-    // We'll continue anyway since browser implementations vary
-  }
-  
-  return { isValid: true };
-}
-
-/**
- * Safely adds a duration property to a blob
- * @returns A new blob with duration property, or the original if it already has duration
- */
-export function safelyAddDurationProperty(blob: Blob, duration: number): Blob {
-  // If the blob already has a duration property with a valid value, return it
-  if ('duration' in blob && typeof (blob as any).duration === 'number' && (blob as any).duration > 0) {
-    console.log('[safelyAddDurationProperty] Blob already has duration property:', (blob as any).duration);
-    return blob;
-  }
-  
-  // Create a new blob with the same content and same type
-  const newBlob = new Blob([blob], { type: blob.type });
-  
+export const normalizeAudioBlob = async (
+  blob: Blob
+): Promise<Blob> => {
   try {
-    // Attempt to define the duration property
-    Object.defineProperty(newBlob, 'duration', {
-      value: duration,
-      writable: false,
-      enumerable: true,
-      configurable: true // Allow property to be redefined if needed
-    });
-    console.log(`[safelyAddDurationProperty] Added duration ${duration}s to blob`);
-  } catch (error) {
-    console.warn('[safelyAddDurationProperty] Could not add duration to blob:', error);
-  }
-  
-  return newBlob;
-}
-
-/**
- * Fixes common issues with audio blob MIME types and adds duration if missing
- * @returns Promise<Blob> A promise that resolves to the normalized audio blob
- */
-export async function normalizeAudioBlob(audioBlob: Blob): Promise<Blob> {
-  try {
-    let resultBlob = audioBlob;
-    let duration = 0;
+    // Check if the blob is already a valid audio type
+    const validAudioTypes = [
+      'audio/webm', 
+      'audio/mp4', 
+      'audio/wav', 
+      'audio/mpeg', 
+      'audio/mp3',
+      'audio/ogg'
+    ];
     
-    // If blob doesn't have duration property or it's zero, try to get it
-    if (!('duration' in audioBlob) || (audioBlob as any).duration === 0) {
-      console.log('[normalizeAudioBlob] Getting duration for blob');
-      duration = await getAudioBlobDuration(audioBlob);
-      
-      // If we still couldn't get a duration, estimate from size
-      if (duration === 0 && audioBlob.size > 0) {
-        duration = audioBlob.size / 16000; // Rough estimate based on 128kbps audio
-        console.log(`[normalizeAudioBlob] Estimated duration from size: ${duration}s`);
-      }
-      
-      if (duration > 0) {
-        resultBlob = safelyAddDurationProperty(resultBlob, duration);
-      }
-    } else {
-      duration = (audioBlob as any).duration;
-      console.log(`[normalizeAudioBlob] Blob already has duration ${duration}s`);
-    }
+    let mimeType = blob.type;
     
-    // If the blob doesn't have a proper MIME type, try to assign one
-    if (!resultBlob.type.includes('audio/')) {
-      // Look at the size to make an educated guess
-      const newBlobType = resultBlob.size > 1000000 ? 'audio/wav' : 'audio/webm;codecs=opus';
-      const newBlob = new Blob([resultBlob], { type: newBlobType });
+    // If no valid mime type, try to determine from the first bytes
+    if (!validAudioTypes.includes(mimeType)) {
+      console.log(`[BlobUtils] Invalid MIME type: ${mimeType}, trying to determine from content`);
+      const buffer = await blob.arrayBuffer();
+      const bytes = new Uint8Array(buffer.slice(0, 16));
       
-      // Transfer the duration if it exists
-      if (duration > 0) {
-        resultBlob = safelyAddDurationProperty(newBlob, duration);
+      // Detection based on header bytes
+      if (bytes[0] === 0x1A && bytes[1] === 0x45 && bytes[2] === 0xDF && bytes[3] === 0xA3) {
+        mimeType = 'audio/webm';
+      } else if (bytes[0] === 0x52 && bytes[1] === 0x49 && bytes[2] === 0x46 && bytes[3] === 0x46) {
+        mimeType = 'audio/wav';
+      } else if (bytes[0] === 0x49 && bytes[1] === 0x44 && bytes[2] === 0x33) {
+        mimeType = 'audio/mp3';
+      } else if (bytes[4] === 0x66 && bytes[5] === 0x74 && bytes[6] === 0x79 && bytes[7] === 0x70) {
+        mimeType = 'audio/mp4';
       } else {
-        resultBlob = newBlob;
-      }
-    } 
-    // If audio blob is webm but doesn't specify codec, add it
-    else if (resultBlob.type === 'audio/webm') {
-      const newBlob = new Blob([resultBlob], { type: 'audio/webm;codecs=opus' });
-      
-      // Transfer the duration if it exists
-      if (duration > 0) {
-        resultBlob = safelyAddDurationProperty(newBlob, duration);
-      } else {
-        resultBlob = newBlob;
+        console.log('[BlobUtils] Could not determine audio type, defaulting to audio/webm');
+        mimeType = 'audio/webm';
       }
     }
     
-    console.log(`[normalizeAudioBlob] Normalized blob: type=${resultBlob.type}, size=${resultBlob.size}B, duration=${duration}s`);
+    // Create a new blob with the correct MIME type
+    const normalizedBlob = new Blob([await blob.arrayBuffer()], { type: mimeType });
     
-    // Return the fully normalized blob
-    return resultBlob;
+    // Add the duration property if it exists on the original blob
+    if ('duration' in blob) {
+      Object.defineProperty(normalizedBlob, 'duration', {
+        value: (blob as any).duration,
+        writable: false
+      });
+    }
+    
+    console.log(`[BlobUtils] Normalized blob: size=${normalizedBlob.size}, type=${normalizedBlob.type}, hasDuration=${'duration' in normalizedBlob}`);
+    return normalizedBlob;
   } catch (error) {
-    console.error('[normalizeAudioBlob] Error:', error);
-    // Return the original blob in case of error
-    return audioBlob;
+    console.error('[BlobUtils] Error normalizing audio blob:', error);
+    return blob; // Return original blob on error
   }
-}
+};
