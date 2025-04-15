@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -9,7 +8,7 @@ import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle }
 import { Badge } from '@/components/ui/badge';
 import { blogPosts } from '@/data/blogPosts';
 import Navbar from '@/components/Navbar';
-import Footer from '@/pages/landing/components/Footer';
+import Footer from '@/components/website/Footer';
 
 const BlogPage = () => {
   const [searchQuery, setSearchQuery] = useState('');

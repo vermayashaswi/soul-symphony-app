@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Apple, PlayIcon, ArrowRight, Shield, Mic, Brain, Download } from 'lucide-react';
@@ -6,7 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Link } from 'react-router-dom';
 import SouloLogo from '@/components/SouloLogo';
 import Navbar from '@/components/Navbar';
-import Footer from '@/pages/landing/components/Footer';
+import Footer from '@/components/website/Footer';
 
 const AppDownloadPage = () => {
   const appFeatures = [

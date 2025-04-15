@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -9,7 +8,7 @@ import { Badge } from '@/components/ui/badge';
 import { Card, CardContent } from '@/components/ui/card';
 import { blogPosts, BlogPost } from '@/data/blogPosts';
 import Navbar from '@/components/Navbar';
-import Footer from '@/pages/landing/components/Footer';
+import Footer from '@/components/website/Footer';
 
 const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();

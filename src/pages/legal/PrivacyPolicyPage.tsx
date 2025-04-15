@@ -4,7 +4,7 @@ import { Link } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { ArrowLeft } from 'lucide-react';
 import Navbar from '@/components/Navbar';
-import Footer from '@/pages/landing/components/Footer';
+import Footer from '@/components/website/Footer';
 import { useTranslation } from 'react-i18next';
 
 const PrivacyPolicyPage = () => {
