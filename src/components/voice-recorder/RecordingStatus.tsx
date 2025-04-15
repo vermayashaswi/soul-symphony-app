@@ -5,10 +5,15 @@ import { formatTime } from '@/utils/format-time';
 
 interface RecordingStatusProps {
   isRecording: boolean;
-  recordingTime: number;
+  recordingTime: number | string;
 }
 
 export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusProps) {
+  // If recordingTime is already a string, use it directly, otherwise format it
+  const displayTime = typeof recordingTime === 'string' 
+    ? recordingTime 
+    : formatTime(recordingTime);
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -28,7 +33,7 @@ export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusP
           ease: "easeInOut"
         }}
       />
-      <span className="text-xl font-medium">{formatTime(recordingTime)}</span>
+      <span className="text-xl font-medium">{displayTime}</span>
     </motion.div>
   );
 }
