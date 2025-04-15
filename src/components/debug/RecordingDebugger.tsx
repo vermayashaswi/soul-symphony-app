@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Bug, ChevronDown, ChevronUp, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -30,14 +29,12 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
   const [startTime, setStartTime] = useState<number>(Date.now());
   const { addEvent, isEnabled } = useDebugLog();
   
-  // Update steps when current status changes
   useEffect(() => {
     if (!currentStatus) return;
     
     const now = Date.now();
     
     if (currentStatus === 'Recording') {
-      // Reset steps when starting a new recording
       setSteps([
         {
           step: 'Microphone Access',
@@ -57,10 +54,8 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
       addEvent('recording', 'Recording started', 'info', { timestamp: now });
     } 
     else if (currentStatus === 'Recorded' && steps.length > 0) {
-      // Update recording step to completed and add next steps
       const updatedSteps = [...steps];
       
-      // Find the "Recording Started" step and update it
       const recordingStepIndex = updatedSteps.findIndex(s => s.step === 'Recording Started');
       if (recordingStepIndex >= 0) {
         updatedSteps[recordingStepIndex] = {
@@ -70,21 +65,20 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
         };
       }
       
-      // Add audio processing steps
       updatedSteps.push(
         {
           step: 'Audio Processing',
           status: 'completed',
           timestamp: now,
           details: `Created audio blob: ${audioBlob ? formatBytes(audioBlob.size) : 'N/A'}, type: ${audioBlob?.type || 'N/A'}`,
-          duration: 100 // Estimated
+          duration: 100
         },
         {
           step: 'Playback Ready',
           status: 'completed',
           timestamp: now + 100,
           details: `Audio duration: ${formatTime(audioDuration || 0)}`,
-          duration: 200 // Estimated
+          duration: 200
         },
         {
           step: 'Waiting for Save',
@@ -103,16 +97,16 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
     }
   }, [currentStatus, audioDuration, audioBlob, addEvent]);
   
-  // If debug mode is disabled, don't render
-  if (!isEnabled) return null;
-  
   return (
     <div className="fixed bottom-20 right-4 z-50 flex flex-col items-end">
       <Button
         size="sm"
         variant="outline"
-        className="flex items-center gap-2 mb-2 bg-white dark:bg-gray-800 shadow-md"
+        className={`flex items-center gap-2 mb-2 bg-white dark:bg-gray-800 shadow-md ${
+          isEnabled ? 'opacity-100' : 'opacity-50'
+        }`}
         onClick={() => setIsOpen(!isOpen)}
+        disabled={!isEnabled}
       >
         <Bug className="h-4 w-4" />
         <span>Debug Recording</span>
@@ -187,7 +181,6 @@ export const RecordingDebugger: React.FC<RecordingDebuggerProps> = ({
   );
 };
 
-// Helper function to format bytes
 function formatBytes(bytes: number, decimals = 2): string {
   if (bytes === 0) return '0 Bytes';
   
@@ -200,7 +193,6 @@ function formatBytes(bytes: number, decimals = 2): string {
   return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
 }
 
-// Helper function to format time
 function formatTime(seconds: number): string {
   const mins = Math.floor(seconds / 60);
   const secs = Math.floor(seconds % 60);
