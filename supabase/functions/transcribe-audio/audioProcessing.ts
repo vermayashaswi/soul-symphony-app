@@ -54,10 +54,11 @@ export function processBase64Chunks(base64String: string, chunkSize = 32768): Ui
       offset += chunk.length;
     }
 
-    // If the resulting array is very small or empty, add significant padding
+    // If the resulting array is very small, add significant padding
     if (result.length < 1000) {
       console.log("Audio data very small, adding significant padding");
-      const paddedResult = new Uint8Array(result.length + 65536); // Add 64KB padding
+      // Add 256KB padding for very small recordings
+      const paddedResult = new Uint8Array(result.length + 262144); 
       paddedResult.set(result);
       // Fill the rest with silence (0s)
       for (let i = result.length; i < paddedResult.length; i++) {
@@ -110,14 +111,19 @@ export function detectFileType(data: Uint8Array): string {
     }
   }
   
+  // Check for MP3 signature (ID3)
+  if (data.length > 3 && data[0] === 0x49 && data[1] === 0x44 && data[2] === 0x33) {
+    return 'mp3';
+  }
+  
   // Check for OGG signature
   if (data.length > 4 && data[0] === 0x4F && data[1] === 0x67 && data[2] === 0x67 && data[3] === 0x53) {
     return 'ogg';
   }
   
-  // Default to webm as it's most commonly used by MediaRecorder
-  console.log("File type detection fallback to webm");
-  return 'webm';
+  // Default to mp3 as it's most commonly supported for playback
+  console.log("File type detection fallback to mp3");
+  return 'mp3';
 }
 
 /**
@@ -130,13 +136,13 @@ export function ensureValidAudioData(data: Uint8Array, fileType: string): Uint8A
     
     // Create different padding based on file type
     if (fileType === 'wav') {
-      // Create minimal valid WAV file (64KB of silence)
-      const silence = new Uint8Array(65536).fill(0);
+      // Create minimal valid WAV file (256KB of silence)
+      const silence = new Uint8Array(262144).fill(0);
       
       // WAV header (44 bytes)
       const header = new Uint8Array([
         0x52, 0x49, 0x46, 0x46, // "RIFF"
-        0x24, 0x20, 0x00, 0x00, // Chunk size (64KB + 36)
+        0x24, 0x20, 0x00, 0x00, // Chunk size (256KB + 36)
         0x57, 0x41, 0x56, 0x45, // "WAVE"
         0x66, 0x6D, 0x74, 0x20, // "fmt "
         0x10, 0x00, 0x00, 0x00, // Subchunk1 size (16)
@@ -147,7 +153,21 @@ export function ensureValidAudioData(data: Uint8Array, fileType: string): Uint8A
         0x02, 0x00, // Block align
         0x10, 0x00, // Bits per sample (16)
         0x64, 0x61, 0x74, 0x61, // "data"
-        0x00, 0x20, 0x00, 0x00  // Subchunk2 size (64KB)
+        0x00, 0x20, 0x00, 0x00  // Subchunk2 size (256KB)
+      ]);
+      
+      const result = new Uint8Array(header.length + silence.length);
+      result.set(header);
+      result.set(silence, header.length);
+      
+      return result;
+    } else if (fileType === 'mp3') {
+      // Create a minimal MP3 frame (silent)
+      const silence = new Uint8Array(262144).fill(0);
+      const header = new Uint8Array([
+        0xFF, 0xFB, 0x90, 0x44, // Basic MP3 frame header
+        0x00, 0x00, 0x00, 0x00, // Additional header data
+        0x00, 0x00, 0x00, 0x00  // Additional header data
       ]);
       
       const result = new Uint8Array(header.length + silence.length);
@@ -157,7 +177,7 @@ export function ensureValidAudioData(data: Uint8Array, fileType: string): Uint8A
       return result;
     } else {
       // For WebM or other formats, return a larger padding
-      return new Uint8Array(65536).fill(0); // 64KB of silence
+      return new Uint8Array(262144).fill(0); // 256KB of silence
     }
   }
   

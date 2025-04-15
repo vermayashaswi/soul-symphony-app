@@ -36,30 +36,27 @@ export function PlaybackControls({
   const [sliderValue, setSliderValue] = useState(0);
   const [isTouchActive, setIsTouchActive] = useState(false);
   const { isMobile } = useIsMobile();
-  const lastDurationRef = useRef<number>(0);
   
-  // Fix for zero duration audio - use a minimum valid duration
-  const effectiveDuration = audioDuration <= 0 ? 1 : audioDuration;
+  // Store the initial duration to prevent flickering
+  const stableDuration = useRef<number>(audioDuration > 0 ? audioDuration : 1);
   
-  // Anti-flicker mechanism - only update duration if it's stable
-  const stableDuration = useRef<number>(effectiveDuration);
-  
+  // Only update the stable duration ref if the new value is significantly different and stable
   useEffect(() => {
-    if (Math.abs(effectiveDuration - lastDurationRef.current) > 0.1) {
-      lastDurationRef.current = effectiveDuration;
+    if (audioDuration > 0 && Math.abs(audioDuration - stableDuration.current) > 0.5) {
+      stableDuration.current = audioDuration;
     }
-  }, [effectiveDuration]);
+  }, [audioDuration]);
   
-  // Update slider and current time based on playback progress, with anti-flicker
+  // Update slider and current time based on playback progress
   useEffect(() => {
-    if (!isTouchActive && playbackProgress !== undefined && lastDurationRef.current > 0) {
-      const timeInSeconds = (playbackProgress * lastDurationRef.current);
+    if (!isTouchActive && playbackProgress !== undefined) {
+      const timeInSeconds = (playbackProgress * stableDuration.current);
       setCurrentTime(timeInSeconds);
       setSliderValue(playbackProgress * 100);
     }
   }, [playbackProgress, isTouchActive]);
   
-  // Force update the slider position during playback with requestAnimationFrame
+  // Force update the slider position during playback with requestAnimationFrame for smooth updates
   useEffect(() => {
     let animationFrameId: number;
     
@@ -73,7 +70,7 @@ export function PlaybackControls({
           }
           return prev;
         });
-        setCurrentTime(playbackProgress * lastDurationRef.current);
+        setCurrentTime(playbackProgress * stableDuration.current);
         animationFrameId = requestAnimationFrame(updateSlider);
       };
       
@@ -88,20 +85,19 @@ export function PlaybackControls({
   }, [isPlaying, playbackProgress, isTouchActive]);
   
   const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(lastDurationRef.current);
+  const formattedDuration = formatTime(stableDuration.current);
   
   const handleSliderChange = (value: number[]) => {
     if (onSeek) {
       const position = value[0] / 100;
       setSliderValue(value[0]);
-      setCurrentTime(position * lastDurationRef.current);
+      setCurrentTime(position * stableDuration.current);
       onSeek(position);
     }
   };
 
   // Function to ensure all toasts are completely cleared
   const handleSaveClick = async () => {
-    // Always allow saving even if duration is 0
     setIsClearingToasts(true);
     
     // First force clear any existing toasts
@@ -159,7 +155,7 @@ export function PlaybackControls({
           value={[sliderValue]}
           max={100}
           step={0.1}
-          onValueChange={handleSliderChange}
+          onValueChange={(values) => handleSliderChange(values)}
           disabled={isProcessing || !audioBlob}
           className="mb-2"
           onTouchStart={() => setIsTouchActive(true)}

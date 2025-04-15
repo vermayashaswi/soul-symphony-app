@@ -47,10 +47,10 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
   console.log(`[blob-utils] Normalizing audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
   
   // If the blob is very small, add significant padding to prevent playback issues
-  if (audioBlob.size < 500) {
+  if (audioBlob.size < 1000) {
     console.log('[blob-utils] Adding padding to small audio blob');
-    // Create a larger padding for very small files (32KB)
-    const padding = new Uint8Array(32768).fill(0);
+    // Create a larger padding for very small files (128KB)
+    const padding = new Uint8Array(131072).fill(0);
     return new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
   }
   
@@ -75,19 +75,17 @@ export function getProperMimeType(blob: Blob): string {
     return blob.type;
   }
   
-  // Default for browsers with MediaRecorder
+  // Check for browser support
   if (typeof MediaRecorder !== 'undefined') {
-    // Check if the browser supports opus in webm
-    if (MediaRecorder.isTypeSupported('audio/webm;codecs=opus')) {
-      return 'audio/webm;codecs=opus';
-    }
-    
-    // Fallbacks in order of preference
+    // Use a broad compatibility approach - try mp3 first as it's widely supported
     const types = [
+      'audio/mpeg',
+      'audio/mp3',
+      'audio/wav',
+      'audio/webm;codecs=opus',
       'audio/webm',
       'audio/mp4',
-      'audio/ogg;codecs=opus',
-      'audio/wav'
+      'audio/ogg;codecs=opus'
     ];
     
     for (const type of types) {
@@ -97,8 +95,8 @@ export function getProperMimeType(blob: Blob): string {
     }
   }
   
-  // Final fallback to webm/opus which is widely supported
-  return 'audio/webm;codecs=opus';
+  // Final fallback to mp3 which is widely supported for playback
+  return 'audio/mpeg';
 }
 
 /**
@@ -125,12 +123,16 @@ export function extractAudioData(blob: Blob): Promise<ArrayBuffer> {
  */
 export function createPlayableAudioBlob(originalBlob: Blob): Blob {
   // For very small blobs, add significant padding
-  if (originalBlob.size < 1000) {
+  if (originalBlob.size < 2000) {
     console.log('[blob-utils] Creating significantly padded playable blob');
-    // Add 64KB of padding for very small files
-    const padding = new Uint8Array(65536).fill(0);
+    // Add 256KB of padding for very small files
+    const padding = new Uint8Array(262144).fill(0);
     
-    // Try to use WAV format for better browser compatibility
+    // Try several formats for better browser compatibility
+    if (MediaRecorder.isTypeSupported('audio/mp3')) {
+      return new Blob([originalBlob, padding], { type: 'audio/mp3' });
+    }
+    
     if (MediaRecorder.isTypeSupported('audio/wav')) {
       return new Blob([originalBlob, padding], { type: 'audio/wav' });
     }
@@ -161,9 +163,9 @@ export function createPlayableAudioBlob(originalBlob: Blob): Blob {
     return originalBlob;
   }
   
-  // For other formats, try converting to WebM
+  // For other formats, try converting to MP3 as it's widely supported
   console.log('[blob-utils] Creating playable blob with type change');
   return new Blob([originalBlob], { 
-    type: 'audio/webm;codecs=opus' 
+    type: 'audio/mpeg' 
   });
 }
