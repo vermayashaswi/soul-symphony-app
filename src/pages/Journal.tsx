@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { processRecording, getEntryIdForProcessingId, setEntryIdForProcessingId } from '@/utils/audio-processing';
+import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import JournalHeader from '@/components/journal/JournalHeader';
@@ -11,6 +11,7 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
+import { supabase } from '@/integrations/supabase/client';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);

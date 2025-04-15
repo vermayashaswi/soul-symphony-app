@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -366,7 +367,8 @@ export default function JournalEntriesList({
       
       pendingDeletions.current.add(entryId);
       
-      setProcessingEntries(prev => prev.filter(tempId => {
+      // Update the visible processing entries
+      setVisibleProcessingEntries(prev => prev.filter(tempId => {
         const mappedId = getEntryIdForProcessingId(tempId);
         return mappedId !== entryId;
       }));

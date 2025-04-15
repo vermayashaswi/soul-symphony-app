@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -10,11 +11,12 @@ import {
   isProcessingEntry,
   resetProcessingState,
   getProcessingEntries,
-  removeProcessingEntryById
+  removeProcessingEntryById as removeProcessingEntryFromState
 } from './audio/processing-state';
 import { validateInitialState, setupProcessingTimeout } from './audio/recording-validation';
 import { processRecordingInBackground } from './audio/background-processor';
 import { blobToBase64 } from './audio/blob-utils';
+import { supabase } from '@/integrations/supabase/client';
 
 // To track correlation between tempIds and final entryIds
 const processingToEntryIdMap = new Map<string, number>();
@@ -25,7 +27,22 @@ const processingToEntryIdMap = new Map<string, number>();
  * @returns The corresponding entry ID if found, or undefined
  */
 export function getEntryIdForProcessingId(tempId: string): number | undefined {
-  return processingToEntryIdMap.get(tempId);
+  try {
+    // First check the in-memory map
+    const memoryResult = processingToEntryIdMap.get(tempId);
+    if (memoryResult) return memoryResult;
+    
+    // Then check localStorage as fallback
+    const processingToEntryMap = localStorage.getItem('processingToEntryMap');
+    if (!processingToEntryMap) return undefined;
+    
+    const map = JSON.parse(processingToEntryMap);
+    const result = map[tempId];
+    return result ? Number(result) : undefined;
+  } catch (error) {
+    console.error('[Audio Processing] Error getting entry ID for processing ID:', error);
+    return undefined;
+  }
 }
 
 /**
@@ -34,7 +51,18 @@ export function getEntryIdForProcessingId(tempId: string): number | undefined {
  * @param entryId The final database entry ID
  */
 export function setEntryIdForProcessingId(tempId: string, entryId: number): void {
+  // Store in memory map
   processingToEntryIdMap.set(tempId, entryId);
+  
+  // Also persist to localStorage for cross-page survival
+  try {
+    const processingToEntryMap = localStorage.getItem('processingToEntryMap');
+    const map = processingToEntryMap ? JSON.parse(processingToEntryMap) : {};
+    map[tempId] = entryId;
+    localStorage.setItem('processingToEntryMap', JSON.stringify(map));
+  } catch (error) {
+    console.error('[Audio Processing] Error setting entry ID for processing ID:', error);
+  }
   
   // Dispatch an event to notify components of the correlation
   window.dispatchEvent(new CustomEvent('processingEntryMapped', {
@@ -47,6 +75,7 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
  */
 export function clearProcessingToEntryIdMap(): void {
   processingToEntryIdMap.clear();
+  localStorage.removeItem('processingToEntryMap');
 }
 
 /**
@@ -172,28 +201,15 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
 export { 
   isProcessingEntry, 
   resetProcessingState, 
-  getProcessingEntries,
-  removeProcessingEntryById 
+  getProcessingEntries
 } from './audio/processing-state';
 
-// Update getEntryIdForProcessingId to be more resilient
-export const getEntryIdForProcessingId = (tempId: string): number | null => {
-  try {
-    const processingToEntryMap = localStorage.getItem('processingToEntryMap');
-    if (!processingToEntryMap) return null;
-    
-    const map = JSON.parse(processingToEntryMap);
-    return map[tempId] || null;
-  } catch (error) {
-    console.error('[Audio Processing] Error getting entry ID for processing ID:', error);
-    return null;
-  }
-};
-
-// Update the removeProcessingEntryById function to properly clean up all traces
-export const removeProcessingEntryById = (entryId: number | string): void => {
+/**
+ * Remove a processing entry by ID, cleaning up both processing state and mapping
+ */
+export function removeProcessingEntryById(entryId: number | string): void {
   // First, remove from the processing state
-  removeProcessingFromState(entryId);
+  removeProcessingEntryFromState(entryId);
   
   // Then, clean up the map storage
   try {
@@ -208,6 +224,8 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
         if (String(map[tempId]) === idStr) {
           delete map[tempId];
           hasChanges = true;
+          // Also remove from memory map
+          processingToEntryIdMap.delete(tempId);
         }
       });
       
@@ -234,4 +252,4 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
   window.dispatchEvent(new CustomEvent('entryDeleted', {
     detail: { entryId }
   }));
-};
+}
