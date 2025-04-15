@@ -3,7 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useRecordRTCRecorder } from '@/hooks/use-recordrtc-recorder';
+import { useAudioRecorder } from '@/hooks/use-audio-recorder';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { normalizeAudioBlob } from '@/utils/audio/blob-utils';
 import { toast } from 'sonner';
@@ -32,12 +32,15 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [audioPrepared, setAudioPrepared] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
   const [toastsCleared, setToastsCleared] = useState(false);
+  
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
   const domClearAttemptedRef = useRef(false);
+  
   const { user } = useAuth();
   const { isMobile } = useIsMobile();
   
+  // Audio recording hook
   const {
     isRecording,
     recordingTime,
@@ -49,17 +52,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     stopRecording,
     requestPermissions,
     resetRecording
-  } = useRecordRTCRecorder({ 
+  } = useAudioRecorder({ 
     noiseReduction: false,
     maxDuration: 300
   });
   
+  // Audio playback hook
   const {
     isPlaying,
     playbackProgress,
     audioDuration,
-    togglePlayback,
     audioRef,
+    togglePlayback,
     reset: resetPlayback,
     seekTo,
     prepareAudio
@@ -74,6 +78,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   });
 
+  // Clear toasts on mount
   useEffect(() => {
     const clearToastsOnMount = async () => {
       await ensureAllToastsCleared();
@@ -87,20 +92,23 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     };
   }, []);
 
+  // Clear recording error when recording starts
   useEffect(() => {
     if (isRecording) {
       setRecordingError(null);
     }
   }, [isRecording]);
   
+  // Show warning for long recordings
   useEffect(() => {
-    if (isRecording && recordingTime >= 120) {
+    if (isRecording && recordingTime >= 120000) {
       toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
         duration: 3000,
       });
     }
   }, [isRecording, recordingTime]);
   
+  // Handle animation visibility
   useEffect(() => {
     if (isRecording) {
       setShowAnimation(true);
@@ -109,6 +117,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   }, [isRecording, audioBlob]);
   
+  // Prepare audio when blob is available
   useEffect(() => {
     if (audioBlob && !audioPrepared) {
       console.log('[VoiceRecorder] New audio blob detected, preparing audio...');
@@ -119,6 +128,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   }, [audioBlob, audioPrepared, prepareAudio]);
   
+  // Update debug info when state changes
   useEffect(() => {
     console.log('[VoiceRecorder] State update:', {
       isProcessing,
@@ -139,11 +149,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         status: isRecording 
           ? 'Recording' 
           : (audioBlob ? 'Recorded' : 'No Recording'),
-        duration: audioDuration || recordingTime
+        duration: audioDuration || (recordingTime / 1000)
       });
     }
-  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
+  }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, 
+       audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
+  // Clean up when component unmounts
   useEffect(() => {
     return () => {
       console.log('[VoiceRecorder] Component unmounting, resetting state');
@@ -156,6 +168,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     };
   }, [isProcessing]);
   
+  // Handle saving recording
   const handleSaveEntry = async () => {
     if (!audioBlob) {
       setRecordingError("No audio recording available");
@@ -221,14 +234,24 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         return;
       }
       
-      // Important: This normalizes the blob and awaits the result
-      const normalizedBlob = await normalizeAudioBlob(audioBlob);
+      // Important: Normalize the blob and await the result
+      let normalizedBlob: Blob;
+      try {
+        normalizedBlob = await normalizeAudioBlob(audioBlob);
+      } catch (error) {
+        console.error('[VoiceRecorder] Error normalizing audio blob:', error);
+        setRecordingError("Error processing audio. Please try again.");
+        setIsProcessing(false);
+        setHasSaved(false);
+        savingInProgressRef.current = false;
+        return;
+      }
       
       console.log('[VoiceRecorder] Processing audio:', {
         type: normalizedBlob.type,
         size: normalizedBlob.size,
         duration: audioDuration,
-        recordingTime: recordingTime,
+        recordingTime: recordingTime / 1000,
         hasPlayedOnce: hasPlayedOnce,
         audioPrepared: audioPrepared,
         blobHasDuration: 'duration' in normalizedBlob
@@ -283,6 +306,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   };
 
+  // Handle restarting recording
   const handleRestart = async () => {
     await ensureAllToastsCleared();
     
@@ -305,6 +329,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     });
   };
 
+  // Determine if prompt should be shown
   const shouldShowPrompt = !isRecording && !audioBlob;
 
   return (

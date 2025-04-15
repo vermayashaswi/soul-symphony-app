@@ -12,7 +12,7 @@ export function RecordingStatus({ isRecording, recordingTime }: RecordingStatusP
   // If recordingTime is already a string, use it directly, otherwise format it
   const displayTime = typeof recordingTime === 'string' 
     ? recordingTime 
-    : formatTime(recordingTime);
+    : formatTime(typeof recordingTime === 'number' ? recordingTime / 1000 : 0);
   
   return (
     <motion.div

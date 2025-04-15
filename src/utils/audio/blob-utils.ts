@@ -62,7 +62,15 @@ export function getAudioBlobDuration(blob: Blob): Promise<number> {
       audio.removeEventListener('loadedmetadata', onLoadedMetadata);
       audio.removeEventListener('error', onError);
       URL.revokeObjectURL(objectUrl);
-      resolve(0);
+      
+      // Try to estimate duration from blob size
+      let estimatedDuration = 0;
+      if (blob.size > 0) {
+        // Rough estimation: ~128kbps
+        estimatedDuration = blob.size / 16000;
+      }
+      
+      resolve(estimatedDuration);
     }, 5000);
     
     audio.addEventListener('loadedmetadata', () => clearTimeout(timeout));
@@ -113,14 +121,14 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
  * Safely adds a duration property to a blob
  * @returns A new blob with duration property, or the original if it already has duration
  */
-function safelyAddDurationProperty(blob: Blob, duration: number): Blob {
+export function safelyAddDurationProperty(blob: Blob, duration: number): Blob {
   // If the blob already has a duration property, return it as is
   if ('duration' in blob) {
     console.log('[safelyAddDurationProperty] Blob already has duration property:', (blob as any).duration);
     return blob;
   }
   
-  // Create a new blob with the same content but new type
+  // Create a new blob with the same content but same type
   const newBlob = new Blob([blob], { type: blob.type });
   
   try {
