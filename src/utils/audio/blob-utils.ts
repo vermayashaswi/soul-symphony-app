@@ -1,3 +1,4 @@
+
 /**
  * Utility functions for working with audio blobs
  */
@@ -110,6 +111,7 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
 
 /**
  * Fixes common issues with audio blob MIME types and adds duration if missing
+ * @returns Promise<Blob> A promise that resolves to the normalized audio blob
  */
 export function normalizeAudioBlob(audioBlob: Blob): Promise<Blob> {
   return new Promise(async (resolve) => {

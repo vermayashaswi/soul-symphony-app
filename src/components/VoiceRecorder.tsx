@@ -220,7 +220,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         return;
       }
       
-      const normalizedBlob = normalizeAudioBlob(audioBlob);
+      const normalizedBlob = await normalizeAudioBlob(audioBlob);
       
       console.log('[VoiceRecorder] Processing audio:', {
         type: normalizedBlob.type,
