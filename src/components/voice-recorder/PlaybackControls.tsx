@@ -46,176 +46,117 @@ export function PlaybackControls({
     }
   }, [playbackProgress, audioDuration, isTouchActive]);
   
-  // Force update the slider position during playback with requestAnimationFrame
-  useEffect(() => {
-    let animationFrameId: number;
-    
-    if (isPlaying && !isTouchActive) {
-      const updateSlider = () => {
-        setSliderValue(prev => {
-          // Only update if there's a real change to prevent unnecessary renders
-          const newValue = playbackProgress * 100;
-          if (Math.abs(prev - newValue) > 0.1) {
-            return newValue;
-          }
-          return prev;
-        });
-        setCurrentTime(playbackProgress * audioDuration);
-        animationFrameId = requestAnimationFrame(updateSlider);
-      };
-      
-      animationFrameId = requestAnimationFrame(updateSlider);
-    }
-    
-    return () => {
-      if (animationFrameId) {
-        cancelAnimationFrame(animationFrameId);
-      }
-    };
-  }, [isPlaying, playbackProgress, audioDuration, isTouchActive]);
+  // Format time as MM:SS
+  const formatTime = (seconds: number): string => {
+    if (isNaN(seconds) || seconds < 0) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
+  };
   
-  const formattedProgress = formatTime(currentTime);
-  const formattedDuration = formatTime(audioDuration);
-  
+  // Handle slider change
   const handleSliderChange = (value: number[]) => {
+    const newPosition = value[0] / 100;
+    setSliderValue(value[0]);
+    setCurrentTime(newPosition * audioDuration);
+    
     if (onSeek) {
-      const position = value[0] / 100;
-      setSliderValue(value[0]);
-      setCurrentTime(position * audioDuration);
-      onSeek(position);
+      onSeek(newPosition);
     }
   };
-
-  // Function to ensure all toasts are completely cleared
-  const handleSaveClick = async () => {
-    setIsClearingToasts(true);
-    
-    // First force clear any existing toasts
-    clearAllToasts();
-    
-    // Give some time for the DOM to update
-    await new Promise(resolve => setTimeout(resolve, 50));
-    
-    // Clear again to ensure any new toasts are also cleared
-    clearAllToasts();
-    
-    // Wait a bit more for any lingering DOM effects
-    await new Promise(resolve => setTimeout(resolve, 150));
-    
-    // Try to find any remaining toast elements and force remove them
-    try {
-      const toastElements = document.querySelectorAll('[data-sonner-toast]');
-      if (toastElements.length > 0) {
-        console.log(`[PlaybackControls] Found ${toastElements.length} lingering toasts, removing manually`);
-        toastElements.forEach(el => {
-          if (el.parentNode) {
-            el.parentNode.removeChild(el);
-          }
-        });
-      }
-      
-      // Also try to clear any toast containers from the DOM
-      const toastContainers = document.querySelectorAll('[data-sonner-toaster]');
-      if (toastContainers.length > 0) {
-        console.log(`[PlaybackControls] Found ${toastContainers.length} toast containers`);
-        // Don't remove containers as they're needed, but clear their children
-        toastContainers.forEach(container => {
-          while (container.firstChild) {
-            container.removeChild(container.firstChild);
-          }
-        });
-      }
-    } catch (e) {
-      console.error('[PlaybackControls] Error trying to manually clear toasts:', e);
+  
+  // Start of touch interaction
+  const handleTouchStart = () => {
+    setIsTouchActive(true);
+  };
+  
+  // End of touch interaction
+  const handleTouchEnd = () => {
+    if (onSeek && sliderValue !== undefined) {
+      onSeek(sliderValue / 100);
     }
     
-    // Final safety check
-    clearAllToasts();
-    
-    // Now it's safe to proceed with the save operation
-    setIsClearingToasts(false);
-    onSaveEntry();
+    setTimeout(() => {
+      setIsTouchActive(false);
+    }, 100);
   };
   
   return (
-    <div className={cn("w-full px-4", isMobile ? "px-2" : "px-4")}>
-      <div className="mb-4 relative">
-        <Slider
-          defaultValue={[0]}
-          value={[sliderValue]}
-          max={100}
-          step={0.1}
-          onValueChange={handleSliderChange}
-          disabled={isProcessing || !audioBlob}
-          className="mb-2"
-          onTouchStart={() => setIsTouchActive(true)}
-          onTouchEnd={() => setIsTouchActive(false)}
-          onPointerDown={() => setIsTouchActive(true)}
-          onPointerUp={() => setIsTouchActive(false)}
-        />
-        <div className="flex justify-between mt-1.5 text-xs text-slate-500">
-          <span>{formattedProgress}</span>
-          <span>{formattedDuration}</span>
+    <div className="w-full px-4 py-2">
+      <div className="flex flex-col w-full gap-3">
+        <div className="flex items-center gap-3 mb-1 w-full">
+          <Button 
+            size="icon" 
+            variant="outline" 
+            className="h-10 w-10 rounded-full bg-white"
+            onClick={onTogglePlayback}
+            disabled={isProcessing}
+          >
+            {isPlaying ? (
+              <Pause className="h-4 w-4" />
+            ) : (
+              <Play className="h-4 w-4 ml-0.5" />
+            )}
+          </Button>
+          
+          <div className="relative w-full flex items-center">
+            <Slider
+              value={[sliderValue]}
+              min={0}
+              max={100}
+              step={0.1}
+              className={cn(
+                "w-full transition-opacity", 
+                (isProcessing) ? "opacity-60 cursor-not-allowed" : ""
+              )}
+              onValueChange={handleSliderChange}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onMouseDown={handleTouchStart}
+              onMouseUp={handleTouchEnd}
+              disabled={isProcessing}
+            />
+          </div>
+          
+          <div className="text-sm text-muted-foreground w-[60px] text-right">
+            {formatTime(currentTime)}/{formatTime(audioDuration)}
+          </div>
         </div>
-      </div>
-
-      <div className={cn(
-        "flex items-center justify-center gap-4 mt-6",
-        isMobile ? "gap-2" : "gap-4"
-      )}>
-        {/* Play/Pause Button */}
-        <Button 
-          onClick={onTogglePlayback}
-          variant="ghost" 
-          size="icon"
-          className={cn(
-            "rounded-full border",
-            isMobile ? "w-12 h-12" : "w-10 h-10"
-          )}
-          disabled={isProcessing || !audioBlob}
-        >
-          {isPlaying ? (
-            <Pause className={cn(isMobile ? "h-6 w-6" : "h-5 w-5")} />
-          ) : (
-            <Play className={cn(isMobile ? "h-6 w-6 ml-0.5" : "h-5 w-5 ml-0.5")} />
-          )}
-        </Button>
         
-        {/* Save Button */}
-        <Button 
-          onClick={handleSaveClick}
-          disabled={isProcessing || !audioBlob || isClearingToasts}
-          variant="default"
-          className={cn(isMobile ? "px-6 py-2 text-sm h-10" : "")}
-        >
-          {isProcessing || isClearingToasts ? (
-            <>
-              <Loader2 className={cn("mr-2 animate-spin", isMobile ? "h-4 w-4" : "h-4 w-4")} />
-              {isClearingToasts ? "Preparing..." : "Processing..."}
-            </>
-          ) : "Save"}
-        </Button>
-        
-        {/* Restart Button */}
-        <Button 
-          onClick={onRestart}
-          variant="ghost" 
-          size="icon"
-          className={cn(
-            "rounded-full border",
-            isMobile ? "w-12 h-12" : "w-10 h-10"
-          )}
-          disabled={isProcessing}
-        >
-          <RotateCcw className={cn(isMobile ? "h-6 w-6" : "h-5 w-5")} />
-        </Button>
+        <div className="flex justify-center gap-3">
+          <Button 
+            variant="outline" 
+            className="rounded-full"
+            onClick={onRestart}
+            disabled={isProcessing}
+          >
+            <RotateCcw className="h-4 w-4 mr-2" /> New Recording
+          </Button>
+          
+          <Button 
+            variant="default" 
+            className="rounded-full bg-green-600 hover:bg-green-700"
+            onClick={async () => {
+              setIsClearingToasts(true);
+              await clearAllToasts();
+              setTimeout(() => {
+                setIsClearingToasts(false);
+                onSaveEntry();
+              }, 100);
+            }}
+            disabled={isProcessing || isClearingToasts}
+          >
+            {isProcessing || isClearingToasts ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> 
+                {isClearingToasts ? 'Preparing...' : 'Processing...'}
+              </>
+            ) : (
+              'Save Entry'
+            )}
+          </Button>
+        </div>
       </div>
     </div>
   );
-}
-
-function formatTime(seconds: number): string {
-  const mins = Math.floor(seconds / 60);
-  const secs = Math.floor(seconds % 60);
-  return `${mins}:${secs.toString().padStart(2, '0')}`;
 }
