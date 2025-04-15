@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -41,11 +40,29 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   }
   
   // Validate duration is set
-  const blobDuration = (audioBlob as any)?.duration;
+  let blobDuration = (audioBlob as any)?.duration;
   if (blobDuration === undefined || blobDuration === null || blobDuration < 0.1) {
-    console.error('[AudioProcessing] Audio blob has invalid duration:', blobDuration);
-    return { success: false, error: 'Recording duration too short or missing' };
+    // Try to set duration if missing
+    const blobSize = audioBlob.size;
+    // Estimate duration based on blob size (very rough estimate)
+    const estimatedDuration = blobSize / 16000; // Approximate bytes per second for audio
+    
+    if (estimatedDuration < 0.1) {
+      console.error('[AudioProcessing] Audio blob has invalid duration and size is too small');
+      return { success: false, error: 'Recording duration too short or missing' };
+    }
+    
+    console.log(`[AudioProcessing] Setting missing duration on blob to estimated ${estimatedDuration}s`);
+    Object.defineProperty(audioBlob, 'duration', {
+      value: estimatedDuration,
+      writable: false,
+      configurable: true
+    });
+    
+    blobDuration = estimatedDuration;
   }
+  
+  console.log(`[AudioProcessing] Validated blob duration: ${blobDuration}s`);
   
   // Clear all toasts to ensure UI is clean before processing
   await clearAllToasts();

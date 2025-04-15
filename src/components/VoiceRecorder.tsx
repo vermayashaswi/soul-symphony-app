@@ -71,7 +71,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           console.log(`[VoiceRecorder] Setting blob duration explicitly to ${recordingDurationSec}s (was: ${existingDuration})`);
           Object.defineProperty(normalizedBlob, 'duration', {
             value: recordingDurationSec,
-            writable: false
+            writable: false,
+            configurable: true
           });
         } else {
           console.log(`[VoiceRecorder] Blob already has duration: ${existingDuration}s`);
@@ -82,7 +83,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         if (!(playable as any).duration || (playable as any).duration < 0.1) {
           Object.defineProperty(playable, 'duration', {
             value: recordingDurationSec,
-            writable: false
+            writable: false,
+            configurable: true
           });
         }
         
@@ -93,7 +95,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         if (audioBlob && (!(audioBlob as any).duration || (audioBlob as any).duration < 0.1)) {
           Object.defineProperty(audioBlob, 'duration', {
             value: recordingTime / 1000,
-            writable: false
+            writable: false,
+            configurable: true
           });
         }
         setPlayableBlob(audioBlob);
@@ -249,12 +252,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.log(`[VoiceRecorder] Setting missing blob duration to ${blobDuration}s before saving`);
       Object.defineProperty(audioBlob, 'duration', {
         value: blobDuration,
-        writable: false
+        writable: false,
+        configurable: true
       });
     }
     
-    const hasDuration = blobDuration > 0.1 || recordingTime > 100;
-    if (!hasDuration) {
+    if (blobDuration < 0.1 && recordingTime < 100) {
       console.error('[VoiceRecorder] Recording has invalid duration:', blobDuration, 'recordingTime:', recordingTime);
       setRecordingError("Recording duration is too short");
       return;
@@ -321,7 +324,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       if (!(normalizedBlob as any).duration || (normalizedBlob as any).duration < 0.1) {
         Object.defineProperty(normalizedBlob, 'duration', {
           value: effectiveDuration,
-          writable: false
+          writable: false,
+          configurable: true
         });
       }
       

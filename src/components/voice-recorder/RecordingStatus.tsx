@@ -6,10 +6,12 @@ import { formatTime } from '@/utils/format-time';
 interface RecordingStatusProps {
   isRecording: boolean;
   recordingTime: number;
-  isProcessing?: boolean; // Add isProcessing prop
+  isProcessing?: boolean;
 }
 
 export function RecordingStatus({ isRecording, recordingTime, isProcessing = false }: RecordingStatusProps) {
+  if (!isRecording && !isProcessing) return null;
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}

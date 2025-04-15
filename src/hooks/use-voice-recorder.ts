@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect, useCallback } from "react";
 import { recordAudio } from "../utils/audioRecorder";
 
@@ -11,10 +10,10 @@ export function useVoiceRecorder({
   onRecordingComplete,
   onError,
 }: UseVoiceRecorderProps) {
-  const [status, setStatus] = useState<
+  const [status, setStatus: any] = useState<
     "idle" | "acquiring_media" | "recording" | "stopping"
   >("idle");
-  const [recorderInstance, setRecorderInstance] = useState<any>(null);
+  const [recorderInstance, setRecorderInstance: any] = useState<any>(null);
   const [mediaStream, setMediaStream] = useState<MediaStream | null>(null);
   const [recordingBlob, setRecordingBlob] = useState<Blob | null>(null);
   const [startTime, setStartTime] = useState<number>(0);
@@ -101,12 +100,18 @@ export function useVoiceRecorder({
           
           // Ensure duration is set on the blob
           const recordingDuration = elapsedTime / 1000;
-          if (!(blob as any).duration || (blob as any).duration < 0.1) {
+          
+          // Check if duration is already set and valid
+          const existingDuration = (blob as any).duration;
+          if (!existingDuration || existingDuration < 0.1) {
             console.log(`Setting blob duration explicitly to ${recordingDuration}s`);
             Object.defineProperty(blob, 'duration', {
               value: recordingDuration,
-              writable: false
+              writable: false,
+              configurable: true
             });
+          } else {
+            console.log(`Blob already has duration set: ${existingDuration}s`);
           }
           
           console.log(`Final blob duration: ${(blob as any).duration}s`);
@@ -127,33 +132,27 @@ export function useVoiceRecorder({
           // Even if blob is small, try to process it
           if (blob) {
             const tempId = generateTempId();
-            console.log(`Processing audio blob: ${formatBytes(blob.size)}, duration: ${formatTime(elapsedTime)}, blob.duration: ${(blob as any).duration}s`);
-            onRecordingComplete(blob, tempId);
+            const blobDuration = (blob as any).duration;
             
-            if (opId) {
-              window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
-                detail: {
-                  id: opId,
-                  status: 'success',
-                  message: 'Recording completed',
-                  details: `Audio size: ${formatBytes(blob.size)}, Duration: ${formatTime(elapsedTime)}, Blob duration: ${(blob as any).duration}s, TempID: ${tempId}`
-                }
-              }));
+            console.log(`Processing audio blob: ${formatBytes(blob.size)}, duration: ${formatTime(elapsedTime)}, blob.duration: ${blobDuration}s`);
+            
+            // Verify duration explicitly before passing to callback
+            if (blobDuration < 0.1) {
+              console.warn(`Audio duration too short (${blobDuration}s), enforcing minimum duration`);
+              
+              // Enforce minimum duration if needed
+              Object.defineProperty(blob, 'duration', {
+                value: Math.max(0.5, recordingDuration),
+                writable: false,
+                configurable: true
+              });
+              
+              console.log(`Enforced minimum duration: ${(blob as any).duration}s`);
             }
+            
+            onRecordingComplete(blob, tempId);
           } else {
             console.error("Recording failed: no blob");
-            
-            if (opId) {
-              window.dispatchEvent(new CustomEvent('journalOperationUpdate', {
-                detail: {
-                  id: opId,
-                  status: 'error',
-                  message: 'Recording failed',
-                  details: 'No audio blob received'
-                }
-              }));
-            }
-            
             if (onError) onError(new Error("Recording failed: no blob"));
           }
         })

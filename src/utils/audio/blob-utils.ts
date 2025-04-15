@@ -1,4 +1,3 @@
-
 /**
  * Utility functions for working with audio blobs
  */
@@ -56,6 +55,10 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
 export function normalizeAudioBlob(audioBlob: Blob): Blob {
   console.log(`[blob-utils] Normalizing audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
   
+  // Preserve original duration
+  const originalDuration = (audioBlob as any).duration;
+  console.log(`[blob-utils] Original blob duration: ${originalDuration || 'undefined'}`);
+  
   // If the blob is very small, add significant padding to prevent playback issues
   if (audioBlob.size < 1000) {
     console.log('[blob-utils] Adding padding to small audio blob');
@@ -63,6 +66,17 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
     const padding = new Uint8Array(131072).fill(0);
     const paddedBlob = new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
     console.log('[blob-utils] After padding:', paddedBlob.size, 'bytes, type:', paddedBlob.type);
+    
+    // Transfer duration to the new blob if it exists
+    if (originalDuration && originalDuration > 0) {
+      Object.defineProperty(paddedBlob, 'duration', {
+        value: originalDuration,
+        writable: false,
+        configurable: true
+      });
+      console.log(`[blob-utils] Transferred duration ${originalDuration}s to padded blob`);
+    }
+    
     return paddedBlob;
   }
   
@@ -70,6 +84,17 @@ export function normalizeAudioBlob(audioBlob: Blob): Blob {
   if (!audioBlob.type.includes('audio/')) {
     const properBlob = new Blob([audioBlob], { type: getProperMimeType(audioBlob) });
     console.log('[blob-utils] Fixed MIME type:', properBlob.type);
+    
+    // Transfer duration to the new blob if it exists
+    if (originalDuration && originalDuration > 0) {
+      Object.defineProperty(properBlob, 'duration', {
+        value: originalDuration,
+        writable: false,
+        configurable: true
+      });
+      console.log(`[blob-utils] Transferred duration ${originalDuration}s to fixed-type blob`);
+    }
+    
     return properBlob;
   }
   
@@ -149,6 +174,10 @@ export function extractAudioData(blob: Blob): Promise<ArrayBuffer> {
 export function createPlayableAudioBlob(originalBlob: Blob): Blob {
   console.log('[blob-utils] Creating playable blob from:', originalBlob.size, 'bytes, type:', originalBlob.type);
   
+  // Preserve original duration
+  const originalDuration = (originalBlob as any).duration;
+  console.log(`[blob-utils] Original blob duration for playable: ${originalDuration || 'undefined'}`);
+  
   // For very small blobs, add significant padding
   if (originalBlob.size < 2000) {
     console.log('[blob-utils] Creating significantly padded playable blob');
@@ -156,23 +185,32 @@ export function createPlayableAudioBlob(originalBlob: Blob): Blob {
     const padding = new Uint8Array(262144).fill(0);
     
     // Try several formats for better browser compatibility
+    let paddedBlob: Blob;
+    
     if (MediaRecorder.isTypeSupported('audio/mp3')) {
-      const paddedBlob = new Blob([originalBlob, padding], { type: 'audio/mp3' });
+      paddedBlob = new Blob([originalBlob, padding], { type: 'audio/mp3' });
       console.log('[blob-utils] Created MP3 padded blob:', paddedBlob.size, 'bytes');
-      return paddedBlob;
-    }
-    
-    if (MediaRecorder.isTypeSupported('audio/wav')) {
-      const paddedBlob = new Blob([originalBlob, padding], { type: 'audio/wav' });
+    } else if (MediaRecorder.isTypeSupported('audio/wav')) {
+      paddedBlob = new Blob([originalBlob, padding], { type: 'audio/wav' });
       console.log('[blob-utils] Created WAV padded blob:', paddedBlob.size, 'bytes');
-      return paddedBlob;
+    } else {
+      paddedBlob = new Blob([originalBlob, padding], { 
+        type: 'audio/webm;codecs=opus' 
+      });
+      console.log('[blob-utils] Created WebM padded blob:', paddedBlob.size, 'bytes');
     }
     
-    const defaultPaddedBlob = new Blob([originalBlob, padding], { 
-      type: 'audio/webm;codecs=opus' 
-    });
-    console.log('[blob-utils] Created WebM padded blob:', defaultPaddedBlob.size, 'bytes');
-    return defaultPaddedBlob;
+    // Transfer duration to the new blob if it exists
+    if (originalDuration && originalDuration > 0) {
+      Object.defineProperty(paddedBlob, 'duration', {
+        value: originalDuration,
+        writable: false,
+        configurable: true
+      });
+      console.log(`[blob-utils] Transferred duration ${originalDuration}s to padded playable blob`);
+    }
+    
+    return paddedBlob;
   }
   
   // If the original blob is already a playable format, return it
@@ -199,10 +237,20 @@ export function createPlayableAudioBlob(originalBlob: Blob): Blob {
   }
   
   // For other formats, try converting to MP3 as it's widely supported
-  console.log('[blob-utils] Creating playable blob with type change to MP3');
   const convertedBlob = new Blob([originalBlob], { 
     type: 'audio/mpeg' 
   });
   console.log('[blob-utils] Created MP3 blob:', convertedBlob.size, 'bytes');
+  
+  // Transfer duration to the converted blob if it exists
+  if (originalDuration && originalDuration > 0) {
+    Object.defineProperty(convertedBlob, 'duration', {
+      value: originalDuration,
+      writable: false,
+      configurable: true
+    });
+    console.log(`[blob-utils] Transferred duration ${originalDuration}s to converted playable blob`);
+  }
+  
   return convertedBlob;
 }
