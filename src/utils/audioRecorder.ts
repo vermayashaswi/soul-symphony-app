@@ -8,21 +8,23 @@ export const recordAudio = async () => {
     throw new Error('Audio recording not supported in this browser');
   }
   
-  // Request microphone access with optimized settings
+  // Request microphone access with optimized settings for higher quality
   const stream = await navigator.mediaDevices.getUserMedia({ 
     audio: {
       echoCancellation: true,
       noiseSuppression: true,
-      autoGainControl: true
+      autoGainControl: true,
+      sampleRate: 44100, // Standard sample rate for better compatibility
+      channelCount: 1    // Mono for smaller file size and better compatibility
     }
   });
   
   // Try multiple MIME types in order of preference
   const mimeTypes = [
-    'audio/webm;codecs=opus',
-    'audio/webm',
-    'audio/mp4',
-    'audio/ogg;codecs=opus'
+    'audio/webm;codecs=opus', // Best quality and compression
+    'audio/mp4',              // Good iOS support
+    'audio/ogg;codecs=opus',  // Good quality fallback
+    'audio/wav'               // Universal compatibility 
   ];
   
   // Find the first supported MIME type
@@ -37,7 +39,9 @@ export const recordAudio = async () => {
   console.log(`[audioRecorder] Using MIME type: ${mimeType || 'default browser MIME type'}`);
   
   // Set up MediaRecorder with best supported options
-  const options: MediaRecorderOptions = {};
+  const options: MediaRecorderOptions = {
+    audioBitsPerSecond: 128000 // Consistent bitrate for better compatibility
+  };
   
   // Only add mime type if we found a supported one
   if (mimeType) {
@@ -65,6 +69,8 @@ export const recordAudio = async () => {
   
   const audioChunks: BlobPart[] = [];
   let startTime = Date.now();
+  let pauseTime = 0;
+  let totalPausedTime = 0;
   
   // Add data to chunks when available
   mediaRecorder.addEventListener('dataavailable', (event) => {
@@ -80,25 +86,63 @@ export const recordAudio = async () => {
   const stop = () => {
     return new Promise<{ audioUrl: string, blob: Blob }>((resolve) => {
       mediaRecorder.addEventListener('stop', () => {
-        // Create audio blob and get its URL
-        const audioBlob = new Blob(audioChunks, { type: mediaRecorder.mimeType || 'audio/webm;codecs=opus' });
+        // Calculate precise duration
+        const actualDuration = (Date.now() - startTime - totalPausedTime) / 1000;
+        console.log(`[audioRecorder] Calculated audio duration: ${actualDuration.toFixed(3)}s`);
+        
+        // Create audio blob with proper MIME type ensuring it's a format browsers can play
+        let mimeTypeToUse = mediaRecorder.mimeType;
+        
+        // Ensure MIME type is valid and well-supported
+        if (!mimeTypeToUse || mimeTypeToUse === 'audio/webm;codecs=opus') {
+          // WebM is well-supported in most browsers but sometimes has duration issues
+          // Force to mp3 or wav if WebM was used but had issues
+          if (actualDuration < 0.5 && MediaRecorder.isTypeSupported('audio/wav')) {
+            mimeTypeToUse = 'audio/wav';
+          } else if (MediaRecorder.isTypeSupported('audio/mp3') || MediaRecorder.isTypeSupported('audio/mpeg')) {
+            mimeTypeToUse = MediaRecorder.isTypeSupported('audio/mp3') ? 'audio/mp3' : 'audio/mpeg';
+          }
+        }
+        
+        console.log(`[audioRecorder] Creating blob with type: ${mimeTypeToUse}`);
+        const audioBlob = new Blob(audioChunks, { type: mimeTypeToUse });
+        
+        // Create a new Blob with an explicit duration property
         const audioUrl = URL.createObjectURL(audioBlob);
         
-        // Calculate duration and set it directly on the blob
-        const duration = (Date.now() - startTime) / 1000;
-        console.log(`[audioRecorder] Calculated audio duration: ${duration}s`);
-        
-        // Set duration property on the blob
+        // Explicitly set the duration on the blob using defineProp since it won't be accessible otherwise
         Object.defineProperty(audioBlob, 'duration', {
-          value: duration,
+          value: actualDuration,
           writable: false,
-          configurable: true
+          configurable: true,
+          enumerable: true // Make it enumerable so it shows up in logs
         });
+        
+        console.log(`[audioRecorder] Audio blob created: ${audioBlob.size} bytes, type: ${audioBlob.type}, duration: ${(audioBlob as any).duration}s`);
+        
+        // Verify the duration was set correctly
+        if ((audioBlob as any).duration !== actualDuration) {
+          console.warn('[audioRecorder] Duration property was not set correctly on the blob');
+        }
         
         // Release microphone
         stream.getTracks().forEach(track => track.stop());
         
-        resolve({ audioUrl, blob: audioBlob });
+        // Check if duration was properly set before resolving
+        if ((audioBlob as any).duration === undefined || (audioBlob as any).duration === null) {
+          console.warn('[audioRecorder] Duration was not set on blob, attempting to set it again');
+          // Try once more with different approach
+          const blobWithDuration = new Blob([audioBlob], { type: audioBlob.type });
+          Object.defineProperty(blobWithDuration, 'duration', {
+            value: actualDuration,
+            writable: false,
+            configurable: true,
+            enumerable: true
+          });
+          resolve({ audioUrl, blob: blobWithDuration });
+        } else {
+          resolve({ audioUrl, blob: audioBlob });
+        }
       });
       
       if (mediaRecorder.state === 'recording') {
@@ -111,13 +155,14 @@ export const recordAudio = async () => {
   return {
     start: () => {
       if (mediaRecorder.state !== 'recording') {
-        startTime = Date.now(); // Reset start time when recording is started
+        startTime = Date.now() - totalPausedTime; // Adjust start time if there were pauses
         mediaRecorder.start(100);
       }
     },
     stop,
     pause: () => {
       if (mediaRecorder.state === 'recording') {
+        pauseTime = Date.now();
         mediaRecorder.pause();
         return true;
       }
@@ -125,6 +170,7 @@ export const recordAudio = async () => {
     },
     resume: () => {
       if (mediaRecorder.state === 'paused') {
+        totalPausedTime += (Date.now() - pauseTime);
         mediaRecorder.resume();
         return true;
       }

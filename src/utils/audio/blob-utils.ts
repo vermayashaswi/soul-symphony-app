@@ -45,60 +45,69 @@ export function validateAudioBlob(audioBlob: Blob | null): { isValid: boolean; e
     return { isValid: false, errorMessage: 'Empty recording detected.' };
   }
   
+  // Check for duration property
+  const blobDuration = (audioBlob as any).duration;
+  if (blobDuration === undefined || blobDuration === null) {
+    console.warn('[blob-utils] Audio blob has no duration property');
+    // Still consider it valid, we'll set duration later
+  } else if (blobDuration < 0.1) {
+    console.warn('[blob-utils] Audio blob has very short duration:', blobDuration);
+    // Still consider it valid, we'll enforce minimum duration later
+  } else {
+    console.log(`[blob-utils] Audio blob has valid duration: ${blobDuration}s`);
+  }
+  
   console.log(`[blob-utils] Validated audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
   return { isValid: true };
 }
 
 /**
  * Fixes common issues with audio blob MIME types and adds padding to small files
+ * Also ensures duration is properly set
  */
 export function normalizeAudioBlob(audioBlob: Blob): Blob {
   console.log(`[blob-utils] Normalizing audio blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`);
   
-  // Preserve original duration
+  // Extract the original duration if present
   const originalDuration = (audioBlob as any).duration;
   console.log(`[blob-utils] Original blob duration: ${originalDuration || 'undefined'}`);
   
-  // If the blob is very small, add significant padding to prevent playback issues
+  // If no duration is set or it's too small, try to estimate a reasonable one
+  let effectiveDuration = originalDuration;
+  if (effectiveDuration === undefined || effectiveDuration === null || effectiveDuration < 0.1) {
+    // Estimate based on audio size (rough approximation)
+    const estimatedDuration = Math.max(0.5, audioBlob.size / 16000);
+    console.log(`[blob-utils] Estimated duration from size: ${estimatedDuration.toFixed(2)}s`);
+    effectiveDuration = estimatedDuration;
+  }
+  
+  // If the blob is very small, add significant padding
+  let resultBlob: Blob;
+  
   if (audioBlob.size < 1000) {
     console.log('[blob-utils] Adding padding to small audio blob');
     // Create a larger padding for very small files (128KB)
     const padding = new Uint8Array(131072).fill(0);
-    const paddedBlob = new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
-    console.log('[blob-utils] After padding:', paddedBlob.size, 'bytes, type:', paddedBlob.type);
-    
-    // Transfer duration to the new blob if it exists
-    if (originalDuration && originalDuration > 0) {
-      Object.defineProperty(paddedBlob, 'duration', {
-        value: originalDuration,
-        writable: false,
-        configurable: true
-      });
-      console.log(`[blob-utils] Transferred duration ${originalDuration}s to padded blob`);
-    }
-    
-    return paddedBlob;
+    resultBlob = new Blob([audioBlob, padding], { type: getProperMimeType(audioBlob) });
+    console.log('[blob-utils] After padding:', resultBlob.size, 'bytes, type:', resultBlob.type);
+  } else if (!audioBlob.type.includes('audio/')) {
+    // If the blob doesn't have a proper MIME type, assign one
+    resultBlob = new Blob([audioBlob], { type: getProperMimeType(audioBlob) });
+    console.log('[blob-utils] Fixed MIME type:', resultBlob.type);
+  } else {
+    resultBlob = audioBlob;
   }
   
-  // If the blob doesn't have a proper MIME type, assign one
-  if (!audioBlob.type.includes('audio/')) {
-    const properBlob = new Blob([audioBlob], { type: getProperMimeType(audioBlob) });
-    console.log('[blob-utils] Fixed MIME type:', properBlob.type);
-    
-    // Transfer duration to the new blob if it exists
-    if (originalDuration && originalDuration > 0) {
-      Object.defineProperty(properBlob, 'duration', {
-        value: originalDuration,
-        writable: false,
-        configurable: true
-      });
-      console.log(`[blob-utils] Transferred duration ${originalDuration}s to fixed-type blob`);
-    }
-    
-    return properBlob;
-  }
+  // Ensure duration is explicitly set on the result blob
+  Object.defineProperty(resultBlob, 'duration', {
+    value: effectiveDuration,
+    writable: false,
+    configurable: true,
+    enumerable: true
+  });
   
-  return audioBlob;
+  console.log(`[blob-utils] Final normalized blob: ${resultBlob.size} bytes, type: ${resultBlob.type}, duration: ${(resultBlob as any).duration}s`);
+  return resultBlob;
 }
 
 /**
