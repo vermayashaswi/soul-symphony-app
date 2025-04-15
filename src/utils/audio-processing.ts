@@ -17,6 +17,39 @@ import { validateInitialState, setupProcessingTimeout } from './audio/recording-
 import { processRecordingInBackground } from './audio/background-processor';
 import { blobToBase64 } from './audio/blob-utils';
 
+// To track correlation between tempIds and final entryIds
+const processingToEntryIdMap = new Map<string, number>();
+
+/**
+ * Get the mapping between a temporary processing ID and the final entry ID
+ * @param tempId The temporary processing ID
+ * @returns The corresponding entry ID if found, or undefined
+ */
+export function getEntryIdForProcessingId(tempId: string): number | undefined {
+  return processingToEntryIdMap.get(tempId);
+}
+
+/**
+ * Store a mapping between a temporary processing ID and its final entry ID
+ * @param tempId The temporary processing ID
+ * @param entryId The final database entry ID
+ */
+export function setEntryIdForProcessingId(tempId: string, entryId: number): void {
+  processingToEntryIdMap.set(tempId, entryId);
+  
+  // Dispatch an event to notify components of the correlation
+  window.dispatchEvent(new CustomEvent('processingEntryMapped', {
+    detail: { tempId, entryId, timestamp: Date.now() }
+  }));
+}
+
+/**
+ * Clears the processing to entry ID mapping
+ */
+export function clearProcessingToEntryIdMap(): void {
+  processingToEntryIdMap.clear();
+}
+
 /**
  * Processes an audio recording for transcription and analysis
  * Returns immediately with a temporary ID while processing continues in background
@@ -103,6 +136,12 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     processRecordingInBackground(audioBlob, userId, tempId)
       .then(result => {
         console.log('[AudioProcessing] Background processing completed:', result);
+        
+        // If we have an entryId in the result, store the mapping
+        if (result.entryId) {
+          setEntryIdForProcessingId(tempId, result.entryId);
+          console.log(`[AudioProcessing] Mapped tempId ${tempId} to entryId ${result.entryId}`);
+        }
       })
       .catch(err => {
         console.error('[AudioProcessing] Background processing error:', err);

@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { processRecording } from '@/utils/audio-processing';
+import { processRecording, getEntryIdForProcessingId } from '@/utils/audio-processing';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import VoiceRecorder from '@/components/VoiceRecorder';
 import JournalHeader from '@/components/journal/JournalHeader';
@@ -11,7 +11,10 @@ import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
-import { logInfo } from '@/components/debug/DebugPanel';
+
+const logInfo = (message: string, source: string) => {
+  console.log(`[${source}] ${message}`);
+};
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -44,6 +47,7 @@ const Journal = () => {
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [entriesReady, setEntriesReady] = useState(false);
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const processingToEntryMapRef = useRef<Map<string, number>>(new Map());
 
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -57,18 +61,56 @@ const Journal = () => {
       // Handle processing entries changed event
     };
     
+    const handleProcessingEntryMapped = (event: CustomEvent) => {
+      if (event.detail && event.detail.tempId && event.detail.entryId) {
+        console.log(`[Journal] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
+        
+        processingToEntryMapRef.current.set(event.detail.tempId, event.detail.entryId);
+        
+        if (processingEntries.includes(event.detail.tempId)) {
+          setProcessedEntryIds(prev => [...prev, event.detail.entryId]);
+          
+          toast.success('Journal entry analyzed and saved', {
+            duration: 3000,
+            id: 'journal-success-toast',
+            closeButton: false
+          });
+          
+          setProcessingEntries(prev => prev.filter(id => id !== event.detail.tempId));
+          
+          if (toastIds[event.detail.tempId]) {
+            toast.dismiss(toastIds[event.detail.tempId]);
+            
+            setToastIds(prev => {
+              const newToastIds = { ...prev };
+              delete newToastIds[event.detail.tempId];
+              return newToastIds;
+            });
+          }
+          
+          setTimeout(() => {
+            console.log('[Journal] Doing additional fetch for complete entry data after mapping');
+            fetchEntries();
+            setRefreshKey(prev => prev + 1);
+          }, 500);
+        }
+      }
+    };
+    
     window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
+    window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     
     return () => {
       window.removeEventListener('error', handleError);
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
+      window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
       if (autoRetryTimeoutRef.current) {
         clearTimeout(autoRetryTimeoutRef.current);
       }
       
       clearAllToasts();
     };
-  }, []);
+  }, [processingEntries, toastIds, fetchEntries]);
 
   const { 
     entries, 
@@ -121,32 +163,68 @@ const Journal = () => {
       
       const newEntryIds = currentEntryIds.filter(id => !prevEntryIds.includes(id));
       
-      if (newEntryIds.length > 0 && processingEntries.length > 0) {
+      if (newEntryIds.length > 0) {
         console.log('[Journal] New entries detected:', newEntryIds);
         logInfo(`New entries detected: ${newEntryIds.join(', ')}`, 'Journal');
-        setEntryHasBeenProcessed(true);
         
-        setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
-        
-        toast.success('Journal entry analyzed and saved', {
-          duration: 3000,
-          id: 'journal-success-toast',
-          closeButton: false
+        const connectedProcessingEntries: string[] = [];
+        processingEntries.forEach(tempId => {
+          const mappedEntryId = getEntryIdForProcessingId(tempId);
+          if (mappedEntryId && newEntryIds.includes(mappedEntryId)) {
+            connectedProcessingEntries.push(tempId);
+          }
         });
         
-        setTimeout(() => {
-          console.log('[Journal] Doing additional fetch for complete entry data');
-          fetchEntries();
-          setRefreshKey(prev => prev + 1);
-        }, 1000);
-        
-        setProcessingEntries([]);
-        setToastIds({});
-        setIsSavingRecording(false);
-        setSafeToSwitchTab(true);
-        
-        if (activeTab === 'record') {
-          setActiveTab('entries');
+        if (connectedProcessingEntries.length > 0 || processingEntries.length > 0) {
+          console.log('[Journal] Found connection between new entries and processing entries:', connectedProcessingEntries);
+          setEntryHasBeenProcessed(true);
+          
+          setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
+          
+          if (!newEntryIds.some(id => notifiedEntryIds.has(id))) {
+            toast.success('Journal entry analyzed and saved', {
+              duration: 3000,
+              id: 'journal-success-toast',
+              closeButton: false
+            });
+            
+            setNotifiedEntryIds(prev => {
+              const newSet = new Set(prev);
+              newEntryIds.forEach(id => newSet.add(id));
+              return newSet;
+            });
+          }
+          
+          if (connectedProcessingEntries.length > 0) {
+            setProcessingEntries(prev => prev.filter(id => !connectedProcessingEntries.includes(id)));
+            
+            connectedProcessingEntries.forEach(tempId => {
+              if (toastIds[tempId]) {
+                toast.dismiss(toastIds[tempId]);
+              }
+            });
+            
+            setToastIds(prev => {
+              const newToastIds = { ...prev };
+              connectedProcessingEntries.forEach(tempId => {
+                delete newToastIds[tempId];
+              });
+              return newToastIds;
+            });
+          }
+          
+          setTimeout(() => {
+            console.log('[Journal] Doing additional fetch for complete entry data');
+            fetchEntries();
+            setRefreshKey(prev => prev + 1);
+          }, 1000);
+          
+          setIsSavingRecording(false);
+          setSafeToSwitchTab(true);
+          
+          if (activeTab === 'record') {
+            setActiveTab('entries');
+          }
         }
         
         setEntriesReady(true);
@@ -158,7 +236,7 @@ const Journal = () => {
         setEntriesReady(true);
       }
     }
-  }, [entries, processingEntries, toastIds, entriesReady, activeTab, fetchEntries]);
+  }, [entries, processingEntries, toastIds, entriesReady, activeTab, fetchEntries, notifiedEntryIds]);
 
   useEffect(() => {
     return () => {

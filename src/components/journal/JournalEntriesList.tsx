@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -8,7 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import JournalSearch from './JournalSearch';
-import { getProcessingEntries } from '@/utils/audio-processing';
+import { getProcessingEntries, getEntryIdForProcessingId } from '@/utils/audio-processing';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -35,6 +34,7 @@ export default function JournalEntriesList({
   const [persistedProcessingEntries, setPersistedProcessingEntries] = useState<string[]>([]);
   const [isSearchActive, setIsSearchActive] = useState(false);
   const [processingStep, setProcessingStep] = useState<string>('recording');
+  const [processingToEntryMap, setProcessingToEntryMap] = useState<Map<string, number>>(new Map());
   const hasProcessingEntries = Array.isArray(processingEntries) && processingEntries.length > 0 || persistedProcessingEntries.length > 0;
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
@@ -66,6 +66,40 @@ export default function JournalEntriesList({
       };
     }
   }, [hasProcessingEntries]);
+
+  // Listen for mapping events between processing IDs and entry IDs
+  useEffect(() => {
+    const handleProcessingEntryMapped = (event: CustomEvent) => {
+      if (event.detail && event.detail.tempId && event.detail.entryId) {
+        console.log(`[JournalEntriesList] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
+        
+        setProcessingToEntryMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(event.detail.tempId, event.detail.entryId);
+          return newMap;
+        });
+        
+        // Check if this entry is in our current entries list and highlight it
+        const newEntryId = event.detail.entryId;
+        if (newEntryId && !animatedEntryIds.includes(newEntryId)) {
+          setAnimatedEntryIds(prev => [...prev, newEntryId]);
+          
+          // Remove highlight after 5 seconds
+          setTimeout(() => {
+            if (componentMounted.current) {
+              setAnimatedEntryIds(prev => prev.filter(id => id !== newEntryId));
+            }
+          }, 5000);
+        }
+      }
+    };
+    
+    window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+    
+    return () => {
+      window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+    };
+  }, [animatedEntryIds]);
 
   // Load persisted processing entries from localStorage
   useEffect(() => {
@@ -138,12 +172,27 @@ export default function JournalEntriesList({
     try {
       if (Array.isArray(entries) && entries.length > 0) {
         if (entries.length > prevEntriesLength) {
+          // Find newly added entries
           const newEntryIds: number[] = [];
           
-          for (let i = 0; i < Math.min(entries.length - prevEntriesLength, entries.length); i++) {
-            const entry = entries[i];
-            if (entry && typeof entry === 'object' && entry.id) {
-              newEntryIds.push(entry.id);
+          // Check processing entries first - these have priority for animation
+          if (persistedProcessingEntries.length > 0) {
+            persistedProcessingEntries.forEach(tempId => {
+              const mappedEntryId = getEntryIdForProcessingId(tempId);
+              if (mappedEntryId && !animatedEntryIds.includes(mappedEntryId)) {
+                console.log(`[JournalEntriesList] Found mapped entry ID for processing ${tempId}: ${mappedEntryId}`);
+                newEntryIds.push(mappedEntryId);
+              }
+            });
+          }
+          
+          // If no mapped entries were found, use the traditional approach
+          if (newEntryIds.length === 0) {
+            for (let i = 0; i < Math.min(entries.length - prevEntriesLength, entries.length); i++) {
+              const entry = entries[i];
+              if (entry && typeof entry === 'object' && entry.id && !animatedEntryIds.includes(entry.id)) {
+                newEntryIds.push(entry.id);
+              }
             }
           }
             
@@ -167,7 +216,7 @@ export default function JournalEntriesList({
       console.error('[JournalEntriesList] Error processing entry animations:', error);
       setAnimatedEntryIds([]);
     }
-  }, [entries.length, prevEntriesLength, entries]);
+  }, [entries.length, prevEntriesLength, entries, persistedProcessingEntries, animatedEntryIds]);
   
   const handleEntryDelete = async (entryId: number) => {
     try {
@@ -403,7 +452,7 @@ export default function JournalEntriesList({
                       delay: index === 0 && safeLocalEntries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
                     }}
                     className={animatedEntryIds.includes(entry.id) ? 
-                      "rounded-lg shadow-md relative overflow-hidden" : 
+                      "rounded-lg shadow-md relative overflow-hidden ring-2 ring-primary ring-opacity-50" : 
                       "relative overflow-hidden"
                     }
                   >
