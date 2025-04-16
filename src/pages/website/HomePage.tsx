@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail, Calendar, TrendingUp } from 'lucide-react';
@@ -702,8 +703,114 @@ const HomePage = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {[
-              {
-                text: "\"SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time and helps me stay consistent with my practice!\"",
-                author: "Arjun P., Software Engineer",
-                avatar: "https://images.unsplash.com/photo-1610216705422-caa3fcb6d1
+            {testimonials.map((testimonial, index) => (
+              <div key={index} className="bg-white p-6 rounded-lg shadow-md flex flex-col h-full">
+                <p className="text-muted-foreground mb-6 flex-grow">{testimonial.text}</p>
+                <div className="flex items-center mt-auto">
+                  <div className="w-12 h-12 rounded-full overflow-hidden mr-4">
+                    <img 
+                      src={testimonial.avatar} 
+                      alt={testimonial.author}
+                      className="w-full h-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <h4 className="font-medium text-gray-900">{testimonial.author}</h4>
+                  </div>
+                </div>
+              </div>
+            ))}
+          </div>
+        </div>
+      </section>
+      
+      <section className="py-16 md:py-24 bg-white">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-16">
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Security</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">Your Privacy Matters to Us</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              We've built SOuLO with privacy and security as top priorities from day one
+            </p>
+          </div>
+          
+          <div className="flex flex-col md:flex-row gap-12 md:gap-8 items-center max-w-6xl mx-auto">
+            <div className="w-full md:w-1/2">
+              <img 
+                src="https://images.unsplash.com/photo-1581289627710-45747c57e9a6?q=80&w=1000&auto=format&fit=crop"
+                alt="Privacy and Security" 
+                className="w-full h-auto rounded-lg shadow-lg"
+              />
+            </div>
+            
+            <div className="w-full md:w-1/2 space-y-6">
+              <div className="flex gap-3">
+                <div className="bg-primary/10 p-2 rounded-full h-10 w-10 flex items-center justify-center shrink-0">
+                  <Shield className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">End-to-End Encryption</h3>
+                  <p className="text-muted-foreground">Your journal entries are encrypted on your device before being sent to our servers.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <div className="bg-primary/10 p-2 rounded-full h-10 w-10 flex items-center justify-center shrink-0">
+                  <Shield className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">No Data Sharing</h3>
+                  <p className="text-muted-foreground">We never sell or share your data with third parties for advertising or marketing.</p>
+                </div>
+              </div>
+              
+              <div className="flex gap-3">
+                <div className="bg-primary/10 p-2 rounded-full h-10 w-10 flex items-center justify-center shrink-0">
+                  <Shield className="h-5 w-5 text-primary" />
+                </div>
+                <div>
+                  <h3 className="text-xl font-bold mb-2">Local Processing</h3>
+                  <p className="text-muted-foreground">Advanced processing happens on your device when possible to preserve privacy.</p>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <section className="py-16 md:py-24 bg-gradient-to-br from-blue-50 to-purple-50">
+        <div className="container mx-auto px-4">
+          <div className="max-w-3xl mx-auto text-center">
+            <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to start your journaling journey?</h2>
+            <p className="text-lg text-muted-foreground mb-8">
+              Download SOuLO now and transform how you reflect on your day.
+            </p>
+            
+            <div className="flex flex-col sm:flex-row gap-4 justify-center">
+              <Button 
+                size="lg" 
+                className="gap-2 bg-black text-white hover:bg-gray-800" 
+                onClick={openAppStore}
+              >
+                <Apple className="h-5 w-5" />
+                <span>App Store</span>
+              </Button>
+              <Button 
+                size="lg" 
+                className="gap-2 bg-primary hover:bg-primary/90" 
+                onClick={openPlayStore}
+              >
+                <Play className="h-5 w-5" />
+                <span>Google Play</span>
+              </Button>
+            </div>
+          </div>
+        </div>
+      </section>
+      
+      <Footer />
+    </div>
+  );
+};
+
+export default HomePage;
