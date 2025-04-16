@@ -96,7 +96,7 @@ async function generateReviewAndRating(label: any, entities: any, themes: any): 
 
 async function processReviews(limit = 10): Promise<any> {
   try {
-    // Fetch reviews to process - now we get ALL reviews, not just null ones
+    // Fetch reviews to process
     const { data: reviews, error } = await supabase
       .from('PoPs_Reviews')
       .select('id, Label, entities, Themes, "Restaurant Name"')
@@ -128,7 +128,7 @@ async function processReviews(limit = 10): Promise<any> {
           review.Themes
         );
         
-        // Update the review with the generated data
+        // Update both Reviews and Rating columns together in a single operation
         const { error: updateError } = await supabase
           .from('PoPs_Reviews')
           .update({

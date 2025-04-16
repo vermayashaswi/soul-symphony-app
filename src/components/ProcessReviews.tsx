@@ -1,11 +1,11 @@
-
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
 import { supabase } from "@/integrations/supabase/client";
 import { toast } from "sonner";
 import { Progress } from "./ui/progress";
 import { Separator } from "./ui/separator";
+import { Square } from "lucide-react";
 
 export function ProcessReviews() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -22,9 +22,18 @@ export function ProcessReviews() {
     columns: string[];
     sampleData?: any;
   } | null>(null);
+  const shouldContinueRef = useRef(true);
 
   useEffect(() => {
     checkTableStructure();
+    
+    // Reset stop flag when component mounts
+    shouldContinueRef.current = true;
+    
+    // Clean up function
+    return () => {
+      shouldContinueRef.current = false;
+    };
   }, []);
 
   const checkTableStructure = async () => {
@@ -87,8 +96,15 @@ export function ProcessReviews() {
     }
   };
 
+  const stopProcessing = () => {
+    shouldContinueRef.current = false;
+    toast.info("Stopping the processing after current batch completes...");
+  };
+
   const processReviews = async (processAll: boolean = false) => {
     try {
+      shouldContinueRef.current = true;
+      
       setIsProcessing(true);
       setProgress(0);
       setErrorDetails(null);
@@ -130,12 +146,15 @@ export function ProcessReviews() {
           setProgress(Math.floor((processed / totalToProcess) * 100));
         }
         
-        if (processAll && data.remaining > 0) {
+        if (processAll && data.remaining > 0 && shouldContinueRef.current) {
           toast.info(`Processing next batch. Remaining: ${data.remaining}`);
           setTimeout(() => {
             processReviews(true);
           }, 2000);
         } else {
+          if (!shouldContinueRef.current) {
+            toast.success("Processing stopped by user");
+          }
           setIsProcessing(false);
         }
       } else {
@@ -233,28 +252,40 @@ export function ProcessReviews() {
           </div>
         )}
       </CardContent>
-      <CardFooter className="flex justify-between">
+      <CardFooter className="flex flex-wrap gap-2">
         <Button 
           variant="outline" 
           onClick={checkTableStructure}
           disabled={isVerifying || isProcessing}
+          size="sm"
         >
           Check Table
         </Button>
-        <Separator orientation="vertical" className="h-8" />
         <Button 
           variant="outline" 
           onClick={() => processReviews(false)}
           disabled={isVerifying || isProcessing}
+          size="sm"
         >
           Process Batch
         </Button>
         <Button 
           onClick={() => processReviews(true)}
           disabled={isVerifying || isProcessing}
+          size="sm"
         >
           Process All Reviews
         </Button>
+        {isProcessing && (
+          <Button 
+            variant="destructive"
+            onClick={stopProcessing}
+            size="sm"
+          >
+            <Square className="mr-1 h-4 w-4" />
+            Stop Processing
+          </Button>
+        )}
       </CardFooter>
     </Card>
   );
