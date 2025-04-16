@@ -200,42 +200,47 @@ async function extractThemes(text: string): Promise<string[]> {
   }
 }
 
-// Verify table structure and required columns
+// Verify table structure and required columns - FIXED to avoid information_schema issues
 async function verifyTableStructure() {
   try {
     console.log('Verifying PoPs_Reviews table structure...');
     
-    // Get the column definitions for PoPs_Reviews table
-    const { data: columns, error } = await supabase
-      .from('information_schema.columns')
-      .select('column_name')
-      .eq('table_name', 'PoPs_Reviews')
-      .eq('table_schema', 'public');
+    // First check if the table exists by trying to select from it
+    const { data: tableExists, error: tableError } = await supabase
+      .from('PoPs_Reviews')
+      .select('id')
+      .limit(1);
     
-    if (error) {
-      console.error('Error fetching table structure:', error);
-      throw error;
+    if (tableError) {
+      console.error('Error checking if table exists:', tableError);
+      throw new Error(`Table PoPs_Reviews does not exist or cannot be accessed: ${tableError.message}`);
     }
     
-    if (!columns || columns.length === 0) {
-      throw new Error('Table PoPs_Reviews not found or has no columns');
+    // Now check if our required columns exist by querying them
+    const { data: columnsExist, error: columnsError } = await supabase
+      .from('PoPs_Reviews')
+      .select('Rating, entities, Themes')
+      .limit(0);
+    
+    if (columnsError && columnsError.message.includes('column') && columnsError.message.includes('does not exist')) {
+      console.error('Error checking columns:', columnsError);
+      
+      // Figure out which columns are missing from the error message
+      const errorMsg = columnsError.message.toLowerCase();
+      const missingColumns = [];
+      
+      if (errorMsg.includes('rating')) missingColumns.push('Rating');
+      if (errorMsg.includes('entities')) missingColumns.push('entities');
+      if (errorMsg.includes('themes')) missingColumns.push('Themes');
+      
+      if (missingColumns.length > 0) {
+        throw new Error(`Missing required columns: ${missingColumns.join(', ')}`);
+      } else {
+        throw new Error(`Unknown column error: ${columnsError.message}`);
+      }
     }
     
-    // Extract column names
-    const columnNames = columns.map(col => col.column_name.toLowerCase());
-    console.log('Available columns:', columnNames);
-    
-    // Check for required columns (case-insensitive check)
-    const requiredColumns = ['rating', 'entities', 'themes'];
-    const missingColumns = requiredColumns.filter(col => 
-      !columnNames.includes(col.toLowerCase())
-    );
-    
-    if (missingColumns.length > 0) {
-      console.error('Missing required columns:', missingColumns);
-      throw new Error(`Table is missing required columns: ${missingColumns.join(', ')}`);
-    }
-    
+    console.log('Table structure verified successfully');
     return true;
   } catch (error) {
     console.error('Table structure verification failed:', error);
@@ -326,6 +331,75 @@ serve(async (req) => {
     const { limit = 10, offset = 0, processAll = false } = await req.json();
     
     console.log(`Request received with limit: ${limit}, offset: ${offset}, processAll: ${processAll}`);
+    
+    // Try to add the missing columns if they don't exist
+    try {
+      // First check if the table exists
+      const { error: tableCheckError } = await supabase
+        .from('PoPs_Reviews')
+        .select('id')
+        .limit(1);
+      
+      if (!tableCheckError) {
+        // Try to add Rating column if it doesn't exist
+        try {
+          await supabase.rpc('table_column_exists', { table_name: 'PoPs_Reviews', column_name: 'Rating' })
+            .then(async ({ data: columnExists }) => {
+              if (columnExists === false) {
+                // Using RPC is safer than direct SQL when we don't have schema access
+                console.log('Adding Rating column');
+                await supabase.rpc('add_column', { 
+                  table_name: 'PoPs_Reviews', 
+                  column_name: 'Rating', 
+                  column_type: 'integer' 
+                });
+              }
+            });
+        } catch (e) {
+          console.log('Error checking/adding Rating column:', e);
+          // Continue even if this fails
+        }
+        
+        // Try to add entities column if it doesn't exist
+        try {
+          await supabase.rpc('table_column_exists', { table_name: 'PoPs_Reviews', column_name: 'entities' })
+            .then(async ({ data: columnExists }) => {
+              if (columnExists === false) {
+                console.log('Adding entities column');
+                await supabase.rpc('add_column', { 
+                  table_name: 'PoPs_Reviews', 
+                  column_name: 'entities', 
+                  column_type: 'jsonb' 
+                });
+              }
+            });
+        } catch (e) {
+          console.log('Error checking/adding entities column:', e);
+          // Continue even if this fails
+        }
+        
+        // Try to add Themes column if it doesn't exist
+        try {
+          await supabase.rpc('table_column_exists', { table_name: 'PoPs_Reviews', column_name: 'Themes' })
+            .then(async ({ data: columnExists }) => {
+              if (columnExists === false) {
+                console.log('Adding Themes column');
+                await supabase.rpc('add_column', { 
+                  table_name: 'PoPs_Reviews', 
+                  column_name: 'Themes', 
+                  column_type: 'text[]' 
+                });
+              }
+            });
+        } catch (e) {
+          console.log('Error checking/adding Themes column:', e);
+          // Continue even if this fails
+        }
+      }
+    } catch (e) {
+      console.log('Error checking table structure:', e);
+      // Continue with normal verification
+    }
     
     // First check if the required table structure exists
     try {

@@ -24,6 +24,24 @@ export function ProcessReviews() {
       
       console.log(`Starting to process reviews: processAll=${processAll}`);
       
+      // Check if the required columns exist first by fetching a single row
+      try {
+        const { error: checkError } = await supabase
+          .from('PoPs_Reviews')
+          .select('id, Reviews')
+          .limit(1);
+        
+        if (checkError) {
+          throw new Error(`Table error: ${checkError.message}`);
+        }
+      } catch (checkError) {
+        console.error('Error checking table:', checkError);
+        setErrorDetails(`Table check failed: ${(checkError as Error).message}`);
+        setIsProcessing(false);
+        toast.error('Table check failed. Please check console for details.');
+        return;
+      }
+      
       const { data, error } = await supabase.functions.invoke('process-restaurant-reviews', {
         body: { limit: 10, offset: 0, processAll }
       });
