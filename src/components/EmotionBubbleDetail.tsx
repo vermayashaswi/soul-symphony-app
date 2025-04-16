@@ -1,199 +1,65 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
+import React from 'react';
+import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EmotionBubbleDetailProps {
   name: string;
   size: number;
   color: string;
-  className?: string;
-  value?: number;
-  percentage?: number;
-  onClick?: (name: string) => void;
   isDisturbed?: boolean;
-  isHighlighted?: boolean;
   isDragging?: boolean;
+  isHighlighted?: boolean;
+  percentage?: number;
+  onClick: (emotion: string) => void;
 }
 
 const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   name,
   size,
   color,
-  className,
-  value,
-  percentage,
-  onClick,
   isDisturbed = false,
+  isDragging = false,
   isHighlighted = false,
-  isDragging = false
+  percentage,
+  onClick
 }) => {
-  const isMobile = useIsMobile();
-  const [showPercentage, setShowPercentage] = useState(false);
-  const timeoutRef = useRef<number | null>(null);
-  const isIOS = typeof navigator !== 'undefined' && 
-    (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
-    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
-  
-  // Reset showPercentage when isHighlighted changes to false
-  useEffect(() => {
-    if (!isHighlighted && showPercentage) {
-      setShowPercentage(false);
-    }
-  }, [isHighlighted, showPercentage]);
-  
-  useEffect(() => {
-    if (timeoutRef.current) {
-      window.clearTimeout(timeoutRef.current);
-    }
-    
-    if (showPercentage && !isHighlighted) {
-      timeoutRef.current = window.setTimeout(() => {
-        setShowPercentage(false);
-      }, 2000);
-    }
-    
-    return () => {
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [showPercentage, isHighlighted]);
-
-  const calculateFontSize = () => {
-    let baseSize;
-    
-    if (name.length <= 3) {
-      baseSize = size / 3.5;
-    } else if (name.length <= 6) {
-      baseSize = size / 4;
-    } else if (name.length <= 10) {
-      baseSize = size / 5;
-    } else {
-      baseSize = size / 6;
-    }
-    
-    if (size < 50) {
-      baseSize = baseSize * 0.8;
-    }
-    
-    const minSize = isMobile ? 10 : 12;
-    const maxSize = isMobile ? 16 : 20;
-    
-    return Math.min(maxSize, Math.max(minSize, baseSize));
-  };
-  
-  const fontSizeStyle: React.CSSProperties = {
-    fontSize: `${calculateFontSize()}px`,
-    lineHeight: '1.2',
-    maxWidth: '90%',
-    overflow: 'hidden',
-    textOverflow: 'ellipsis',
-    display: 'flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    wordBreak: 'break-word',
-    textAlign: 'center' as const,
-    height: '100%',
-    padding: '12%',
-    fontWeight: name.length <= 1 ? 'normal' : 'medium'
-  };
-
-  const bubbleSize = Math.max(isMobile ? 40 : 50, size);
-
-  const getAnimation = () => {
-    if (isDragging) {
-      return {};
-    } else if (isDisturbed) {
-      return {
-        scale: [1, 1.1, 0.95, 1.05, 1],
-        rotate: [0, 5, -5, 3, 0],
-        transition: {
-          duration: 1.5,
-          ease: "easeInOut"
-        }
-      };
-    }
-    
-    return {
-      scale: [1, 1.03, 1, 0.97, 1],
-      y: [0, -3, 0, 3, 0],
-      transition: {
-        duration: 3,
-        repeat: Infinity,
-        ease: "easeInOut"
-      }
-    };
-  };
-
-  const handleBubbleClick = () => {
-    // Toggle percentage display on click
-    setShowPercentage(!showPercentage);
-    
-    if (onClick && name && name !== '•') {
-      onClick(name);
-    }
-  };
-
-  // Only show percentage if explicitly highlighted (external control) or locally toggled (and we have a percentage)
-  const shouldShowPercentage = (isHighlighted || showPercentage) && percentage !== undefined;
-
-  // iOS-specific styles
-  const iosStyles: React.CSSProperties = isIOS ? {
-    WebkitBackfaceVisibility: 'hidden',
-    WebkitTransform: 'translateZ(0)',
-    WebkitPerspective: '1000',
-    WebkitTapHighlightColor: 'transparent'
-  } : {};
+  const fontSize = Math.max(size / 4.5, 12);
+  const backgroundColorClass = color.split(' ')[0];
+  const textColorClass = color.split(' ')[1];
 
   return (
-    <div className="relative">
-      <motion.div
-        animate={getAnimation()}
-        whileTap={{ scale: 0.95, transition: { duration: 0.2 } }}
-        className={cn(
-          "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative emotion-bubble-container",
-          color,
-          isHighlighted ? "ring-2 ring-primary ring-opacity-70" : "",
-          isDragging ? "shadow-lg z-50" : "",
-          className
-        )}
-        style={{ 
-          width: bubbleSize, 
-          height: bubbleSize,
-          ...iosStyles
-        }}
-        initial={{ opacity: 1 }}
-        whileHover={{ 
-          scale: 1.05, 
-          boxShadow: "0 10px 15px -5px rgba(0, 0, 0, 0.3)",
-          transition: { duration: 0.2 }
-        }}
-        onClick={handleBubbleClick}
-      >
-        <span className="font-medium px-1 text-center" style={fontSizeStyle}>
-          {name}
-        </span>
-      </motion.div>
-      
-      {/* We only show the percentage popup if explicitly requested */}
-      <AnimatePresence>
-        {shouldShowPercentage && (
-          <motion.div 
-            className="absolute -top-8 bg-background border border-border shadow-md px-2 py-1 rounded-md text-xs font-semibold z-10"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-            style={{
-              WebkitTransform: 'translateZ(0)', // iOS GPU rendering optimization
-            }}
-          >
-            {(Math.round(percentage * 10) / 10).toFixed(1)}%
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </div>
+    <motion.div
+      className={cn(
+        "flex items-center justify-center w-full h-full rounded-full relative select-none",
+        backgroundColorClass,
+        isDragging ? "cursor-grabbing" : "cursor-pointer"
+      )}
+      onClick={() => onClick(name)}
+      style={{ fontSize: `${fontSize}px` }}
+      animate={{
+        scale: isHighlighted ? 1.1 : 1,
+        boxShadow: isHighlighted 
+          ? `0 0 20px 3px rgba(139, 92, 246, 0.5)` 
+          : isDragging 
+            ? `0 4px 8px rgba(0, 0, 0, 0.2)` 
+            : `0 2px 4px rgba(0, 0, 0, 0.1)`
+      }}
+      transition={{ 
+        duration: isDisturbed ? 0.2 : 0.3,
+        ease: "easeOut" 
+      }}
+      whileHover={{ scale: 1.05 }}
+      whileTap={{ scale: 0.95 }}
+    >
+      <span className={cn(
+        textColorClass,
+        "font-medium text-center truncate px-2",
+        isHighlighted ? "font-bold" : ""
+      )}>
+        {name}
+      </span>
+    </motion.div>
   );
 };
 
