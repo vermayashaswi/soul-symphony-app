@@ -24,6 +24,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
   const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const componentMounted = useRef(true);
+  const deleteAttempted = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -34,6 +35,8 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
   const handleDelete = async () => {
     try {
       setIsDeleting(true);
+      deleteAttempted.current = true;
+      
       // First close the dialog to prevent further user interactions
       setOpen(false);
       
@@ -48,8 +51,26 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
     }
   };
 
+  // Handle dialog close without deletion
+  const handleDialogChange = (newOpenState: boolean) => {
+    // Only update if there's a change
+    if (open !== newOpenState) {
+      // If closing without deletion attempt, reset states
+      if (!newOpenState && !deleteAttempted.current && isDeleting === false) {
+        console.log('[DeleteEntryDialog] Dialog closed without deletion');
+      }
+      // Always update the open state
+      setOpen(newOpenState);
+      
+      // Reset the delete attempted flag when dialog opens
+      if (newOpenState) {
+        deleteAttempted.current = false;
+      }
+    }
+  };
+
   return (
-    <Dialog open={open} onOpenChange={setOpen}>
+    <Dialog open={open} onOpenChange={handleDialogChange}>
       <DialogTrigger asChild>
         <Button variant="ghost" size={isMobile ? "sm" : "icon"} className={isMobile ? "h-8 w-8 p-0" : ""}>
           <Trash2 className="h-4 w-4" />
@@ -64,7 +85,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex space-x-2">
-          <Button type="button" variant="secondary" onClick={() => setOpen(false)} disabled={isDeleting}>
+          <Button type="button" variant="secondary" onClick={() => handleDialogChange(false)} disabled={isDeleting}>
             Cancel
           </Button>
           <Button 

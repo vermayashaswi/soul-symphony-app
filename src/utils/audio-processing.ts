@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -19,10 +20,30 @@ import { supabase } from '@/integrations/supabase/client';
 
 // To track correlation between tempIds and final entryIds
 const processingToEntryIdMap = new Map<string, number>();
-// New set to track deleted processing entries
+// Set to track deleted processing entries
 const deletedProcessingIds = new Set<string>();
-// New set to track deleted entry IDs
+// Set to track deleted entry IDs
 const deletedEntryIds = new Set<number>();
+// Map to track which processing entries have been completed
+const completedProcessingEntries = new Map<string, boolean>();
+
+/**
+ * Check if a processing entry or actual entry has been deleted
+ * @param tempId The processing ID to check
+ * @param entryId The entry ID to check
+ * @returns True if either ID has been marked as deleted
+ */
+export function isEntryDeleted(tempId?: string, entryId?: number): boolean {
+  if (tempId && deletedProcessingIds.has(tempId)) {
+    return true;
+  }
+  
+  if (entryId && deletedEntryIds.has(entryId)) {
+    return true;
+  }
+  
+  return false;
+}
 
 /**
  * Get the mapping between a temporary processing ID and the final entry ID
@@ -71,8 +92,17 @@ export function getEntryIdForProcessingId(tempId: string): number | undefined {
  * @param entryId The final database entry ID
  */
 export function setEntryIdForProcessingId(tempId: string, entryId: number): void {
+  // Skip if either ID is in the deleted sets
+  if (deletedProcessingIds.has(tempId) || deletedEntryIds.has(entryId)) {
+    console.log(`[Audio Processing] Skipping mapping of deleted entry: ${tempId} -> ${entryId}`);
+    return;
+  }
+
   // Store in memory map
   processingToEntryIdMap.set(tempId, entryId);
+  
+  // Mark this processing entry as completed
+  completedProcessingEntries.set(tempId, true);
   
   // Also persist to localStorage for cross-page survival
   try {
@@ -95,6 +125,7 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
  */
 export function clearProcessingToEntryIdMap(): void {
   processingToEntryIdMap.clear();
+  completedProcessingEntries.clear();
   localStorage.removeItem('processingToEntryMap');
 }
 
@@ -225,17 +256,37 @@ export {
 } from './audio/processing-state';
 
 /**
+ * Check if a processing entry is completed (mapped to a real entry)
+ * @param tempId The temporary processing ID
+ * @returns True if the processing is completed, false otherwise
+ */
+export function isProcessingEntryCompleted(tempId: string): boolean {
+  // Check if it's marked as completed in memory
+  if (completedProcessingEntries.has(tempId)) {
+    return true;
+  }
+  
+  // Check if it has a mapped entry ID
+  const entryId = getEntryIdForProcessingId(tempId);
+  return entryId !== undefined;
+}
+
+/**
  * Remove a processing entry by ID, cleaning up both processing state and mapping
  */
 export function removeProcessingEntryById(entryId: number | string): void {
+  console.log(`[Audio Processing] Removing processing entry by ID: ${entryId}`);
+  
   // First, remove from the processing state
   removeProcessingEntryFromState(entryId);
   
   // Track this deleted entry
   if (typeof entryId === 'number') {
     deletedEntryIds.add(entryId);
+    console.log(`[Audio Processing] Added entry ID ${entryId} to deleted entries set`);
   } else {
     deletedProcessingIds.add(entryId);
+    console.log(`[Audio Processing] Added processing ID ${entryId} to deleted processing set`);
   }
   
   // Then, clean up the map storage
@@ -253,18 +304,24 @@ export function removeProcessingEntryById(entryId: number | string): void {
           hasChanges = true;
           // Also remove from memory map
           processingToEntryIdMap.delete(tempId);
+          // Mark as completed (technically deleted, but this prevents it from showing again)
+          completedProcessingEntries.set(tempId, true);
           // And mark as deleted
           deletedProcessingIds.add(tempId);
+          console.log(`[Audio Processing] Removed mapping for tempId ${tempId} -> ${idStr}`);
         }
       });
       
       // If this is a temp ID itself, mark it as deleted
       if (typeof entryId === 'string') {
         deletedProcessingIds.add(entryId);
+        completedProcessingEntries.set(entryId, true);
+        
         if (map[entryId]) {
           const mappedEntryId = Number(map[entryId]);
           if (!isNaN(mappedEntryId)) {
             deletedEntryIds.add(mappedEntryId);
+            console.log(`[Audio Processing] Added mapped entry ID ${mappedEntryId} to deleted entries set`);
           }
           delete map[entryId];
           hasChanges = true;
@@ -294,4 +351,18 @@ export function removeProcessingEntryById(entryId: number | string): void {
   window.dispatchEvent(new CustomEvent('entryDeleted', {
     detail: { entryId }
   }));
+}
+
+/**
+ * Get all deleted entry IDs (both processing IDs and real entry IDs)
+ * @returns An object containing sets of deleted IDs
+ */
+export function getDeletedEntryIds(): { 
+  processingIds: Set<string>, 
+  entryIds: Set<number> 
+} {
+  return {
+    processingIds: new Set(deletedProcessingIds),
+    entryIds: new Set(deletedEntryIds)
+  };
 }

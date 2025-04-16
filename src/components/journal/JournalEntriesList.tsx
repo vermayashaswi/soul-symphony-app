@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -7,7 +8,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import JournalSearch from './JournalSearch';
-import { getProcessingEntries, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
+import { 
+  getProcessingEntries, 
+  getEntryIdForProcessingId, 
+  removeProcessingEntryById, 
+  isEntryDeleted,
+  isProcessingEntryCompleted,
+  getDeletedEntryIds
+} from '@/utils/audio-processing';
 import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
 
 interface JournalEntriesListProps {
@@ -44,6 +52,7 @@ export default function JournalEntriesList({
   const [fullyProcessedEntries, setFullyProcessedEntries] = useState<Set<number>>(new Set());
   const [deletedEntryIds, setDeletedEntryIds] = useState<Set<number>>(new Set());
   const [deletedProcessingTempIds, setDeletedProcessingTempIds] = useState<Set<string>>(new Set());
+  const [processingCardShouldShow, setProcessingCardShouldShow] = useState<boolean>(false);
   
   const mainProcessingEntryId = visibleProcessingEntries.length > 0 ? visibleProcessingEntries[0] : null;
   const hasProcessingEntries = mainProcessingEntryId !== null && processingEntries.length > 0;
@@ -55,6 +64,72 @@ export default function JournalEntriesList({
   const processingStepTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const entryTransitionTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const displayedProcessingId = useRef<string | null>(null);
+  const processingStateChangedRef = useRef(false);
+  const dialogOpenRef = useRef(false);
+
+  // Listen for entry deletion events
+  useEffect(() => {
+    const handleEntryDeleted = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId) {
+        console.log(`[JournalEntriesList] Entry deleted event: ${event.detail.entryId}`);
+        
+        // Update local deleted state sets
+        if (typeof event.detail.entryId === 'number') {
+          setDeletedEntryIds(prev => {
+            const newSet = new Set(prev);
+            newSet.add(event.detail.entryId);
+            return newSet;
+          });
+        } else if (typeof event.detail.entryId === 'string') {
+          setDeletedProcessingTempIds(prev => {
+            const newSet = new Set(prev);
+            newSet.add(event.detail.entryId);
+            return newSet;
+          });
+        }
+        
+        // Update visibleProcessingEntries
+        setVisibleProcessingEntries(prev => prev.filter(id => {
+          // Remove if it's the one that was just deleted
+          if (id === event.detail.entryId) return false;
+          
+          // Remove if its mapped entry was just deleted
+          const mappedId = getEntryIdForProcessingId(id);
+          if (mappedId && mappedId === event.detail.entryId) return false;
+          
+          return true;
+        }));
+
+        // Set the processing card visibility to false after any deletion
+        setProcessingCardShouldShow(false);
+      }
+    };
+    
+    window.addEventListener('entryDeleted', handleEntryDeleted as EventListener);
+    
+    // Sync with global deleted entries state
+    const syncDeletedEntries = () => {
+      try {
+        const { processingIds, entryIds } = getDeletedEntryIds();
+        
+        setDeletedProcessingTempIds(new Set(processingIds));
+        setDeletedEntryIds(new Set(entryIds));
+      } catch (error) {
+        console.error('[JournalEntriesList] Error syncing deleted entries:', error);
+      }
+    };
+    
+    // Initial sync
+    syncDeletedEntries();
+    
+    // Sync periodically
+    const syncInterval = setInterval(syncDeletedEntries, 2000);
+    
+    return () => {
+      window.removeEventListener('entryDeleted', handleEntryDeleted as EventListener);
+      clearInterval(syncInterval);
+    };
+  }, []);
 
   useEffect(() => {
     const handleProcessingEntryMapped = (event: CustomEvent) => {
@@ -70,6 +145,9 @@ export default function JournalEntriesList({
           console.log(`[JournalEntriesList] Already processed this tempId: ${event.detail.tempId}, skipping`);
           return;
         }
+        
+        // Set processing card visibility to false as we have a real entry now
+        setProcessingCardShouldShow(false);
         
         setProcessedProcessingIds(prev => {
           const newSet = new Set(prev);
@@ -169,6 +247,9 @@ export default function JournalEntriesList({
         if (matchedEntry) {
           console.log(`[JournalEntriesList] Found actual entry data for ${tempId}:`, matchedEntry.id);
           
+          // Set processing card visibility to false as we have a real entry
+          setProcessingCardShouldShow(false);
+          
           setFullyProcessedEntries(prev => {
             const newSet = new Set(prev);
             newSet.add(matchedEntry.id);
@@ -206,42 +287,81 @@ export default function JournalEntriesList({
           const isRecent = !isNaN(timestamp) && timestamp > tenMinutesAgo;
           const isNotProcessed = !processedProcessingIds.has(id);
           const isNotDeleted = !deletedProcessingTempIds.has(id);
-          return isRecent && isNotProcessed && isNotDeleted;
+          const isNotCompleted = !isProcessingEntryCompleted(id);
+          return isRecent && isNotProcessed && isNotDeleted && isNotCompleted;
         });
         
         setPersistedProcessingEntries(validEntries);
-        setVisibleProcessingEntries(validEntries.filter(id => !deletedProcessingTempIds.has(id)).slice(0, 1));
+        
+        const visibleEntries = validEntries
+          .filter(id => !deletedProcessingTempIds.has(id))
+          .slice(0, 1);
+          
+        setVisibleProcessingEntries(visibleEntries);
+        
+        // Only show processing card if we actually have valid entries that aren't processed or deleted
+        setProcessingCardShouldShow(visibleEntries.length > 0);
       } else {
         setPersistedProcessingEntries([]);
         setVisibleProcessingEntries([]);
+        setProcessingCardShouldShow(false);
       }
     };
     
     loadPersistedProcessingEntries();
     
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
+      processingStateChangedRef.current = true;
+      
       if (event.detail && Array.isArray(event.detail.entries)) {
+        // If we have a removedId, update our deleted sets
+        if (event.detail.removedId) {
+          const removedId = event.detail.removedId;
+          if (typeof removedId === 'number' || !isNaN(Number(removedId))) {
+            const numId = Number(removedId);
+            setDeletedEntryIds(prev => {
+              const newSet = new Set(prev);
+              newSet.add(numId);
+              return newSet;
+            });
+          } else {
+            setDeletedProcessingTempIds(prev => {
+              const newSet = new Set(prev);
+              newSet.add(String(removedId));
+              return newSet;
+            });
+          }
+          
+          // Always hide processing card when an entry is removed
+          setProcessingCardShouldShow(false);
+        }
+        
         if (event.detail.entries.length > 0) {
           const newEntries = event.detail.entries.filter(id => 
             !processedProcessingIds.has(id) && 
-            !deletedProcessingTempIds.has(id)
+            !deletedProcessingTempIds.has(id) &&
+            !isProcessingEntryCompleted(id)
           );
           
           setPersistedProcessingEntries(newEntries);
           
-          setVisibleProcessingEntries(prev => {
-            const entriesWithoutMapping = newEntries
-              .filter(tempId => 
-                !Array.from(processingToEntryMap.keys()).includes(tempId) &&
-                !deletedProcessingTempIds.has(tempId)
-              )
-              .slice(0, 1);
-            
-            return entriesWithoutMapping;
-          });
+          const entriesToDisplay = newEntries
+            .filter(tempId => 
+              !Array.from(processingToEntryMap.keys()).includes(tempId) &&
+              !deletedProcessingTempIds.has(tempId) &&
+              !isProcessingEntryCompleted(tempId)
+            )
+            .slice(0, 1);
+          
+          setVisibleProcessingEntries(entriesToDisplay);
+          
+          // Only show processing card if we have valid entries to display
+          // AND no dialog is open (to prevent showing on dialog close)
+          setProcessingCardShouldShow(entriesToDisplay.length > 0 && !dialogOpenRef.current);
         } else {
           setPersistedProcessingEntries([]);
           setVisibleProcessingEntries([]);
+          setProcessingCardShouldShow(false);
         }
       }
     };
@@ -301,13 +421,23 @@ export default function JournalEntriesList({
         setFilteredEntries(uniqueEntries);
         setSeenEntryIds(new Set(entryIds));
         
+        // Update visible processing entries
         setVisibleProcessingEntries(prev => {
-          return prev.filter(tempId => {
+          const filtered = prev.filter(tempId => {
             if (transitionalLoadingEntries.includes(tempId)) return true;
+            if (deletedProcessingTempIds.has(tempId)) return false;
             
             const mappedEntryId = getEntryIdForProcessingId(tempId);
-            return !mappedEntryId || (!entryIds.includes(mappedEntryId) && !deletedEntryIds.has(mappedEntryId));
+            if (!mappedEntryId) return true;
+            
+            // Don't show if the mapped entry is in our entries list or is deleted
+            return !entryIds.includes(mappedEntryId) && !deletedEntryIds.has(mappedEntryId);
           });
+          
+          // Update processing card visibility based on filtered entries
+          setProcessingCardShouldShow(filtered.length > 0 && !dialogOpenRef.current);
+          
+          return filtered;
         });
       } else {
         console.warn('[JournalEntriesList] Entries is not an array:', entries);
@@ -337,6 +467,7 @@ export default function JournalEntriesList({
           if (persistedProcessingEntries.length > 0) {
             persistedProcessingEntries.forEach(tempId => {
               if (processedProcessingIds.has(tempId)) return;
+              if (deletedProcessingTempIds.has(tempId)) return;
               
               const mappedEntryId = getEntryIdForProcessingId(tempId);
               if (mappedEntryId && !animatedEntryIds.includes(mappedEntryId)) {
@@ -358,6 +489,9 @@ export default function JournalEntriesList({
                   newSet.add(tempId);
                   return newSet;
                 });
+                
+                // Hide processing card when an entry is fully processed
+                setProcessingCardShouldShow(false);
               }
             });
           }
@@ -398,11 +532,14 @@ export default function JournalEntriesList({
       console.error('[JournalEntriesList] Error processing entry animations:', error);
       setAnimatedEntryIds([]);
     }
-  }, [entries.length, prevEntriesLength, entries, persistedProcessingEntries, animatedEntryIds, seenEntryIds, processedProcessingIds]);
+  }, [entries.length, prevEntriesLength, entries, persistedProcessingEntries, animatedEntryIds, seenEntryIds, processedProcessingIds, deletedProcessingTempIds]);
   
   const handleEntryDelete = async (entryId: number) => {
     try {
       console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
+      
+      // Set references to track dialog state
+      dialogOpenRef.current = true;
       
       pendingDeletions.current.add(entryId);
       setDeletedEntryIds(prev => {
@@ -410,6 +547,9 @@ export default function JournalEntriesList({
         newSet.add(entryId);
         return newSet;
       });
+      
+      // Always hide the processing card when deletion starts
+      setProcessingCardShouldShow(false);
       
       const tempIdsToDelete: string[] = [];
       visibleProcessingEntries.forEach(tempId => {
@@ -458,8 +598,10 @@ export default function JournalEntriesList({
         });
       });
       
+      // Clean up in audio-processing
       removeProcessingEntryById(entryId);
       
+      // Update local entries for immediate UI response
       setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
       setFilteredEntries(prev => prev.filter(entry => entry.id !== entryId));
       
@@ -469,9 +611,13 @@ export default function JournalEntriesList({
             try {
               await onDeleteEntry(entryId);
               pendingDeletions.current.delete(entryId);
+              // Reset dialog state after deletion completes
+              dialogOpenRef.current = false;
             } catch (error) {
               console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
               pendingDeletions.current.delete(entryId);
+              // Reset dialog state on error
+              dialogOpenRef.current = false;
             }
           }
         }, 100);
@@ -481,6 +627,8 @@ export default function JournalEntriesList({
       
       if (componentMounted.current) {
         pendingDeletions.current.delete(entryId);
+        // Reset dialog state on error
+        dialogOpenRef.current = false;
       }
     }
   };
@@ -618,12 +766,15 @@ export default function JournalEntriesList({
     );
   };
 
+  // Enhanced condition to prevent showing processing card after deletions or dialog interactions
   const shouldShowProcessingCard = hasProcessingEntries && 
+    processingCardShouldShow &&
     !processedTransitionalEntries.some(id => id === mainProcessingEntryId) &&
     (!mainProcessingEntryId || 
       !getEntryIdForProcessingId(mainProcessingEntryId) || 
       (!deletedEntryIds.has(getEntryIdForProcessingId(mainProcessingEntryId)!) &&
-       !deletedProcessingTempIds.has(mainProcessingEntryId)));
+       !deletedProcessingTempIds.has(mainProcessingEntryId))) &&
+    !dialogOpenRef.current;
 
   return (
     <ErrorBoundary>
