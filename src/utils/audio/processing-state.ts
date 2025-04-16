@@ -11,9 +11,18 @@ let processingTimeoutId: NodeJS.Timeout | null = null;
 let lastStateChangeTime = 0;
 const DEBOUNCE_THRESHOLD = 1000; // Increased from 500ms to 1000ms to prevent rapid state changes
 
+// Store all deleted entries to prevent them from showing up again if user navigates away and back
+const deletedProcessingTempIds = new Set<string>();
+
 // Store processing entries in localStorage to persist across navigations
 export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
   try {
+    // Skip any operations for deleted temp IDs
+    if (deletedProcessingTempIds.has(tempId)) {
+      console.log(`[Audio.ProcessingState] Skipping operation for deleted tempId: ${tempId}`);
+      return getProcessingEntries(); // Return current state without changes
+    }
+    
     // Prevent rapid toggling by implementing a simple debounce
     const now = Date.now();
     if (now - lastStateChangeTime < DEBOUNCE_THRESHOLD) {
@@ -32,6 +41,8 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
       console.log(`[Audio.ProcessingState] Added entry ${tempIdWithTimestamp} to processing list. Now tracking ${entries.length} entries.`);
     } else if (action === 'remove') {
       entries = entries.filter(id => !id.startsWith(tempId));
+      // Mark as deleted so it won't show up again
+      deletedProcessingTempIds.add(tempId);
       console.log(`[Audio.ProcessingState] Removed entry ${tempId} from processing list. Now tracking ${entries.length} entries.`);
     }
     
@@ -56,10 +67,15 @@ export const getProcessingEntries = (): string[] => {
     const storedEntries = localStorage.getItem('processingEntries');
     let entries = storedEntries ? JSON.parse(storedEntries) : [];
     
-    // Filter out stale entries (older than 10 minutes)
+    // Filter out stale entries (older than 10 minutes) and deleted entries
     if (entries.length > 0) {
       const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
       entries = entries.filter((entry: string) => {
+        // Skip deleted entries
+        if (deletedProcessingTempIds.has(entry.split('-')[0])) {
+          return false;
+        }
+        
         // Check if entry has timestamp (entries added after this update)
         const parts = entry.split('-');
         if (parts.length > 1) {
@@ -99,8 +115,17 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
     
     // Enhanced filtering to catch more variations of tempId
     const updatedEntries = entries.filter(tempId => {
+      // Get the base tempId without timestamp
+      const baseTempId = tempId.split('-')[0];
+      
       // Check if this tempId contains the entryId we want to remove
       const hasId = tempId.includes(idStr);
+      
+      // Mark as deleted if it matches
+      if (hasId || baseTempId === idStr) {
+        deletedProcessingTempIds.add(baseTempId);
+        return false;
+      }
       
       // Also check if this tempId is mapped to the entryId in processingToEntryMap
       let isMapped = false;
@@ -108,7 +133,11 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
         const mapStr = localStorage.getItem('processingToEntryMap');
         if (mapStr) {
           const map = JSON.parse(mapStr);
-          isMapped = String(map[tempId]) === idStr;
+          isMapped = String(map[baseTempId]) === idStr;
+          
+          if (isMapped) {
+            deletedProcessingTempIds.add(baseTempId);
+          }
         }
       } catch (e) {
         // Ignore parsing errors
@@ -130,6 +159,12 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
   } catch (error) {
     console.error('[Audio.ProcessingState] Error removing processing entry from storage:', error);
   }
+};
+
+// Check if an entry ID has been marked as deleted
+export const isEntryDeleted = (tempId: string): boolean => {
+  const baseTempId = tempId.split('-')[0];
+  return deletedProcessingTempIds.has(baseTempId);
 };
 
 // Check if a journal entry is currently being processed

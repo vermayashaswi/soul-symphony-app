@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import { clearAllToasts } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useDebugLog } from '@/utils/debug/DebugContext';
+import { updateProcessingEntries } from '@/utils/audio/processing-state';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -107,7 +108,11 @@ export function PlaybackControls({
     const tempId = 'temp-' + Date.now();
     addEvent('ProcessingFlow', 'Dispatching immediate processing event', 'info', { tempId });
     
-    // Create a processing entry state first
+    // Create a processing entry state first - CRITICAL for persistence
+    // This must be called BEFORE dispatching the event for proper iOS state management
+    updateProcessingEntries(tempId, 'add');
+    
+    // Then dispatch the event to update all components
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
       detail: { 
         entries: [tempId], 
@@ -115,21 +120,6 @@ export function PlaybackControls({
         forceUpdate: true 
       }
     }));
-    
-    // Store in localStorage right away for persistence
-    try {
-      const existingEntries = JSON.parse(localStorage.getItem('processingEntries') || '[]');
-      if (!existingEntries.includes(tempId)) {
-        existingEntries.push(tempId);
-        localStorage.setItem('processingEntries', JSON.stringify(existingEntries));
-        addEvent('ProcessingFlow', 'Updated localStorage with tempId', 'success', { 
-          tempId, 
-          existingEntries 
-        });
-      }
-    } catch (e) {
-      addEvent('ProcessingFlow', 'Error updating localStorage', 'error', e);
-    }
     
     // Send another event after a short delay to ensure the UI catches it
     setTimeout(() => {
@@ -143,7 +133,7 @@ export function PlaybackControls({
       }));
     }, 50);
     
-    // And a third time just to be sure
+    // And a third time just to be sure - important for iOS
     setTimeout(() => {
       addEvent('ProcessingFlow', 'Sending third processing event', 'info', { tempId });
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {

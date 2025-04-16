@@ -18,6 +18,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const prevContentRef = useRef(content);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentAvailableRef = useRef(false);
+  const transitionInProgressRef = useRef(false);
   
   // Debug logging
   useEffect(() => {
@@ -31,12 +32,13 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     });
   }, [content, isProcessing, isExpanded, showLoading, stableContent, addEvent]);
   
-  // Handle content and loading state transitions
+  // Handle content and loading state transitions with persistence
   useEffect(() => {
-    // Immediately show loading state if isProcessing is true, regardless of current state
+    // Force loading state to show if isProcessing is true
     if (isProcessing && !showLoading) {
       addEvent('EntryContent', 'Processing started, showing loading state immediately', 'info');
       setShowLoading(true);
+      transitionInProgressRef.current = true;
       return;
     }
     
@@ -50,7 +52,8 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       contentIsLoading,
       isProcessing,
       contentSample: content?.substring(0, 20) + (content?.length > 20 ? '...' : ''),
-      showLoading
+      showLoading,
+      transitionInProgress: transitionInProgressRef.current
     });
     
     // Clear any existing timeout to prevent race conditions
@@ -62,6 +65,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       // Show loading state
       setShowLoading(true);
       contentAvailableRef.current = false;
+      transitionInProgressRef.current = true;
     } else if (!contentAvailableRef.current) {
       // Content is now available - transition from loading to content display
       contentAvailableRef.current = true;
@@ -75,8 +79,11 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         addEvent('EntryContent', 'Transitioning from loading to content display', 'info');
         setShowLoading(false);
         setStableContent(content);
+        timeoutRef.current = setTimeout(() => {
+          transitionInProgressRef.current = false;
+        }, 300); // Allow time for the animation to complete
       }, delayTime);
-    } else if (content !== stableContent && !showLoading) {
+    } else if (content !== stableContent && !showLoading && !transitionInProgressRef.current) {
       // Content has changed while already displaying content (not during loading)
       addEvent('EntryContent', 'Content updated while already showing content', 'info');
       setStableContent(content);
@@ -93,8 +100,9 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     };
   }, [content, isProcessing, showLoading, stableContent, addEvent]);
 
+  // This is critical for iOS - we need to use a non-default exit mode to avoid animation artifacts
   return (
-    <AnimatePresence mode="wait">
+    <AnimatePresence mode="wait" initial={false}>
       {showLoading ? (
         <LoadingEntryContent key="loading" />
       ) : isExpanded ? (
@@ -106,13 +114,14 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           transition={{ duration: 0.3 }}
           onAnimationStart={() => addEvent('EntryContent', 'Expanded content animation started', 'info')}
           onAnimationComplete={() => addEvent('EntryContent', 'Expanded content animation completed', 'info')}
+          className="will-change-opacity" // iOS optimization
         >
           <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
         </motion.div>
       ) : (
         <motion.p
           key="collapsed" 
-          className="text-xs md:text-sm text-foreground line-clamp-3"
+          className="text-xs md:text-sm text-foreground line-clamp-3 will-change-opacity" // iOS optimization
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
