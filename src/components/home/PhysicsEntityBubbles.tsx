@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { cn } from '@/lib/utils';
 import Matter, { 
@@ -29,7 +28,6 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
   const [highlightedEntity, setHighlightedEntity] = useState<string | null>(null);
   const [initialized, setInitialized] = useState(false);
   
-  // Get container dimensions
   useEffect(() => {
     if (containerRef.current) {
       const updateDimensions = () => {
@@ -48,19 +46,14 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
     }
   }, []);
 
-  // Set up physics engine when dimensions are available
   useEffect(() => {
-    // Don't proceed if no dimensions yet or already initialized
     if (dimensions.width === 0 || dimensions.height === 0 || initialized) return;
     
-    // Filter entities with type "others"
     const filteredEntities = entities.filter(entity => entity.type !== 'others').slice(0, 7);
     if (!filteredEntities.length) return;
     
-    // Find max count
     const maxCount = Math.max(...filteredEntities.map(e => e.count));
     
-    // Set up physics
     const engine = Engine.create({
       gravity: { x: 0, y: 0 }
     });
@@ -79,10 +72,8 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
       }
     });
     
-    // Create walls
     const wallThickness = 50;
     const walls = [
-      // Bottom wall
       Bodies.rectangle(
         dimensions.width / 2, 
         dimensions.height + wallThickness / 2, 
@@ -90,7 +81,6 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         wallThickness, 
         { isStatic: true, render: { visible: false } }
       ),
-      // Top wall
       Bodies.rectangle(
         dimensions.width / 2, 
         -wallThickness / 2, 
@@ -98,7 +88,6 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         wallThickness, 
         { isStatic: true, render: { visible: false } }
       ),
-      // Left wall
       Bodies.rectangle(
         -wallThickness / 2, 
         dimensions.height / 2, 
@@ -106,7 +95,6 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         dimensions.height + 100, 
         { isStatic: true, render: { visible: false } }
       ),
-      // Right wall
       Bodies.rectangle(
         dimensions.width + wallThickness / 2, 
         dimensions.height / 2, 
@@ -118,32 +106,28 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
     
     World.add(engine.world, walls);
     
-    // Calculate maximum bubble size that would allow 3 bubbles to stack vertically
     const maxBubbleSize = Math.min(dimensions.width / 3, dimensions.height / 3);
     
-    // Create bubbles with improved spacing
     const bubbleSpacing = dimensions.width / (filteredEntities.length + 1);
     
     filteredEntities.forEach((entity, index) => {
-      // Size based on count while ensuring it's large enough to fit text
-      const normFactor = 0.4 + (entity.count / maxCount) * 0.6; // Ensuring minimum size
+      const normFactor = 0.3 + (entity.count / maxCount) * 0.7;
       const radius = Math.max(
-        30, // Minimum bubble size
+        30,
         maxBubbleSize * normFactor / 2
       );
       
-      // Position bubbles with more spacing to prevent immediate collisions
       const initialX = (index + 1) * bubbleSpacing;
-      const initialY = dimensions.height / 2 + (index % 3 - 1) * 20; // Staggered heights
+      const initialY = dimensions.height / 2 + (index % 3 - 1) * 20;
       
       const circle = Bodies.circle(initialX, initialY, radius, {
-        restitution: 0.7, // Bounciness
-        friction: 0.001,   // Very low friction
-        frictionAir: 0.02, // Slightly reduced air friction for smoother movement
-        density: 0.001,    // Lower density for gentler collisions
+        restitution: 0.7,
+        friction: 0.001,
+        frictionAir: 0.02,
+        density: 0.001,
         render: {
-          fillStyle: `rgba(var(--primary), 0.2)`, // More visible bubble
-          strokeStyle: `rgba(var(--primary), 0.5)`, // More visible border
+          fillStyle: `rgba(var(--primary), 0.2)`,
+          strokeStyle: `rgba(var(--primary), 0.5)`,
           lineWidth: 2,
         },
         plugin: {
@@ -154,40 +138,34 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         }
       });
       
-      // Set very gentle initial velocity
       Matter.Body.setVelocity(circle, {
-        x: (Math.random() - 0.5) * 0.7, // Reduced velocity
-        y: (Math.random() - 0.5) * 0.7, // Reduced velocity
+        x: (Math.random() - 0.5) * 0.7,
+        y: (Math.random() - 0.5) * 0.7,
       });
       
       World.add(engine.world, circle);
     });
     
-    // Add mouse interaction with reduced stiffness for gentler movement
     const mouse = Mouse.create(canvasRef.current);
     const mouseConstraint = MouseConstraint.create(engine, {
       mouse: mouse,
       constraint: {
-        stiffness: 0.1, // Reduced stiffness for more gentle interactions
+        stiffness: 0.1,
         render: {
           visible: false
         }
       }
     });
     
-    // Handle mouse hover
     Matter.Events.on(mouseConstraint, 'mousemove', function(event) {
       const mousePosition = event.mouse.position;
       let foundEntity = null;
       
-      // Check if mouse is over any bubble
       for (let i = 0; i < engine.world.bodies.length; i++) {
         const body = engine.world.bodies[i];
         
-        // Skip walls
         if (body.isStatic) continue;
         
-        // Check if mouse position is inside this circle
         const distance = Matter.Vector.magnitude(
           Matter.Vector.sub(body.position, mousePosition)
         );
@@ -201,17 +179,15 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
       setHighlightedEntity(foundEntity);
     });
     
-    // When mouse leaves canvas, clear highlight
     canvasRef.current.addEventListener('mouseleave', () => {
       setHighlightedEntity(null);
     });
     
     World.add(engine.world, mouseConstraint);
     
-    // Run engine with fixed timestep for smoother rendering
     const runner = Matter.Runner.create({
       isFixed: true,
-      delta: 1000 / 60 // Lock at 60 FPS for smooth rendering
+      delta: 1000 / 60
     });
     Matter.Runner.run(runner, engine);
     
@@ -219,9 +195,7 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
     
     setInitialized(true);
     
-    // Cleanup on unmount
     return () => {
-      // Properly stop and clear everything
       if (runner) Matter.Runner.stop(runner);
       Render.stop(render);
       World.clear(engine.world, false);
@@ -233,7 +207,6 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
     };
   }, [dimensions, entities, initialized]);
 
-  // Filter out entities with type "others"
   const filteredEntities = entities.filter(entity => entity.type !== 'others').slice(0, 7);
   
   if (!filteredEntities.length || dimensions.width === 0) {
@@ -250,9 +223,7 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         className="absolute top-0 left-0 w-full h-full"
       />
       
-      {/* Overlay text labels */}
       {initialized && engineRef.current && filteredEntities.map((entity) => {
-        // Find matching physics body
         const body = engineRef.current?.world.bodies.find(
           b => b.plugin?.entityData?.name === entity.name && !b.isStatic
         );
@@ -283,7 +254,6 @@ const PhysicsEntityBubbles: React.FC<PhysicsEntityBubblesProps> = ({ entities, c
         );
       })}
       
-      {/* Highlight effects for glowing */}
       {initialized && engineRef.current && highlightedEntity && filteredEntities.map((entity) => {
         if (entity.name !== highlightedEntity) return null;
         

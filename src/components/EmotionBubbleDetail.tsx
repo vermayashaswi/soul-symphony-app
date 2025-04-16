@@ -135,19 +135,20 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     <div className="relative">
       <motion.div
         animate={getAnimation()}
-        whileTap={{ scale: 0.95 }}
+        whileTap={{ scale: 0.95, transition: { duration: 0.2 } }}
+        // Always restore original scale on tap end
         className={cn(
           "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative",
           color,
-          isHighlighted ? "ring-4 ring-primary ring-opacity-100" : "",
+          isHighlighted ? "ring-2 ring-primary ring-opacity-70" : "",
           isDragging ? "shadow-lg z-50" : "",
           className
         )}
         style={{ width: bubbleSize, height: bubbleSize }}
         initial={{ opacity: 1 }}
         whileHover={{ 
-          scale: 1.1, 
-          boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 1)",
+          scale: 1.05, 
+          boxShadow: "0 10px 15px -5px rgba(0, 0, 0, 0.3)",
           transition: { duration: 0.2 }
         }}
         onClick={handleBubbleClick}
