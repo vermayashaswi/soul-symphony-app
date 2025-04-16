@@ -64,31 +64,6 @@ const ViewportManager: React.FC = () => {
         handHeld.content = 'true';
         document.head.appendChild(handHeld);
       }
-      
-      // Set page-specific event persistence (helps for iOS state persistence)
-      if (location.pathname.includes('journal')) {
-        document.documentElement.classList.add('journal-page');
-        
-        // Check if we need to restore processing state
-        const processingEntries = sessionStorage.getItem('processingEntries');
-        if (processingEntries && JSON.parse(processingEntries).length > 0) {
-          console.log('Found processing entries on page load, will restore state');
-          
-          // Dispatch event after a small delay to ensure components are mounted
-          setTimeout(() => {
-            window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-              detail: { 
-                entries: JSON.parse(processingEntries), 
-                lastUpdate: Date.now(),
-                forceUpdate: true,
-                restoredFromNavigation: true
-              }
-            }));
-          }, 500);
-        }
-      } else {
-        document.documentElement.classList.remove('journal-page');
-      }
     };
     
     setCorrectViewport();
@@ -103,15 +78,85 @@ const ViewportManager: React.FC = () => {
     
     window.addEventListener('orientationchange', handleOrientationChange);
     
-    // Also handle page visibility changes (app being backgrounded/foregrounded)
+    // Handle page visibility changes (app being backgrounded/foregrounded)
     const handleVisibilityChange = () => {
       if (document.visibilityState === 'visible') {
         console.log('App returned to foreground, checking for state restoration');
         setTimeout(setCorrectViewport, 100);
+        
+        // Check for processing entries every time the app returns to foreground
+        // This helps when switching between app features
+        const processingEntries = sessionStorage.getItem('processingEntries') || localStorage.getItem('processingEntries');
+        if (processingEntries && location.pathname.includes('journal')) {
+          try {
+            const entries = JSON.parse(processingEntries);
+            if (entries && entries.length > 0) {
+              console.log('Found processing entries on visibility change, will restore state:', entries);
+              
+              // Dispatch event to ensure UI is updated
+              setTimeout(() => {
+                window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+                  detail: { 
+                    entries: entries, 
+                    lastUpdate: Date.now(),
+                    forceUpdate: true,
+                    restoredFromNavigation: true
+                  }
+                }));
+              }, 300);
+            }
+          } catch (error) {
+            console.error('Error parsing processing entries on visibility change:', error);
+          }
+        }
       }
     };
     
     document.addEventListener('visibilitychange', handleVisibilityChange);
+    
+    // Set page-specific event persistence (helps for iOS state persistence)
+    if (location.pathname.includes('journal')) {
+      document.documentElement.classList.add('journal-page');
+      
+      // Check if we need to restore processing state on every navigation
+      const processingEntries = sessionStorage.getItem('processingEntries') || localStorage.getItem('processingEntries');
+      if (processingEntries) {
+        try {
+          const entries = JSON.parse(processingEntries);
+          if (entries && entries.length > 0) {
+            console.log('Found processing entries on route change, will restore state:', entries);
+            
+            // Dispatch event after a small delay to ensure components are mounted
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+                detail: { 
+                  entries: entries, 
+                  lastUpdate: Date.now(),
+                  forceUpdate: true,
+                  restoredFromNavigation: true
+                }
+              }));
+            }, 300);
+            
+            // Send a second event with slightly longer delay for components that mount later
+            setTimeout(() => {
+              window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+                detail: { 
+                  entries: entries, 
+                  lastUpdate: Date.now() + 1,
+                  forceUpdate: true,
+                  restoredFromNavigation: true
+                }
+              }));
+            }, 800);
+          }
+        } catch (error) {
+          console.error('Error parsing processing entries on route change:', error);
+        }
+      }
+    } else {
+      document.documentElement.classList.remove('journal-page');
+    }
     
     return () => {
       window.removeEventListener('orientationchange', handleOrientationChange);

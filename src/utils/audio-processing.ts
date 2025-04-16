@@ -12,7 +12,8 @@ import {
   resetProcessingState,
   getProcessingEntries,
   removeProcessingEntryById as removeProcessingEntryFromState,
-  isEntryDeleted as isEntryDeletedFromState
+  isEntryDeleted as isEntryDeletedFromState,
+  handleRouteChange
 } from './audio/processing-state';
 import { validateInitialState, setupProcessingTimeout } from './audio/recording-validation';
 import { processRecordingInBackground } from './audio/background-processor';
@@ -80,8 +81,12 @@ export function getEntryIdForProcessingId(tempId: string): number | undefined {
       return fullMemoryResult;
     }
     
-    // Then check localStorage as fallback - critical for persistence across navigation
-    const processingToEntryMap = localStorage.getItem('processingToEntryMap');
+    // Check both localStorage and sessionStorage for persistence
+    const processingToEntryMapLocal = localStorage.getItem('processingToEntryMap');
+    const processingToEntryMapSession = sessionStorage.getItem('processingToEntryMap');
+    
+    // Use sessionStorage if available, otherwise fallback to localStorage
+    const processingToEntryMap = processingToEntryMapSession || processingToEntryMapLocal;
     if (!processingToEntryMap) return undefined;
     
     const map = JSON.parse(processingToEntryMap);
@@ -124,25 +129,44 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
   completedProcessingEntries.set(tempId, true);
   completedProcessingEntries.set(baseTempId, true);
   
-  // Also persist to localStorage for cross-page survival - this is crucial for iOS
+  // Persist to both localStorage and sessionStorage for cross-page survival
   try {
-    const processingToEntryMap = localStorage.getItem('processingToEntryMap');
-    const map = processingToEntryMap ? JSON.parse(processingToEntryMap) : {};
-    map[tempId] = entryId;
-    map[baseTempId] = entryId;
-    localStorage.setItem('processingToEntryMap', JSON.stringify(map));
+    // Get maps from both storage types
+    const processingToEntryMapLocal = localStorage.getItem('processingToEntryMap');
+    const processingToEntryMapSession = sessionStorage.getItem('processingToEntryMap');
     
-    // Also update session storage as an additional persistence layer for iOS
+    // Create or update maps
+    const localMap = processingToEntryMapLocal ? JSON.parse(processingToEntryMapLocal) : {};
+    const sessionMap = processingToEntryMapSession ? JSON.parse(processingToEntryMapSession) : {};
+    
+    // Update both maps
+    localMap[tempId] = entryId;
+    localMap[baseTempId] = entryId;
+    sessionMap[tempId] = entryId;
+    sessionMap[baseTempId] = entryId;
+    
+    // Store back in both storage types
+    localStorage.setItem('processingToEntryMap', JSON.stringify(localMap));
+    sessionStorage.setItem('processingToEntryMap', JSON.stringify(sessionMap));
+    
+    // Also update individual entries in session storage
     sessionStorage.setItem(`processing_${tempId}`, String(entryId));
     sessionStorage.setItem(`processing_${baseTempId}`, String(entryId));
   } catch (error) {
     console.error('[Audio Processing] Error setting entry ID for processing ID:', error);
   }
   
-  // Dispatch an event to notify components of the correlation
+  // Dispatch events to notify components - send multiple for maximum reliability
   window.dispatchEvent(new CustomEvent('processingEntryMapped', {
     detail: { tempId, entryId, timestamp: Date.now() }
   }));
+  
+  // Send another event after a delay to ensure all components catch it
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('processingEntryMapped', {
+      detail: { tempId, entryId, timestamp: Date.now() + 1 }
+    }));
+  }, 100);
 }
 
 /**
@@ -152,6 +176,7 @@ export function clearProcessingToEntryIdMap(): void {
   processingToEntryIdMap.clear();
   completedProcessingEntries.clear();
   localStorage.removeItem('processingToEntryMap');
+  sessionStorage.removeItem('processingToEntryMap');
   
   // Clear session storage entries too
   const keysToRemove: string[] = [];
@@ -234,10 +259,10 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     setupProcessingTimeout();
     console.log('[AudioProcessing] Setup processing timeout');
     
-    // Add this entry to localStorage to persist across navigations - CRITICAL for iOS
+    // Add this entry to both localStorage and sessionStorage
     const updatedEntries = updateProcessingEntries(tempId, 'add');
     
-    // Also store in sessionStorage for additional iOS reliability
+    // Also store in sessionStorage directly for additional reliability
     const existingEntries = sessionStorage.getItem('processingEntries');
     const sessionEntries = existingEntries ? JSON.parse(existingEntries) : [];
     if (!sessionEntries.includes(tempId)) {
@@ -245,7 +270,11 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       sessionStorage.setItem('processingEntries', JSON.stringify(sessionEntries));
     }
     
-    console.log('[AudioProcessing] Updated processing entries in localStorage:', updatedEntries);
+    console.log('[AudioProcessing] Updated processing entries in storage:', updatedEntries);
+    
+    // Also update the entryContentLoading flag
+    localStorage.setItem('entryContentLoading', 'true');
+    sessionStorage.setItem('entryContentLoading', 'true');
     
     // Log the audio details
     console.log('[AudioProcessing] Processing audio:', {
@@ -278,17 +307,32 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     // Return immediately with the temp ID
     console.log('[AudioProcessing] Returning success with tempId:', tempId);
     
-    // Force multiple custom event dispatches to ensure UI updates - critical for iOS
+    // Force multiple custom event dispatches to ensure UI updates - send in sequence
+    // First immediately
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
       detail: { entries: updatedEntries, lastUpdate: Date.now(), forceUpdate: true }
     }));
     
-    // Also dispatch after a small delay - iOS needs this redundancy
+    // Then after a small delay
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { entries: updatedEntries, lastUpdate: Date.now() + 1, forceUpdate: true }
       }));
     }, 100);
+    
+    // Then after a medium delay
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { entries: updatedEntries, lastUpdate: Date.now() + 2, forceUpdate: true }
+      }));
+    }, 500);
+    
+    // Finally after a longer delay to catch any late mounting components
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { entries: updatedEntries, lastUpdate: Date.now() + 3, forceUpdate: true }
+      }));
+    }, 1000);
     
     return { success: true, tempId };
   } catch (error: any) {
@@ -304,7 +348,8 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
 export { 
   isProcessingEntry, 
   resetProcessingState, 
-  getProcessingEntries
+  getProcessingEntries,
+  handleRouteChange
 } from './audio/processing-state';
 
 /**
@@ -356,28 +401,63 @@ export function removeProcessingEntryById(entryId: number | string): void {
     }
   }
   
-  // Then, clean up the map storage
+  // Then, clean up the map storage (both localStorage and sessionStorage)
   try {
-    const processingToEntryMap = localStorage.getItem('processingToEntryMap');
-    if (processingToEntryMap) {
-      const map = JSON.parse(processingToEntryMap);
+    // Get maps from both storage types
+    const processingToEntryMapLocal = localStorage.getItem('processingToEntryMap');
+    const processingToEntryMapSession = sessionStorage.getItem('processingToEntryMap');
+    
+    // Process both maps if they exist
+    if (processingToEntryMapLocal || processingToEntryMapSession) {
+      const localMap = processingToEntryMapLocal ? JSON.parse(processingToEntryMapLocal) : {};
+      const sessionMap = processingToEntryMapSession ? JSON.parse(processingToEntryMapSession) : {};
       const idStr = String(entryId);
       
-      // Find and remove any entry with this ID
-      let hasChanges = false;
-      Object.keys(map).forEach(tempId => {
+      // Find and remove any entry with this ID from both maps
+      let hasLocalChanges = false;
+      let hasSessionChanges = false;
+      
+      // Process localStorage map
+      Object.keys(localMap).forEach(tempId => {
         // Extract base tempId without timestamp if it has one
         const baseTempId = tempId.includes('-') ? tempId.split('-')[0] : tempId;
         
-        if (String(map[tempId]) === idStr) {
-          delete map[tempId];
-          hasChanges = true;
+        if (String(localMap[tempId]) === idStr) {
+          delete localMap[tempId];
+          hasLocalChanges = true;
+          
           // Also remove from memory map
           processingToEntryIdMap.delete(tempId);
           processingToEntryIdMap.delete(baseTempId);
-          // Mark as completed (technically deleted, but this prevents it from showing again)
+          
+          // Mark as completed
           completedProcessingEntries.set(tempId, true);
           completedProcessingEntries.set(baseTempId, true);
+          
+          // And mark as deleted
+          deletedProcessingIds.add(baseTempId);
+          
+          console.log(`[Audio Processing] Removed mapping for tempId ${tempId} -> ${idStr} from localStorage`);
+        }
+      });
+      
+      // Process sessionStorage map
+      Object.keys(sessionMap).forEach(tempId => {
+        // Extract base tempId without timestamp if it has one
+        const baseTempId = tempId.includes('-') ? tempId.split('-')[0] : tempId;
+        
+        if (String(sessionMap[tempId]) === idStr) {
+          delete sessionMap[tempId];
+          hasSessionChanges = true;
+          
+          // Also remove from memory map if not already done
+          processingToEntryIdMap.delete(tempId);
+          processingToEntryIdMap.delete(baseTempId);
+          
+          // Mark as completed
+          completedProcessingEntries.set(tempId, true);
+          completedProcessingEntries.set(baseTempId, true);
+          
           // And mark as deleted
           deletedProcessingIds.add(baseTempId);
           
@@ -385,18 +465,18 @@ export function removeProcessingEntryById(entryId: number | string): void {
           sessionStorage.removeItem(`processing_${tempId}`);
           sessionStorage.removeItem(`processing_${baseTempId}`);
           
-          console.log(`[Audio Processing] Removed mapping for tempId ${tempId} -> ${idStr}`);
+          console.log(`[Audio Processing] Removed mapping for tempId ${tempId} -> ${idStr} from sessionStorage`);
         }
       });
       
-      // If this is a temp ID itself, mark it as deleted
+      // If this is a temp ID itself, mark it as deleted in both maps
       if (typeof entryId === 'string') {
         // Extract base tempId without timestamp if it has one
         const baseTempId = entryId.includes('-') ? entryId.split('-')[0] : entryId;
         deletedProcessingIds.add(baseTempId);
         completedProcessingEntries.set(baseTempId, true);
         
-        // Add to session storage deleted set for iOS
+        // Add to session storage deleted set
         try {
           const deletedIds = sessionStorage.getItem('deletedProcessingIds');
           const idsSet = deletedIds ? new Set(JSON.parse(deletedIds)) : new Set();
@@ -406,15 +486,28 @@ export function removeProcessingEntryById(entryId: number | string): void {
           console.error('[Audio Processing] Error updating session storage deleted IDs:', error);
         }
         
-        if (map[entryId] || map[baseTempId]) {
-          const mappedEntryId = Number(map[entryId] || map[baseTempId]);
+        // Check localStorage map
+        if (localMap[entryId] || localMap[baseTempId]) {
+          const mappedEntryId = Number(localMap[entryId] || localMap[baseTempId]);
           if (!isNaN(mappedEntryId)) {
             deletedEntryIds.add(mappedEntryId);
-            console.log(`[Audio Processing] Added mapped entry ID ${mappedEntryId} to deleted entries set`);
+            console.log(`[Audio Processing] Added mapped entry ID ${mappedEntryId} to deleted entries set from localStorage`);
           }
-          delete map[entryId];
-          delete map[baseTempId];
-          hasChanges = true;
+          delete localMap[entryId];
+          delete localMap[baseTempId];
+          hasLocalChanges = true;
+        }
+        
+        // Check sessionStorage map
+        if (sessionMap[entryId] || sessionMap[baseTempId]) {
+          const mappedEntryId = Number(sessionMap[entryId] || sessionMap[baseTempId]);
+          if (!isNaN(mappedEntryId)) {
+            deletedEntryIds.add(mappedEntryId);
+            console.log(`[Audio Processing] Added mapped entry ID ${mappedEntryId} to deleted entries set from sessionStorage`);
+          }
+          delete sessionMap[entryId];
+          delete sessionMap[baseTempId];
+          hasSessionChanges = true;
           
           // Remove from session storage too
           sessionStorage.removeItem(`processing_${entryId}`);
@@ -423,19 +516,29 @@ export function removeProcessingEntryById(entryId: number | string): void {
       }
       
       // Update storage if changes were made
-      if (hasChanges) {
-        localStorage.setItem('processingToEntryMap', JSON.stringify(map));
-        
+      if (hasLocalChanges) {
+        localStorage.setItem('processingToEntryMap', JSON.stringify(localMap));
+      }
+      
+      if (hasSessionChanges) {
+        sessionStorage.setItem('processingToEntryMap', JSON.stringify(sessionMap));
+      }
+      
+      if (hasLocalChanges || hasSessionChanges) {
         // Get current entries from processing state, filtered by deletion status
         const currentEntries = getProcessingEntries().filter(id => {
           const baseTempId = id.includes('-') ? id.split('-')[0] : id;
           return !deletedProcessingIds.has(baseTempId) && !isEntryDeleted(baseTempId);
         });
         
-        // Update session storage too
+        // Update both storage types with filtered entries
+        localStorage.setItem('processingEntries', JSON.stringify(currentEntries));
         sessionStorage.setItem('processingEntries', JSON.stringify(currentEntries));
         
-        // Dispatch an event to notify other components
+        // Dispatch multiple events in sequence to ensure all components get the update
+        const idStr = String(entryId);
+        
+        // First event immediately
         window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
           detail: { 
             entries: currentEntries,
@@ -445,7 +548,7 @@ export function removeProcessingEntryById(entryId: number | string): void {
           }
         }));
         
-        // Also dispatch after a small delay - iOS needs this redundancy
+        // Second event after a small delay
         setTimeout(() => {
           window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
             detail: { 
@@ -456,13 +559,25 @@ export function removeProcessingEntryById(entryId: number | string): void {
             }
           }));
         }, 100);
+        
+        // Third event after a longer delay
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+            detail: { 
+              entries: currentEntries,
+              lastUpdate: Date.now() + 2,
+              removedId: idStr,
+              forceUpdate: true 
+            }
+          }));
+        }, 500);
       }
     }
   } catch (error) {
     console.error('[Audio Processing] Error removing entry from processing map:', error);
   }
   
-  // Also, ensure we update the UI by dispatching an additional event
+  // Also, ensure we update the UI by dispatching additional event for entry deletion
   window.dispatchEvent(new CustomEvent('entryDeleted', {
     detail: { entryId }
   }));
@@ -494,3 +609,53 @@ export function getDeletedEntryIds(): {
     entryIds: new Set(deletedEntryIds)
   };
 }
+
+// Handle app focus changes to ensure proper state restoration
+document.addEventListener('visibilitychange', () => {
+  if (document.visibilityState === 'visible') {
+    console.log('[Audio Processing] Document became visible, checking processing entries');
+    
+    // Check both localStorage and sessionStorage
+    const entriesLocal = localStorage.getItem('processingEntries');
+    const entriesSession = sessionStorage.getItem('processingEntries');
+    
+    // Use the one with more entries
+    let entries = [];
+    
+    if (entriesLocal) {
+      try {
+        entries = JSON.parse(entriesLocal);
+      } catch (e) {
+        console.error('[Audio Processing] Error parsing localStorage entries:', e);
+      }
+    }
+    
+    if (entriesSession) {
+      try {
+        const sessionEntries = JSON.parse(entriesSession);
+        // Use session entries if they have more items
+        if (sessionEntries.length > entries.length) {
+          entries = sessionEntries;
+        }
+      } catch (e) {
+        console.error('[Audio Processing] Error parsing sessionStorage entries:', e);
+      }
+    }
+    
+    if (entries.length > 0) {
+      console.log('[Audio Processing] Found processing entries on visibility change:', entries);
+      
+      // Dispatch event to ensure UI updates
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+          detail: { 
+            entries: entries, 
+            lastUpdate: Date.now(),
+            forceUpdate: true,
+            restoredFromVisibility: true
+          }
+        }));
+      }, 300);
+    }
+  }
+});
