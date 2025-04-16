@@ -523,7 +523,6 @@ const HomePage = () => {
     
     return () => clearInterval(interval);
   }, []);
-  
 
   return (
     <div className="min-h-screen bg-white">
@@ -719,4 +718,46 @@ const HomePage = () => {
                     "Complete control over what you share",
                     "Option to delete all your data at any time"
                   ].map((item, i) => (
-                    <li key={i} className
+                    <li key={i} className="flex items-start gap-2">
+                      <Check className="h-5 w-5 text-primary mt-0.5 shrink-0" />
+                      <span>{item}</span>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            </motion.div>
+            
+            <motion.div 
+              className="w-full md:w-[55%]"
+              initial={{ opacity: 0, x: 20 }}
+              whileInView={{ opacity: 1, x: 0 }}
+              viewport={{ once: true }}
+              transition={{ delay: 0.2 }}
+            >
+              <div className="relative">
+                <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-purple-500/30 rounded-2xl blur-xl"></div>
+                <div className="relative bg-white rounded-xl overflow-hidden shadow-lg aspect-[4/3]">
+                  <img 
+                    src="/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png" 
+                    alt="Privacy Focused" 
+                    className="w-full h-full object-cover"
+                  />
+                  <div className="absolute inset-0 bg-gradient-to-tr from-black/70 via-black/40 to-transparent flex items-end p-6">
+                    <div className="text-white">
+                      <h3 className="text-xl font-bold mb-2">Secure By Design</h3>
+                      <p className="text-sm text-gray-200">Your thoughts remain private and protected from unwanted access</p>
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </motion.div>
+          </div>
+        </div>
+      </section>
+      
+      <Footer />
+    </div>
+  );
+};
+
+export default HomePage;
