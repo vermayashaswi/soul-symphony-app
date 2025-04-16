@@ -18,10 +18,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   useEffect(() => {
-    // Detect keyboard visibility
+    // Detect keyboard visibility with multiple signals
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
-        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
+        // More aggressive detection threshold
+        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
         setIsKeyboardVisible(isKeyboard);
       }
     };
@@ -29,15 +30,18 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     // Initial check
     handleVisualViewportResize();
     
-    // Set up listeners
+    // Set up listeners for viewport changes
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleVisualViewportResize);
       window.addEventListener('resize', handleVisualViewportResize);
     }
     
     // Set up listeners for keyboard events
-    window.addEventListener('keyboardOpen', () => setIsKeyboardVisible(true));
-    window.addEventListener('keyboardClose', () => setIsKeyboardVisible(false));
+    const handleKeyboardOpen = () => setIsKeyboardVisible(true);
+    const handleKeyboardClose = () => setIsKeyboardVisible(false);
+    
+    window.addEventListener('keyboardOpen', handleKeyboardOpen);
+    window.addEventListener('keyboardClose', handleKeyboardClose);
     
     // Clean up listeners
     return () => {
@@ -46,16 +50,16 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         window.removeEventListener('resize', handleVisualViewportResize);
       }
       
-      window.removeEventListener('keyboardOpen', () => setIsKeyboardVisible(true));
-      window.removeEventListener('keyboardClose', () => setIsKeyboardVisible(false));
+      window.removeEventListener('keyboardOpen', handleKeyboardOpen);
+      window.removeEventListener('keyboardClose', handleKeyboardClose);
     };
   }, []);
   
   useEffect(() => {
     // Always show mobile navigation for app routes in mobile or native app
-    // Remove the onboardingComplete check to ensure navigation is always visible
+    // Hide when keyboard is visible
     const shouldShowNav = (isMobile || isNativeApp()) && 
-                          !isKeyboardVisible; // Hide when keyboard is visible
+                          !isKeyboardVisible; 
     
     console.log('MobileNavigation visibility check:', { 
       shouldShowNav, 
@@ -96,7 +100,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     <motion.div 
       className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted p-2"
       style={{
-        zIndex: 50, // Ensure navbar is below the input but above other content
+        zIndex: 50, // Keep navbar below the input
         paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))'
       }}
       initial={{ y: 100 }}
