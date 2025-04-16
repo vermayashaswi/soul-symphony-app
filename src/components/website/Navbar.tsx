@@ -72,13 +72,6 @@ const Navbar = () => {
           
           <div className="hidden md:flex items-center space-x-4">
             <Button 
-              variant="outline" 
-              size="sm" 
-              asChild
-            >
-              <Link to="/auth">Sign In</Link>
-            </Button>
-            <Button 
               size="sm" 
               asChild
             >
@@ -123,9 +116,6 @@ const Navbar = () => {
                 </NavLink>
               ))}
               <div className="flex flex-col space-y-2 pt-2 border-t border-gray-100">
-                <Button variant="outline" asChild>
-                  <Link to="/auth">Sign In</Link>
-                </Button>
                 <Button asChild>
                   <Link to="/download">Download</Link>
                 </Button>
