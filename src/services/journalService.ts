@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
@@ -128,7 +127,7 @@ export const fetchJournalEntries = async (
         text: entity.text
       })) : undefined,
       duration: item.duration,
-      user_feedback: item.user_feedback
+      user_feedback: item.user_feedback || null
     }));
     
     return typedEntries;
