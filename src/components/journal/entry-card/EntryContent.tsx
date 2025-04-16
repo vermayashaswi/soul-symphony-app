@@ -66,6 +66,13 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       setShowLoading(true);
       contentAvailableRef.current = false;
       transitionInProgressRef.current = true;
+      
+      // Also store the loading state in session storage - this is critical for iOS persistence
+      try {
+        sessionStorage.setItem('entryContentLoading', 'true');
+      } catch (error) {
+        console.error('Error storing loading state in session storage:', error);
+      }
     } else if (!contentAvailableRef.current) {
       // Content is now available - transition from loading to content display
       contentAvailableRef.current = true;
@@ -79,6 +86,14 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         addEvent('EntryContent', 'Transitioning from loading to content display', 'info');
         setShowLoading(false);
         setStableContent(content);
+        
+        // Clear the loading state in session storage
+        try {
+          sessionStorage.removeItem('entryContentLoading');
+        } catch (error) {
+          console.error('Error removing loading state from session storage:', error);
+        }
+        
         timeoutRef.current = setTimeout(() => {
           transitionInProgressRef.current = false;
         }, 300); // Allow time for the animation to complete
@@ -99,6 +114,26 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       }
     };
   }, [content, isProcessing, showLoading, stableContent, addEvent]);
+  
+  // Check session storage on component mount to restore loading state (for iOS)
+  useEffect(() => {
+    try {
+      const storedLoadingState = sessionStorage.getItem('entryContentLoading');
+      if (storedLoadingState === 'true' && !showLoading) {
+        addEvent('EntryContent', 'Restoring loading state from session storage', 'info');
+        setShowLoading(true);
+      }
+    } catch (error) {
+      console.error('Error checking loading state in session storage:', error);
+    }
+    
+    // Clean up on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, []);
 
   // This is critical for iOS - we need to use a non-default exit mode to avoid animation artifacts
   return (

@@ -56,6 +56,39 @@ const ViewportManager: React.FC = () => {
         fullscreen.content = 'yes';
         document.head.appendChild(fullscreen);
       }
+      
+      // Add meta tag to prevent iOS zoom
+      if (!document.querySelector('meta[name="HandheldFriendly"]')) {
+        const handHeld = document.createElement('meta');
+        handHeld.name = 'HandheldFriendly';
+        handHeld.content = 'true';
+        document.head.appendChild(handHeld);
+      }
+      
+      // Set page-specific event persistence (helps for iOS state persistence)
+      if (location.pathname.includes('journal')) {
+        document.documentElement.classList.add('journal-page');
+        
+        // Check if we need to restore processing state
+        const processingEntries = sessionStorage.getItem('processingEntries');
+        if (processingEntries && JSON.parse(processingEntries).length > 0) {
+          console.log('Found processing entries on page load, will restore state');
+          
+          // Dispatch event after a small delay to ensure components are mounted
+          setTimeout(() => {
+            window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+              detail: { 
+                entries: JSON.parse(processingEntries), 
+                lastUpdate: Date.now(),
+                forceUpdate: true,
+                restoredFromNavigation: true
+              }
+            }));
+          }, 500);
+        }
+      } else {
+        document.documentElement.classList.remove('journal-page');
+      }
     };
     
     setCorrectViewport();
@@ -70,8 +103,19 @@ const ViewportManager: React.FC = () => {
     
     window.addEventListener('orientationchange', handleOrientationChange);
     
+    // Also handle page visibility changes (app being backgrounded/foregrounded)
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        console.log('App returned to foreground, checking for state restoration');
+        setTimeout(setCorrectViewport, 100);
+      }
+    };
+    
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    
     return () => {
       window.removeEventListener('orientationchange', handleOrientationChange);
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
   }, [location.pathname]);
   

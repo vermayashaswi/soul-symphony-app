@@ -80,7 +80,7 @@ export function getEntryIdForProcessingId(tempId: string): number | undefined {
       return fullMemoryResult;
     }
     
-    // Then check localStorage as fallback
+    // Then check localStorage as fallback - critical for persistence across navigation
     const processingToEntryMap = localStorage.getItem('processingToEntryMap');
     if (!processingToEntryMap) return undefined;
     
@@ -124,13 +124,17 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
   completedProcessingEntries.set(tempId, true);
   completedProcessingEntries.set(baseTempId, true);
   
-  // Also persist to localStorage for cross-page survival
+  // Also persist to localStorage for cross-page survival - this is crucial for iOS
   try {
     const processingToEntryMap = localStorage.getItem('processingToEntryMap');
     const map = processingToEntryMap ? JSON.parse(processingToEntryMap) : {};
     map[tempId] = entryId;
     map[baseTempId] = entryId;
     localStorage.setItem('processingToEntryMap', JSON.stringify(map));
+    
+    // Also update session storage as an additional persistence layer for iOS
+    sessionStorage.setItem(`processing_${tempId}`, String(entryId));
+    sessionStorage.setItem(`processing_${baseTempId}`, String(entryId));
   } catch (error) {
     console.error('[Audio Processing] Error setting entry ID for processing ID:', error);
   }
@@ -148,6 +152,17 @@ export function clearProcessingToEntryIdMap(): void {
   processingToEntryIdMap.clear();
   completedProcessingEntries.clear();
   localStorage.removeItem('processingToEntryMap');
+  
+  // Clear session storage entries too
+  const keysToRemove: string[] = [];
+  for (let i = 0; i < sessionStorage.length; i++) {
+    const key = sessionStorage.key(i);
+    if (key && key.startsWith('processing_')) {
+      keysToRemove.push(key);
+    }
+  }
+  
+  keysToRemove.forEach(key => sessionStorage.removeItem(key));
 }
 
 /**
@@ -219,8 +234,17 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     setupProcessingTimeout();
     console.log('[AudioProcessing] Setup processing timeout');
     
-    // Add this entry to localStorage to persist across navigations
+    // Add this entry to localStorage to persist across navigations - CRITICAL for iOS
     const updatedEntries = updateProcessingEntries(tempId, 'add');
+    
+    // Also store in sessionStorage for additional iOS reliability
+    const existingEntries = sessionStorage.getItem('processingEntries');
+    const sessionEntries = existingEntries ? JSON.parse(existingEntries) : [];
+    if (!sessionEntries.includes(tempId)) {
+      sessionEntries.push(tempId);
+      sessionStorage.setItem('processingEntries', JSON.stringify(sessionEntries));
+    }
+    
     console.log('[AudioProcessing] Updated processing entries in localStorage:', updatedEntries);
     
     // Log the audio details
@@ -254,10 +278,17 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     // Return immediately with the temp ID
     console.log('[AudioProcessing] Returning success with tempId:', tempId);
     
-    // Force a custom event dispatch to ensure UI updates
+    // Force multiple custom event dispatches to ensure UI updates - critical for iOS
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
       detail: { entries: updatedEntries, lastUpdate: Date.now(), forceUpdate: true }
     }));
+    
+    // Also dispatch after a small delay - iOS needs this redundancy
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { entries: updatedEntries, lastUpdate: Date.now() + 1, forceUpdate: true }
+      }));
+    }, 100);
     
     return { success: true, tempId };
   } catch (error: any) {
@@ -313,6 +344,16 @@ export function removeProcessingEntryById(entryId: number | string): void {
     const baseTempId = entryId.includes('-') ? entryId.split('-')[0] : entryId;
     deletedProcessingIds.add(baseTempId);
     console.log(`[Audio Processing] Added processing ID ${baseTempId} to deleted processing set`);
+    
+    // Also add to session storage deleted set for iOS
+    try {
+      const deletedIds = sessionStorage.getItem('deletedProcessingIds');
+      const idsSet = deletedIds ? new Set(JSON.parse(deletedIds)) : new Set();
+      idsSet.add(baseTempId);
+      sessionStorage.setItem('deletedProcessingIds', JSON.stringify(Array.from(idsSet)));
+    } catch (error) {
+      console.error('[Audio Processing] Error updating session storage deleted IDs:', error);
+    }
   }
   
   // Then, clean up the map storage
@@ -339,6 +380,11 @@ export function removeProcessingEntryById(entryId: number | string): void {
           completedProcessingEntries.set(baseTempId, true);
           // And mark as deleted
           deletedProcessingIds.add(baseTempId);
+          
+          // Remove from session storage too
+          sessionStorage.removeItem(`processing_${tempId}`);
+          sessionStorage.removeItem(`processing_${baseTempId}`);
+          
           console.log(`[Audio Processing] Removed mapping for tempId ${tempId} -> ${idStr}`);
         }
       });
@@ -350,6 +396,16 @@ export function removeProcessingEntryById(entryId: number | string): void {
         deletedProcessingIds.add(baseTempId);
         completedProcessingEntries.set(baseTempId, true);
         
+        // Add to session storage deleted set for iOS
+        try {
+          const deletedIds = sessionStorage.getItem('deletedProcessingIds');
+          const idsSet = deletedIds ? new Set(JSON.parse(deletedIds)) : new Set();
+          idsSet.add(baseTempId);
+          sessionStorage.setItem('deletedProcessingIds', JSON.stringify(Array.from(idsSet)));
+        } catch (error) {
+          console.error('[Audio Processing] Error updating session storage deleted IDs:', error);
+        }
+        
         if (map[entryId] || map[baseTempId]) {
           const mappedEntryId = Number(map[entryId] || map[baseTempId]);
           if (!isNaN(mappedEntryId)) {
@@ -359,6 +415,10 @@ export function removeProcessingEntryById(entryId: number | string): void {
           delete map[entryId];
           delete map[baseTempId];
           hasChanges = true;
+          
+          // Remove from session storage too
+          sessionStorage.removeItem(`processing_${entryId}`);
+          sessionStorage.removeItem(`processing_${baseTempId}`);
         }
       }
       
@@ -366,18 +426,36 @@ export function removeProcessingEntryById(entryId: number | string): void {
       if (hasChanges) {
         localStorage.setItem('processingToEntryMap', JSON.stringify(map));
         
+        // Get current entries from processing state, filtered by deletion status
+        const currentEntries = getProcessingEntries().filter(id => {
+          const baseTempId = id.includes('-') ? id.split('-')[0] : id;
+          return !deletedProcessingIds.has(baseTempId) && !isEntryDeleted(baseTempId);
+        });
+        
+        // Update session storage too
+        sessionStorage.setItem('processingEntries', JSON.stringify(currentEntries));
+        
         // Dispatch an event to notify other components
         window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
           detail: { 
-            entries: getProcessingEntries().filter(id => {
-              const baseTempId = id.includes('-') ? id.split('-')[0] : id;
-              return !deletedProcessingIds.has(baseTempId) && !isEntryDeleted(baseTempId);
-            }),
+            entries: currentEntries,
             lastUpdate: Date.now(),
             removedId: idStr,
             forceUpdate: true 
           }
         }));
+        
+        // Also dispatch after a small delay - iOS needs this redundancy
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+            detail: { 
+              entries: currentEntries,
+              lastUpdate: Date.now() + 1,
+              removedId: idStr,
+              forceUpdate: true 
+            }
+          }));
+        }, 100);
       }
     }
   } catch (error) {
@@ -398,6 +476,19 @@ export function getDeletedEntryIds(): {
   processingIds: Set<string>, 
   entryIds: Set<number> 
 } {
+  // Merge deleted IDs from session storage too (for iOS persistence)
+  try {
+    const deletedIds = sessionStorage.getItem('deletedProcessingIds');
+    if (deletedIds) {
+      const sessionDeletedIds = new Set(JSON.parse(deletedIds));
+      sessionDeletedIds.forEach(id => {
+        deletedProcessingIds.add(id as string);
+      });
+    }
+  } catch (error) {
+    console.error('[Audio Processing] Error merging session storage deleted IDs:', error);
+  }
+  
   return {
     processingIds: new Set(deletedProcessingIds),
     entryIds: new Set(deletedEntryIds)
