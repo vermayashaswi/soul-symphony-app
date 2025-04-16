@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 
 // Demo component that shows floating emotion bubbles
@@ -13,22 +13,33 @@ const EmotionBubblesDemo = () => {
     { name: "Inspired", color: "#ec4899", size: 0.9, percentage: 5 }
   ];
 
+  const [selectedBubble, setSelectedBubble] = useState<number | null>(null);
+
   // Calculate sizes based on percentages
   const maxPercentage = Math.max(...emotions.map(e => e.percentage));
   const minSize = 14; // Minimum bubble size
-  const maxSize = 35; // Maximum bubble size
+  const maxSize = 50; // Maximum bubble size (increased for better contrast)
+
+  const handleBubbleClick = (index: number) => {
+    if (selectedBubble === index) {
+      setSelectedBubble(null);
+    } else {
+      setSelectedBubble(index);
+    }
+  };
 
   return (
     <div className="w-full h-full relative">
       {emotions.map((emotion, index) => {
-        // Calculate size proportional to percentage
-        const sizeMultiplier = (emotion.percentage / maxPercentage) * 0.8 + 0.2; // Ensure minimum size
-        const bubbleSize = minSize + (maxSize - minSize) * sizeMultiplier;
+        // Calculate size using square root scale for better visual proportion
+        // This ensures small percentages are still visible but large percentages are appropriately larger
+        const sizeRatio = Math.sqrt(emotion.percentage / maxPercentage);
+        const bubbleSize = minSize + (maxSize - minSize) * sizeRatio;
         
         return (
           <motion.div
             key={index}
-            className="absolute rounded-full flex items-center justify-center"
+            className="absolute rounded-full flex items-center justify-center cursor-pointer"
             style={{
               backgroundColor: emotion.color,
               width: `${bubbleSize}px`,
@@ -49,6 +60,7 @@ const EmotionBubblesDemo = () => {
               scale: 1.1,
               transition: { duration: 0.2 } 
             }}
+            onClick={() => handleBubbleClick(index)}
             // Ensure return to original size
             transition={{
               duration: 4 + index,
@@ -57,6 +69,18 @@ const EmotionBubblesDemo = () => {
             }}
           >
             {emotion.name}
+            
+            {/* Single percentage popup that appears only when selected */}
+            {selectedBubble === index && (
+              <motion.div 
+                className="absolute -top-8 bg-background border border-border shadow-md px-2 py-1 rounded-md text-xs font-semibold z-10"
+                initial={{ opacity: 0, y: 10 }}
+                animate={{ opacity: 1, y: 0 }}
+                exit={{ opacity: 0, y: 10 }}
+              >
+                {emotion.percentage}%
+              </motion.div>
+            )}
           </motion.div>
         );
       })}

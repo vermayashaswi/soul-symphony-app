@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -33,21 +33,26 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   const [showPercentage, setShowPercentage] = useState(false);
   const timeoutRef = useRef<number | null>(null);
   
+  // Reset showPercentage when isHighlighted changes to false
   useEffect(() => {
-    if (isHighlighted) {
-      setShowPercentage(true);
+    if (!isHighlighted && showPercentage) {
+      setShowPercentage(false);
     }
-  }, [isHighlighted]);
+    
+    if (isHighlighted) {
+      setShowPercentage(false); // Prevent showing both popups
+    }
+  }, [isHighlighted, showPercentage]);
   
   useEffect(() => {
+    if (timeoutRef.current) {
+      window.clearTimeout(timeoutRef.current);
+    }
+    
     if (showPercentage && !isHighlighted) {
-      if (timeoutRef.current) {
-        window.clearTimeout(timeoutRef.current);
-      }
-      
       timeoutRef.current = window.setTimeout(() => {
         setShowPercentage(false);
-      }, 1000);
+      }, 2000);
     }
     
     return () => {
@@ -124,12 +129,15 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   };
 
   const handleBubbleClick = () => {
-    setShowPercentage(true);
+    // Toggle percentage display on click
+    setShowPercentage(!showPercentage);
     
     if (onClick && name && name !== '•') {
       onClick(name);
     }
   };
+
+  const shouldShowPercentage = (isHighlighted || showPercentage) && percentage !== undefined;
 
   return (
     <div className="relative">
@@ -157,16 +165,18 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
           {name}
         </span>
         
-        {(showPercentage || isHighlighted) && percentage !== undefined && (
-          <motion.div 
-            className="absolute -top-8 bg-background border border-border shadow-md px-2 py-1 rounded-md text-xs font-semibold z-10"
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0, y: 10 }}
-          >
-            {(Math.round(percentage * 10) / 10).toFixed(1)}%
-          </motion.div>
-        )}
+        <AnimatePresence>
+          {shouldShowPercentage && (
+            <motion.div 
+              className="absolute -top-8 bg-background border border-border shadow-md px-2 py-1 rounded-md text-xs font-semibold z-10"
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0, y: 10 }}
+            >
+              {(Math.round(percentage * 10) / 10).toFixed(1)}%
+            </motion.div>
+          )}
+        </AnimatePresence>
       </motion.div>
     </div>
   );
