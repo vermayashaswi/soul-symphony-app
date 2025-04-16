@@ -86,7 +86,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   return (
     <motion.div 
-      className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted p-2 z-50"
+      className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted p-2"
+      style={{
+        zIndex: 51, // Ensure navbar is above the input
+        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))'
+      }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}

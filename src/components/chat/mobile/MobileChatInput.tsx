@@ -172,12 +172,12 @@ export default function MobileChatInput({
       }`}
       style={{
         position: 'fixed',
-        bottom: isKeyboardVisible ? 0 : '69px', // Position at keyboard or navbar
+        bottom: isKeyboardVisible ? 0 : '0px', // Changed from 69px to 0px
         left: 0,
         right: 0,
         paddingBottom: isKeyboardVisible ? '5px' : '8px',
         marginBottom: 0,
-        zIndex: 9999,
+        zIndex: 50, // Increased z-index to be above the navigation bar
         boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
         transition: 'bottom 0.2s ease',
         borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
