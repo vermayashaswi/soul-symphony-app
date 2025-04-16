@@ -1,3 +1,4 @@
+
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -118,19 +119,12 @@ export function EmotionChart({
       }
     });
     
-    const filteredEmotions = Object.fromEntries(
-      Object.entries(emotionScores)
-        .filter(([_, value]) => value > 0)
-        .sort((a, b) => b[1] - a[1])
-        .slice(0, 15)
-    );
-    
     console.log(`[EmotionChart] Bubble data updated for timeframe: ${timeframe}`, {
-      emotionCount: Object.keys(filteredEmotions).length,
-      firstFewEmotions: Object.entries(filteredEmotions).slice(0, 3)
+      emotionCount: Object.keys(emotionScores).length,
+      firstFewEmotions: Object.entries(emotionScores).slice(0, 3)
     });
     
-    return filteredEmotions;
+    return emotionScores;
   }, [aggregatedData, timeframe]);
   
   useEffect(() => {
@@ -437,7 +431,8 @@ export function EmotionChart({
     const emotionEntries = Object.entries(bubbleData);
     if (emotionEntries.length === 0) return null;
     
-    const total = emotionEntries.reduce((sum, [value]) => sum + value, 0);
+    // Fix for TypeScript error: The reduce accumulator should be a number, not a string
+    const total = emotionEntries.reduce((sum, [_, value]) => sum + value, 0);
     
     return (
       <div className="mt-4 pt-4 border-t">
