@@ -96,11 +96,10 @@ async function generateReviewAndRating(label: any, entities: any, themes: any): 
 
 async function processReviews(limit = 10): Promise<any> {
   try {
-    // Fetch reviews that don't have Reviews filled in yet
+    // Fetch reviews to process - now we get ALL reviews, not just null ones
     const { data: reviews, error } = await supabase
       .from('PoPs_Reviews')
       .select('id, Label, entities, Themes, "Restaurant Name"')
-      .is('Reviews', null)
       .order('id', { ascending: true })
       .limit(limit);
     
@@ -172,18 +171,17 @@ serve(async (req) => {
     console.log(`Request received with limit: ${limit}, processAll: ${processAll}`);
     
     if (processAll) {
-      // Get total count of unprocessed reviews
+      // Get total count of reviews to process
       const { count, error: countError } = await supabase
         .from('PoPs_Reviews')
-        .select('id', { count: 'exact', head: true })
-        .is('Reviews', null);
+        .select('id', { count: 'exact', head: true });
       
       if (countError) {
-        console.error('Error counting unprocessed reviews:', countError);
+        console.error('Error counting reviews:', countError);
         throw countError;
       }
       
-      console.log(`Total unprocessed reviews: ${count}`);
+      console.log(`Total reviews to process: ${count}`);
       
       if (count === 0) {
         return new Response(
