@@ -14,6 +14,7 @@ import {
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { JournalEntry as JournalEntryType } from '@/types/journal';
 
 export interface JournalEntry {
   id: number;
@@ -249,7 +250,7 @@ export function JournalEntryCard({
       
       const { error } = await supabase
         .from('Journal Entries')
-        .update({ user_feedback: feedback })
+        .update({ user_feedback: feedback.toString() })
         .eq('id', safeEntry.id);
     
       if (error) {

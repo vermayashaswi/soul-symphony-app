@@ -127,7 +127,8 @@ export const fetchJournalEntries = async (
         name: entity.name,
         text: entity.text
       })) : undefined,
-      duration: item.duration
+      duration: item.duration,
+      user_feedback: item.user_feedback
     }));
     
     return typedEntries;
