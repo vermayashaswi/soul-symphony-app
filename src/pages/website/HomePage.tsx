@@ -360,19 +360,19 @@ const HomePage = () => {
 
   const testimonials = [
     {
-      text: "SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
-      author: "Sarah K., Designer",
-      avatar: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png"
+      text: "\"SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time and helps me stay consistent with my practice!\"",
+      author: "Arjun P., Software Engineer",
+      avatar: "/lovable-uploads/2377dbd6-9844-498d-9c1c-6c18ca058917.png"
     },
     {
-      text: "As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible.",
-      author: "Michael T., Engineer",
-      avatar: "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png"
+      text: "\"As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible. SOuLO has become an essential part of my self-care routine.\"",
+      author: "Tanaka H., Designer",
+      avatar: "/lovable-uploads/a5f94b12-bf36-47db-8ebb-1c2445d191bf.png"
     },
     {
-      text: "The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes.",
-      author: "Jamie L., Therapist",
-      avatar: "/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png"
+      text: "\"The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes in my life. It's like having a therapist in my pocket!\"",
+      author: "Emma S., Teacher",
+      avatar: "/lovable-uploads/2b19ea1c-cceb-4beb-9e4e-11e905c56358.png"
     }
   ];
 
@@ -691,6 +691,47 @@ const HomePage = () => {
         </div>
       </section>
       
+      <section className="py-16 md:py-24 bg-gradient-to-br from-gray-50 to-purple-50/30">
+        <div className="container mx-auto px-4">
+          <div className="text-center mb-12">
+            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Testimonials</span>
+            <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
+            <p className="text-muted-foreground max-w-2xl mx-auto">
+              Hear from people who have transformed their journaling experience with SOuLO
+            </p>
+          </div>
+          
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
+            {testimonials.map((testimonial, index) => (
+              <motion.div
+                key={index}
+                initial={{ opacity: 0, y: 20 }}
+                whileInView={{ opacity: 1, y: 0 }}
+                transition={{ duration: 0.5, delay: index * 0.1 }}
+                viewport={{ once: true }}
+                className="bg-white rounded-xl shadow-md p-6 flex flex-col"
+              >
+                <div className="mb-6">
+                  <p className="text-gray-700 italic">{testimonial.text}</p>
+                </div>
+                <div className="mt-auto flex items-center gap-3">
+                  <div className="h-12 w-12 rounded-full overflow-hidden">
+                    <img 
+                      src={testimonial.avatar} 
+                      alt={testimonial.author}
+                      className="h-full w-full object-cover"
+                    />
+                  </div>
+                  <div>
+                    <p className="font-medium">{testimonial.author}</p>
+                  </div>
+                </div>
+              </motion.div>
+            ))}
+          </div>
+        </div>
+      </section>
+      
       <section className="py-16 md:py-24 bg-gray-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
@@ -738,7 +779,7 @@ const HomePage = () => {
                 <div className="absolute -inset-1 bg-gradient-to-r from-primary/30 to-purple-500/30 rounded-2xl blur-xl"></div>
                 <div className="relative bg-white rounded-xl overflow-hidden shadow-lg aspect-[4/3]">
                   <img 
-                    src="/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png" 
+                    src="/lovable-uploads/241062d6-3971-492c-aaeb-a110d1256c7a.png" 
                     alt="Privacy Focused" 
                     className="w-full h-full object-cover"
                   />

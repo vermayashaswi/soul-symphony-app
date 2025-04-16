@@ -1,167 +1,52 @@
 
 import React from 'react';
 import { Routes, Route, Navigate } from 'react-router-dom';
-import Journal from '@/pages/Journal';
-import Auth from '@/pages/Auth';
+import Index from '@/pages/Index';
 import Home from '@/pages/Home';
+import Journal from '@/pages/Journal';
 import Insights from '@/pages/Insights';
 import SmartChat from '@/pages/SmartChat';
-import Settings from '@/pages/Settings';
+import Chat from '@/pages/Chat';
 import ProtectedRoute from './ProtectedRoute';
-import MobileNavigation from './MobileNavigation';
-import { useAuth } from '@/contexts/AuthContext';
-import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import HomePage from '@/pages/website/HomePage';
-import { isAppSubdomain } from './RouteHelpers';
+import Auth from '@/pages/Auth';
+import Settings from '@/pages/Settings';
+import AppDownload from '@/pages/AppDownload';
+import NotFound from '@/pages/NotFound';
+import ViewportManager from './ViewportManager';
+import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
+import FAQPage from '@/pages/website/FAQPage';
+import BlogPage from '@/pages/website/BlogPage';
+import BlogPostPage from '@/pages/website/BlogPostPage';
 
 const AppRoutes = () => {
-  const { user } = useAuth();
-  const onboardingComplete = user?.user_metadata?.onboarding_completed ?? null;
-  const appSubdomain = window.location.hostname === 'app.soulo.online';
-
-  // Force render marketing site on main domain
-  if (!appSubdomain && window.location.pathname === '/') {
-    console.log('Main domain - showing modern landing page (HomePage)');
-    return <HomePage />;
-  }
+  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
 
   return (
-    <>
+    <ViewportManager>
       <Routes>
-        {/* Auth routes - adjust paths based on domain */}
-        {appSubdomain ? (
-          <Route path="/auth" element={<Auth />} />
-        ) : (
-          <>
-            <Route path="/app/auth" element={<Auth />} />
-            <Route path="/auth" element={<Auth />} />
-          </>
-        )}
+        {/* Main website routes */}
+        <Route path="/" element={<Index />} />
+        <Route path="/privacy" element={<PrivacyPolicyPage />} />
+        <Route path="/faq" element={<FAQPage />} />
+        <Route path="/download" element={<AppDownload />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* Onboarding route - accessible without auth */}
-        {appSubdomain ? (
-          <Route path="/onboarding" element={<OnboardingScreen />} />
-        ) : (
-          <Route path="/app/onboarding" element={<OnboardingScreen />} />
-        )}
+        {/* App routes */}
+        <Route path="/auth" element={<Auth />} />
+        <Route element={<ProtectedRoute />}>
+          <Route path="/home" element={<Home />} />
+          <Route path="/journal" element={<Journal />} />
+          <Route path="/insights" element={<Insights />} />
+          <Route path="/chat" element={<Chat />} />
+          <Route path="/smart-chat" element={<SmartChat />} />
+          <Route path="/settings" element={<Settings />} />
+        </Route>
         
-        {/* Website routes - use the modern landing page */}
-        {!appSubdomain && (
-          <Route path="/" element={<HomePage />} />
-        )}
-        
-        {/* App routes with domain-specific paths */}
-        {isAppSubdomain() ? (
-          <>
-            <Route 
-              path="/home" 
-              element={
-                <ProtectedRoute>
-                  <Home />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/journal" 
-              element={
-                <ProtectedRoute>
-                  <Journal />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/insights" 
-              element={
-                <ProtectedRoute>
-                  <Insights />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/smart-chat" 
-              element={
-                <ProtectedRoute>
-                  <SmartChat />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/settings" 
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } 
-            />
-          </>
-        ) : (
-          <>
-            <Route 
-              path="/app/home" 
-              element={
-                <ProtectedRoute>
-                  <Home />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/app/journal" 
-              element={
-                <ProtectedRoute>
-                  <Journal />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/app/insights" 
-              element={
-                <ProtectedRoute>
-                  <Insights />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/app/smart-chat" 
-              element={
-                <ProtectedRoute>
-                  <SmartChat />
-                </ProtectedRoute>
-              } 
-            />
-            
-            <Route 
-              path="/app/settings" 
-              element={
-                <ProtectedRoute>
-                  <Settings />
-                </ProtectedRoute>
-              } 
-            />
-          </>
-        )}
-        
-        {/* Root app routes - conditionally redirect based on auth status */}
-        {appSubdomain ? (
-          <Route 
-            path="/" 
-            element={user ? <Navigate to="/home" replace /> : <Navigate to="/onboarding" replace />} 
-          />
-        ) : (
-          <Route 
-            path="/app" 
-            element={user ? <Navigate to="/app/home" replace /> : <Navigate to="/app/onboarding" replace />} 
-          />
-        )}
+        {/* Catch-all route */}
+        <Route path="*" element={<NotFound />} />
       </Routes>
-      {user && <MobileNavigation onboardingComplete={onboardingComplete} />}
-    </>
+    </ViewportManager>
   );
 };
 

@@ -13,7 +13,7 @@ const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
 
   useEffect(() => {
     if (slug) {
@@ -42,51 +42,18 @@ const BlogPostPage = () => {
       <div className="min-h-screen bg-white">
         <Navbar />
         <div className="pt-32 pb-16 container mx-auto px-4 text-center">
-          <h1 className="text-3xl font-bold mb-4">{t('blog.postNotFound')}</h1>
+          <h1 className="text-3xl font-bold mb-4">Post Not Found</h1>
           <p className="text-muted-foreground mb-8">
-            {t('blog.postNotFoundMessage')}
+            The blog post you're looking for doesn't exist or has been moved.
           </p>
           <Button asChild>
-            <Link to="/blog">{t('blog.backToBlog')}</Link>
+            <Link to="/blog">Back to Blog</Link>
           </Button>
         </div>
         <Footer />
       </div>
     );
   }
-
-  // Get translated content based on current language
-  const getTranslatedContent = () => {
-    // This is a simplified example - in a real app, you would fetch translated content from your API
-    // or have translations for each content piece
-    if (i18n.language === 'en' || !post.translations) {
-      return {
-        title: post.title,
-        excerpt: post.excerpt,
-        content: post.content,
-        category: post.category
-      };
-    }
-    
-    const translations = post.translations?.[i18n.language];
-    if (translations) {
-      return {
-        title: translations.title || post.title,
-        excerpt: translations.excerpt || post.excerpt,
-        content: translations.content || post.content,
-        category: translations.category || post.category
-      };
-    }
-    
-    return {
-      title: post.title,
-      excerpt: post.excerpt,
-      content: post.content,
-      category: post.category
-    };
-  };
-
-  const translatedContent = getTranslatedContent();
 
   return (
     <div className="min-h-screen bg-white">
@@ -97,13 +64,13 @@ const BlogPostPage = () => {
           <div className="max-w-3xl mx-auto">
             <Link to="/blog" className="flex items-center text-primary hover:underline mb-8">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              {t('blog.backToBlog')}
+              Back to Blog
             </Link>
             
             <div className="aspect-video overflow-hidden rounded-lg mb-8">
               <img 
                 src={post.image} 
-                alt={translatedContent.title}
+                alt={post.title}
                 className="w-full h-full object-cover"
               />
             </div>
@@ -111,7 +78,7 @@ const BlogPostPage = () => {
             <div className="mb-8">
               <div className="flex flex-wrap items-center gap-4 mb-4 text-sm text-muted-foreground">
                 <span className="text-xs font-medium uppercase text-primary bg-primary/10 px-2 py-1 rounded-full">
-                  {translatedContent.category}
+                  {post.category}
                 </span>
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
@@ -119,7 +86,7 @@ const BlogPostPage = () => {
                 </div>
                 <div className="flex items-center gap-1">
                   <User className="h-4 w-4" />
-                  <span>{post.author}</span>
+                  <span>{post.author.name}</span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
@@ -127,26 +94,26 @@ const BlogPostPage = () => {
                 </div>
               </div>
               
-              <h1 className="text-3xl md:text-4xl font-bold mb-4">{translatedContent.title}</h1>
-              <p className="text-lg text-muted-foreground">{translatedContent.excerpt}</p>
+              <h1 className="text-3xl md:text-4xl font-bold mb-4">{post.title}</h1>
+              <p className="text-lg text-muted-foreground">{post.excerpt}</p>
             </div>
             
-            <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: translatedContent.content }}></div>
+            <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: post.content }}></div>
             
             <div className="border-t border-gray-100 mt-12 pt-8">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
                 <div className="flex items-center gap-4">
                   <div className="w-12 h-12 bg-primary/10 rounded-full flex items-center justify-center text-primary font-bold">
-                    {post.author.charAt(0)}
+                    {post.author.avatar}
                   </div>
                   <div>
-                    <p className="font-medium">{post.author}</p>
-                    <p className="text-sm text-muted-foreground">{t('blog.author')}</p>
+                    <p className="font-medium">{post.author.name}</p>
+                    <p className="text-sm text-muted-foreground">{post.author.role}</p>
                   </div>
                 </div>
                 <div className="flex gap-4">
                   <Button variant="outline" asChild>
-                    <Link to="/blog">{t('blog.moreArticles')}</Link>
+                    <Link to="/blog">More Articles</Link>
                   </Button>
                 </div>
               </div>

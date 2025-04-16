@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Link } from 'react-router-dom';
@@ -7,71 +6,17 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from '@/components/ui/card';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
+import { blogPosts } from '@/utils/blog-utils';
 import { useTranslation } from 'react-i18next';
 
 const BlogPage = () => {
   const { t } = useTranslation();
   
-  // Blog post data - this would ideally come from a CMS or API
-  // We're hardcoding for demonstration but using translation keys
-  const featuredPost = {
-    id: 1,
-    slug: 'why-voice-journaling-is-the-future',
-    title: t('blog.featuredPost.title'),
-    excerpt: t('blog.featuredPost.excerpt'),
-    image: '/lovable-uploads/f1035a0b-8b30-4d38-9234-6560a14558de.png',
-    date: t('blog.featuredPost.date'),
-    author: t('blog.featuredPost.author'),
-    readTime: t('blog.featuredPost.readTime'),
-    category: t('blog.featuredPost.category')
-  };
-
-  const blogPosts = [
-    {
-      id: 2,
-      slug: 'how-ai-enhances-your-journaling-experience',
-      title: t('blog.posts.0.title'),
-      excerpt: t('blog.posts.0.excerpt'),
-      image: '/lovable-uploads/a6374f0f-2e81-45f4-8c42-dfe81f7fbf01.png',
-      date: t('blog.posts.0.date'),
-      author: t('blog.posts.0.author'),
-      readTime: t('blog.posts.0.readTime'),
-      category: t('blog.posts.0.category')
-    },
-    {
-      id: 3,
-      slug: 'benefits-of-daily-reflection-through-voice-journals',
-      title: t('blog.posts.1.title'),
-      excerpt: t('blog.posts.1.excerpt'),
-      image: '/lovable-uploads/8dd08973-e7a2-4bef-a990-1e3ff0dede92.png',
-      date: t('blog.posts.1.date'),
-      author: t('blog.posts.1.author'),
-      readTime: t('blog.posts.1.readTime'),
-      category: t('blog.posts.1.category')
-    },
-    {
-      id: 4,
-      slug: 'voice-journaling-for-busy-professionals',
-      title: t('blog.posts.2.title'),
-      excerpt: t('blog.posts.2.excerpt'),
-      image: '/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png',
-      date: t('blog.posts.2.date'),
-      author: t('blog.posts.2.author'),
-      readTime: t('blog.posts.2.readTime'),
-      category: t('blog.posts.2.category')
-    },
-    {
-      id: 5,
-      slug: 'tracking-emotional-patterns-with-voice-journaling',
-      title: t('blog.posts.3.title'),
-      excerpt: t('blog.posts.3.excerpt'),
-      image: '/lovable-uploads/a66f2232-4b39-4d46-ace5-19e4c81b1f05.png',
-      date: t('blog.posts.3.date'),
-      author: t('blog.posts.3.author'),
-      readTime: t('blog.posts.3.readTime'),
-      category: t('blog.posts.3.category')
-    }
-  ];
+  // Featured post is the first blog post (about voice journaling benefits)
+  const featuredPost = blogPosts[0];
+  
+  // Other blog posts (excluding the featured one)
+  const otherPosts = blogPosts.slice(1);
 
   return (
     <div className="min-h-screen bg-white">
@@ -80,9 +25,9 @@ const BlogPage = () => {
       <div className="pt-24 md:pt-32 pb-16">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">{t('blog.pageTitle')}</h1>
+            <h1 className="text-4xl md:text-5xl font-bold mb-4">SOuLO Blog</h1>
             <p className="text-muted-foreground text-lg max-w-2xl mx-auto">
-              {t('blog.pageSubtitle')}
+              Insights and guidance for your self-discovery journey through voice journaling
             </p>
           </div>
           
@@ -122,7 +67,7 @@ const BlogPage = () => {
                       <div className="flex items-center justify-between mb-4">
                         <div className="flex items-center gap-2">
                           <User className="h-4 w-4 text-primary" />
-                          <span className="text-sm">{featuredPost.author}</span>
+                          <span className="text-sm">{featuredPost.author.name}</span>
                         </div>
                         <div className="flex items-center gap-2">
                           <Clock className="h-4 w-4 text-primary" />
@@ -130,7 +75,7 @@ const BlogPage = () => {
                         </div>
                       </div>
                       <Button className="w-full group">
-                        {t('blog.readMore')}
+                        Read More
                         <ArrowRight className="ml-2 h-4 w-4 transition-transform group-hover:translate-x-1" />
                       </Button>
                     </div>
@@ -142,9 +87,9 @@ const BlogPage = () => {
           
           {/* Blog Posts Grid */}
           <div>
-            <h2 className="text-2xl md:text-3xl font-bold mb-8">{t('blog.latestArticles')}</h2>
+            <h2 className="text-2xl md:text-3xl font-bold mb-8">Latest Articles</h2>
             <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-              {blogPosts.map((post, index) => (
+              {otherPosts.map((post, index) => (
                 <motion.div
                   key={post.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -179,7 +124,7 @@ const BlogPage = () => {
                         <div className="flex items-center justify-between w-full text-sm text-muted-foreground">
                           <div className="flex items-center gap-1">
                             <User className="h-3 w-3" />
-                            <span>{post.author}</span>
+                            <span>{post.author.name}</span>
                           </div>
                           <div className="flex items-center gap-1">
                             <Clock className="h-3 w-3" />
