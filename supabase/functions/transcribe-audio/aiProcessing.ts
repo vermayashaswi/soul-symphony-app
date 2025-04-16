@@ -1,3 +1,4 @@
+
 // This file should be created if it doesn't exist yet
 // It contains functions for AI processing in the transcribe-audio edge function
 
@@ -21,8 +22,8 @@ export async function translateAndRefineText(
 
     const primaryLanguage = detectedLanguages[0] || 'en';
     
-    // Updated to always use the same prompt regardless of detected language
-    const systemPrompt = `You are a professional translator that understands multi-lingual contexts and colloquial language phrases. Translate the following text from ${primaryLanguage} to English, preserving the original meaning, tone, and style. Then, fix any grammatical errors, improve clarity, and enhance readability while keeping the original meaning intact. Do not assume or add anything by yourself. Your response will be shown to a user using an app that wants to ONLY see their translation in English!!!`;
+    // Updated prompt as specified
+    const systemPrompt = `You are a professional translator for a voice journaling app, SOuLO, that understands multi-lingual contexts and colloquial language phrases. Translate the following text from ${primaryLanguage} to English, preserving the original meaning, tone, and style. Make sure you use the languages detected by us as context as well. Then, fix any grammatical errors, improve clarity, and enhance readability while keeping the original meaning intact. Do't assume or add anything by yourself. Your response will be shown to a user using an app that wants to ONLY see their translation in English!!!`;
 
     // Make request to OpenAI
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
