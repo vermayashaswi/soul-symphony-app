@@ -19,7 +19,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentAvailableRef = useRef(false);
   const transitionInProgressRef = useRef(false);
-  const mountedRef = useRef(false);
   
   // Debug logging
   useEffect(() => {
@@ -33,29 +32,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     });
   }, [content, isProcessing, isExpanded, showLoading, stableContent, addEvent]);
   
-  // Mark component as mounted
-  useEffect(() => {
-    mountedRef.current = true;
-    
-    // On mount, check if we need to restore the loading state from session storage
-    const storedLoadingState = 
-      sessionStorage.getItem('entryContentLoading') === 'true' || 
-      localStorage.getItem('entryContentLoading') === 'true';
-      
-    if (storedLoadingState && !showLoading) {
-      addEvent('EntryContent', 'Restoring loading state from storage on mount', 'info');
-      setShowLoading(true);
-      transitionInProgressRef.current = true;
-    }
-    
-    return () => {
-      mountedRef.current = false;
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
-  
   // Handle content and loading state transitions with persistence
   useEffect(() => {
     // Force loading state to show if isProcessing is true
@@ -63,14 +39,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       addEvent('EntryContent', 'Processing started, showing loading state immediately', 'info');
       setShowLoading(true);
       transitionInProgressRef.current = true;
-      
-      // Store state in both localStorage and sessionStorage for maximum persistence
-      try {
-        sessionStorage.setItem('entryContentLoading', 'true');
-        localStorage.setItem('entryContentLoading', 'true');
-      } catch (error) {
-        console.error('Error storing loading state in storage:', error);
-      }
       return;
     }
     
@@ -99,12 +67,11 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       contentAvailableRef.current = false;
       transitionInProgressRef.current = true;
       
-      // Store the loading state in both localStorage and sessionStorage for maximum persistence
+      // Also store the loading state in session storage - this is critical for iOS persistence
       try {
         sessionStorage.setItem('entryContentLoading', 'true');
-        localStorage.setItem('entryContentLoading', 'true');
       } catch (error) {
-        console.error('Error storing loading state in storage:', error);
+        console.error('Error storing loading state in session storage:', error);
       }
     } else if (!contentAvailableRef.current) {
       // Content is now available - transition from loading to content display
@@ -116,17 +83,15 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       addEvent('EntryContent', `Content available, will show after ${delayTime}ms delay`, 'info');
       
       timeoutRef.current = setTimeout(() => {
-        if (!mountedRef.current) return;
         addEvent('EntryContent', 'Transitioning from loading to content display', 'info');
         setShowLoading(false);
         setStableContent(content);
         
-        // Clear the loading state in both localStorage and sessionStorage
+        // Clear the loading state in session storage
         try {
           sessionStorage.removeItem('entryContentLoading');
-          localStorage.removeItem('entryContentLoading');
         } catch (error) {
-          console.error('Error removing loading state from storage:', error);
+          console.error('Error removing loading state from session storage:', error);
         }
         
         timeoutRef.current = setTimeout(() => {
@@ -150,62 +115,25 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     };
   }, [content, isProcessing, showLoading, stableContent, addEvent]);
   
-  // Handle visibility changes - critical for navigation between app features
+  // Check session storage on component mount to restore loading state (for iOS)
   useEffect(() => {
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
-        // When app becomes visible again, check if we need to restore loading state
-        try {
-          const storedLoadingState = 
-            sessionStorage.getItem('entryContentLoading') === 'true' || 
-            localStorage.getItem('entryContentLoading') === 'true';
-            
-          if (storedLoadingState && !showLoading) {
-            addEvent('EntryContent', 'Restoring loading state from storage on visibility change', 'info');
-            setShowLoading(true);
-            transitionInProgressRef.current = true;
-          }
-        } catch (error) {
-          console.error('Error checking loading state in storage:', error);
-        }
+    try {
+      const storedLoadingState = sessionStorage.getItem('entryContentLoading');
+      if (storedLoadingState === 'true' && !showLoading) {
+        addEvent('EntryContent', 'Restoring loading state from session storage', 'info');
+        setShowLoading(true);
+      }
+    } catch (error) {
+      console.error('Error checking loading state in session storage:', error);
+    }
+    
+    // Clean up on unmount
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
       }
     };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
-    
-    return () => {
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
-    };
-  }, [showLoading, addEvent]);
-  
-  // React to processing entries changes from other components
-  useEffect(() => {
-    const handleProcessingEntriesChanged = (event: Event) => {
-      const customEvent = event as CustomEvent;
-      if (customEvent.detail?.restoredFromNavigation) {
-        addEvent('EntryContent', 'Processing entries restored from navigation', 'info');
-        
-        if (!showLoading) {
-          setShowLoading(true);
-          transitionInProgressRef.current = true;
-          
-          // Also store in storage for persistence
-          try {
-            sessionStorage.setItem('entryContentLoading', 'true');
-            localStorage.setItem('entryContentLoading', 'true');
-          } catch (error) {
-            console.error('Error storing loading state in storage:', error);
-          }
-        }
-      }
-    };
-    
-    window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged);
-    
-    return () => {
-      window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged);
-    };
-  }, [showLoading, addEvent]);
+  }, []);
 
   // This is critical for iOS - we need to use a non-default exit mode to avoid animation artifacts
   return (

@@ -14,9 +14,6 @@ const DEBOUNCE_THRESHOLD = 1000; // Increased from 500ms to 1000ms to prevent ra
 // Store all deleted entries to prevent them from showing up again if user navigates away and back
 const deletedProcessingTempIds = new Set<string>();
 
-// Track last known route to handle navigation events
-let lastKnownRoute: string | null = null;
-
 // Store processing entries in localStorage to persist across navigations
 export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
   try {
@@ -34,22 +31,8 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
     }
     lastStateChangeTime = now;
     
-    // Get entries from both localStorage and sessionStorage for maximum reliability
-    const storedEntriesLocal = localStorage.getItem('processingEntries');
-    const storedEntriesSession = sessionStorage.getItem('processingEntries');
-    
-    // Prefer sessionStorage if available, otherwise use localStorage
-    let entries: string[] = [];
-    if (storedEntriesSession) {
-      try {
-        entries = JSON.parse(storedEntriesSession);
-      } catch (e) {
-        // If parsing fails, try localStorage
-        entries = storedEntriesLocal ? JSON.parse(storedEntriesLocal) : [];
-      }
-    } else {
-      entries = storedEntriesLocal ? JSON.parse(storedEntriesLocal) : [];
-    }
+    const storedEntries = localStorage.getItem('processingEntries');
+    let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
     
     if (action === 'add' && !entries.includes(tempId)) {
       // Add timestamp to tempId to track staleness
@@ -63,29 +46,13 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
       console.log(`[Audio.ProcessingState] Removed entry ${tempId} from processing list. Now tracking ${entries.length} entries.`);
     }
     
-    // Store in both localStorage and sessionStorage for maximum persistence
     localStorage.setItem('processingEntries', JSON.stringify(entries));
-    sessionStorage.setItem('processingEntries', JSON.stringify(entries));
     
-    // Dispatch multiple events to ensure all components get the update
-    // First event for immediate update
+    // Dispatch an event so other components can react to the change
+    // Ensure we set forceUpdate flag to true to guarantee the UI updates
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
       detail: { entries, lastUpdate: now, forceUpdate: true }
     }));
-    
-    // Second event after a slight delay to catch any components that might have missed it
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries, lastUpdate: now + 1, forceUpdate: true }
-      }));
-    }, 100);
-    
-    // Third event with longer delay for components that mount later
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries, lastUpdate: now + 2, forceUpdate: true }
-      }));
-    }, 500);
     
     return entries;
   } catch (error) {
@@ -94,26 +61,11 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
   }
 };
 
-// Get the current processing entries from localStorage and sessionStorage
+// Get the current processing entries from localStorage
 export const getProcessingEntries = (): string[] => {
   try {
-    // Try to get from both storage types
-    const storedEntriesLocal = localStorage.getItem('processingEntries');
-    const storedEntriesSession = sessionStorage.getItem('processingEntries');
-    
-    // Prefer sessionStorage if available, otherwise use localStorage
-    let entries: string[] = [];
-    
-    if (storedEntriesSession) {
-      try {
-        entries = JSON.parse(storedEntriesSession);
-      } catch (e) {
-        // If parsing fails, try localStorage
-        entries = storedEntriesLocal ? JSON.parse(storedEntriesLocal) : [];
-      }
-    } else {
-      entries = storedEntriesLocal ? JSON.parse(storedEntriesLocal) : [];
-    }
+    const storedEntries = localStorage.getItem('processingEntries');
+    let entries = storedEntries ? JSON.parse(storedEntries) : [];
     
     // Filter out stale entries (older than 10 minutes) and deleted entries
     if (entries.length > 0) {
@@ -134,9 +86,8 @@ export const getProcessingEntries = (): string[] => {
         return true;
       });
       
-      // Update both storage types with filtered entries
+      // Update storage with filtered entries
       localStorage.setItem('processingEntries', JSON.stringify(entries));
-      sessionStorage.setItem('processingEntries', JSON.stringify(entries));
     }
     
     console.log(`[Audio.ProcessingState] Retrieved ${entries.length} processing entries from storage.`);
@@ -144,39 +95,6 @@ export const getProcessingEntries = (): string[] => {
   } catch (error) {
     console.error('[Audio.ProcessingState] Error retrieving processing entries from storage:', error);
     return [];
-  }
-};
-
-// Handle route changes to ensure processing cards persist
-export const handleRouteChange = (newRoute: string) => {
-  // Skip if same route
-  if (newRoute === lastKnownRoute) return;
-  
-  // Track if we're leaving or entering the journal route
-  const wasOnJournal = lastKnownRoute?.includes('journal') || false;
-  const isOnJournal = newRoute.includes('journal');
-  
-  console.log(`[Audio.ProcessingState] Route changed: ${lastKnownRoute} -> ${newRoute}`);
-  lastKnownRoute = newRoute;
-  
-  // If we're returning to journal, check if we need to restore processing entries
-  if (!wasOnJournal && isOnJournal) {
-    const entries = getProcessingEntries();
-    if (entries.length > 0) {
-      console.log(`[Audio.ProcessingState] Returned to journal with ${entries.length} processing entries, dispatching event`);
-      
-      // Dispatch event after a delay to ensure components are mounted
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-          detail: { 
-            entries, 
-            lastUpdate: Date.now(),
-            forceUpdate: true,
-            restoredFromNavigation: true
-          }
-        }));
-      }, 300);
-    }
   }
 };
 
@@ -192,24 +110,8 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
     lastStateChangeTime = now;
     
     const idStr = String(entryId);
-    
-    // Try to get from both storage types
-    const storedEntriesLocal = localStorage.getItem('processingEntries');
-    const storedEntriesSession = sessionStorage.getItem('processingEntries');
-    
-    // Prefer sessionStorage if available, otherwise use localStorage
-    let entries: string[] = [];
-    
-    if (storedEntriesSession) {
-      try {
-        entries = JSON.parse(storedEntriesSession);
-      } catch (e) {
-        // If parsing fails, try localStorage
-        entries = storedEntriesLocal ? JSON.parse(storedEntriesLocal) : [];
-      }
-    } else {
-      entries = storedEntriesLocal ? JSON.parse(storedEntriesLocal) : [];
-    }
+    const storedEntries = localStorage.getItem('processingEntries');
+    let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
     
     // Enhanced filtering to catch more variations of tempId
     const updatedEntries = entries.filter(tempId => {
@@ -245,26 +147,12 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
     });
     
     if (updatedEntries.length !== entries.length) {
-      // Update both storage types with updated entries
       localStorage.setItem('processingEntries', JSON.stringify(updatedEntries));
-      sessionStorage.setItem('processingEntries', JSON.stringify(updatedEntries));
       
-      // Dispatch events with increasing delays to ensure all components get updates
+      // Dispatch an event so other components can react to the change
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr, forceUpdate: true }
       }));
-      
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-          detail: { entries: updatedEntries, lastUpdate: now + 1, removedId: idStr, forceUpdate: true }
-        }));
-      }, 100);
-      
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-          detail: { entries: updatedEntries, lastUpdate: now + 2, removedId: idStr, forceUpdate: true }
-        }));
-      }, 500);
       
       console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
     }
@@ -290,13 +178,8 @@ export function resetProcessingState(): void {
   isEntryBeingProcessed = false;
   processingLock = false;
   
-  // Clear all processing entries from localStorage and sessionStorage
+  // Clear all processing entries from localStorage
   localStorage.setItem('processingEntries', JSON.stringify([]));
-  sessionStorage.setItem('processingEntries', JSON.stringify([]));
-  
-  // Also clear loading states
-  localStorage.removeItem('entryContentLoading');
-  sessionStorage.removeItem('entryContentLoading');
   
   if (processingTimeoutId) {
     clearTimeout(processingTimeoutId);
