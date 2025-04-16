@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, NavLink } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
@@ -26,7 +25,6 @@ const Navbar = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, []);
   
-  // Close mobile menu when navigating to a new page
   useEffect(() => {
     setIsMenuOpen(false);
   }, [location.pathname]);
@@ -47,11 +45,15 @@ const Navbar = () => {
     >
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
-          <Link to="/" className="font-bold text-xl">
-            SOuLO
+          <Link to="/" className="font-bold text-xl flex items-center">
+            <span className="text-[#9b87f5]">so</span>
+            <span className="text-[#9b87f5] relative">
+              \
+              <span className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[#9b87f5] text-sm">●</span>
+            </span>
+            <span className="text-[#9b87f5]">LO</span>
           </Link>
           
-          {/* Desktop Nav */}
           <nav className="hidden md:flex items-center space-x-8">
             {navItems.map((item) => (
               <NavLink
@@ -78,7 +80,6 @@ const Navbar = () => {
             </Button>
           </div>
           
-          {/* Mobile Menu Button */}
           <button
             className="md:hidden p-2 focus:outline-none"
             onClick={toggleMenu}
@@ -89,7 +90,6 @@ const Navbar = () => {
         </div>
       </div>
       
-      {/* Mobile Menu */}
       <AnimatePresence>
         {isMenuOpen && (
           <motion.div

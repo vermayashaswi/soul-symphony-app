@@ -1,148 +1,50 @@
-
-import { Home, Book, BarChart2, MessageSquare, Settings } from 'lucide-react';
-import { Link, useLocation } from 'react-router-dom';
+import React from 'react';
 import { motion } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
-import { useEffect, useState } from 'react';
-import { isAppSubdomain } from '@/routes/RouteHelpers';
+import { useNavigate } from 'react-router-dom';
+import { Button } from '@/components/ui/button';
+import { 
+  Home, 
+  User, 
+  MessageSquare, 
+  LineChart 
+} from 'lucide-react';
 
 const MobileNavbar = () => {
-  const location = useLocation();
-  const { user } = useAuth();
-  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const [isChatInputActive, setIsChatInputActive] = useState(false);
-  const appSubdomain = isAppSubdomain();
-  
-  // Dynamically build navigation items based on subdomain
-  const navItems = appSubdomain ? 
-    [
-      { path: '/home', label: 'Home', icon: Home },
-      { path: '/journal', label: 'Journal', icon: Book },
-      { path: '/insights', label: 'Insights', icon: BarChart2 },
-      { path: '/smart-chat', label: 'Chat', icon: MessageSquare },
-      { path: '/settings', label: 'Settings', icon: Settings },
-    ] : 
-    [
-      { path: '/app/home', label: 'Home', icon: Home },
-      { path: '/app/journal', label: 'Journal', icon: Book },
-      { path: '/app/insights', label: 'Insights', icon: BarChart2 },
-      { path: '/app/smart-chat', label: 'Chat', icon: MessageSquare },
-      { path: '/app/settings', label: 'Settings', icon: Settings },
-    ];
-
-  // Only show the navbar if the user is logged in and not on auth page
-  const authPath = appSubdomain ? '/auth' : '/app/auth';
-  if (!user || location.pathname === authPath) {
-    return null;
-  }
-  
-  // Listen for keyboard visibility changes and chat input focus
-  useEffect(() => {
-    const handleVisualViewportResize = () => {
-      if (window.visualViewport) {
-        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
-        setIsKeyboardVisible(isKeyboard);
-      }
-    };
-    
-    // Check if the chat input is active
-    const checkChatInputActive = () => {
-      const chatInputFocused = document.querySelector('.mobile-chat-interface input:focus');
-      setIsChatInputActive(!!chatInputFocused);
-    };
-    
-    // Initial check
-    handleVisualViewportResize();
-    checkChatInputActive();
-    
-    // Set up event listeners
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
-      window.addEventListener('resize', handleVisualViewportResize);
-    }
-    
-    // Listen for focus events on chat inputs
-    document.addEventListener('focusin', checkChatInputActive);
-    document.addEventListener('focusout', checkChatInputActive);
-    
-    // Custom event for keyboard visibility
-    const handleKeyboardOpen = () => setIsKeyboardVisible(true);
-    const handleKeyboardClose = () => setIsKeyboardVisible(false);
-    
-    window.addEventListener('keyboardOpen', handleKeyboardOpen);
-    window.addEventListener('keyboardClose', handleKeyboardClose);
-    
-    return () => {
-      if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
-        window.removeEventListener('resize', handleVisualViewportResize);
-      }
-      document.removeEventListener('focusin', checkChatInputActive);
-      document.removeEventListener('focusout', checkChatInputActive);
-      window.removeEventListener('keyboardOpen', handleKeyboardOpen);
-      window.removeEventListener('keyboardClose', handleKeyboardClose);
-    };
-  }, []);
-
-  // Return null when keyboard is visible or chat input is active in chat page
-  const chatPath = appSubdomain ? '/smart-chat' : '/app/smart-chat';
-  const isChatPage = location.pathname === chatPath;
-  if (isKeyboardVisible || (isChatPage && isChatInputActive)) {
-    return null;
-  }
-
-  // Improved active route detection to ensure only one tab is active
-  const getActiveStatus = (path: string) => {
-    // Check if current path matches the nav item path
-    return location.pathname === path || 
-           // Also check if current path is a sub-path
-           (path.endsWith('/home') && location.pathname.includes('/home/')) ||
-           (path.endsWith('/journal') && location.pathname.includes('/journal/')) ||
-           (path.endsWith('/insights') && location.pathname.includes('/insights/')) ||
-           (path.endsWith('/smart-chat') && location.pathname.includes('/smart-chat/')) ||
-           (path.endsWith('/settings') && location.pathname.includes('/settings/'));
-  };
+  const navigate = useNavigate();
 
   return (
-    <motion.div 
-      className="fixed bottom-0 left-0 right-0 h-16 bg-background border-t border-muted flex items-center justify-around z-40 px-1 backdrop-blur-sm"
+    <motion.nav
+      className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t px-4 py-2 z-50"
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      {navItems.map(item => {
-        const isActive = getActiveStatus(item.path);
-        
-        return (
-          <Link 
-            key={item.path} 
-            to={item.path}
-            className="flex flex-col items-center justify-center w-full h-full pt-1"
-          >
-            <div className="relative">
-              {isActive && (
-                <motion.div
-                  layoutId="nav-pill-mobile"
-                  className="absolute -inset-1 bg-theme/20 rounded-full"
-                  transition={{ type: "spring", duration: 0.6 }}
-                />
-              )}
-              <item.icon className={cn(
-                "relative h-5 w-5 transition-colors duration-200",
-                isActive ? "text-theme" : "text-muted-foreground"
-              )} />
-            </div>
-            <span className={cn(
-              "text-xs mt-1 transition-colors duration-200",
-              isActive ? "text-theme font-medium" : "text-muted-foreground"
-            )}>
-              {item.label}
-            </span>
-          </Link>
-        );
-      })}
-    </motion.div>
+      <div className="flex justify-between items-center">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="p-0" 
+          onClick={() => navigate('/')}
+        >
+          <span className="text-[#9b87f5]">so</span>
+          <span className="text-[#9b87f5] relative">
+            \
+            <span className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[#9b87f5] text-sm">●</span>
+          </span>
+          <span className="text-[#9b87f5]">LO</span>
+        </Button>
+
+        <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
+          <User className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/chat')}>
+          <MessageSquare className="h-5 w-5" />
+        </Button>
+        <Button variant="ghost" size="icon" onClick={() => navigate('/insights')}>
+          <LineChart className="h-5 w-5" />
+        </Button>
+      </div>
+    </motion.nav>
   );
 };
 
