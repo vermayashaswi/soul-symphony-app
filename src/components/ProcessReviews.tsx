@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
@@ -23,7 +22,6 @@ export function ProcessReviews() {
     sampleData?: any;
   } | null>(null);
 
-  // Check the table structure on component mount
   useEffect(() => {
     checkTableStructure();
   }, []);
@@ -33,7 +31,6 @@ export function ProcessReviews() {
     setErrorDetails(null);
     
     try {
-      // Check if the table exists by querying it
       const { data: tableData, error: tableError } = await supabase
         .from('PoPs_Reviews')
         .select('id')
@@ -47,13 +44,11 @@ export function ProcessReviews() {
         return;
       }
       
-      // Get the columns information using the custom function we created
       const { data: columnsData, error: columnsError } = await supabase
         .rpc('check_table_columns', { table_name: 'PoPs_Reviews' })
         .select();
       
       if (columnsError) {
-        // Fallback method: try to query with * to see existing columns
         const { data: fallbackData, error: fallbackError } = await supabase
           .from('PoPs_Reviews')
           .select('*')
@@ -66,7 +61,6 @@ export function ProcessReviews() {
           return;
         }
         
-        // Extract column names from the fallback data
         const columnNames = fallbackData && fallbackData.length > 0 
           ? Object.keys(fallbackData[0]) 
           : [];
@@ -77,7 +71,6 @@ export function ProcessReviews() {
           sampleData: fallbackData
         });
       } else {
-        // Use the direct column information from our custom function
         const columnNames = columnsData?.map(col => col.column_name) || [];
         setTableInfo({ 
           exists: true, 
@@ -101,7 +94,6 @@ export function ProcessReviews() {
       
       console.log(`Starting to process reviews: processAll=${processAll}`);
       
-      // Invoke the edge function with debug mode
       const { data, error } = await supabase.functions.invoke('process-restaurant-reviews', {
         body: { 
           limit: 10, 
@@ -130,7 +122,6 @@ export function ProcessReviews() {
           totalToProcess: data.totalToProcess || data.total || 0
         });
         
-        // Calculate progress
         const totalToProcess = data.totalToProcess || data.total || 0;
         const processed = data.processed || 0;
         
@@ -138,12 +129,11 @@ export function ProcessReviews() {
           setProgress(Math.floor((processed / totalToProcess) * 100));
         }
         
-        // Continue processing if there are more reviews and processAll is true
         if (processAll && data.remaining > 0) {
           toast.info(`Processing next batch. Remaining: ${data.remaining}`);
           setTimeout(() => {
             processReviews(true);
-          }, 2000); // Wait 2 seconds before processing the next batch
+          }, 2000);
         } else {
           setIsProcessing(false);
         }
@@ -210,7 +200,7 @@ export function ProcessReviews() {
                   </div>
                   <div>
                     {tableInfo.columns.includes('Themes') ? 
-                      <span className="text-green-600">✓ Themes column exists</span> : 
+                      <span className="text-green-600">✓ Themes column exists (JSONB)</span> : 
                       <span className="text-red-600">✗ Themes column missing</span>}
                   </div>
                 </>

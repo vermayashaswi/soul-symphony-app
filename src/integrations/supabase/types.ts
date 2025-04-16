@@ -191,7 +191,7 @@ export type Database = {
           Rating: number | null
           "Restaurant Name": string
           Reviews: string
-          Themes: string[] | null
+          Themes: Json | null
         }
         Insert: {
           entities?: Json | null
@@ -200,7 +200,7 @@ export type Database = {
           Rating?: number | null
           "Restaurant Name": string
           Reviews: string
-          Themes?: string[] | null
+          Themes?: Json | null
         }
         Update: {
           entities?: Json | null
@@ -209,7 +209,7 @@ export type Database = {
           Rating?: number | null
           "Restaurant Name"?: string
           Reviews?: string
-          Themes?: string[] | null
+          Themes?: Json | null
         }
         Relationships: []
       }
