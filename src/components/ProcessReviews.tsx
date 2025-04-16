@@ -95,11 +95,10 @@ export function ProcessReviews() {
       
       console.log(`Starting to process reviews: processAll=${processAll}`);
       
-      // Use the new generate-restaurant-reviews function instead of process-restaurant-reviews
+      // Use the generate-restaurant-reviews function
       const { data, error } = await supabase.functions.invoke('generate-restaurant-reviews', {
         body: { 
           limit: 10, 
-          offset: 0, 
           processAll,
           debug: true 
         }
