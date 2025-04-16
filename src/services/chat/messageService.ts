@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
+import { Json } from "@/integrations/supabase/types";
 
 /**
  * Get all messages for a specific thread
@@ -26,8 +27,8 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       content: msg.content,
       sender: msg.sender as 'user' | 'assistant',
       created_at: msg.created_at,
-      reference_entries: msg.reference_entries,
-      analysis_data: msg.analysis_data,
+      reference_entries: msg.reference_entries as any[] | undefined,
+      analysis_data: msg.analysis_data as any,
       has_numeric_result: msg.has_numeric_result,
       role: msg.sender as 'user' | 'assistant'
     }));
@@ -79,8 +80,8 @@ export const saveMessage = async (
       content: data.content,
       sender: data.sender as 'user' | 'assistant',
       created_at: data.created_at,
-      reference_entries: data.reference_entries,
-      analysis_data: data.analysis_data,
+      reference_entries: data.reference_entries as any[] | undefined,
+      analysis_data: data.analysis_data as any,
       has_numeric_result: data.has_numeric_result,
       role: data.sender as 'user' | 'assistant'
     };
