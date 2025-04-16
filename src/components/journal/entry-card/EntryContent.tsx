@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -18,7 +17,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const prevContentRef = useRef(content);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const contentAvailableRef = useRef(false);
-  const transitionInProgressRef = useRef(false);
   
   // Debug logging
   useEffect(() => {
@@ -32,13 +30,12 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     });
   }, [content, isProcessing, isExpanded, showLoading, stableContent, addEvent]);
   
-  // Handle content and loading state transitions with persistence
+  // Handle content and loading state transitions
   useEffect(() => {
     // Force loading state to show if isProcessing is true
     if (isProcessing && !showLoading) {
       addEvent('EntryContent', 'Processing started, showing loading state immediately', 'info');
       setShowLoading(true);
-      transitionInProgressRef.current = true;
       return;
     }
     
@@ -52,8 +49,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       contentIsLoading,
       isProcessing,
       contentSample: content?.substring(0, 20) + (content?.length > 20 ? '...' : ''),
-      showLoading,
-      transitionInProgress: transitionInProgressRef.current
+      showLoading
     });
     
     // Clear any existing timeout to prevent race conditions
@@ -65,14 +61,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       // Show loading state
       setShowLoading(true);
       contentAvailableRef.current = false;
-      transitionInProgressRef.current = true;
-      
-      // Also store the loading state in session storage - this is critical for iOS persistence
-      try {
-        sessionStorage.setItem('entryContentLoading', 'true');
-      } catch (error) {
-        console.error('Error storing loading state in session storage:', error);
-      }
     } else if (!contentAvailableRef.current) {
       // Content is now available - transition from loading to content display
       contentAvailableRef.current = true;
@@ -87,18 +75,9 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         setShowLoading(false);
         setStableContent(content);
         
-        // Clear the loading state in session storage
-        try {
-          sessionStorage.removeItem('entryContentLoading');
-        } catch (error) {
-          console.error('Error removing loading state from session storage:', error);
-        }
-        
-        timeoutRef.current = setTimeout(() => {
-          transitionInProgressRef.current = false;
-        }, 300); // Allow time for the animation to complete
+        timeoutRef.current = null;
       }, delayTime);
-    } else if (content !== stableContent && !showLoading && !transitionInProgressRef.current) {
+    } else if (content !== stableContent && !showLoading) {
       // Content has changed while already displaying content (not during loading)
       addEvent('EntryContent', 'Content updated while already showing content', 'info');
       setStableContent(content);
@@ -114,28 +93,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       }
     };
   }, [content, isProcessing, showLoading, stableContent, addEvent]);
-  
-  // Check session storage on component mount to restore loading state (for iOS)
-  useEffect(() => {
-    try {
-      const storedLoadingState = sessionStorage.getItem('entryContentLoading');
-      if (storedLoadingState === 'true' && !showLoading) {
-        addEvent('EntryContent', 'Restoring loading state from session storage', 'info');
-        setShowLoading(true);
-      }
-    } catch (error) {
-      console.error('Error checking loading state in session storage:', error);
-    }
-    
-    // Clean up on unmount
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, []);
 
-  // This is critical for iOS - we need to use a non-default exit mode to avoid animation artifacts
   return (
     <AnimatePresence mode="wait" initial={false}>
       {showLoading ? (
@@ -149,14 +107,13 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           transition={{ duration: 0.3 }}
           onAnimationStart={() => addEvent('EntryContent', 'Expanded content animation started', 'info')}
           onAnimationComplete={() => addEvent('EntryContent', 'Expanded content animation completed', 'info')}
-          className="will-change-opacity" // iOS optimization
         >
           <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
         </motion.div>
       ) : (
         <motion.p
           key="collapsed" 
-          className="text-xs md:text-sm text-foreground line-clamp-3 will-change-opacity" // iOS optimization
+          className="text-xs md:text-sm text-foreground line-clamp-3"
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
