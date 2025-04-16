@@ -1,162 +1,190 @@
 
-import { useToast } from "@/hooks/use-toast";
-import { 
-  getUserChatThreads, 
-  getThreadMessages, 
-  saveMessage, 
-  createChatThread, 
-  updateThreadTitle 
-} from "./index";
+import { useState, useEffect } from 'react';
+import { ChatThread, ChatMessage } from './types';
+import { getUserChatThreads, getThreadMessages } from './threadService';
+import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Hook to handle database errors and show toast notifications
+ * Hook for managing chat persistence
+ * Provides threads, messages, and loading states
  */
-export const useChatPersistence = () => {
-  const { toast } = useToast();
+export const useChatPersistence = (userId: string | undefined, initialThreadId?: string) => {
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(initialThreadId || null);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [threadsLoading, setThreadsLoading] = useState(true);
+  const [messagesLoading, setMessagesLoading] = useState(false);
   
-  const handleError = (message: string) => {
-    toast({
-      title: "Connection Error",
-      description: message,
-      variant: "destructive",
-    });
+  // Listen for real-time updates to threads
+  useEffect(() => {
+    if (!userId) {
+      setThreads([]);
+      setThreadsLoading(false);
+      return;
+    }
     
-    // Clear any loading states when an error occurs
-    sessionStorage.removeItem('chatLoadingState');
-    sessionStorage.removeItem('chatProcessingStage');
-    sessionStorage.removeItem('chatProcessingThreadId');
-    sessionStorage.removeItem('chatProcessingTimestamp');
+    const loadThreads = async () => {
+      setThreadsLoading(true);
+      try {
+        const threads = await getUserChatThreads(userId);
+        setThreads(threads);
+      } catch (error) {
+        console.error("Error loading chat threads:", error);
+      } finally {
+        setThreadsLoading(false);
+        setLoading(false);
+      }
+    };
+    
+    loadThreads();
+    
+    // Subscribe to changes in the chat_threads table
+    const threadsSubscription = supabase
+      .channel('chat_threads_changes')
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_threads',
+        filter: `user_id=eq.${userId}`
+      }, (payload) => {
+        console.log('Real-time thread update:', payload);
+        loadThreads();
+      })
+      .subscribe();
+      
+    // Also listen for thread title updates via custom event
+    const handleThreadTitleUpdate = (event: CustomEvent) => {
+      if (event.detail?.threadId && event.detail?.title) {
+        setThreads(prevThreads => 
+          prevThreads.map(thread => 
+            thread.id === event.detail.threadId 
+              ? { ...thread, title: event.detail.title } 
+              : thread
+          )
+        );
+      }
+    };
+    
+    window.addEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
+    
+    return () => {
+      threadsSubscription.unsubscribe();
+      window.removeEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
+    };
+  }, [userId]);
+  
+  // Load messages for the current thread
+  useEffect(() => {
+    if (!currentThreadId) {
+      setMessages([]);
+      return;
+    }
+    
+    const loadMessages = async () => {
+      setMessagesLoading(true);
+      try {
+        const messages = await getThreadMessages(currentThreadId);
+        setMessages(messages);
+      } catch (error) {
+        console.error(`Error loading messages for thread ${currentThreadId}:`, error);
+      } finally {
+        setMessagesLoading(false);
+      }
+    };
+    
+    loadMessages();
+    
+    // Subscribe to message changes for the current thread
+    const messagesSubscription = supabase
+      .channel(`messages_${currentThreadId}`)
+      .on('postgres_changes', {
+        event: '*',
+        schema: 'public',
+        table: 'chat_messages',
+        filter: `thread_id=eq.${currentThreadId}`
+      }, (payload) => {
+        console.log('Real-time message update:', payload);
+        loadMessages();
+      })
+      .subscribe();
+      
+    return () => {
+      messagesSubscription.unsubscribe();
+    };
+  }, [currentThreadId]);
+  
+  // Add a message to the current thread
+  const addMessage = async (content: string, sender: 'user' | 'assistant') => {
+    if (!currentThreadId) return null;
+    
+    try {
+      // Send directly to the database
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: currentThreadId,
+          content,
+          sender
+        })
+        .select('*')
+        .single();
+      
+      if (error) throw error;
+      
+      // Also update thread timestamp
+      await supabase
+        .from('chat_threads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', currentThreadId);
+      
+      // Return the new message
+      return data as ChatMessage;
+    } catch (error) {
+      console.error("Error adding message:", error);
+      return null;
+    }
   };
   
-  const persistLoadingState = (threadId: string, stage: string) => {
-    sessionStorage.setItem('chatLoadingState', 'true');
-    sessionStorage.setItem('chatProcessingStage', stage);
-    sessionStorage.setItem('chatProcessingThreadId', threadId);
-    sessionStorage.setItem('chatProcessingTimestamp', Date.now().toString());
-  };
-  
-  const clearLoadingState = () => {
-    sessionStorage.removeItem('chatLoadingState');
-    sessionStorage.removeItem('chatProcessingStage');
-    sessionStorage.removeItem('chatProcessingThreadId');
-    sessionStorage.removeItem('chatProcessingTimestamp');
+  // Create a new thread
+  const createThread = async (title: string = "New Conversation") => {
+    if (!userId) return null;
+    
+    try {
+      // Create a new thread
+      const { data, error } = await supabase
+        .from('chat_threads')
+        .insert({
+          user_id: userId,
+          title,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select('*')
+        .single();
+      
+      if (error) throw error;
+      
+      // Set as current thread
+      setCurrentThreadId(data.id);
+      
+      // Return the new thread
+      return data as ChatThread;
+    } catch (error) {
+      console.error("Error creating thread:", error);
+      return null;
+    }
   };
   
   return {
-    getUserChatThreads: async (userId: string) => {
-      try {
-        return await getUserChatThreads(userId);
-      } catch (error) {
-        handleError("Failed to retrieve your chat conversations.");
-        return [];
-      }
-    },
-    
-    getThreadMessages: async (threadId: string) => {
-      try {
-        const messages = await getThreadMessages(threadId);
-        // If we have messages and the last one is from the assistant, we can clear any loading state
-        // But only clear if the loading state is for THIS thread
-        if (messages && messages.length > 0 && messages[messages.length - 1].sender === 'assistant') {
-          const processingThreadId = sessionStorage.getItem('chatProcessingThreadId');
-          if (processingThreadId === threadId) {
-            clearLoadingState();
-          }
-        }
-        return messages;
-      } catch (error) {
-        handleError("Failed to load conversation messages.");
-        return [];
-      }
-    },
-    
-    saveMessage: async (
-      threadId: string, 
-      content: string, 
-      sender: 'user' | 'assistant',
-      references?: any[],
-      analysisData?: any,
-      hasNumericResult?: boolean
-    ) => {
-      try {
-        // If this is a user message, persist the loading state
-        if (sender === 'user') {
-          persistLoadingState(threadId, "Analyzing your question...");
-        } else if (sender === 'assistant') {
-          // If this is an assistant response, clear the loading state
-          clearLoadingState();
-        }
-        
-        return await saveMessage(threadId, content, sender, references, analysisData, hasNumericResult);
-      } catch (error) {
-        handleError("Failed to save your message. Please try again.");
-        return null;
-      }
-    },
-    
-    createChatThread: async (userId: string, title: string = "New Conversation") => {
-      try {
-        return await createChatThread(userId, title);
-      } catch (error) {
-        handleError("Failed to create a new conversation. Please try again.");
-        return null;
-      }
-    },
-    
-    updateThreadTitle: async (threadId: string, newTitle: string) => {
-      try {
-        return await updateThreadTitle(threadId, newTitle);
-      } catch (error) {
-        handleError("Failed to update conversation title.");
-        return false;
-      }
-    },
-    
-    persistLoadingState,
-    clearLoadingState,
-    
-    // New methods for checking loading state
-    isLoadingFor: (threadId: string) => {
-      const isLoading = sessionStorage.getItem('chatLoadingState') === 'true';
-      const processingThreadId = sessionStorage.getItem('chatProcessingThreadId');
-      
-      // Check if loading and for this specific thread
-      return isLoading && processingThreadId === threadId;
-    },
-    
-    getCurrentProcessingStage: () => {
-      return sessionStorage.getItem('chatProcessingStage');
-    },
-    
-    // Add a method to check if loading state is stale (over 5 minutes old)
-    isLoadingStateStale: () => {
-      const timestamp = sessionStorage.getItem('chatProcessingTimestamp');
-      if (!timestamp) return false;
-      
-      const now = Date.now();
-      const then = parseInt(timestamp);
-      const fiveMinutesMs = 5 * 60 * 1000;
-      
-      return now - then > fiveMinutesMs;
-    },
-    
-    // Check and clear stale loading state
-    checkAndClearStaleLoadingState: () => {
-      const isLoading = sessionStorage.getItem('chatLoadingState') === 'true';
-      if (isLoading) {
-        const timestamp = sessionStorage.getItem('chatProcessingTimestamp');
-        if (timestamp) {
-          const now = Date.now();
-          const then = parseInt(timestamp);
-          const fiveMinutesMs = 5 * 60 * 1000;
-          
-          if (now - then > fiveMinutesMs) {
-            clearLoadingState();
-            return true; // Was stale and cleared
-          }
-        }
-      }
-      return false; // Not stale or not loading
-    }
+    threads,
+    messages,
+    loading,
+    threadsLoading,
+    messagesLoading,
+    currentThreadId,
+    setCurrentThreadId,
+    addMessage,
+    createThread
   };
 };

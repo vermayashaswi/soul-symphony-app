@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
