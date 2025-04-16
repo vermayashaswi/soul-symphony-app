@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, NavLink } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
+import SouloLogo from '@/components/SouloLogo';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -46,12 +48,7 @@ const Navbar = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
           <Link to="/" className="font-bold text-xl flex items-center">
-            <span className="text-[#9b87f5]">so</span>
-            <span className="text-[#9b87f5] relative">
-              \
-              <span className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[#9b87f5] text-sm">●</span>
-            </span>
-            <span className="text-[#9b87f5]">LO</span>
+            <SouloLogo size="normal" useColorTheme={true} />
           </Link>
           
           <nav className="hidden md:flex items-center space-x-8">

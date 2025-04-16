@@ -26,12 +26,12 @@ import { useTheme } from '@/hooks/use-theme';
 
 const Navbar = () => {
   const navigate = useNavigate();
-  const { user, signOut } = useAuth(); // Changed logout to signOut to match AuthContextType
+  const { user, signOut } = useAuth(); 
   const { theme, setTheme } = useTheme();
   const isMobile = useIsMobile();
 
   const handleLogout = async () => {
-    await signOut(); // Changed logout to signOut
+    await signOut();
     navigate('/auth');
   };
 

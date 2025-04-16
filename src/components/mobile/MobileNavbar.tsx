@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +9,7 @@ import {
   MessageSquare, 
   LineChart 
 } from 'lucide-react';
+import SouloLogo from '@/components/SouloLogo';
 
 const MobileNavbar = () => {
   const navigate = useNavigate();
@@ -26,12 +28,7 @@ const MobileNavbar = () => {
           className="p-0" 
           onClick={() => navigate('/')}
         >
-          <span className="text-[#9b87f5]">so</span>
-          <span className="text-[#9b87f5] relative">
-            \
-            <span className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 text-[#9b87f5] text-sm">●</span>
-          </span>
-          <span className="text-[#9b87f5]">LO</span>
+          <SouloLogo size="small" useColorTheme={true} />
         </Button>
 
         <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
