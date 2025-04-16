@@ -90,6 +90,10 @@ export function EmotionChart({
   const [bubbleKey, setBubbleKey] = useState(0); 
   const [selectedEmotionInfo, setSelectedEmotionInfo] = useState<{name: string, percentage: number} | null>(null);
   const [visibleEmotions, setVisibleEmotions] = useState<string[]>([]);
+  const [topRightPercentage, setTopRightPercentage] = useState<{
+    emotion: string;
+    percentage: number;
+  } | null>(null);
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   
@@ -144,13 +148,13 @@ export function EmotionChart({
       const total = Object.values(bubbleData).reduce((sum, value) => sum + value, 0);
       const percentage = (bubbleData[emotion] / total) * 100;
       
-      setSelectedEmotionInfo({
-        name: emotion,
+      setTopRightPercentage({
+        emotion: emotion,
         percentage: Math.round(percentage * 10) / 10
       });
       
       setTimeout(() => {
-        setSelectedEmotionInfo(null);
+        setTopRightPercentage(null);
       }, 2000);
     }
   };
@@ -456,22 +460,23 @@ export function EmotionChart({
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
           <div className="w-full">
+            <div className="absolute top-2 right-2 text-xs text-muted-foreground z-10">
+              * Darker colors represent higher scores of emotion
+            </div>
+            
+            {topRightPercentage && (
+              <div className="absolute top-2 right-32 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
+                {topRightPercentage.emotion}: {topRightPercentage.percentage}%
+              </div>
+            )}
+            
             <div className="h-[300px]" key={bubbleKey}>
               {Object.keys(bubbleData).length > 0 ? (
-                <>
-                  <EmotionBubbles 
-                    emotions={bubbleData} 
-                    preventOverlap={true}
-                    onEmotionClick={handleEmotionClick}
-                  />
-                  {selectedEmotionInfo && (
-                    <div 
-                      className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-background/90 py-2 px-4 rounded-lg shadow-lg text-primary font-medium z-[100]"
-                    >
-                      {selectedEmotionInfo.percentage}%
-                    </div>
-                  )}
-                </>
+                <EmotionBubbles 
+                  emotions={bubbleData} 
+                  preventOverlap={true}
+                  onEmotionClick={handleEmotionClick}
+                />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
                   No emotions data available for this timeframe

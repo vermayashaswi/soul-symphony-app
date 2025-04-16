@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -37,10 +36,6 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   useEffect(() => {
     if (!isHighlighted && showPercentage) {
       setShowPercentage(false);
-    }
-    
-    if (isHighlighted) {
-      setShowPercentage(false); // Prevent showing both popups
     }
   }, [isHighlighted, showPercentage]);
   
@@ -137,6 +132,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
     }
   };
 
+  // Only show percentage if explicitly highlighted (external control) or locally toggled (and we have a percentage)
   const shouldShowPercentage = (isHighlighted || showPercentage) && percentage !== undefined;
 
   return (
@@ -144,7 +140,6 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
       <motion.div
         animate={getAnimation()}
         whileTap={{ scale: 0.95, transition: { duration: 0.2 } }}
-        // Always restore original scale on tap end
         className={cn(
           "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative",
           color,
@@ -164,20 +159,21 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
         <span className="font-medium px-1 text-center" style={fontSizeStyle}>
           {name}
         </span>
-        
-        <AnimatePresence>
-          {shouldShowPercentage && (
-            <motion.div 
-              className="absolute -top-8 bg-background border border-border shadow-md px-2 py-1 rounded-md text-xs font-semibold z-10"
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              exit={{ opacity: 0, y: 10 }}
-            >
-              {(Math.round(percentage * 10) / 10).toFixed(1)}%
-            </motion.div>
-          )}
-        </AnimatePresence>
       </motion.div>
+      
+      {/* We only show the percentage popup if explicitly requested */}
+      <AnimatePresence>
+        {shouldShowPercentage && (
+          <motion.div 
+            className="absolute -top-8 bg-background border border-border shadow-md px-2 py-1 rounded-md text-xs font-semibold z-10"
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0, y: 10 }}
+          >
+            {(Math.round(percentage * 10) / 10).toFixed(1)}%
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 };

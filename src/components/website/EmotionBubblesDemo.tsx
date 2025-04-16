@@ -1,24 +1,34 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
+import { useTheme } from '@/hooks/use-theme';
 
-// Demo component that shows floating emotion bubbles
+// Demo component that shows floating emotion bubbles with equal sizes but varying color intensities
 const EmotionBubblesDemo = () => {
-  // Define emotions with their colors, sizes (relative) and percentages
+  // Define emotions with their percentages
   const emotions = [
-    { name: "Joy", color: "#8b5cf6", size: 1.6, percentage: 40 },
-    { name: "Calm", color: "#06b6d4", size: 1.2, percentage: 25 },
-    { name: "Hope", color: "#10b981", size: 1.3, percentage: 20 },
-    { name: "Focus", color: "#f59e0b", size: 0.8, percentage: 10 },
-    { name: "Inspired", color: "#ec4899", size: 0.9, percentage: 5 }
+    { name: "Joy", percentage: 40 },
+    { name: "Calm", percentage: 25 },
+    { name: "Hope", percentage: 20 },
+    { name: "Focus", percentage: 10 },
+    { name: "Inspired", percentage: 5 }
   ];
 
   const [selectedBubble, setSelectedBubble] = useState<number | null>(null);
+  const { colorTheme, theme } = useTheme();
 
-  // Calculate sizes based on percentages
-  const maxPercentage = Math.max(...emotions.map(e => e.percentage));
-  const minSize = 14; // Minimum bubble size
-  const maxSize = 50; // Maximum bubble size (increased for better contrast)
+  // Calculate the available area (using 70% of the container)
+  const containerWidth = 100; // Percentage units
+  const containerHeight = 100; // Percentage units
+  const availableArea = containerWidth * containerHeight * 0.7;
+  
+  // Calculate bubble size
+  const numberOfBubbles = emotions.length;
+  const areaPerBubble = availableArea / numberOfBubbles;
+  const bubbleRadius = Math.sqrt(areaPerBubble / Math.PI);
+  
+  // Uniform bubble size (convert to pixels for display)
+  const bubbleSize = Math.min(30, bubbleRadius * 0.4); // Limiting max size for better aesthetics
 
   const handleBubbleClick = (index: number) => {
     if (selectedBubble === index) {
@@ -28,20 +38,41 @@ const EmotionBubblesDemo = () => {
     }
   };
 
+  // Get the base color from the theme
+  const baseColor = '#8b5cf6'; // Default purple if theme color isn't available
+
   return (
     <div className="w-full h-full relative">
+      {/* Info text about color intensity */}
+      <div className="absolute top-1 right-1 text-xs text-muted-foreground">
+        * Darker colors represent higher scores of emotion
+      </div>
+      
+      {/* Percentage display when a bubble is selected */}
+      {selectedBubble !== null && (
+        <motion.div 
+          className="absolute top-1 right-12 bg-background border border-border shadow-md px-2 py-1 rounded-md text-sm font-semibold z-10"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: 10 }}
+        >
+          {emotions[selectedBubble].percentage}%
+        </motion.div>
+      )}
+      
       {emotions.map((emotion, index) => {
-        // Calculate size using square root scale for better visual proportion
-        // This ensures small percentages are still visible but large percentages are appropriately larger
-        const sizeRatio = Math.sqrt(emotion.percentage / maxPercentage);
-        const bubbleSize = minSize + (maxSize - minSize) * sizeRatio;
+        // Calculate opacity based on percentage (higher percentage = more opaque/darker)
+        // Using a scale that ensures even low percentages are still visible
+        const minOpacity = 0.3;
+        const maxPercentage = Math.max(...emotions.map(e => e.percentage));
+        const opacity = minOpacity + ((1 - minOpacity) * (emotion.percentage / maxPercentage));
         
         return (
           <motion.div
             key={index}
             className="absolute rounded-full flex items-center justify-center cursor-pointer"
             style={{
-              backgroundColor: emotion.color,
+              backgroundColor: baseColor,
               width: `${bubbleSize}px`,
               height: `${bubbleSize}px`,
               fontSize: `${bubbleSize / 4}px`,
@@ -49,8 +80,8 @@ const EmotionBubblesDemo = () => {
               fontWeight: 'bold',
               top: `${25 + Math.sin(index * 1.5) * 15}px`,
               left: `${(index * 16) % 95}%`,
-              zIndex: Math.floor(emotion.percentage),
-              boxShadow: `0 0 10px ${emotion.color}80`
+              opacity: opacity,
+              boxShadow: `0 0 10px ${baseColor}80`
             }}
             animate={{
               y: [0, -5, 0, 5, 0],
@@ -69,18 +100,6 @@ const EmotionBubblesDemo = () => {
             }}
           >
             {emotion.name}
-            
-            {/* Single percentage popup that appears only when selected */}
-            {selectedBubble === index && (
-              <motion.div 
-                className="absolute -top-8 bg-background border border-border shadow-md px-2 py-1 rounded-md text-xs font-semibold z-10"
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, y: 10 }}
-              >
-                {emotion.percentage}%
-              </motion.div>
-            )}
           </motion.div>
         );
       })}
