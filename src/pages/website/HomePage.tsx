@@ -362,17 +362,17 @@ const HomePage = () => {
     {
       text: "\"SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time and helps me stay consistent with my practice!\"",
       author: "Arjun P., Software Engineer",
-      avatar: "https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b"
+      avatar: "https://images.unsplash.com/photo-1610216705422-caa3fcb6d158?q=80&w=250&h=250&auto=format&fit=crop"
     },
     {
       text: "\"As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible. SOuLO has become an essential part of my self-care routine.\"",
       author: "Tanaka H., Designer",
-      avatar: "https://images.unsplash.com/photo-1520813792240-56fc4a3352f5"
+      avatar: "https://images.unsplash.com/photo-1622542796254-5b9c46a259b8?q=80&w=250&h=250&auto=format&fit=crop"
     },
     {
       text: "\"The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes in my life. It's like having a therapist in my pocket!\"",
       author: "Emma S., Teacher",
-      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2"
+      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=250&h=250&auto=format&fit=crop"
     }
   ];
 
@@ -706,17 +706,17 @@ const HomePage = () => {
               {
                 text: "\"SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time and helps me stay consistent with my practice!\"",
                 author: "Arjun P., Software Engineer",
-                avatar: "https://images.unsplash.com/photo-1581090464777-f3220bbe1b8b"
+                avatar: "https://images.unsplash.com/photo-1610216705422-caa3fcb6d158?q=80&w=250&h=250&auto=format&fit=crop"
               },
               {
                 text: "\"As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible. SOuLO has become an essential part of my self-care routine.\"",
                 author: "Tanaka H., Designer",
-                avatar: "https://images.unsplash.com/photo-1520813792240-56fc4a3352f5"
+                avatar: "https://images.unsplash.com/photo-1622542796254-5b9c46a259b8?q=80&w=250&h=250&auto=format&fit=crop"
               },
               {
                 text: "\"The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes in my life. It's like having a therapist in my pocket!\"",
                 author: "Emma S., Teacher",
-                avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2"
+                avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=250&h=250&auto=format&fit=crop"
               }
             ].map((testimonial, index) => (
               <motion.div
