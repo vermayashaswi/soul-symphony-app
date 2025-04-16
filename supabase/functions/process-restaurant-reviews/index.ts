@@ -23,7 +23,7 @@ async function analyzeSentiment(text: string): Promise<number> {
     
     if (!googleNLApiKey) {
       console.error('Google API key not found in environment');
-      throw new Error('Google Natural Language API key is not configured');
+      return 3; // Default to neutral rating
     }
     
     // Call the Google Natural Language API - specifying analyzeSentiment endpoint
@@ -43,7 +43,7 @@ async function analyzeSentiment(text: string): Promise<number> {
     if (!response.ok) {
       const error = await response.text();
       console.error('Error analyzing sentiment:', error);
-      throw new Error(`Failed to analyze sentiment: ${error}`);
+      return 3; // Default to neutral rating
     }
 
     const result = await response.json();
@@ -72,278 +72,13 @@ async function analyzeSentiment(text: string): Promise<number> {
   }
 }
 
-// Extract entities from text
-async function extractEntities(text: string): Promise<any[]> {
-  try {
-    console.log('Extracting entities from review:', text.slice(0, 100) + '...');
-    
-    if (!googleNLApiKey) {
-      console.error('Google API key not found in environment');
-      return [];
-    }
-    
-    const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${googleNLApiKey}`, {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        document: {
-          type: 'PLAIN_TEXT',
-          content: text
-        },
-        encodingType: 'UTF8'
-      })
-    });
-
-    if (!response.ok) {
-      const errorData = await response.json();
-      console.error("Google NL API error:", errorData);
-      return [];
-    }
-
-    const result = await response.json();
-    
-    // Transform the entities to our preferred format
-    const formattedEntities = result.entities?.map((entity: any) => ({
-      name: entity.name,
-      type: entity.type,
-      salience: entity.salience,
-      mentions: entity.mentions?.length || 0
-    })) || [];
-    
-    console.log(`Extracted ${formattedEntities.length} entities`);
-    return formattedEntities;
-  } catch (error) {
-    console.error('Error in extractEntities:', error);
-    return [];
-  }
-}
-
-// Extract themes from text
-async function extractThemes(text: string): Promise<any> {
-  try {
-    console.log(`Starting theme extraction for review: "${text.substring(0, 100)}..."`);
-    
-    if (!openAIApiKey) {
-      console.error('OpenAI API key is missing or empty');
-      return ['Food', 'Service', 'Ambience']; // Fallback themes
-    }
-    
-    const prompt = `
-      Analyze the following restaurant review and extract the main themes or topics discussed (maximum 5 themes).
-      
-      For themes, return simple phrases or keywords that capture the essence of what the review is about.
-      
-      Return the results as a JSON object with one property:
-      - "themes": An array of strings representing the main themes
-      
-      Example response format:
-      {
-        "themes": ["food quality", "service", "ambiance"]
-      }
-      
-      Restaurant review:
-      ${text}
-    `;
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAIApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are a theme extraction assistant. Extract themes from restaurant reviews following the exact format requested.'
-          },
-          {
-            role: 'user',
-            content: prompt
-          }
-        ],
-        temperature: 0.3,
-        response_format: { type: "json_object" }
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`OpenAI API error: ${response.status} ${response.statusText}`, errorText);
-      return ['Food', 'Service', 'Ambience']; // Fallback themes
-    }
-
-    const result = await response.json();
-    
-    // Extract themes from the response
-    const contentText = result.choices[0].message.content;
-    
-    try {
-      // Parse the JSON response
-      const parsedContent = JSON.parse(contentText);
-      
-      // Extract themes
-      const themes = parsedContent.themes || [];
-      console.log(`Extracted themes:`, themes);
-      
-      return themes.length ? themes : ['Food', 'Service', 'Ambience'];
-    } catch (err) {
-      console.error('Error parsing JSON:', err);
-      return ['Food', 'Service', 'Ambience'];
-    }
-  } catch (error) {
-    console.error('Error in extractThemes:', error);
-    return ['Food', 'Service', 'Ambience'];
-  }
-}
-
-// Verify table structure and create/add required columns
-async function verifyTableStructure(debug = false) {
-  try {
-    console.log('Verifying PoPs_Reviews table structure...');
-    
-    // First check if the table exists by trying to select from it
-    const { data: tableExists, error: tableError } = await supabase
-      .from('PoPs_Reviews')
-      .select('id')
-      .limit(1);
-    
-    if (tableError) {
-      console.error('Error checking if table exists:', tableError);
-      throw new Error(`Table PoPs_Reviews does not exist or cannot be accessed: ${tableError.message}`);
-    }
-    
-    // Check if the required columns exist
-    let missingColumns = [];
-    const requiredColumns = [
-      { name: 'Rating', type: 'integer' },
-      { name: 'entities', type: 'jsonb' },
-      { name: 'Themes', type: 'jsonb' }
-    ];
-    
-    // Get all columns in the table
-    const { data: columnsData, error: columnsError } = await supabase
-      .rpc('check_table_columns', { table_name: 'PoPs_Reviews' });
-    
-    if (columnsError) {
-      console.error('Error getting columns:', columnsError);
-      
-      // Try a direct approach
-      const { data: fallbackData, error: fallbackError } = await supabase
-        .from('PoPs_Reviews')
-        .select('*')
-        .limit(1);
-      
-      if (fallbackError) {
-        console.error('Error with fallback column check:', fallbackError);
-        throw new Error(`Failed to verify columns: ${fallbackError.message}`);
-      }
-      
-      // Extract column names from the fallback data
-      const columnMap = new Map();
-      if (fallbackData && fallbackData.length > 0) {
-        Object.keys(fallbackData[0]).forEach(col => columnMap.set(col, true));
-      }
-      
-      // Check which required columns are missing
-      for (const col of requiredColumns) {
-        if (!columnMap.has(col.name)) {
-          missingColumns.push(col);
-        }
-      }
-    } else {
-      // Convert columns to a map for easier lookup
-      const columnMap = new Map();
-      if (columnsData) {
-        columnsData.forEach(col => columnMap.set(col.column_name, col.data_type));
-      }
-      
-      // Check which required columns are missing
-      for (const col of requiredColumns) {
-        if (!columnMap.has(col.name)) {
-          missingColumns.push(col);
-        }
-      }
-    }
-    
-    // Add any missing columns
-    console.log('Missing columns:', missingColumns);
-    
-    if (missingColumns.length > 0) {
-      for (const col of missingColumns) {
-        console.log(`Adding missing column: ${col.name}`);
-        try {
-          const { error } = await supabase.rpc('exec_sql', { 
-            sql: `ALTER TABLE public."PoPs_Reviews" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}` 
-          });
-          
-          if (error) {
-            console.error(`Error adding column ${col.name}:`, error);
-            // Try direct SQL
-            const alterResult = await supabase
-              .from('_exec_sql')
-              .select('*')
-              .eq('query', `ALTER TABLE public."PoPs_Reviews" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}`);
-            
-            if (alterResult.error) {
-              console.error(`Direct SQL for column ${col.name} failed:`, alterResult.error);
-            }
-          } else {
-            console.log(`Successfully added column ${col.name}`);
-          }
-        } catch (e) {
-          console.error(`Error adding column ${col.name}:`, e);
-        }
-      }
-    }
-    
-    // Verify columns now exist by direct check
-    const { data: finalCheck, error: finalError } = await supabase
-      .from('PoPs_Reviews')
-      .select('Rating, entities, Themes')
-      .limit(1);
-    
-    if (finalError) {
-      console.error('Final column check failed:', finalError);
-      if (debug) {
-        return {
-          success: false,
-          error: `Column verification failed: ${finalError.message}`,
-          columns: requiredColumns
-        };
-      } else {
-        throw new Error(`Column verification failed: ${finalError.message}`);
-      }
-    }
-    
-    console.log('Table structure verified successfully');
-    return { success: true };
-  } catch (error) {
-    console.error('Table structure verification failed:', error);
-    if (debug) {
-      return { 
-        success: false, 
-        error: error.message || 'Unknown error during table verification'
-      };
-    } else {
-      throw error;
-    }
-  }
-}
-
 // Process a batch of reviews
 async function processReviews(limit = 10, offset = 0): Promise<any> {
   try {
-    // First verify table structure
-    await verifyTableStructure();
-    
     // Fetch reviews that haven't been processed
     const { data: reviews, error } = await supabase
       .from('PoPs_Reviews')
-      .select('id, Reviews')
+      .select('id, Reviews, Restaurant Name')
       .is('Rating', null)
       .order('id', { ascending: true })
       .range(offset, offset + limit - 1);
@@ -366,22 +101,20 @@ async function processReviews(limit = 10, offset = 0): Promise<any> {
       try {
         console.log(`Processing review ID: ${review.id}`);
         
-        // Extract entities
-        const entities = await extractEntities(review.Reviews);
+        // Skip reviews without text
+        if (!review.Reviews) {
+          console.log(`Skipping review ${review.id} - no review text`);
+          continue;
+        }
         
         // Analyze sentiment and get rating
         const rating = await analyzeSentiment(review.Reviews);
-        
-        // Extract themes
-        const themes = await extractThemes(review.Reviews);
         
         // Update the review with the processed data
         const { error: updateError } = await supabase
           .from('PoPs_Reviews')
           .update({
-            Rating: rating,
-            entities: entities,
-            Themes: themes
+            Rating: rating
           })
           .eq('id', review.id);
         
@@ -414,25 +147,9 @@ serve(async (req) => {
   }
 
   try {
-    const { limit = 10, offset = 0, processAll = false, debug = false } = await req.json();
+    const { limit = 10, offset = 0, processAll = false } = await req.json();
     
-    console.log(`Request received with limit: ${limit}, offset: ${offset}, processAll: ${processAll}, debug: ${debug}`);
-    
-    // Verify table structure with debug mode if specified
-    const structureResult = await verifyTableStructure(debug);
-    if (debug && !structureResult.success) {
-      return new Response(
-        JSON.stringify({
-          success: false,
-          error: structureResult.error,
-          details: structureResult
-        }),
-        {
-          status: 400,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        }
-      );
-    }
+    console.log(`Request received with limit: ${limit}, offset: ${offset}, processAll: ${processAll}`);
     
     if (processAll) {
       // Get total count of unprocessed reviews
@@ -502,3 +219,4 @@ serve(async (req) => {
     );
   }
 });
+

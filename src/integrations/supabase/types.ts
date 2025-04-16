@@ -190,7 +190,7 @@ export type Database = {
           Label: Json
           Rating: number | null
           "Restaurant Name": string
-          Reviews: string
+          Reviews: string | null
           Themes: Json | null
         }
         Insert: {
@@ -199,7 +199,7 @@ export type Database = {
           Label: Json
           Rating?: number | null
           "Restaurant Name": string
-          Reviews: string
+          Reviews?: string | null
           Themes?: Json | null
         }
         Update: {
@@ -208,7 +208,7 @@ export type Database = {
           Label?: Json
           Rating?: number | null
           "Restaurant Name"?: string
-          Reviews?: string
+          Reviews?: string | null
           Themes?: Json | null
         }
         Relationships: []
