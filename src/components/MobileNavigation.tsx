@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isNativeApp, isAppRoute } from './RouteHelpers';
+import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MobileNavigationProps {
