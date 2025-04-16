@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -11,8 +10,7 @@ import {
   isProcessingEntry,
   resetProcessingState,
   getProcessingEntries,
-  removeProcessingEntryById as removeProcessingEntryFromState,
-  isEntryDeleted as isEntryDeletedFromState
+  removeProcessingEntryById as removeProcessingEntryFromState
 } from './audio/processing-state';
 import { validateInitialState, setupProcessingTimeout } from './audio/recording-validation';
 import { processRecordingInBackground } from './audio/background-processor';
@@ -35,7 +33,7 @@ const completedProcessingEntries = new Map<string, boolean>();
  * @returns True if either ID has been marked as deleted
  */
 export function isEntryDeleted(tempId?: string, entryId?: number): boolean {
-  if (tempId && (deletedProcessingIds.has(tempId) || isEntryDeletedFromState(tempId))) {
+  if (tempId && deletedProcessingIds.has(tempId)) {
     return true;
   }
   
