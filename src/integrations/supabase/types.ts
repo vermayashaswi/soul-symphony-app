@@ -182,6 +182,7 @@ export type Database = {
       }
       PoPs_Reviews: {
         Row: {
+          datetime: string | null
           entities: Json | null
           id: number
           Label: Json
@@ -191,6 +192,7 @@ export type Database = {
           Themes: Json | null
         }
         Insert: {
+          datetime?: string | null
           entities?: Json | null
           id?: number
           Label: Json
@@ -200,6 +202,7 @@ export type Database = {
           Themes?: Json | null
         }
         Update: {
+          datetime?: string | null
           entities?: Json | null
           id?: number
           Label?: Json
