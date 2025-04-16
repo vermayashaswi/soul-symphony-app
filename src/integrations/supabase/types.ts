@@ -183,6 +183,27 @@ export type Database = {
           },
         ]
       }
+      PoPs_Reviews: {
+        Row: {
+          id: number
+          Label: Json
+          "Restaurant Name": string
+          Reviews: string
+        }
+        Insert: {
+          id?: number
+          Label: Json
+          "Restaurant Name": string
+          Reviews: string
+        }
+        Update: {
+          id?: number
+          Label?: Json
+          "Restaurant Name"?: string
+          Reviews?: string
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           avatar_url: string | null
