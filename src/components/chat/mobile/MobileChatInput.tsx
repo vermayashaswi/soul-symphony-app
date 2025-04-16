@@ -172,14 +172,14 @@ export default function MobileChatInput({
       }`}
       style={{
         position: 'fixed',
-        bottom: isKeyboardVisible ? 0 : '0px', // Changed from 69px to 0px
+        bottom: 0, // FIXED: Always position at the bottom of the screen
         left: 0,
         right: 0,
-        paddingBottom: isKeyboardVisible ? '5px' : '8px',
+        paddingBottom: isKeyboardVisible ? '5px' : 'env(safe-area-inset-bottom, 8px)',
         marginBottom: 0,
-        zIndex: 50, // Increased z-index to be above the navigation bar
+        zIndex: 60, // Increased z-index to be above the navigation bar
         boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
-        transition: 'bottom 0.2s ease',
+        transition: 'all 0.2s ease',
         borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
         borderBottom: !isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
         visibility: 'visible',

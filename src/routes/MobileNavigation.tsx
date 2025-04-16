@@ -35,12 +35,19 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       window.addEventListener('resize', handleVisualViewportResize);
     }
     
+    // Set up listeners for keyboard events
+    window.addEventListener('keyboardOpen', () => setIsKeyboardVisible(true));
+    window.addEventListener('keyboardClose', () => setIsKeyboardVisible(false));
+    
     // Clean up listeners
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
         window.removeEventListener('resize', handleVisualViewportResize);
       }
+      
+      window.removeEventListener('keyboardOpen', () => setIsKeyboardVisible(true));
+      window.removeEventListener('keyboardClose', () => setIsKeyboardVisible(false));
     };
   }, []);
   
@@ -54,7 +61,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       shouldShowNav, 
       isMobile, 
       isNativeApp: isNativeApp(),
-      path: location.pathname
+      path: location.pathname,
+      isKeyboardVisible
     });
     
     setIsVisible(shouldShowNav);
@@ -88,7 +96,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     <motion.div 
       className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted p-2"
       style={{
-        zIndex: 51, // Ensure navbar is above the input
+        zIndex: 50, // Ensure navbar is below the input but above other content
         paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))'
       }}
       initial={{ y: 100 }}
