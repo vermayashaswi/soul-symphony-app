@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -232,21 +233,23 @@
     padding: 0.5rem !important;
   }
   
-  /* Mobile chat input specific fixes - UPDATED for consistent bottom positioning */
+  /* FIXED: Mobile chat input styles to eliminate all gaps */
+  /* This ensures the input is always fixed at the bottom, directly above the navbar when keyboard is closed */
   .mobile-chat-input-container {
     position: fixed;
-    bottom: 16px;
+    bottom: 0;
     left: 0;
     right: 0;
+    z-index: 50; 
+    margin: 0 !important;
+    padding: 0 !important;
     background-color: hsl(var(--background));
-    z-index: 50;
-    padding-bottom: env(safe-area-inset-bottom, 10px);
-    margin-bottom: 0 !important;
+    border-top: 0;
   }
   
-  /* Add space at the bottom of the chat content to prevent messages from being hidden behind the input */
+  /* Adjust chat content to prevent overlap with input */
   .mobile-chat-content {
-    padding-bottom: 30px !important;
+    padding-bottom: 80px !important; /* Give enough space for the input */
   }
   
   /* Ensure empty chat state is properly visible */
@@ -459,111 +462,76 @@
     -webkit-tap-highlight-color: transparent !important;
   }
   
-  /* Chat input keyboard adjustments - UPDATED for consistent positioning */
-  .keyboard-visible {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 9999;
-    background-color: hsl(var(--background));
-    border-top: 1px solid hsl(var(--border));
-    padding: 8px 10px;
-    transition: transform 0.2s ease-out;
-  }
-  
-  /* UPDATED: Input visibility improvements with better spacing from nav bar */
-  .mobile-chat-interface .input-container {
-    position: fixed;
-    bottom: 85px; /* Increased to ensure it stays fully above the navbar */
-    left: 0;
-    right: 0;
-    padding-bottom: 0;
-    z-index: 50;
-    background-color: var(--background);
-    border-top: 1px solid var(--border);
-    padding-top: 8px;
-  }
-  
-  /* UPDATED: Chat area scrolling adjustments */
-  .mobile-chat-area {
-    padding-bottom: 60px !important; /* Reduced to match input height */
-    margin-bottom: 0 !important;
-  }
-  
-  /* FIXED: Input spacing when keyboard is closed - preventing overlap with navbar */
-  .p-2.bg-background.border-t.border-border.flex.items-center.gap-2:not(.input-keyboard-active) {
-    margin-bottom: 0 !important; 
-    position: fixed;
-    bottom: 85px; /* Increased to stay well above navbar */
-    left: 0;
-    right: 0;
-    z-index: 40;
-  }
-  
-  /* NEW: Add bottom area protection for chat content */
-  .mobile-chat-interface .chat-content-container {
-    padding-bottom: 150px; /* Increased to provide more space */
-  }
-  
-  /* NEW: When keyboard is open on mobile, ensure input stays visible */
-  .mobile-chat-interface.keyboard-visible .input-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 9999;
-    padding-bottom: 3px;
-  }
-  
-  /* ADDITIONAL: Add extra spacing at the bottom of chat interface to prevent overlap */
-  .mobile-chat-interface .chat-area {
-    margin-bottom: 15px;
-  }
-  
-  /* ADDITIONAL: Ensure the chat input stays visible and provides enough clearance above navbar */
-  .mobile-chat-input {
-    margin-bottom: 75px !important;
-  }
-
-  /* Updated chat input positioning to remove gap */
+  /* COMPLETELY FIXED: Chat input positioning in all scenarios */
   .mobile-chat-interface .p-2.bg-background.border-t.border-border.flex.items-center.gap-2 {
     position: fixed;
     bottom: 0;
     left: 0;
     right: 0;
-    margin-bottom: 0 !important;
-    z-index: 50;
-    padding-bottom: env(safe-area-inset-bottom, 10px);
-    border-top: none; /* Remove border to make it seamless */
+    padding: 7px 10px;
+    margin: 0 !important;
+    z-index: 9999; /* Ultra high z-index to ensure it's above everything */
+    background-color: hsl(var(--background));
+    transition: bottom 0.2s ease;
   }
-
-  /* Ensure chat content has enough bottom padding */
-  .mobile-chat-interface .chat-content {
-    padding-bottom: 0 !important; /* Reduced from 75px to eliminate any extra space */
-  }
-
-  /* Remove any potential gaps in the mobile chat interface */
-  .mobile-chat-interface {
-    position: relative;
+  
+  /* When keyboard is visible, adjust the input box to maintain no gap */
+  .mobile-chat-interface.keyboard-visible .p-2.bg-background.border-t.border-border.flex.items-center.gap-2 {
     bottom: 0;
-    left: 0;
-    right: 0;
+    padding-bottom: 5px;
+    border-top: 1px solid rgba(0, 0, 0, 0.1);
   }
-
-  /* NEW: Additional styles to ensure no gaps */
+  
+  /* Default state - attach to bottom nav when keyboard not visible */
+  .mobile-chat-interface:not(.keyboard-visible) .p-2.bg-background.border-t.border-border.flex.items-center.gap-2 {
+    bottom: 69px; /* Height of the bottom nav - keeps it directly above */
+    border-top: none;
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Ensure proper spacing for content */
+  .mobile-chat-interface .chat-content-container {
+    padding-bottom: 140px; /* Extra space to ensure all content is visible */
+  }
+  
+  /* FIX: Ensure input visibility */
   .mobile-chat-interface .input-container {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    right: 0;
-    z-index: 50;
-    padding-bottom: env(safe-area-inset-bottom, 10px);
+    visibility: visible !important;
+    opacity: 1 !important;
+    z-index: 9999;
   }
-
-  /* Adjust chat area to stick to the bottom */
-  .mobile-chat-area {
-    padding-bottom: 60px !important; /* Reduced to match input height */
+  
+  /* Handle transition between keyboard open/closed states */
+  @media screen and (max-height: 600px) {
+    .mobile-chat-interface.keyboard-visible .p-2.bg-background.border-t.border-border.flex.items-center.gap-2 {
+      bottom: 0;
+    }
+  }
+  
+  /* For devices with notches or rounded corners, ensure padding */
+  @supports (padding: max(0px)) {
+    .keyboard-visible .mobile-chat-input {
+      padding-bottom: max(5px, env(safe-area-inset-bottom, 0));
+    }
+  }
+  
+  /* Ensure the chat input never becomes invisible */
+  .mobile-chat-input-container,
+  .mobile-chat-interface .p-2.bg-background {
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  /* Create a phantom space to prevent content from being hidden behind fixed elements */
+  .mobile-chat-area::after {
+    content: "";
+    display: block;
+    height: 120px; /* Match the total height of input + navbar */
+    width: 100%;
+  }
+  
+  /* Prevent unwanted margin/padding that might create gaps */
+  .mobile-chat-interface *[class*="mb-"] {
     margin-bottom: 0 !important;
   }
 }

@@ -83,28 +83,47 @@ export default function MobileChatInput({
   };
 
   useEffect(() => {
+    // Function to detect keyboard visibility
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
-        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.8;
-        setIsKeyboardVisible(isKeyboard);
+        // If viewport height is significantly reduced, keyboard is likely open
+        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
         
-        const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
-        window.dispatchEvent(new Event(eventName));
-        
-        if (isKeyboard && inputRef.current) {
-          // Ensure the chat input is visible by scrolling to it
-          setTimeout(() => {
-            // More aggressive scrolling - ensure we see the input box clearly
-            inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
-            window.scrollTo({
-              top: document.body.scrollHeight,
-              behavior: 'smooth'
-            });
-          }, 300);
+        if (isKeyboardVisible !== isKeyboard) {
+          setIsKeyboardVisible(isKeyboard);
+          
+          // Dispatch events to notify other components
+          const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
+          window.dispatchEvent(new Event(eventName));
+          
+          // Add class to body for CSS targeting
+          if (isKeyboard) {
+            document.body.classList.add('keyboard-visible');
+            document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
+          } else {
+            document.body.classList.remove('keyboard-visible');
+            document.querySelector('.mobile-chat-interface')?.classList.remove('keyboard-visible');
+            
+            // When keyboard closes, ensure we're scrolled to the bottom
+            setTimeout(() => {
+              window.scrollTo({
+                top: document.body.scrollHeight,
+                behavior: 'smooth'
+              });
+            }, 100);
+          }
+          
+          // When keyboard opens, ensure the input is visible
+          if (isKeyboard && inputRef.current) {
+            setTimeout(() => {
+              inputRef.current?.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }, 100);
+          }
         }
       }
     };
 
+    // Run immediately and set up listeners
     handleVisualViewportResize();
     
     if (window.visualViewport) {
@@ -112,54 +131,59 @@ export default function MobileChatInput({
       window.addEventListener('resize', handleVisualViewportResize);
     }
     
+    // Also listen for focus events on the input
+    const handleFocus = () => {
+      // Assume keyboard will be visible soon after focus
+      document.body.classList.add('keyboard-visible');
+      document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
+      
+      // Short delay to ensure keyboard has time to appear
+      setTimeout(() => {
+        if (inputRef.current) {
+          inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+        }
+      }, 300);
+    };
+    
+    const inputElement = inputRef.current;
+    if (inputElement) {
+      inputElement.addEventListener('focus', handleFocus);
+    }
+    
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
         window.removeEventListener('resize', handleVisualViewportResize);
       }
-    };
-  }, []);
-
-  useEffect(() => {
-    const handleFocus = () => {
-      setTimeout(() => {
-        // More aggressive scrolling and positioning for focus events
-        window.scrollTo({
-          top: document.body.scrollHeight,
-          behavior: 'smooth'
-        });
-        
-        setIsKeyboardVisible(true);
-        
-        window.dispatchEvent(new Event('keyboardOpen'));
-      }, 300);
-    };
-
-    const inputElement = inputRef.current;
-    if (inputElement) {
-      inputElement.addEventListener('focus', handleFocus);
-    }
-
-    return () => {
+      
       if (inputElement) {
         inputElement.removeEventListener('focus', handleFocus);
       }
+      
+      document.body.classList.remove('keyboard-visible');
     };
-  }, []);
+  }, [isKeyboardVisible]);
 
   return (
     <div 
       ref={inputContainerRef}
       className={`p-2 bg-background border-t border-border flex items-center gap-2 ${
-        isKeyboardVisible ? 'fixed bottom-0 left-0 right-0 z-[9999] input-keyboard-active' : ''
+        isKeyboardVisible ? 'input-keyboard-active' : ''
       }`}
       style={{
-        paddingBottom: isKeyboardVisible ? '7px' : 'env(safe-area-inset-bottom, 10px)',
-        marginBottom: 0, // Keep consistent margin
-        // Add a clear visual separation from the navbar with a slight shadow
-        boxShadow: '0 -2px 5px rgba(0, 0, 0, 0.05)',
-        position: 'relative',
-        zIndex: 50 // Ensure input stays on top
+        position: 'fixed',
+        bottom: isKeyboardVisible ? 0 : '69px', // Position at keyboard or navbar
+        left: 0,
+        right: 0,
+        paddingBottom: isKeyboardVisible ? '5px' : '8px',
+        marginBottom: 0,
+        zIndex: 9999,
+        boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
+        transition: 'bottom 0.2s ease',
+        borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+        borderBottom: !isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
+        visibility: 'visible',
+        opacity: 1,
       }}
     >
       <div className="flex-1 relative">
