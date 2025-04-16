@@ -108,7 +108,6 @@ export type Database = {
           "refined text": string | null
           sentiment: string | null
           "transcription text": string | null
-          user_feedback: number | null
           user_id: string | null
         }
         Insert: {
@@ -123,7 +122,6 @@ export type Database = {
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
-          user_feedback?: number | null
           user_id?: string | null
         }
         Update: {
@@ -138,7 +136,6 @@ export type Database = {
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
-          user_feedback?: number | null
           user_id?: string | null
         }
         Relationships: [
