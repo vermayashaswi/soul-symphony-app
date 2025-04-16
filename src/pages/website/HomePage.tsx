@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail, Calendar, TrendingUp } from 'lucide-react';
@@ -403,7 +402,7 @@ const HomePage = () => {
       icon: Brain
     },
     {
-      step: "3a",
+      step: "3",
       title: "Analyze Your Emotional Patterns",
       description: [
         "Filter insights using customizable time ranges (day, week, month, year)",
@@ -420,7 +419,7 @@ const HomePage = () => {
       multiplePhones: true
     },
     {
-      step: "3b",
+      step: "4",
       title: "Visualize Your Emotional Journey",
       description: [
         "See graphical representations of emotion score movements over time",
@@ -436,7 +435,7 @@ const HomePage = () => {
       multiplePhones: true
     },
     {
-      step: "4",
+      step: "5",
       title: "Chat with Your Journal",
       description: [
         "Have a conversation with \"Rūḥ\", an emotionally intelligent AI assistant",
@@ -594,12 +593,9 @@ const HomePage = () => {
                         </div>
                         <ul className="text-muted-foreground mb-6 space-y-2 list-disc pl-5">
                           {item.description.map((point, index) => (
-                            <li key={index} className="text-left">{point}</li>
+                            <li key={index} className="text-left whitespace-normal" style={{ maxWidth: "500px", paddingRight: "20px" }}>{point}</li>
                           ))}
                         </ul>
-                        <div className="bg-primary/10 rounded-full w-12 h-12 flex items-center justify-center mb-4 mx-auto md:mx-0">
-                          {React.createElement(item.icon, { className: "h-6 w-6 text-primary" })}
-                        </div>
                       </div>
                       
                       <div className="w-full md:w-1/2 order-1 md:order-2">
