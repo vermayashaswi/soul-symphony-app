@@ -1,4 +1,3 @@
-
 import { useState, useMemo, useEffect } from 'react';
 import { 
   LineChart, 
@@ -428,38 +427,7 @@ export function EmotionChart({
   };
 
   const renderBubbleLegend = () => {
-    const emotionEntries = Object.entries(bubbleData);
-    if (emotionEntries.length === 0) return null;
-    
-    // Fix for TypeScript error: The reduce accumulator should be a number, not a string
-    const total = emotionEntries.reduce((sum, [_, value]) => sum + value, 0);
-    
-    return (
-      <div className="mt-4 pt-4 border-t">
-        <h4 className="text-sm font-medium mb-2">Legend (Top Emotions)</h4>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-5 gap-2">
-          {emotionEntries.map(([emotion, value], index) => {
-            const percentage = (value / total) * 100;
-            const formattedPercentage = percentage < 1 ? "<1%" : `${Math.round(percentage)}%`;
-            
-            return (
-              <div 
-                key={emotion} 
-                className="flex items-center gap-2 text-xs"
-                title={`${emotion}: ${formattedPercentage}`}
-              >
-                <div 
-                  className="w-3 h-3 rounded-full flex-shrink-0"
-                  style={{ backgroundColor: getEmotionColor(emotion, index) }}
-                />
-                <span className="capitalize truncate">{emotion}</span>
-                <span className="text-muted-foreground ml-auto">{formattedPercentage}</span>
-              </div>
-            );
-          })}
-        </div>
-      </div>
-    );
+    return null;
   };
 
   return (
@@ -496,9 +464,6 @@ export function EmotionChart({
                     preventOverlap={true}
                     onEmotionClick={handleEmotionClick}
                   />
-                  <div className="absolute bottom-3 right-3 text-xs text-muted-foreground bg-background/70 px-2 py-1 rounded-md z-50">
-                    Tip: Tap bubbles to see percentages
-                  </div>
                   {selectedEmotionInfo && (
                     <div 
                       className="absolute top-1/2 left-1/2 transform -translate-x-1/2 -translate-y-1/2 bg-background/90 py-2 px-4 rounded-lg shadow-lg text-primary font-medium z-[100]"
@@ -513,8 +478,6 @@ export function EmotionChart({
                 </div>
               )}
             </div>
-            
-            {Object.keys(bubbleData).length > 0 && renderBubbleLegend()}
           </div>
         )}
       </div>
