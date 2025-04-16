@@ -1,7 +1,8 @@
 
 import { useState, useEffect } from 'react';
 import { ChatThread, ChatMessage } from './types';
-import { getUserChatThreads, getThreadMessages } from './threadService';
+import { getUserChatThreads } from './threadService';
+import { getThreadMessages } from './messageService';
 import { supabase } from '@/integrations/supabase/client';
 
 /**

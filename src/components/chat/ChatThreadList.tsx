@@ -11,6 +11,7 @@ interface ChatThreadListProps {
   onStartNewThread: () => Promise<string | null>;
   currentThreadId: string | null;
   showDeleteButtons?: boolean;
+  newChatButtonWidth?: 'full' | 'half';
 }
 
 const ChatThreadList: React.FC<ChatThreadListProps> = ({
@@ -18,7 +19,8 @@ const ChatThreadList: React.FC<ChatThreadListProps> = ({
   onSelectThread,
   onStartNewThread,
   currentThreadId,
-  showDeleteButtons = true
+  showDeleteButtons = true,
+  newChatButtonWidth = 'full'
 }) => {
   const [threads, setThreads] = useState<ChatThread[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,7 +90,7 @@ const ChatThreadList: React.FC<ChatThreadListProps> = ({
       <div className="p-4 border-b">
         <Button 
           onClick={handleStartNewThread}
-          className="w-full"
+          className={newChatButtonWidth === 'full' ? "w-full" : "w-1/2"}
           disabled={creatingThread}
         >
           {creatingThread ? (

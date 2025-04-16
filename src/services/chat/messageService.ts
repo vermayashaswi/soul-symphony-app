@@ -3,11 +3,11 @@ import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
 
 /**
- * Get messages for a specific thread
+ * Get all messages for a specific thread
  */
 export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]> => {
   try {
-    console.log("Fetching messages for thread:", threadId);
+    console.log(`Fetching messages for thread ${threadId}`);
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
@@ -19,115 +19,52 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       throw error;
     }
     
-    console.log(`Found ${data?.length || 0} messages for thread ${threadId}`);
+    // Map the DB fields to the ChatMessage type
+    const messages: ChatMessage[] = data.map(msg => ({
+      id: msg.id,
+      thread_id: msg.thread_id,
+      content: msg.content,
+      sender: msg.sender as 'user' | 'assistant',
+      created_at: msg.created_at,
+      reference_entries: msg.reference_entries,
+      analysis_data: msg.analysis_data,
+      has_numeric_result: msg.has_numeric_result,
+      role: msg.sender as 'user' | 'assistant'
+    }));
     
-    return (data || []).map(msg => {
-      // Type assertion to avoid TypeScript errors
-      const messageData = msg as any;
-      
-      const typedMessage: ChatMessage = {
-        id: messageData.id,
-        thread_id: messageData.thread_id,
-        content: messageData.content,
-        created_at: messageData.created_at,
-        sender: messageData.sender === 'user' ? 'user' : 'assistant',
-        role: messageData.sender === 'user' ? 'user' : 'assistant',
-        reference_entries: messageData.reference_entries ? 
-          Array.isArray(messageData.reference_entries) ? 
-            messageData.reference_entries : 
-            [] : 
-          undefined,
-        has_numeric_result: messageData.has_numeric_result || false
-      };
-      
-      // Adding analysis_data if it exists in the response
-      if (messageData.analysis_data) {
-        typedMessage.analysis_data = messageData.analysis_data;
-      } else if (messageData.reference_entries && typeof messageData.reference_entries === 'object') {
-        const refObj = messageData.reference_entries as Record<string, any>;
-        if (refObj.analysis_data) {
-          typedMessage.analysis_data = refObj.analysis_data;
-        }
-      }
-      
-      return typedMessage;
-    });
+    console.log(`Found ${messages.length} messages for thread ${threadId}`);
+    return messages;
   } catch (error) {
-    console.error("Failed to get thread messages:", error);
+    console.error("Failed to get chat messages:", error);
     return [];
   }
 };
 
 /**
- * Save a message
+ * Save a message to a thread
  */
 export const saveMessage = async (
   threadId: string, 
   content: string, 
   sender: 'user' | 'assistant',
-  references?: any[],
-  analysisData?: any,
+  references?: any[] | null,
+  analysis?: any | null,
   hasNumericResult?: boolean
 ): Promise<ChatMessage | null> => {
   try {
-    // Input validation
-    if (!threadId || typeof threadId !== 'string') {
-      console.error("Invalid thread ID:", threadId);
-      throw new Error("Invalid thread ID");
-    }
+    console.log(`Saving message to thread ${threadId}`);
     
-    if (!content || typeof content !== 'string') {
-      console.error("Invalid message content");
-      throw new Error("Message content is required");
-    }
-    
-    if (sender !== 'user' && sender !== 'assistant') {
-      console.error("Invalid sender type:", sender);
-      throw new Error("Invalid sender type. Must be 'user' or 'assistant'");
-    }
-
-    console.log(`Saving ${sender} message to thread ${threadId}:`, content.substring(0, 50) + "...");
-    
-    // First, verify the thread exists
-    const { data: threadData, error: threadError } = await supabase
-      .from('chat_threads')
-      .select('id')
-      .eq('id', threadId)
-      .single();
-      
-    if (threadError || !threadData) {
-      console.error("Thread does not exist:", threadError);
-      throw new Error(`Thread ${threadId} does not exist`);
-    }
-    
-    // Define the message structure with explicit type to ensure compile-time type checking
-    const messageData: {
-      thread_id: string;
-      content: string;
-      sender: string;
-      reference_entries: any[] | null;
-      has_numeric_result: boolean;
-      analysis_data?: any;
-    } = {
-      thread_id: threadId,
-      content: content,
-      sender: sender,
-      reference_entries: references || null,
-      has_numeric_result: hasNumericResult || false
-    };
-    
-    // Only add analysis_data field if it was provided
-    if (analysisData !== undefined) {
-      messageData.analysis_data = analysisData;
-    }
-    
-    console.log("Inserting message with data:", JSON.stringify(messageData, null, 2));
-    
-    // Insert the message into the database
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert(messageData)
-      .select('*')
+      .insert({
+        thread_id: threadId,
+        content,
+        sender,
+        reference_entries: references || null,
+        analysis_data: analysis || null,
+        has_numeric_result: hasNumericResult || false
+      })
+      .select()
       .single();
       
     if (error) {
@@ -135,80 +72,23 @@ export const saveMessage = async (
       throw error;
     }
     
-    if (!data) {
-      console.error("No data returned after inserting message");
-      throw new Error("Failed to save message: No data returned");
-    }
-    
-    console.log("Message saved successfully:", data.id);
-    
-    // Update the thread's updated_at timestamp
-    const { error: updateError } = await supabase
-      .from('chat_threads')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', threadId);
-      
-    if (updateError) {
-      console.error("Error updating thread timestamp:", updateError);
-      // Continue anyway as this is not critical
-    }
-    
-    // For user messages, log in user_queries table
-    if (sender === 'user') {
-      try {
-        const { data: userData, error: userError } = await supabase
-          .from('chat_threads')
-          .select('user_id')
-          .eq('id', threadId)
-          .single();
-          
-        if (!userError && userData && userData.user_id) {
-          await supabase.functions.invoke('ensure-chat-persistence', {
-            body: {
-              userId: userData.user_id,
-              messageId: data.id,
-              threadId: threadId,
-              queryText: content
-            }
-          });
-          console.log("User query logged successfully");
-        } else {
-          console.error("Could not find user_id for thread:", threadId);
-        }
-      } catch (queryError) {
-        console.error("Error logging user query:", queryError);
-        // Continue anyway as this is not critical
-      }
-    }
-    
-    // Format the message in the standard structure
-    // Use 'data as any' to avoid TypeScript type errors when accessing analysis_data
-    const dbData = data as any;
-    const typedMessage: ChatMessage = {
-      id: dbData.id,
-      thread_id: dbData.thread_id,
-      content: dbData.content,
-      created_at: dbData.created_at,
-      sender: dbData.sender === 'user' ? 'user' : 'assistant',
-      role: dbData.sender === 'user' ? 'user' : 'assistant',
-      reference_entries: dbData.reference_entries ? 
-        Array.isArray(dbData.reference_entries) ? 
-          dbData.reference_entries : 
-          [] : 
-        undefined,
-      has_numeric_result: dbData.has_numeric_result || false
+    // Map the DB response to the ChatMessage type
+    const message: ChatMessage = {
+      id: data.id,
+      thread_id: data.thread_id,
+      content: data.content,
+      sender: data.sender as 'user' | 'assistant',
+      created_at: data.created_at,
+      reference_entries: data.reference_entries,
+      analysis_data: data.analysis_data,
+      has_numeric_result: data.has_numeric_result,
+      role: data.sender as 'user' | 'assistant'
     };
     
-    // Only add analysis_data if it exists in the response
-    if (analysisData) {
-      typedMessage.analysis_data = analysisData;
-    } else if (dbData.analysis_data) {
-      typedMessage.analysis_data = dbData.analysis_data;
-    }
-    
-    return typedMessage;
+    console.log(`Message saved with ID ${data.id}`);
+    return message;
   } catch (error) {
     console.error("Failed to save message:", error);
-    throw error; // Re-throw to ensure errors are properly caught upstream
+    return null;
   }
 };
