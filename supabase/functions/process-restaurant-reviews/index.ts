@@ -121,7 +121,7 @@ async function extractEntities(text: string): Promise<any[]> {
 }
 
 // Extract themes from text
-async function extractThemes(text: string): Promise<string[]> {
+async function extractThemes(text: string): Promise<any> {
   try {
     console.log(`Starting theme extraction for review: "${text.substring(0, 100)}..."`);
     
@@ -200,182 +200,6 @@ async function extractThemes(text: string): Promise<string[]> {
   }
 }
 
-// Create the required database functions for adding columns if they don't exist
-async function createHelperFunctions() {
-  try {
-    console.log('Creating helper functions...');
-    
-    // Create a function to check if a column exists
-    await supabase.rpc('create_table_column_exists_function', {}).catch(e => {
-      console.log('Function might already exist or failed to create:', e);
-    });
-    
-    // Create a function to add a column if it doesn't exist
-    await supabase.rpc('create_add_column_function', {}).catch(e => {
-      console.log('Function might already exist or failed to create:', e);
-    });
-    
-    console.log('Helper functions created or already exist');
-    return true;
-  } catch (e) {
-    console.error('Error creating helper functions:', e);
-    return false;
-  }
-}
-
-// Create RPC function to check if a column exists
-async function createColumnExistsFunction() {
-  try {
-    // Using raw SQL query through RPC to create the function
-    const { error } = await supabase.rpc('exec_sql', {
-      sql: `
-        CREATE OR REPLACE FUNCTION public.table_column_exists(table_name text, column_name text)
-        RETURNS boolean AS $$
-        DECLARE
-          column_exists boolean;
-        BEGIN
-          SELECT EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-            AND table_name = $1
-            AND column_name = $2
-          ) INTO column_exists;
-          
-          RETURN column_exists;
-        END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `
-    });
-    
-    if (error) {
-      console.error('Error creating table_column_exists function:', error);
-      return false;
-    }
-    
-    console.log('Created table_column_exists function');
-    return true;
-  } catch (e) {
-    console.error('Error in createColumnExistsFunction:', e);
-    return false;
-  }
-}
-
-// Create RPC function to add a column if it doesn't exist
-async function createAddColumnFunction() {
-  try {
-    // Using raw SQL query through RPC to create the function
-    const { error } = await supabase.rpc('exec_sql', {
-      sql: `
-        CREATE OR REPLACE FUNCTION public.add_column_if_not_exists(
-          table_name text, 
-          column_name text, 
-          column_type text
-        )
-        RETURNS boolean AS $$
-        DECLARE
-          column_exists boolean;
-        BEGIN
-          -- Check if the column already exists
-          SELECT EXISTS (
-            SELECT 1
-            FROM information_schema.columns
-            WHERE table_schema = 'public'
-            AND table_name = $1
-            AND column_name = $2
-          ) INTO column_exists;
-          
-          -- If column doesn't exist, add it
-          IF NOT column_exists THEN
-            EXECUTE format('ALTER TABLE public.%I ADD COLUMN %I %s', 
-                          $1, $2, $3);
-            RETURN true;
-          END IF;
-          
-          RETURN false;
-        END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `
-    });
-    
-    if (error) {
-      console.error('Error creating add_column_if_not_exists function:', error);
-      return false;
-    }
-    
-    console.log('Created add_column_if_not_exists function');
-    return true;
-  } catch (e) {
-    console.error('Error in createAddColumnFunction:', e);
-    return false;
-  }
-}
-
-// Create a function to get table columns
-async function createGetTableColumnsFunction() {
-  try {
-    // Using raw SQL query through RPC to create the function
-    const { error } = await supabase.rpc('exec_sql', {
-      sql: `
-        CREATE OR REPLACE FUNCTION public.get_table_columns(table_name text)
-        RETURNS TABLE(column_name text, data_type text) AS $$
-        BEGIN
-          RETURN QUERY
-          SELECT c.column_name::text, c.data_type::text
-          FROM information_schema.columns c
-          WHERE c.table_schema = 'public'
-          AND c.table_name = $1
-          ORDER BY c.ordinal_position;
-        END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `
-    });
-    
-    if (error) {
-      console.error('Error creating get_table_columns function:', error);
-      return false;
-    }
-    
-    console.log('Created get_table_columns function');
-    return true;
-  } catch (e) {
-    console.error('Error in createGetTableColumnsFunction:', e);
-    return false;
-  }
-}
-
-// Create a function to execute SQL directly
-async function createExecSqlFunction() {
-  try {
-    // Using raw SQL query through RPC to create the function
-    const { error } = await supabase.rpc('exec_sql', {
-      sql: `
-        CREATE OR REPLACE FUNCTION public.exec_sql(sql text)
-        RETURNS void AS $$
-        BEGIN
-          EXECUTE sql;
-        END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `
-    }).catch(e => {
-      // Function might already exist
-      console.log('Function might already exist:', e);
-      return { error: null };
-    });
-    
-    if (error) {
-      console.error('Error creating exec_sql function:', error);
-      return false;
-    }
-    
-    console.log('Created or verified exec_sql function');
-    return true;
-  } catch (e) {
-    console.error('Error in createExecSqlFunction:', e);
-    return false;
-  }
-}
-
 // Verify table structure and create/add required columns
 async function verifyTableStructure(debug = false) {
   try {
@@ -392,56 +216,50 @@ async function verifyTableStructure(debug = false) {
       throw new Error(`Table PoPs_Reviews does not exist or cannot be accessed: ${tableError.message}`);
     }
     
-    // Create the exec_sql function if needed (this is needed to create other functions)
-    await createExecSqlFunction();
-    
-    // Attempt to create helper functions
-    const { data: columnFnExists } = await supabase.rpc('check_function_exists', { 
-      function_name: 'table_column_exists' 
-    }).catch(e => {
-      console.log('Function check failed, assuming functions need to be created:', e);
-      return { data: false };
-    });
-    
-    if (!columnFnExists) {
-      await createColumnExistsFunction();
-      await createAddColumnFunction();
-      await createGetTableColumnsFunction();
-    }
-    
     // Check if the required columns exist
     let missingColumns = [];
     const requiredColumns = [
       { name: 'Rating', type: 'integer' },
       { name: 'entities', type: 'jsonb' },
-      { name: 'Themes', type: 'text[]' }
+      { name: 'Themes', type: 'jsonb' }
     ];
     
     // Get all columns in the table
-    const { data: columns, error: columnsError } = await supabase
-      .rpc('get_table_columns', { table_name: 'PoPs_Reviews' })
-      .select();
+    const { data: columnsData, error: columnsError } = await supabase
+      .rpc('check_table_columns', { table_name: 'PoPs_Reviews' });
     
     if (columnsError) {
       console.error('Error getting columns:', columnsError);
       
-      // Try a direct approach to check each column
+      // Try a direct approach
+      const { data: fallbackData, error: fallbackError } = await supabase
+        .from('PoPs_Reviews')
+        .select('*')
+        .limit(1);
+      
+      if (fallbackError) {
+        console.error('Error with fallback column check:', fallbackError);
+        throw new Error(`Failed to verify columns: ${fallbackError.message}`);
+      }
+      
+      // Extract column names from the fallback data
+      const columnMap = new Map();
+      if (fallbackData && fallbackData.length > 0) {
+        Object.keys(fallbackData[0]).forEach(col => columnMap.set(col, true));
+      }
+      
+      // Check which required columns are missing
       for (const col of requiredColumns) {
-        const { data: exists } = await supabase
-          .rpc('table_column_exists', { 
-            table_name: 'PoPs_Reviews', 
-            column_name: col.name 
-          })
-          .single();
-        
-        if (!exists) {
+        if (!columnMap.has(col.name)) {
           missingColumns.push(col);
         }
       }
     } else {
       // Convert columns to a map for easier lookup
       const columnMap = new Map();
-      columns.forEach(col => columnMap.set(col.column_name, col.data_type));
+      if (columnsData) {
+        columnsData.forEach(col => columnMap.set(col.column_name, col.data_type));
+      }
       
       // Check which required columns are missing
       for (const col of requiredColumns) {
@@ -454,56 +272,50 @@ async function verifyTableStructure(debug = false) {
     // Add any missing columns
     console.log('Missing columns:', missingColumns);
     
-    for (const col of missingColumns) {
-      console.log(`Adding missing column: ${col.name}`);
-      try {
-        const { data, error } = await supabase
-          .rpc('add_column_if_not_exists', { 
-            table_name: 'PoPs_Reviews', 
-            column_name: col.name, 
-            column_type: col.type 
-          });
-        
-        if (error) {
-          console.error(`Error adding column ${col.name}:`, error);
-          
-          // Try direct SQL execution as fallback
-          await supabase.rpc('exec_sql', { 
+    if (missingColumns.length > 0) {
+      for (const col of missingColumns) {
+        console.log(`Adding missing column: ${col.name}`);
+        try {
+          const { error } = await supabase.rpc('exec_sql', { 
             sql: `ALTER TABLE public."PoPs_Reviews" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}` 
           });
-        } else {
-          console.log(`Successfully added column ${col.name}`);
+          
+          if (error) {
+            console.error(`Error adding column ${col.name}:`, error);
+            // Try direct SQL
+            const alterResult = await supabase
+              .from('_exec_sql')
+              .select('*')
+              .eq('query', `ALTER TABLE public."PoPs_Reviews" ADD COLUMN IF NOT EXISTS "${col.name}" ${col.type}`);
+            
+            if (alterResult.error) {
+              console.error(`Direct SQL for column ${col.name} failed:`, alterResult.error);
+            }
+          } else {
+            console.log(`Successfully added column ${col.name}`);
+          }
+        } catch (e) {
+          console.error(`Error adding column ${col.name}:`, e);
         }
-      } catch (e) {
-        console.error(`Error adding column ${col.name}:`, e);
       }
     }
     
-    // Verify all required columns exist now
-    let stillMissingColumns = [];
-    for (const col of requiredColumns) {
-      const { data: exists, error: checkError } = await supabase
-        .rpc('table_column_exists', { 
-          table_name: 'PoPs_Reviews', 
-          column_name: col.name 
-        })
-        .single();
-      
-      if (checkError || !exists) {
-        stillMissingColumns.push(col.name);
-      }
-    }
+    // Verify columns now exist by direct check
+    const { data: finalCheck, error: finalError } = await supabase
+      .from('PoPs_Reviews')
+      .select('Rating, entities, Themes')
+      .limit(1);
     
-    if (stillMissingColumns.length > 0) {
+    if (finalError) {
+      console.error('Final column check failed:', finalError);
       if (debug) {
-        console.error(`After adding, still missing columns: ${stillMissingColumns.join(', ')}`);
         return {
           success: false,
-          error: `Unable to add columns: ${stillMissingColumns.join(', ')}`,
-          missingColumns: stillMissingColumns
+          error: `Column verification failed: ${finalError.message}`,
+          columns: requiredColumns
         };
       } else {
-        throw new Error(`Missing required columns: ${stillMissingColumns.join(', ')}`);
+        throw new Error(`Column verification failed: ${finalError.message}`);
       }
     }
     
@@ -595,40 +407,6 @@ async function processReviews(limit = 10, offset = 0): Promise<any> {
   }
 }
 
-// Create helper function to check if a function exists
-async function createFunctionExistsCheck() {
-  try {
-    const { error } = await supabase.rpc('exec_sql', {
-      sql: `
-        CREATE OR REPLACE FUNCTION public.check_function_exists(function_name text)
-        RETURNS boolean AS $$
-        DECLARE
-          func_exists boolean;
-        BEGIN
-          SELECT EXISTS (
-            SELECT 1
-            FROM pg_proc
-            WHERE proname = $1
-          ) INTO func_exists;
-          
-          RETURN func_exists;
-        END;
-        $$ LANGUAGE plpgsql SECURITY DEFINER;
-      `
-    });
-    
-    if (error) {
-      console.error('Error creating check_function_exists function:', error);
-      return false;
-    }
-    
-    return true;
-  } catch (e) {
-    console.error('Error in createFunctionExistsCheck:', e);
-    return false;
-  }
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -636,9 +414,6 @@ serve(async (req) => {
   }
 
   try {
-    // Create the function exists check function if needed
-    await createFunctionExistsCheck();
-    
     const { limit = 10, offset = 0, processAll = false, debug = false } = await req.json();
     
     console.log(`Request received with limit: ${limit}, offset: ${offset}, processAll: ${processAll}, debug: ${debug}`);
