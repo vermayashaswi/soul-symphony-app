@@ -24,20 +24,24 @@ async function generateReviewAndRating(label: any, entities: any, themes: any): 
       throw new Error('OpenAI API key not configured');
     }
     
+    // Updated prompt to emphasize variety in ratings
     const prompt = `
-      I want you to create a feedback text and rating basis these parameters like label, entities and themes. 
-      Labels are essentially tags against a QR code that has been used by a user to drop feedbacks. 
-      Entities and Themes are what the feedback text should have. 
-      Please at random select a rating first (1-5) and then basis that sentiment, devise the feedback text using the labels, entities and themes jsons as well.
-
-      Here is the data:
-      Labels: ${JSON.stringify(label)}
-      Entities: ${JSON.stringify(entities || {})}
-      Themes: ${JSON.stringify(themes || {})}
-
-      Please respond with a JSON object containing:
-      1. A "rating" field with a number between 1 and 5
-      2. A "review" field with the feedback text
+      Generate a restaurant review and rating based on the following data:
+      
+      Restaurant Label: ${JSON.stringify(label || {})}
+      Food/Service Entities: ${JSON.stringify(entities || {})}
+      Dining Themes: ${JSON.stringify(themes || {})}
+      
+      First, assign a rating between 1 and 5 stars (use the full range from 1 to 5) and then write a realistic 
+      review that matches the rating. Make the review sound authentic.
+      
+      Please respond with ONLY a JSON object in this exact format:
+      {
+        "rating": (number between 1-5),
+        "review": "(your review text here)"
+      }
+      
+      DO NOT include any markdown formatting, code blocks, or additional text.
     `;
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -49,10 +53,10 @@ async function generateReviewAndRating(label: any, entities: any, themes: any): 
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that generates realistic restaurant reviews.' },
+          { role: 'system', content: 'You are a helpful assistant that generates realistic restaurant reviews. Respond with ONLY valid JSON, no markdown or code blocks.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.7,
+        temperature: 0.9, // Increased temperature for more variety
       }),
     });
 
@@ -63,33 +67,65 @@ async function generateReviewAndRating(label: any, entities: any, themes: any): 
     }
 
     const result = await response.json();
-    const content = result.choices[0].message.content;
+    let content = result.choices[0].message.content.trim();
+    console.log('Raw OpenAI response:', content);
+    
+    // Remove any markdown code block formatting if present
+    if (content.startsWith('```')) {
+      content = content.replace(/```json\n?/, '').replace(/```\n?/, '').trim();
+    }
     
     try {
       // Try to parse the result as JSON
       const parsedContent = JSON.parse(content);
+      
+      // Validate that we have the expected fields
+      if (!parsedContent.hasOwnProperty('review') || !parsedContent.hasOwnProperty('rating')) {
+        throw new Error('Missing required fields in response');
+      }
+      
+      // Validate and normalize rating
+      let rating = parseInt(parsedContent.rating);
+      if (isNaN(rating) || rating < 1 || rating > 5) {
+        // Generate a more random fallback rating
+        rating = Math.floor(Math.random() * 5) + 1;
+      }
+      
       return {
         review: parsedContent.review || "No review generated",
-        rating: parsedContent.rating || 3
+        rating: rating
       };
     } catch (parseError) {
       console.error('Failed to parse OpenAI response as JSON:', parseError);
       
-      // Fallback: Try to extract rating and review from text
+      // Improved fallback: Extract rating and review from text
       const ratingMatch = content.match(/rating"?\s*:?\s*(\d+)/i);
-      const rating = ratingMatch ? parseInt(ratingMatch[1]) : 3;
+      const rating = ratingMatch ? parseInt(ratingMatch[1]) : Math.floor(Math.random() * 5) + 1;
       
       // Extract text that looks like a review
-      const reviewMatch = content.match(/review"?\s*:?\s*"([^"]+)"/i);
-      const review = reviewMatch ? reviewMatch[1] : content;
+      const reviewMatch = content.match(/review"?\s*:?\s*"([^"]+)"/i) || content.match(/review"?\s*:?\s*'([^']+)'/i);
+      let review = reviewMatch ? reviewMatch[1] : content;
+      
+      // If we still don't have a good review, create a generic one based on rating
+      if (!review || review.length < 20) {
+        const sentiments = [
+          "Terrible experience. Would not recommend.",
+          "Disappointing visit with several issues.",
+          "Average experience, neither great nor terrible.",
+          "Very good experience with minor improvements possible.",
+          "Excellent experience! Highly recommended!"
+        ];
+        review = sentiments[rating - 1];
+      }
       
       return { review, rating };
     }
   } catch (error) {
     console.error('Error in generateReviewAndRating:', error);
+    // Return random rating for variety in case of errors
     return { 
       review: "Error generating review.",
-      rating: 3 // Default neutral rating
+      rating: Math.floor(Math.random() * 5) + 1
     };
   }
 }
