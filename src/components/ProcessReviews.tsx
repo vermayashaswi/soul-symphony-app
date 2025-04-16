@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Button } from "./ui/button";
 import { Card, CardContent, CardDescription, CardFooter, CardHeader, CardTitle } from "./ui/card";
@@ -94,7 +95,8 @@ export function ProcessReviews() {
       
       console.log(`Starting to process reviews: processAll=${processAll}`);
       
-      const { data, error } = await supabase.functions.invoke('process-restaurant-reviews', {
+      // Use the new generate-restaurant-reviews function instead of process-restaurant-reviews
+      const { data, error } = await supabase.functions.invoke('generate-restaurant-reviews', {
         body: { 
           limit: 10, 
           offset: 0, 
@@ -158,7 +160,7 @@ export function ProcessReviews() {
       <CardHeader>
         <CardTitle>Process Restaurant Reviews</CardTitle>
         <CardDescription>
-          Extract sentiment, entities, and themes from restaurant reviews.
+          Generate review text and ratings based on labels, entities, and themes data.
         </CardDescription>
       </CardHeader>
       <CardContent>
@@ -186,7 +188,12 @@ export function ProcessReviews() {
                 <>
                   <div>Columns: {tableInfo.columns.join(', ') || 'None found'}</div>
                   <div className="text-xs text-amber-600">
-                    Required columns: id, Reviews, Rating, entities, Themes
+                    Required columns: id, Label, "Restaurant Name", Reviews, Rating, entities, Themes
+                  </div>
+                  <div>
+                    {tableInfo.columns.includes('Reviews') ? 
+                      <span className="text-green-600">✓ Reviews column exists</span> : 
+                      <span className="text-red-600">✗ Reviews column missing</span>}
                   </div>
                   <div>
                     {tableInfo.columns.includes('Rating') ? 
@@ -194,14 +201,9 @@ export function ProcessReviews() {
                       <span className="text-red-600">✗ Rating column missing</span>}
                   </div>
                   <div>
-                    {tableInfo.columns.includes('entities') ? 
-                      <span className="text-green-600">✓ entities column exists</span> : 
-                      <span className="text-red-600">✗ entities column missing</span>}
-                  </div>
-                  <div>
-                    {tableInfo.columns.includes('Themes') ? 
-                      <span className="text-green-600">✓ Themes column exists (JSONB)</span> : 
-                      <span className="text-red-600">✗ Themes column missing</span>}
+                    {tableInfo.columns.includes('Label') ? 
+                      <span className="text-green-600">✓ Label column exists (JSONB)</span> : 
+                      <span className="text-red-600">✗ Label column missing</span>}
                   </div>
                 </>
               )}

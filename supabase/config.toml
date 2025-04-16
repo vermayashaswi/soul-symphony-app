@@ -34,6 +34,8 @@ api_url = "http://localhost"
 [functions]
 [functions.process-restaurant-reviews]
 verify_jwt = false
+[functions.generate-restaurant-reviews]
+verify_jwt = false
 
 [inbucket]
 enabled = true
