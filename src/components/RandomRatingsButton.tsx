@@ -3,7 +3,7 @@ import { useState } from 'react';
 import { Button } from "./ui/button";
 import { toast } from "sonner";
 import { supabase } from "@/integrations/supabase/client";
-import { Dice } from 'lucide-react';
+import { Dices } from 'lucide-react';  // Changed from 'Dice' to 'Dices'
 
 export function RandomRatingsButton() {
   const [isProcessing, setIsProcessing] = useState(false);
@@ -52,7 +52,7 @@ export function RandomRatingsButton() {
       disabled={isProcessing}
       className="gap-2"
     >
-      <Dice className="h-4 w-4" />
+      <Dices className="h-4 w-4" />  {/* Changed from 'Dice' to 'Dices' */}
       {isProcessing ? 'Assigning Random Ratings...' : 'Assign Random Ratings'}
     </Button>
   );
