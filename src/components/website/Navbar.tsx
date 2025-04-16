@@ -4,7 +4,6 @@ import { Link, useLocation, NavLink } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
-import SouloLogo from '@/components/SouloLogo';
 import { cn } from '@/lib/utils';
 
 const Navbar = () => {
@@ -49,7 +48,10 @@ const Navbar = () => {
       <div className="container mx-auto px-4">
         <div className="flex items-center justify-between">
           <Link to="/" className="flex items-center">
-            <SouloLogo size="medium" useColorTheme={true} />
+            <div className="w-10 h-10 rounded-full bg-green-500 flex items-center justify-center">
+              <span className="text-white font-bold text-lg">SO</span>
+            </div>
+            <span className="ml-2 font-bold text-xl">uLO</span>
           </Link>
           
           {/* Desktop Nav */}
