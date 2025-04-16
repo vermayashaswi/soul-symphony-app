@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -247,6 +246,13 @@ export function JournalEntryCard({
         }
       }
       
+      console.log(`User feedback for entry ${safeEntry.id}: ${feedback}`);
+      
+      // You could add analytics tracking here if needed
+      // Or implement a different storage approach using a separate table
+      
+      // Commented out the database update since the field doesn't exist
+      /*
       const { error } = await supabase
         .from('Journal Entries')
         .update({ user_feedback: feedback })
@@ -256,6 +262,7 @@ export function JournalEntryCard({
         console.error('Error saving user feedback:', error);
         toast.error('Failed to save feedback');
       }
+      */
     } catch (error) {
       console.error('Unexpected error saving feedback:', error);
       toast.error('An unexpected error occurred');
