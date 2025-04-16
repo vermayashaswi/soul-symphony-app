@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Routes, Route, Navigate } from 'react-router-dom';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Index from '@/pages/Index';
 import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
@@ -22,8 +22,9 @@ const AppRoutes = () => {
   const isAppSubdomain = window.location.hostname === 'app.soulo.online';
 
   return (
-    <ViewportManager>
-      <Routes>
+    <Routes>
+      {/* Wrap all routes that need ViewportManager in a parent Route */}
+      <Route element={<ViewportManager />}>
         {/* Main website routes */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy" element={<PrivacyPolicyPage />} />
@@ -34,6 +35,8 @@ const AppRoutes = () => {
         
         {/* App routes */}
         <Route path="/auth" element={<Auth />} />
+        
+        {/* Protected routes with their own Outlet */}
         <Route element={<ProtectedRoute />}>
           <Route path="/home" element={<Home />} />
           <Route path="/journal" element={<Journal />} />
@@ -45,8 +48,8 @@ const AppRoutes = () => {
         
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
-      </Routes>
-    </ViewportManager>
+      </Route>
+    </Routes>
   );
 };
 

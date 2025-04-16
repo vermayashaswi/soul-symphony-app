@@ -1,13 +1,9 @@
 
 import React, { useState, useEffect } from 'react';
-import { Navigate, useLocation } from 'react-router-dom';
+import { Navigate, useLocation, Outlet } from 'react-router-dom';
 import { supabase } from '@/integrations/supabase/client';
 
-interface ProtectedRouteProps {
-  children: React.ReactNode;
-}
-
-const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
+const ProtectedRoute: React.FC = () => {
   const [isLoading, setIsLoading] = useState(true);
   const [user, setUser] = useState<any>(null);
   const location = useLocation();
@@ -55,7 +51,8 @@ const ProtectedRoute: React.FC<ProtectedRouteProps> = ({ children }) => {
     return <Navigate to={`/app/auth?redirectTo=${location.pathname}`} replace />;
   }
   
-  return <>{children}</>;
+  // Use Outlet to render child routes
+  return <Outlet />;
 };
 
 export default ProtectedRoute;
