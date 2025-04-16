@@ -108,6 +108,7 @@ export type Database = {
           "refined text": string | null
           sentiment: string | null
           "transcription text": string | null
+          user_feedback: number | null
           user_id: string | null
         }
         Insert: {
@@ -122,6 +123,7 @@ export type Database = {
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
+          user_feedback?: number | null
           user_id?: string | null
         }
         Update: {
@@ -136,6 +138,7 @@ export type Database = {
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
+          user_feedback?: number | null
           user_id?: string | null
         }
         Relationships: [
@@ -179,39 +182,6 @@ export type Database = {
             referencedColumns: ["id"]
           },
         ]
-      }
-      PoPs_Reviews: {
-        Row: {
-          datetime: string | null
-          entities: Json | null
-          id: number
-          Label: Json
-          Rating: number | null
-          "Restaurant Name": string
-          Reviews: string | null
-          Themes: Json | null
-        }
-        Insert: {
-          datetime?: string | null
-          entities?: Json | null
-          id?: number
-          Label: Json
-          Rating?: number | null
-          "Restaurant Name": string
-          Reviews?: string | null
-          Themes?: Json | null
-        }
-        Update: {
-          datetime?: string | null
-          entities?: Json | null
-          id?: number
-          Label?: Json
-          Rating?: number | null
-          "Restaurant Name"?: string
-          Reviews?: string | null
-          Themes?: Json | null
-        }
-        Relationships: []
       }
       profiles: {
         Row: {
@@ -353,13 +323,6 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
-      check_table_columns: {
-        Args: { table_name: string }
-        Returns: {
-          column_name: string
-          data_type: string
-        }[]
-      }
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
         Returns: Json

@@ -1,11 +1,5 @@
 # Welcome to your Lovable project
 
-## Project Versions
-
-### SOULO v1.1
-**Timestamp**: 2025-04-16
-**Description**: Initial stable version of the Soulo application with core mobile chat interface functionality.
-
 ## Project info
 
 **URL**: https://lovable.dev/projects/571d731e-b54b-453e-9f48-a2c79a572930
