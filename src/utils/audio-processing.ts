@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -20,6 +19,10 @@ import { supabase } from '@/integrations/supabase/client';
 
 // To track correlation between tempIds and final entryIds
 const processingToEntryIdMap = new Map<string, number>();
+// New set to track deleted processing entries
+const deletedProcessingIds = new Set<string>();
+// New set to track deleted entry IDs
+const deletedEntryIds = new Set<number>();
 
 /**
  * Get the mapping between a temporary processing ID and the final entry ID
@@ -28,9 +31,20 @@ const processingToEntryIdMap = new Map<string, number>();
  */
 export function getEntryIdForProcessingId(tempId: string): number | undefined {
   try {
+    // Check if this processing ID was deleted
+    if (deletedProcessingIds.has(tempId)) {
+      return undefined;
+    }
+    
     // First check the in-memory map
     const memoryResult = processingToEntryIdMap.get(tempId);
-    if (memoryResult) return memoryResult;
+    if (memoryResult) {
+      // Check if the entry ID was deleted
+      if (deletedEntryIds.has(memoryResult)) {
+        return undefined;
+      }
+      return memoryResult;
+    }
     
     // Then check localStorage as fallback
     const processingToEntryMap = localStorage.getItem('processingToEntryMap');
@@ -38,6 +52,12 @@ export function getEntryIdForProcessingId(tempId: string): number | undefined {
     
     const map = JSON.parse(processingToEntryMap);
     const result = map[tempId];
+    
+    // Check if the entry ID was deleted
+    if (result && deletedEntryIds.has(Number(result))) {
+      return undefined;
+    }
+    
     return result ? Number(result) : undefined;
   } catch (error) {
     console.error('[Audio Processing] Error getting entry ID for processing ID:', error);
@@ -211,6 +231,13 @@ export function removeProcessingEntryById(entryId: number | string): void {
   // First, remove from the processing state
   removeProcessingEntryFromState(entryId);
   
+  // Track this deleted entry
+  if (typeof entryId === 'number') {
+    deletedEntryIds.add(entryId);
+  } else {
+    deletedProcessingIds.add(entryId);
+  }
+  
   // Then, clean up the map storage
   try {
     const processingToEntryMap = localStorage.getItem('processingToEntryMap');
@@ -226,8 +253,23 @@ export function removeProcessingEntryById(entryId: number | string): void {
           hasChanges = true;
           // Also remove from memory map
           processingToEntryIdMap.delete(tempId);
+          // And mark as deleted
+          deletedProcessingIds.add(tempId);
         }
       });
+      
+      // If this is a temp ID itself, mark it as deleted
+      if (typeof entryId === 'string') {
+        deletedProcessingIds.add(entryId);
+        if (map[entryId]) {
+          const mappedEntryId = Number(map[entryId]);
+          if (!isNaN(mappedEntryId)) {
+            deletedEntryIds.add(mappedEntryId);
+          }
+          delete map[entryId];
+          hasChanges = true;
+        }
+      }
       
       // Update storage if changes were made
       if (hasChanges) {
@@ -236,7 +278,7 @@ export function removeProcessingEntryById(entryId: number | string): void {
         // Dispatch an event to notify other components
         window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
           detail: { 
-            entries: getProcessingEntries(),
+            entries: getProcessingEntries().filter(id => !deletedProcessingIds.has(id)),
             lastUpdate: Date.now(),
             removedId: idStr,
             forceUpdate: true 

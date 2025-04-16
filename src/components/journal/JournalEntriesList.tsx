@@ -43,6 +43,7 @@ export default function JournalEntriesList({
   const [processedProcessingIds, setProcessedProcessingIds] = useState<Set<string>>(new Set());
   const [fullyProcessedEntries, setFullyProcessedEntries] = useState<Set<number>>(new Set());
   const [deletedEntryIds, setDeletedEntryIds] = useState<Set<number>>(new Set());
+  const [deletedProcessingTempIds, setDeletedProcessingTempIds] = useState<Set<string>>(new Set());
   
   const mainProcessingEntryId = visibleProcessingEntries.length > 0 ? visibleProcessingEntries[0] : null;
   const hasProcessingEntries = mainProcessingEntryId !== null && processingEntries.length > 0;
@@ -60,7 +61,7 @@ export default function JournalEntriesList({
       if (event.detail && event.detail.tempId && event.detail.entryId) {
         console.log(`[JournalEntriesList] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
         
-        if (deletedEntryIds.has(event.detail.entryId)) {
+        if (deletedEntryIds.has(event.detail.entryId) || deletedProcessingTempIds.has(event.detail.tempId)) {
           console.log(`[JournalEntriesList] Skipping mapped entry ${event.detail.entryId} as it was deleted`);
           return;
         }
@@ -155,7 +156,7 @@ export default function JournalEntriesList({
     return () => {
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     };
-  }, [entries, processedProcessingIds, deletedEntryIds]);
+  }, [entries, processedProcessingIds, deletedEntryIds, deletedProcessingTempIds]);
 
   useEffect(() => {
     if (entries.length > 0 && processingToEntryMap.size > 0) {
@@ -204,11 +205,12 @@ export default function JournalEntriesList({
           const timestamp = parseInt(id.split('-').pop() || '0');
           const isRecent = !isNaN(timestamp) && timestamp > tenMinutesAgo;
           const isNotProcessed = !processedProcessingIds.has(id);
-          return isRecent && isNotProcessed;
+          const isNotDeleted = !deletedProcessingTempIds.has(id);
+          return isRecent && isNotProcessed && isNotDeleted;
         });
         
         setPersistedProcessingEntries(validEntries);
-        setVisibleProcessingEntries(validEntries.slice(0, 1));
+        setVisibleProcessingEntries(validEntries.filter(id => !deletedProcessingTempIds.has(id)).slice(0, 1));
       } else {
         setPersistedProcessingEntries([]);
         setVisibleProcessingEntries([]);
@@ -220,13 +222,19 @@ export default function JournalEntriesList({
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
       if (event.detail && Array.isArray(event.detail.entries)) {
         if (event.detail.entries.length > 0) {
-          const newEntries = event.detail.entries.filter(id => !processedProcessingIds.has(id));
+          const newEntries = event.detail.entries.filter(id => 
+            !processedProcessingIds.has(id) && 
+            !deletedProcessingTempIds.has(id)
+          );
           
           setPersistedProcessingEntries(newEntries);
           
           setVisibleProcessingEntries(prev => {
             const entriesWithoutMapping = newEntries
-              .filter(tempId => !Array.from(processingToEntryMap.keys()).includes(tempId))
+              .filter(tempId => 
+                !Array.from(processingToEntryMap.keys()).includes(tempId) &&
+                !deletedProcessingTempIds.has(tempId)
+              )
               .slice(0, 1);
             
             return entriesWithoutMapping;
@@ -252,7 +260,7 @@ export default function JournalEntriesList({
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       document.removeEventListener('visibilitychange', handleVisibilityChange);
     };
-  }, [processingToEntryMap, processedProcessingIds]);
+  }, [processingToEntryMap, processedProcessingIds, deletedProcessingTempIds]);
 
   useEffect(() => {
     try {
@@ -403,14 +411,44 @@ export default function JournalEntriesList({
         return newSet;
       });
       
+      const tempIdsToDelete: string[] = [];
+      visibleProcessingEntries.forEach(tempId => {
+        const mappedId = getEntryIdForProcessingId(tempId);
+        if (mappedId === entryId) {
+          tempIdsToDelete.push(tempId);
+        }
+      });
+      
+      persistedProcessingEntries.forEach(tempId => {
+        const mappedId = getEntryIdForProcessingId(tempId);
+        if (mappedId === entryId) {
+          tempIdsToDelete.push(tempId);
+        }
+      });
+      
+      processingToEntryMap.forEach((mappedEntryId, tempId) => {
+        if (mappedEntryId === entryId) {
+          tempIdsToDelete.push(tempId);
+        }
+      });
+      
+      if (tempIdsToDelete.length > 0) {
+        console.log(`[JournalEntriesList] Marking temp IDs as deleted:`, tempIdsToDelete);
+        setDeletedProcessingTempIds(prev => {
+          const newSet = new Set(prev);
+          tempIdsToDelete.forEach(id => newSet.add(id));
+          return newSet;
+        });
+      }
+      
       setVisibleProcessingEntries(prev => prev.filter(tempId => {
         const mappedId = getEntryIdForProcessingId(tempId);
-        return mappedId !== entryId;
+        return mappedId !== entryId && !tempIdsToDelete.includes(tempId);
       }));
       
       setPersistedProcessingEntries(prev => prev.filter(tempId => {
         const mappedId = getEntryIdForProcessingId(tempId);
-        return mappedId !== entryId;
+        return mappedId !== entryId && !tempIdsToDelete.includes(tempId);
       }));
       
       setTransitionalLoadingEntries(prev => {
@@ -584,7 +622,8 @@ export default function JournalEntriesList({
     !processedTransitionalEntries.some(id => id === mainProcessingEntryId) &&
     (!mainProcessingEntryId || 
       !getEntryIdForProcessingId(mainProcessingEntryId) || 
-      !deletedEntryIds.has(getEntryIdForProcessingId(mainProcessingEntryId)!));
+      (!deletedEntryIds.has(getEntryIdForProcessingId(mainProcessingEntryId)!) &&
+       !deletedProcessingTempIds.has(mainProcessingEntryId)));
 
   return (
     <ErrorBoundary>

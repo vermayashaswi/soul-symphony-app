@@ -49,6 +49,7 @@ const Journal = () => {
   const [entriesReady, setEntriesReady] = useState(false);
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const processingToEntryMapRef = useRef<Map<string, number>>(new Map());
+  const [deletedProcessingIds, setDeletedProcessingIds] = useState<Set<string>>(new Set());
 
   const { 
     entries, 
@@ -73,13 +74,21 @@ const Journal = () => {
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
       if (event.detail && Array.isArray(event.detail.entries)) {
         console.log(`[Journal] Processing entries changed: ${event.detail.entries.length} entries`);
-        setProcessingEntries(event.detail.entries);
+        // Filter out entries that were deleted
+        const filteredEntries = event.detail.entries.filter(id => !deletedProcessingIds.has(id));
+        setProcessingEntries(filteredEntries);
       }
     };
     
     const handleProcessingEntryMapped = (event: CustomEvent) => {
       if (event.detail && event.detail.tempId && event.detail.entryId) {
         console.log(`[Journal] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
+        
+        // Check if this entry was already deleted
+        if (deletedProcessingIds.has(event.detail.tempId)) {
+          console.log(`[Journal] Skipping mapped entry as its tempId was deleted: ${event.detail.tempId}`);
+          return;
+        }
         
         processingToEntryMapRef.current.set(event.detail.tempId, event.detail.entryId);
         
@@ -139,7 +148,7 @@ const Journal = () => {
       
       clearAllToasts();
     };
-  }, [processingEntries, toastIds, fetchEntries]);
+  }, [processingEntries, toastIds, fetchEntries, deletedProcessingIds]);
 
   useEffect(() => {
     clearAllToasts();
@@ -614,27 +623,49 @@ const Journal = () => {
       
       clearAllToasts();
       
-      // First, remove any processing entries related to this entry
+      // Find and mark any processing entries related to this one as deleted
+      const tempIdsToDelete: string[] = [];
+      
       processingEntries.forEach(tempId => {
         const mappedId = getEntryIdForProcessingId(tempId);
         if (mappedId === entryId) {
+          tempIdsToDelete.push(tempId);
+          
           if (toastIds[tempId]) {
             toast.dismiss(toastIds[tempId]);
           }
-          // Clean up this processing entry
-          removeProcessingEntryById(entryId);
         }
       });
       
-      // Update our UI states
+      // Also check the map for any other tempIds that might map to this entryId
+      processingToEntryMapRef.current.forEach((mappedId, tempId) => {
+        if (mappedId === entryId && !tempIdsToDelete.includes(tempId)) {
+          tempIdsToDelete.push(tempId);
+        }
+      });
+      
+      // Mark these as deleted to prevent them from reappearing
+      if (tempIdsToDelete.length > 0) {
+        console.log(`[Journal] Marking processing entries as deleted:`, tempIdsToDelete);
+        setDeletedProcessingIds(prev => {
+          const newSet = new Set(prev);
+          tempIdsToDelete.forEach(id => newSet.add(id));
+          return newSet;
+        });
+      }
+      
+      // Clean up processing entries
+      removeProcessingEntryById(entryId);
+      
+      // Update UI states
       const updatedProcessingEntries = processingEntries.filter(
-        tempId => getEntryIdForProcessingId(tempId) !== entryId
+        tempId => !tempIdsToDelete.includes(tempId) && getEntryIdForProcessingId(tempId) !== entryId
       );
       setProcessingEntries(updatedProcessingEntries);
       
       const updatedToastIds = { ...toastIds };
       Object.keys(updatedToastIds).forEach(key => {
-        if (key.includes(String(entryId))) {
+        if (key.includes(String(entryId)) || tempIdsToDelete.includes(key)) {
           delete updatedToastIds[key];
         }
       });
@@ -646,7 +677,7 @@ const Journal = () => {
         return updated;
       });
       
-      // Now delete the entry from the database
+      // Delete from the database
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
@@ -656,7 +687,7 @@ const Journal = () => {
         throw error;
       }
       
-      // Refresh the entries list
+      // Refresh entries
       setTimeout(() => {
         setRefreshKey(Date.now());
         fetchEntries();
