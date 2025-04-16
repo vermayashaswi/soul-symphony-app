@@ -381,10 +381,14 @@ const HomePage = () => {
       step: "1",
       title: "Record Your Thoughts",
       description: [
-        "Speak freely in any language about your day, feelings, or thoughts",
-        "Works even in noisy environments and understands multiple languages",
-        "No writing required - just talk naturally as you would to a friend",
-        "Automatic transcription saves your spoken words into text format"
+        "Speak freely in any language about",
+        "your day, feelings, or thoughts.",
+        "Works even in noisy environments and",
+        "understands multiple languages perfectly.",
+        "No writing required - just talk",
+        "naturally as you would to friend.",
+        "Automatic transcription saves your spoken",
+        "words into text format effortlessly."
       ],
       image: "/lovable-uploads/eb66a92e-1044-4a85-9380-4790da9cf683.png",
       icon: Mic
@@ -393,10 +397,14 @@ const HomePage = () => {
       step: "2",
       title: "AI Analyzes Your Entry",
       description: [
-        "Our AI transcribes your voice and analyzes emotional patterns and themes",
-        "Automatically recognizes key entities like people, places, and things",
-        "Creates searchable tags to help you easily filter and find past entries",
-        "Identifies recurring themes and patterns in your journaling"
+        "Our AI transcribes your voice and",
+        "analyzes emotional patterns thoroughly.",
+        "Automatically recognizes key entities like",
+        "people, places, and important things.",
+        "Creates searchable tags to help you",
+        "easily filter and find entries.",
+        "Identifies recurring themes and patterns",
+        "in your regular journaling practice."
       ],
       image: "/lovable-uploads/185c449b-b8f9-435d-b91b-3638651c0d06.png",
       icon: Brain
@@ -405,10 +413,14 @@ const HomePage = () => {
       step: "3",
       title: "Analyze Your Emotional Patterns",
       description: [
-        "Filter insights using customizable time ranges (day, week, month, year)",
-        "See your dominant moods and what emotions appear most in your entries",
-        "Track your biggest emotional changes and their intensity over time",
-        "View your journaling activity stats and streaks"
+        "Filter insights using customizable time",
+        "ranges across days, weeks, months.",
+        "See your dominant moods and what",
+        "emotions appear most frequently recorded.",
+        "Track your biggest emotional changes and",
+        "their intensity over selected periods.",
+        "View your journaling activity stats and",
+        "streaks to maintain consistent practice."
       ],
       images: [
         "/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png",
@@ -422,10 +434,14 @@ const HomePage = () => {
       step: "4",
       title: "Visualize Your Emotional Journey",
       description: [
-        "See graphical representations of emotion score movements over time",
-        "Explore emotional bubbles that define your personality and their intensities",
-        "View your overall sentiment changes in interactive calendar format",
-        "Identify patterns in your mood with color-coded visual guides"
+        "See graphical representations of emotion",
+        "score movements across time periods.",
+        "Explore emotional bubbles that define your",
+        "personality and their relative intensities.",
+        "View your overall sentiment changes in",
+        "interactive and informative calendar format.",
+        "Identify patterns in your mood with",
+        "color-coded visual guidance systems."
       ],
       images: [
         "/lovable-uploads/3eeb2da1-ba02-4cd6-b5f7-100f72896921.png",
@@ -438,10 +454,14 @@ const HomePage = () => {
       step: "5",
       title: "Chat with Your Journal",
       description: [
-        "Have a conversation with \"Rūḥ\", an emotionally intelligent AI assistant",
-        "Ask questions about your past entries and get insightful responses",
-        "Receive personalized guidance specific to your own journal entries",
-        "Get contextual advice on mental health and emotional wellbeing"
+        "Have a conversation with \"Rūḥ\", an",
+        "emotionally intelligent AI assistant daily.",
+        "Ask questions about your past entries",
+        "and get insightful detailed responses.",
+        "Receive personalized guidance specific to",
+        "your own recorded journal entries.",
+        "Get contextual advice on mental health",
+        "and overall emotional wellbeing topics."
       ],
       image: "/lovable-uploads/1c377509-f91d-4c41-9289-dc867a89a90e.png",
       icon: MessageSquare
@@ -495,6 +515,15 @@ const HomePage = () => {
     
     return () => clearInterval(interval);
   }, []);
+
+  useEffect(() => {
+    const interval = setInterval(() => {
+      nextProcessStep();
+    }, 5000); // Change to 5 seconds (5000ms)
+    
+    return () => clearInterval(interval);
+  }, []);
+  
 
   return (
     <div className="min-h-screen bg-white">
@@ -578,6 +607,11 @@ const HomePage = () => {
           <Carousel 
             className="w-full max-w-5xl mx-auto"
             setActiveItem={setActiveProcessStep}
+            opts={{
+              loop: true,
+              duration: 20,
+              align: "center"
+            }}
           >
             <CarouselContent>
               {processSteps.map((item, i) => (
@@ -591,9 +625,19 @@ const HomePage = () => {
                           </div>
                           <h3 className="text-2xl font-bold">{item.title}</h3>
                         </div>
-                        <ul className="text-muted-foreground mb-6 space-y-2 list-disc pl-5">
+                        <ul className="text-muted-foreground mb-6 space-y-3 list-disc pl-5">
                           {item.description.map((point, index) => (
-                            <li key={index} className="text-left whitespace-normal" style={{ maxWidth: "500px", paddingRight: "20px" }}>{point}</li>
+                            index % 2 === 0 && index < item.description.length - 1 ? (
+                              <li key={index} className="text-left whitespace-normal leading-tight" style={{ maxWidth: "500px", paddingRight: "20px" }}>
+                                <span>{point}</span>
+                                <br />
+                                <span>{item.description[index + 1]}</span>
+                              </li>
+                            ) : index % 2 !== 0 ? null : (
+                              <li key={index} className="text-left whitespace-normal leading-tight" style={{ maxWidth: "500px", paddingRight: "20px" }}>
+                                {point}
+                              </li>
+                            )
                           ))}
                         </ul>
                       </div>
@@ -675,86 +719,4 @@ const HomePage = () => {
                     "Complete control over what you share",
                     "Option to delete all your data at any time"
                   ].map((item, i) => (
-                    <li key={i} className="flex items-start gap-3">
-                      <Check className="h-5 w-5 text-primary shrink-0 mt-0.5" />
-                      <span className="text-gray-300">{item}</span>
-                    </li>
-                  ))}
-                </ul>
-                <div className="mt-6">
-                  <Button variant="outline" asChild className="gap-2 bg-transparent text-white border-white hover:bg-white/10">
-                    <a href="/privacy-policy">
-                      Learn More About Our Privacy
-                      <ArrowRight className="h-4 w-4" />
-                    </a>
-                  </Button>
-                </div>
-              </div>
-            </motion.div>
-            
-            <motion.div 
-              className="w-full md:w-[35%]"
-              initial={{ opacity: 0, x: 20 }}
-              whileInView={{ opacity: 1, x: 0 }}
-              viewport={{ once: true }}
-            >
-              <img 
-                src="/lovable-uploads/2ca17c6f-5994-4559-a86c-7dcac6672b6c.png" 
-                alt="Privacy-focused design" 
-                className="w-full h-auto rounded-xl shadow-lg"
-              />
-            </motion.div>
-          </div>
-        </div>
-      </section>
-      
-      <section className="py-16 md:py-24 bg-white">
-        <div className="container mx-auto px-4">
-          <div className="text-center mb-12">
-            <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Testimonials</span>
-            <h2 className="text-3xl md:text-4xl font-bold mb-4">What Our Users Say</h2>
-            <p className="text-muted-foreground max-w-2xl mx-auto">
-              Join thousands of people who have transformed their self-reflection practice with SOuLO
-            </p>
-          </div>
-          
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-5xl mx-auto">
-            {[
-              {
-                text: "SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time!",
-                author: "Sarah K., Designer",
-                avatar: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png"
-              },
-              {
-                text: "As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible.",
-                author: "Michael T., Engineer",
-                avatar: "/lovable-uploads/5b18686b-4a3c-4341-a072-479db470ac1d.png"
-              },
-              {
-                text: "The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes.",
-                author: "Jamie L., Therapist",
-                avatar: "/lovable-uploads/cb710491-93f0-42be-a596-f64d80d9800e.png"
-              }
-            ].map((testimonial, index) => (
-              <div key={index} className="bg-white p-6 rounded-xl shadow-md border border-gray-100">
-                <p className="mb-4 text-gray-600">{testimonial.text}</p>
-                <div className="flex items-center gap-3">
-                  <img 
-                    src={testimonial.avatar} 
-                    alt={testimonial.author} 
-                    className="w-12 h-12 rounded-full object-cover"
-                  />
-                  <p className="font-medium">{testimonial.author}</p>
-                </div>
-              </div>
-            ))}
-          </div>
-        </div>
-      </section>
-      
-      <Footer />
-    </div>
-  );
-};
-
-export default HomePage;
+                    <li key={i} className
