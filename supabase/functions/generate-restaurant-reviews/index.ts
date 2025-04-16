@@ -15,33 +15,27 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function generateReviewAndRating(label: any, entities: any, themes: any): Promise<{review: string, rating: number}> {
+async function generateReviewFromRating(label: any, entities: any, themes: any, rating: number): Promise<string> {
   try {
-    console.log('Generating review and rating for data:', { label, entities, themes });
+    console.log('Generating review based on data and existing rating:', { label, entities, themes, rating });
     
     if (!openAIApiKey) {
       console.error('OpenAI API key not found in environment');
       throw new Error('OpenAI API key not configured');
     }
     
-    // Updated prompt to emphasize variety in ratings
+    // Updated prompt that explicitly specifies to use the existing rating
     const prompt = `
-      Generate a restaurant review and rating based on the following data:
+      Generate a restaurant review for a ${rating}-star rating (on a scale of 1-5) based on the following data:
       
       Restaurant Label: ${JSON.stringify(label || {})}
       Food/Service Entities: ${JSON.stringify(entities || {})}
       Dining Themes: ${JSON.stringify(themes || {})}
       
-      First, assign a rating between 1 and 5 stars (use the full range from 1 to 5) and then write a realistic 
-      review that matches the rating. Make the review sound authentic.
+      Write a realistic, practical, colloquial review as if it was written by a real restaurant customer.
+      The tone and content of the review should accurately reflect the ${rating}-star rating.
       
-      Please respond with ONLY a JSON object in this exact format:
-      {
-        "rating": (number between 1-5),
-        "review": "(your review text here)"
-      }
-      
-      DO NOT include any markdown formatting, code blocks, or additional text.
+      Please respond with ONLY the review text, no additional formatting or explanation.
     `;
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -53,10 +47,10 @@ async function generateReviewAndRating(label: any, entities: any, themes: any): 
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: [
-          { role: 'system', content: 'You are a helpful assistant that generates realistic restaurant reviews. Respond with ONLY valid JSON, no markdown or code blocks.' },
+          { role: 'system', content: 'You are a helpful assistant that generates realistic restaurant reviews. Respond with only the review text.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.9, // Increased temperature for more variety
+        temperature: 0.9,
       }),
     });
 
@@ -67,75 +61,24 @@ async function generateReviewAndRating(label: any, entities: any, themes: any): 
     }
 
     const result = await response.json();
-    let content = result.choices[0].message.content.trim();
-    console.log('Raw OpenAI response:', content);
+    const reviewText = result.choices[0].message.content.trim();
+    console.log('Generated review:', reviewText);
     
-    // Remove any markdown code block formatting if present
-    if (content.startsWith('```')) {
-      content = content.replace(/```json\n?/, '').replace(/```\n?/, '').trim();
-    }
-    
-    try {
-      // Try to parse the result as JSON
-      const parsedContent = JSON.parse(content);
-      
-      // Validate that we have the expected fields
-      if (!parsedContent.hasOwnProperty('review') || !parsedContent.hasOwnProperty('rating')) {
-        throw new Error('Missing required fields in response');
-      }
-      
-      // Validate and normalize rating
-      let rating = parseInt(parsedContent.rating);
-      if (isNaN(rating) || rating < 1 || rating > 5) {
-        // Generate a more random fallback rating
-        rating = Math.floor(Math.random() * 5) + 1;
-      }
-      
-      return {
-        review: parsedContent.review || "No review generated",
-        rating: rating
-      };
-    } catch (parseError) {
-      console.error('Failed to parse OpenAI response as JSON:', parseError);
-      
-      // Improved fallback: Extract rating and review from text
-      const ratingMatch = content.match(/rating"?\s*:?\s*(\d+)/i);
-      const rating = ratingMatch ? parseInt(ratingMatch[1]) : Math.floor(Math.random() * 5) + 1;
-      
-      // Extract text that looks like a review
-      const reviewMatch = content.match(/review"?\s*:?\s*"([^"]+)"/i) || content.match(/review"?\s*:?\s*'([^']+)'/i);
-      let review = reviewMatch ? reviewMatch[1] : content;
-      
-      // If we still don't have a good review, create a generic one based on rating
-      if (!review || review.length < 20) {
-        const sentiments = [
-          "Terrible experience. Would not recommend.",
-          "Disappointing visit with several issues.",
-          "Average experience, neither great nor terrible.",
-          "Very good experience with minor improvements possible.",
-          "Excellent experience! Highly recommended!"
-        ];
-        review = sentiments[rating - 1];
-      }
-      
-      return { review, rating };
-    }
+    return reviewText;
   } catch (error) {
-    console.error('Error in generateReviewAndRating:', error);
-    // Return random rating for variety in case of errors
-    return { 
-      review: "Error generating review.",
-      rating: Math.floor(Math.random() * 5) + 1
-    };
+    console.error('Error in generateReviewFromRating:', error);
+    return "Error generating review.";
   }
 }
 
 async function processReviews(limit = 10): Promise<any> {
   try {
-    // Fetch reviews to process
+    // Only fetch reviews that have a Rating but no Reviews
     const { data: reviews, error } = await supabase
       .from('PoPs_Reviews')
-      .select('id, Label, entities, Themes, "Restaurant Name"')
+      .select('id, Label, entities, Themes, "Restaurant Name", Rating')
+      .not('Rating', 'is', null)  // Only get rows that already have a Rating
+      .is('Reviews', null)        // Only get rows that don't have Reviews yet
       .order('id', { ascending: true })
       .limit(limit);
     
@@ -144,10 +87,10 @@ async function processReviews(limit = 10): Promise<any> {
       throw error;
     }
     
-    console.log(`Processing ${reviews?.length || 0} reviews`);
+    console.log(`Processing ${reviews?.length || 0} reviews with existing ratings`);
     
     if (!reviews || reviews.length === 0) {
-      return { processed: 0, total: 0, message: 'No reviews to process' };
+      return { processed: 0, total: 0, message: 'No reviews to process (all reviews with ratings already have review text)' };
     }
     
     let processedCount = 0;
@@ -155,21 +98,26 @@ async function processReviews(limit = 10): Promise<any> {
     // Process each review
     for (const review of reviews) {
       try {
-        console.log(`Processing review ID: ${review.id}`);
+        console.log(`Processing review ID: ${review.id} with Rating: ${review.Rating}`);
         
-        // Generate review text and rating
-        const { review: reviewText, rating } = await generateReviewAndRating(
+        if (review.Rating === null) {
+          console.log(`Skipping review ID: ${review.id} because it has no rating`);
+          continue;
+        }
+        
+        // Generate review text based on existing rating
+        const reviewText = await generateReviewFromRating(
           review.Label, 
           review.entities, 
-          review.Themes
+          review.Themes,
+          review.Rating
         );
         
-        // Update both Reviews and Rating columns together in a single operation
+        // Update only the Reviews column with the generated text
         const { error: updateError } = await supabase
           .from('PoPs_Reviews')
           .update({
-            Reviews: reviewText,
-            Rating: rating
+            Reviews: reviewText
           })
           .eq('id', review.id);
         
@@ -207,10 +155,12 @@ serve(async (req) => {
     console.log(`Request received with limit: ${limit}, processAll: ${processAll}`);
     
     if (processAll) {
-      // Get total count of reviews to process
+      // Get total count of reviews to process (with Rating but no Reviews)
       const { count, error: countError } = await supabase
         .from('PoPs_Reviews')
-        .select('id', { count: 'exact', head: true });
+        .select('id', { count: 'exact', head: true })
+        .not('Rating', 'is', null)
+        .is('Reviews', null);
       
       if (countError) {
         console.error('Error counting reviews:', countError);
@@ -223,7 +173,7 @@ serve(async (req) => {
         return new Response(
           JSON.stringify({ 
             success: true, 
-            message: 'No reviews to process',
+            message: 'No reviews to process (all reviews with ratings already have review text)',
             processed: 0,
             remaining: 0
           }),
