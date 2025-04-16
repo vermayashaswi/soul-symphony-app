@@ -487,8 +487,8 @@
   
   /* UPDATED: Chat area scrolling adjustments */
   .mobile-chat-area {
-    padding-bottom: 120px !important; /* Increased to create more space */
-    margin-bottom: 90px !important; /* Increased to match the navbar height + input height */
+    padding-bottom: 60px !important; /* Reduced to match input height */
+    margin-bottom: 0 !important;
   }
   
   /* FIXED: Input spacing when keyboard is closed - preventing overlap with navbar */
@@ -540,7 +540,7 @@
 
   /* Ensure chat content has enough bottom padding */
   .mobile-chat-interface .chat-content {
-    padding-bottom: 75px !important;
+    padding-bottom: 0 !important; /* Reduced from 75px to eliminate any extra space */
   }
 
   /* Remove any potential gaps in the mobile chat interface */
@@ -549,6 +549,22 @@
     bottom: 0;
     left: 0;
     right: 0;
+  }
+
+  /* NEW: Additional styles to ensure no gaps */
+  .mobile-chat-interface .input-container {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    z-index: 50;
+    padding-bottom: env(safe-area-inset-bottom, 10px);
+  }
+
+  /* Adjust chat area to stick to the bottom */
+  .mobile-chat-area {
+    padding-bottom: 60px !important; /* Reduced to match input height */
+    margin-bottom: 0 !important;
   }
 }
 
