@@ -535,11 +535,20 @@
     margin-bottom: 0 !important;
     z-index: 50;
     padding-bottom: env(safe-area-inset-bottom, 10px);
+    border-top: none; /* Remove border to make it seamless */
   }
 
   /* Ensure chat content has enough bottom padding */
   .mobile-chat-interface .chat-content {
     padding-bottom: 75px !important;
+  }
+
+  /* Remove any potential gaps in the mobile chat interface */
+  .mobile-chat-interface {
+    position: relative;
+    bottom: 0;
+    left: 0;
+    right: 0;
   }
 }
 
