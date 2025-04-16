@@ -1,4 +1,3 @@
-
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -12,6 +11,18 @@
   .insights-container,
   .settings-container {
     padding-bottom: 4rem !important;
+  }
+  
+  /* iOS-specific padding for safe areas */
+  @supports (padding: max(0px)) {
+    .smart-chat-container,
+    .journal-container,
+    .insights-container,
+    .settings-container {
+      padding-bottom: max(4rem, env(safe-area-inset-bottom) + 4rem) !important;
+      padding-left: max(1rem, env(safe-area-inset-left) + 0.5rem) !important;
+      padding-right: max(1rem, env(safe-area-inset-right) + 0.5rem) !important;
+    }
   }
   
   /* Remove extra space at the top of mobile pages */
@@ -30,9 +41,12 @@
     padding-bottom: 2px !important;
   }
   
-  /* Increase touch targets */
-  .mobile-chat-interface button {
-    min-height: 40px;
+  /* Increase touch targets for iOS */
+  .mobile-chat-interface button,
+  button {
+    min-height: 44px; /* Apple recommends 44px minimum */
+    touch-action: manipulation; /* Prevent double-tap zoom */
+    -webkit-tap-highlight-color: transparent; /* Remove tap highlight */
   }
   
   /* Optimize space usage in chat interface */
@@ -86,6 +100,50 @@
     box-shadow: -2px 0 4px rgba(0, 0, 0, 0.05);
     /* Shift left by 25% */
     transform: translateX(-25%);
+  }
+  
+  /* iOS-specific fixes for emotion bubbles */
+  .emotion-bubble {
+    transform: translateZ(0); /* Force GPU acceleration on iOS */
+    -webkit-backface-visibility: hidden; /* Prevent flicker on iOS */
+    will-change: transform; /* Hint for browser optimization */
+  }
+  
+  /* Fix for iOS scroll bounce effect */
+  html, body {
+    position: fixed;
+    width: 100%;
+    height: 100%;
+    overflow: auto;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Fix for iOS input zoom */
+  input, select, textarea {
+    font-size: 16px !important; /* Prevent auto-zoom on iOS */
+  }
+  
+  /* Fix for iOS position fixed issues */
+  .fixed {
+    -webkit-transform: translateZ(0);
+  }
+  
+  /* Fix for iOS scrolling performance */
+  * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  /* Fix for iOS momentum scrolling */
+  .overflow-auto, .overflow-y-auto {
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Ensure proper buttons on iOS */
+  button {
+    cursor: pointer;
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
   }
   
   /* Ensure the thread buttons have adequate spacing and are highly visible */
@@ -478,20 +536,28 @@
   /* When keyboard is visible, adjust the input box to maintain no gap */
   .mobile-chat-interface.keyboard-visible .p-2.bg-background.border-t.border-border.flex.items-center.gap-2 {
     bottom: 0;
-    padding-bottom: 5px;
+    padding-bottom: env(safe-area-inset-bottom, 5px); /* iOS safe area support */
     border-top: 1px solid rgba(0, 0, 0, 0.1);
   }
   
   /* Default state - attach to bottom nav when keyboard not visible */
   .mobile-chat-interface:not(.keyboard-visible) .p-2.bg-background.border-t.border-border.flex.items-center.gap-2 {
-    bottom: 69px; /* Height of the bottom nav - keeps it directly above */
+    bottom: max(69px, 69px + env(safe-area-inset-bottom, 0px)); /* iOS safe area support */
     border-top: none;
     border-bottom: 1px solid rgba(0, 0, 0, 0.1);
   }
   
-  /* Ensure proper spacing for content */
+  /* iOS-specific fixes for emotion bubbles and charts */
+  .emotion-bubble-container {
+    transform: translateZ(0);
+    -webkit-backface-visibility: hidden;
+    will-change: transform;
+    transform-style: preserve-3d;
+  }
+  
+  /* Ensure proper spacing for content accounting for iOS safe areas */
   .mobile-chat-interface .chat-content-container {
-    padding-bottom: 140px; /* Extra space to ensure all content is visible */
+    padding-bottom: max(140px, 140px + env(safe-area-inset-bottom, 0px));
   }
   
   /* FIX: Ensure input visibility */
@@ -512,6 +578,10 @@
   @supports (padding: max(0px)) {
     .keyboard-visible .mobile-chat-input {
       padding-bottom: max(5px, env(safe-area-inset-bottom, 0));
+    }
+    
+    .fixed.bottom-0 {
+      padding-bottom: env(safe-area-inset-bottom, 0);
     }
   }
   
@@ -718,4 +788,32 @@
 
 .dark .chat-thread-list .thread-item:hover .thread-action-buttons {
   background-color: hsla(var(--card), 0.5);
+}
+
+/* Special iOS overrides that apply regardless of screen size */
+@supports (-webkit-touch-callout: none) {
+  /* iOS-specific styles */
+  
+  /* Fix for notched devices */
+  .fixed {
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  
+  /* Fix for bounce effect */
+  html, body {
+    overflow: hidden;
+    height: 100%;
+  }
+  
+  #root {
+    overflow: auto;
+    height: 100%;
+    -webkit-overflow-scrolling: touch;
+  }
+  
+  /* Fix for emotion bubbles on iOS */
+  .rounded-full {
+    -webkit-backface-visibility: hidden;
+    -webkit-transform: translateZ(0) scale(1.0, 1.0);
+  }
 }

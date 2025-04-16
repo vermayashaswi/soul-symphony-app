@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -31,6 +32,9 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   const isMobile = useIsMobile();
   const [showPercentage, setShowPercentage] = useState(false);
   const timeoutRef = useRef<number | null>(null);
+  const isIOS = typeof navigator !== 'undefined' && 
+    (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1));
   
   // Reset showPercentage when isHighlighted changes to false
   useEffect(() => {
@@ -135,19 +139,31 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   // Only show percentage if explicitly highlighted (external control) or locally toggled (and we have a percentage)
   const shouldShowPercentage = (isHighlighted || showPercentage) && percentage !== undefined;
 
+  // iOS-specific styles
+  const iosStyles: React.CSSProperties = isIOS ? {
+    WebkitBackfaceVisibility: 'hidden',
+    WebkitTransform: 'translateZ(0)',
+    WebkitPerspective: '1000',
+    WebkitTapHighlightColor: 'transparent'
+  } : {};
+
   return (
     <div className="relative">
       <motion.div
         animate={getAnimation()}
         whileTap={{ scale: 0.95, transition: { duration: 0.2 } }}
         className={cn(
-          "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative",
+          "rounded-full flex items-center justify-center cursor-pointer shadow-sm transition-shadow relative emotion-bubble-container",
           color,
           isHighlighted ? "ring-2 ring-primary ring-opacity-70" : "",
           isDragging ? "shadow-lg z-50" : "",
           className
         )}
-        style={{ width: bubbleSize, height: bubbleSize }}
+        style={{ 
+          width: bubbleSize, 
+          height: bubbleSize,
+          ...iosStyles
+        }}
         initial={{ opacity: 1 }}
         whileHover={{ 
           scale: 1.05, 
@@ -169,6 +185,9 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
             initial={{ opacity: 0, y: 10 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0, y: 10 }}
+            style={{
+              WebkitTransform: 'translateZ(0)', // iOS GPU rendering optimization
+            }}
           >
             {(Math.round(percentage * 10) / 10).toFixed(1)}%
           </motion.div>

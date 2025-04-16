@@ -23,10 +23,40 @@ const fixViewportHeight = () => {
     // Slight delay to ensure viewport has updated after orientation change
     setTimeout(setVhProperty, 100);
   });
+  
+  // Special handling for iOS keyboard appearance
+  if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+      (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+    
+    // Track when iOS keyboard shows/hides by monitoring input focus
+    const inputs = document.querySelectorAll('input, textarea');
+    inputs.forEach(input => {
+      input.addEventListener('focus', () => {
+        document.body.classList.add('keyboard-visible');
+        // Force reflow to ensure transition works
+        setTimeout(() => {
+          window.scrollTo(0, 0);
+          setVhProperty();
+        }, 50);
+      });
+      
+      input.addEventListener('blur', () => {
+        document.body.classList.remove('keyboard-visible');
+        // Small delay to ensure UI updates after keyboard hides
+        setTimeout(setVhProperty, 50);
+      });
+    });
+  }
 };
 
 // Call the fix on page load
 fixViewportHeight();
+
+// Detect iOS and set a class on the HTML element
+if (/iPad|iPhone|iPod/.test(navigator.userAgent) || 
+    (navigator.platform === 'MacIntel' && navigator.maxTouchPoints > 1)) {
+  document.documentElement.classList.add('ios-device');
+}
 
 ReactDOM.createRoot(document.getElementById('root')!).render(
   <React.StrictMode>

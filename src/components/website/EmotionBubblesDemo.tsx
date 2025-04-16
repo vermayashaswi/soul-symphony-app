@@ -2,6 +2,7 @@
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Demo component that shows floating emotion bubbles with equal sizes but varying color intensities
 const EmotionBubblesDemo = () => {
@@ -16,6 +17,7 @@ const EmotionBubblesDemo = () => {
 
   const [selectedBubble, setSelectedBubble] = useState<number | null>(null);
   const { colorTheme, theme } = useTheme();
+  const isMobile = useIsMobile();
 
   // Calculate the available area (using 70% of the container)
   const containerWidth = 100; // Percentage units
@@ -70,7 +72,7 @@ const EmotionBubblesDemo = () => {
         return (
           <motion.div
             key={index}
-            className="absolute rounded-full flex items-center justify-center cursor-pointer"
+            className="absolute rounded-full flex items-center justify-center cursor-pointer emotion-bubble-container"
             style={{
               backgroundColor: baseColor,
               width: `${bubbleSize}px`,
@@ -81,7 +83,10 @@ const EmotionBubblesDemo = () => {
               top: `${25 + Math.sin(index * 1.5) * 15}px`,
               left: `${(index * 16) % 95}%`,
               opacity: opacity,
-              boxShadow: `0 0 10px ${baseColor}80`
+              boxShadow: `0 0 10px ${baseColor}80`,
+              WebkitBackfaceVisibility: 'hidden', // iOS GPU rendering optimization
+              WebkitTransform: 'translateZ(0)', // iOS GPU rendering optimization
+              WebkitPerspective: '1000', // iOS GPU rendering optimization
             }}
             animate={{
               y: [0, -5, 0, 5, 0],

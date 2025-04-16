@@ -74,8 +74,29 @@ export function useIsMobile() {
       }
     };
     
+    // Special handling for iOS orientation changes
+    const handleOrientationChange = () => {
+      console.log("Orientation change detected");
+      // On iOS, we need a small delay
+      if (initialIsIOS) {
+        setTimeout(() => {
+          handleResize();
+        }, 100);
+      } else {
+        handleResize();
+      }
+    };
+    
     window.addEventListener('resize', handleResize);
-    window.addEventListener('orientationchange', handleResize);
+    window.addEventListener('orientationchange', handleOrientationChange);
+    
+    // Set appropriate body classes for device-specific CSS
+    if (initialIsIOS) {
+      document.body.classList.add('ios-device');
+    }
+    if (initialIsAndroid) {
+      document.body.classList.add('android-device');
+    }
     
     // Setup matchMedia query as well
     const mql = window.matchMedia(`(max-width: ${MOBILE_BREAKPOINT - 1}px)`);
@@ -103,13 +124,20 @@ export function useIsMobile() {
     
     return () => {
       window.removeEventListener('resize', handleResize);
-      window.removeEventListener('orientationchange', handleResize);
+      window.removeEventListener('orientationchange', handleOrientationChange);
       
       try {
         mql.removeEventListener('change', handleMqlChange);
       } catch (err) {
         // @ts-ignore - Using deprecated API for compatibility
         mql.removeListener && mql.removeListener(handleMqlChange);
+      }
+      
+      if (initialIsIOS) {
+        document.body.classList.remove('ios-device');
+      }
+      if (initialIsAndroid) {
+        document.body.classList.remove('android-device');
       }
     };
   }, [isMobile]);
