@@ -362,17 +362,17 @@ const HomePage = () => {
     {
       text: "\"SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time and helps me stay consistent with my practice!\"",
       author: "Arjun P., Software Engineer",
-      avatar: "/lovable-uploads/2377dbd6-9844-498d-9c1c-6c18ca058917.png"
+      avatar: "https://images.unsplash.com/photo-1618151313441-bc79b11e5090?q=80&w=250&h=250&auto=format&fit=crop"
     },
     {
       text: "\"As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible. SOuLO has become an essential part of my self-care routine.\"",
       author: "Tanaka H., Designer",
-      avatar: "/lovable-uploads/a5f94b12-bf36-47db-8ebb-1c2445d191bf.png"
+      avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=250&h=250&auto=format&fit=crop"
     },
     {
       text: "\"The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes in my life. It's like having a therapist in my pocket!\"",
       author: "Emma S., Teacher",
-      avatar: "/lovable-uploads/2b19ea1c-cceb-4beb-9e4e-11e905c56358.png"
+      avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=250&h=250&auto=format&fit=crop"
     }
   ];
 
@@ -691,7 +691,7 @@ const HomePage = () => {
         </div>
       </section>
       
-      <section className="py-16 md:py-24 bg-gradient-to-br from-gray-50 to-purple-50/30">
+      <section className="py-16 md:py-24 bg-gradient-to-br from-blue-50 to-purple-50">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Testimonials</span>
@@ -702,17 +702,33 @@ const HomePage = () => {
           </div>
           
           <div className="grid grid-cols-1 md:grid-cols-3 gap-8 max-w-6xl mx-auto">
-            {testimonials.map((testimonial, index) => (
+            {[
+              {
+                text: "\"SOuLO has completely transformed how I reflect on my day. The voice journaling feature saves me so much time and helps me stay consistent with my practice!\"",
+                author: "Arjun P., Software Engineer",
+                avatar: "https://images.unsplash.com/photo-1618151313441-bc79b11e5090?q=80&w=250&h=250&auto=format&fit=crop"
+              },
+              {
+                text: "\"As someone who struggles with writing, being able to speak my thoughts and have them analyzed is incredible. SOuLO has become an essential part of my self-care routine.\"",
+                author: "Tanaka H., Designer",
+                avatar: "https://images.unsplash.com/photo-1472099645785-5658abf4ff4e?q=80&w=250&h=250&auto=format&fit=crop"
+              },
+              {
+                text: "\"The emotional insights I get from SOuLO have helped me understand my patterns and make positive changes in my life. It's like having a therapist in my pocket!\"",
+                author: "Emma S., Teacher",
+                avatar: "https://images.unsplash.com/photo-1544005313-94ddf0286df2?q=80&w=250&h=250&auto=format&fit=crop"
+              }
+            ].map((testimonial, index) => (
               <motion.div
                 key={index}
                 initial={{ opacity: 0, y: 20 }}
                 whileInView={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.5, delay: index * 0.1 }}
                 viewport={{ once: true }}
-                className="bg-white rounded-xl shadow-md p-6 flex flex-col"
+                className="bg-gradient-to-br from-primary/80 to-purple-600/80 rounded-xl shadow-md p-6 flex flex-col"
               >
                 <div className="mb-6">
-                  <p className="text-gray-700 italic">{testimonial.text}</p>
+                  <p className="text-white italic">{testimonial.text}</p>
                 </div>
                 <div className="mt-auto flex items-center gap-3">
                   <div className="h-12 w-12 rounded-full overflow-hidden">
@@ -723,7 +739,7 @@ const HomePage = () => {
                     />
                   </div>
                   <div>
-                    <p className="font-medium">{testimonial.author}</p>
+                    <p className="font-medium text-white">{testimonial.author}</p>
                   </div>
                 </div>
               </motion.div>
