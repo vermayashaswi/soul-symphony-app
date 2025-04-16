@@ -14,24 +14,43 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-async function assignRandomRatings(limit = 10): Promise<any> {
+async function assignRandomRatings(batchSize = 1000): Promise<any> {
   try {
-    // Fetch reviews to process
+    // Count the total number of NULL ratings to process
+    const { count, error: countError } = await supabase
+      .from('PoPs_Reviews')
+      .select('id', { count: 'exact', head: true })
+      .is('Rating', null);
+    
+    if (countError) {
+      console.error('Error counting NULL ratings:', countError);
+      throw countError;
+    }
+    
+    const totalNullRatings = count || 0;
+    console.log(`Total NULL ratings to process: ${totalNullRatings}`);
+    
+    if (totalNullRatings === 0) {
+      return { processed: 0, total: 0, message: 'No NULL ratings to process' };
+    }
+    
+    // Fetch reviews with NULL ratings to process in this batch
     const { data: reviews, error } = await supabase
       .from('PoPs_Reviews')
       .select('id')
+      .is('Rating', null)
       .order('id', { ascending: true })
-      .limit(limit);
+      .limit(batchSize);
     
     if (error) {
-      console.error('Error fetching reviews:', error);
+      console.error('Error fetching reviews with NULL ratings:', error);
       throw error;
     }
     
-    console.log(`Processing ${reviews?.length || 0} reviews`);
+    console.log(`Processing ${reviews?.length || 0} reviews with NULL ratings in this batch`);
     
     if (!reviews || reviews.length === 0) {
-      return { processed: 0, total: 0, message: 'No reviews to process' };
+      return { processed: 0, total: 0, message: 'No reviews to process in this batch' };
     }
     
     let processedCount = 0;
@@ -66,10 +85,66 @@ async function assignRandomRatings(limit = 10): Promise<any> {
     return {
       processed: processedCount,
       total: reviews.length,
-      message: `Assigned random ratings to ${processedCount} out of ${reviews.length} reviews`
+      remaining: totalNullRatings - processedCount,
+      message: `Assigned random ratings to ${processedCount} out of ${reviews.length} reviews in this batch. Total remaining: ${totalNullRatings - processedCount}`
     };
   } catch (error) {
     console.error('Error in assignRandomRatings:', error);
+    throw error;
+  }
+}
+
+async function processAllNullRatings(batchSize = 1000): Promise<any> {
+  try {
+    // Count total null ratings
+    const { count, error: countError } = await supabase
+      .from('PoPs_Reviews')
+      .select('id', { count: 'exact', head: true })
+      .is('Rating', null);
+    
+    if (countError) {
+      console.error('Error counting NULL ratings:', countError);
+      throw countError;
+    }
+    
+    const totalNullRatings = count || 0;
+    console.log(`Total NULL ratings to process: ${totalNullRatings}`);
+    
+    if (totalNullRatings === 0) {
+      return { processed: 0, message: 'No NULL ratings to process' };
+    }
+    
+    let totalProcessed = 0;
+    let remaining = totalNullRatings;
+    let batchNumber = 1;
+    
+    // Process batches until all NULL ratings are handled
+    while (remaining > 0) {
+      console.log(`Processing batch #${batchNumber}, remaining: ${remaining}`);
+      
+      const result = await assignRandomRatings(batchSize);
+      
+      totalProcessed += result.processed;
+      remaining = totalNullRatings - totalProcessed;
+      
+      console.log(`Batch #${batchNumber} completed: processed ${result.processed}, total processed: ${totalProcessed}, remaining: ${remaining}`);
+      
+      if (result.processed === 0) {
+        // No more records processed in this batch, break to avoid infinite loop
+        break;
+      }
+      
+      batchNumber++;
+    }
+    
+    return {
+      totalProcessed,
+      totalNullRatings,
+      remaining,
+      message: `Processed all available NULL ratings. Assigned random ratings to ${totalProcessed} out of ${totalNullRatings} reviews.`
+    };
+  } catch (error) {
+    console.error('Error in processAllNullRatings:', error);
     throw error;
   }
 }
@@ -81,58 +156,36 @@ serve(async (req) => {
   }
 
   try {
-    const { limit = 100, processAll = false } = await req.json().catch(() => ({ limit: 100, processAll: false }));
+    const { processAll = true, batchSize = 1000 } = await req.json().catch(() => ({ processAll: true, batchSize: 1000 }));
     
-    console.log(`Request received with limit: ${limit}, processAll: ${processAll}`);
+    console.log(`Request received with processAll: ${processAll}, batchSize: ${batchSize}`);
     
+    let result;
     if (processAll) {
-      // Get total count of reviews to process
-      const { count, error: countError } = await supabase
-        .from('PoPs_Reviews')
-        .select('id', { count: 'exact', head: true });
-      
-      if (countError) {
-        console.error('Error counting reviews:', countError);
-        throw countError;
-      }
-      
-      console.log(`Total reviews to process: ${count}`);
-      
-      if (count === 0) {
-        return new Response(
-          JSON.stringify({ 
-            success: true, 
-            message: 'No reviews to process',
-            processed: 0,
-            remaining: 0
-          }),
-          { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-        );
-      }
-      
-      // Process reviews
-      const result = await assignRandomRatings(limit);
+      // Process all NULL ratings in batches
+      result = await processAllNullRatings(batchSize);
       
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: result.message,
-          processed: result.processed,
-          remaining: count - result.processed,
-          totalToProcess: count
+          totalProcessed: result.totalProcessed,
+          totalNullRatings: result.totalNullRatings,
+          remaining: result.remaining
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     } else {
-      // Process single batch
-      const result = await assignRandomRatings(limit);
+      // Process a single batch of NULL ratings
+      result = await assignRandomRatings(batchSize);
       
       return new Response(
         JSON.stringify({ 
           success: true, 
           message: result.message,
           processed: result.processed,
-          total: result.total
+          total: result.total,
+          remaining: result.remaining || 0
         }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );

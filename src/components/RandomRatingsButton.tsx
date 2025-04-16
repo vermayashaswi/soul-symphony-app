@@ -14,8 +14,8 @@ export function RandomRatingsButton() {
       
       const { data, error } = await supabase.functions.invoke('assign-random-ratings', {
         body: { 
-          limit: 100,
-          processAll: true
+          processAll: true,
+          batchSize: 1000
         }
       });
       
@@ -31,7 +31,13 @@ export function RandomRatingsButton() {
       }
       
       if (data.success) {
-        toast.success(data.message || 'Random ratings assigned successfully');
+        toast.success(
+          `${data.message} Processed: ${data.totalProcessed || 0} rows. ${
+            data.remaining > 0 
+              ? `Remaining: ${data.remaining}` 
+              : 'All NULL ratings have been assigned values!'
+          }`
+        );
       } else {
         const errorMsg = data.error || 'Assignment failed with no specific error';
         console.error('Assignment failed:', errorMsg);
