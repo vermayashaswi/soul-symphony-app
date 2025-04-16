@@ -42,6 +42,7 @@ export default function JournalEntriesList({
   const [seenEntryIds, setSeenEntryIds] = useState<Set<number>>(new Set());
   const [processedProcessingIds, setProcessedProcessingIds] = useState<Set<string>>(new Set());
   const [fullyProcessedEntries, setFullyProcessedEntries] = useState<Set<number>>(new Set());
+  const [deletedEntryIds, setDeletedEntryIds] = useState<Set<number>>(new Set());
   
   const mainProcessingEntryId = visibleProcessingEntries.length > 0 ? visibleProcessingEntries[0] : null;
   const hasProcessingEntries = mainProcessingEntryId !== null && processingEntries.length > 0;
@@ -58,6 +59,11 @@ export default function JournalEntriesList({
     const handleProcessingEntryMapped = (event: CustomEvent) => {
       if (event.detail && event.detail.tempId && event.detail.entryId) {
         console.log(`[JournalEntriesList] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
+        
+        if (deletedEntryIds.has(event.detail.entryId)) {
+          console.log(`[JournalEntriesList] Skipping mapped entry ${event.detail.entryId} as it was deleted`);
+          return;
+        }
         
         if (processedProcessingIds.has(event.detail.tempId)) {
           console.log(`[JournalEntriesList] Already processed this tempId: ${event.detail.tempId}, skipping`);
@@ -149,7 +155,7 @@ export default function JournalEntriesList({
     return () => {
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     };
-  }, [entries, processedProcessingIds]);
+  }, [entries, processedProcessingIds, deletedEntryIds]);
 
   useEffect(() => {
     if (entries.length > 0 && processingToEntryMap.size > 0) {
@@ -259,6 +265,7 @@ export default function JournalEntriesList({
               typeof entry !== 'object' || 
               !entry.id || 
               pendingDeletions.current.has(entry.id) || 
+              deletedEntryIds.has(entry.id) || 
               (!entry.content && !entry.created_at)) {
             continue;
           }
@@ -291,7 +298,7 @@ export default function JournalEntriesList({
             if (transitionalLoadingEntries.includes(tempId)) return true;
             
             const mappedEntryId = getEntryIdForProcessingId(tempId);
-            return !mappedEntryId || !entryIds.includes(mappedEntryId);
+            return !mappedEntryId || (!entryIds.includes(mappedEntryId) && !deletedEntryIds.has(mappedEntryId));
           });
         });
       } else {
@@ -309,7 +316,7 @@ export default function JournalEntriesList({
     return () => {
       componentMounted.current = false;
     };
-  }, [entries, recentlyCompletedEntries, transitionalLoadingEntries]);
+  }, [entries, recentlyCompletedEntries, transitionalLoadingEntries, deletedEntryIds]);
 
   useEffect(() => {
     if (!componentMounted.current) return;
@@ -390,8 +397,18 @@ export default function JournalEntriesList({
       console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
       
       pendingDeletions.current.add(entryId);
+      setDeletedEntryIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(entryId);
+        return newSet;
+      });
       
       setVisibleProcessingEntries(prev => prev.filter(tempId => {
+        const mappedId = getEntryIdForProcessingId(tempId);
+        return mappedId !== entryId;
+      }));
+      
+      setPersistedProcessingEntries(prev => prev.filter(tempId => {
         const mappedId = getEntryIdForProcessingId(tempId);
         return mappedId !== entryId;
       }));
@@ -406,6 +423,7 @@ export default function JournalEntriesList({
       removeProcessingEntryById(entryId);
       
       setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
+      setFilteredEntries(prev => prev.filter(entry => entry.id !== entryId));
       
       if (onDeleteEntry) {
         setTimeout(async () => {
@@ -484,7 +502,7 @@ export default function JournalEntriesList({
   const safeLocalEntries = Array.isArray(displayEntries) ? displayEntries : [];
   
   for (const entry of safeLocalEntries) {
-    if (!pendingDeletions.current.has(entry.id)) {
+    if (!pendingDeletions.current.has(entry.id) && !deletedEntryIds.has(entry.id)) {
       uniqueEntriesMap.set(entry.id, entry);
     }
   }
@@ -493,10 +511,14 @@ export default function JournalEntriesList({
   
   const processedTransitionalEntries = transitionalLoadingEntries.filter(tempId => {
     const actualEntry = processingToActualEntry.get(tempId);
-    return actualEntry && fullyProcessedEntries.has(actualEntry.id);
+    return actualEntry && 
+           fullyProcessedEntries.has(actualEntry.id) && 
+           !deletedEntryIds.has(actualEntry.id);
   });
   
   const finalLocalEntries = finalDisplayEntries.filter(entry => {
+    if (deletedEntryIds.has(entry.id)) return false;
+    
     const hasMatchingTransitional = processedTransitionalEntries.some(tempId => {
       const transitionalEntry = processingToActualEntry.get(tempId);
       return transitionalEntry && transitionalEntry.id === entry.id;
@@ -524,6 +546,10 @@ export default function JournalEntriesList({
           </div>
         </div>
       );
+    }
+    
+    if (deletedEntryIds.has(actualEntry.id)) {
+      return null;
     }
     
     return (
@@ -554,6 +580,12 @@ export default function JournalEntriesList({
     );
   };
 
+  const shouldShowProcessingCard = hasProcessingEntries && 
+    !processedTransitionalEntries.some(id => id === mainProcessingEntryId) &&
+    (!mainProcessingEntryId || 
+      !getEntryIdForProcessingId(mainProcessingEntryId) || 
+      !deletedEntryIds.has(getEntryIdForProcessingId(mainProcessingEntryId)!));
+
   return (
     <ErrorBoundary>
       <div>
@@ -581,7 +613,7 @@ export default function JournalEntriesList({
               </ErrorBoundary>
             ))}
             
-            {hasProcessingEntries && !processedTransitionalEntries.some(id => id === mainProcessingEntryId) && (
+            {shouldShowProcessingCard && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -604,7 +636,7 @@ export default function JournalEntriesList({
               </motion.div>
             )}
             
-            {finalDisplayEntries.length === 0 && !hasProcessingEntries && !loading ? (
+            {finalDisplayEntries.length === 0 && !shouldShowProcessingCard && !loading ? (
               <motion.div 
                 initial={{ opacity: 0, y: 10 }}
                 animate={{ opacity: 1, y: 0 }}
