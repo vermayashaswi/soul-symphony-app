@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -78,7 +79,7 @@ export function getEntryIdForProcessingId(tempId: string): number | undefined {
       return fullMemoryResult;
     }
     
-    // Then check localStorage as fallback - critical for persistence across navigation
+    // Then check localStorage as fallback - critical for persistence across navigations
     const processingToEntryMap = localStorage.getItem('processingToEntryMap');
     if (!processingToEntryMap) return undefined;
     
