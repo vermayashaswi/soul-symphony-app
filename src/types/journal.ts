@@ -14,6 +14,7 @@ export interface JournalEntry {
   entities?: Json;
   "foreign key"?: string;
   master_themes?: string[];
+  user_feedback?: string;
 }
 
 export interface JournalEntryFormData extends JournalEntry {
