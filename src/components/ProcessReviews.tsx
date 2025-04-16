@@ -14,21 +14,30 @@ export function ProcessReviews() {
     remaining: number;
     totalToProcess: number;
   } | null>(null);
+  const [errorDetails, setErrorDetails] = useState<string | null>(null);
 
   const processReviews = async (processAll: boolean = false) => {
     try {
       setIsProcessing(true);
       setProgress(0);
+      setErrorDetails(null);
+      
+      console.log(`Starting to process reviews: processAll=${processAll}`);
       
       const { data, error } = await supabase.functions.invoke('process-restaurant-reviews', {
         body: { limit: 10, offset: 0, processAll }
       });
       
       if (error) {
-        throw error;
+        console.error('Error invoking function:', error);
+        throw new Error(`Function error: ${error.message || 'Unknown function error'}`);
       }
       
       console.log('Processing result:', data);
+      
+      if (!data) {
+        throw new Error('No data returned from function');
+      }
       
       if (data.success) {
         toast.success(data.message);
@@ -56,12 +65,17 @@ export function ProcessReviews() {
           setIsProcessing(false);
         }
       } else {
-        toast.error('Processing failed');
+        const errorMsg = data.error || 'Processing failed with no specific error';
+        console.error('Processing failed:', errorMsg);
+        setErrorDetails(errorMsg);
+        toast.error(`Processing failed: ${errorMsg}`);
         setIsProcessing(false);
       }
     } catch (error) {
       console.error('Error processing reviews:', error);
-      toast.error('Error processing reviews: ' + (error as Error).message);
+      const errorMessage = (error as Error).message || 'Unknown error occurred';
+      setErrorDetails(errorMessage);
+      toast.error('Error processing reviews: ' + errorMessage);
       setIsProcessing(false);
     }
   };
@@ -95,6 +109,13 @@ export function ProcessReviews() {
               <div>Total:</div>
               <div>{stats.totalToProcess}</div>
             </div>
+          </div>
+        )}
+        
+        {errorDetails && (
+          <div className="mt-4 p-4 bg-red-50 border border-red-100 rounded-md">
+            <h3 className="font-medium text-red-800 mb-2">Error Details</h3>
+            <p className="text-sm text-red-700 whitespace-pre-wrap">{errorDetails}</p>
           </div>
         )}
       </CardContent>

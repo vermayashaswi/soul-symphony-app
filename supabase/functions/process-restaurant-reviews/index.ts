@@ -200,9 +200,55 @@ async function extractThemes(text: string): Promise<string[]> {
   }
 }
 
+// Verify table structure and required columns
+async function verifyTableStructure() {
+  try {
+    console.log('Verifying PoPs_Reviews table structure...');
+    
+    // Get the column definitions for PoPs_Reviews table
+    const { data: columns, error } = await supabase
+      .from('information_schema.columns')
+      .select('column_name')
+      .eq('table_name', 'PoPs_Reviews')
+      .eq('table_schema', 'public');
+    
+    if (error) {
+      console.error('Error fetching table structure:', error);
+      throw error;
+    }
+    
+    if (!columns || columns.length === 0) {
+      throw new Error('Table PoPs_Reviews not found or has no columns');
+    }
+    
+    // Extract column names
+    const columnNames = columns.map(col => col.column_name.toLowerCase());
+    console.log('Available columns:', columnNames);
+    
+    // Check for required columns (case-insensitive check)
+    const requiredColumns = ['rating', 'entities', 'themes'];
+    const missingColumns = requiredColumns.filter(col => 
+      !columnNames.includes(col.toLowerCase())
+    );
+    
+    if (missingColumns.length > 0) {
+      console.error('Missing required columns:', missingColumns);
+      throw new Error(`Table is missing required columns: ${missingColumns.join(', ')}`);
+    }
+    
+    return true;
+  } catch (error) {
+    console.error('Table structure verification failed:', error);
+    throw error;
+  }
+}
+
 // Process a batch of reviews
 async function processReviews(limit = 10, offset = 0): Promise<any> {
   try {
+    // First verify table structure
+    await verifyTableStructure();
+    
     // Fetch reviews that haven't been processed
     const { data: reviews, error } = await supabase
       .from('PoPs_Reviews')
@@ -281,6 +327,23 @@ serve(async (req) => {
     
     console.log(`Request received with limit: ${limit}, offset: ${offset}, processAll: ${processAll}`);
     
+    // First check if the required table structure exists
+    try {
+      await verifyTableStructure();
+    } catch (structureError) {
+      console.error('Table structure verification failed:', structureError);
+      return new Response(
+        JSON.stringify({
+          success: false,
+          error: `Table structure error: ${structureError.message}`
+        }),
+        {
+          status: 400,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+    
     if (processAll) {
       // Get total count of unprocessed reviews
       const { count, error: countError } = await supabase
@@ -289,6 +352,7 @@ serve(async (req) => {
         .is('Rating', null);
       
       if (countError) {
+        console.error('Error counting unprocessed reviews:', countError);
         throw countError;
       }
       
@@ -339,7 +403,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({
         success: false,
-        error: error.message
+        error: error.message || "Unknown error occurred"
       }),
       {
         status: 500,
