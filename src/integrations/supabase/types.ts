@@ -185,22 +185,31 @@ export type Database = {
       }
       PoPs_Reviews: {
         Row: {
+          entities: Json | null
           id: number
           Label: Json
+          Rating: number | null
           "Restaurant Name": string
           Reviews: string
+          Themes: string[] | null
         }
         Insert: {
+          entities?: Json | null
           id?: number
           Label: Json
+          Rating?: number | null
           "Restaurant Name": string
           Reviews: string
+          Themes?: string[] | null
         }
         Update: {
+          entities?: Json | null
           id?: number
           Label?: Json
+          Rating?: number | null
           "Restaurant Name"?: string
           Reviews?: string
+          Themes?: string[] | null
         }
         Relationships: []
       }
@@ -344,6 +353,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      check_table_columns: {
+        Args: { table_name: string }
+        Returns: {
+          column_name: string
+          data_type: string
+        }[]
+      }
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
         Returns: Json

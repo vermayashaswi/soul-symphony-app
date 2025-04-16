@@ -47,9 +47,9 @@ export function ProcessReviews() {
         return;
       }
       
-      // Get the columns information
+      // Get the columns information using the custom function we created
       const { data: columnsData, error: columnsError } = await supabase
-        .rpc('get_table_columns', { table_name: 'PoPs_Reviews' })
+        .rpc('check_table_columns', { table_name: 'PoPs_Reviews' })
         .select();
       
       if (columnsError) {
@@ -77,7 +77,7 @@ export function ProcessReviews() {
           sampleData: fallbackData
         });
       } else {
-        // Use the direct column information from RPC if available
+        // Use the direct column information from our custom function
         const columnNames = columnsData?.map(col => col.column_name) || [];
         setTableInfo({ 
           exists: true, 
@@ -100,27 +100,6 @@ export function ProcessReviews() {
       setErrorDetails(null);
       
       console.log(`Starting to process reviews: processAll=${processAll}`);
-      
-      // First, try to add the missing columns directly from the client side
-      if (tableInfo && tableInfo.exists && !tableInfo.columns.includes('Rating')) {
-        toast.info('Attempting to add missing Rating column...');
-        try {
-          // Try to add the Rating column if it doesn't exist
-          const { error: alterError } = await supabase.rpc('add_column_if_not_exists', { 
-            table_name: 'PoPs_Reviews', 
-            column_name: 'Rating', 
-            column_type: 'integer' 
-          });
-          
-          if (alterError) {
-            console.warn('Could not add Rating column:', alterError);
-          } else {
-            toast.success('Added Rating column');
-          }
-        } catch (e) {
-          console.warn('Error adding column:', e);
-        }
-      }
       
       // Invoke the edge function with debug mode
       const { data, error } = await supabase.functions.invoke('process-restaurant-reviews', {
