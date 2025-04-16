@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
-import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail, Calendar } from 'lucide-react';
+import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail, Calendar, TrendingUp } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -19,6 +19,8 @@ import SouloLogo from '@/components/SouloLogo';
 import Footer from '@/components/website/Footer';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
+import EmotionBubblesDemo from '@/components/website/EmotionBubblesDemo';
+import SentimentChartDemo from '@/components/website/SentimentChartDemo';
 
 const PhoneVoiceAnimation = () => {
   const [animationStage, setAnimationStage] = useState(0);
@@ -173,30 +175,67 @@ const PhoneVoiceAnimation = () => {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col"
               >
-                <h3 className="text-white text-center mb-4 text-sm">Your Journal Insights</h3>
+                <h3 className="text-white text-center mb-3 text-sm">Your Journal Insights</h3>
+                
+                {/* Enhanced Insights with Visualizations */}
                 <div className="space-y-3">
-                  {insights.map((insight, index) => (
-                    <motion.div
-                      key={index}
-                      initial={{ opacity: 0, x: -20 }}
-                      animate={{ opacity: 1, x: 0 }}
-                      transition={{ delay: index * 0.3 }}
-                      className="bg-gray-800/80 p-3 rounded-lg border border-gray-700"
-                    >
-                      <div className="flex gap-2">
-                        <div className="min-w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
-                          <LineChart className="h-3 w-3 text-primary" />
-                        </div>
-                        <p className="text-white text-xs">{insight}</p>
+                  {/* Emotions Visualization */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.1 }}
+                    className="bg-gray-800/80 p-3 rounded-lg border border-gray-700"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="min-w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                        <LineChart className="h-3 w-3 text-primary" />
                       </div>
-                    </motion.div>
-                  ))}
+                      <p className="text-white text-xs">Emotional patterns</p>
+                    </div>
+                    <div className="h-[60px] mt-2">
+                      <EmotionBubblesDemo />
+                    </div>
+                  </motion.div>
+                  
+                  {/* Sentiment Chart */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.3 }}
+                    className="bg-gray-800/80 p-3 rounded-lg border border-gray-700"
+                  >
+                    <div className="flex items-center gap-2 mb-1">
+                      <div className="min-w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                        <TrendingUp className="h-3 w-3 text-primary" />
+                      </div>
+                      <p className="text-white text-xs">Sentiment trending up</p>
+                    </div>
+                    <div className="h-[60px] mt-1">
+                      <SentimentChartDemo />
+                    </div>
+                  </motion.div>
+                  
+                  {/* Text Insight */}
+                  <motion.div
+                    initial={{ opacity: 0, y: 10 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    transition={{ delay: 0.5 }}
+                    className="bg-gray-800/80 p-3 rounded-lg border border-gray-700"
+                  >
+                    <div className="flex gap-2">
+                      <div className="min-w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
+                        <LineChart className="h-3 w-3 text-primary" />
+                      </div>
+                      <p className="text-white text-xs">Sleep pattern improving since last week</p>
+                    </div>
+                  </motion.div>
                 </div>
+                
                 <motion.div 
                   className="mt-auto mb-4 w-full bg-primary/20 p-3 rounded-lg flex items-center justify-between"
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
-                  transition={{ delay: 1.2 }}
+                  transition={{ delay: 0.8 }}
                 >
                   <p className="text-primary text-xs">View full analysis</p>
                   <ArrowRight className="h-4 w-4 text-primary" />
