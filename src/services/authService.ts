@@ -1,13 +1,11 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { isAppSubdomain } from '@/routes/RouteHelpers';
+import { isAppRoute } from '@/routes/RouteHelpers';
 
 /**
  * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  const isOnAppSubdomain = isAppSubdomain();
-  
   // For iOS in standalone mode (PWA), we need to handle redirects differently
   // Check for standalone mode in a type-safe way
   const isInStandaloneMode = () => {
@@ -21,14 +19,8 @@ export const getRedirectUrl = (): string => {
     return standaloneCheck || iosSafariStandalone;
   };
   
-  // Enforce app.soulo.online domain as the redirect
-  if (isOnAppSubdomain) {
-    // We're on the correct domain
-    return `${window.location.origin}/auth`;
-  } else {
-    // We're on the wrong domain, redirect to app subdomain
-    return 'https://app.soulo.online/auth';
-  }
+  // All auth redirects should go to /app/auth
+  return `${window.location.origin}/app/auth`;
 };
 
 /**

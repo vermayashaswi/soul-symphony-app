@@ -18,88 +18,47 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import { isAppSubdomain, getBaseUrl } from './RouteHelpers';
 
 const AppRoutes = () => {
-  // Detect if we're on the app subdomain
-  const isOnAppSubdomain = isAppSubdomain();
-  
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* App subdomain routes - handle differently */}
-        {isOnAppSubdomain ? (
-          <>
-            {/* Root of app subdomain */}
-            <Route path="/" element={<OnboardingScreen />} />
-            <Route path="/onboarding" element={<OnboardingScreen />} />
-            <Route path="/auth" element={<Auth />} />
-            
-            {/* Protected app routes */}
-            <Route element={<ProtectedRoute />}>
-              <Route path="/home" element={<Home />} />
-              <Route path="/journal" element={<Journal />} />
-              <Route path="/insights" element={<Insights />} />
-              <Route path="/chat" element={<Chat />} />
-              <Route path="/smart-chat" element={<SmartChat />} />
-              <Route path="/settings" element={<Settings />} />
-            </Route>
-
-            {/* Handle any /app prefixes - redirect to clean paths */}
-            <Route path="/app" element={<Navigate to="/" replace />} />
-            <Route path="/app/*" element={<Navigate to="/" replace />} />
-            
-            {/* Handle malformed paths with URLs in them */}
-            <Route path="*/https://*" element={<Navigate to="/" replace />} />
-            <Route path="https://*" element={<Navigate to="/" replace />} />
-            <Route path="*soulo.online*" element={<Navigate to="/" replace />} />
-            <Route path="*app.soulo.online*" element={<Navigate to="/" replace />} />
-            
-            {/* Content routes on app subdomain */}
-            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-            <Route path="/blog" element={<BlogPage />} />
-            <Route path="/blog/:slug" element={<BlogPostPage />} />
-            <Route path="/faq" element={<FAQPage />} />
-            <Route path="/app-download" element={<AppDownload />} />
-          </>
-        ) : (
-          <>
-            {/* Main website routes */}
-            <Route path="/" element={<Index />} />
-            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-            <Route path="/faq" element={<FAQPage />} />
-            <Route path="/download" element={<AppDownload />} />
-            <Route path="/blog" element={<BlogPage />} />
-            <Route path="/blog/:slug" element={<BlogPostPage />} />
-            
-            {/* App route redirects with loading indicators */}
-            <Route path="/app" element={
-              <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-              </div>
-            } />
-            
-            <Route path="/app/*" element={
-              <div className="min-h-screen flex items-center justify-center">
-                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-              </div>
-            } />
-            
-            {/* Redirect legacy app routes to app subdomain */}
-            <Route path="/auth" element={<Navigate to="https://app.soulo.online/auth" replace />} />
-            <Route path="/onboarding" element={<Navigate to="https://app.soulo.online/onboarding" replace />} />
-            <Route path="/home" element={<Navigate to="https://app.soulo.online/home" replace />} />
-            <Route path="/journal" element={<Navigate to="https://app.soulo.online/journal" replace />} />
-            <Route path="/insights" element={<Navigate to="https://app.soulo.online/insights" replace />} />
-            <Route path="/chat" element={<Navigate to="https://app.soulo.online/chat" replace />} />
-            <Route path="/smart-chat" element={<Navigate to="https://app.soulo.online/smart-chat" replace />} />
-            <Route path="/settings" element={<Navigate to="https://app.soulo.online/settings" replace />} />
-          </>
-        )}
+        {/* Website Routes */}
+        <Route path="/" element={<Index />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/faq" element={<FAQPage />} />
+        <Route path="/download" element={<AppDownload />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
+        
+        {/* App Routes */}
+        <Route path="/app" element={<OnboardingScreen />} />
+        <Route path="/app/onboarding" element={<OnboardingScreen />} />
+        <Route path="/app/auth" element={<Auth />} />
+        
+        {/* Protected App Routes */}
+        <Route path="/app" element={<ProtectedRoute />}>
+          <Route path="home" element={<Home />} />
+          <Route path="journal" element={<Journal />} />
+          <Route path="insights" element={<Insights />} />
+          <Route path="chat" element={<Chat />} />
+          <Route path="smart-chat" element={<SmartChat />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+        
+        {/* Legacy Route Redirects */}
+        <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
+        <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
+        <Route path="/home" element={<Navigate to="/app/home" replace />} />
+        <Route path="/journal" element={<Navigate to="/app/journal" replace />} />
+        <Route path="/insights" element={<Navigate to="/app/insights" replace />} />
+        <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
+        <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
+        <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
         
         {/* Catch-all route */}
-        <Route path="*" element={<NotFound isAppSubdomain={isOnAppSubdomain} />} />
+        <Route path="*" element={<NotFound />} />
       </Route>
     </Routes>
   );

@@ -4,28 +4,28 @@ import { Link, useLocation } from "react-router-dom";
 import { ArrowLeft } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import Navbar from "@/components/Navbar";
-import { isAppSubdomain } from "@/routes/RouteHelpers";
+import { isAppRoute } from "@/routes/RouteHelpers";
 
 interface NotFoundProps {
   isAppSubdomain?: boolean;
 }
 
-const NotFound = ({ isAppSubdomain: isAppDomain }: NotFoundProps) => {
+const NotFound = ({ isAppSubdomain }: NotFoundProps = {}) => {
   const location = useLocation();
-  // If isAppDomain was not passed directly, check again here
-  const isAppMode = isAppDomain !== undefined ? isAppDomain : isAppSubdomain();
+  // Check if it's an app route
+  const isAppPath = isAppRoute(location.pathname);
 
   useEffect(() => {
     console.error(
       "404 Error: User attempted to access non-existent route:",
       location.pathname,
-      { isAppMode }
+      { isAppPath }
     );
-  }, [location.pathname, isAppMode]);
+  }, [location.pathname, isAppPath]);
 
-  // Determine the correct "back to home" path based on domain
-  const homePath = isAppMode ? "/home" : "/";
-  const homeText = isAppMode ? "App Home" : "Home";
+  // Determine the correct "back to home" path based on path
+  const homePath = isAppPath ? "/app/home" : "/";
+  const homeText = isAppPath ? "App Home" : "Home";
 
   return (
     <div className="min-h-screen">
@@ -51,15 +51,15 @@ const NotFound = ({ isAppSubdomain: isAppDomain }: NotFoundProps) => {
             </Link>
           </Button>
           
-          {isAppMode && (
+          {isAppPath && (
             <div className="mt-4 text-sm text-muted-foreground">
-              <p>Looking for the main website? Visit <a href="https://soulo.online" className="text-primary hover:underline">soulo.online</a></p>
+              <p>Looking for the main website? Visit <Link to="/" className="text-primary hover:underline">soulo.online</Link></p>
             </div>
           )}
           
-          {!isAppMode && (
+          {!isAppPath && (
             <div className="mt-4 text-sm text-muted-foreground">
-              <p>Looking for the app? Visit <a href="https://app.soulo.online" className="text-primary hover:underline">app.soulo.online</a></p>
+              <p>Looking for the app? Visit <Link to="/app" className="text-primary hover:underline">soulo.online/app</Link></p>
             </div>
           )}
         </div>

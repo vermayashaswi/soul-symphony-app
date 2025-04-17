@@ -7,7 +7,6 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
 import { signInWithGoogle } from '@/services/authService';
-import { isAppSubdomain } from '@/routes/RouteHelpers';
 
 export default function Auth() {
   const location = useLocation();
@@ -21,17 +20,11 @@ export default function Auth() {
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
-  const isOnAppSubdomain = isAppSubdomain();
   
   // No more need to manipulate paths - just use them directly
   const getValidRedirectPath = (path: string | null) => {
     if (!path) {
-      return '/home';
-    }
-    
-    // Remove /app prefix if present 
-    if (path.startsWith('/app/')) {
-      return path.replace('/app/', '/');
+      return '/app/home';
     }
     
     return path;
@@ -47,7 +40,6 @@ export default function Auth() {
     storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    isOnAppSubdomain
   });
 
   useEffect(() => {
