@@ -42,7 +42,10 @@ export async function transcribeAudioWithWhisper(
     const formData = new FormData();
     formData.append('file', audioBlob, filename);
     formData.append('model', 'gpt-4o-transcribe');  // Using full gpt-4o-transcribe model
-    formData.append('language', language);
+    // Important: Don't set language to 'auto', remove it if it's 'auto'
+    if (language !== 'auto') {
+      formData.append('language', language);
+    }
     formData.append('response_format', 'json');
     formData.append('prompt', 'The following is a journal entry or conversation that may contain personal thoughts, feelings, or experiences.');
     
@@ -212,7 +215,7 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
     const languageList = detectedLanguages.join(', ');
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
+      method: 'POST',
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${apiKey}`

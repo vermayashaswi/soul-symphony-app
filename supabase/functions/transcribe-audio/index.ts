@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -166,11 +165,12 @@ serve(async (req) => {
       console.log("Sending audio to OpenAI API for transcription");
       console.log("Using model: gpt-4o-transcribe");
       
+      // Important: Use 'en' as default language instead of 'auto'
       const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(
         blob, 
         detectedFileType, 
         openAIApiKey, 
-        'auto'  // Let the model detect the language automatically
+        'en'  // Use 'en' as a fallback instead of 'auto'
       );
       
       console.log("Transcription successful:", transcribedText ? "yes" : "no");
