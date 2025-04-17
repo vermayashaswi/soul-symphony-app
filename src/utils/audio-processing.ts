@@ -492,3 +492,24 @@ export function getDeletedEntryIds(): {
     entryIds: new Set(deletedEntryIds)
   };
 }
+
+// Add a debug publisher function to help track voice recording process
+export function publishDebugEvent(category: string, action: string, details: string) {
+  try {
+    // Create and dispatch a custom event for debugging
+    const event = new CustomEvent('voiceRecorderDebug', {
+      detail: {
+        category,
+        action,
+        details,
+        timestamp: Date.now()
+      }
+    });
+    
+    window.dispatchEvent(event);
+    console.log(`[Debug] ${category}: ${action} - ${details}`);
+  } catch (error) {
+    // Fail silently
+    console.error('Error publishing debug event:', error);
+  }
+}
