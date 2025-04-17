@@ -27,7 +27,7 @@ export async function sendAudioForTranscription(
 
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
-    console.log('[TranscriptionService] Using transcription model: gpt-4o-mini-transcribe');
+    console.log('[TranscriptionService] Using transcription model: gpt-4o-transcribe');
     
     // Add more diagnostic info about the audio data being sent
     console.log('[TranscriptionService] Audio data sample (first 100 chars):', base64Audio.substring(0, 100));
@@ -65,9 +65,9 @@ export async function sendAudioForTranscription(
         audio: cleanBase64,
         userId: userId || null,
         directTranscription: directTranscription,
-        highQuality: false, // Set to false for mini model
+        highQuality: true, // Set to true for full model
         recordingTime: estimatedDuration,
-        modelName: 'gpt-4o-mini-transcribe',
+        modelName: 'gpt-4o-transcribe',
         format: 'wav', // Tell the server we're sending WAV format
         audioConfig: {
           sampleRate: 44100,
@@ -112,7 +112,8 @@ export async function sendAudioForTranscription(
       hasEntryId: !!response.data?.entryId,
       entryId: response.data?.entryId || 'none',
       audioUrl: response.data?.audioUrl ? 'exists' : 'none',
-      model: 'gpt-4o-mini-transcribe',
+      model: 'gpt-4o-transcribe',
+      detectedLanguages: response.data?.detectedLanguages || 'none',
       responseData: JSON.stringify(response.data).substring(0, 200) + '...' // Log a sample of the response
     });
 

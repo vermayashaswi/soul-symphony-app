@@ -7,9 +7,7 @@ import {
   generateEmbedding, 
   analyzeEmotions, 
   transcribeAudioWithWhisper,
-  translateAndRefineText,
-  detectLanguageFromAudio,
-  detectLanguages
+  translateAndRefineText
 } from "./aiProcessing.ts";
 import { analyzeWithGoogleNL } from "./nlProcessing.ts";
 import { 
@@ -103,7 +101,7 @@ serve(async (req) => {
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
     console.log("High quality mode:", highQuality ? "YES" : "NO");
     console.log("Audio data length:", audio.length);
-    console.log("Using model: gpt-4o-mini-transcribe");
+    console.log("Using model: gpt-4o-transcribe");
     
     // Process audio data in a try-catch block to handle any processing errors
     let binaryAudio;
@@ -164,16 +162,19 @@ serve(async (req) => {
     });
     
     try {
-      // First detect primary language from audio
-      console.log("Detecting primary language from audio sample...");
-      const primaryLanguage = await detectLanguageFromAudio(blob, openAIApiKey);
-      console.log("Primary language detected:", primaryLanguage);
+      // Transcribe audio with the new model that provides language detection
+      console.log("Sending audio to OpenAI API for transcription");
+      console.log("Using model: gpt-4o-transcribe");
       
-      // Transcribe audio file with detected language
-      console.log("Sending audio to OpenAI API for transcription with language:", primaryLanguage);
-      console.log("Using model: gpt-4o-mini-transcribe");
-      const transcribedText = await transcribeAudioWithWhisper(blob, detectedFileType, openAIApiKey, primaryLanguage);
+      const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(
+        blob, 
+        detectedFileType, 
+        openAIApiKey, 
+        'auto'  // Let the model detect the language automatically
+      );
+      
       console.log("Transcription successful:", transcribedText ? "yes" : "no");
+      console.log("Detected languages:", detectedLanguages);
       
       if (!transcribedText) {
         throw new Error('Failed to get transcription from OpenAI API');
@@ -181,13 +182,11 @@ serve(async (req) => {
 
       // If direct transcription mode, return just the transcription
       if (directTranscription) {
-        return createSuccessResponse({ transcription: transcribedText });
+        return createSuccessResponse({ 
+          transcription: transcribedText,
+          detectedLanguages
+        });
       }
-
-      // Detect languages in the transcribed text for better refinement
-      console.log("Detecting languages in transcribed text...");
-      const detectedLanguages = await detectLanguages(transcribedText, openAIApiKey);
-      console.log("Languages detected in transcription:", detectedLanguages);
       
       // Process with GPT for translation and refinement with detected languages
       console.log("Processing transcription with GPT for refinement...");

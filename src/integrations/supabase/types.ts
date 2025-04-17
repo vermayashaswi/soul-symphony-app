@@ -414,13 +414,13 @@ export type Database = {
       }
       match_journal_entries: {
         Args:
+          | Record<PropertyKey, never>
           | {
               query_embedding: string
               match_threshold: number
               match_count: number
               user_id_filter: string
             }
-          | Record<PropertyKey, never>
         Returns: {
           id: number
           content: string

@@ -4,14 +4,13 @@ export async function transcribeAudioWithWhisper(
   fileExtension: string,
   apiKey: string,
   language: string = 'en'
-): Promise<string> {
+): Promise<{ text: string, detectedLanguages: string[] }> {
   try {
     // Log incoming audio details for debugging
     console.log('[Transcription] Preparing audio for OpenAI:', {
       blobSize: audioBlob.size,
       blobType: audioBlob.type,
-      fileExtension,
-      language
+      fileExtension
     });
     
     // Ensure we have a valid API key
@@ -42,7 +41,7 @@ export async function transcribeAudioWithWhisper(
     
     const formData = new FormData();
     formData.append('file', audioBlob, filename);
-    formData.append('model', 'gpt-4o-mini-transcribe');  // Using gpt-4o-mini-transcribe model
+    formData.append('model', 'gpt-4o-transcribe');  // Using full gpt-4o-transcribe model
     formData.append('language', language);
     formData.append('response_format', 'json');
     formData.append('prompt', 'The following is a journal entry or conversation that may contain personal thoughts, feelings, or experiences.');
@@ -51,9 +50,8 @@ export async function transcribeAudioWithWhisper(
       fileSize: audioBlob.size,
       fileType: audioBlob.type,
       fileExtension,
-      language,
       hasApiKey: !!apiKey,
-      model: 'gpt-4o-mini-transcribe'
+      model: 'gpt-4o-transcribe'
     });
     
     // Add timeout to prevent hanging requests
@@ -78,7 +76,7 @@ export async function transcribeAudioWithWhisper(
         throw new Error(`Transcription API error: ${response.status} - ${errorText}`);
       }
       
-      // Note: gpt-4o-mini-transcribe only supports json or text response formats
+      // Parse the JSON response from the gpt-4o-transcribe model
       const result = await response.json();
       
       if (!result.text) {
@@ -89,10 +87,17 @@ export async function transcribeAudioWithWhisper(
       console.log('[Transcription] Success:', {
         textLength: result.text.length,
         sampleText: result.text.substring(0, 100) + '...',
-        model: 'gpt-4o-mini-transcribe'
+        model: 'gpt-4o-transcribe',
+        detectedLanguage: result.language || 'unknown',
       });
       
-      return result.text;
+      // Extract detected languages from the response
+      const detectedLanguages = result.language ? [result.language] : ['en'];
+      
+      return {
+        text: result.text,
+        detectedLanguages
+      };
     } catch (fetchError) {
       clearTimeout(timeoutId);
       if (fetchError.name === 'AbortError') {
@@ -106,7 +111,6 @@ export async function transcribeAudioWithWhisper(
   }
 }
 
-// Add these exported functions that were referenced but missing
 export async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
   try {
     console.log("[AI] Generating embedding for text:", text.substring(0, 100) + "...");
@@ -205,16 +209,7 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
       return { refinedText: text };
     }
     
-    // Skip if the text is already in English and relatively short
-    if (detectedLanguages.length === 1 && detectedLanguages[0] === 'en' && text.length < 2000) {
-      console.log("[AI] Text already in English and relatively short, minimal refinement");
-      return { refinedText: text };
-    }
-    
-    const isMainlyEnglish = detectedLanguages[0] === 'en';
-    const prompt = isMainlyEnglish 
-      ? `Refine this journal entry to fix any grammar or spelling errors, but preserve the meaning, tone, and style:`
-      : `Translate this journal entry to English, while preserving the original meaning, tone, and style:`;
+    const languageList = detectedLanguages.join(', ');
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -227,13 +222,13 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant that ${isMainlyEnglish ? 'refines' : 'translates'} journal entries.
-            Your task is to ${isMainlyEnglish ? 'correct any grammar or spelling mistakes while preserving the original meaning, tone, and style' : 'translate the text to English while preserving the original meaning, tone, and style'}.
-            Do not add or remove information. Do not summarize. Keep the same level of detail.`
+            content: `You are a helpful assistant that translates journal entries for a voice journaling app called SOuLO where users record their entries in multiple languages at once. Your task is to correct any grammar or spelling mistakes while preserving the original meaning, tone, and style. Preserve the original meaning, local context, colloquial usage of terms and do not add or remove information. Do not summarize. Keep the same level of details as in the original.
+
+Here are the detected languages being used in this transcription text: ${languageList}`
           },
           {
             role: "user",
-            content: prompt + "\n\n" + text
+            content: text
           }
         ],
         temperature: 0.3
@@ -260,105 +255,4 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
   }
 }
 
-export async function detectLanguageFromAudio(audioBlob: Blob, apiKey: string): Promise<string> {
-  try {
-    // For small audio files, we'll just use 'en' as default to save API calls
-    if (audioBlob.size < 100000) { // Less than 100KB
-      console.log("[AI] Audio file too small, assuming English");
-      return 'en';
-    }
-    
-    // Sample the first few seconds for language detection
-    const formData = new FormData();
-    formData.append('file', audioBlob.slice(0, Math.min(500000, audioBlob.size)), 'audio.webm');
-    formData.append('model', 'gpt-4o-mini-transcribe');
-    formData.append('prompt', 'Identify the language being spoken');
-    formData.append('response_format', 'json');
-    
-    console.log('[AI] Detecting language from audio...');
-    
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: formData
-    });
-    
-    if (!response.ok) {
-      console.error('[AI] Language detection error, defaulting to English');
-      return 'en';
-    }
-    
-    const result = await response.json();
-    
-    // If no result or very short sample, default to English
-    if (!result.text || result.text.length < 5) {
-      console.log('[AI] Insufficient audio for language detection, defaulting to English');
-      return 'en';
-    }
-    
-    // Use the detected text to determine language
-    return await detectLanguages(result.text, apiKey);
-  } catch (error) {
-    console.error('[AI] Error in detectLanguageFromAudio:', error);
-    return 'en'; // Default to English on error
-  }
-}
-
-export async function detectLanguages(text: string, apiKey: string): Promise<string> {
-  try {
-    // For very short text, assume English to save API calls
-    if (text.length < 10) {
-      return 'en';
-    }
-    
-    console.log("[AI] Detecting language from text:", text.substring(0, 50) + "...");
-    
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a language detection specialist. 
-            Analyze the text and determine the primary language used. 
-            Respond with just the ISO 639-1 language code (e.g., 'en' for English, 'es' for Spanish).
-            If multiple languages are present, return only the predominant language code.`
-          },
-          {
-            role: "user",
-            content: text.substring(0, 1000) // Use only first 1000 chars for detection
-          }
-        ],
-        temperature: 0.2,
-        max_tokens: 10
-      })
-    });
-    
-    if (!response.ok) {
-      console.error("[AI] Language detection error, defaulting to English");
-      return 'en';
-    }
-    
-    const result = await response.json();
-    const langCode = result.choices[0].message.content.trim().toLowerCase();
-    
-    // Basic validation of language code format
-    if (langCode.length !== 2 || !/^[a-z]{2}$/.test(langCode)) {
-      console.log("[AI] Invalid language code detected, defaulting to English:", langCode);
-      return 'en';
-    }
-    
-    console.log("[AI] Language detected:", langCode);
-    return langCode;
-  } catch (error) {
-    console.error("[AI] Error in detectLanguages:", error);
-    return 'en'; // Default to English on error
-  }
-}
+// Remove other language detection functions
