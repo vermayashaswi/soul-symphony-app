@@ -78,6 +78,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   // Skip specific routes where nav doesn't make sense
   const hiddenRoutes = ['/app/auth', '/app/onboarding'];
+  
+  // Also hide on the main /app route if onboarding is not complete
+  if (!onboardingComplete && location.pathname === '/app') {
+    return null;
+  }
+  
   if (hiddenRoutes.includes(location.pathname)) {
     return null;
   }

@@ -1,29 +1,31 @@
 
-import React, { useEffect } from 'react';
-import { Outlet } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Outlet, useLocation } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
+import MobileNavigation from '@/components/MobileNavigation';
+import { isAppRoute } from './RouteHelpers';
+import { useOnboarding } from '@/hooks/use-onboarding';
 
 const ViewportManager: React.FC = () => {
-  useEffect(() => {
-    // Set viewport meta tag for better mobile compatibility
-    const viewportMeta = document.querySelector('meta[name="viewport"]');
-    
-    if (viewportMeta) {
-      console.log('Updating existing viewport meta tag');
-      viewportMeta.setAttribute(
-        'content',
-        'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover'
-      );
-    } else {
-      console.log('Creating new viewport meta tag');
-      const newViewportMeta = document.createElement('meta');
-      newViewportMeta.name = 'viewport';
-      newViewportMeta.content = 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no, viewport-fit=cover';
-      document.head.appendChild(newViewportMeta);
-    }
-  }, []);
-
-  // Use Outlet to render child routes
-  return <Outlet />;
+  const location = useLocation();
+  const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const { onboardingComplete } = useOnboarding();
+  
+  // Render the appropriate layout based on route and device
+  return (
+    <>
+      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'}`}>
+        <Outlet />
+      </div>
+      
+      {/* Display mobile navigation when appropriate */}
+      {isAppRoute(location.pathname) && (
+        <MobileNavigation onboardingComplete={onboardingComplete} />
+      )}
+    </>
+  );
 };
 
 export default ViewportManager;
