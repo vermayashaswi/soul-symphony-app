@@ -6,8 +6,30 @@ export async function transcribeAudioWithWhisper(
   language: string = 'en'
 ): Promise<string> {
   try {
+    // Log incoming audio details for debugging
+    console.log('[Transcription] Preparing audio for OpenAI:', {
+      blobSize: audioBlob.size,
+      blobType: audioBlob.type,
+      fileExtension,
+      language
+    });
+    
+    // Ensure we have a valid API key
+    if (!apiKey) {
+      throw new Error('Missing OpenAI API key');
+    }
+    
+    // Ensure the audio blob is valid
+    if (!audioBlob || audioBlob.size === 0) {
+      throw new Error('Empty or invalid audio data');
+    }
+    
+    // Create a proper filename with extension
+    const filename = `audio.${fileExtension}`;
+    console.log(`[Transcription] Using filename: ${filename}`);
+    
     const formData = new FormData();
-    formData.append('file', audioBlob, `audio.${fileExtension}`);
+    formData.append('file', audioBlob, filename);
     formData.append('model', 'gpt-4o-mini-transcribe');  // Using gpt-4o-mini-transcribe model
     formData.append('language', language);
     formData.append('response_format', 'json');
@@ -22,35 +44,50 @@ export async function transcribeAudioWithWhisper(
       model: 'gpt-4o-mini-transcribe'
     });
     
-    const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`
-      },
-      body: formData
-    });
+    // Add timeout to prevent hanging requests
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 60000); // 60 second timeout
     
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[Transcription] API error:', errorText);
-      throw new Error(`Transcription API error: ${response.status} - ${errorText}`);
+    try {
+      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`
+        },
+        body: formData,
+        signal: controller.signal
+      });
+      
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error('[Transcription] API error:', errorText);
+        throw new Error(`Transcription API error: ${response.status} - ${errorText}`);
+      }
+      
+      // Note: gpt-4o-mini-transcribe only supports json or text response formats
+      const result = await response.json();
+      
+      if (!result.text) {
+        console.error('[Transcription] No text in response:', result);
+        throw new Error('No transcription text returned from API');
+      }
+      
+      console.log('[Transcription] Success:', {
+        textLength: result.text.length,
+        sampleText: result.text.substring(0, 100) + '...',
+        model: 'gpt-4o-mini-transcribe'
+      });
+      
+      return result.text;
+    } catch (fetchError) {
+      clearTimeout(timeoutId);
+      if (fetchError.name === 'AbortError') {
+        throw new Error('Transcription request timed out after 60 seconds');
+      }
+      throw fetchError;
     }
-    
-    // Note: gpt-4o-mini-transcribe only supports json or text response formats
-    const result = await response.json();
-    
-    if (!result.text) {
-      console.error('[Transcription] No text in response:', result);
-      throw new Error('No transcription text returned from API');
-    }
-    
-    console.log('[Transcription] Success:', {
-      textLength: result.text.length,
-      sampleText: result.text.substring(0, 100) + '...',
-      model: 'gpt-4o-mini-transcribe'
-    });
-    
-    return result.text;
   } catch (error) {
     console.error('[Transcription] Error in transcribeAudioWithWhisper:', error);
     throw error;

@@ -39,6 +39,11 @@ export async function sendAudioForTranscription(
       cleanBase64 = cleanBase64.split(',')[1];
     }
     
+    // Validate base64 string
+    if (!cleanBase64 || cleanBase64.length < 50) {
+      throw new Error('Invalid audio data: Base64 string is too short');
+    }
+    
     // Call the Supabase edge function with the properly formatted body
     console.log('[TranscriptionService] Invoking transcribe-audio edge function');
     const response = await supabase.functions.invoke('transcribe-audio', {
@@ -123,6 +128,11 @@ export async function transcribeAudioBlob(
       hasDuration: 'duration' in audioBlob,
       duration: (audioBlob as any).duration || 'unknown'
     });
+    
+    // Basic validation of the audio blob
+    if (!audioBlob || audioBlob.size < 100) {
+      throw new Error('Audio blob is empty or too small to be valid');
+    }
     
     // Convert blob to base64
     const base64Audio = await blobToBase64(audioBlob);

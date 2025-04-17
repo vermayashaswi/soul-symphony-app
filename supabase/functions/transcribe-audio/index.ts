@@ -2,7 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
-import { processBase64Chunks, detectFileType } from "./audioProcessing.ts";
+import { processBase64Chunks, detectFileType, isValidAudioData } from "./audioProcessing.ts";
 import { 
   generateEmbedding, 
   analyzeEmotions, 
@@ -114,6 +114,11 @@ serve(async (req) => {
       if (binaryAudio.length === 0) {
         throw new Error('Failed to process audio data - empty result');
       }
+      
+      // Validate audio data quality
+      if (!isValidAudioData(binaryAudio)) {
+        throw new Error('Audio data appears corrupted or invalid');
+      }
     } catch (processingError) {
       console.error("Error processing audio data:", processingError);
       throw new Error(`Failed to process audio data: ${processingError.message}`);
@@ -149,8 +154,14 @@ serve(async (req) => {
     let mimeType = 'audio/webm';
     if (detectedFileType === 'mp4') mimeType = 'audio/mp4';
     if (detectedFileType === 'wav') mimeType = 'audio/wav';
+    if (detectedFileType === 'ogg') mimeType = 'audio/ogg';
     
     const blob = new Blob([binaryAudio], { type: mimeType });
+    console.log("Created blob for transcription:", {
+      size: blob.size,
+      type: blob.type,
+      detectedFileType
+    });
     
     try {
       // First detect primary language from audio
@@ -287,8 +298,10 @@ serve(async (req) => {
               if (!entryData?.entities) {
                 console.log("Calling batch-extract-entities for entry:", entryId);
                 
-                // The full URL needs to have the protocol (https://) included
-                const functionUrl = `https://${supabaseUrl.replace('https://', '')}/functions/v1/batch-extract-entities`;
+                // Construct the full URL carefully, ensuring correct formatting
+                const baseUrl = supabaseUrl.replace(/^https:\/\//, '');
+                const functionUrl = `https://${baseUrl}/functions/v1/batch-extract-entities`;
+                
                 console.log("Calling function URL:", functionUrl);
                 
                 const response = await fetch(functionUrl, {
@@ -309,6 +322,7 @@ serve(async (req) => {
                   console.error("Error calling batch-extract-entities:", responseText);
                   console.error("Status:", response.status);
                   console.error("Status Text:", response.statusText);
+                  throw new Error(`Failed to call batch-extract-entities: ${response.status} - ${responseText}`);
                 } else {
                   const result = await response.json();
                   console.log("batch-extract-entities result:", result);

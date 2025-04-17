@@ -42,9 +42,9 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
               echoCancellation: true,
               noiseSuppression: true,
               autoGainControl: true,
-              sampleRate: 48000, // Reduced sample rate for better compatibility
-              sampleSize: 16,    // Reduced to 16 bits for better compatibility
-              channelCount: 1,   // Mono for simpler processing
+              sampleRate: 44100, // Standard sample rate for better compatibility
+              sampleSize: 16,    // Standard bit depth for better compatibility
+              channelCount: 1,   // Mono for simpler processing and compatibility
             } 
           });
           
@@ -52,12 +52,12 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           
           const options = {
             type: 'audio',
-            mimeType: 'audio/wav', // WAV format for better compatibility
+            mimeType: 'audio/wav', // WAV format for better compatibility with OpenAI
             recorderType: StereoAudioRecorder,
-            numberOfAudioChannels: 1, // Mono for simpler processing
-            desiredSampRate: 48000,   // Reduced sample rate
+            numberOfAudioChannels: 1, // Mono for simplicity and compatibility
+            desiredSampRate: 44100,   // Standard sample rate
             checkForInactiveTracks: true,
-            timeSlice: 50, // Record in smaller chunks for real-time processing
+            timeSlice: 1000, // Record in 1-second chunks for better stability
             audioBitsPerSecond: 128000, // Lower bitrate for smaller files
           };
           
@@ -107,6 +107,11 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
             type: blob.type,
             duration: (blob as any).duration || 'unknown'
           });
+          
+          // Verify the blob is valid
+          if (blob.size < 100) {
+            throw new Error("Recording produced an empty or invalid audio file");
+          }
           
           // Add duration property to blob if missing
           if (!('duration' in blob)) {

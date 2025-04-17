@@ -54,6 +54,12 @@ export function processBase64Chunks(base64String: string): Uint8Array {
     }
     
     console.log(`Processed ${chunks.length} chunks into a ${totalLength} byte array`);
+    
+    // Verify the processed data is not empty
+    if (totalLength === 0) {
+      throw new Error('Processed audio data is empty');
+    }
+    
     return result;
   } catch (error) {
     console.error('Error processing base64 chunks:', error);
@@ -75,9 +81,15 @@ export function detectFileType(binaryData: Uint8Array): string {
       wav: [0x52, 0x49, 0x46, 0x46] // WAV ("RIFF")
     };
     
+    // Log first few bytes for debugging
+    const first8Bytes = Array.from(binaryData.slice(0, 8))
+      .map(b => b.toString(16).padStart(2, '0'))
+      .join(' ');
+    console.log('First 8 bytes of audio data:', first8Bytes);
+    
     // Check for MP4 signature (special case, offset 4)
     if (binaryData.length > 8) {
-      const possibleMp4 = true;
+      let possibleMp4 = true;
       for (let i = 0; i < signatures.mp4.length; i++) {
         if (binaryData[i + 4] !== signatures.mp4[i]) {
           possibleMp4 = false;
@@ -122,11 +134,72 @@ export function detectFileType(binaryData: Uint8Array): string {
       if (matchesMp3) return 'mp3';
     }
     
-    // Default to webm if we can't detect the type
-    console.log('Could not detect audio file type, defaulting to webm');
-    return 'webm';
+    // If format detection fails, try to find "OggS" anywhere in the data (for Ogg files)
+    const ogg = [0x4F, 0x67, 0x67, 0x53]; // "OggS"
+    for (let i = 0; i < Math.min(binaryData.length - 4, 100); i++) { // Check only first 100 bytes
+      let matchesOgg = true;
+      for (let j = 0; j < ogg.length; j++) {
+        if (binaryData[i + j] !== ogg[j]) {
+          matchesOgg = false;
+          break;
+        }
+      }
+      if (matchesOgg) return 'ogg';
+    }
+    
+    // Default to wav if we can't detect the type, as it's widely supported
+    console.log('Could not detect audio file type, defaulting to wav');
+    return 'wav';
   } catch (error) {
     console.error('Error detecting file type:', error);
-    return 'webm'; // Default to webm on error
+    return 'wav'; // Default to wav on error as it's more widely supported by OpenAI
   }
+}
+
+/**
+ * Verify if the audio data appears to be valid before sending to OpenAI
+ * @param binaryData - The processed binary audio data
+ * @returns True if data appears valid, false otherwise
+ */
+export function isValidAudioData(binaryData: Uint8Array): boolean {
+  // Check if data is too small to be valid audio
+  if (!binaryData || binaryData.length < 100) {
+    console.error('Audio data too small to be valid:', binaryData?.length || 0);
+    return false;
+  }
+  
+  // Check for all zeros or repeating patterns which might indicate corruption
+  let allZeros = true;
+  let repeatingPattern = true;
+  const patternLength = 10; // Check for repeating patterns of this length
+  
+  for (let i = 0; i < Math.min(1000, binaryData.length); i++) {
+    // Check if not all zeros
+    if (binaryData[i] !== 0) {
+      allZeros = false;
+    }
+    
+    // Check for non-repeating pattern
+    if (i >= patternLength && 
+        binaryData[i] !== binaryData[i - patternLength]) {
+      repeatingPattern = false;
+    }
+    
+    // If we've verified it's neither all zeros nor a repeating pattern, we can stop checking
+    if (!allZeros && !repeatingPattern && i > 100) {
+      break;
+    }
+  }
+  
+  if (allZeros) {
+    console.error('Audio data appears to be all zeros');
+    return false;
+  }
+  
+  if (repeatingPattern) {
+    console.error('Audio data appears to have a simple repeating pattern');
+    return false;
+  }
+  
+  return true;
 }
