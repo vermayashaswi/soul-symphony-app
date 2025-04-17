@@ -1,4 +1,3 @@
-
 // This file should be created if it doesn't exist yet
 // It contains functions for AI processing in the transcribe-audio edge function
 
@@ -69,10 +68,10 @@ export async function detectLanguageFromAudio(
   apiKey: string
 ): Promise<string> {
   try {
-    // Use Whisper to detect language from a small sample
+    // Use the new gpt-4o-transcribe-mini model to detect language from a small sample
     const formData = new FormData();
     formData.append('file', audioBlob, 'audio.webm');
-    formData.append('model', 'whisper-1');
+    formData.append('model', 'gpt-4o-transcribe-mini');
     formData.append('language', 'auto');
     formData.append('response_format', 'json');
     
@@ -145,7 +144,7 @@ export async function detectLanguages(
 }
 
 /**
- * Transcribe audio with Whisper API
+ * Transcribe audio with the new gpt-4o-transcribe-mini model
  * @param audioBlob - Audio blob
  * @param fileExtension - Audio file extension
  * @param apiKey - OpenAI API key
@@ -160,7 +159,7 @@ export async function transcribeAudioWithWhisper(
   try {
     const formData = new FormData();
     formData.append('file', audioBlob, `audio.${fileExtension}`);
-    formData.append('model', 'whisper-1');
+    formData.append('model', 'gpt-4o-transcribe-mini');
     formData.append('language', language);
     formData.append('response_format', 'json');
     
@@ -174,8 +173,8 @@ export async function transcribeAudioWithWhisper(
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Whisper API error:', errorText);
-      throw new Error(`Whisper API error: ${response.status} - ${errorText}`);
+      console.error('Transcription API error:', errorText);
+      throw new Error(`Transcription API error: ${response.status} - ${errorText}`);
     }
     
     const result = await response.json();

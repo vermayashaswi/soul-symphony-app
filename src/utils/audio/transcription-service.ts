@@ -27,6 +27,7 @@ export async function sendAudioForTranscription(
 
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
+    console.log('[TranscriptionService] Using transcription model: gpt-4o-transcribe-mini');
     
     // Add more diagnostic info about the audio data being sent
     console.log('[TranscriptionService] Audio data sample (first 100 chars):', base64Audio.substring(0, 100));
