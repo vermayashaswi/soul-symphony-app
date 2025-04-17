@@ -4,7 +4,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isNativeApp, isAppRoute, isAppSubdomain } from '@/routes/RouteHelpers';
+import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MobileNavigationProps {
@@ -16,7 +16,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const isOnAppSubdomain = isAppSubdomain();
   
   useEffect(() => {
     // Detect keyboard visibility with multiple signals
@@ -84,13 +83,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  // Define navigation items with simple paths (no /app/ prefix)
+  // Define navigation items with app path prefix
   const navItems = [
-    { path: '/home', icon: Home, label: 'Home' },
-    { path: '/journal', icon: BookOpen, label: 'Journal' },
-    { path: '/smart-chat', icon: MessageCircle, label: 'Chat' },
-    { path: '/insights', icon: BarChart2, label: 'Insights' },
-    { path: '/settings', icon: Settings, label: 'Settings' },
+    { path: '/app/home', icon: Home, label: 'Home' },
+    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
+    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
+    { path: '/app/insights', icon: BarChart2, label: 'Insights' },
+    { path: '/app/settings', icon: Settings, label: 'Settings' },
   ];
 
   // Active status just needs to check current path
