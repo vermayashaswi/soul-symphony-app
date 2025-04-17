@@ -5,7 +5,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 // Demo component that shows floating emotion bubbles with equal sizes but varying color intensities
-const EmotionBubblesDemo = () => {
+const EmotionBubblesDemo = ({ isPhonePreview = false }) => {
   // Define emotions with their percentages
   const emotions = [
     { name: "Joy", percentage: 40 },
@@ -29,8 +29,10 @@ const EmotionBubblesDemo = () => {
   const areaPerBubble = availableArea / numberOfBubbles;
   const bubbleRadius = Math.sqrt(areaPerBubble / Math.PI);
   
-  // Uniform bubble size (convert to pixels for display)
-  const bubbleSize = Math.min(30, bubbleRadius * 0.4); // Limiting max size for better aesthetics
+  // Adjust size based on if this is in the phone preview
+  const bubbleSize = isPhonePreview 
+    ? Math.min(28, bubbleRadius * 0.7) // Larger for phone preview
+    : Math.min(30, bubbleRadius * 0.4); // Normal size otherwise
 
   const handleBubbleClick = (index: number) => {
     if (selectedBubble === index) {
@@ -45,13 +47,15 @@ const EmotionBubblesDemo = () => {
 
   return (
     <div className="w-full h-full relative">
-      {/* Info text about color intensity */}
-      <div className="absolute top-1 right-1 text-xs text-muted-foreground">
-        * Darker colors represent higher scores of emotion
-      </div>
+      {/* Info text about color intensity - hide in phone preview */}
+      {!isPhonePreview && (
+        <div className="absolute top-1 right-1 text-xs text-muted-foreground">
+          * Darker colors represent higher scores of emotion
+        </div>
+      )}
       
       {/* Percentage display when a bubble is selected */}
-      {selectedBubble !== null && (
+      {selectedBubble !== null && !isPhonePreview && (
         <motion.div 
           className="absolute top-1 right-12 bg-background border border-border shadow-md px-2 py-1 rounded-md text-sm font-semibold z-10"
           initial={{ opacity: 0, y: 10 }}
@@ -65,28 +69,44 @@ const EmotionBubblesDemo = () => {
       {emotions.map((emotion, index) => {
         // Calculate opacity based on percentage (higher percentage = more opaque/darker)
         // Using a scale that ensures even low percentages are still visible
-        const minOpacity = 0.3;
+        const minOpacity = 0.4; // Increased minimum opacity for better visibility
         const maxPercentage = Math.max(...emotions.map(e => e.percentage));
         const opacity = minOpacity + ((1 - minOpacity) * (emotion.percentage / maxPercentage));
+        
+        // Adjusted positions for the phone preview
+        const topPosition = isPhonePreview
+          ? `${15 + (index * 8) % 30}px`  // More compact vertical distribution
+          : `${25 + Math.sin(index * 1.5) * 15}px`;
+        
+        const leftPosition = isPhonePreview
+          ? `${10 + (index * 18) % 80}%`  // More spread out horizontal distribution
+          : `${(index * 16) % 95}%`;
+        
+        // Faster animation for phone preview
+        const animationDuration = isPhonePreview ? 2 + index : 4 + index;
+        
+        // Stronger boxShadow for phone preview
+        const shadowIntensity = isPhonePreview ? '0 0 15px' : '0 0 10px';
         
         return (
           <motion.div
             key={index}
-            className="absolute rounded-full flex items-center justify-center cursor-pointer emotion-bubble-container"
+            className={`absolute rounded-full flex items-center justify-center cursor-pointer emotion-bubble-container ${
+              isPhonePreview ? 'text-white font-bold' : 'text-white font-bold'
+            }`}
             style={{
               backgroundColor: baseColor,
               width: `${bubbleSize}px`,
               height: `${bubbleSize}px`,
-              fontSize: `${bubbleSize / 4}px`,
-              color: 'white',
-              fontWeight: 'bold',
-              top: `${25 + Math.sin(index * 1.5) * 15}px`,
-              left: `${(index * 16) % 95}%`,
+              fontSize: isPhonePreview ? `${bubbleSize / 3.5}px` : `${bubbleSize / 4}px`,
+              top: topPosition,
+              left: leftPosition,
               opacity: opacity,
-              boxShadow: `0 0 10px ${baseColor}80`,
+              boxShadow: `${shadowIntensity} ${baseColor}${isPhonePreview ? 'cc' : '80'}`,
               WebkitBackfaceVisibility: 'hidden', // iOS GPU rendering optimization
               WebkitTransform: 'translateZ(0)', // iOS GPU rendering optimization
               WebkitPerspective: '1000', // iOS GPU rendering optimization
+              zIndex: isPhonePreview ? 5 : 'auto',
             }}
             animate={{
               y: [0, -5, 0, 5, 0],
@@ -97,9 +117,9 @@ const EmotionBubblesDemo = () => {
               transition: { duration: 0.2 } 
             }}
             onClick={() => handleBubbleClick(index)}
-            // Ensure return to original size
+            // Faster animation for phone preview
             transition={{
-              duration: 4 + index,
+              duration: animationDuration,
               repeat: Infinity,
               ease: "easeInOut"
             }}

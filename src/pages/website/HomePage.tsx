@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Apple, Play, Shield, Brain, Mic, MessageSquare, LineChart, ArrowRight, Check, Mail, Calendar, TrendingUp } from 'lucide-react';
@@ -211,7 +210,7 @@ const PhoneVoiceAnimation = () => {
                       <p className="text-white text-xs">Sentiment trending up</p>
                     </div>
                     <div className="h-[60px] mt-1">
-                      <SentimentChartDemo />
+                      <SentimentChartDemo isPhonePreview={true} />
                     </div>
                   </motion.div>
                   
