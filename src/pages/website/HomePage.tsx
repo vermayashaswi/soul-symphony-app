@@ -192,7 +192,7 @@ const PhoneVoiceAnimation = () => {
                       <p className="text-white text-xs">Emotional patterns</p>
                     </div>
                     <div className="h-[60px] mt-2">
-                      <EmotionBubblesDemo />
+                      <EmotionBubblesDemo isPhonePreview={true} />
                     </div>
                   </motion.div>
                   
