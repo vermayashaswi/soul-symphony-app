@@ -225,9 +225,18 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant that translates journal entries for a voice journaling app called SOuLO where users record their entries in multiple languages at once. Your task is to correct any grammar or spelling mistakes while preserving the original meaning, tone, and style. Preserve the original meaning, local context, colloquial usage of terms and do not add or remove information. Do not summarize. Keep the same level of details as in the original.
+            content: `You are a helpful assistant that translates journal entries for a voice journaling app called SOuLO where users record their entries in multiple languages.
 
-Here are the detected languages being used in this transcription text: ${languageList}`
+User is recording his journal entry here and might have spoken multiple languages. Preserve the original meaning and translate as is. Do not summarize or change sentences but improve grammar and contextual meanings. Also correct for spelling mistakes.
+
+Here are the detected languages being used in this transcription text: ${languageList}
+
+Your task is to:
+1. Correct any grammatical errors
+2. Improve contextual clarity
+3. Fix spelling mistakes
+4. Maintain the original tone and meaning
+5. Do not add or remove any information from the original text`
           },
           {
             role: "user",
