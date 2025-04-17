@@ -1,6 +1,5 @@
 
 import React, { useEffect } from 'react';
-import { BrowserRouter } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
 import { isAppSubdomain } from './routes/RouteHelpers';
 import { Toaster } from "@/components/ui/toaster";
@@ -47,11 +46,11 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <BrowserRouter>
+    <>
       <AppRoutes />
       <Toaster />
       <SonnerToaster position="top-right" />
-    </BrowserRouter>
+    </>
   );
 };
 
