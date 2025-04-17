@@ -273,7 +273,7 @@ serve(async (req) => {
             }
           })();
           
-          // FIXED: Entity extraction function calling with proper URL construction
+          // Entity extraction calling with proper URL construction
           const entityExtractionPromise = (async () => {
             try {
               // First check if there's already entities data
@@ -287,8 +287,8 @@ serve(async (req) => {
               if (!entryData?.entities) {
                 console.log("Calling batch-extract-entities for entry:", entryId);
                 
-                // Make a direct HTTP request to the batch-extract-entities function
-                const functionUrl = `${supabaseUrl}/functions/v1/batch-extract-entities`;
+                // The full URL needs to have the protocol (https://) included
+                const functionUrl = `https://${supabaseUrl.replace('https://', '')}/functions/v1/batch-extract-entities`;
                 console.log("Calling function URL:", functionUrl);
                 
                 const response = await fetch(functionUrl, {
