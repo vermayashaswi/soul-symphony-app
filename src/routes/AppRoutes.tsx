@@ -46,13 +46,14 @@ const AppRoutes = () => {
               <Route path="/settings" element={<Settings />} />
             </Route>
 
-            {/* Redirect /app/* paths to the root path equivalents */}
+            {/* Handle any /app prefixes - redirect to clean paths */}
             <Route path="/app" element={<Navigate to="/" replace />} />
             <Route path="/app/*" element={<Navigate to="/" replace />} />
             
-            {/* Handle malformed paths that have the domain or https in them */}
+            {/* Handle malformed paths with URLs in them */}
             <Route path="*/https://*" element={<Navigate to="/" replace />} />
             <Route path="https://*" element={<Navigate to="/" replace />} />
+            <Route path="*soulo.online*" element={<Navigate to="/" replace />} />
             <Route path="*app.soulo.online*" element={<Navigate to="/" replace />} />
             
             {/* Content routes on app subdomain */}
@@ -72,8 +73,7 @@ const AppRoutes = () => {
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             
-            {/* Redirect app routes to app subdomain */}
-            {/* Use element instead of to="" to allow our useEffect logic to handle the redirect */}
+            {/* App route redirects with loading indicators */}
             <Route path="/app" element={
               <div className="min-h-screen flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

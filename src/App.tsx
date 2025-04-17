@@ -14,7 +14,7 @@ const App: React.FC = () => {
     const currentPath = window.location.pathname;
     
     // Logic for main domain (soulo.online)
-    if (currentHostname === 'soulo.online') {
+    if (!isAppSubdomain()) {
       // Special case for /app route
       if (currentPath === '/app') {
         const newUrl = `https://app.soulo.online${window.location.search}${window.location.hash}`;
@@ -43,7 +43,7 @@ const App: React.FC = () => {
     }
     
     // Logic for app subdomain (app.soulo.online)
-    if (currentHostname === 'app.soulo.online') {
+    if (isAppSubdomain()) {
       // Remove /app/ prefix if present
       if (currentPath.startsWith('/app/')) {
         const newPath = currentPath.replace('/app/', '/');
@@ -51,9 +51,9 @@ const App: React.FC = () => {
         window.history.replaceState(null, '', newPath);
       }
       
-      // Fix incorrectly formatted URLs that have the domain in the path
-      if (currentPath.includes('https://')) {
-        console.log('Fixing malformed URL path that contains https://', currentPath);
+      // Fix incorrectly formatted URLs that have domains or https in the path
+      if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
+        console.log('Fixing malformed URL path:', currentPath);
         window.history.replaceState(null, '', '/');
       }
     }
