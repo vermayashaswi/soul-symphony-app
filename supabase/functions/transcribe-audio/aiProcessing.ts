@@ -8,9 +8,18 @@ export async function transcribeAudioWithWhisper(
   try {
     const formData = new FormData();
     formData.append('file', audioBlob, `audio.${fileExtension}`);
-    formData.append('model', 'whisper-1');  // Corrected model name
+    formData.append('model', 'whisper-1');  // Using the stable whisper-1 model
     formData.append('language', language);
     formData.append('response_format', 'json');
+    formData.append('prompt', 'The following is a journal entry or conversation that may contain personal thoughts, feelings, or experiences.');
+    
+    console.log('[Transcription] Sending request to OpenAI with:', {
+      fileSize: audioBlob.size,
+      fileType: audioBlob.type,
+      fileExtension,
+      language,
+      hasApiKey: !!apiKey
+    });
     
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
       method: 'POST',
@@ -22,14 +31,25 @@ export async function transcribeAudioWithWhisper(
     
     if (!response.ok) {
       const errorText = await response.text();
-      console.error('Transcription API error:', errorText);
+      console.error('[Transcription] API error:', errorText);
       throw new Error(`Transcription API error: ${response.status} - ${errorText}`);
     }
     
     const result = await response.json();
-    return result.text || '';
+    
+    if (!result.text) {
+      console.error('[Transcription] No text in response:', result);
+      throw new Error('No transcription text returned from API');
+    }
+    
+    console.log('[Transcription] Success:', {
+      textLength: result.text.length,
+      sampleText: result.text.substring(0, 100) + '...'
+    });
+    
+    return result.text;
   } catch (error) {
-    console.error('Error in transcribeAudioWithWhisper:', error);
+    console.error('[Transcription] Error in transcribeAudioWithWhisper:', error);
     throw error;
   }
 }
