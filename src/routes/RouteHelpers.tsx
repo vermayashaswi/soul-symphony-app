@@ -8,13 +8,26 @@ export const isNativeApp = (): boolean => {
 };
 
 export const isAppSubdomain = (): boolean => {
-  return window.location.hostname === 'app.soulo.online';
+  // More robust subdomain check to handle various domain patterns
+  const hostname = window.location.hostname;
+  return hostname === 'app.soulo.online' || 
+         hostname.startsWith('app.') || 
+         hostname === 'localhost' || 
+         hostname.match(/^\d+\.\d+\.\d+\.\d+$/); // IP address
 };
 
 export const getBaseUrl = (): string => {
   if (isAppSubdomain()) {
-    return 'https://app.soulo.online';
+    // If we're on the app subdomain, return that as base
+    return window.location.origin;
   }
+  
+  // For development environment
+  if (window.location.hostname === 'localhost' || window.location.hostname.match(/^\d+\.\d+\.\d+\.\d+$/)) {
+    return window.location.origin;
+  }
+  
+  // For production
   return 'https://soulo.online';
 };
 
