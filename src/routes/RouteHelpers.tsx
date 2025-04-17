@@ -13,7 +13,7 @@ export const isAppSubdomain = (): boolean => {
   return hostname === 'app.soulo.online' || 
          hostname.startsWith('app.') || 
          hostname === 'localhost' || 
-         hostname.match(/^\d+\.\d+\.\d+\.\d+$/); // IP address
+         !!hostname.match(/^\d+\.\d+\.\d+\.\d+$/); // IP address with !! to convert to boolean
 };
 
 export const getBaseUrl = (): string => {
