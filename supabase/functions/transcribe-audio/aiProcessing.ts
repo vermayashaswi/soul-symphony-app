@@ -8,7 +8,7 @@ export async function transcribeAudioWithWhisper(
   try {
     const formData = new FormData();
     formData.append('file', audioBlob, `audio.${fileExtension}`);
-    formData.append('model', 'gpt-4o-mini-transcribe');  // Updated to use gpt-4o-mini-transcribe model
+    formData.append('model', 'gpt-4o-mini-transcribe');  // Using gpt-4o-mini-transcribe model
     formData.append('language', language);
     formData.append('response_format', 'json');
     formData.append('prompt', 'The following is a journal entry or conversation that may contain personal thoughts, feelings, or experiences.');
