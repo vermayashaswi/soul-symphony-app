@@ -54,7 +54,7 @@ async function extractEntities(text) {
   }
 }
 
-// Function to process a batch of journal entries
+// Function to process a batch of journal entries or specific entry IDs
 async function processJournalEntries(entries, diagnosticMode = false) {
   const results = [];
 
@@ -110,7 +110,12 @@ serve(async (req) => {
   }
 
   try {
-    const { diagnosticMode = false, checkApiKeyOnly = false, processAll = false } = await req.json();
+    const { 
+      diagnosticMode = false, 
+      checkApiKeyOnly = false, 
+      processAll = false,
+      entryIds = [] 
+    } = await req.json();
 
     if (checkApiKeyOnly) {
       if (!googleApiKey) {
@@ -139,22 +144,46 @@ serve(async (req) => {
     }
 
     console.log("Starting batch entity extraction...");
-
-    // Use the correct field names in the query
-    const query = supabase
-      .from('Journal Entries')
-      .select('id, "refined text", "transcription text"')
-      .is('entities', null)
-      .limit(50);
+    
+    let entries = [];
+    
+    // Check if we have specific entry IDs to process
+    if (entryIds && entryIds.length > 0) {
+      console.log(`Processing specific entries: ${entryIds.join(', ')}`);
       
-    const { data: entries, error: fetchError } = await query;
-
-    if (fetchError) {
-      console.error("Error fetching journal entries:", fetchError);
-      return new Response(JSON.stringify({ error: 'Failed to fetch journal entries', details: fetchError }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        status: 500,
-      });
+      const { data: specificEntries, error: fetchSpecificError } = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text", "transcription text"')
+        .in('id', entryIds);
+        
+      if (fetchSpecificError) {
+        console.error("Error fetching specific journal entries:", fetchSpecificError);
+        return new Response(JSON.stringify({ error: 'Failed to fetch specific journal entries', details: fetchSpecificError }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        });
+      }
+      
+      entries = specificEntries || [];
+    } else {
+      // Use the correct field names in the query for batch processing
+      const query = supabase
+        .from('Journal Entries')
+        .select('id, "refined text", "transcription text"')
+        .is('entities', null)
+        .limit(50);
+        
+      const { data: batchEntries, error: fetchError } = await query;
+  
+      if (fetchError) {
+        console.error("Error fetching journal entries:", fetchError);
+        return new Response(JSON.stringify({ error: 'Failed to fetch journal entries', details: fetchError }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+          status: 500,
+        });
+      }
+      
+      entries = batchEntries || [];
     }
 
     if (!entries || entries.length === 0) {

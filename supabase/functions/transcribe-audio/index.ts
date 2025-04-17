@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -272,18 +273,47 @@ serve(async (req) => {
             }
           })();
           
-          // Entity extraction in the background
+          // Fix the entity extraction background task to directly call the function
+          // without using supabase.functions.invoke which isn't working correctly
           const entityExtractionPromise = (async () => {
             try {
-              await supabase.functions.invoke('batch-extract-entities', {
-                body: {
-                  userId: userId,
-                  processAll: false,
-                  diagnosticMode: false
+              // First check if there's already entities data
+              const { data: entryData } = await supabase
+                .from('Journal Entries')
+                .select('entities')
+                .eq('id', entryId)
+                .single();
+                
+              // Only call batch-extract-entities if entities field is null
+              if (!entryData?.entities) {
+                console.log("Calling batch-extract-entities directly for entry:", entryId);
+                
+                // Make a direct HTTP request to the batch-extract-entities function
+                const response = await fetch(`${supabaseUrl}/functions/v1/batch-extract-entities`, {
+                  method: 'POST',
+                  headers: {
+                    'Content-Type': 'application/json',
+                    'Authorization': `Bearer ${supabaseServiceKey}`
+                  },
+                  body: JSON.stringify({
+                    entryIds: [entryId],
+                    userId: userId,
+                    diagnosticMode: true
+                  })
+                });
+                
+                if (!response.ok) {
+                  const errorText = await response.text();
+                  console.error("Error calling batch-extract-entities:", errorText);
+                } else {
+                  const result = await response.json();
+                  console.log("batch-extract-entities result:", result);
                 }
-              });
+              } else {
+                console.log("Entry already has entities, skipping batch-extract-entities");
+              }
             } catch (entityErr) {
-              console.error("Error starting entity extraction:", entityErr);
+              console.error("Error in entity extraction:", entityErr);
             }
           })();
           
