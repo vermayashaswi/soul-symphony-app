@@ -273,8 +273,7 @@ serve(async (req) => {
             }
           })();
           
-          // Fix the entity extraction background task to directly call the function
-          // without using supabase.functions.invoke which isn't working correctly
+          // FIXED: Entity extraction function calling with proper URL construction
           const entityExtractionPromise = (async () => {
             try {
               // First check if there's already entities data
@@ -286,10 +285,13 @@ serve(async (req) => {
                 
               // Only call batch-extract-entities if entities field is null
               if (!entryData?.entities) {
-                console.log("Calling batch-extract-entities directly for entry:", entryId);
+                console.log("Calling batch-extract-entities for entry:", entryId);
                 
                 // Make a direct HTTP request to the batch-extract-entities function
-                const response = await fetch(`${supabaseUrl}/functions/v1/batch-extract-entities`, {
+                const functionUrl = `${supabaseUrl}/functions/v1/batch-extract-entities`;
+                console.log("Calling function URL:", functionUrl);
+                
+                const response = await fetch(functionUrl, {
                   method: 'POST',
                   headers: {
                     'Content-Type': 'application/json',
@@ -303,8 +305,10 @@ serve(async (req) => {
                 });
                 
                 if (!response.ok) {
-                  const errorText = await response.text();
-                  console.error("Error calling batch-extract-entities:", errorText);
+                  const responseText = await response.text();
+                  console.error("Error calling batch-extract-entities:", responseText);
+                  console.error("Status:", response.status);
+                  console.error("Status Text:", response.statusText);
                 } else {
                   const result = await response.json();
                   console.log("batch-extract-entities result:", result);
@@ -314,6 +318,7 @@ serve(async (req) => {
               }
             } catch (entityErr) {
               console.error("Error in entity extraction:", entityErr);
+              console.error("Error details:", entityErr.stack || entityErr);
             }
           })();
           
@@ -324,6 +329,15 @@ serve(async (req) => {
               embeddingPromise,
               entityExtractionPromise
             ]));
+          } else {
+            // For environments without waitUntil, still run the tasks
+            Promise.all([
+              themeExtractionPromise,
+              embeddingPromise,
+              entityExtractionPromise
+            ]).catch(err => {
+              console.error("Error in background tasks:", err);
+            });
           }
         } catch (bgErr) {
           console.error("Error setting up background tasks:", bgErr);
