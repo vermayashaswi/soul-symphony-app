@@ -50,8 +50,10 @@ const AppRoutes = () => {
             <Route path="/app" element={<Navigate to="/" replace />} />
             <Route path="/app/*" element={<Navigate to="/" replace />} />
             
-            {/* Handle malformed paths that have the domain in them */}
+            {/* Handle malformed paths that have the domain or https in them */}
             <Route path="*/https://*" element={<Navigate to="/" replace />} />
+            <Route path="https://*" element={<Navigate to="/" replace />} />
+            <Route path="*app.soulo.online*" element={<Navigate to="/" replace />} />
             
             {/* Content routes on app subdomain */}
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
@@ -70,14 +72,15 @@ const AppRoutes = () => {
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             
-            {/* Special handling for /app route */}
+            {/* Redirect app routes to app subdomain */}
+            {/* Use element instead of to="" to allow our useEffect logic to handle the redirect */}
             <Route path="/app" element={
-              <Navigate to="https://app.soulo.online" replace />
+              <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
             } />
             
-            {/* Redirect app routes to app subdomain with simple external redirects */}
             <Route path="/app/*" element={
-              // This is replaced by the logic in App.tsx useEffect
               <div className="min-h-screen flex items-center justify-center">
                 <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
               </div>

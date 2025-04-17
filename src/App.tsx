@@ -52,10 +52,9 @@ const App: React.FC = () => {
       }
       
       // Fix incorrectly formatted URLs that have the domain in the path
-      if (currentPath.includes('https://app.soulo.online')) {
-        const correctedPath = '/';
-        console.log('Fixing malformed URL path:', correctedPath);
-        window.history.replaceState(null, '', correctedPath);
+      if (currentPath.includes('https://')) {
+        console.log('Fixing malformed URL path that contains https://', currentPath);
+        window.history.replaceState(null, '', '/');
       }
     }
   }, []);
