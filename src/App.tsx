@@ -1,4 +1,3 @@
-
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -51,11 +50,13 @@ const App = () => {
     
     // Handle main domain navigation to /app/* paths
     if (!isOnAppSubdomain && window.location.pathname.startsWith('/app/')) {
-      // Redirect from soulo.online/app/* to app.soulo.online/*
-      const newPath = window.location.pathname.replace('/app/', '/');
-      const newUrl = `https://app.soulo.online${newPath}${window.location.search}${window.location.hash}`;
+      // Extract the path without the /app prefix
+      const pathWithoutAppPrefix = window.location.pathname.replace('/app/', '/');
+      // Create the new URL with the app subdomain
+      const newUrl = `https://app.soulo.online${pathWithoutAppPrefix}${window.location.search}${window.location.hash}`;
       console.log('Redirecting main domain /app path to app subdomain:', newUrl);
-      window.location.href = newUrl;
+      // Use replace instead of assigning to href to avoid adding to browser history
+      window.location.replace(newUrl);
       return;
     }
     

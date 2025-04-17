@@ -18,7 +18,7 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import { isAppSubdomain } from './RouteHelpers';
+import { isAppSubdomain, getBaseUrl } from './RouteHelpers';
 
 const AppRoutes = () => {
   // Detect if we're on the app subdomain
@@ -66,9 +66,16 @@ const AppRoutes = () => {
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             
-            {/* Redirect app routes to app subdomain */}
-            <Route path="/app" element={<Navigate to="https://app.soulo.online" replace />} />
-            <Route path="/app/*" element={<Navigate to="https://app.soulo.online" replace />} />
+            {/* Redirect app routes to app subdomain with simple external redirects */}
+            <Route path="/app" element={
+              <Navigate to="https://app.soulo.online" replace />
+            } />
+            <Route path="/app/*" element={
+              // This is replaced by the logic in App.tsx useEffect
+              <div className="min-h-screen flex items-center justify-center">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+              </div>
+            } />
             
             {/* Redirect legacy app routes to app subdomain */}
             <Route path="/auth" element={<Navigate to="https://app.soulo.online/auth" replace />} />

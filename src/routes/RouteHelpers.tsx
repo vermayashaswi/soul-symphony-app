@@ -12,7 +12,10 @@ export const isAppSubdomain = (): boolean => {
 };
 
 export const getBaseUrl = (): string => {
-  return '';
+  if (isAppSubdomain()) {
+    return 'https://app.soulo.online';
+  }
+  return 'https://soulo.online';
 };
 
 export const isAppRoute = (pathname: string): boolean => {
@@ -107,6 +110,22 @@ export const AppRouteWrapper = ({
 };
 
 export const RedirectRoute = ({ to }: { to: string }) => {
-  console.log('RedirectRoute: Redirecting to', to);
+  // Handle absolute URLs (like https://app.soulo.online)
+  if (to.startsWith('http')) {
+    // For external redirects, use a useEffect to navigate
+    useEffect(() => {
+      console.log('RedirectRoute: Redirecting to external URL:', to);
+      window.location.replace(to);
+    }, [to]);
+    
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  // For internal redirects, use Navigate
+  console.log('RedirectRoute: Redirecting to internal path:', to);
   return <Navigate to={to} replace />;
 };
