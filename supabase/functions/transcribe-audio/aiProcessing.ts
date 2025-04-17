@@ -24,8 +24,20 @@ export async function transcribeAudioWithWhisper(
       throw new Error('Empty or invalid audio data');
     }
     
+    // Enforce minimum audio size
+    if (audioBlob.size < 100) {
+      throw new Error('Audio file is too small to be valid');
+    }
+
+    // Validate content type - always use WAV for best compatibility
+    const contentType = audioBlob.type || 'audio/wav';
+    if (!contentType.includes('audio/')) {
+      console.warn('[Transcription] Audio blob has non-audio content type:', contentType);
+      // We'll continue anyway but log the warning
+    }
+    
     // Create a proper filename with extension
-    const filename = `audio.${fileExtension}`;
+    const filename = `audio.${fileExtension || 'wav'}`;
     console.log(`[Transcription] Using filename: ${filename}`);
     
     const formData = new FormData();

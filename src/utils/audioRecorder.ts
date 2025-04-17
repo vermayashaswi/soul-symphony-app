@@ -8,20 +8,21 @@ export const recordAudio = async () => {
     throw new Error('Audio recording not supported in this browser');
   }
   
-  // Request microphone access
+  // Request microphone access with specific constraints for better compatibility
   const stream = await navigator.mediaDevices.getUserMedia({ 
     audio: {
       echoCancellation: true,
       noiseSuppression: true,
       autoGainControl: true,
-      channelCount: 1,
-      sampleRate: 44100
+      channelCount: 1,     // Mono for better compatibility
+      sampleRate: 44100,   // Standard sample rate for better compatibility
+      sampleSize: 16       // Standard bit depth for better compatibility
     } 
   });
   
   // Set up the MediaRecorder with specific options for better compatibility
   const options = {
-    mimeType: 'audio/webm;codecs=opus',
+    mimeType: 'audio/wav',  // WAV format for better compatibility with OpenAI
     audioBitsPerSecond: 128000
   };
   
@@ -68,8 +69,8 @@ export const recordAudio = async () => {
               return;
             }
             
-            // Create blob with correct MIME type
-            const mimeType = mediaRecorder.mimeType || 'audio/webm;codecs=opus';
+            // Create blob with correct MIME type - always use WAV for better compatibility
+            const mimeType = 'audio/wav';
             const audioBlob = new Blob(audioChunks, { type: mimeType });
             
             if (audioBlob.size < 100) {

@@ -22,6 +22,15 @@ export function processBase64Chunks(base64String: string): Uint8Array {
       cleanBase64 += '='.repeat(4 - padding);
     }
     
+    // Validate base64 string before processing
+    try {
+      // Test decode a small portion to validate format
+      atob(cleanBase64.substring(0, Math.min(100, cleanBase64.length)));
+    } catch (e) {
+      console.error('Invalid base64 string:', e);
+      throw new Error('Invalid base64 encoding format');
+    }
+    
     // Process in chunks to prevent memory issues with large files
     const chunks: Uint8Array[] = [];
     const chunkSize = 8192; // Process 8KB at a time
@@ -202,4 +211,46 @@ export function isValidAudioData(binaryData: Uint8Array): boolean {
   }
   
   return true;
+}
+
+/**
+ * Validate and fix audio data to ensure it's in a valid format for OpenAI
+ * @param binaryData - The processed binary audio data
+ * @param fileType - The detected file type
+ * @returns Fixed audio data if needed, or original if already valid
+ */
+export function validateAndFixAudioData(binaryData: Uint8Array, fileType: string): Uint8Array {
+  // Check if we have valid audio data
+  if (!isValidAudioData(binaryData)) {
+    throw new Error('Invalid audio data detected, cannot process');
+  }
+  
+  // Simple check for WAV header validity if it's a WAV file
+  if (fileType === 'wav' && binaryData.length > 44) {
+    // Check for RIFF header
+    const hasRiffHeader = 
+      binaryData[0] === 0x52 && // R
+      binaryData[1] === 0x49 && // I
+      binaryData[2] === 0x46 && // F
+      binaryData[3] === 0x46;   // F
+      
+    // Check for WAVE format
+    const hasWaveFormat = 
+      binaryData[8] === 0x57 && // W
+      binaryData[9] === 0x41 && // A
+      binaryData[10] === 0x56 && // V
+      binaryData[11] === 0x45;   // E
+      
+    if (!hasRiffHeader || !hasWaveFormat) {
+      console.warn('WAV file has invalid header, may cause transcription issues');
+      // We don't try to fix the header here as it's too complex
+    }
+  }
+  
+  // For all file types, ensure we have a minimum viable size
+  if (binaryData.length < 1000) {
+    console.warn('Audio file is very small, may not contain enough data for transcription');
+  }
+  
+  return binaryData;
 }

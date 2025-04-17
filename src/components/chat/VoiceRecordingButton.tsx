@@ -42,9 +42,9 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
               echoCancellation: true,
               noiseSuppression: true,
               autoGainControl: true,
-              sampleRate: 96000,
-              sampleSize: 24,
-              channelCount: 2,
+              sampleRate: 44100, // Standard sample rate for better compatibility
+              sampleSize: 16,    // Standard bit depth for better compatibility
+              channelCount: 1,   // Mono for simpler processing and compatibility
             } 
           });
           
@@ -52,13 +52,13 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           
           const options = {
             type: 'audio',
-            mimeType: 'audio/wav',
+            mimeType: 'audio/wav', // WAV format for better compatibility with OpenAI
             recorderType: StereoAudioRecorder,
-            numberOfAudioChannels: 2,
-            desiredSampRate: 96000,
+            numberOfAudioChannels: 1, // Mono for simplicity and compatibility
+            desiredSampRate: 44100,   // Standard sample rate
             checkForInactiveTracks: true,
-            timeSlice: 50, // Record in smaller chunks for real-time processing
-            audioBitsPerSecond: 320000,
+            timeSlice: 1000, // Record in 1-second chunks for better stability
+            audioBitsPerSecond: 128000, // Lower bitrate for smaller files
           };
           
           const rtcRecorder = new RecordRTC(mediaStream, options);

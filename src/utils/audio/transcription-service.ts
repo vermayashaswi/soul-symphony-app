@@ -39,10 +39,24 @@ export async function sendAudioForTranscription(
       cleanBase64 = cleanBase64.split(',')[1];
     }
     
-    // Validate base64 string
+    // Validate base64 string - ensure it's properly formed
     if (!cleanBase64 || cleanBase64.length < 50) {
       throw new Error('Invalid audio data: Base64 string is too short');
     }
+    
+    try {
+      // Verify this is a valid base64 string by trying to decode a small part
+      atob(cleanBase64.substring(0, 100));
+    } catch (e) {
+      console.error('[TranscriptionService] Invalid base64 encoding:', e);
+      throw new Error('Invalid audio data: Not properly base64 encoded');
+    }
+    
+    // Better estimation of recording time
+    const estimatedDuration = Math.max(
+      (cleanBase64.length > 1000) ? Math.floor(cleanBase64.length / 700) : 1,
+      directTranscription ? 5 : 3 // Minimum length assumptions
+    );
     
     // Call the Supabase edge function with the properly formatted body
     console.log('[TranscriptionService] Invoking transcribe-audio edge function');
@@ -52,8 +66,14 @@ export async function sendAudioForTranscription(
         userId: userId || null,
         directTranscription: directTranscription,
         highQuality: false, // Set to false for mini model
-        recordingTime: (cleanBase64.length > 1000) ? Math.floor(cleanBase64.length / 700) : null,
-        timeout: 60000
+        recordingTime: estimatedDuration,
+        modelName: 'gpt-4o-mini-transcribe',
+        format: 'wav', // Tell the server we're sending WAV format
+        audioConfig: {
+          sampleRate: 44100,
+          channels: 1,
+          bitDepth: 16
+        }
       }
     });
 
@@ -132,6 +152,13 @@ export async function transcribeAudioBlob(
     // Basic validation of the audio blob
     if (!audioBlob || audioBlob.size < 100) {
       throw new Error('Audio blob is empty or too small to be valid');
+    }
+    
+    // Verify audio MIME type
+    const validTypes = ['audio/wav', 'audio/webm', 'audio/mp3', 'audio/mp4', 'audio/mpeg', 'audio/ogg'];
+    if (!validTypes.includes(audioBlob.type) && audioBlob.type !== '') {
+      console.warn('[TranscriptionService] Unusual audio type:', audioBlob.type);
+      // Continue anyway but log the warning
     }
     
     // Convert blob to base64
