@@ -15,6 +15,14 @@ const App: React.FC = () => {
     
     // Logic for main domain (soulo.online)
     if (currentHostname === 'soulo.online') {
+      // Special case for /app route
+      if (currentPath === '/app') {
+        const newUrl = `https://app.soulo.online${window.location.search}${window.location.hash}`;
+        console.log('Redirecting /app to app subdomain root:', newUrl);
+        window.location.replace(newUrl);
+        return;
+      }
+      
       // If path starts with /app/, redirect to app subdomain
       if (currentPath.startsWith('/app/')) {
         const newPath = currentPath.replace('/app/', '/');
@@ -41,6 +49,13 @@ const App: React.FC = () => {
         const newPath = currentPath.replace('/app/', '/');
         console.log('Correcting path on app subdomain:', newPath);
         window.history.replaceState(null, '', newPath);
+      }
+      
+      // Fix incorrectly formatted URLs that have the domain in the path
+      if (currentPath.includes('https://app.soulo.online')) {
+        const correctedPath = '/';
+        console.log('Fixing malformed URL path:', correctedPath);
+        window.history.replaceState(null, '', correctedPath);
       }
     }
   }, []);

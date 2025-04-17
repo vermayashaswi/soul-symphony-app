@@ -47,7 +47,11 @@ const AppRoutes = () => {
             </Route>
 
             {/* Redirect /app/* paths to the root path equivalents */}
+            <Route path="/app" element={<Navigate to="/" replace />} />
             <Route path="/app/*" element={<Navigate to="/" replace />} />
+            
+            {/* Handle malformed paths that have the domain in them */}
+            <Route path="*/https://*" element={<Navigate to="/" replace />} />
             
             {/* Content routes on app subdomain */}
             <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
@@ -66,10 +70,12 @@ const AppRoutes = () => {
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             
-            {/* Redirect app routes to app subdomain with simple external redirects */}
+            {/* Special handling for /app route */}
             <Route path="/app" element={
               <Navigate to="https://app.soulo.online" replace />
             } />
+            
+            {/* Redirect app routes to app subdomain with simple external redirects */}
             <Route path="/app/*" element={
               // This is replaced by the logic in App.tsx useEffect
               <div className="min-h-screen flex items-center justify-center">
