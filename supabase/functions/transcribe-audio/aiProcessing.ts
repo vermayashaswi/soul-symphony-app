@@ -8,7 +8,7 @@ export async function transcribeAudioWithWhisper(
   try {
     const formData = new FormData();
     formData.append('file', audioBlob, `audio.${fileExtension}`);
-    formData.append('model', 'gpt-4o-transcribe');  // Updated to use gpt-4o-transcribe model
+    formData.append('model', 'gpt-4o-mini-transcribe');  // Updated to use gpt-4o-mini-transcribe model
     formData.append('language', language);
     formData.append('response_format', 'json');
     formData.append('prompt', 'The following is a journal entry or conversation that may contain personal thoughts, feelings, or experiences.');
@@ -18,7 +18,8 @@ export async function transcribeAudioWithWhisper(
       fileType: audioBlob.type,
       fileExtension,
       language,
-      hasApiKey: !!apiKey
+      hasApiKey: !!apiKey,
+      model: 'gpt-4o-mini-transcribe'
     });
     
     const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
@@ -35,6 +36,7 @@ export async function transcribeAudioWithWhisper(
       throw new Error(`Transcription API error: ${response.status} - ${errorText}`);
     }
     
+    // Note: gpt-4o-mini-transcribe only supports json or text response formats
     const result = await response.json();
     
     if (!result.text) {
@@ -44,7 +46,8 @@ export async function transcribeAudioWithWhisper(
     
     console.log('[Transcription] Success:', {
       textLength: result.text.length,
-      sampleText: result.text.substring(0, 100) + '...'
+      sampleText: result.text.substring(0, 100) + '...',
+      model: 'gpt-4o-mini-transcribe'
     });
     
     return result.text;
