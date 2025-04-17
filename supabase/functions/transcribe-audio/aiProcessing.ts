@@ -254,5 +254,3 @@ Here are the detected languages being used in this transcription text: ${languag
     return { refinedText: text };
   }
 }
-
-// Remove other language detection functions

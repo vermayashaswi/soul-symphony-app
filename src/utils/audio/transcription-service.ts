@@ -67,7 +67,7 @@ export async function sendAudioForTranscription(
         directTranscription: directTranscription,
         highQuality: true, // Set to true for full model
         recordingTime: estimatedDuration,
-        modelName: 'gpt-4o-transcribe',
+        modelName: 'gpt-4o-transcribe', // Use the full model
         format: 'wav', // Tell the server we're sending WAV format
         audioConfig: {
           sampleRate: 44100,
