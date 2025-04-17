@@ -11,6 +11,10 @@ export const isAppSubdomain = (): boolean => {
   return window.location.hostname === 'app.soulo.online';
 };
 
+export const getBaseUrl = (): string => {
+  return isAppSubdomain() ? '' : '/app';
+};
+
 export const isAppRoute = (pathname: string): boolean => {
   // Handle both app.soulo.online/* and soulo.online/app/*
   const appSubdomain = isAppSubdomain();
@@ -25,6 +29,24 @@ export const isAppRoute = (pathname: string): boolean => {
   
   // On main domain, /app/* paths are app routes
   return pathname === '/app' || pathname.startsWith('/app/');
+};
+
+export const getAppPath = (path: string): string => {
+  // If we're on the app subdomain, don't prefix with /app
+  if (isAppSubdomain()) {
+    // Remove /app prefix if it exists
+    if (path.startsWith('/app/')) {
+      return path.replace('/app', '');
+    }
+    return path;
+  }
+  
+  // If we're on the main domain and path doesn't already start with /app
+  if (!path.startsWith('/app')) {
+    return `/app${path}`;
+  }
+  
+  return path;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {

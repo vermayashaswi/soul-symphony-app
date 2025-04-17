@@ -4,7 +4,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
+import { isNativeApp, isAppRoute, isAppSubdomain, getAppPath } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MobileNavigationProps {
@@ -16,6 +16,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const isOnAppSubdomain = isAppSubdomain();
   
   useEffect(() => {
     // Detect keyboard visibility with multiple signals
@@ -77,22 +78,36 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }
   
   // Skip specific routes where nav doesn't make sense
-  const hiddenRoutes = ['/app/auth', '/app/onboarding'];
+  const hiddenRoutes = isOnAppSubdomain 
+    ? ['/auth', '/onboarding']
+    : ['/app/auth', '/app/onboarding'];
+    
   if (hiddenRoutes.includes(location.pathname)) {
     return null;
   }
   
+  // Base paths depend on whether we're on the app subdomain or not
+  const basePath = isOnAppSubdomain ? '' : '/app';
+  
   const navItems = [
-    { path: '/app/home', icon: Home, label: 'Home' },
-    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
-    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
-    { path: '/app/insights', icon: BarChart2, label: 'Insights' },
-    { path: '/app/settings', icon: Settings, label: 'Settings' },
+    { path: `${basePath}/home`, icon: Home, label: 'Home' },
+    { path: `${basePath}/journal`, icon: BookOpen, label: 'Journal' },
+    { path: `${basePath}/smart-chat`, icon: MessageCircle, label: 'Chat' },
+    { path: `${basePath}/insights`, icon: BarChart2, label: 'Insights' },
+    { path: `${basePath}/settings`, icon: Settings, label: 'Settings' },
   ];
 
   // Improved active route detection for handling back navigation
   const getActiveStatus = (path: string) => {
-    // Match any path that starts with the given path
+    // Handle both path formats based on domain
+    if (isOnAppSubdomain) {
+      // On app subdomain, compare with both /path and /app/path
+      return location.pathname.startsWith(path) || 
+             location.pathname.startsWith(path.replace(basePath, '')) ||
+             location.pathname.startsWith(path.replace('', '/app'));
+    }
+    
+    // On main domain, just check the path as is
     return location.pathname.startsWith(path);
   };
   

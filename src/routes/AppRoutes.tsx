@@ -17,37 +17,74 @@ import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
+import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import { isAppSubdomain } from './RouteHelpers';
 
 const AppRoutes = () => {
-  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
-
+  // Detect if we're on the app subdomain
+  const isOnAppSubdomain = isAppSubdomain();
+  
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
       <Route element={<ViewportManager />}>
-        {/* Main website routes */}
-        <Route path="/" element={<Index />} />
-        <Route path="/privacy" element={<PrivacyPolicyPage />} />
-        <Route path="/faq" element={<FAQPage />} />
-        <Route path="/download" element={<AppDownload />} />
-        <Route path="/blog" element={<BlogPage />} />
-        <Route path="/blog/:slug" element={<BlogPostPage />} />
-        
-        {/* App routes */}
-        <Route path="/auth" element={<Auth />} />
-        
-        {/* Protected routes with their own Outlet */}
-        <Route element={<ProtectedRoute />}>
-          <Route path="/home" element={<Home />} />
-          <Route path="/journal" element={<Journal />} />
-          <Route path="/insights" element={<Insights />} />
-          <Route path="/chat" element={<Chat />} />
-          <Route path="/smart-chat" element={<SmartChat />} />
-          <Route path="/settings" element={<Settings />} />
-        </Route>
+        {/* App subdomain routes - handle differently */}
+        {isOnAppSubdomain ? (
+          <>
+            {/* Root of app subdomain */}
+            <Route path="/" element={<OnboardingScreen />} />
+            <Route path="/onboarding" element={<OnboardingScreen />} />
+            <Route path="/auth" element={<Auth />} />
+            
+            {/* Protected app routes */}
+            <Route element={<ProtectedRoute />}>
+              <Route path="/home" element={<Home />} />
+              <Route path="/journal" element={<Journal />} />
+              <Route path="/insights" element={<Insights />} />
+              <Route path="/chat" element={<Chat />} />
+              <Route path="/smart-chat" element={<SmartChat />} />
+              <Route path="/settings" element={<Settings />} />
+            </Route>
+
+            {/* Redirect /app/* paths to the root path equivalents */}
+            <Route path="/app" element={<Navigate to="/" replace />} />
+            <Route path="/app/home" element={<Navigate to="/home" replace />} />
+            <Route path="/app/journal" element={<Navigate to="/journal" replace />} />
+            <Route path="/app/insights" element={<Navigate to="/insights" replace />} />
+            <Route path="/app/chat" element={<Navigate to="/chat" replace />} />
+            <Route path="/app/smart-chat" element={<Navigate to="/smart-chat" replace />} />
+            <Route path="/app/settings" element={<Navigate to="/settings" replace />} />
+            <Route path="/app/auth" element={<Navigate to="/auth" replace />} />
+            <Route path="/app/onboarding" element={<Navigate to="/onboarding" replace />} />
+          </>
+        ) : (
+          <>
+            {/* Main website routes */}
+            <Route path="/" element={<Index />} />
+            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/download" element={<AppDownload />} />
+            <Route path="/blog" element={<BlogPage />} />
+            <Route path="/blog/:slug" element={<BlogPostPage />} />
+            
+            {/* App routes on main domain - redirect to app subdomain */}
+            <Route path="/app" element={<Navigate to="https://app.soulo.online" replace />} />
+            <Route path="/app/*" element={<Navigate to="https://app.soulo.online" replace />} />
+            
+            {/* Legacy routes - redirect to app subdomain */}
+            <Route path="/auth" element={<Navigate to="https://app.soulo.online/auth" replace />} />
+            <Route path="/onboarding" element={<Navigate to="https://app.soulo.online/onboarding" replace />} />
+            <Route path="/home" element={<Navigate to="https://app.soulo.online/home" replace />} />
+            <Route path="/journal" element={<Navigate to="https://app.soulo.online/journal" replace />} />
+            <Route path="/insights" element={<Navigate to="https://app.soulo.online/insights" replace />} />
+            <Route path="/chat" element={<Navigate to="https://app.soulo.online/chat" replace />} />
+            <Route path="/smart-chat" element={<Navigate to="https://app.soulo.online/smart-chat" replace />} />
+            <Route path="/settings" element={<Navigate to="https://app.soulo.online/settings" replace />} />
+          </>
+        )}
         
         {/* Catch-all route */}
-        <Route path="*" element={<NotFound />} />
+        <Route path="*" element={<NotFound isAppSubdomain={isOnAppSubdomain} />} />
       </Route>
     </Routes>
   );
