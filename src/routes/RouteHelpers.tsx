@@ -12,45 +12,25 @@ export const isAppSubdomain = (): boolean => {
 };
 
 export const getBaseUrl = (): string => {
-  return isAppSubdomain() ? '' : '/app';
+  return '';
 };
 
 export const isAppRoute = (pathname: string): boolean => {
-  // Handle both app.soulo.online/* and soulo.online/app/*
-  const appSubdomain = isAppSubdomain();
-  
-  if (appSubdomain) {
-    // On app subdomain, all paths are app routes except explicit website routes
-    return !pathname.startsWith('/blog') && 
-           !pathname.startsWith('/faq') && 
-           !pathname.startsWith('/privacy-policy') && 
-           !pathname.startsWith('/app-download');
-  }
-  
-  // On main domain, /app/* paths are app routes
-  return pathname === '/app' || pathname.startsWith('/app/');
-};
+  // All routes on app subdomain are app routes
+  // No app routes on main domain
+  return isAppSubdomain();
+}
 
 export const getAppPath = (path: string): string => {
-  // If we're on the app subdomain, don't prefix with /app
-  if (isAppSubdomain()) {
-    // Remove /app prefix if it exists
-    if (path.startsWith('/app/')) {
-      return path.replace('/app', '');
-    }
-    return path;
+  // On app subdomain, all paths are as-is
+  if (path.startsWith('/app/')) {
+    return path.replace('/app', '');
   }
-  
-  // If we're on the main domain and path doesn't already start with /app
-  if (!path.startsWith('/app')) {
-    return `/app${path}`;
-  }
-  
   return path;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
-  // Website routes are anything that doesn't start with /app on main domain
+  // Website routes are on main domain only
   // Or specific content routes on app subdomain
   const appSubdomain = isAppSubdomain();
   
@@ -62,8 +42,8 @@ export const isWebsiteRoute = (pathname: string): boolean => {
            pathname.startsWith('/app-download');
   }
   
-  // On main domain, everything not starting with /app is a website route
-  return !pathname.startsWith('/app');
+  // On main domain, everything is a website route
+  return !appSubdomain;
 }
 
 export const WebsiteRouteWrapper = ({ element }: { element: React.ReactNode }) => {
@@ -87,32 +67,25 @@ export const AppRouteWrapper = ({
   const { user } = useAuth();
   const navigate = useNavigate();
   const location = useLocation();
-  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+  const isOnAppSubdomain = isAppSubdomain();
   
   console.log('AppRouteWrapper rendering:', location.pathname, { 
     requiresAuth, 
     userExists: !!user,
-    isAppSubdomain
+    isOnAppSubdomain
   });
   
   useEffect(() => {
     if (requiresAuth && !user) {
       console.log('Protected route accessed without auth, redirecting to auth');
       
-      // Adjust redirect path based on subdomain
-      if (isAppSubdomain) {
-        navigate('/auth', { 
-          state: { from: location },
-          replace: true
-        });
-      } else {
-        navigate('/app/auth', { 
-          state: { from: location },
-          replace: true
-        });
-      }
+      // Always redirect to /auth on the app subdomain
+      navigate('/auth', { 
+        state: { from: location },
+        replace: true
+      });
     }
-  }, [user, navigate, requiresAuth, location, isAppSubdomain]);
+  }, [user, navigate, requiresAuth, location]);
 
   // If this is a protected route and user is not authenticated,
   // render nothing while the redirect happens

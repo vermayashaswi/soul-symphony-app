@@ -1,32 +1,12 @@
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { isAppRoute } from '@/routes/RouteHelpers';
+import { isAppSubdomain } from '@/routes/RouteHelpers';
 
 /**
  * Gets the redirect URL for authentication
  */
 export const getRedirectUrl = (): string => {
-  // This is a production environment fix specifically for soulo.online
-  // Force the correct URL for production environment
-  if (window.location.hostname === 'soulo.online' || 
-      window.location.hostname === 'app.soulo.online' ||
-      window.location.hostname.endsWith('.soulo.online')) {
-    
-    // Special case for app subdomain
-    if (window.location.hostname === 'app.soulo.online') {
-      return 'https://app.soulo.online/auth';
-    }
-    
-    // For main domain, redirect to the /app/auth path
-    return 'https://soulo.online/app/auth';
-  }
-  
-  const origin = window.location.origin;
-  const urlParams = new URLSearchParams(window.location.search);
-  const redirectTo = urlParams.get('redirectTo');
-  if (redirectTo) {
-    localStorage.setItem('authRedirectTo', redirectTo);
-  }
+  const isOnAppSubdomain = isAppSubdomain();
   
   // For iOS in standalone mode (PWA), we need to handle redirects differently
   // Check for standalone mode in a type-safe way
@@ -40,31 +20,14 @@ export const getRedirectUrl = (): string => {
     
     return standaloneCheck || iosSafariStandalone;
   };
-    
-  // For PWA on iOS, we want to avoid redirects that might break the app
-  if (isInStandaloneMode() && /iPhone|iPad|iPod/i.test(navigator.userAgent)) {
-    // Use a special auth flow that works better in PWA context
-    const pathname = window.location.pathname;
-    const isAppSubdomain = window.location.hostname === 'app.soulo.online';
-    
-    // Check if we're on app auth page - adjust path based on domain
-    if (isAppSubdomain) {
-      return `${origin}/auth?pwa_mode=true`;
-    } else {
-      return `${origin}/app/auth?pwa_mode=true`;
-    }
-  }
   
-  // Otherwise use the current origin for local development
-  // Use the current path to determine if we're in /auth or /app/auth
-  const pathname = window.location.pathname;
-  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
-  
-  // Check if we're on app auth page - adjust path based on domain
-  if (isAppSubdomain) {
-    return `${origin}/auth`;
+  // Enforce app.soulo.online domain as the redirect
+  if (isOnAppSubdomain) {
+    // We're on the correct domain
+    return `${window.location.origin}/auth`;
   } else {
-    return `${origin}/app/auth`;
+    // We're on the wrong domain, redirect to app subdomain
+    return 'https://app.soulo.online/auth';
   }
 };
 
@@ -129,12 +92,7 @@ export const signInWithGoogle = async (): Promise<void> => {
     }
   } catch (error: any) {
     console.error('Error signing in with Google:', error.message);
-    
-    // Only show toast if we're in an app route
-    const currentPath = window.location.pathname;
-    if (isAppRoute(currentPath)) {
-      toast.error(`Error signing in with Google: ${error.message}`);
-    }
+    toast.error(`Error signing in with Google: ${error.message}`);
     throw error;
   }
 };
@@ -159,12 +117,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
     }
   } catch (error: any) {
     console.error('Error signing in with email:', error.message);
-    
-    // Only show toast if we're in an app route
-    const currentPath = window.location.pathname;
-    if (isAppRoute(currentPath)) {
-      toast.error(`Error signing in with email: ${error.message}`);
-    }
+    toast.error(`Error signing in with email: ${error.message}`);
     throw error;
   }
 };
@@ -189,12 +142,7 @@ export const signUp = async (email: string, password: string): Promise<void> => 
     }
   } catch (error: any) {
     console.error('Error signing up:', error.message);
-    
-    // Only show toast if we're in an app route
-    const currentPath = window.location.pathname;
-    if (isAppRoute(currentPath)) {
-      toast.error(`Error signing up: ${error.message}`);
-    }
+    toast.error(`Error signing up: ${error.message}`);
     throw error;
   }
 };
@@ -211,12 +159,7 @@ export const resetPassword = async (email: string): Promise<void> => {
     }
   } catch (error: any) {
     console.error('Error resetting password:', error.message);
-    
-    // Only show toast if we're in an app route
-    const currentPath = window.location.pathname;
-    if (isAppRoute(currentPath)) {
-      toast.error(`Error resetting password: ${error.message}`);
-    }
+    toast.error(`Error resetting password: ${error.message}`);
     throw error;
   }
 };

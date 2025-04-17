@@ -4,7 +4,7 @@ import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { isNativeApp, isAppRoute, isAppSubdomain, getAppPath } from '@/routes/RouteHelpers';
+import { isNativeApp, isAppRoute, isAppSubdomain } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 
 interface MobileNavigationProps {
@@ -78,36 +78,23 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }
   
   // Skip specific routes where nav doesn't make sense
-  const hiddenRoutes = isOnAppSubdomain 
-    ? ['/auth', '/onboarding']
-    : ['/app/auth', '/app/onboarding'];
+  const hiddenRoutes = ['/auth', '/onboarding'];
     
   if (hiddenRoutes.includes(location.pathname)) {
     return null;
   }
   
-  // Base paths depend on whether we're on the app subdomain or not
-  const basePath = isOnAppSubdomain ? '' : '/app';
-  
+  // Define navigation items with simple paths (no /app/ prefix)
   const navItems = [
-    { path: `${basePath}/home`, icon: Home, label: 'Home' },
-    { path: `${basePath}/journal`, icon: BookOpen, label: 'Journal' },
-    { path: `${basePath}/smart-chat`, icon: MessageCircle, label: 'Chat' },
-    { path: `${basePath}/insights`, icon: BarChart2, label: 'Insights' },
-    { path: `${basePath}/settings`, icon: Settings, label: 'Settings' },
+    { path: '/home', icon: Home, label: 'Home' },
+    { path: '/journal', icon: BookOpen, label: 'Journal' },
+    { path: '/smart-chat', icon: MessageCircle, label: 'Chat' },
+    { path: '/insights', icon: BarChart2, label: 'Insights' },
+    { path: '/settings', icon: Settings, label: 'Settings' },
   ];
 
-  // Improved active route detection for handling back navigation
+  // Active status just needs to check current path
   const getActiveStatus = (path: string) => {
-    // Handle both path formats based on domain
-    if (isOnAppSubdomain) {
-      // On app subdomain, compare with both /path and /app/path
-      return location.pathname.startsWith(path) || 
-             location.pathname.startsWith(path.replace(basePath, '')) ||
-             location.pathname.startsWith(path.replace('', '/app'));
-    }
-    
-    // On main domain, just check the path as is
     return location.pathname.startsWith(path);
   };
   

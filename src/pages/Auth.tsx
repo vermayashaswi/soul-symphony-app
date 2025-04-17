@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
 import { signInWithGoogle } from '@/services/authService';
-import { isAppRoute } from '@/routes/RouteHelpers';
+import { isAppSubdomain } from '@/routes/RouteHelpers';
 
 export default function Auth() {
   const location = useLocation();
@@ -21,26 +21,20 @@ export default function Auth() {
   const redirectParam = searchParams.get('redirectTo');
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
-  const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+  const isOnAppSubdomain = isAppSubdomain();
   
-  // Make sure we redirect to an app route with the proper path format
+  // No more need to manipulate paths - just use them directly
   const getValidRedirectPath = (path: string | null) => {
     if (!path) {
-      // Default redirect path based on domain
-      return isAppSubdomain ? '/home' : '/app/home';
+      return '/home';
     }
     
-    // If on subdomain, remove /app/ prefix if present
-    if (isAppSubdomain && path.startsWith('/app/')) {
+    // Remove /app prefix if present 
+    if (path.startsWith('/app/')) {
       return path.replace('/app/', '/');
     }
     
-    // If on main domain, ensure /app/ prefix
-    if (!isAppSubdomain && !path.startsWith('/app/') && isAppRoute(path)) {
-      return `/app${path}`;
-    }
-    
-    return isAppRoute(path) ? path : (isAppSubdomain ? '/home' : '/app/home');
+    return path;
   };
   
   // Determine where to redirect after auth
@@ -53,7 +47,7 @@ export default function Auth() {
     storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    isAppSubdomain
+    isOnAppSubdomain
   });
 
   useEffect(() => {

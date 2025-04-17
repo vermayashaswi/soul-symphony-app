@@ -25,6 +25,7 @@ const NotFound = ({ isAppSubdomain: isAppDomain }: NotFoundProps) => {
 
   // Determine the correct "back to home" path based on domain
   const homePath = isAppMode ? "/home" : "/";
+  const homeText = isAppMode ? "App Home" : "Home";
 
   return (
     <div className="min-h-screen">
@@ -46,19 +47,19 @@ const NotFound = ({ isAppSubdomain: isAppDomain }: NotFoundProps) => {
           <Button asChild size="lg" className="rounded-full">
             <Link to={homePath}>
               <ArrowLeft className="mr-2 h-4 w-4" />
-              Back to {isAppMode ? "App Home" : "Home"}
+              Back to {homeText}
             </Link>
           </Button>
           
           {isAppMode && (
             <div className="mt-4 text-sm text-muted-foreground">
-              <p>Looking for the main website? Go to <a href="https://soulo.online" className="text-primary hover:underline">soulo.online</a></p>
+              <p>Looking for the main website? Visit <a href="https://soulo.online" className="text-primary hover:underline">soulo.online</a></p>
             </div>
           )}
           
           {!isAppMode && (
             <div className="mt-4 text-sm text-muted-foreground">
-              <p>Looking for the app? Go to <a href="https://app.soulo.online" className="text-primary hover:underline">app.soulo.online</a></p>
+              <p>Looking for the app? Visit <a href="https://app.soulo.online" className="text-primary hover:underline">app.soulo.online</a></p>
             </div>
           )}
         </div>

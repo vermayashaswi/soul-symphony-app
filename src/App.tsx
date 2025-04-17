@@ -1,3 +1,4 @@
+
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as Sonner } from "@/components/ui/sonner";
 import { TooltipProvider } from "@/components/ui/tooltip";
@@ -13,6 +14,7 @@ import "./styles/mobile.css";
 import { useEffect } from 'react';
 import { handleAuthCallback } from "./services/authService";
 import { debugLogger } from "@/components/debug/DebugPanel.tsx";
+import { isAppSubdomain } from "./routes/RouteHelpers";
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -44,26 +46,25 @@ const App = () => {
       hostname: window.location.hostname
     });
     
-    // Add domain-specific handling for app.soulo.online
-    const isAppSubdomain = window.location.hostname === 'app.soulo.online';
+    // Domain-specific handling
+    const isOnAppSubdomain = isAppSubdomain();
+    
+    // Handle main domain navigation to /app/* paths
+    if (!isOnAppSubdomain && window.location.pathname.startsWith('/app/')) {
+      // Redirect from soulo.online/app/* to app.soulo.online/*
+      const newPath = window.location.pathname.replace('/app/', '/');
+      const newUrl = `https://app.soulo.online${newPath}${window.location.search}${window.location.hash}`;
+      console.log('Redirecting main domain /app path to app subdomain:', newUrl);
+      window.location.href = newUrl;
+      return;
+    }
     
     // Handle app subdomain path corrections
-    if (isAppSubdomain && window.location.pathname.startsWith('/app/')) {
+    if (isOnAppSubdomain && window.location.pathname.startsWith('/app/')) {
       // If we're on app.soulo.online/app/*, redirect to app.soulo.online/*
       const newPath = window.location.pathname.replace('/app/', '/');
       console.log('Redirecting from app subdomain path with /app/ prefix to:', newPath);
       window.history.replaceState(null, '', newPath);
-    }
-    
-    // Handle main domain redirects to app subdomain if configured
-    const shouldRedirectToAppSubdomain = false; // Set to true if you want to redirect all traffic
-    if (!isAppSubdomain && shouldRedirectToAppSubdomain && window.location.pathname.startsWith('/app/')) {
-      // If we're on soulo.online/app/*, redirect to app.soulo.online/*
-      const newPath = window.location.pathname.replace('/app/', '/');
-      const newUrl = `https://app.soulo.online${newPath}${window.location.search}${window.location.hash}`;
-      console.log('Redirecting to app subdomain:', newUrl);
-      window.location.href = newUrl;
-      return;
     }
     
     // Add a global error listener to catch runtime errors

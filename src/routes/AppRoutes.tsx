@@ -47,31 +47,30 @@ const AppRoutes = () => {
             </Route>
 
             {/* Redirect /app/* paths to the root path equivalents */}
-            <Route path="/app" element={<Navigate to="/" replace />} />
-            <Route path="/app/home" element={<Navigate to="/home" replace />} />
-            <Route path="/app/journal" element={<Navigate to="/journal" replace />} />
-            <Route path="/app/insights" element={<Navigate to="/insights" replace />} />
-            <Route path="/app/chat" element={<Navigate to="/chat" replace />} />
-            <Route path="/app/smart-chat" element={<Navigate to="/smart-chat" replace />} />
-            <Route path="/app/settings" element={<Navigate to="/settings" replace />} />
-            <Route path="/app/auth" element={<Navigate to="/auth" replace />} />
-            <Route path="/app/onboarding" element={<Navigate to="/onboarding" replace />} />
+            <Route path="/app/*" element={<Navigate to="/" replace />} />
+            
+            {/* Content routes on app subdomain */}
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+            <Route path="/blog" element={<BlogPage />} />
+            <Route path="/blog/:slug" element={<BlogPostPage />} />
+            <Route path="/faq" element={<FAQPage />} />
+            <Route path="/app-download" element={<AppDownload />} />
           </>
         ) : (
           <>
             {/* Main website routes */}
             <Route path="/" element={<Index />} />
-            <Route path="/privacy" element={<PrivacyPolicyPage />} />
+            <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
             <Route path="/faq" element={<FAQPage />} />
             <Route path="/download" element={<AppDownload />} />
             <Route path="/blog" element={<BlogPage />} />
             <Route path="/blog/:slug" element={<BlogPostPage />} />
             
-            {/* App routes on main domain - redirect to app subdomain */}
+            {/* Redirect app routes to app subdomain */}
             <Route path="/app" element={<Navigate to="https://app.soulo.online" replace />} />
             <Route path="/app/*" element={<Navigate to="https://app.soulo.online" replace />} />
             
-            {/* Legacy routes - redirect to app subdomain */}
+            {/* Redirect legacy app routes to app subdomain */}
             <Route path="/auth" element={<Navigate to="https://app.soulo.online/auth" replace />} />
             <Route path="/onboarding" element={<Navigate to="https://app.soulo.online/onboarding" replace />} />
             <Route path="/home" element={<Navigate to="https://app.soulo.online/home" replace />} />
