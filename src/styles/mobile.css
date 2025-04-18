@@ -604,26 +604,32 @@
     left: 50% !important;
     top: 50% !important;
     transform: translate(-50%, -50%) !important;
-    width: 95vw !important;
-    max-width: 95vw !important;
+    width: 90vw !important;
+    max-width: 90vw !important;
     margin: 0 auto !important;
   }
   
   /* Ensure dialog content fits on small screens */
   .DialogContent {
-    max-width: 95vw !important;
-    width: 95vw !important;
+    max-width: 90vw !important;
+    width: 90vw !important;
     padding: 16px !important;
     left: 50% !important;
     transform: translate(-50%, -50%) !important;
   }
-  
-  /* Ensure bottom padding for dialogs on mobile */
+
+  /* Adjusted dialog positioning for all radix dialogs */
   [role="dialog"] {
     padding-bottom: env(safe-area-inset-bottom, 16px) !important;
   }
   
-  /* Fix dialog buttons on mobile */
+  /* Mobile-optimized dialog styling */
+  [role="dialog"] .DialogContent {
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Better dialog buttons for mobile */
   .DialogFooter {
     flex-direction: row !important;
     justify-content: flex-end !important;
@@ -631,12 +637,16 @@
     margin-top: 16px !important;
   }
   
-  /* Ensure dialog fits within viewport */
-  [role="dialog"] .DialogContent {
-    max-height: 85vh !important;
-    overflow-y: auto !important;
+  /* Fix for dialog content visibility */
+  [data-radix-dialog-content] {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    max-width: 90vw !important;
+    width: 90vw !important;
   }
-  
+
   /* Dark mode support for the bottom navigation bar */
   .dark .fixed.bottom-0.bg-background,
   .dark .fixed.bottom-0.bg-white {

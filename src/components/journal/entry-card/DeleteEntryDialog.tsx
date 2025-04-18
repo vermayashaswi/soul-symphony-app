@@ -76,7 +76,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
           <Trash2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="sm:max-w-[425px] w-[95%] max-w-[95vw] mx-auto">
+      <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 sm:max-w-[425px] w-[90%] max-w-[90vw] mx-auto">
         <DialogHeader>
           <DialogTitle>Are you absolutely sure?</DialogTitle>
           <DialogDescription>
@@ -84,7 +84,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
             servers.
           </DialogDescription>
         </DialogHeader>
-        <DialogFooter className="flex space-x-2">
+        <DialogFooter className="flex flex-row justify-end space-x-2 mt-4">
           <Button type="button" variant="secondary" onClick={() => handleDialogChange(false)} disabled={isDeleting}>
             Cancel
           </Button>
