@@ -157,12 +157,12 @@ serve(async (req) => {
           
           try {
             console.log("Starting entity extraction for entry:", entryId);
-            // Modify the way we call the batch-extract-entities function to avoid the error
+            // Call with proper entryIds format
             const { error: invokeError } = await supabase.functions.invoke('batch-extract-entities', {
               body: {
                 processAll: false,
                 diagnosticMode: false,
-                entryId: entryId
+                entryIds: [entryId]  // Pass as array to match expected format
               }
             });
             

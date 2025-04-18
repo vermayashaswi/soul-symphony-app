@@ -1,3 +1,4 @@
+
 /**
  * Utilities for extracting themes from journal entries
  */
@@ -66,7 +67,7 @@ export async function triggerFullTextProcessing(entryId: number): Promise<boolea
   try {
     console.log(`Starting full text processing for entry ID: ${entryId}`);
     
-    // First clear existing analysis data
+    // First clear existing analysis data to ensure we get fresh results
     const { error: clearError } = await supabase
       .from('Journal Entries')
       .update({ 
@@ -128,7 +129,7 @@ export async function triggerFullTextProcessing(entryId: number): Promise<boolea
         body: {
           processAll: false,
           diagnosticMode: false,
-          entryId: entryId
+          entryIds: [entryId]  // Pass as array to match expected format
         }
       })
     ]);

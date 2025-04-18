@@ -44,7 +44,12 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         .from('Journal Entries')
         .update({ 
           "refined text": editedContent,
-          "Edit_Status": 1
+          "Edit_Status": 1,
+          // Reset analysis fields to ensure they're reprocessed
+          "sentiment": null,
+          "emotions": null,
+          "master_themes": null,
+          "entities": null
         })
         .eq('id', entryId);
         
@@ -65,7 +70,9 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       
       // Trigger full text processing in the background
       try {
+        // The full processing function handles all AI analysis (themes, sentiment, emotions, entities)
         await triggerFullTextProcessing(entryId);
+        console.log("Full text processing triggered successfully");
       } catch (processingError) {
         console.error('Processing failed but entry was updated:', processingError);
         // Don't show error toast as the main update succeeded
