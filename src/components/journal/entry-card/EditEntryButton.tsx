@@ -7,12 +7,12 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { triggerThemeExtraction } from '@/utils/audio/theme-extractor';
+import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
 
 interface EditEntryButtonProps {
   entryId: number;
   content: string;
-  onEntryUpdated: () => void;
+  onEntryUpdated: (newContent: string) => void;
 }
 
 export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryButtonProps) {
@@ -22,7 +22,6 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const isMobile = useIsMobile();
 
   const handleOpenDialog = () => {
-    // Reset content to original when opening dialog
     setEditedContent(content);
     setIsDialogOpen(true);
   };
@@ -40,59 +39,37 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      console.log('Updating entry:', entryId, 'with new content:', editedContent);
-      
-      // First, just update the text content
+      // First, update the text content
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
           "refined text": editedContent,
-          "Edit_Status": 1 // Keep status update
+          "Edit_Status": 1
         })
         .eq('id', entryId);
         
       if (updateError) {
         console.error("Error updating entry:", updateError);
         toast.error(`Failed to update entry: ${updateError.message}`);
-        setIsSubmitting(false);
         return;
       }
-      
-      // Successfully updated text, now update parent component first
-      onEntryUpdated();
+
+      // Update parent component with new content immediately
+      onEntryUpdated(editedContent);
       
       // Close dialog after successful update
       handleCloseDialog();
       
-      // Show a success toast for the update
+      // Show success toast
       toast.success('Journal entry updated');
       
-      // Now start theme extraction in the background
-      console.log('Starting theme extraction for entry:', entryId);
-      
-      // Clear themes in a separate update to avoid potential conflicts
-      const { error: themesUpdateError } = await supabase
-        .from('Journal Entries')
-        .update({ 
-          themes: null,
-          master_themes: null 
-        })
-        .eq('id', entryId);
-        
-      if (themesUpdateError) {
-        console.error("Error clearing themes:", themesUpdateError);
-        // Non-blocking - we already updated the text content
+      // Trigger full text processing in the background
+      try {
+        await triggerFullTextProcessing(entryId);
+      } catch (processingError) {
+        console.error('Processing failed but entry was updated:', processingError);
+        // Don't show error toast as the main update succeeded
       }
-      
-      // Trigger theme extraction asynchronously to avoid blocking the UI
-      triggerThemeExtraction(entryId)
-        .then(() => {
-          console.log('Theme extraction completed for entry:', entryId);
-          // Don't show a toast for theme completion to avoid confusion
-        })
-        .catch((extractionError) => {
-          console.error('Theme extraction failed but entry was updated:', extractionError);
-        });
       
     } catch (error) {
       console.error('Error updating journal entry:', error);

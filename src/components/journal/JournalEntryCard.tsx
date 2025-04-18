@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -33,6 +32,7 @@ export interface JournalEntry {
   predictedLanguages?: {
     [key: string]: number;
   } | null;
+  Edit_Status?: number | null;
 }
 
 interface JournalEntryCardProps {
@@ -40,13 +40,15 @@ interface JournalEntryCardProps {
   onDelete?: (entryId: number) => void;
   isNew?: boolean;
   isProcessing?: boolean;
+  setEntries: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
 }
 
 export function JournalEntryCard({ 
   entry, 
   onDelete, 
   isNew = false, 
-  isProcessing = false 
+  isProcessing = false,
+  setEntries
 }: JournalEntryCardProps) {
   const safeEntry = {
     id: entry?.id || 0,
@@ -54,7 +56,8 @@ export function JournalEntryCard({
     created_at: entry?.created_at || new Date().toISOString(),
     sentiment: entry?.sentiment || null,
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
-    themes: Array.isArray(entry?.themes) ? entry.themes : []
+    themes: Array.isArray(entry?.themes) ? entry.themes : [],
+    Edit_Status: entry?.Edit_Status || null
   };
 
   const [isExpanded, setIsExpanded] = useState(isNew);
@@ -289,6 +292,17 @@ export function JournalEntryCard({
                            (!safeEntry.themes || safeEntry.themes.length === 0) && 
                            (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
 
+  const handleEntryUpdate = (newContent: string) => {
+    // Update the local entry content immediately
+    setEntries(prevEntries => {
+      const updatedEntry = {
+        ...entry,
+        content: newContent
+      };
+      return prevEntries.map(e => e.id === entry.id ? updatedEntry : e);
+    });
+  };
+
   if (hasError) {
     return (
       <Card className="bg-background shadow-md border-red-300">
@@ -326,7 +340,14 @@ export function JournalEntryCard({
         <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''} ${getSentimentBorderClass()}`}>
           <div className="flex justify-between items-center p-3 md:p-4">
             <div className="flex items-center space-x-3">
-              <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">{createdAtFormatted}</h3>
+              <div className="flex flex-col">
+                <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
+                  {createdAtFormatted}
+                </h3>
+                {entry.Edit_Status === 1 && (
+                  <span className="text-xs text-muted-foreground">(edited)</span>
+                )}
+              </div>
             </div>
 
             <div className="flex items-center space-x-2">
@@ -337,7 +358,7 @@ export function JournalEntryCard({
               <EditEntryButton 
                 entryId={safeEntry.id}
                 content={safeEntry.content}
-                onEntryUpdated={handleRefresh}
+                onEntryUpdated={handleEntryUpdate}
               />
               <DeleteEntryDialog onDelete={handleDelete} />
             </div>
