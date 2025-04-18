@@ -22,6 +22,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const isMobile = useIsMobile();
 
   const handleOpenDialog = () => {
+    // Reset content to original when opening dialog
     setEditedContent(content);
     setIsDialogOpen(true);
   };
@@ -39,40 +40,59 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      // Update both the refined text and Edit_Status
+      console.log('Updating entry:', entryId, 'with new content:', editedContent);
+      
+      // First, just update the text content
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
           "refined text": editedContent,
-          "Edit_Status": 1,
-          themes: null, // Clear themes so they can be regenerated
-          master_themes: null 
+          "Edit_Status": 1 // Keep status update
         })
         .eq('id', entryId);
         
       if (updateError) {
         console.error("Error updating entry:", updateError);
-        toast.error('Failed to update entry');
+        toast.error(`Failed to update entry: ${updateError.message}`);
         setIsSubmitting(false);
         return;
       }
       
-      // Close dialog first to improve perceived performance
-      handleCloseDialog();
-      
-      // Notify parent that the entry was updated immediately after successful update
+      // Successfully updated text, now update parent component first
       onEntryUpdated();
+      
+      // Close dialog after successful update
+      handleCloseDialog();
       
       // Show a success toast for the update
       toast.success('Journal entry updated');
       
-      // Trigger theme extraction in the background
-      try {
-        await triggerThemeExtraction(entryId);
-        toast.success('Themes extraction completed');
-      } catch (extractionError) {
-        console.error('Theme extraction failed but entry was updated:', extractionError);
+      // Now start theme extraction in the background
+      console.log('Starting theme extraction for entry:', entryId);
+      
+      // Clear themes in a separate update to avoid potential conflicts
+      const { error: themesUpdateError } = await supabase
+        .from('Journal Entries')
+        .update({ 
+          themes: null,
+          master_themes: null 
+        })
+        .eq('id', entryId);
+        
+      if (themesUpdateError) {
+        console.error("Error clearing themes:", themesUpdateError);
+        // Non-blocking - we already updated the text content
       }
+      
+      // Trigger theme extraction asynchronously to avoid blocking the UI
+      triggerThemeExtraction(entryId)
+        .then(() => {
+          console.log('Theme extraction completed for entry:', entryId);
+          // Don't show a toast for theme completion to avoid confusion
+        })
+        .catch((extractionError) => {
+          console.error('Theme extraction failed but entry was updated:', extractionError);
+        });
       
     } catch (error) {
       console.error('Error updating journal entry:', error);
