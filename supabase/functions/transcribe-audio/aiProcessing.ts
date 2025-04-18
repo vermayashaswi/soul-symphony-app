@@ -1,4 +1,3 @@
-
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob,
   fileExtension: string,
@@ -206,12 +205,6 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
     console.log("[AI] Refining text:", text.substring(0, 100) + "...");
     console.log("[AI] Detected languages:", detectedLanguages);
     
-    // Skip refinement for very short text
-    if (text.length < 10) {
-      console.log("[AI] Text too short, skipping refinement");
-      return { refinedText: text };
-    }
-    
     const languageList = detectedLanguages.join(', ');
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -225,9 +218,7 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
         messages: [
           {
             role: "system",
-            content: `You are a helpful assistant that translates journal entries for a voice journaling app called SOuLO where users record their entries in multiple languages.
-
-User is recording his journal entry here and might have spoken multiple languages. Preserve the original meaning and translate as is. Do not summarize or change sentences but improve grammar and contextual meanings. Also correct for spelling mistakes.
+            content: `You are an expert translator assistant that translates multilingual journal entries for a voice journaling app called SOuLO where users record their entries in multiple languages.
 
 Here are the detected languages being used in this transcription text: ${languageList}
 
@@ -236,7 +227,8 @@ Your task is to:
 2. Improve contextual clarity
 3. Fix spelling mistakes
 4. Maintain the original tone and meaning
-5. Do not add or remove any information from the original text`
+5. Do not add or remove any information from the original text
+6. Preserve the original meaning and translate as is!`
           },
           {
             role: "user",
