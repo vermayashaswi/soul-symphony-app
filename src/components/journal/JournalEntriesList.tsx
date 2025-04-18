@@ -36,7 +36,7 @@ const JournalEntriesList = ({
 }: JournalEntriesListProps) => {
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
-  const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
+  const [localEntries, setLocalEntriesState] = useState<JournalEntry[]>([]);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [renderRetryCount, setRenderRetryCount] = useState(0);
   const [persistedProcessingEntries, setPersistedProcessingEntries] = useState<string[]>([]);
@@ -65,6 +65,17 @@ const JournalEntriesList = ({
   const displayedProcessingId = useRef<string | null>(null);
   const processingStateChangedRef = useRef(false);
   const dialogOpenRef = useRef(false);
+
+  // Fix for the duplicate setLocalEntries issue - use a callback that uses the state setter
+  const setLocalEntries = useCallback((entriesUpdate: React.SetStateAction<JournalEntry[]>) => {
+    const newEntries = typeof entriesUpdate === 'function' 
+      ? entriesUpdate(localEntries || []) 
+      : entriesUpdate;
+    
+    setLocalEntriesState(newEntries);
+    
+    console.log('[JournalEntriesList] Local entries updated, count:', newEntries.length);
+  }, [localEntries]);
 
   useEffect(() => {
     const handleEntryDeleted = (event: CustomEvent) => {
@@ -398,7 +409,7 @@ const JournalEntriesList = ({
         const uniqueEntries = [...recentlyProcessedEntries, ...regularEntries];
         const entryIds = uniqueEntries.map(entry => entry.id);
         
-        setLocalEntries(uniqueEntries);
+        setLocalEntriesState(uniqueEntries);
         setFilteredEntries(uniqueEntries);
         setSeenEntryIds(new Set(entryIds));
         
@@ -423,13 +434,13 @@ const JournalEntriesList = ({
         });
       } else {
         console.warn('[JournalEntriesList] Entries is not an array:', entries);
-        setLocalEntries([]);
+        setLocalEntriesState([]);
         setFilteredEntries([]);
       }
     } catch (error) {
       console.error('[JournalEntriesList] Error processing entries:', error);
       setRenderError(error instanceof Error ? error : new Error('Unknown error processing entries'));
-      setLocalEntries([]);
+      setLocalEntriesState([]);
       setFilteredEntries([]);
     }
 
@@ -606,16 +617,6 @@ const JournalEntriesList = ({
       }
     }
   };
-  
-  const setLocalEntries = useCallback((entriesUpdate: React.SetStateAction<JournalEntry[]>) => {
-    const newEntries = typeof entriesUpdate === 'function' 
-      ? entriesUpdate(localEntries || []) 
-      : entriesUpdate;
-    
-    setLocalEntries(newEntries);
-    
-    console.log('[JournalEntriesList] Local entries updated, count:', newEntries.length);
-  }, [localEntries]);
 
   useEffect(() => {
     return () => {
@@ -857,28 +858,4 @@ const JournalEntriesList = ({
                       "relative overflow-hidden"
                     }
                   >
-                    <JournalEntryCard 
-                      entry={entry} 
-                      onDelete={handleEntryDelete} 
-                      isNew={animatedEntryIds.includes(entry.id) || recentlyCompletedEntries.includes(entry.id)}
-                      isProcessing={false}
-                      setEntries={setLocalEntries}
-                    />
-                  </motion.div>
-                </ErrorBoundary>
-              ))
-            )}
-          </div>
-        </AnimatePresence>
-        
-        {loading && safeLocalEntries.length > 0 && !hasProcessingEntries && (
-          <div className="flex items-center justify-center h-16 mt-4">
-            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-          </div>
-        )}
-      </div>
-    </ErrorBoundary>
-  );
-};
-
-export default JournalEntriesList;
+                    <
