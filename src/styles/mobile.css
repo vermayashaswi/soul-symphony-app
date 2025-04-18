@@ -831,31 +831,36 @@
     background-color: hsla(var(--card), 0.5);
   }
   
-  /* Special iOS overrides that apply regardless of screen size */
-  @supports (-webkit-touch-callout: none) {
-    /* iOS-specific styles */
-    
-    /* Fix for notched devices */
-    .fixed {
-      padding-bottom: env(safe-area-inset-bottom, 0);
-    }
-    
-    /* Fix for bounce effect */
-    html, body {
-      overflow: hidden;
-      height: 100%;
-    }
-    
-    #root {
-      overflow: auto;
-      height: 100%;
-      -webkit-overflow-scrolling: touch;
-    }
-    
-    /* Fix for emotion bubbles on iOS */
-    .rounded-full {
-      -webkit-backface-visibility: hidden;
-      -webkit-transform: translateZ(0) scale(1.0, 1.0);
-    }
+  /* FIXED: Modal and Dialog positioning to ensure they're always centered and visible */
+  /* This is the key fix for dialogs and modals appearing off-screen */
+  [role="dialog"] {
+    position: fixed !important;
+    max-width: 90vw !important;
+    width: 90vw !important;
+    margin: 0 auto !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
   }
-}
+  
+  /* Force all modal content to stay within viewport */
+  [data-radix-dialog-content],
+  [data-radix-alert-dialog-content],
+  [data-radix-popover-content],
+  [data-radix-dropdown-content] {
+    max-width: 90vw !important;
+    width: 90vw !important;
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    position: fixed !important;
+    margin: 0 !important;
+  }
+  
+  /* Force any portal-based content to be properly positioned */
+  [data-radix-popper-content-wrapper] {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;

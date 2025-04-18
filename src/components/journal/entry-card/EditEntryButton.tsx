@@ -95,7 +95,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       </Button>
       
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
-        <DialogContent className="fixed left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-lg mx-auto overflow-y-auto max-h-[85vh]">
+        <DialogContent className="w-[90%] max-w-lg mx-auto">
           <DialogHeader>
             <DialogTitle>Edit Journal Entry</DialogTitle>
           </DialogHeader>
