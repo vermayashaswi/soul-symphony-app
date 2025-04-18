@@ -76,7 +76,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
           <Trash2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="fixed left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 sm:max-w-[425px] w-[90%] max-w-[90vw] mx-auto">
+      <DialogContent className="fixed left-[50%] top-[50%] -translate-x-1/2 -translate-y-1/2 w-[90%] max-w-md mx-auto">
         <DialogHeader>
           <DialogTitle>Are you absolutely sure?</DialogTitle>
           <DialogDescription>
