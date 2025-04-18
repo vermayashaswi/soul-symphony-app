@@ -39,11 +39,12 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      // Update the journal entry content in the "refined text" column
+      // Update both the refined text and Edit_Status
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
           "refined text": editedContent,
+          "Edit_Status": 1,
           themes: null, // Clear themes so they can be regenerated
           master_themes: null 
         })

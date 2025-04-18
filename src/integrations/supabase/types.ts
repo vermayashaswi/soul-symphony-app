@@ -100,6 +100,7 @@ export type Database = {
           audio_url: string | null
           created_at: string
           duration: number | null
+          Edit_Status: number
           emotions: Json | null
           entities: Json | null
           "foreign key": string | null
@@ -115,6 +116,7 @@ export type Database = {
           audio_url?: string | null
           created_at?: string
           duration?: number | null
+          Edit_Status?: number
           emotions?: Json | null
           entities?: Json | null
           "foreign key"?: string | null
@@ -130,6 +132,7 @@ export type Database = {
           audio_url?: string | null
           created_at?: string
           duration?: number | null
+          Edit_Status?: number
           emotions?: Json | null
           entities?: Json | null
           "foreign key"?: string | null
