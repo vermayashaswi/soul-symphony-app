@@ -293,14 +293,31 @@ export function JournalEntryCard({
                            (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
 
   const handleEntryUpdate = (newContent: string) => {
-    // Update the local entry content immediately
+    console.log(`[JournalEntryCard] Updating entry ${entry.id} with new content: "${newContent.substring(0, 30)}..."`);
+    
     setEntries(prevEntries => {
-      const updatedEntry = {
-        ...entry,
-        content: newContent
-      };
-      return prevEntries.map(e => e.id === entry.id ? updatedEntry : e);
+      return prevEntries.map(e => {
+        if (e.id === entry.id) {
+          return {
+            ...e,
+            content: newContent,
+            Edit_Status: 1,
+            sentiment: null,
+            emotions: null,
+            master_themes: [],
+            entities: []
+          };
+        }
+        return e;
+      });
     });
+    
+    setTimeout(() => {
+      console.log('[JournalEntryCard] Triggering re-fetch for updated analysis data');
+      window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
+        detail: { entryId: entry.id }
+      }));
+    }, 5000);
   };
 
   if (hasError) {

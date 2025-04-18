@@ -109,6 +109,9 @@ export async function triggerFullTextProcessing(entryId: number): Promise<boolea
     }
 
     // Call functions in parallel for better performance
+    console.log(`Dispatching parallel processing operations for entry ID: ${entryId}`);
+    console.log(`Text length: ${text.length} characters`);
+    
     const [
       themesPromise,
       sentimentPromise,
@@ -139,6 +142,43 @@ export async function triggerFullTextProcessing(entryId: number): Promise<boolea
       sentiment: sentimentPromise.status,
       entities: entitiesPromise.status
     });
+    
+    // Add detailed logging for each function result
+    if (themesPromise.status === 'fulfilled') {
+      console.log('Themes processing succeeded');
+    } else {
+      console.error('Themes processing failed:', themesPromise.reason);
+    }
+    
+    if (sentimentPromise.status === 'fulfilled') {
+      console.log('Sentiment analysis succeeded');
+    } else {
+      console.error('Sentiment analysis failed:', sentimentPromise.reason);
+    }
+    
+    if (entitiesPromise.status === 'fulfilled') {
+      console.log('Entities extraction succeeded');
+    } else {
+      console.error('Entities extraction failed:', entitiesPromise.reason);
+    }
+
+    // Verify processing by fetching the updated entry
+    try {
+      const { data: updatedEntry } = await supabase
+        .from('Journal Entries')
+        .select('sentiment, emotions, master_themes, entities')
+        .eq('id', entryId)
+        .single();
+        
+      console.log('Updated entry processing status:', {
+        hasSentiment: updatedEntry?.sentiment !== null,
+        hasEmotions: updatedEntry?.emotions !== null,
+        hasThemes: Array.isArray(updatedEntry?.master_themes) && updatedEntry?.master_themes.length > 0,
+        hasEntities: Array.isArray(updatedEntry?.entities) && updatedEntry?.entities.length > 0
+      });
+    } catch (verifyError) {
+      console.error('Error verifying processing results:', verifyError);
+    }
 
     return true;
   } catch (err) {

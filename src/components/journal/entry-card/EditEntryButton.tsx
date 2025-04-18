@@ -59,7 +59,8 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         return;
       }
 
-      // Update parent component with new content immediately
+      // Critical fix: Update parent component with new content BEFORE closing dialog
+      // This ensures the UI is updated immediately
       onEntryUpdated(editedContent);
       
       // Close dialog after successful update

@@ -127,6 +127,7 @@ serve(async (req) => {
     }
     
     console.log(`Received request to extract themes for entry ${entryId || 'unknown'}`);
+    console.log(`Text length: ${text.length} characters, beginning: "${text.substring(0, 50)}..."`);
     
     const { themes } = await extract_themes(text);
     

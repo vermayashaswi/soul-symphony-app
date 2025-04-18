@@ -750,6 +750,23 @@ const Journal = () => {
     setLastAction(`Recorder: ${info.status}`);
   };
 
+  // Add an event listener for journal entry updates
+  useEffect(() => {
+    const handleJournalEntryUpdated = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId) {
+        console.log(`[Journal] Entry updated event detected for ID: ${event.detail.entryId}, refreshing data`);
+        setRefreshKey(prev => prev + 1);
+        fetchEntries();
+      }
+    };
+    
+    window.addEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
+    
+    return () => {
+      window.removeEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
+    };
+  }, [fetchEntries]);
+
   return (
     <ErrorBoundary onReset={resetError}>
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
@@ -873,4 +890,4 @@ const Journal = () => {
   );
 };
 
-export default Journal;
+export default Journal

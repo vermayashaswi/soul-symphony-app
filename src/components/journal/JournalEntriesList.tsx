@@ -26,14 +26,14 @@ interface JournalEntriesListProps {
   onDeleteEntry?: (entryId: number) => Promise<void> | void;
 }
 
-export default function JournalEntriesList({ 
+const JournalEntriesList = ({ 
   entries = [],
   loading = false, 
   processingEntries = [], 
   processedEntryIds = [],
   onStartRecording, 
   onDeleteEntry 
-}: JournalEntriesListProps) {
+}: JournalEntriesListProps) => {
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
   const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
@@ -607,6 +607,16 @@ export default function JournalEntriesList({
     }
   };
   
+  const setLocalEntries = useCallback((entriesUpdate: React.SetStateAction<JournalEntry[]>) => {
+    const newEntries = typeof entriesUpdate === 'function' 
+      ? entriesUpdate(localEntries || []) 
+      : entriesUpdate;
+    
+    setLocalEntries(newEntries);
+    
+    console.log('[JournalEntriesList] Local entries updated, count:', newEntries.length);
+  }, [localEntries]);
+
   useEffect(() => {
     return () => {
       console.log("[JournalEntriesList] Component unmounting");
@@ -752,7 +762,7 @@ export default function JournalEntriesList({
 
   return (
     <ErrorBoundary>
-      <div>
+      <div className="space-y-4 pb-20">
         <div className="space-y-4 mb-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Your Journal Entries</h2>
@@ -869,4 +879,6 @@ export default function JournalEntriesList({
       </div>
     </ErrorBoundary>
   );
-}
+};
+
+export default JournalEntriesList;
