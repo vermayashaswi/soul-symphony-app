@@ -1,5 +1,4 @@
-
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { JournalEntry, JournalEntryCard } from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
 import { Plus, Loader2, Mic, FileText, CheckCircle2, AlertTriangle } from 'lucide-react';
@@ -67,13 +66,11 @@ export default function JournalEntriesList({
   const processingStateChangedRef = useRef(false);
   const dialogOpenRef = useRef(false);
 
-  // Listen for entry deletion events
   useEffect(() => {
     const handleEntryDeleted = (event: CustomEvent) => {
       if (event.detail && event.detail.entryId) {
         console.log(`[JournalEntriesList] Entry deleted event: ${event.detail.entryId}`);
         
-        // Update local deleted state sets
         if (typeof event.detail.entryId === 'number') {
           setDeletedEntryIds(prev => {
             const newSet = new Set(prev);
@@ -88,26 +85,19 @@ export default function JournalEntriesList({
           });
         }
         
-        // Update visibleProcessingEntries
         setVisibleProcessingEntries(prev => prev.filter(id => {
-          // Remove if it's the one that was just deleted
           if (id === event.detail.entryId) return false;
-          
-          // Remove if its mapped entry was just deleted
           const mappedId = getEntryIdForProcessingId(id);
           if (mappedId && mappedId === event.detail.entryId) return false;
-          
           return true;
         }));
-
-        // Set the processing card visibility to false after any deletion
+        
         setProcessingCardShouldShow(false);
       }
     };
     
     window.addEventListener('entryDeleted', handleEntryDeleted as EventListener);
     
-    // Sync with global deleted entries state
     const syncDeletedEntries = () => {
       try {
         const { processingIds, entryIds } = getDeletedEntryIds();
@@ -119,10 +109,8 @@ export default function JournalEntriesList({
       }
     };
     
-    // Initial sync
     syncDeletedEntries();
     
-    // Sync periodically
     const syncInterval = setInterval(syncDeletedEntries, 2000);
     
     return () => {
@@ -146,7 +134,6 @@ export default function JournalEntriesList({
           return;
         }
         
-        // Set processing card visibility to false as we have a real entry now
         setProcessingCardShouldShow(false);
         
         setProcessedProcessingIds(prev => {
@@ -247,7 +234,6 @@ export default function JournalEntriesList({
         if (matchedEntry) {
           console.log(`[JournalEntriesList] Found actual entry data for ${tempId}:`, matchedEntry.id);
           
-          // Set processing card visibility to false as we have a real entry
           setProcessingCardShouldShow(false);
           
           setFullyProcessedEntries(prev => {
@@ -299,7 +285,6 @@ export default function JournalEntriesList({
           
         setVisibleProcessingEntries(visibleEntries);
         
-        // Only show processing card if we actually have valid entries that aren't processed or deleted
         setProcessingCardShouldShow(visibleEntries.length > 0);
       } else {
         setPersistedProcessingEntries([]);
@@ -314,7 +299,6 @@ export default function JournalEntriesList({
       processingStateChangedRef.current = true;
       
       if (event.detail && Array.isArray(event.detail.entries)) {
-        // If we have a removedId, update our deleted sets
         if (event.detail.removedId) {
           const removedId = event.detail.removedId;
           if (typeof removedId === 'number' || !isNaN(Number(removedId))) {
@@ -332,7 +316,6 @@ export default function JournalEntriesList({
             });
           }
           
-          // Always hide processing card when an entry is removed
           setProcessingCardShouldShow(false);
         }
         
@@ -355,8 +338,6 @@ export default function JournalEntriesList({
           
           setVisibleProcessingEntries(entriesToDisplay);
           
-          // Only show processing card if we have valid entries to display
-          // AND no dialog is open (to prevent showing on dialog close)
           setProcessingCardShouldShow(entriesToDisplay.length > 0 && !dialogOpenRef.current);
         } else {
           setPersistedProcessingEntries([]);
@@ -421,7 +402,6 @@ export default function JournalEntriesList({
         setFilteredEntries(uniqueEntries);
         setSeenEntryIds(new Set(entryIds));
         
-        // Update visible processing entries
         setVisibleProcessingEntries(prev => {
           const filtered = prev.filter(tempId => {
             if (transitionalLoadingEntries.includes(tempId)) return true;
@@ -430,11 +410,13 @@ export default function JournalEntriesList({
             const mappedEntryId = getEntryIdForProcessingId(tempId);
             if (!mappedEntryId) return true;
             
-            // Don't show if the mapped entry is in our entries list or is deleted
-            return !entryIds.includes(mappedEntryId) && !deletedEntryIds.has(mappedEntryId);
+            if (!entryIds.includes(mappedEntryId) && !deletedEntryIds.has(mappedEntryId)) {
+              return true;
+            }
+            
+            return false;
           });
           
-          // Update processing card visibility based on filtered entries
           setProcessingCardShouldShow(filtered.length > 0 && !dialogOpenRef.current);
           
           return filtered;
@@ -490,7 +472,6 @@ export default function JournalEntriesList({
                   return newSet;
                 });
                 
-                // Hide processing card when an entry is fully processed
                 setProcessingCardShouldShow(false);
               }
             });
@@ -538,7 +519,6 @@ export default function JournalEntriesList({
     try {
       console.log(`[JournalEntriesList] Handling deletion of entry ${entryId}`);
       
-      // Set references to track dialog state
       dialogOpenRef.current = true;
       
       pendingDeletions.current.add(entryId);
@@ -548,7 +528,6 @@ export default function JournalEntriesList({
         return newSet;
       });
       
-      // Always hide the processing card when deletion starts
       setProcessingCardShouldShow(false);
       
       const tempIdsToDelete: string[] = [];
@@ -598,10 +577,8 @@ export default function JournalEntriesList({
         });
       });
       
-      // Clean up in audio-processing
       removeProcessingEntryById(entryId);
       
-      // Update local entries for immediate UI response
       setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
       setFilteredEntries(prev => prev.filter(entry => entry.id !== entryId));
       
@@ -611,12 +588,10 @@ export default function JournalEntriesList({
             try {
               await onDeleteEntry(entryId);
               pendingDeletions.current.delete(entryId);
-              // Reset dialog state after deletion completes
               dialogOpenRef.current = false;
             } catch (error) {
               console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
               pendingDeletions.current.delete(entryId);
-              // Reset dialog state on error
               dialogOpenRef.current = false;
             }
           }
@@ -627,7 +602,6 @@ export default function JournalEntriesList({
       
       if (componentMounted.current) {
         pendingDeletions.current.delete(entryId);
-        // Reset dialog state on error
         dialogOpenRef.current = false;
       }
     }
@@ -753,6 +727,7 @@ export default function JournalEntriesList({
           onDelete={handleEntryDelete}
           isNew={true}
           isProcessing={false}
+          setEntries={setLocalEntries}
         />
         <motion.div
           initial={{ opacity: 1 }}
@@ -766,7 +741,6 @@ export default function JournalEntriesList({
     );
   };
 
-  // Enhanced condition to prevent showing processing card after deletions or dialog interactions
   const shouldShowProcessingCard = hasProcessingEntries && 
     processingCardShouldShow &&
     !processedTransitionalEntries.some(id => id === mainProcessingEntryId) &&
@@ -878,6 +852,7 @@ export default function JournalEntriesList({
                       onDelete={handleEntryDelete} 
                       isNew={animatedEntryIds.includes(entry.id) || recentlyCompletedEntries.includes(entry.id)}
                       isProcessing={false}
+                      setEntries={setLocalEntries}
                     />
                   </motion.div>
                 </ErrorBoundary>
