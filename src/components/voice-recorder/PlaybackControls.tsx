@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
@@ -7,8 +6,6 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { clearAllToasts } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useDebugLog } from '@/utils/debug/DebugContext';
-import { updateProcessingEntries } from '@/utils/audio/processing-state';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
@@ -197,7 +194,7 @@ export function PlaybackControls({
         <div className="flex justify-center gap-3">
           <Button 
             variant="outline" 
-            className="rounded-full"
+            className="rounded-full px-4"
             onClick={onRestart}
             disabled={isProcessing}
           >
@@ -206,7 +203,7 @@ export function PlaybackControls({
           
           <Button 
             variant="default" 
-            className="rounded-full bg-green-600 hover:bg-green-700"
+            className="rounded-full px-4 bg-green-600 hover:bg-green-700"
             onClick={handleSaveEntry}
             disabled={isProcessing || isClearingToasts || !audioBlob || audioBlob.size < 100}
           >

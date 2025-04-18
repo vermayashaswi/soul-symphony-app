@@ -52,12 +52,14 @@ export function RecordingButton({
         className={cn(
           "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
           isRecording ? "bg-red-500 border-red-600" : "bg-theme-color hover:bg-theme-color/90 border-theme-color/20",
-          "w-20 h-20"
+          "w-20 h-20",
+          audioBlob && "opacity-50 cursor-not-allowed" // Grey out when recording is done
         )}
         style={{
           boxShadow: isRecording ? `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined
         }}
         whileTap={{ scale: 0.95 }}
+        disabled={audioBlob !== null} // Disable when recording is done
       >
         {isRecording ? (
           <Square className="w-7 h-7 text-white" />

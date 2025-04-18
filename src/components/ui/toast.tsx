@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import * as ToastPrimitives from "@radix-ui/react-toast"
 import { cva, type VariantProps } from "class-variance-authority"
@@ -46,12 +45,10 @@ const Toast = React.forwardRef<
   React.ComponentPropsWithoutRef<typeof ToastPrimitives.Root> &
     VariantProps<typeof toastVariants>
 >(({ className, variant, ...props }, ref) => {
-  // Create a ref that matches the expected element type of ToastPrimitives.Root
   const toastRef = React.useRef<React.ElementRef<typeof ToastPrimitives.Root>>(null);
   const { onOpenChange } = props;
   const { colorTheme, theme, systemTheme } = useTheme();
   
-  // Determine if we're in dark mode
   const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
   
   useSwipeGesture(toastRef as React.RefObject<HTMLElement>, {
@@ -77,7 +74,6 @@ const Toast = React.forwardRef<
         toastVariants({ variant }), 
         className, 
         "bg-theme border-theme/30",
-        // Apply black text regardless of theme
         "text-black"
       )}
       {...props}
@@ -109,7 +105,7 @@ const ToastClose = React.forwardRef<
     <ToastPrimitives.Close
       ref={ref}
       className={cn(
-        "absolute right-2 top-2 rounded-md p-1 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100",
+        "absolute right-2 top-2 rounded-full p-1 opacity-0 transition-opacity hover:opacity-100 focus:opacity-100 focus:outline-none focus:ring-2 group-hover:opacity-100",
         "text-black/50 hover:text-black focus:ring-black",
         className
       )}
