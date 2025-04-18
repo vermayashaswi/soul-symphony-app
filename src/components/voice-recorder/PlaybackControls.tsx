@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
@@ -6,6 +7,8 @@ import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
 import { clearAllToasts } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useDebugLog } from '@/utils/debug/DebugContext';
+import { updateProcessingEntries } from '@/utils/audio/processing-state';
 
 interface PlaybackControlsProps {
   audioBlob: Blob | null;
