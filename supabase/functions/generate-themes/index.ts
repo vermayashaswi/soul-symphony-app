@@ -120,19 +120,48 @@ serve(async (req) => {
   }
 
   try {
-    const { text, entryId } = await req.json();
+    // Parse the request to see if it contains text directly or if we need to fetch an entry
+    const requestData = await req.json();
+    const { text, entryId, fromEdit = false } = requestData;
     
-    if (!text) {
+    let textToProcess = text;
+    let entryIdToUpdate = entryId;
+    
+    // If no direct text was provided but entryId was, fetch the entry text
+    if (!textToProcess && entryIdToUpdate) {
+      console.log(`No direct text provided, fetching text for entry ${entryIdToUpdate}`);
+      
+      const { data: entryData, error: entryError } = await supabase
+        .from('Journal Entries')
+        .select('"refined text"')
+        .eq('id', entryIdToUpdate)
+        .single();
+        
+      if (entryError) {
+        console.error(`Error fetching entry ${entryIdToUpdate}:`, entryError);
+        throw new Error(`Failed to fetch entry: ${entryError.message}`);
+      }
+      
+      if (!entryData || !entryData["refined text"]) {
+        console.error(`Entry ${entryIdToUpdate} has no refined text`);
+        throw new Error('Entry has no text content to process');
+      }
+      
+      textToProcess = entryData["refined text"];
+      console.log(`Retrieved text for entry ${entryIdToUpdate}, length: ${textToProcess.length}`);
+    }
+    
+    if (!textToProcess) {
       throw new Error('No text provided for theme extraction');
     }
     
-    console.log(`Received request to extract themes for entry ${entryId || 'unknown'}`);
-    console.log(`Text length: ${text.length} characters, beginning: "${text.substring(0, 50)}..."`);
+    console.log(`Processing ${fromEdit ? 'edited' : 'new'} entry ${entryIdToUpdate || 'unknown'}`);
+    console.log(`Text length: ${textToProcess.length} characters, beginning: "${textToProcess.substring(0, 50)}..."`);
     
-    const { themes } = await extract_themes(text);
+    const { themes } = await extract_themes(textToProcess);
     
-    if (entryId) {
-      console.log(`Updating entry ${entryId} with themes:`, themes);
+    if (entryIdToUpdate) {
+      console.log(`Updating entry ${entryIdToUpdate} with themes:`, themes);
       
       const updates: any = {};
       
@@ -149,21 +178,21 @@ serve(async (req) => {
         const { error } = await supabase
           .from('Journal Entries')
           .update(updates)
-          .eq('id', entryId);
+          .eq('id', entryIdToUpdate);
           
         if (error) {
-          console.error(`Error updating entry ${entryId}:`, error);
+          console.error(`Error updating entry ${entryIdToUpdate}:`, error);
         } else {
-          console.log(`Successfully updated entry ${entryId} with themes:`, themes);
+          console.log(`Successfully updated entry ${entryIdToUpdate} with themes:`, themes);
           
           try {
-            console.log("Starting entity extraction for entry:", entryId);
+            console.log("Starting entity extraction for entry:", entryIdToUpdate);
             // Call with proper entryIds format
             const { error: invokeError } = await supabase.functions.invoke('batch-extract-entities', {
               body: {
                 processAll: false,
                 diagnosticMode: false,
-                entryIds: [entryId]  // Pass as array to match expected format
+                entryIds: [entryIdToUpdate]  // Pass as array to match expected format
               }
             });
             

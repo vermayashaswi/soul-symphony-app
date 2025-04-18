@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -61,23 +60,48 @@ serve(async (req) => {
   }
 
   try {
-    const { userId } = await req.json();
-    console.log('Processing journal entries for user:', userId);
-
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
-    // Fetch all entries from the database that don't have sentiment analysis yet
-    const { data: entries, error: fetchError } = await supabase
-      .from('Journal Entries')
-      .select('id, "refined text"')
-      .eq('user_id', userId)
-      .is('sentiment', null);
+    const reqData = await req.json();
+    const { userId, entryIds } = reqData;
     
-    if (fetchError) {
-      console.error('Error fetching entries:', fetchError);
-      throw fetchError;
+    console.log('Processing request with params:', {
+      userId: userId || 'not provided',
+      entryIds: entryIds ? `[${entryIds.join(', ')}]` : 'not provided'
+    });
+
+    let entries;
+    
+    // Check if specific entry IDs were provided
+    if (entryIds && Array.isArray(entryIds) && entryIds.length > 0) {
+      console.log(`Processing specific entries: ${entryIds.join(', ')}`);
+      
+      const { data: specificEntries, error: fetchSpecificError } = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text"')
+        .in('id', entryIds);
+      
+      if (fetchSpecificError) {
+        throw fetchSpecificError;
+      }
+      
+      entries = specificEntries;
+    } 
+    // Otherwise, if userId is provided, get entries for that user
+    else if (userId) {
+      console.log('Processing journal entries for user:', userId);
+      
+      const { data: userEntries, error: fetchError } = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text"')
+        .eq('user_id', userId)
+        .is('sentiment', null);
+      
+      if (fetchError) {
+        throw fetchError;
+      }
+      
+      entries = userEntries;
+    } else {
+      throw new Error('Either userId or entryIds must be provided');
     }
 
     console.log(`Found ${entries?.length || 0} entries to process`);

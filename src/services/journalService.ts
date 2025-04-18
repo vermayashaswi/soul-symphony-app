@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
@@ -134,5 +135,52 @@ export const fetchJournalEntries = async (
   } catch (error: any) {
     console.error('[JournalService] Error fetching entries:', error);
     throw error;
+  }
+};
+
+/**
+ * Reprocesses a journal entry's text to update analysis fields
+ */
+export const reprocessJournalEntry = async (entryId: number): Promise<boolean> => {
+  try {
+    console.log(`[JournalService] Triggering reprocessing for entry ID: ${entryId}`);
+    
+    // Get the entry's refined text
+    const { data: entryData, error: fetchError } = await supabase
+      .from('Journal Entries')
+      .select('"refined text"')
+      .eq('id', entryId)
+      .single();
+      
+    if (fetchError || !entryData) {
+      console.error('[JournalService] Error fetching entry text:', fetchError);
+      return false;
+    }
+    
+    const textToProcess = entryData["refined text"];
+    if (!textToProcess) {
+      console.error('[JournalService] No text to process for entry:', entryId);
+      return false;
+    }
+    
+    // Trigger theme extraction with the text
+    const { error: themeError } = await supabase.functions.invoke('generate-themes', {
+      body: { 
+        text: textToProcess,
+        entryId: entryId,
+        fromEdit: true
+      }
+    });
+    
+    if (themeError) {
+      console.error('[JournalService] Error triggering theme extraction:', themeError);
+      return false;
+    }
+    
+    console.log('[JournalService] Successfully triggered reprocessing for entry:', entryId);
+    return true;
+  } catch (error: any) {
+    console.error('[JournalService] Error reprocessing journal entry:', error);
+    return false;
   }
 };
