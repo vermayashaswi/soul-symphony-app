@@ -597,216 +597,255 @@
     backface-visibility: hidden;
     will-change: transform;
   }
-}
-
-/* Dark mode support for the bottom navigation bar */
-.dark .fixed.bottom-0.bg-background,
-.dark .fixed.bottom-0.bg-white {
-  background-color: hsl(var(--background)) !important;
-  border-color: hsl(var(--border)) !important;
-}
-
-/* Improve the contrast of the navigation text in dark mode */
-.dark .text-muted-foreground {
-  color: hsl(var(--muted-foreground));
-}
-
-/* Fix for any lingering white backgrounds in dark mode */
-.dark [class*="bg-white"] {
-  background-color: hsl(var(--background)) !important;
-}
-
-/* Ensure the bottom nav has a subtle blur in dark mode */
-.dark .fixed.bottom-0 {
-  backdrop-filter: blur(8px);
-  box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
-}
-
-/* Dark mode support for sticky elements */
-.dark .sticky {
-  background-color: hsl(var(--background));
-  border-bottom: 1px solid hsl(var(--border));
-}
-
-/* Add new animations for language elements */
-@keyframes float-in {
-  0% {
-    opacity: 0;
-    transform: translateY(20px);
-  }
-  100% {
-    opacity: 1;
-    transform: translateY(0);
-  }
-}
-
-@keyframes float-around {
-  0%, 100% {
-    transform: translate(0, 0);
-  }
-  25% {
-    transform: translate(5px, -5px);
-  }
-  50% {
-    transform: translate(0, -10px);
-  }
-  75% {
-    transform: translate(-5px, -5px);
-  }
-}
-
-.float-in {
-  animation: float-in 0.8s ease-out forwards;
-}
-
-.float-around {
-  animation: float-around 10s ease-in-out infinite;
-}
-
-/* Improved animation related styles */
-.language-animation-word {
-  transition: all 0.3s ease;
-  opacity: 0.8;
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-}
-
-.language-animation-container {
-  perspective: 1000px;
-  will-change: transform;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-}
-
-.language-animation-3d {
-  transform-style: preserve-3d;
-}
-
-/* Optimize animation performance */
-.will-change-transform {
-  will-change: transform, opacity;
-  backface-visibility: hidden;
-  transform: translateZ(0);
-}
-
-/* Add fluid motion to animations */
-.fluid-motion {
-  transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-/* Improve animation smoothness */
-.smooth-float {
-  animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
-  animation-fill-mode: both;
-}
-
-/* Chat Thread List Styles - Updated for better visibility in both light and dark modes */
-.chat-thread-list .thread-item {
-  position: relative;
-}
-
-.chat-thread-list .thread-action-buttons {
-  position: absolute;
-  right: 0;
-  top: 0;
-  bottom: 0;
-  display: flex;
-  align-items: center;
-  padding-right: 4px;
-  z-index: 10;
-  /* Shift left by 25% */
-  transform: translateX(-25%);
-}
-
-.chat-thread-list .thread-edit-button,
-.chat-thread-list .thread-delete-button {
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 2px;
-  border-radius: 6px;
-  transition: all 0.2s ease;
-  background-color: hsla(var(--background), 0.8);
-  /* Always visible */
-  opacity: 1 !important;
-}
-
-/* Light mode styles */
-.chat-thread-list .thread-edit-button {
-  color: hsl(var(--primary));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-.chat-thread-list .thread-delete-button {
-  color: hsl(var(--destructive));
-  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
-}
-
-/* Dark mode styles */
-.dark .chat-thread-list .thread-edit-button,
-.dark .chat-thread-list .thread-delete-button {
-  background-color: hsla(var(--card), 0.7);
-  box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
-}
-
-.dark .chat-thread-list .thread-edit-button {
-  color: hsl(var(--primary));
-}
-
-.dark .chat-thread-list .thread-delete-button {
-  color: hsl(var(--destructive));
-}
-
-/* Hover effects */
-.chat-thread-list .thread-edit-button:hover,
-.chat-thread-list .thread-delete-button:hover {
-  transform: translateY(-1px);
-  box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
-}
-
-/* Active effects */
-.chat-thread-list .thread-edit-button:active,
-.chat-thread-list .thread-delete-button:active {
-  transform: translateY(1px);
-  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
-}
-
-/* Add a subtle background on hover to highlight the action area */
-.chat-thread-list .thread-item:hover .thread-action-buttons {
-  background-color: hsla(var(--background), 0.5);
-  backdrop-filter: blur(4px);
-  border-radius: 0 0.375rem 0.375rem 0;
-}
-
-.dark .chat-thread-list .thread-item:hover .thread-action-buttons {
-  background-color: hsla(var(--card), 0.5);
-}
-
-/* Special iOS overrides that apply regardless of screen size */
-@supports (-webkit-touch-callout: none) {
-  /* iOS-specific styles */
   
-  /* Fix for notched devices */
-  .fixed {
-    padding-bottom: env(safe-area-inset-bottom, 0);
+  /* Improved dialog positioning for mobile */
+  [data-radix-popper-content-wrapper] {
+    position: fixed !important;
+    left: 50% !important;
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+    width: 95vw !important;
+    max-width: 95vw !important;
+    margin: 0 auto !important;
   }
   
-  /* Fix for bounce effect */
-  html, body {
-    overflow: hidden;
-    height: 100%;
+  /* Ensure dialog content fits on small screens */
+  .DialogContent {
+    max-width: 95vw !important;
+    width: 95vw !important;
+    padding: 16px !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
   }
   
-  #root {
-    overflow: auto;
-    height: 100%;
-    -webkit-overflow-scrolling: touch;
+  /* Ensure bottom padding for dialogs on mobile */
+  [role="dialog"] {
+    padding-bottom: env(safe-area-inset-bottom, 16px) !important;
   }
   
-  /* Fix for emotion bubbles on iOS */
-  .rounded-full {
-    -webkit-backface-visibility: hidden;
-    -webkit-transform: translateZ(0) scale(1.0, 1.0);
+  /* Fix dialog buttons on mobile */
+  .DialogFooter {
+    flex-direction: row !important;
+    justify-content: flex-end !important;
+    gap: 8px !important;
+    margin-top: 16px !important;
+  }
+  
+  /* Ensure dialog fits within viewport */
+  [role="dialog"] .DialogContent {
+    max-height: 85vh !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Dark mode support for the bottom navigation bar */
+  .dark .fixed.bottom-0.bg-background,
+  .dark .fixed.bottom-0.bg-white {
+    background-color: hsl(var(--background)) !important;
+    border-color: hsl(var(--border)) !important;
+  }
+  
+  /* Improve the contrast of the navigation text in dark mode */
+  .dark .text-muted-foreground {
+    color: hsl(var(--muted-foreground));
+  }
+  
+  /* Fix for any lingering white backgrounds in dark mode */
+  .dark [class*="bg-white"] {
+    background-color: hsl(var(--background)) !important;
+  }
+  
+  /* Ensure the bottom nav has a subtle blur in dark mode */
+  .dark .fixed.bottom-0 {
+    backdrop-filter: blur(8px);
+    box-shadow: 0 -1px 3px rgba(0, 0, 0, 0.2);
+  }
+  
+  /* Dark mode support for sticky elements */
+  .dark .sticky {
+    background-color: hsl(var(--background));
+    border-bottom: 1px solid hsl(var(--border));
+  }
+  
+  /* Add new animations for language elements */
+  @keyframes float-in {
+    0% {
+      opacity: 0;
+      transform: translateY(20px);
+    }
+    100% {
+      opacity: 1;
+      transform: translateY(0);
+    }
+  }
+  
+  @keyframes float-around {
+    0%, 100% {
+      transform: translate(0, 0);
+    }
+    25% {
+      transform: translate(5px, -5px);
+    }
+    50% {
+      transform: translate(0, -10px);
+    }
+    75% {
+      transform: translate(-5px, -5px);
+    }
+  }
+  
+  .float-in {
+    animation: float-in 0.8s ease-out forwards;
+  }
+  
+  .float-around {
+    animation: float-around 10s ease-in-out infinite;
+  }
+  
+  /* Improved animation related styles */
+  .language-animation-word {
+    transition: all 0.3s ease;
+    opacity: 0.8;
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+  
+  .language-animation-container {
+    perspective: 1000px;
+    will-change: transform;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+  
+  .language-animation-3d {
+    transform-style: preserve-3d;
+  }
+  
+  /* Optimize animation performance */
+  .will-change-transform {
+    will-change: transform, opacity;
+    backface-visibility: hidden;
+    transform: translateZ(0);
+  }
+  
+  /* Add fluid motion to animations */
+  .fluid-motion {
+    transition-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+  }
+  
+  /* Improve animation smoothness */
+  .smooth-float {
+    animation-timing-function: cubic-bezier(0.4, 0, 0.2, 1);
+    animation-fill-mode: both;
+  }
+  
+  /* Chat Thread List Styles - Updated for better visibility in both light and dark modes */
+  .chat-thread-list .thread-item {
+    position: relative;
+  }
+  
+  .chat-thread-list .thread-action-buttons {
+    position: absolute;
+    right: 0;
+    top: 0;
+    bottom: 0;
+    display: flex;
+    align-items: center;
+    padding-right: 4px;
+    z-index: 10;
+    /* Shift left by 25% */
+    transform: translateX(-25%);
+  }
+  
+  .chat-thread-list .thread-edit-button,
+  .chat-thread-list .thread-delete-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin: 0 2px;
+    border-radius: 6px;
+    transition: all 0.2s ease;
+    background-color: hsla(var(--background), 0.8);
+    /* Always visible */
+    opacity: 1 !important;
+  }
+  
+  /* Light mode styles */
+  .chat-thread-list .thread-edit-button {
+    color: hsl(var(--primary));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  .chat-thread-list .thread-delete-button {
+    color: hsl(var(--destructive));
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Dark mode styles */
+  .dark .chat-thread-list .thread-edit-button,
+  .dark .chat-thread-list .thread-delete-button {
+    background-color: hsla(var(--card), 0.7);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.3);
+  }
+  
+  .dark .chat-thread-list .thread-edit-button {
+    color: hsl(var(--primary));
+  }
+  
+  .dark .chat-thread-list .thread-delete-button {
+    color: hsl(var(--destructive));
+  }
+  
+  /* Hover effects */
+  .chat-thread-list .thread-edit-button:hover,
+  .chat-thread-list .thread-delete-button:hover {
+    transform: translateY(-1px);
+    box-shadow: 0 2px 5px rgba(0, 0, 0, 0.15);
+  }
+  
+  /* Active effects */
+  .chat-thread-list .thread-edit-button:active,
+  .chat-thread-list .thread-delete-button:active {
+    transform: translateY(1px);
+    box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Add a subtle background on hover to highlight the action area */
+  .chat-thread-list .thread-item:hover .thread-action-buttons {
+    background-color: hsla(var(--background), 0.5);
+    backdrop-filter: blur(4px);
+    border-radius: 0 0.375rem 0.375rem 0;
+  }
+  
+  .dark .chat-thread-list .thread-item:hover .thread-action-buttons {
+    background-color: hsla(var(--card), 0.5);
+  }
+  
+  /* Special iOS overrides that apply regardless of screen size */
+  @supports (-webkit-touch-callout: none) {
+    /* iOS-specific styles */
+    
+    /* Fix for notched devices */
+    .fixed {
+      padding-bottom: env(safe-area-inset-bottom, 0);
+    }
+    
+    /* Fix for bounce effect */
+    html, body {
+      overflow: hidden;
+      height: 100%;
+    }
+    
+    #root {
+      overflow: auto;
+      height: 100%;
+      -webkit-overflow-scrolling: touch;
+    }
+    
+    /* Fix for emotion bubbles on iOS */
+    .rounded-full {
+      -webkit-backface-visibility: hidden;
+      -webkit-transform: translateZ(0) scale(1.0, 1.0);
+    }
   }
 }
