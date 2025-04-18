@@ -84,7 +84,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       <Button 
         variant="ghost" 
         size={isMobile ? "sm" : "icon"} 
-        className={isMobile ? "h-8 w-8 p-0" : ""}
+        className={isMobile ? "h-8 w-8 p-0 rounded-full" : "rounded-full"}
         onClick={handleOpenDialog}
         aria-label="Edit entry"
       >
@@ -109,12 +109,14 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
               variant="outline" 
               onClick={handleCloseDialog}
               disabled={isSubmitting}
+              className="rounded-full"
             >
               Cancel
             </Button>
             <Button 
               onClick={handleSaveChanges}
               disabled={isSubmitting || !editedContent.trim() || editedContent === content}
+              className="rounded-full"
             >
               {isSubmitting ? 'Saving...' : 'Save Changes'}
             </Button>

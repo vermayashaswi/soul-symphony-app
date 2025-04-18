@@ -30,6 +30,7 @@
     --input: 240 5.9% 90%;
     --ring: 217 91.2% 59.8%; /* Match primary */
     --radius: 0.75rem;
+    --radius-full: 9999px; /* Add this to ensure circular elements */
     --color-theme: #3b82f6; /* Calm/Blue as default */
     --chart-bg: 0 0% 100%; /* New variable for chart backgrounds */
     --primary-h: 217; /* For direct HSL usage */
@@ -62,6 +63,7 @@
     --border: 240 3.7% 15.9%;
     --input: 240 3.7% 15.9%;
     --ring: 217 91.2% 59.8%; /* Match primary */
+    --radius-full: 9999px; /* Add this to ensure circular elements */
     --chart-bg: 240 10% 3.9%; /* Match background in dark mode */
     --primary-h: 217; /* For direct HSL usage */
     --primary-s: 91.2%; /* For direct HSL usage */
@@ -84,6 +86,17 @@
   /* Apply theme color to all page headers */
   h1, h2, h3 {
     @apply text-theme-color;
+  }
+  
+  /* Ensure rounded-full elements are truly circular */
+  .rounded-full {
+    border-radius: 9999px !important;
+  }
+  
+  /* Fix for radix UI components */
+  [data-radix-popper-content-wrapper] [data-radix-radio-item],
+  [data-radix-radio-item] {
+    border-radius: 9999px !important;
   }
 }
 

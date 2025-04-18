@@ -3,7 +3,7 @@
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
   .mobile-chat-interface .rounded-full {
-    border-radius: 24px;
+    border-radius: 9999px !important; /* Force perfect circles */
   }
   
   /* Add padding to the bottom of the page content to make room for the navigation bar */
@@ -56,6 +56,31 @@
     font-size: 0.95rem;
     line-height: 1.4;
     margin: 0.5rem 0;
+  }
+  
+  /* Preserve rounded buttons and circular elements */
+  button.rounded-full,
+  .rounded-full,
+  *[class*="rounded-full"] {
+    border-radius: 9999px !important;
+  }
+  
+  /* Preserve radio button circularity */
+  [data-radix-radio-item],
+  [data-radix-radio-item] > span {
+    border-radius: 9999px !important;
+  }
+  
+  /* Ensure chat buttons are circular */
+  .chat-interface button.rounded-full,
+  .mobile-chat-input-container button.rounded-full {
+    border-radius: 9999px !important;
+    aspect-ratio: 1 / 1;
+  }
+  
+  /* Ensure proper borders for toggle buttons */
+  [data-radix-collection-item] {
+    border-radius: inherit !important;
   }
   
   /* Reduce padding in chat messages */
