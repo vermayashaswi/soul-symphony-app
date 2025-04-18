@@ -858,4 +858,28 @@ const JournalEntriesList = ({
                       "relative overflow-hidden"
                     }
                   >
-                    <
+                    <JournalEntryCard 
+                      entry={entry} 
+                      onDelete={handleEntryDelete} 
+                      isNew={animatedEntryIds.includes(entry.id) || recentlyCompletedEntries.includes(entry.id)}
+                      isProcessing={false}
+                      setEntries={setLocalEntries}
+                    />
+                  </motion.div>
+                </ErrorBoundary>
+              ))
+            )}
+          </div>
+        </AnimatePresence>
+        
+        {loading && safeLocalEntries.length > 0 && !hasProcessingEntries && (
+          <div className="flex items-center justify-center h-16 mt-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default JournalEntriesList;
