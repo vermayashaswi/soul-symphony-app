@@ -1,5 +1,5 @@
 
-import { isMobile } from '@/hooks/use-mobile';
+import { useMobile } from '@/hooks/use-mobile';
 
 export const RECORDING_LIMITS = {
   MAX_DURATION: 300, // 5 minutes in seconds

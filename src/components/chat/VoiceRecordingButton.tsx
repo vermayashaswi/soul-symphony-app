@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from "react";
 import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -6,7 +7,7 @@ import { formatTime } from "@/utils/format-time";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
-import { getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
+import { getAudioConfig, getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -54,7 +55,11 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           
           const timeout = setTimeout(() => {
             if (isRecording) {
-              toast.info("Maximum recording duration reached (5 minutes)");
+              toast({
+                title: "Recording limit reached",
+                description: "Maximum recording duration reached (5 minutes)",
+                variant: "default"
+              });
               handleVoiceRecording();
             }
           }, RECORDING_LIMITS.MAX_DURATION * 1000);
