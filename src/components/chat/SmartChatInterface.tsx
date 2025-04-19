@@ -419,6 +419,7 @@ const SmartChatInterface = () => {
       toast({
         title: "Success",
         description: "Conversation deleted successfully",
+        variant: "default"
       });
       
       setShowDeleteDialog(false);
