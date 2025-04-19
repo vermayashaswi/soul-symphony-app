@@ -416,6 +416,8 @@ const SmartChatInterface = () => {
         }
       }
       
+      debugLog.addEvent("Thread Deletion", "Conversation deleted successfully", "info");
+      
       toast({
         title: "Success",
         description: "Conversation deleted successfully",
