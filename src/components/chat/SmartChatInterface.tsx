@@ -106,11 +106,11 @@ const SmartChatInterface = () => {
         return;
       }
       
-      debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
+      debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "info");
       const messages = await getThreadMessages(threadId);
       
       if (messages && messages.length > 0) {
-        debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
+        debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "info");
         console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
         setChatHistory(messages);
         setShowSuggestions(false);
@@ -179,7 +179,7 @@ const SmartChatInterface = () => {
       try {
         debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
         savedUserMessage = await saveMessage(threadId, message, 'user');
-        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
+        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "info");
         console.log("User message saved with ID:", savedUserMessage?.id);
         
         if (savedUserMessage) {
@@ -216,7 +216,7 @@ const SmartChatInterface = () => {
         emotion: queryTypes.emotion || 'none detected'
       };
       
-      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
+      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "info");
       console.log("Query analysis result:", queryTypes);
       
       setProcessingStage("Searching for insights...");
@@ -238,7 +238,7 @@ const SmartChatInterface = () => {
         errorState: response.role === 'error'
       };
       
-      debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
+      debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "info");
       console.log("Response received:", responseInfo);
       
       try {
@@ -252,7 +252,7 @@ const SmartChatInterface = () => {
           response.hasNumericResult
         );
         
-        debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
+        debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "info");
         console.log("Assistant response saved with ID:", savedResponse?.id);
         
         if (savedResponse) {
@@ -512,6 +512,4 @@ const SmartChatInterface = () => {
   );
 };
 
-export default function SmartChatInterfaceWrapper() {
-  return <SmartChatInterface />;
-}
+export default SmartChatInterface;
