@@ -9,9 +9,7 @@ import {
   MessagesSquare, 
   Brain, 
   Sparkles,
-  HeartHandshake,
-  Wifi,
-  WifiOff
+  HeartHandshake
 } from 'lucide-react';
 
 const processingSteps = [
@@ -44,48 +42,21 @@ const processingSteps = [
 
 export function LoadingEntryContent() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [elapsed, setElapsed] = useState(0);
-  const [isOnline, setIsOnline] = useState(true);
   
   useEffect(() => {
-    // Update step every 3 seconds for smooth progression
-    const stepInterval = setInterval(() => {
+    const interval = setInterval(() => {
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
     }, 3000);
     
-    // Track elapsed time to show additional messaging for long waits
-    const elapsedInterval = setInterval(() => {
-      setElapsed(prev => prev + 1);
-    }, 1000);
-    
-    // Monitor network status
-    const handleOnline = () => setIsOnline(true);
-    const handleOffline = () => setIsOnline(false);
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Initial network check
-    setIsOnline(navigator.onLine);
-    
-    return () => {
-      clearInterval(stepInterval);
-      clearInterval(elapsedInterval);
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
+    return () => clearInterval(interval);
   }, []);
   
   const currentStep = processingSteps[currentStepIndex];
   
-  // Show reassurance message for longer waits
-  const showReassurance = elapsed > 10;
-  const showNetworkWarning = !isOnline && elapsed > 5;
-  
   return (
     <motion.div 
       className="space-y-2"
-      initial={{ opacity: 0.7 }}
+      initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
@@ -116,9 +87,9 @@ export function LoadingEntryContent() {
           <AnimatePresence mode="wait">
             <motion.div 
               key={currentStep.id}
-              initial={{ scale: 0, opacity: 0.7 }}
+              initial={{ scale: 0, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0.7 }}
+              exit={{ scale: 0, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
               transition={{ duration: 0.3 }}
               className="absolute inset-0 flex items-center justify-center"
             >
@@ -132,40 +103,15 @@ export function LoadingEntryContent() {
         <AnimatePresence mode="wait">
           <motion.div 
             key={currentStep.id}
-            initial={{ y: 10, opacity: 0.7 }}
+            initial={{ y: 10, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -10, opacity: 0.7 }}
+            exit={{ y: -10, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
             transition={{ duration: 0.3 }}
             className="text-sm text-center text-muted-foreground"
           >
             {currentStep.text}
           </motion.div>
         </AnimatePresence>
-        
-        {showNetworkWarning && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="flex items-center gap-2 text-xs text-center text-red-500 mt-3 max-w-[250px]"
-          >
-            <WifiOff className="h-3 w-3" />
-            <span>You appear to be offline. Please check your internet connection.</span>
-          </motion.div>
-        )}
-        
-        {showReassurance && !showNetworkWarning && (
-          <motion.div
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ duration: 0.5 }}
-            className="text-xs text-center text-muted-foreground/70 mt-3 max-w-[250px]"
-          >
-            {elapsed > 30 ? 
-              "Still working... network might be slow, but we'll get there!" : 
-              "This might take a moment on slower connections..."}
-          </motion.div>
-        )}
       </div>
     </motion.div>
   );

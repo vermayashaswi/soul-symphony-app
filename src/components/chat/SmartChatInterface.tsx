@@ -106,11 +106,11 @@ const SmartChatInterface = () => {
         return;
       }
       
-      debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "info");
+      debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
       const messages = await getThreadMessages(threadId);
       
       if (messages && messages.length > 0) {
-        debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "info");
+        debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
         console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
         setChatHistory(messages);
         setShowSuggestions(false);
@@ -179,7 +179,7 @@ const SmartChatInterface = () => {
       try {
         debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
         savedUserMessage = await saveMessage(threadId, message, 'user');
-        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "info");
+        debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
         console.log("User message saved with ID:", savedUserMessage?.id);
         
         if (savedUserMessage) {
@@ -216,7 +216,7 @@ const SmartChatInterface = () => {
         emotion: queryTypes.emotion || 'none detected'
       };
       
-      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "info");
+      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
       console.log("Query analysis result:", queryTypes);
       
       setProcessingStage("Searching for insights...");
@@ -238,7 +238,7 @@ const SmartChatInterface = () => {
         errorState: response.role === 'error'
       };
       
-      debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "info");
+      debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
       console.log("Response received:", responseInfo);
       
       try {
@@ -252,7 +252,7 @@ const SmartChatInterface = () => {
           response.hasNumericResult
         );
         
-        debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "info");
+        debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
         console.log("Assistant response saved with ID:", savedResponse?.id);
         
         if (savedResponse) {
@@ -359,7 +359,7 @@ const SmartChatInterface = () => {
         .eq('thread_id', currentThreadId);
         
       if (messagesError) {
-        console.error("Error deleting messages:", messagesError);
+        console.error("[Desktop] Error deleting messages:", messagesError);
         throw messagesError;
       }
       
@@ -369,7 +369,7 @@ const SmartChatInterface = () => {
         .eq('id', currentThreadId);
         
       if (threadError) {
-        console.error("Error deleting thread:", threadError);
+        console.error("[Desktop] Error deleting thread:", threadError);
         throw threadError;
       }
       
@@ -416,17 +416,14 @@ const SmartChatInterface = () => {
         }
       }
       
-      debugLog.addEvent("Thread Deletion", "Conversation deleted successfully", "success");
-      
       toast({
         title: "Success",
         description: "Conversation deleted successfully",
-        variant: "default"
       });
       
       setShowDeleteDialog(false);
     } catch (error) {
-      console.error("Error deleting thread:", error);
+      console.error("[Desktop] Error deleting thread:", error);
       toast({
         title: "Error",
         description: "Failed to delete conversation",
@@ -515,4 +512,6 @@ const SmartChatInterface = () => {
   );
 };
 
-export default SmartChatInterface;
+export default function SmartChatInterfaceWrapper() {
+  return <SmartChatInterface />;
+}

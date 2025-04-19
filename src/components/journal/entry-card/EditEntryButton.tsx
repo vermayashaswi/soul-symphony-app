@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -9,8 +8,6 @@ import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
 import { Loader2 } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
-import { Wifi, WifiOff } from 'lucide-react';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -24,110 +21,17 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [updatedInBackground, setUpdatedInBackground] = useState(false);
-  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
-  const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'slow' | null>(null);
   const isMobile = useIsMobile();
-
-  // Ensure minimum processing time for consistent UX
-  const MIN_PROCESSING_TIME = 2000; // 2 seconds minimum
-  const MAX_PROCESSING_TIME = 15000; // 15 seconds maximum before closing dialog anyway
-
-  // Monitor network status
-  useEffect(() => {
-    const handleOnline = () => setNetworkStatus('online');
-    const handleOffline = () => setNetworkStatus('offline');
-    
-    window.addEventListener('online', handleOnline);
-    window.addEventListener('offline', handleOffline);
-    
-    // Initial network check
-    setNetworkStatus(navigator.onLine ? 'online' : 'offline');
-    
-    return () => {
-      window.removeEventListener('online', handleOnline);
-      window.removeEventListener('offline', handleOffline);
-    };
-  }, []);
-  
-  useEffect(() => {
-    let processingTimer: NodeJS.Timeout | null = null;
-    let maxProcessingTimer: NodeJS.Timeout | null = null;
-    
-    // If processing has started, set up timers
-    if (isProcessing && processingStartTime) {
-      // Calculate how much time has passed since processing started
-      const timePassed = Date.now() - processingStartTime;
-      
-      // If we haven't reached minimum processing time, set a timer for the remaining time
-      if (timePassed < MIN_PROCESSING_TIME) {
-        const timeRemaining = MIN_PROCESSING_TIME - timePassed;
-        processingTimer = setTimeout(() => {
-          // Only close if still processing after timer completes
-          if (isProcessing && isDialogOpen) {
-            console.log('Minimum processing time reached, closing dialog');
-            setIsDialogOpen(false);
-            setIsSubmitting(false);
-            setIsProcessing(false);
-          }
-        }, timeRemaining);
-      }
-      
-      // Also set a maximum processing time limit
-      maxProcessingTimer = setTimeout(() => {
-        if (isProcessing && isDialogOpen) {
-          console.log('Maximum processing time reached, closing dialog anyway');
-          setIsDialogOpen(false);
-          setIsSubmitting(false);
-          setIsProcessing(false);
-          toast.success('Entry updated (still processing in background)');
-        }
-      }, MAX_PROCESSING_TIME);
-    }
-    
-    // Clean up timers on unmount or when processing state changes
-    return () => {
-      if (processingTimer) clearTimeout(processingTimer);
-      if (maxProcessingTimer) clearTimeout(maxProcessingTimer);
-    };
-  }, [isProcessing, processingStartTime, isDialogOpen]);
 
   const handleOpenDialog = () => {
     setEditedContent(content);
     setIsDialogOpen(true);
     setUpdatedInBackground(false);
-    setNetworkStatus(navigator.onLine ? 'online' : 'offline');
   };
 
   const handleCloseDialog = () => {
     if (!isSubmitting) {
       setIsDialogOpen(false);
-    }
-  };
-
-  const checkNetworkSpeed = async (): Promise<boolean> => {
-    try {
-      const startTime = Date.now();
-      const response = await fetch('https://www.google.com/favicon.ico', { 
-        method: 'HEAD',
-        cache: 'no-cache'
-      });
-      const endTime = Date.now();
-      const duration = endTime - startTime;
-      
-      // If it takes more than 2 seconds to fetch a tiny favicon, network is slow
-      const isNetworkSlow = duration > 2000;
-      
-      if (isNetworkSlow) {
-        setNetworkStatus('slow');
-        return false;
-      }
-      
-      setNetworkStatus('online');
-      return true;
-    } catch (error) {
-      console.error('Network check failed:', error);
-      setNetworkStatus('offline');
-      return false;
     }
   };
 
@@ -140,107 +44,48 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      // Check network status before proceeding
-      const networkGood = await checkNetworkSpeed();
-      if (!networkGood) {
-        if (networkStatus === 'offline') {
-          toast.error("You're offline. Please check your internet connection.");
-          setIsSubmitting(false);
-          return;
-        } else if (networkStatus === 'slow') {
-          toast.warning("Your network connection is slow. This might take longer than usual.");
-        }
-      }
-      
       const originalContent = content;
       const newContent = editedContent;
       
       // Update UI with processing state IMMEDIATELY but keep dialog open
       onEntryUpdated(newContent, true);
       setIsProcessing(true);
-      setProcessingStartTime(Date.now());
       
-      // Add retry logic for network issues
-      let retryCount = 0;
-      const maxRetries = 3;
-      let updateSuccess = false;
-      
-      while (retryCount < maxRetries && !updateSuccess) {
-        try {
-          const { error: updateError } = await supabase
-            .from('Journal Entries')
-            .update({ 
-              "refined text": newContent,
-              "Edit_Status": 1,
-              "sentiment": "0",
-              "emotions": { "Neutral": 0.5 },
-              "master_themes": ["Processing"],
-              "entities": []
-            })
-            .eq('id', entryId);
-            
-          if (updateError) {
-            retryCount++;
-            console.error(`Error updating entry (attempt ${retryCount}):`, updateError);
-            
-            if (retryCount >= maxRetries) {
-              throw updateError;
-            }
-            
-            // Wait with exponential backoff before retry
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-          } else {
-            updateSuccess = true;
-          }
-        } catch (err) {
-          retryCount++;
-          console.error(`Network error during update (attempt ${retryCount}):`, err);
-          
-          if (retryCount >= maxRetries) {
-            throw err;
-          }
-          
-          // Wait with exponential backoff before retry
-          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-        }
-      }
-      
-      if (!updateSuccess) {
-        throw new Error("Failed to update entry after multiple attempts");
+      const { error: updateError } = await supabase
+        .from('Journal Entries')
+        .update({ 
+          "refined text": newContent,
+          "Edit_Status": 1,
+          "sentiment": "0",
+          "emotions": { "Neutral": 0.5 },
+          "master_themes": ["Processing"],
+          "entities": []
+        })
+        .eq('id', entryId);
+        
+      if (updateError) {
+        console.error("Error updating entry:", updateError);
+        toast.error(`Failed to update entry: ${updateError.message}`);
+        onEntryUpdated(originalContent, false);
+        setIsProcessing(false);
+        setIsSubmitting(false);
+        return;
       }
 
       // Set updated flag and keep dialog open briefly
       setUpdatedInBackground(true);
       
       try {
-        // Process with retry logic
-        let processingSuccess = false;
-        retryCount = 0;
-        
-        while (retryCount < maxRetries && !processingSuccess) {
-          try {
-            await triggerFullTextProcessing(entryId);
-            processingSuccess = true;
-          } catch (err) {
-            retryCount++;
-            console.error(`Processing error (attempt ${retryCount}):`, err);
-            
-            if (retryCount >= maxRetries) {
-              throw err;
-            }
-            
-            // Wait with exponential backoff before retry
-            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
-          }
-        }
+        await triggerFullTextProcessing(entryId);
         
         // Ensure minimum processing time for UX consistency
-        const processingElapsed = Date.now() - (processingStartTime || Date.now());
-        if (processingElapsed < MIN_PROCESSING_TIME) {
-          await new Promise(resolve => setTimeout(resolve, MIN_PROCESSING_TIME - processingElapsed));
-        }
+        const minProcessingTime = 1000; // 1 second minimum
+        await new Promise(resolve => setTimeout(resolve, minProcessingTime));
         
-        // Dialog close is now handled by the useEffect
+        // Close dialog and update UI
+        setIsDialogOpen(false);
+        setIsSubmitting(false);
+        setIsProcessing(false);
         toast.success('Journal entry updated successfully');
         
       } catch (processingError) {
@@ -253,13 +98,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       
     } catch (error) {
       console.error('Error updating journal entry:', error);
-      
-      if (networkStatus === 'offline' || !navigator.onLine) {
-        toast.error("Facing network issues. Check your internet connection");
-      } else {
-        toast.error('Failed to update entry');
-      }
-      
+      toast.error('Failed to update entry');
       setIsSubmitting(false);
       setIsProcessing(false);
     }
@@ -278,34 +117,11 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         <Edit className="h-4 w-4" />
       </Button>
       
-      <Dialog open={isDialogOpen} onOpenChange={(open) => {
-        // Only allow closing if not submitting
-        if (!isSubmitting) {
-          setIsDialogOpen(open);
-        }
-      }}>
+      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="w-[90%] max-w-lg mx-auto">
           <DialogHeader>
             <DialogTitle>Edit Journal Entry</DialogTitle>
           </DialogHeader>
-          
-          {networkStatus === 'offline' && (
-            <Alert variant="destructive" className="mb-4">
-              <WifiOff className="h-4 w-4" />
-              <AlertDescription>
-                You appear to be offline. Changes may not save until your connection is restored.
-              </AlertDescription>
-            </Alert>
-          )}
-          
-          {networkStatus === 'slow' && (
-            <Alert variant="warning" className="mb-4">
-              <Wifi className="h-4 w-4" />
-              <AlertDescription>
-                Your network connection seems slow. Saving might take longer than usual.
-              </AlertDescription>
-            </Alert>
-          )}
           
           <Textarea
             value={editedContent}

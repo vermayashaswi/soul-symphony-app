@@ -178,11 +178,11 @@ const MobileChatInterfaceContent = ({
         return;
       }
       
-      debugLog.addEvent("Thread Loading", `[Mobile] Thread ${threadId} found, fetching messages`, "info");
+      debugLog.addEvent("Thread Loading", `[Mobile] Thread ${threadId} found, fetching messages`, "success");
       const chatMessages = await getThreadMessages(threadId);
       
       if (chatMessages && chatMessages.length > 0) {
-        debugLog.addEvent("Thread Loading", `[Mobile] Loaded ${chatMessages.length} messages for thread ${threadId}`, "info");
+        debugLog.addEvent("Thread Loading", `[Mobile] Loaded ${chatMessages.length} messages for thread ${threadId}`, "success");
         console.log(`[Mobile] Loaded ${chatMessages.length} messages for thread ${threadId}`);
         
         const uiMessages = chatMessages.map(msg => ({
@@ -240,7 +240,7 @@ const MobileChatInterfaceContent = ({
             throw new Error("Failed to create new thread");
           }
           threadId = newThreadId;
-          debugLog.addEvent("Thread Creation", `[Mobile] New thread created: ${newThreadId}`, "info");
+          debugLog.addEvent("Thread Creation", `[Mobile] New thread created: ${newThreadId}`, "success");
         } else {
           const newThreadId = uuidv4();
           debugLog.addEvent("Thread Creation", `[Mobile] Creating new thread with ID: ${newThreadId}`, "info");
@@ -261,7 +261,7 @@ const MobileChatInterfaceContent = ({
           
           threadId = newThreadId;
           setCurrentThreadId(newThreadId);
-          debugLog.addEvent("Thread Creation", `[Mobile] New thread created: ${newThreadId}`, "info");
+          debugLog.addEvent("Thread Creation", `[Mobile] New thread created: ${newThreadId}`, "success");
         }
       } catch (error: any) {
         debugLog.addEvent("Thread Creation", `[Mobile] Error creating thread: ${error.message || "Unknown error"}`, "error");
@@ -294,7 +294,7 @@ const MobileChatInterfaceContent = ({
     try {
       debugLog.addEvent("Database", `[Mobile] Saving user message to thread ${threadId}`, "info");
       const savedUserMessage = await saveMessage(threadId, message, 'user');
-      debugLog.addEvent("Database", `[Mobile] User message saved: ${savedUserMessage?.id}`, "info");
+      debugLog.addEvent("Database", `[Mobile] User message saved: ${savedUserMessage?.id}`, "success");
       console.log("[Mobile] User message saved:", savedUserMessage?.id);
       
       window.dispatchEvent(
@@ -321,7 +321,7 @@ const MobileChatInterfaceContent = ({
         emotion: queryTypes.emotion || 'none detected'
       };
       
-      debugLog.addEvent("Query Analysis", `[Mobile] Analysis result: ${JSON.stringify(analysisDetails)}`, "info");
+      debugLog.addEvent("Query Analysis", `[Mobile] Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
       console.log("[Mobile] Query analysis result:", queryTypes);
       
       setProcessingStage("Searching for insights...");
@@ -343,7 +343,7 @@ const MobileChatInterfaceContent = ({
         errorState: response.role === 'error'
       };
       
-      debugLog.addEvent("AI Processing", `[Mobile] Response received: ${JSON.stringify(responseInfo)}`, "info");
+      debugLog.addEvent("AI Processing", `[Mobile] Response received: ${JSON.stringify(responseInfo)}`, "success");
       console.log("[Mobile] Response received:", responseInfo);
       
       const uiResponse: UIChatMessage = {
@@ -369,7 +369,7 @@ const MobileChatInterfaceContent = ({
         response.hasNumericResult || false
       );
       
-      debugLog.addEvent("Database", `[Mobile] Assistant response saved: ${savedResponse?.id}`, "info");
+      debugLog.addEvent("Database", `[Mobile] Assistant response saved: ${savedResponse?.id}`, "success");
       console.log("[Mobile] Assistant response saved:", savedResponse?.id);
       
       if (messages.length === 0) {
@@ -418,7 +418,7 @@ const MobileChatInterfaceContent = ({
           errorMessageContent,
           'assistant'
         );
-        debugLog.addEvent("Database", `[Mobile] Error message saved to database: ${savedErrorMessage?.id}`, "info");
+        debugLog.addEvent("Database", `[Mobile] Error message saved to database: ${savedErrorMessage?.id}`, "success");
         console.log("[Mobile] Error message saved to database:", savedErrorMessage?.id);
       } catch (e) {
         debugLog.addEvent("Database", `[Mobile] Failed to save error message: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
