@@ -1,17 +1,17 @@
-
 import React, { createContext, useContext, useState, useCallback, useEffect } from 'react';
+import { LogLevel } from './debugLogTypes';
 
 interface DebugEvent {
   timestamp: number;
   component: string;
   action: string;
-  level: 'info' | 'warning' | 'error';
+  level: LogLevel;
   details?: any;
 }
 
 interface DebugContextType {
   events: DebugEvent[];
-  addEvent: (component: string, action: string, level: 'info' | 'warning' | 'error', details?: any) => void;
+  addEvent: (component: string, action: string, level: LogLevel, details?: any) => void;
   clearEvents: () => void;
   networkStatus: 'online' | 'offline' | 'slow' | 'unknown';
 }
@@ -89,7 +89,7 @@ export const DebugProvider: React.FC<{children: React.ReactNode}> = ({ children 
     };
   }, []);
   
-  const addEventToState = (component: string, action: string, level: 'info' | 'warning' | 'error', details?: any) => {
+  const addEventToState = (component: string, action: string, level: LogLevel, details?: any) => {
     const newEvent: DebugEvent = {
       timestamp: Date.now(),
       component,
@@ -113,7 +113,7 @@ export const DebugProvider: React.FC<{children: React.ReactNode}> = ({ children 
     });
   };
   
-  const addEvent = useCallback((component: string, action: string, level: 'info' | 'warning' | 'error', details?: any) => {
+  const addEvent = useCallback((component: string, action: string, level: LogLevel, details?: any) => {
     addEventToState(component, action, level, details);
   }, []);
   
@@ -159,7 +159,8 @@ export const DebugLogPanel: React.FC<{show?: boolean}> = ({ show = false }) => {
         {events.map((event, i) => (
           <div key={i} className={`
             ${event.level === 'error' ? 'text-red-400' : 
-               event.level === 'warning' ? 'text-yellow-400' : 'text-blue-300'}
+               event.level === 'warning' ? 'text-yellow-400' : 
+               event.level === 'success' ? 'text-green-400' : 'text-blue-300'}
           `}>
             <span className="opacity-70">{new Date(event.timestamp).toLocaleTimeString()}</span>
             {' - '}

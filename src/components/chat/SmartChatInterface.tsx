@@ -359,7 +359,7 @@ const SmartChatInterface = () => {
         .eq('thread_id', currentThreadId);
         
       if (messagesError) {
-        console.error("[Desktop] Error deleting messages:", messagesError);
+        console.error("Error deleting messages:", messagesError);
         throw messagesError;
       }
       
@@ -369,7 +369,7 @@ const SmartChatInterface = () => {
         .eq('id', currentThreadId);
         
       if (threadError) {
-        console.error("[Desktop] Error deleting thread:", threadError);
+        console.error("Error deleting thread:", threadError);
         throw threadError;
       }
       
@@ -416,7 +416,7 @@ const SmartChatInterface = () => {
         }
       }
       
-      debugLog.addEvent("Thread Deletion", "Conversation deleted successfully", "info");
+      debugLog.addEvent("Thread Deletion", "Conversation deleted successfully", "success");
       
       toast({
         title: "Success",
