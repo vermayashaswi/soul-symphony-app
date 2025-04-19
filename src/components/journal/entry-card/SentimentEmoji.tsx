@@ -25,11 +25,16 @@ export function SentimentEmoji({ sentiment, isProcessing = false }: SentimentEmo
       if (typeof sentiment === 'string') {
         return parseFloat(sentiment);
       } else if (sentiment && typeof sentiment === 'object') {
-        return sentiment.score;
+        if ('sentiment' in sentiment && typeof sentiment.sentiment === 'string') {
+          return parseFloat(sentiment.sentiment);
+        } else if ('score' in sentiment && typeof sentiment.score === 'number') {
+          return sentiment.score;
+        }
       }
       return 0;
     } catch (error) {
       console.error("[SentimentEmoji] Error parsing sentiment score:", error);
+      console.log("[SentimentEmoji] Sentiment value that caused the error:", sentiment);
       return 0;
     }
   };

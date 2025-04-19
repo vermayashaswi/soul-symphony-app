@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -86,7 +87,9 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
         userId
       });
 
+      // Fix: Proper date filtering for entries
       const entries = allEntries?.filter(entry => {
+        if (!entry.created_at) return false;
         const entryDate = new Date(entry.created_at);
         return entryDate >= startDate && entryDate <= endDate;
       }) || [];
@@ -94,6 +97,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       console.log(`Filtered ${entries.length} entries for ${timeRange}`);
 
       const processedEntries = entries.map(entry => {
+        // Process emotions data
         if (entry.emotions && typeof entry.emotions === 'string') {
           try {
             entry.emotions = JSON.parse(entry.emotions);
@@ -109,8 +113,10 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       const journalActivity = calculateJournalActivity(processedEntries, timeRange);
       const aggregatedEmotionData = processEmotionData(processedEntries, timeRange);
 
+      // Process all entries for sentiment data
       const processedAllEntries = allEntries?.map(entry => {
-        if (!entry.sentiment && entry.emotions) {
+        // If sentiment is missing but emotions exist, calculate it
+        if ((!entry.sentiment || entry.sentiment === '0') && entry.emotions) {
           try {
             const emotions = typeof entry.emotions === 'string' 
               ? JSON.parse(entry.emotions) 
@@ -120,17 +126,25 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
               let totalSentiment = 0;
               let count = 0;
               
-              Object.values(emotions).forEach((score: any) => {
-                if (typeof score === 'number' || !isNaN(Number(score))) {
-                  totalSentiment += Number(score);
+              Object.entries(emotions).forEach(([emotion, score]: [string, any]) => {
+                // Convert positive emotions to positive values, negative emotions to negative values
+                const emotionValue = Number(score);
+                if (!isNaN(emotionValue)) {
+                  // Map certain emotions to negative sentiment values
+                  const negativeEmotions = ['sad', 'angry', 'anxious', 'fearful', 'stressed', 'disappointed', 'frustrated'];
+                  const multiplier = negativeEmotions.includes(emotion.toLowerCase()) ? -1 : 1;
+                  totalSentiment += emotionValue * multiplier;
                   count++;
                 }
               });
               
               if (count > 0) {
-                let avgSentiment = totalSentiment / count;
+                // Normalize to range between -1 and 1
+                let avgSentiment = totalSentiment / (count * 2);
                 if (avgSentiment > 1.0) avgSentiment = 1.0;
-                entry.sentiment = avgSentiment.toFixed(2);
+                if (avgSentiment < -1.0) avgSentiment = -1.0;
+                
+                entry.sentiment = avgSentiment.toString();
                 console.log(`Calculated sentiment for entry ${entry.id}: ${entry.sentiment}`);
               }
             }
@@ -178,7 +192,7 @@ const getDateRange = (timeRange: TimeRange) => {
       endDate = endOfDay(now);
       break;
     case 'week':
-      startDate = startOfWeek(now, { weekStartsOn: 1 });
+      startDate = startOfWeek(now, { weekStartsOn: 1 }); // Monday as week start
       endDate = endOfWeek(now, { weekStartsOn: 1 });
       break;
     case 'month':
