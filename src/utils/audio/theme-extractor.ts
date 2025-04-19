@@ -2,6 +2,35 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
+ * Triggers theme extraction for a journal entry
+ * This is specifically for refreshing the themes of an existing entry
+ * without re-analyzing the entire text
+ */
+export const triggerThemeExtraction = async (entryId: number): Promise<boolean> => {
+  console.log(`[theme-extractor] Triggering theme extraction for entry: ${entryId}`);
+  
+  try {
+    const { data, error } = await supabase.functions.invoke('generate-themes', {
+      body: { 
+        entryId: entryId,
+        fromEdit: false
+      }
+    });
+    
+    if (error) {
+      console.error("[theme-extractor] Error triggering theme extraction:", error);
+      return false;
+    } else {
+      console.log("[theme-extractor] Theme extraction triggered successfully:", data);
+      return true;
+    }
+  } catch (error) {
+    console.error("[theme-extractor] Error in triggerThemeExtraction:", error);
+    return false;
+  }
+};
+
+/**
  * Triggers background processing for a journal entry after text edit
  * This function initiates the same analysis processes that happen after voice transcription
  * but skips the audio processing steps since we already have text

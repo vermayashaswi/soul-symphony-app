@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
@@ -163,19 +162,10 @@ export const reprocessJournalEntry = async (entryId: number): Promise<boolean> =
       return false;
     }
     
-    // Trigger theme extraction with the text
-    const { error: themeError } = await supabase.functions.invoke('generate-themes', {
-      body: { 
-        text: textToProcess,
-        entryId: entryId,
-        fromEdit: true
-      }
-    });
-    
-    if (themeError) {
-      console.error('[JournalService] Error triggering theme extraction:', themeError);
-      return false;
-    }
+    // Trigger processing with the text
+    // Now using the fully qualified import path to avoid name conflicts
+    const { triggerFullTextProcessing } = await import('@/utils/audio/theme-extractor');
+    await triggerFullTextProcessing(entryId);
     
     console.log('[JournalService] Successfully triggered reprocessing for entry:', entryId);
     return true;
