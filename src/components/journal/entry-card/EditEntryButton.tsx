@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -40,18 +39,15 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      // First, update the text content
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
           "refined text": editedContent,
           "Edit_Status": 1,
-          // Reset analysis fields to ensure they're reprocessed with default values
-          // This prevents empty {} objects in the database
-          "sentiment": "0", // Default neutral sentiment
-          "emotions": { "Neutral": 0.5 }, // Default neutral emotion
-          "master_themes": ["Processing"], // Temporary theme while processing
-          "entities": [] // Empty array is better than null or empty object
+          "sentiment": "0",
+          "emotions": { "Neutral": 0.5 },
+          "master_themes": ["Processing"],
+          "entities": []
         })
         .eq('id', entryId);
         
@@ -61,22 +57,16 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         return;
       }
 
-      // Critical fix: Update parent component with new content BEFORE closing dialog
-      // This ensures the UI is updated immediately
       onEntryUpdated(editedContent);
       
-      // Close dialog after successful update
+      await new Promise(resolve => setTimeout(resolve, 100));
       handleCloseDialog();
       
-      // Show processing toast
       toast.success('Journal entry updated. Processing analysis...');
       setIsProcessing(true);
       
-      // Trigger full text processing in the background with a short delay
-      // This delay helps ensure smoother UI transitions
       setTimeout(async () => {
         try {
-          // The full processing function handles all AI analysis (themes, sentiment, emotions, entities)
           await triggerFullTextProcessing(entryId);
           console.log("Full text processing triggered successfully");
           toast.success('Journal entry analysis completed');
