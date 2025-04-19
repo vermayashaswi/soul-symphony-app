@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -55,14 +54,14 @@ async function analyzeEmotions(text: string) {
           {
             role: "system",
             content: `You are an emotion analysis assistant. You will analyze text and identify emotions expressed in it.
-            Analyze the text and select 2-3 of the most prominent emotions from this list:
+            Analyze the text and select up to 5 of the most prominent emotions from this list:
             ${emotionsList}
             
             For each emotion you identify, provide an intensity score from 0.1 to 1.0 (with 1.0 being the strongest).
             Always provide at least one emotion, even if the text seems neutral (use a lower intensity score in that case).
             
             Format your response as JSON without explanations, like this example:
-            {"Joy": 0.8, "Gratitude": 0.6}`
+            {"Joy": 0.8, "Gratitude": 0.6, "Curiosity": 0.4, "Contentment": 0.3, "Hope": 0.2}`
           },
           {
             role: "user",
