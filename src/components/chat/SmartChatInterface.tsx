@@ -426,7 +426,7 @@ const SmartChatInterface = () => {
       
       setShowDeleteDialog(false);
     } catch (error) {
-      console.error("[Desktop] Error deleting thread:", error);
+      console.error("Error deleting thread:", error);
       toast({
         title: "Error",
         description: "Failed to delete conversation",
