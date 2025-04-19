@@ -47,10 +47,11 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       // Close dialog immediately
       setIsDialogOpen(false);
       
-      // Set processing state BEFORE updating UI
+      // Set processing state BEFORE updating UI, and ensure we have a local state
+      // that won't be affected by component re-renders
       setIsProcessing(true);
       
-      // Update UI with loading state immediately
+      // Update UI with processing state IMMEDIATELY
       onEntryUpdated(newContent, true);
       
       // Show toast for initial update
@@ -85,17 +86,22 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         await triggerFullTextProcessing(entryId);
         
         // Set a timeout for the analysis to complete before showing final state
-        // This helps prevent flickering by maintaining the loading state
+        // This helps prevent flickering by maintaining the loading state for a minimum time
+        const minProcessingTime = 6000; // Ensure loader shows for at least 6 seconds
+        const processingStartTime = Date.now();
+        
         const analysisCompletionTimeout = setTimeout(() => {
           console.log("Analysis completion timeout reached, finalizing UI state");
           onEntryUpdated(newContent, false);
           setIsProcessing(false);
           toast.success('Journal entry analysis completed');
-        }, 8000); // Give analysis up to 8 seconds to complete
+        }, 12000); // Increased to 12 seconds to ensure analysis has enough time
         
         // Set up polling to check for completed analysis
         let pollingAttempts = 0;
-        const maxPollingAttempts = 10;
+        const maxPollingAttempts = 15; // Increased polling attempts
+        const pollingDelay = 800; // Polling every 800ms
+        
         const pollingInterval = setInterval(async () => {
           pollingAttempts++;
           console.log(`Polling for analysis completion (attempt ${pollingAttempts})`);
@@ -122,8 +128,12 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
                                Object.keys(data.emotions).length > 0 && 
                                !Object.keys(data.emotions).includes("Neutral");
                                
-            if (hasRealThemes || hasEmotions) {
-              // Analysis appears complete, update UI and clear polling
+            // Check if minimum processing time has elapsed
+            const timeElapsed = Date.now() - processingStartTime;
+            const minTimeElapsed = timeElapsed >= minProcessingTime;
+                               
+            if ((hasRealThemes || hasEmotions) && minTimeElapsed) {
+              // Analysis appears complete AND minimum time elapsed, update UI and clear polling
               clearTimeout(analysisCompletionTimeout);
               clearInterval(pollingInterval);
               
@@ -137,11 +147,25 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
               console.log("Reached max polling attempts, finalizing UI state");
               onEntryUpdated(newContent, false);
               setIsProcessing(false);
+              
+              if (!minTimeElapsed) {
+                // If we haven't reached the minimum time, wait until we do
+                const remainingTime = minProcessingTime - timeElapsed;
+                if (remainingTime > 0) {
+                  setTimeout(() => {
+                    toast.success('Journal entry analysis completed');
+                  }, remainingTime);
+                } else {
+                  toast.success('Journal entry analysis completed');
+                }
+              } else {
+                toast.success('Journal entry analysis completed');
+              }
             }
           } catch (pollError) {
             console.error("Polling error:", pollError);
           }
-        }, 1000); // Check every second
+        }, pollingDelay);
         
       } catch (processingError) {
         console.error('Processing failed:', processingError);
