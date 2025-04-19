@@ -17,13 +17,52 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [transitionInProgress, setTransitionInProgress] = useState(false);
   const contentAvailableRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const prevContentRef = useRef(content);
 
-  // Update content immediately when it changes
+  // Immediately update content when it changes to prevent flicker
   useEffect(() => {
-    if (content && content !== "Processing entry..." && content !== "Loading...") {
+    if (content !== prevContentRef.current) {
+      // If we have new content, update immediately without any transition
       setStableContent(content);
+      prevContentRef.current = content;
+      
+      addEvent('EntryContent', 'Content changed - immediate update', 'info', {
+        oldContent: prevContentRef.current?.substring(0, 20),
+        newContent: content?.substring(0, 20)
+      });
     }
-  }, [content]);
+  }, [content, addEvent]);
+
+  // Handle loading state separately
+  useEffect(() => {
+    if (isProcessing) {
+      setShowLoading(true);
+      return;
+    }
+
+    const contentIsLoading = !content || 
+                          content === "Processing entry..." || 
+                          content.trim() === "" ||
+                          content === "Loading...";
+
+    if (timeoutRef.current) {
+      clearTimeout(timeoutRef.current);
+    }
+
+    if (contentIsLoading) {
+      setShowLoading(true);
+      contentAvailableRef.current = false;
+    } else {
+      contentAvailableRef.current = true;
+      setShowLoading(false);
+    }
+
+    return () => {
+      if (timeoutRef.current) {
+        clearTimeout(timeoutRef.current);
+      }
+    };
+  }, [content, isProcessing]);
 
   // Debug logging
   useEffect(() => {
@@ -37,40 +76,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       stableContentSet: stableContent === content
     });
   }, [content, isProcessing, isExpanded, showLoading, stableContent, transitionInProgress, addEvent]);
-
-  useEffect(() => {
-    if (isProcessing && !showLoading) {
-      addEvent('EntryContent', 'Processing started, showing loading state immediately', 'info');
-      setShowLoading(true);
-      return;
-    }
-
-    const contentIsLoading = isProcessing || 
-                          !content || 
-                          content === "Processing entry..." || 
-                          content.trim() === "" ||
-                          content === "Loading...";
-
-    if (timeoutRef.current) {
-      clearTimeout(timeoutRef.current);
-    }
-
-    if (contentIsLoading) {
-      setShowLoading(true);
-      contentAvailableRef.current = false;
-    } else {
-      // Content is available - update immediately
-      contentAvailableRef.current = true;
-      setShowLoading(false);
-      setStableContent(content);
-    }
-
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [content, isProcessing, addEvent]);
 
   return (
     <AnimatePresence mode="wait" initial={false}>

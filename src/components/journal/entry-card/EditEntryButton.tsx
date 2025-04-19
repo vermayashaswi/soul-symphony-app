@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -56,15 +57,19 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         toast.error(`Failed to update entry: ${updateError.message}`);
         return;
       }
-
+      
+      // First update the UI state immediately to avoid flicker
       onEntryUpdated(editedContent);
       
-      await new Promise(resolve => setTimeout(resolve, 100));
-      handleCloseDialog();
+      // Close the dialog only after the state is updated
+      setIsSubmitting(false);
+      setIsDialogOpen(false);
       
+      // Show success toast after dialog is closed
       toast.success('Journal entry updated. Processing analysis...');
       setIsProcessing(true);
       
+      // Process the text analysis in the background
       setTimeout(async () => {
         try {
           await triggerFullTextProcessing(entryId);
@@ -81,7 +86,6 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     } catch (error) {
       console.error('Error updating journal entry:', error);
       toast.error('Failed to update entry');
-    } finally {
       setIsSubmitting(false);
     }
   };
