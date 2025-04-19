@@ -39,7 +39,8 @@ export const triggerFullTextProcessing = async (entryId: number): Promise<void> 
   console.log(`[theme-extractor] Triggering full text processing for entry: ${entryId}`);
   
   try {
-    // Step 1: First, trigger theme extraction
+    // Step 1: First, trigger theme extraction with the "fromEdit" flag set to true
+    // This ensures themes get regenerated completely for edited text
     const { data: themeData, error: themeError } = await supabase.functions.invoke('generate-themes', {
       body: { 
         entryId: entryId,
@@ -56,7 +57,6 @@ export const triggerFullTextProcessing = async (entryId: number): Promise<void> 
     // Step 2: Trigger entity extraction
     try {
       console.log("[theme-extractor] Starting entity extraction for entry:", entryId);
-      // Call with proper entryIds format
       const { error: entitiesError } = await supabase.functions.invoke('batch-extract-entities', {
         body: {
           processAll: false,
@@ -89,6 +89,36 @@ export const triggerFullTextProcessing = async (entryId: number): Promise<void> 
       }
     } catch (sentimentErr) {
       console.error("[theme-extractor] Error starting sentiment analysis:", sentimentErr);
+    }
+    
+    // Step 4: Trigger emotions analysis (using the same API endpoint used for new recordings)
+    try {
+      const { data: entryData, error: fetchError } = await supabase
+        .from('Journal Entries')
+        .select('"refined text"')
+        .eq('id', entryId)
+        .single();
+        
+      if (fetchError || !entryData || !entryData["refined text"]) {
+        console.error("[theme-extractor] Error fetching entry text for emotions analysis:", fetchError);
+      } else {
+        // Call the OpenAI API through the edge function for emotions analysis
+        // This is the same endpoint used for new recordings
+        const { error: emotionsError } = await supabase.functions.invoke('analyze-emotions', {
+          body: {
+            entryId: entryId,
+            text: entryData["refined text"]
+          }
+        });
+        
+        if (emotionsError) {
+          console.error("[theme-extractor] Error triggering emotions analysis:", emotionsError);
+        } else {
+          console.log("[theme-extractor] Emotions analysis triggered successfully");
+        }
+      }
+    } catch (emotionsErr) {
+      console.error("[theme-extractor] Error starting emotions analysis:", emotionsErr);
     }
     
     console.log(`[theme-extractor] All analysis jobs triggered for entry: ${entryId}`);

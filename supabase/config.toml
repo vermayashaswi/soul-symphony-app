@@ -1,7 +1,8 @@
 
 # A string used to distinguish different Supabase projects on the same host. Defaults to the working
 # directory name when running `supabase init`.
-project_id = "kwnwhgucnzpxndzjayyq"
+project_id = "kwnwhgucnzpqxndzjayyq"
+org_id = "org_2NJnZwQkH1ZIttVw"
 
 [api]
 # Port to use for the API URL.
@@ -11,8 +12,8 @@ port = 54321
 schemas = ["public", "storage", "graphql_public"]
 # Extra schemas to add to the search_path of every request. public is always included.
 extra_search_path = ["public", "extensions"]
-# The maximum number of rows returns from a view, table, or stored procedure. Limits payload size
-# for accidental or malicious requests.
+# Maximum rows to return from a view, table, or stored procedure. Limits payload size for accidental
+# or malicious requests.
 max_rows = 1000
 
 [db]
@@ -44,7 +45,8 @@ file_size_limit = "50MiB"
 site_url = "http://localhost:3000"
 # A list of *exact* URLs that auth providers are permitted to redirect to post authentication.
 additional_redirect_urls = ["https://localhost:3000"]
-# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 (1 week).
+# How long tokens are valid for, in seconds. Defaults to 3600 (1 hour), maximum 604,800 seconds (1
+# week).
 jwt_expiry = 3600
 # Allow/disallow new user signups to your project.
 enable_signup = true
@@ -72,5 +74,13 @@ redirect_uri = ""
 url = ""
 
 [functions]
-# Port to use for Functions.
+# Port to serve Edge Functions on your local machine.
 port = 54321
+serve_local_functions = true
+
+[functions.analyze-emotions]
+verify_jwt = true
+
+[observability]
+# Port to use for Supabase observability server.
+port = 54327

@@ -82,6 +82,12 @@ export function ThemeLoader({
           const shouldBeLoading = isProcessing || isNew;
           setIsThemesLoading(shouldBeLoading);
           setThemesLoaded(false);
+          
+          // If we're not in a loading state and have no themes, and the entry is not new or processing,
+          // we should try to fetch themes immediately
+          if (!shouldBeLoading && entryId) {
+            console.log(`[ThemeLoader] No initial themes, setting up immediate poll for entry ${entryId}`);
+          }
         }
       }
     } catch (error) {
@@ -91,9 +97,15 @@ export function ThemeLoader({
     }
   }, [initialThemes, isProcessing, isNew, entryId]);
 
-  // Dedicated theme polling mechanism
+  // Dedicated theme polling mechanism with improved error handling and retry logic
   useEffect(() => {
-    if (!mountedRef.current || !entryId || themesLoaded) return;
+    if (!mountedRef.current || !entryId) return;
+    
+    // If we already have themes and they're loaded, don't poll
+    if (themes.length > 0 && themesLoaded) {
+      console.log(`[ThemeLoader] Already have themes for entry ${entryId}, skipping polling`);
+      return;
+    }
     
     // Clean up previous intervals
     if (pollIntervalRef.current) {
@@ -106,104 +118,108 @@ export function ThemeLoader({
       safetyTimeoutRef.current = null;
     }
     
-    // If entry is new or we're explicitly in loading state, set up polling
-    if ((isNew || isProcessing) && entryId) {
-      console.log(`[ThemeLoader] Setting up theme polling for entry ${entryId}`);
+    console.log(`[ThemeLoader] Setting up theme polling for entry ${entryId}`);
+    setIsThemesLoading(true);
+    
+    const pollForThemes = async () => {
+      if (!mountedRef.current) return;
       
-      const pollForThemes = async () => {
-        if (!mountedRef.current) return;
+      try {
+        console.log(`[ThemeLoader] Polling for themes for entry ${entryId}`);
         
-        try {
-          console.log(`[ThemeLoader] Polling for themes for entry ${entryId}`);
+        const { data, error } = await supabase
+          .from('Journal Entries')
+          .select('master_themes, themes')
+          .eq('id', entryId)
+          .maybeSingle();
           
-          const { data, error } = await supabase
-            .from('Journal Entries')
-            .select('master_themes, themes')
-            .eq('id', entryId)
-            .maybeSingle();
+        if (error) {
+          console.warn(`[ThemeLoader] Error polling for themes: ${error.message}`);
+          return;
+        }
+          
+        // Check if data exists and is not an error with additional null checks and type casting
+        if (data && typeof data === 'object') {
+          const entryData = data as JournalEntry;
+          
+          // Safely extract themes with fallbacks using the typed interface
+          const updatedMasterThemes = Array.isArray(entryData.master_themes)
+            ? entryData.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+            : [];
             
-          if (error) {
-            console.warn(`[ThemeLoader] Error polling for themes: ${error.message}`);
-            return;
-          }
+          const updatedThemes = Array.isArray(entryData.themes)
+            ? entryData.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+            : [];
             
-          // Check if data exists and is not an error with additional null checks and type casting
-          if (data && typeof data === 'object') {
-            const entryData = data as JournalEntry;
+          const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
+          
+          // If we now have themes, update them and stop loading
+          if (updatedCurrentThemes.length > 0 && mountedRef.current) {
+            console.log(`[ThemeLoader] Found themes for entry ${entryId}:`, updatedCurrentThemes);
+            setThemes(updatedCurrentThemes);
+            setIsThemesLoading(false);
+            setThemesLoaded(true);
             
-            // Safely extract themes with fallbacks using the typed interface
-            const updatedMasterThemes = Array.isArray(entryData.master_themes)
-              ? entryData.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
-              : [];
-              
-            const updatedThemes = Array.isArray(entryData.themes)
-              ? entryData.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
-              : [];
-              
-            const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
+            // Stop polling since we found the themes
+            if (pollIntervalRef.current) {
+              clearInterval(pollIntervalRef.current);
+              pollIntervalRef.current = null;
+            }
             
-            // If we now have themes, update them and stop loading
-            if (updatedCurrentThemes.length > 0 && mountedRef.current) {
-              console.log(`[ThemeLoader] Found themes for entry ${entryId}:`, updatedCurrentThemes);
-              setThemes(updatedCurrentThemes);
-              setIsThemesLoading(false);
-              setThemesLoaded(true);
-              
-              // Stop polling since we found the themes
-              if (pollIntervalRef.current) {
-                clearInterval(pollIntervalRef.current);
-                pollIntervalRef.current = null;
-              }
+            // Also clear safety timeout as we succeeded
+            if (safetyTimeoutRef.current) {
+              clearTimeout(safetyTimeoutRef.current);
+              safetyTimeoutRef.current = null;
             }
           }
-        } catch (err) {
-          console.error(`[ThemeLoader] Error in theme polling: ${err}`);
         }
-      };
+      } catch (err) {
+        console.error(`[ThemeLoader] Error in theme polling: ${err}`);
+      }
+    };
+    
+    // Initial check immediately
+    pollForThemes();
+    
+    // Then set up interval polling - more frequent polling for faster feedback
+    pollIntervalRef.current = setInterval(pollForThemes, 2000);
+    
+    // Safety timeout: after 30 seconds (increased from 20), stop trying and use fallback
+    safetyTimeoutRef.current = setTimeout(() => {
+      if (!mountedRef.current) return;
       
-      // Initial check immediately
-      pollForThemes();
+      console.log(`[ThemeLoader] Safety timeout reached for entry ${entryId}`);
+      setIsThemesLoading(false);
       
-      // Then set up interval polling
-      pollIntervalRef.current = setInterval(pollForThemes, 3000);
+      // If we still don't have themes after timeout, try fallback
+      if (themes.length === 0 && content && mountedRef.current) {
+        const fallbackThemes = generateFallbackThemes(content);
+        if (fallbackThemes.length > 0) {
+          console.log(`[ThemeLoader] Using fallback themes for entry ${entryId}`);
+          setThemes(fallbackThemes);
+          setThemesLoaded(true);
+        }
+      }
       
-      // Safety timeout: after 20 seconds, stop trying and use fallback
-      safetyTimeoutRef.current = setTimeout(() => {
-        if (!mountedRef.current) return;
-        
-        console.log(`[ThemeLoader] Safety timeout reached for entry ${entryId}`);
-        setIsThemesLoading(false);
-        
-        // If we still don't have themes after timeout, try fallback
-        if (themes.length === 0 && content && mountedRef.current) {
-          const fallbackThemes = generateFallbackThemes(content);
-          if (fallbackThemes.length > 0) {
-            console.log(`[ThemeLoader] Using fallback themes for entry ${entryId}`);
-            setThemes(fallbackThemes);
-            setThemesLoaded(true);
-          }
-        }
-        
-        // Clear polling interval
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-      }, 20000);
+      // Clear polling interval
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
+    }, 30000);
+    
+    // Cleanup on component unmount or deps change
+    return () => {
+      if (pollIntervalRef.current) {
+        clearInterval(pollIntervalRef.current);
+        pollIntervalRef.current = null;
+      }
       
-      // Cleanup on component unmount or deps change
-      return () => {
-        if (pollIntervalRef.current) {
-          clearInterval(pollIntervalRef.current);
-          pollIntervalRef.current = null;
-        }
-        
-        if (safetyTimeoutRef.current) {
-          clearTimeout(safetyTimeoutRef.current);
-          safetyTimeoutRef.current = null;
-        }
-      };
-    }
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+        safetyTimeoutRef.current = null;
+      }
+    };
   }, [entryId, isNew, isProcessing, themesLoaded, content, themes.length]);
 
   // Generate fallback themes from content with robust error handling

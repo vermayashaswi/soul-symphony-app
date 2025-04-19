@@ -19,6 +19,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [editedContent, setEditedContent] = useState(content);
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   const isMobile = useIsMobile();
 
   const handleOpenDialog = () => {
@@ -66,17 +67,21 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       // Close dialog after successful update
       handleCloseDialog();
       
-      // Show success toast
-      toast.success('Journal entry updated');
+      // Show processing toast
+      toast.info('Processing changes...');
+      setIsProcessing(true);
       
       // Trigger full text processing in the background
       try {
         // The full processing function handles all AI analysis (themes, sentiment, emotions, entities)
         await triggerFullTextProcessing(entryId);
         console.log("Full text processing triggered successfully");
+        toast.success('Journal entry updated and processed');
       } catch (processingError) {
         console.error('Processing failed but entry was updated:', processingError);
-        // Don't show error toast as the main update succeeded
+        toast.error('Entry saved but analysis failed');
+      } finally {
+        setIsProcessing(false);
       }
       
     } catch (error) {
@@ -95,6 +100,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         className={isMobile ? "h-8 w-8 p-0 rounded-full" : "rounded-full"}
         onClick={handleOpenDialog}
         aria-label="Edit entry"
+        disabled={isProcessing}
       >
         <Edit className="h-4 w-4" />
       </Button>

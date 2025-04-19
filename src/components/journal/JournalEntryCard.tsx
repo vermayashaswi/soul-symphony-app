@@ -314,10 +314,74 @@ export function JournalEntryCard({
     
     setTimeout(() => {
       console.log('[JournalEntryCard] Triggering re-fetch for updated analysis data');
+      
       window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
         detail: { entryId: entry.id }
       }));
-    }, 5000);
+      
+      const checkForUpdatedThemes = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('Journal Entries')
+            .select('master_themes, emotions, sentiment, entities')
+            .eq('id', entry.id)
+            .single();
+            
+          if (error) {
+            console.error('[JournalEntryCard] Error fetching updated entry data:', error);
+            return;
+          }
+          
+          if (data) {
+            if ((data.master_themes && data.master_themes.length > 0) || 
+                (data.emotions && Object.keys(data.emotions).length > 0)) {
+              
+              console.log('[JournalEntryCard] Found updated data for entry:', data);
+              
+              setEntries(prevEntries => {
+                return prevEntries.map(e => {
+                  if (e.id === entry.id) {
+                    return {
+                      ...e,
+                      master_themes: data.master_themes || [],
+                      themes: data.master_themes || [],
+                      sentiment: data.sentiment,
+                      emotions: data.emotions,
+                      entities: data.entities
+                    };
+                  }
+                  return e;
+                });
+              });
+              
+              return true;
+            }
+          }
+          
+          return false;
+        } catch (err) {
+          console.error('[JournalEntryCard] Error in checkForUpdatedThemes:', err);
+          return false;
+        }
+      };
+      
+      let pollingAttempts = 0;
+      const maxPollingAttempts = 10;
+      
+      const pollingInterval = setInterval(async () => {
+        pollingAttempts++;
+        
+        const updated = await checkForUpdatedThemes();
+        
+        if (updated || pollingAttempts >= maxPollingAttempts) {
+          clearInterval(pollingInterval);
+          
+          if (pollingAttempts >= maxPollingAttempts && !updated) {
+            console.warn('[JournalEntryCard] Stopped polling for updated data after max attempts');
+          }
+        }
+      }, 3000);
+    }, 3000);
   };
 
   if (hasError) {
