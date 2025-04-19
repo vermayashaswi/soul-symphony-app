@@ -14,13 +14,22 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const { addEvent } = useDebugLog();
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
+  
+  // Force a minimum loading time of 2 seconds for better UX
+  const [forceLoading, setForceLoading] = useState(false);
 
   useEffect(() => {
     // When processing flag is true, always show loading state and preserve stable content
     if (isProcessing) {
       setShowLoading(true);
-      // Important: Don't update stableContent while processing to prevent flicker
-      return;
+      setForceLoading(true);
+      
+      // Set a minimum loading time for better UX
+      const timer = setTimeout(() => {
+        setForceLoading(false);
+      }, 2000);
+      
+      return () => clearTimeout(timer);
     }
 
     const contentIsLoading = !content || 
@@ -30,9 +39,9 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
 
     if (contentIsLoading) {
       setShowLoading(true);
-    } else {
+    } else if (!forceLoading) {
       // Only update stable content and hide loader when not processing
-      // and we have valid content
+      // and we have valid content, and not in forced loading state
       setShowLoading(false);
       setStableContent(content);
     }
@@ -42,22 +51,23 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       isProcessing,
       isExpanded,
       showLoading,
-      contentEmpty: contentIsLoading
+      contentEmpty: contentIsLoading,
+      forceLoading
     });
     
-  }, [content, isProcessing, addEvent]);
+  }, [content, isProcessing, addEvent, forceLoading]);
   // Removed isExpanded from dependencies as it shouldn't affect loader visibility
 
   return (
     <AnimatePresence mode="wait" initial={false}>
-      {showLoading ? (
+      {(showLoading || forceLoading) ? (
         <LoadingEntryContent key="loading" />
       ) : isExpanded ? (
         <motion.div
           key="expanded"
-          initial={{ opacity: 0 }}
+          initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
           transition={{ duration: 0.2 }}
         >
           <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
@@ -66,9 +76,9 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         <motion.p
           key="collapsed" 
           className="text-xs md:text-sm text-foreground line-clamp-3"
-          initial={{ opacity: 0 }}
+          initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
+          exit={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
           transition={{ duration: 0.2 }}
         >
           {stableContent}

@@ -117,7 +117,8 @@ export function PlaybackControls({
       detail: { 
         entries: [tempId], 
         lastUpdate: Date.now(),
-        forceUpdate: true 
+        forceUpdate: true,
+        showLoader: true  // Add explicit showLoader flag
       }
     }));
     
@@ -128,7 +129,8 @@ export function PlaybackControls({
         detail: { 
           entries: [tempId], 
           lastUpdate: Date.now(),
-          forceUpdate: true 
+          forceUpdate: true,
+          showLoader: true  // Add explicit showLoader flag
         }
       }));
     }, 50);
@@ -140,7 +142,8 @@ export function PlaybackControls({
         detail: { 
           entries: [tempId], 
           lastUpdate: Date.now(),
-          forceUpdate: true 
+          forceUpdate: true,
+          showLoader: true  // Add explicit showLoader flag
         }
       }));
     }, 200);

@@ -46,7 +46,7 @@ export function LoadingEntryContent() {
   useEffect(() => {
     const interval = setInterval(() => {
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
-    }, 3000);
+    }, 2500); // Slowed down slightly to make steps more visible
     
     return () => clearInterval(interval);
   }, []);
@@ -56,9 +56,9 @@ export function LoadingEntryContent() {
   return (
     <motion.div 
       className="space-y-2"
-      initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+      initial={{ opacity: 0.7 }}
       animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      exit={{ opacity: 0.7 }}
       transition={{ duration: 0.5 }}
     >
       <div className="flex items-center gap-2 mb-4">
@@ -71,7 +71,7 @@ export function LoadingEntryContent() {
       <ShimmerSkeleton className="h-4 w-5/6" />
       <ShimmerSkeleton className="h-4 w-1/2" />
       
-      <div className="flex flex-col items-center mt-6 justify-center space-y-2">
+      <div className="flex flex-col items-center mt-6 justify-center space-y-2 bg-primary/5 p-3 rounded-lg">
         <motion.div 
           className="relative h-10 w-10"
           animate={{ 
@@ -87,9 +87,9 @@ export function LoadingEntryContent() {
           <AnimatePresence mode="wait">
             <motion.div 
               key={currentStep.id}
-              initial={{ scale: 0, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
+              initial={{ scale: 0, opacity: 0.7 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
+              exit={{ scale: 0, opacity: 0.7 }}
               transition={{ duration: 0.3 }}
               className="absolute inset-0 flex items-center justify-center"
             >
@@ -103,11 +103,11 @@ export function LoadingEntryContent() {
         <AnimatePresence mode="wait">
           <motion.div 
             key={currentStep.id}
-            initial={{ y: 10, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
+            initial={{ y: 10, opacity: 0.7 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -10, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
+            exit={{ y: -10, opacity: 0.7 }}
             transition={{ duration: 0.3 }}
-            className="text-sm text-center text-muted-foreground"
+            className="text-sm text-center text-primary font-medium"
           >
             {currentStep.text}
           </motion.div>
