@@ -76,6 +76,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       }
 
       console.log(`Found ${allEntries?.length || 0} total entries for user`);
+      console.log('Sample entry data:', allEntries?.[0] || 'No entries found');
 
       const { startDate, endDate } = getDateRange(timeRange);
       
@@ -92,10 +93,21 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
 
       console.log(`Filtered ${entries.length} entries for ${timeRange}`);
 
-      const dominantMood = calculateDominantMood(entries);
-      const biggestImprovement = calculateBiggestImprovement(allEntries, entries, timeRange);
-      const journalActivity = calculateJournalActivity(entries, timeRange);
-      const aggregatedEmotionData = processEmotionData(entries, timeRange);
+      const processedEntries = entries.map(entry => {
+        if (entry.emotions && typeof entry.emotions === 'string') {
+          try {
+            entry.emotions = JSON.parse(entry.emotions);
+          } catch (e) {
+            console.error('Error parsing emotions JSON string:', e);
+          }
+        }
+        return entry;
+      });
+
+      const dominantMood = calculateDominantMood(processedEntries);
+      const biggestImprovement = calculateBiggestImprovement(allEntries, processedEntries, timeRange);
+      const journalActivity = calculateJournalActivity(processedEntries, timeRange);
+      const aggregatedEmotionData = processEmotionData(processedEntries, timeRange);
 
       const processedAllEntries = allEntries?.map(entry => {
         if (!entry.sentiment && entry.emotions) {
@@ -104,18 +116,23 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
               ? JSON.parse(entry.emotions) 
               : entry.emotions;
             
-            let totalSentiment = 0;
-            let count = 0;
-            
-            Object.values(emotions).forEach((score: any) => {
-              totalSentiment += Number(score);
-              count++;
-            });
-            
-            if (count > 0) {
-              let avgSentiment = totalSentiment / count;
-              if (avgSentiment > 1.0) avgSentiment = 1.0;
-              entry.sentiment = avgSentiment.toFixed(2);
+            if (emotions && typeof emotions === 'object') {
+              let totalSentiment = 0;
+              let count = 0;
+              
+              Object.values(emotions).forEach((score: any) => {
+                if (typeof score === 'number' || !isNaN(Number(score))) {
+                  totalSentiment += Number(score);
+                  count++;
+                }
+              });
+              
+              if (count > 0) {
+                let avgSentiment = totalSentiment / count;
+                if (avgSentiment > 1.0) avgSentiment = 1.0;
+                entry.sentiment = avgSentiment.toFixed(2);
+                console.log(`Calculated sentiment for entry ${entry.id}: ${entry.sentiment}`);
+              }
             }
           } catch (e) {
             console.error('Error processing emotions for sentiment:', e);
@@ -125,7 +142,7 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
       }) || [];
 
       setInsightsData({
-        entries,
+        entries: processedEntries,
         allEntries: processedAllEntries,
         dominantMood,
         biggestImprovement,
@@ -192,13 +209,15 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
           ? JSON.parse(entry.emotions) 
           : entry.emotions;
         
-        Object.entries(emotions).forEach(([emotion, score]) => {
-          if (!emotionCounts[emotion]) {
-            emotionCounts[emotion] = { count: 0, score: 0 };
-          }
-          emotionCounts[emotion].count += 1;
-          emotionCounts[emotion].score += Number(score);
-        });
+        if (emotions && typeof emotions === 'object') {
+          Object.entries(emotions).forEach(([emotion, score]) => {
+            if (!emotionCounts[emotion]) {
+              emotionCounts[emotion] = { count: 0, score: 0 };
+            }
+            emotionCounts[emotion].count += 1;
+            emotionCounts[emotion].score += Number(score);
+          });
+        }
       } catch (e) {
         console.error('Error parsing emotions:', e);
       }
@@ -263,11 +282,13 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
           ? JSON.parse(entry.emotions) 
           : entry.emotions;
         
-        Object.entries(emotions).forEach(([emotion, score]) => {
-          if (!(emotion in initialEmotionValues)) {
-            initialEmotionValues[emotion] = Number(score);
-          }
-        });
+        if (emotions && typeof emotions === 'object') {
+          Object.entries(emotions).forEach(([emotion, score]) => {
+            if (!(emotion in initialEmotionValues)) {
+              initialEmotionValues[emotion] = Number(score);
+            }
+          });
+        }
       } catch (e) {
         console.error('Error parsing emotions for initial values:', e);
       }
@@ -281,13 +302,15 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
           ? JSON.parse(entry.emotions) 
           : entry.emotions;
         
-        Object.entries(emotions).forEach(([emotion, score]) => {
-          if (!currentEmotionAverages[emotion]) {
-            currentEmotionAverages[emotion] = { total: 0, count: 0 };
-          }
-          currentEmotionAverages[emotion].total += Number(score);
-          currentEmotionAverages[emotion].count += 1;
-        });
+        if (emotions && typeof emotions === 'object') {
+          Object.entries(emotions).forEach(([emotion, score]) => {
+            if (!currentEmotionAverages[emotion]) {
+              currentEmotionAverages[emotion] = { total: 0, count: 0 };
+            }
+            currentEmotionAverages[emotion].total += Number(score);
+            currentEmotionAverages[emotion].count += 1;
+          });
+        }
       } catch (e) {
         console.error('Error parsing emotions for current averages:', e);
       }
@@ -393,32 +416,34 @@ const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmo
           ? JSON.parse(entry.emotions) 
           : entry.emotions;
         
-        Object.entries(emotions).forEach(([emotion, score]) => {
-          if (!emotionData[emotion]) {
-            emotionData[emotion] = [];
-          }
-          
-          if (!emotionCounts.has(dateStr)) {
-            emotionCounts.set(dateStr, new Map());
-          }
-          const dateEmotionCounts = emotionCounts.get(dateStr)!;
-          if (!dateEmotionCounts.has(emotion)) {
-            dateEmotionCounts.set(emotion, 0);
-          }
-          dateEmotionCounts.set(emotion, dateEmotionCounts.get(emotion)! + 1);
-          
-          const existingPoint = emotionData[emotion].find(point => point.date === dateStr);
-          
-          if (existingPoint) {
-            existingPoint.value += Number(score);
-          } else {
-            emotionData[emotion].push({
-              date: dateStr,
-              value: Number(score),
-              emotion: emotion
-            });
-          }
-        });
+        if (emotions && typeof emotions === 'object') {
+          Object.entries(emotions).forEach(([emotion, score]) => {
+            if (!emotionData[emotion]) {
+              emotionData[emotion] = [];
+            }
+            
+            if (!emotionCounts.has(dateStr)) {
+              emotionCounts.set(dateStr, new Map());
+            }
+            const dateEmotionCounts = emotionCounts.get(dateStr)!;
+            if (!dateEmotionCounts.has(emotion)) {
+              dateEmotionCounts.set(emotion, 0);
+            }
+            dateEmotionCounts.set(emotion, dateEmotionCounts.get(emotion)! + 1);
+            
+            const existingPoint = emotionData[emotion].find(point => point.date === dateStr);
+            
+            if (existingPoint) {
+              existingPoint.value += Number(score);
+            } else {
+              emotionData[emotion].push({
+                date: dateStr,
+                value: Number(score),
+                emotion: emotion
+              });
+            }
+          });
+        }
       } catch (e) {
         console.error('Error parsing emotions:', e);
       }

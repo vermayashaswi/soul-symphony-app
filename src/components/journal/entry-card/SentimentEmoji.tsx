@@ -24,7 +24,7 @@ export function SentimentEmoji({ sentiment, isProcessing = false }: SentimentEmo
     try {
       if (typeof sentiment === 'string') {
         return parseFloat(sentiment);
-      } else if (sentiment) {
+      } else if (sentiment && typeof sentiment === 'object') {
         return sentiment.score;
       }
       return 0;
