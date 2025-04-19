@@ -40,21 +40,23 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      // Store current content for comparison
+      // Store current content for potential rollback
       const originalContent = content;
       const newContent = editedContent;
       
-      // Close dialog immediately after UI update
+      // Close dialog immediately
       setIsDialogOpen(false);
       
-      // Set processing state first and update UI with loading state
+      // Set processing state BEFORE updating UI
       setIsProcessing(true);
-      onEntryUpdated(newContent, true); // Pass true to indicate processing state
       
-      // Show toast indicating processing has started
-      toast.success('Journal entry updated. Processing analysis...');
+      // Update UI with loading state immediately
+      onEntryUpdated(newContent, true);
       
-      // Perform the database update in the background
+      // Show toast for initial update
+      toast.success('Journal entry updated. Analyzing changes...');
+      
+      // First, update the database entry to mark it for processing
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
@@ -78,27 +80,81 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         return;
       }
       
-      // Process the text analysis in the background
-      setTimeout(async () => {
-        try {
-          await triggerFullTextProcessing(entryId);
-          console.log("Full text processing triggered successfully");
-          toast.success('Journal entry analysis completed');
-          
-          // Update UI to show final content without processing state
+      // Then trigger processing in the background with better error handling
+      try {
+        await triggerFullTextProcessing(entryId);
+        
+        // Set a timeout for the analysis to complete before showing final state
+        // This helps prevent flickering by maintaining the loading state
+        const analysisCompletionTimeout = setTimeout(() => {
+          console.log("Analysis completion timeout reached, finalizing UI state");
           onEntryUpdated(newContent, false);
-        } catch (processingError) {
-          console.error('Processing failed but entry was updated:', processingError);
-          toast.error('Entry saved but analysis failed');
-        } finally {
           setIsProcessing(false);
-        }
-      }, 500);
+          toast.success('Journal entry analysis completed');
+        }, 8000); // Give analysis up to 8 seconds to complete
+        
+        // Set up polling to check for completed analysis
+        let pollingAttempts = 0;
+        const maxPollingAttempts = 10;
+        const pollingInterval = setInterval(async () => {
+          pollingAttempts++;
+          console.log(`Polling for analysis completion (attempt ${pollingAttempts})`);
+          
+          try {
+            const { data, error } = await supabase
+              .from('Journal Entries')
+              .select('master_themes, emotions, sentiment')
+              .eq('id', entryId)
+              .single();
+              
+            if (error) {
+              console.error("Error checking analysis status:", error);
+              return;
+            }
+            
+            // Check if analysis is likely complete by looking for real analysis data
+            const hasRealThemes = data.master_themes && 
+                                 Array.isArray(data.master_themes) && 
+                                 data.master_themes.length > 0 && 
+                                 !data.master_themes.includes("Processing");
+                                 
+            const hasEmotions = data.emotions && 
+                               Object.keys(data.emotions).length > 0 && 
+                               !Object.keys(data.emotions).includes("Neutral");
+                               
+            if (hasRealThemes || hasEmotions) {
+              // Analysis appears complete, update UI and clear polling
+              clearTimeout(analysisCompletionTimeout);
+              clearInterval(pollingInterval);
+              
+              console.log("Analysis complete, updating UI with final state");
+              onEntryUpdated(newContent, false);
+              setIsProcessing(false);
+              toast.success('Journal entry analysis completed');
+            } else if (pollingAttempts >= maxPollingAttempts) {
+              // Give up polling after max attempts
+              clearInterval(pollingInterval);
+              console.log("Reached max polling attempts, finalizing UI state");
+              onEntryUpdated(newContent, false);
+              setIsProcessing(false);
+            }
+          } catch (pollError) {
+            console.error("Polling error:", pollError);
+          }
+        }, 1000); // Check every second
+        
+      } catch (processingError) {
+        console.error('Processing failed:', processingError);
+        toast.error('Entry saved but analysis failed');
+        
+        // Ensure we clean up UI state even on error
+        onEntryUpdated(newContent, false);
+        setIsProcessing(false);
+      }
       
     } catch (error) {
       console.error('Error updating journal entry:', error);
       toast.error('Failed to update entry');
-      setIsSubmitting(false);
     } finally {
       // Ensure submission state is reset
       setIsSubmitting(false);

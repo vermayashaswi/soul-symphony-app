@@ -16,9 +16,10 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [stableContent, setStableContent] = useState(content);
 
   useEffect(() => {
-    // Always show loading state when processing
+    // When processing flag is true, always show loading state
     if (isProcessing) {
       setShowLoading(true);
+      // Don't update stableContent while processing to prevent flicker
       return;
     }
 
@@ -30,6 +31,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     if (contentIsLoading) {
       setShowLoading(true);
     } else {
+      // Only update stable content and hide loader when not processing
       setShowLoading(false);
       setStableContent(content);
     }
@@ -42,7 +44,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       contentEmpty: contentIsLoading
     });
     
-  }, [content, isProcessing, addEvent]);
+  }, [content, isProcessing, addEvent, isExpanded]);
 
   return (
     <AnimatePresence mode="wait" initial={false}>
