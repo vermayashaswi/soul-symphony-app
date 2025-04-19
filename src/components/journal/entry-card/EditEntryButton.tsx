@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+
+import React, { useState, useEffect } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -21,7 +22,54 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [updatedInBackground, setUpdatedInBackground] = useState(false);
+  const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
   const isMobile = useIsMobile();
+
+  // Ensure minimum processing time for consistent UX
+  const MIN_PROCESSING_TIME = 1500; // 1.5 seconds minimum
+  const MAX_PROCESSING_TIME = 10000; // 10 seconds maximum before closing dialog anyway
+
+  useEffect(() => {
+    let processingTimer: NodeJS.Timeout | null = null;
+    let maxProcessingTimer: NodeJS.Timeout | null = null;
+    
+    // If processing has started, set up timers
+    if (isProcessing && processingStartTime) {
+      // Calculate how much time has passed since processing started
+      const timePassed = Date.now() - processingStartTime;
+      
+      // If we haven't reached minimum processing time, set a timer for the remaining time
+      if (timePassed < MIN_PROCESSING_TIME) {
+        const timeRemaining = MIN_PROCESSING_TIME - timePassed;
+        processingTimer = setTimeout(() => {
+          // Only close if still processing after timer completes
+          if (isProcessing && isDialogOpen) {
+            console.log('Minimum processing time reached, closing dialog');
+            setIsDialogOpen(false);
+            setIsSubmitting(false);
+            setIsProcessing(false);
+          }
+        }, timeRemaining);
+      }
+      
+      // Also set a maximum processing time limit
+      maxProcessingTimer = setTimeout(() => {
+        if (isProcessing && isDialogOpen) {
+          console.log('Maximum processing time reached, closing dialog anyway');
+          setIsDialogOpen(false);
+          setIsSubmitting(false);
+          setIsProcessing(false);
+          toast.success('Entry updated (still processing in background)');
+        }
+      }, MAX_PROCESSING_TIME);
+    }
+    
+    // Clean up timers on unmount or when processing state changes
+    return () => {
+      if (processingTimer) clearTimeout(processingTimer);
+      if (maxProcessingTimer) clearTimeout(maxProcessingTimer);
+    };
+  }, [isProcessing, processingStartTime, isDialogOpen]);
 
   const handleOpenDialog = () => {
     setEditedContent(content);
@@ -50,42 +98,89 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       // Update UI with processing state IMMEDIATELY but keep dialog open
       onEntryUpdated(newContent, true);
       setIsProcessing(true);
+      setProcessingStartTime(Date.now());
       
-      const { error: updateError } = await supabase
-        .from('Journal Entries')
-        .update({ 
-          "refined text": newContent,
-          "Edit_Status": 1,
-          "sentiment": "0",
-          "emotions": { "Neutral": 0.5 },
-          "master_themes": ["Processing"],
-          "entities": []
-        })
-        .eq('id', entryId);
-        
-      if (updateError) {
-        console.error("Error updating entry:", updateError);
-        toast.error(`Failed to update entry: ${updateError.message}`);
-        onEntryUpdated(originalContent, false);
-        setIsProcessing(false);
-        setIsSubmitting(false);
-        return;
+      // Add retry logic for network issues
+      let retryCount = 0;
+      const maxRetries = 3;
+      let updateSuccess = false;
+      
+      while (retryCount < maxRetries && !updateSuccess) {
+        try {
+          const { error: updateError } = await supabase
+            .from('Journal Entries')
+            .update({ 
+              "refined text": newContent,
+              "Edit_Status": 1,
+              "sentiment": "0",
+              "emotions": { "Neutral": 0.5 },
+              "master_themes": ["Processing"],
+              "entities": []
+            })
+            .eq('id', entryId);
+            
+          if (updateError) {
+            retryCount++;
+            console.error(`Error updating entry (attempt ${retryCount}):`, updateError);
+            
+            if (retryCount >= maxRetries) {
+              throw updateError;
+            }
+            
+            // Wait with exponential backoff before retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+          } else {
+            updateSuccess = true;
+          }
+        } catch (err) {
+          retryCount++;
+          console.error(`Network error during update (attempt ${retryCount}):`, err);
+          
+          if (retryCount >= maxRetries) {
+            throw err;
+          }
+          
+          // Wait with exponential backoff before retry
+          await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+        }
+      }
+      
+      if (!updateSuccess) {
+        throw new Error("Failed to update entry after multiple attempts");
       }
 
       // Set updated flag and keep dialog open briefly
       setUpdatedInBackground(true);
       
       try {
-        await triggerFullTextProcessing(entryId);
+        // Process with retry logic
+        let processingSuccess = false;
+        retryCount = 0;
+        
+        while (retryCount < maxRetries && !processingSuccess) {
+          try {
+            await triggerFullTextProcessing(entryId);
+            processingSuccess = true;
+          } catch (err) {
+            retryCount++;
+            console.error(`Processing error (attempt ${retryCount}):`, err);
+            
+            if (retryCount >= maxRetries) {
+              throw err;
+            }
+            
+            // Wait with exponential backoff before retry
+            await new Promise(resolve => setTimeout(resolve, 1000 * Math.pow(2, retryCount)));
+          }
+        }
         
         // Ensure minimum processing time for UX consistency
-        const minProcessingTime = 1000; // 1 second minimum
-        await new Promise(resolve => setTimeout(resolve, minProcessingTime));
+        const processingElapsed = Date.now() - (processingStartTime || Date.now());
+        if (processingElapsed < MIN_PROCESSING_TIME) {
+          await new Promise(resolve => setTimeout(resolve, MIN_PROCESSING_TIME - processingElapsed));
+        }
         
-        // Close dialog and update UI
-        setIsDialogOpen(false);
-        setIsSubmitting(false);
-        setIsProcessing(false);
+        // Dialog close is now handled by the useEffect
         toast.success('Journal entry updated successfully');
         
       } catch (processingError) {
@@ -117,7 +212,12 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         <Edit className="h-4 w-4" />
       </Button>
       
-      <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+      <Dialog open={isDialogOpen} onOpenChange={(open) => {
+        // Only allow closing if not submitting
+        if (!isSubmitting) {
+          setIsDialogOpen(open);
+        }
+      }}>
         <DialogContent className="w-[90%] max-w-lg mx-auto">
           <DialogHeader>
             <DialogTitle>Edit Journal Entry</DialogTitle>

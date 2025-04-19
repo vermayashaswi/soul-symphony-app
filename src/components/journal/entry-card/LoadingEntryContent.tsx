@@ -42,21 +42,34 @@ const processingSteps = [
 
 export function LoadingEntryContent() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
+  const [elapsed, setElapsed] = useState(0);
   
   useEffect(() => {
-    const interval = setInterval(() => {
+    // Update step every 3 seconds for smooth progression
+    const stepInterval = setInterval(() => {
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
     }, 3000);
     
-    return () => clearInterval(interval);
+    // Track elapsed time to show additional messaging for long waits
+    const elapsedInterval = setInterval(() => {
+      setElapsed(prev => prev + 1);
+    }, 1000);
+    
+    return () => {
+      clearInterval(stepInterval);
+      clearInterval(elapsedInterval);
+    };
   }, []);
   
   const currentStep = processingSteps[currentStepIndex];
   
+  // Show reassurance message for longer waits
+  const showReassurance = elapsed > 15;
+  
   return (
     <motion.div 
       className="space-y-2"
-      initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+      initial={{ opacity: 0.7 }}
       animate={{ opacity: 1 }}
       exit={{ opacity: 0 }}
       transition={{ duration: 0.5 }}
@@ -87,9 +100,9 @@ export function LoadingEntryContent() {
           <AnimatePresence mode="wait">
             <motion.div 
               key={currentStep.id}
-              initial={{ scale: 0, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
+              initial={{ scale: 0, opacity: 0.7 }}
               animate={{ scale: 1, opacity: 1 }}
-              exit={{ scale: 0, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
+              exit={{ scale: 0, opacity: 0.7 }}
               transition={{ duration: 0.3 }}
               className="absolute inset-0 flex items-center justify-center"
             >
@@ -103,15 +116,28 @@ export function LoadingEntryContent() {
         <AnimatePresence mode="wait">
           <motion.div 
             key={currentStep.id}
-            initial={{ y: 10, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
+            initial={{ y: 10, opacity: 0.7 }}
             animate={{ y: 0, opacity: 1 }}
-            exit={{ y: -10, opacity: 0.7 }} // Changed from 0 to 0.7 to avoid warning
+            exit={{ y: -10, opacity: 0.7 }}
             transition={{ duration: 0.3 }}
             className="text-sm text-center text-muted-foreground"
           >
             {currentStep.text}
           </motion.div>
         </AnimatePresence>
+        
+        {showReassurance && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="text-xs text-center text-muted-foreground/70 mt-3 max-w-[250px]"
+          >
+            {elapsed > 30 ? 
+              "Still working... network might be slow, but we'll get there!" : 
+              "This might take a moment on slower connections..."}
+          </motion.div>
+        )}
       </div>
     </motion.div>
   );

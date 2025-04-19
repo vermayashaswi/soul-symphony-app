@@ -14,11 +14,33 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const { addEvent } = useDebugLog();
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
+  const [prevContent, setPrevContent] = useState(content);
+  
+  // Track content stability to detect rapid changes
+  useEffect(() => {
+    if (content !== prevContent) {
+      setPrevContent(content);
+      
+      // If not processing and content changes, log the change
+      if (!isProcessing) {
+        addEvent('EntryContent', 'Content changed', 'info', {
+          oldLength: prevContent?.length || 0,
+          newLength: content?.length || 0,
+          oldContent: prevContent?.slice(0, 20),
+          newContent: content?.slice(0, 20)
+        });
+      }
+    }
+  }, [content, prevContent, isProcessing, addEvent]);
 
   useEffect(() => {
     // When processing flag is true, always show loading state and preserve stable content
     if (isProcessing) {
       setShowLoading(true);
+      addEvent('EntryContent', 'Processing started', 'info', {
+        currentContent: stableContent?.slice(0, 20),
+        newContent: content?.slice(0, 20)
+      });
       // Important: Don't update stableContent while processing to prevent flicker
       return;
     }
@@ -30,11 +52,23 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
 
     if (contentIsLoading) {
       setShowLoading(true);
+      addEvent('EntryContent', 'Content loading', 'info', {
+        contentEmpty: true
+      });
     } else {
-      // Only update stable content and hide loader when not processing
-      // and we have valid content
-      setShowLoading(false);
-      setStableContent(content);
+      // Delay hiding loader slightly to ensure smooth transition
+      const timer = setTimeout(() => {
+        setShowLoading(false);
+        // Only update stable content once loading is complete
+        setStableContent(content);
+        
+        addEvent('EntryContent', 'Finished loading', 'info', {
+          contentLength: content?.length || 0,
+          sampleContent: content?.slice(0, 20)
+        });
+      }, 300);
+      
+      return () => clearTimeout(timer);
     }
     
     addEvent('EntryContent', 'State update', 'info', {
@@ -42,11 +76,11 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       isProcessing,
       isExpanded,
       showLoading,
-      contentEmpty: contentIsLoading
+      contentEmpty: contentIsLoading,
+      stableContentLength: stableContent?.length || 0
     });
     
-  }, [content, isProcessing, addEvent]);
-  // Removed isExpanded from dependencies as it shouldn't affect loader visibility
+  }, [content, isProcessing, addEvent, stableContent]);
 
   return (
     <AnimatePresence mode="wait" initial={false}>
@@ -58,7 +92,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.3 }}
         >
           <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
         </motion.div>
@@ -69,7 +103,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           exit={{ opacity: 0 }}
-          transition={{ duration: 0.2 }}
+          transition={{ duration: 0.3 }}
         >
           {stableContent}
         </motion.p>

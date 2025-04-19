@@ -1,149 +1,99 @@
+import React, { createContext, useContext, useState, useCallback } from 'react';
 
-import React, { createContext, useContext, useState } from 'react';
-
-// Define the debug step type
-export type DebugStep = {
-  id: string;
-  name: string;
-  status: 'pending' | 'success' | 'error' | 'in-progress';
-  timestamp?: number;
-  details?: string;
-  duration?: number;
-};
-
-// Define the context type
-interface DebugContextType {
-  logs: any[];
-  addLog: (...args: any[]) => void;
-  addEvent: (...args: any[]) => void;
-  clearLogs: () => void;
-  isEnabled: boolean;
-  toggleEnabled: () => void;
-  // Voice recorder debugging
-  recorderSteps: DebugStep[];
-  addRecorderStep: (step: DebugStep) => void;
-  updateRecorderStep: (id: string, updates: Partial<DebugStep>) => void;
-  resetRecorderSteps: () => void;
-  showRecorderDebug: boolean;
-  toggleRecorderDebug: () => void;
+interface DebugEvent {
+  timestamp: number;
+  component: string;
+  action: string;
+  level: 'info' | 'warning' | 'error';
+  details?: any;
 }
 
-// Create the context
+interface DebugContextType {
+  events: DebugEvent[];
+  addEvent: (component: string, action: string, level: 'info' | 'warning' | 'error', details?: any) => void;
+  clearEvents: () => void;
+}
+
 const DebugContext = createContext<DebugContextType>({
-  logs: [],
-  addLog: (...args: any[]) => {},
-  addEvent: (...args: any[]) => {},
-  clearLogs: () => {},
-  isEnabled: false,
-  toggleEnabled: () => {},
-  recorderSteps: [],
-  addRecorderStep: () => {},
-  updateRecorderStep: () => {},
-  resetRecorderSteps: () => {},
-  showRecorderDebug: false,
-  toggleRecorderDebug: () => {},
+  events: [],
+  addEvent: () => {},
+  clearEvents: () => {},
 });
 
-// Create the provider component
-export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [logs, setLogs] = useState<any[]>([]);
-  const [isEnabled, setIsEnabled] = useState<boolean>(
-    localStorage.getItem('debugEnabled') === 'true'
-  );
-  const [recorderSteps, setRecorderSteps] = useState<DebugStep[]>([]);
-  const [showRecorderDebug, setShowRecorderDebug] = useState<boolean>(
-    localStorage.getItem('showRecorderDebug') === 'true'
-  );
-
-  const addLog = (...args: any[]) => {
-    if (!isEnabled) return;
+export const DebugProvider: React.FC<{children: React.ReactNode}> = ({ children }) => {
+  const [events, setEvents] = useState<DebugEvent[]>([]);
+  
+  const addEvent = useCallback((component: string, action: string, level: 'info' | 'warning' | 'error', details?: any) => {
+    const newEvent: DebugEvent = {
+      timestamp: Date.now(),
+      component,
+      action,
+      level,
+      details
+    };
     
-    const timestamp = new Date();
-    setLogs(prevLogs => [
-      ...prevLogs,
-      {
-        id: timestamp.getTime() + Math.random().toString(36).substring(2, 9),
-        timestamp,
-        data: args,
+    // Log to console for easier debugging
+    console.log(`[${component}] ${action}:`, details);
+    
+    setEvents(prev => {
+      const updatedEvents = [...prev, newEvent];
+      
+      // Keep only the last 100 events to prevent memory issues
+      if (updatedEvents.length > 100) {
+        return updatedEvents.slice(-100);
       }
-    ]);
-    
-    // Also log to console if enabled
-    if (isEnabled) {
-      console.log('[DEBUG]', ...args);
-    }
-  };
-
-  const addEvent = (...args: any[]) => {
-    addLog('[EVENT]', ...args);
-  };
-
-  const clearLogs = () => {
-    setLogs([]);
-  };
-
-  const toggleEnabled = () => {
-    const newState = !isEnabled;
-    localStorage.setItem('debugEnabled', newState.toString());
-    setIsEnabled(newState);
-  };
-
-  // Voice recorder debug methods
-  const addRecorderStep = (step: DebugStep) => {
-    setRecorderSteps(prev => [...prev, {
-      ...step,
-      timestamp: step.timestamp || Date.now()
-    }]);
-  };
-
-  const updateRecorderStep = (id: string, updates: Partial<DebugStep>) => {
-    setRecorderSteps(prev => {
-      const index = prev.findIndex(step => step.id === id);
-      if (index === -1) return prev;
-
-      const newSteps = [...prev];
-      newSteps[index] = {
-        ...newSteps[index],
-        ...updates,
-        ...(updates.status === 'success' && !updates.duration && newSteps[index].timestamp 
-          ? { duration: (Date.now() - newSteps[index].timestamp!) / 1000 }
-          : {})
-      };
-      return newSteps;
+      
+      return updatedEvents;
     });
-  };
-
-  const resetRecorderSteps = () => {
-    setRecorderSteps([]);
-  };
-
-  const toggleRecorderDebug = () => {
-    const newState = !showRecorderDebug;
-    localStorage.setItem('showRecorderDebug', newState.toString());
-    setShowRecorderDebug(newState);
-  };
-
-  const value = {
-    logs,
-    addLog,
-    addEvent,
-    clearLogs,
-    isEnabled,
-    toggleEnabled,
-    recorderSteps,
-    addRecorderStep,
-    updateRecorderStep,
-    resetRecorderSteps,
-    showRecorderDebug,
-    toggleRecorderDebug
-  };
-
+  }, []);
+  
+  const clearEvents = useCallback(() => {
+    setEvents([]);
+  }, []);
+  
   return (
-    <DebugContext.Provider value={value}>
+    <DebugContext.Provider value={{ events, addEvent, clearEvents }}>
       {children}
     </DebugContext.Provider>
   );
 };
 
-// Hook for using the debug context
 export const useDebugLog = () => useContext(DebugContext);
+
+// Component to display debug logs when needed
+export const DebugLogPanel: React.FC<{show?: boolean}> = ({ show = false }) => {
+  const { events, clearEvents } = useDebugLog();
+  
+  if (!show) return null;
+  
+  return (
+    <div className="fixed bottom-0 left-0 w-full bg-black/80 text-white z-50 max-h-[300px] overflow-auto p-2 text-xs">
+      <div className="flex justify-between mb-2">
+        <h3>Debug Log ({events.length} events)</h3>
+        <button onClick={clearEvents} className="text-xs bg-red-500 px-2 py-1 rounded">Clear</button>
+      </div>
+      <div className="space-y-1">
+        {events.map((event, i) => (
+          <div key={i} className={`
+            ${event.level === 'error' ? 'text-red-400' : 
+               event.level === 'warning' ? 'text-yellow-400' : 'text-blue-300'}
+          `}>
+            <span className="opacity-70">{new Date(event.timestamp).toLocaleTimeString()}</span>
+            {' - '}
+            <span className="font-bold">{event.component}</span>
+            {': '}
+            <span>{event.action}</span>
+            {event.details && (
+              <pre className="ml-4 text-[10px] opacity-70 whitespace-pre-wrap">
+                {typeof event.details === 'object' 
+                  ? JSON.stringify(event.details, null, 2)
+                  : String(event.details)
+                }
+              </pre>
+            )}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+};
