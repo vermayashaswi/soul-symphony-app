@@ -33,9 +33,12 @@ export function ThemeLoader({
   const [themesLoaded, setThemesLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const [stableThemes, setStableThemes] = useState<string[]>([]);
+  const [hasFoundThemes, setHasFoundThemes] = useState(false);
   const mountedRef = useRef<boolean>(true);
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const themeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Log when the component is mounted/unmounted
   useEffect(() => {
@@ -56,6 +59,11 @@ export function ThemeLoader({
         clearTimeout(safetyTimeoutRef.current);
         safetyTimeoutRef.current = null;
       }
+      
+      if (themeUpdateTimeoutRef.current) {
+        clearTimeout(themeUpdateTimeoutRef.current);
+        themeUpdateTimeoutRef.current = null;
+      }
     };
   }, [entryId]);
 
@@ -73,9 +81,17 @@ export function ThemeLoader({
         );
         
         if (filteredThemes.length > 0) {
-          setThemes(filteredThemes);
-          setThemesLoaded(true);
-          setIsThemesLoading(false);
+          // Add stability - use a short timeout to set themes
+          // This prevents flickering when themes are updated multiple times in quick succession
+          clearTimeout(themeUpdateTimeoutRef.current || undefined);
+          
+          themeUpdateTimeoutRef.current = setTimeout(() => {
+            setThemes(filteredThemes);
+            setStableThemes(filteredThemes);
+            setThemesLoaded(true);
+            setIsThemesLoading(false);
+            setHasFoundThemes(true);
+          }, 100);
         } else {
           setThemes([]);
           // Only set loading if we don't have themes and the entry is new or explicitly processing
@@ -101,8 +117,14 @@ export function ThemeLoader({
   useEffect(() => {
     if (!mountedRef.current || !entryId) return;
     
+    // Critical fix for theme flickering: If we already have stable themes, don't start polling
+    if (stableThemes.length > 0 && hasFoundThemes) {
+      console.log(`[ThemeLoader] Already have stable themes for entry ${entryId}, skipping polling`);
+      return;
+    }
+    
     // If we already have themes and they're loaded, don't poll
-    if (themes.length > 0 && themesLoaded) {
+    if (themes.length > 0 && themesLoaded && !isProcessing) {
       console.log(`[ThemeLoader] Already have themes for entry ${entryId}, skipping polling`);
       return;
     }
@@ -156,9 +178,20 @@ export function ThemeLoader({
           // If we now have themes, update them and stop loading
           if (updatedCurrentThemes.length > 0 && mountedRef.current) {
             console.log(`[ThemeLoader] Found themes for entry ${entryId}:`, updatedCurrentThemes);
-            setThemes(updatedCurrentThemes);
-            setIsThemesLoading(false);
-            setThemesLoaded(true);
+            
+            // Critical fix for theme flickering: Set stable themes first, then set displayed themes with delay
+            setStableThemes(updatedCurrentThemes);
+            setHasFoundThemes(true);
+            
+            // Add a slight delay before updating the displayed themes to prevent flickering
+            clearTimeout(themeUpdateTimeoutRef.current || undefined);
+            themeUpdateTimeoutRef.current = setTimeout(() => {
+              if (mountedRef.current) {
+                setThemes(updatedCurrentThemes);
+                setIsThemesLoading(false);
+                setThemesLoaded(true);
+              }
+            }, 500);
             
             // Stop polling since we found the themes
             if (pollIntervalRef.current) {
@@ -181,25 +214,28 @@ export function ThemeLoader({
     // Initial check immediately
     pollForThemes();
     
-    // Then set up interval polling - more frequent polling for faster feedback
-    pollIntervalRef.current = setInterval(pollForThemes, 2000);
+    // Then set up interval polling - less frequent polling to reduce flickering
+    pollIntervalRef.current = setInterval(pollForThemes, 3000);
     
     // Safety timeout: after 30 seconds (increased from 20), stop trying and use fallback
     safetyTimeoutRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
       
       console.log(`[ThemeLoader] Safety timeout reached for entry ${entryId}`);
-      setIsThemesLoading(false);
       
       // If we still don't have themes after timeout, try fallback
       if (themes.length === 0 && content && mountedRef.current) {
         const fallbackThemes = generateFallbackThemes(content);
         if (fallbackThemes.length > 0) {
           console.log(`[ThemeLoader] Using fallback themes for entry ${entryId}`);
+          setStableThemes(fallbackThemes);
           setThemes(fallbackThemes);
           setThemesLoaded(true);
         }
       }
+      
+      // Always ensure we stop showing the loading state
+      setIsThemesLoading(false);
       
       // Clear polling interval
       if (pollIntervalRef.current) {
@@ -219,8 +255,13 @@ export function ThemeLoader({
         clearTimeout(safetyTimeoutRef.current);
         safetyTimeoutRef.current = null;
       }
+      
+      if (themeUpdateTimeoutRef.current) {
+        clearTimeout(themeUpdateTimeoutRef.current);
+        themeUpdateTimeoutRef.current = null;
+      }
     };
-  }, [entryId, isNew, isProcessing, themesLoaded, content, themes.length]);
+  }, [entryId, isNew, isProcessing, themesLoaded, content, themes.length, stableThemes.length, hasFoundThemes]);
 
   // Generate fallback themes from content with robust error handling
   const generateFallbackThemes = (text: string): string[] => {
@@ -256,6 +297,7 @@ export function ThemeLoader({
           const fallbackThemes = generateFallbackThemes(content);
           if (fallbackThemes.length > 0) {
             setThemes(fallbackThemes);
+            setStableThemes(fallbackThemes);
           }
           setIsThemesLoading(false);
           setThemesLoaded(true);
@@ -282,10 +324,13 @@ export function ThemeLoader({
     );
   }
 
+  // Render either the stable themes (if we have them) or loading state, but avoid toggling back and forth
+  const shouldShowLoadingState = isThemesLoading && (!hasFoundThemes || stableThemes.length === 0);
+
   return (
     <div className="mt-3 md:mt-4">
       <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
-      {isThemesLoading || (!themesLoaded && (isProcessing || isNew)) ? (
+      {shouldShowLoadingState ? (
         <div className="space-y-2 mt-2">
           <div className="flex space-x-2">
             <Skeleton className="h-6 w-16 rounded-md" />
@@ -298,7 +343,7 @@ export function ThemeLoader({
         </div>
       ) : (
         <ThemeBoxes 
-          themes={themes} 
+          themes={hasFoundThemes ? stableThemes : themes} 
           isDisturbed={themesLoaded} 
           isLoading={false} 
         />

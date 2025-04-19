@@ -46,11 +46,12 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         .update({ 
           "refined text": editedContent,
           "Edit_Status": 1,
-          // Reset analysis fields to ensure they're reprocessed
-          "sentiment": null,
-          "emotions": null,
-          "master_themes": null,
-          "entities": null
+          // Reset analysis fields to ensure they're reprocessed with default values
+          // This prevents empty {} objects in the database
+          "sentiment": "0", // Default neutral sentiment
+          "emotions": { "Neutral": 0.5 }, // Default neutral emotion
+          "master_themes": ["Processing"], // Temporary theme while processing
+          "entities": [] // Empty array is better than null or empty object
         })
         .eq('id', entryId);
         
@@ -68,21 +69,24 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       handleCloseDialog();
       
       // Show processing toast
-      toast.info('Processing changes...');
+      toast.success('Journal entry updated. Processing analysis...');
       setIsProcessing(true);
       
-      // Trigger full text processing in the background
-      try {
-        // The full processing function handles all AI analysis (themes, sentiment, emotions, entities)
-        await triggerFullTextProcessing(entryId);
-        console.log("Full text processing triggered successfully");
-        toast.success('Journal entry updated and processed');
-      } catch (processingError) {
-        console.error('Processing failed but entry was updated:', processingError);
-        toast.error('Entry saved but analysis failed');
-      } finally {
-        setIsProcessing(false);
-      }
+      // Trigger full text processing in the background with a short delay
+      // This delay helps ensure smoother UI transitions
+      setTimeout(async () => {
+        try {
+          // The full processing function handles all AI analysis (themes, sentiment, emotions, entities)
+          await triggerFullTextProcessing(entryId);
+          console.log("Full text processing triggered successfully");
+          toast.success('Journal entry analysis completed');
+        } catch (processingError) {
+          console.error('Processing failed but entry was updated:', processingError);
+          toast.error('Entry saved but analysis failed');
+        } finally {
+          setIsProcessing(false);
+        }
+      }, 500);
       
     } catch (error) {
       console.error('Error updating journal entry:', error);
