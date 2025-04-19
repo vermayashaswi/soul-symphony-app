@@ -40,10 +40,25 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
+      // Store current content for comparison
+      const originalContent = content;
+      const newContent = editedContent;
+      
+      // Immediately update UI state to prevent flickering - BEFORE any DB operation
+      onEntryUpdated(newContent);
+      
+      // Close dialog immediately after UI update
+      setIsDialogOpen(false);
+      
+      // Show success toast and set processing state
+      toast.success('Journal entry updated. Processing analysis...');
+      setIsProcessing(true);
+      
+      // Perform the database update in the background - after UI is already updated
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
-          "refined text": editedContent,
+          "refined text": newContent,
           "Edit_Status": 1,
           "sentiment": "0",
           "emotions": { "Neutral": 0.5 },
@@ -55,19 +70,13 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       if (updateError) {
         console.error("Error updating entry:", updateError);
         toast.error(`Failed to update entry: ${updateError.message}`);
+        
+        // Revert UI state on error
+        onEntryUpdated(originalContent);
+        setIsProcessing(false);
+        setIsSubmitting(false);
         return;
       }
-      
-      // First update the UI state immediately to avoid flicker
-      onEntryUpdated(editedContent);
-      
-      // Close the dialog only after the state is updated
-      setIsSubmitting(false);
-      setIsDialogOpen(false);
-      
-      // Show success toast after dialog is closed
-      toast.success('Journal entry updated. Processing analysis...');
-      setIsProcessing(true);
       
       // Process the text analysis in the background
       setTimeout(async () => {
@@ -86,6 +95,9 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     } catch (error) {
       console.error('Error updating journal entry:', error);
       toast.error('Failed to update entry');
+      setIsSubmitting(false);
+    } finally {
+      // Ensure submission state is reset
       setIsSubmitting(false);
     }
   };

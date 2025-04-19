@@ -18,13 +18,15 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const contentAvailableRef = useRef(false);
   const timeoutRef = useRef<NodeJS.Timeout | null>(null);
   const prevContentRef = useRef(content);
+  const forceStableRef = useRef(false);
 
   // Immediately update content when it changes to prevent flicker
   useEffect(() => {
     if (content !== prevContentRef.current) {
-      // If we have new content, update immediately without any transition
+      // Always update stable content immediately when content changes
       setStableContent(content);
       prevContentRef.current = content;
+      forceStableRef.current = true; // Mark this content as stable to prevent overwrites
       
       addEvent('EntryContent', 'Content changed - immediate update', 'info', {
         oldContent: prevContentRef.current?.substring(0, 20),
@@ -55,6 +57,11 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     } else {
       contentAvailableRef.current = true;
       setShowLoading(false);
+      
+      // Only update stableContent if it's not from a direct content change
+      if (!forceStableRef.current) {
+        setStableContent(content);
+      }
     }
 
     return () => {
@@ -73,9 +80,22 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       showLoading,
       transitionInProgress,
       contentEmpty: !content || content === "Processing entry..." || content.trim() === "" || content === "Loading...",
-      stableContentSet: stableContent === content
+      stableContentSet: stableContent === content,
+      forceStable: forceStableRef.current
     });
   }, [content, isProcessing, isExpanded, showLoading, stableContent, transitionInProgress, addEvent]);
+
+  // Reset forceStable flag after processing is complete
+  useEffect(() => {
+    if (!isProcessing && forceStableRef.current) {
+      // Wait a bit before allowing content to be updated by other sources
+      const timer = setTimeout(() => {
+        forceStableRef.current = false;
+      }, 5000); // 5 second lockout period
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isProcessing]);
 
   return (
     <AnimatePresence mode="wait" initial={false}>
