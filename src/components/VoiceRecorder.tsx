@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useRef } from 'react';
-import { Loader2, AlertTriangle, BugPlay } from 'lucide-react';
+import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useAudioRecorder } from '@/hooks/use-audio-recorder';
@@ -16,9 +15,6 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
-import { useDebugLog } from '@/utils/debug/DebugContext';
-import VoiceRecorderDebugPanel from '@/components/debug/VoiceRecorderDebugPanel';
-import { Button } from '@/components/ui/button';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -44,17 +40,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const { user } = useAuth();
   const { isMobile } = useIsMobile();
   
-  // Access debug context
-  const { 
-    addRecorderStep, 
-    updateRecorderStep, 
-    resetRecorderSteps, 
-    recorderSteps,
-    showRecorderDebug,
-    toggleRecorderDebug
-  } = useDebugLog();
-  
-  // Audio recording hook
   const {
     isRecording,
     recordingTime,
@@ -71,7 +56,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     maxDuration: 300
   });
   
-  // Audio playback hook
   const {
     isPlaying,
     playbackProgress,
@@ -86,15 +70,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     onPlaybackStart: () => {
       console.log('[VoiceRecorder] Playback started');
       setHasPlayedOnce(true);
-      updateRecorderStep('playback', { status: 'in-progress', details: 'Playing audio' });
     },
     onPlaybackEnd: () => {
       console.log('[VoiceRecorder] Playback ended');
-      updateRecorderStep('playback', { status: 'success', details: 'Playback completed' });
     }
   });
 
-  // Clear toasts on mount
   useEffect(() => {
     const clearToastsOnMount = async () => {
       await ensureAllToastsCleared();
@@ -102,46 +83,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     };
     
     clearToastsOnMount();
-
-    // Add first debug step
-    addRecorderStep({
-      id: 'init',
-      name: 'Initialize Voice Recorder',
-      status: 'success',
-      timestamp: Date.now(),
-      details: 'Voice recorder component mounted'
-    });
     
     return () => {
       clearAllToasts();
-      resetRecorderSteps();
     };
-  }, [addRecorderStep, resetRecorderSteps]);
+  }, []);
 
-  // Clear recording error when recording starts
   useEffect(() => {
     if (isRecording) {
       setRecordingError(null);
-      
-      // Add recording start debug step
-      addRecorderStep({
-        id: 'recording-start',
-        name: 'Started Recording',
-        status: 'in-progress',
-        timestamp: Date.now(),
-        details: `Recording in format: ${navigator.mediaDevices ? 'WebM/WAV (browser supported)' : 'Unknown'}`
-      });
-    } else if (audioBlob && recorderSteps.some(s => s.id === 'recording-start')) {
-      // Update recording completion debug step
-      updateRecorderStep('recording-start', { 
-        status: 'success', 
-        name: 'Recording Completed',
-        details: `Size: ${(audioBlob.size / 1024).toFixed(2)}KB, Duration: ${(recordingTime / 1000).toFixed(1)}s, Type: ${audioBlob.type}`
-      });
     }
-  }, [isRecording, audioBlob, recordingTime, addRecorderStep, updateRecorderStep, recorderSteps]);
+  }, [isRecording]);
   
-  // Show warning for long recordings
   useEffect(() => {
     if (isRecording && recordingTime >= 120000) {
       toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
@@ -150,7 +103,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   }, [isRecording, recordingTime]);
   
-  // Handle animation visibility
   useEffect(() => {
     if (isRecording) {
       setShowAnimation(true);
@@ -159,39 +111,19 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   }, [isRecording, audioBlob]);
   
-  // Prepare audio when blob is available
   useEffect(() => {
     if (audioBlob && !audioPrepared) {
       console.log('[VoiceRecorder] New audio blob detected, preparing audio...');
       
-      addRecorderStep({
-        id: 'audio-prepare',
-        name: 'Preparing Audio',
-        status: 'in-progress',
-        timestamp: Date.now(),
-        details: `Initializing audio blob of size: ${(audioBlob.size / 1024).toFixed(2)}KB`
-      });
-      
       prepareAudio().then(duration => {
         console.log('[VoiceRecorder] Audio prepared with duration:', duration);
         setAudioPrepared(true);
-        
-        updateRecorderStep('audio-prepare', {
-          status: 'success',
-          details: `Audio prepared with duration: ${duration.toFixed(2)}s`
-        });
       }).catch(error => {
         console.error('[VoiceRecorder] Error preparing audio:', error);
-        
-        updateRecorderStep('audio-prepare', {
-          status: 'error',
-          details: `Error preparing audio: ${error.message}`
-        });
       });
     }
-  }, [audioBlob, audioPrepared, prepareAudio, addRecorderStep, updateRecorderStep]);
+  }, [audioBlob, audioPrepared, prepareAudio]);
   
-  // Update debug info when state changes
   useEffect(() => {
     console.log('[VoiceRecorder] State update:', {
       isProcessing,
@@ -218,7 +150,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, 
        audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
-  // Clean up when component unmounts
   useEffect(() => {
     return () => {
       console.log('[VoiceRecorder] Component unmounting, resetting state');
@@ -231,19 +162,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     };
   }, [isProcessing]);
   
-  // Handle saving recording
   const handleSaveEntry = async () => {
     if (!audioBlob) {
       setRecordingError("No audio recording available");
-      
-      addRecorderStep({
-        id: 'save-error',
-        name: 'Save Error',
-        status: 'error',
-        timestamp: Date.now(),
-        details: 'No audio recording available'
-      });
-      
       return;
     }
     
@@ -256,21 +177,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.log('[VoiceRecorder] Starting save process');
       savingInProgressRef.current = true;
       
-      addRecorderStep({
-        id: 'save-start',
-        name: 'Save Recording',
-        status: 'in-progress',
-        timestamp: Date.now(),
-        details: 'Initiating save process'
-      });
-      
       setWaitingForClear(true);
       
       await ensureAllToastsCleared();
-      
-      updateRecorderStep('save-start', {
-        details: 'Toasts cleared, preparing for processing'
-      });
       
       if (!domClearAttemptedRef.current) {
         domClearAttemptedRef.current = true;
@@ -283,17 +192,9 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                 el.parentNode.removeChild(el);
               }
             });
-            
-            updateRecorderStep('save-start', {
-              details: `Removed ${toastElements.length} lingering toast elements from DOM`
-            });
           }
         } catch (e) {
           console.error('[VoiceRecorder] Error in manual DOM cleanup:', e);
-          
-          updateRecorderStep('save-start', {
-            details: `Error in DOM cleanup: ${e.message}`
-          });
         }
       }
       
@@ -305,41 +206,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setWaitingForClear(false);
       setToastsCleared(true);
       
-      updateRecorderStep('save-start', {
-        details: 'DOM prepared, starting audio validation'
-      });
-      
       if (!hasPlayedOnce || audioDuration === 0) {
         console.log('[VoiceRecorder] Recording not played yet, preparing audio...');
-        
-        addRecorderStep({
-          id: 'audio-validate',
-          name: 'Validating Audio',
-          status: 'in-progress',
-          timestamp: Date.now(),
-          details: 'Audio not played yet, preparing for validation'
-        });
         
         const duration = await prepareAudio();
         console.log('[VoiceRecorder] Audio prepared with duration:', duration);
         setAudioPrepared(true);
-        
-        updateRecorderStep('audio-validate', {
-          status: duration >= 0.5 ? 'success' : 'error',
-          details: `Audio duration: ${duration.toFixed(2)}s${duration < 0.5 ? ' (too short)' : ''}`
-        });
         
         if (duration < 0.5) {
           setRecordingError("Recording is too short. Please try again.");
           setIsProcessing(false);
           setHasSaved(false);
           savingInProgressRef.current = false;
-          
-          updateRecorderStep('save-start', {
-            status: 'error',
-            details: 'Recording too short (< 0.5s)'
-          });
-          
           return;
         }
       } else if (audioDuration < 0.5) {
@@ -347,41 +225,10 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         setIsProcessing(false);
         setHasSaved(false);
         savingInProgressRef.current = false;
-        
-        addRecorderStep({
-          id: 'audio-validate',
-          name: 'Validating Audio',
-          status: 'error',
-          timestamp: Date.now(),
-          details: `Audio too short: ${audioDuration.toFixed(2)}s`
-        });
-        
-        updateRecorderStep('save-start', {
-          status: 'error',
-          details: 'Recording too short (< 0.5s)'
-        });
-        
         return;
-      } else {
-        addRecorderStep({
-          id: 'audio-validate',
-          name: 'Validating Audio',
-          status: 'success',
-          timestamp: Date.now(),
-          details: `Audio valid: ${audioDuration.toFixed(2)}s duration`
-        });
       }
       
-      // Important: Normalize the blob and await the result
       console.log('[VoiceRecorder] Normalizing audio blob before processing...');
-      
-      addRecorderStep({
-        id: 'audio-normalize',
-        name: 'Normalizing Audio',
-        status: 'in-progress',
-        timestamp: Date.now(),
-        details: `Original blob: ${audioBlob.size} bytes, type: ${audioBlob.type}`
-      });
       
       let normalizedBlob: Blob;
       try {
@@ -393,33 +240,16 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           duration: (normalizedBlob as any).duration || 'unknown'
         });
         
-        // Validate the normalized blob
         const validation = validateAudioBlob(normalizedBlob);
         if (!validation.isValid) {
           throw new Error(validation.errorMessage || "Invalid audio data after normalization");
         }
-        
-        updateRecorderStep('audio-normalize', {
-          status: 'success',
-          details: `Normalized to: ${normalizedBlob.size} bytes, type: ${normalizedBlob.type}`
-        });
       } catch (error) {
         console.error('[VoiceRecorder] Error normalizing audio blob:', error);
         setRecordingError("Error processing audio. Please try again.");
         setIsProcessing(false);
         setHasSaved(false);
         savingInProgressRef.current = false;
-        
-        updateRecorderStep('audio-normalize', {
-          status: 'error',
-          details: `Normalization error: ${error instanceof Error ? error.message : String(error)}`
-        });
-        
-        updateRecorderStep('save-start', {
-          status: 'error',
-          details: 'Failed during audio normalization'
-        });
-        
         return;
       }
       
@@ -433,39 +263,18 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
         blobHasDuration: 'duration' in normalizedBlob
       });
       
-      updateRecorderStep('save-start', {
-        details: 'Audio normalized successfully, preparing for transcription'
-      });
-      
       if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
         const estimatedDuration = recordingTime / 1000;
         console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
         
-        // Add duration property to normalized blob if missing
         if (!('duration' in normalizedBlob)) {
           try {
             Object.defineProperty(normalizedBlob, 'duration', {
               value: estimatedDuration,
               writable: false
             });
-            
-            addRecorderStep({
-              id: 'duration-set',
-              name: 'Set Duration Property',
-              status: 'success',
-              timestamp: Date.now(),
-              details: `Added duration property: ${estimatedDuration.toFixed(2)}s from recording time`
-            });
           } catch (err) {
             console.warn("[VoiceRecorder] Could not add duration to blob:", err);
-            
-            addRecorderStep({
-              id: 'duration-set',
-              name: 'Set Duration Property',
-              status: 'error',
-              timestamp: Date.now(),
-              details: `Failed to add duration: ${err instanceof Error ? err.message : String(err)}`
-            });
           }
         }
       }
@@ -475,70 +284,22 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
-          addRecorderStep({
-            id: 'audio-encode',
-            name: 'Base64 Encoding',
-            status: 'in-progress',
-            timestamp: Date.now(),
-            details: 'Converting audio to Base64 format'
-          });
-          
-          // Test the blob conversion before passing to callback
           const base64Test = await blobToBase64(normalizedBlob).catch(err => {
             console.error('[VoiceRecorder] Base64 conversion test failed:', err);
-            
-            updateRecorderStep('audio-encode', {
-              status: 'error',
-              details: `Base64 conversion failed: ${err instanceof Error ? err.message : String(err)}`
-            });
-            
             throw new Error('Error preparing audio for processing');
           });
           
           console.log('[VoiceRecorder] Base64 test conversion successful, length:', base64Test.length);
-          
-          updateRecorderStep('audio-encode', {
-            status: 'success',
-            details: `Base64 encoding successful, length: ${base64Test.length} chars`
-          });
-          
-          addRecorderStep({
-            id: 'transcription',
-            name: 'Transcribing Audio',
-            status: 'in-progress',
-            timestamp: Date.now(),
-            details: 'Sending audio to OpenAI for transcription'
-          });
           
           await onRecordingComplete(normalizedBlob);
           
           saveCompleteRef.current = true;
           savingInProgressRef.current = false;
           
-          updateRecorderStep('transcription', {
-            status: 'success',
-            details: 'Transcription completed successfully'
-          });
-          
-          updateRecorderStep('save-start', {
-            status: 'success',
-            details: 'All processing completed successfully'
-          });
-          
           console.log('[VoiceRecorder] Recording callback completed successfully');
         } catch (error: any) {
           console.error('[VoiceRecorder] Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
-          
-          updateRecorderStep('transcription', {
-            status: 'error',
-            details: `Transcription error: ${error?.message || "Unknown error"}`
-          });
-          
-          updateRecorderStep('save-start', {
-            status: 'error',
-            details: `Failed during transcription phase: ${error?.message || "Unknown error"}`
-          });
           
           setTimeout(() => {
             toast.error("Error saving recording", {
@@ -556,11 +317,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.error('[VoiceRecorder] Error in save entry:', error);
       setRecordingError(error?.message || "An unexpected error occurred");
       
-      updateRecorderStep('save-start', {
-        status: 'error',
-        details: `General error: ${error?.message || "Unknown error"}`
-      });
-      
       setTimeout(() => {
         toast.error("Error saving recording", {
           id: 'error-toast',
@@ -574,7 +330,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     }
   };
 
-  // Handle restarting recording
   const handleRestart = async () => {
     await ensureAllToastsCleared();
     
@@ -590,16 +345,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     savingInProgressRef.current = false;
     domClearAttemptedRef.current = false;
     
-    // Reset debug steps for new recording
-    resetRecorderSteps();
-    addRecorderStep({
-      id: 'restart',
-      name: 'Recording Reset',
-      status: 'success',
-      timestamp: Date.now(),
-      details: 'Started a new recording session'
-    });
-    
     await new Promise(resolve => setTimeout(resolve, 300));
     
     toast.info("Starting a new recording", {
@@ -607,7 +352,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     });
   };
 
-  // Determine if prompt should be shown
   const shouldShowPrompt = !isRecording && !audioBlob;
 
   return (
@@ -643,19 +387,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               }}
               onPermissionRequest={() => {
                 console.log('[VoiceRecorder] Requesting permissions');
-                addRecorderStep({
-                  id: 'permissions',
-                  name: 'Requesting Permissions',
-                  status: 'in-progress',
-                  timestamp: Date.now(),
-                  details: 'Requesting microphone access'
-                });
-                
                 requestPermissions().then(granted => {
-                  updateRecorderStep('permissions', {
-                    status: granted ? 'success' : 'error',
-                    details: granted ? 'Microphone access granted' : 'Microphone access denied'
-                  });
                 });
               }}
               audioLevel={audioLevel}
@@ -681,22 +413,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                   onTogglePlayback={async () => {
                     console.log('[VoiceRecorder] Toggle playback clicked');
                     await ensureAllToastsCleared();
-                    
-                    if (!isPlaying) {
-                      addRecorderStep({
-                        id: 'playback',
-                        name: 'Audio Playback',
-                        status: 'in-progress',
-                        timestamp: Date.now(),
-                        details: 'Starting audio playback'
-                      });
-                    } else {
-                      updateRecorderStep('playback', {
-                        status: 'success',
-                        details: 'Playback paused'
-                      });
-                    }
-                    
                     togglePlayback();
                   }}
                   onSaveEntry={handleSaveEntry}
@@ -736,29 +452,8 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               <span>{waitingForClear ? "Preparing..." : "Processing..."}</span>
             </div>
           )}
-          
-          {/* Debug toggle button */}
-          <div className="absolute top-4 right-4 z-20">
-            <Button
-              variant="ghost"
-              size="sm"
-              onClick={toggleRecorderDebug}
-              className="h-8 w-8 p-0 rounded-full bg-slate-100/80 dark:bg-slate-800/80 backdrop-blur-sm"
-              title="Toggle Debug Panel"
-            >
-              <BugPlay className="h-4 w-4" />
-              <span className="sr-only">Toggle Debug</span>
-            </Button>
-          </div>
         </div>
       </div>
-      
-      {/* Debug panel */}
-      <VoiceRecorderDebugPanel 
-        steps={recorderSteps}
-        isVisible={showRecorderDebug} 
-        toggleVisibility={toggleRecorderDebug}
-      />
     </div>
   );
 }
