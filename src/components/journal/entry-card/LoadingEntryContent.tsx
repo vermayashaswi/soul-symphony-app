@@ -9,7 +9,9 @@ import {
   MessagesSquare, 
   Brain, 
   Sparkles,
-  HeartHandshake
+  HeartHandshake,
+  Wifi,
+  WifiOff
 } from 'lucide-react';
 
 const processingSteps = [
@@ -43,6 +45,7 @@ const processingSteps = [
 export function LoadingEntryContent() {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [elapsed, setElapsed] = useState(0);
+  const [isOnline, setIsOnline] = useState(true);
   
   useEffect(() => {
     // Update step every 3 seconds for smooth progression
@@ -55,16 +58,29 @@ export function LoadingEntryContent() {
       setElapsed(prev => prev + 1);
     }, 1000);
     
+    // Monitor network status
+    const handleOnline = () => setIsOnline(true);
+    const handleOffline = () => setIsOnline(false);
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Initial network check
+    setIsOnline(navigator.onLine);
+    
     return () => {
       clearInterval(stepInterval);
       clearInterval(elapsedInterval);
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
     };
   }, []);
   
   const currentStep = processingSteps[currentStepIndex];
   
   // Show reassurance message for longer waits
-  const showReassurance = elapsed > 15;
+  const showReassurance = elapsed > 10;
+  const showNetworkWarning = !isOnline && elapsed > 5;
   
   return (
     <motion.div 
@@ -126,7 +142,19 @@ export function LoadingEntryContent() {
           </motion.div>
         </AnimatePresence>
         
-        {showReassurance && (
+        {showNetworkWarning && (
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ duration: 0.5 }}
+            className="flex items-center gap-2 text-xs text-center text-red-500 mt-3 max-w-[250px]"
+          >
+            <WifiOff className="h-3 w-3" />
+            <span>You appear to be offline. Please check your internet connection.</span>
+          </motion.div>
+        )}
+        
+        {showReassurance && !showNetworkWarning && (
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}

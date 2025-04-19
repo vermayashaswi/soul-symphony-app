@@ -9,6 +9,8 @@ import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
 import { Loader2 } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
+import { Wifi, WifiOff } from 'lucide-react';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -23,12 +25,30 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const [isProcessing, setIsProcessing] = useState(false);
   const [updatedInBackground, setUpdatedInBackground] = useState(false);
   const [processingStartTime, setProcessingStartTime] = useState<number | null>(null);
+  const [networkStatus, setNetworkStatus] = useState<'online' | 'offline' | 'slow' | null>(null);
   const isMobile = useIsMobile();
 
   // Ensure minimum processing time for consistent UX
-  const MIN_PROCESSING_TIME = 1500; // 1.5 seconds minimum
-  const MAX_PROCESSING_TIME = 10000; // 10 seconds maximum before closing dialog anyway
+  const MIN_PROCESSING_TIME = 2000; // 2 seconds minimum
+  const MAX_PROCESSING_TIME = 15000; // 15 seconds maximum before closing dialog anyway
 
+  // Monitor network status
+  useEffect(() => {
+    const handleOnline = () => setNetworkStatus('online');
+    const handleOffline = () => setNetworkStatus('offline');
+    
+    window.addEventListener('online', handleOnline);
+    window.addEventListener('offline', handleOffline);
+    
+    // Initial network check
+    setNetworkStatus(navigator.onLine ? 'online' : 'offline');
+    
+    return () => {
+      window.removeEventListener('online', handleOnline);
+      window.removeEventListener('offline', handleOffline);
+    };
+  }, []);
+  
   useEffect(() => {
     let processingTimer: NodeJS.Timeout | null = null;
     let maxProcessingTimer: NodeJS.Timeout | null = null;
@@ -75,11 +95,39 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     setEditedContent(content);
     setIsDialogOpen(true);
     setUpdatedInBackground(false);
+    setNetworkStatus(navigator.onLine ? 'online' : 'offline');
   };
 
   const handleCloseDialog = () => {
     if (!isSubmitting) {
       setIsDialogOpen(false);
+    }
+  };
+
+  const checkNetworkSpeed = async (): Promise<boolean> => {
+    try {
+      const startTime = Date.now();
+      const response = await fetch('https://www.google.com/favicon.ico', { 
+        method: 'HEAD',
+        cache: 'no-cache'
+      });
+      const endTime = Date.now();
+      const duration = endTime - startTime;
+      
+      // If it takes more than 2 seconds to fetch a tiny favicon, network is slow
+      const isNetworkSlow = duration > 2000;
+      
+      if (isNetworkSlow) {
+        setNetworkStatus('slow');
+        return false;
+      }
+      
+      setNetworkStatus('online');
+      return true;
+    } catch (error) {
+      console.error('Network check failed:', error);
+      setNetworkStatus('offline');
+      return false;
     }
   };
 
@@ -91,6 +139,18 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
 
     try {
       setIsSubmitting(true);
+      
+      // Check network status before proceeding
+      const networkGood = await checkNetworkSpeed();
+      if (!networkGood) {
+        if (networkStatus === 'offline') {
+          toast.error("You're offline. Please check your internet connection.");
+          setIsSubmitting(false);
+          return;
+        } else if (networkStatus === 'slow') {
+          toast.warning("Your network connection is slow. This might take longer than usual.");
+        }
+      }
       
       const originalContent = content;
       const newContent = editedContent;
@@ -193,7 +253,13 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       
     } catch (error) {
       console.error('Error updating journal entry:', error);
-      toast.error('Failed to update entry');
+      
+      if (networkStatus === 'offline' || !navigator.onLine) {
+        toast.error("Facing network issues. Check your internet connection");
+      } else {
+        toast.error('Failed to update entry');
+      }
+      
       setIsSubmitting(false);
       setIsProcessing(false);
     }
@@ -222,6 +288,24 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
           <DialogHeader>
             <DialogTitle>Edit Journal Entry</DialogTitle>
           </DialogHeader>
+          
+          {networkStatus === 'offline' && (
+            <Alert variant="destructive" className="mb-4">
+              <WifiOff className="h-4 w-4" />
+              <AlertDescription>
+                You appear to be offline. Changes may not save until your connection is restored.
+              </AlertDescription>
+            </Alert>
+          )}
+          
+          {networkStatus === 'slow' && (
+            <Alert variant="warning" className="mb-4">
+              <Wifi className="h-4 w-4" />
+              <AlertDescription>
+                Your network connection seems slow. Saving might take longer than usual.
+              </AlertDescription>
+            </Alert>
+          )}
           
           <Textarea
             value={editedContent}
