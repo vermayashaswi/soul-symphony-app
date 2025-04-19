@@ -12,7 +12,7 @@ import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
 interface EditEntryButtonProps {
   entryId: number;
   content: string;
-  onEntryUpdated: (newContent: string) => void;
+  onEntryUpdated: (newContent: string, isProcessing?: boolean) => void;
 }
 
 export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryButtonProps) {
@@ -44,17 +44,17 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       const originalContent = content;
       const newContent = editedContent;
       
-      // Immediately update UI state to prevent flickering - BEFORE any DB operation
-      onEntryUpdated(newContent);
-      
       // Close dialog immediately after UI update
       setIsDialogOpen(false);
       
-      // Show success toast and set processing state
-      toast.success('Journal entry updated. Processing analysis...');
+      // Set processing state first and update UI with loading state
       setIsProcessing(true);
+      onEntryUpdated(newContent, true); // Pass true to indicate processing state
       
-      // Perform the database update in the background - after UI is already updated
+      // Show toast indicating processing has started
+      toast.success('Journal entry updated. Processing analysis...');
+      
+      // Perform the database update in the background
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
@@ -72,7 +72,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         toast.error(`Failed to update entry: ${updateError.message}`);
         
         // Revert UI state on error
-        onEntryUpdated(originalContent);
+        onEntryUpdated(originalContent, false);
         setIsProcessing(false);
         setIsSubmitting(false);
         return;
@@ -84,6 +84,9 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
           await triggerFullTextProcessing(entryId);
           console.log("Full text processing triggered successfully");
           toast.success('Journal entry analysis completed');
+          
+          // Update UI to show final content without processing state
+          onEntryUpdated(newContent, false);
         } catch (processingError) {
           console.error('Processing failed but entry was updated:', processingError);
           toast.error('Entry saved but analysis failed');
