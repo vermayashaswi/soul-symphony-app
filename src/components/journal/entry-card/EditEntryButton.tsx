@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -8,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
+import { Loader2 } from 'lucide-react';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -20,15 +20,19 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const [editedContent, setEditedContent] = useState(content);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [updatedInBackground, setUpdatedInBackground] = useState(false);
   const isMobile = useIsMobile();
 
   const handleOpenDialog = () => {
     setEditedContent(content);
     setIsDialogOpen(true);
+    setUpdatedInBackground(false);
   };
 
   const handleCloseDialog = () => {
-    setIsDialogOpen(false);
+    if (!isSubmitting) {
+      setIsDialogOpen(false);
+    }
   };
 
   const handleSaveChanges = async () => {
@@ -40,24 +44,13 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      // Store current content for potential rollback
       const originalContent = content;
       const newContent = editedContent;
       
-      // Close dialog immediately
-      setIsDialogOpen(false);
-      
-      // Set processing state BEFORE updating UI, and ensure we have a local state
-      // that won't be affected by component re-renders
+      // Update UI with processing state IMMEDIATELY but keep dialog open
+      onEntryUpdated(newContent, true);
       setIsProcessing(true);
       
-      // Update UI with processing state IMMEDIATELY
-      onEntryUpdated(newContent, true);
-      
-      // Show toast for initial update
-      toast.success('Journal entry updated. Analyzing changes...');
-      
-      // First, update the database entry to mark it for processing
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
@@ -73,115 +66,41 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       if (updateError) {
         console.error("Error updating entry:", updateError);
         toast.error(`Failed to update entry: ${updateError.message}`);
-        
-        // Revert UI state on error
         onEntryUpdated(originalContent, false);
         setIsProcessing(false);
         setIsSubmitting(false);
         return;
       }
+
+      // Set updated flag and keep dialog open briefly
+      setUpdatedInBackground(true);
       
-      // Then trigger processing in the background with better error handling
       try {
         await triggerFullTextProcessing(entryId);
         
-        // Set a timeout for the analysis to complete before showing final state
-        // This helps prevent flickering by maintaining the loading state for a minimum time
-        const minProcessingTime = 6000; // Ensure loader shows for at least 6 seconds
-        const processingStartTime = Date.now();
+        // Ensure minimum processing time for UX consistency
+        const minProcessingTime = 1000; // 1 second minimum
+        await new Promise(resolve => setTimeout(resolve, minProcessingTime));
         
-        const analysisCompletionTimeout = setTimeout(() => {
-          console.log("Analysis completion timeout reached, finalizing UI state");
-          onEntryUpdated(newContent, false);
-          setIsProcessing(false);
-          toast.success('Journal entry analysis completed');
-        }, 12000); // Increased to 12 seconds to ensure analysis has enough time
-        
-        // Set up polling to check for completed analysis
-        let pollingAttempts = 0;
-        const maxPollingAttempts = 15; // Increased polling attempts
-        const pollingDelay = 800; // Polling every 800ms
-        
-        const pollingInterval = setInterval(async () => {
-          pollingAttempts++;
-          console.log(`Polling for analysis completion (attempt ${pollingAttempts})`);
-          
-          try {
-            const { data, error } = await supabase
-              .from('Journal Entries')
-              .select('master_themes, emotions, sentiment')
-              .eq('id', entryId)
-              .single();
-              
-            if (error) {
-              console.error("Error checking analysis status:", error);
-              return;
-            }
-            
-            // Check if analysis is likely complete by looking for real analysis data
-            const hasRealThemes = data.master_themes && 
-                                 Array.isArray(data.master_themes) && 
-                                 data.master_themes.length > 0 && 
-                                 !data.master_themes.includes("Processing");
-                                 
-            const hasEmotions = data.emotions && 
-                               Object.keys(data.emotions).length > 0 && 
-                               !Object.keys(data.emotions).includes("Neutral");
-                               
-            // Check if minimum processing time has elapsed
-            const timeElapsed = Date.now() - processingStartTime;
-            const minTimeElapsed = timeElapsed >= minProcessingTime;
-                               
-            if ((hasRealThemes || hasEmotions) && minTimeElapsed) {
-              // Analysis appears complete AND minimum time elapsed, update UI and clear polling
-              clearTimeout(analysisCompletionTimeout);
-              clearInterval(pollingInterval);
-              
-              console.log("Analysis complete, updating UI with final state");
-              onEntryUpdated(newContent, false);
-              setIsProcessing(false);
-              toast.success('Journal entry analysis completed');
-            } else if (pollingAttempts >= maxPollingAttempts) {
-              // Give up polling after max attempts
-              clearInterval(pollingInterval);
-              console.log("Reached max polling attempts, finalizing UI state");
-              onEntryUpdated(newContent, false);
-              setIsProcessing(false);
-              
-              if (!minTimeElapsed) {
-                // If we haven't reached the minimum time, wait until we do
-                const remainingTime = minProcessingTime - timeElapsed;
-                if (remainingTime > 0) {
-                  setTimeout(() => {
-                    toast.success('Journal entry analysis completed');
-                  }, remainingTime);
-                } else {
-                  toast.success('Journal entry analysis completed');
-                }
-              } else {
-                toast.success('Journal entry analysis completed');
-              }
-            }
-          } catch (pollError) {
-            console.error("Polling error:", pollError);
-          }
-        }, pollingDelay);
+        // Close dialog and update UI
+        setIsDialogOpen(false);
+        setIsSubmitting(false);
+        setIsProcessing(false);
+        toast.success('Journal entry updated successfully');
         
       } catch (processingError) {
         console.error('Processing failed:', processingError);
         toast.error('Entry saved but analysis failed');
-        
-        // Ensure we clean up UI state even on error
-        onEntryUpdated(newContent, false);
+        setIsDialogOpen(false);
+        setIsSubmitting(false);
         setIsProcessing(false);
       }
       
     } catch (error) {
       console.error('Error updating journal entry:', error);
       toast.error('Failed to update entry');
-    } finally {
-      // Ensure submission state is reset
       setIsSubmitting(false);
+      setIsProcessing(false);
     }
   };
 
@@ -209,6 +128,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
             onChange={(e) => setEditedContent(e.target.value)}
             className="min-h-[200px] mt-2"
             placeholder="Edit your journal entry..."
+            disabled={isSubmitting}
           />
           
           <DialogFooter className="flex flex-row justify-end space-x-2 mt-4">
@@ -220,13 +140,23 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
             >
               Cancel
             </Button>
-            <Button 
-              onClick={handleSaveChanges}
-              disabled={isSubmitting || !editedContent.trim() || editedContent === content}
-              className="rounded-full"
-            >
-              {isSubmitting ? 'Saving...' : 'Save Changes'}
-            </Button>
+            {isSubmitting ? (
+              <Button 
+                disabled
+                className="rounded-full"
+              >
+                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                {updatedInBackground ? 'Processing...' : 'Saving...'}
+              </Button>
+            ) : (
+              <Button 
+                onClick={handleSaveChanges}
+                disabled={!editedContent.trim() || editedContent === content}
+                className="rounded-full"
+              >
+                Save Changes
+              </Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>
