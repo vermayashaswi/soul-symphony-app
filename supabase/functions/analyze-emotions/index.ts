@@ -111,9 +111,43 @@ serve(async (req) => {
     if (entryId) {
       console.log(`Updating entry ${entryId} with emotions:`, emotions);
       
+      // First, get existing entities to make sure we don't overwrite them
+      const { data: existingData, error: fetchError } = await supabase
+        .from('Journal Entries')
+        .select('entities')
+        .eq('id', entryId)
+        .single();
+        
+      if (fetchError) {
+        console.error(`Error fetching existing data for entry ${entryId}:`, fetchError);
+      }
+      
+      // Format entities if they exist
+      let formattedEntities = null;
+      if (existingData?.entities) {
+        try {
+          if (Array.isArray(existingData.entities)) {
+            formattedEntities = existingData.entities.map(entity => ({
+              type: entity.type || 'other',
+              name: entity.name || 'unknown',
+              text: entity.text
+            }));
+          }
+        } catch (err) {
+          console.error(`Error formatting entities for entry ${entryId}:`, err);
+          formattedEntities = existingData.entities;
+        }
+      }
+      
+      // Update the entry with emotions and properly formatted entities
+      const updateData: Record<string, any> = { emotions };
+      if (formattedEntities !== null) {
+        updateData.entities = formattedEntities;
+      }
+      
       const { error } = await supabase
         .from('Journal Entries')
-        .update({ emotions })
+        .update(updateData)
         .eq('id', entryId);
         
       if (error) {

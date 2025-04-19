@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -79,10 +78,20 @@ async function processJournalEntries(entries, diagnosticMode = false) {
         continue;
       }
 
+      // Ensure entities are properly formatted before saving to database
+      let formattedEntities = entities;
+      if (entities && Array.isArray(entities)) {
+        formattedEntities = entities.map(entity => ({
+          type: entity.type || 'other',
+          name: entity.name || entity.mentions?.[0]?.text?.content || 'unknown',
+          text: entity.mentions?.[0]?.text?.content
+        }));
+      }
+
       // Update the journal entry with extracted entities
       const { error: updateError } = await supabase
         .from('Journal Entries')
-        .update({ entities: entities })
+        .update({ entities: formattedEntities })
         .eq('id', entry.id);
 
       if (updateError) {

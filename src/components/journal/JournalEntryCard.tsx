@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -348,7 +349,7 @@ export function JournalEntryCard({
                     if (data.entities) {
                       try {
                         if (Array.isArray(data.entities)) {
-                          parsedEntities = data.entities.map(entity => ({
+                          parsedEntities = data.entities.map((entity: any) => ({
                             type: entity.type || 'other',
                             name: entity.name || '',
                             text: entity.text
@@ -357,12 +358,21 @@ export function JournalEntryCard({
                         else if (typeof data.entities === 'string') {
                           const parsed = JSON.parse(data.entities);
                           if (Array.isArray(parsed)) {
-                            parsedEntities = parsed.map(entity => ({
+                            parsedEntities = parsed.map((entity: any) => ({
                               type: entity.type || 'other',
                               name: entity.name || '',
                               text: entity.text
                             }));
                           }
+                        }
+                        else if (data.entities && typeof data.entities === 'object') {
+                          // Handle case where data.entities is already a JSON object
+                          const entities = Array.isArray(data.entities) ? data.entities : [data.entities];
+                          parsedEntities = entities.map((entity: any) => ({
+                            type: entity.type || 'other',
+                            name: entity.name || '',
+                            text: entity.text
+                          }));
                         }
                       } catch (err) {
                         console.error('[JournalEntryCard] Error parsing entities:', err);
