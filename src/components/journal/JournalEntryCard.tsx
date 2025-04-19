@@ -13,7 +13,7 @@ import {
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
-import { JournalEntry as JournalEntryType } from '@/types/journal';
+import { JournalEntry as JournalEntryType, Json } from '@/types/journal';
 
 export interface JournalEntry {
   id: number;
@@ -33,6 +33,7 @@ export interface JournalEntry {
     [key: string]: number;
   } | null;
   Edit_Status?: number | null;
+  user_feedback?: string | null;
 }
 
 interface JournalEntryCardProps {
@@ -57,7 +58,8 @@ export function JournalEntryCard({
     sentiment: entry?.sentiment || null,
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
     themes: Array.isArray(entry?.themes) ? entry.themes : [],
-    Edit_Status: entry?.Edit_Status || null
+    Edit_Status: entry?.Edit_Status || null,
+    user_feedback: entry?.user_feedback || null
   };
 
   const [isExpanded, setIsExpanded] = useState(isNew);
@@ -329,7 +331,7 @@ export function JournalEntryCard({
             
           if (error) {
             console.error('[JournalEntryCard] Error fetching updated entry data:', error);
-            return;
+            return false;
           }
           
           if (data) {
@@ -341,13 +343,40 @@ export function JournalEntryCard({
               setEntries(prevEntries => {
                 return prevEntries.map(e => {
                   if (e.id === entry.id) {
+                    let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
+                    
+                    if (data.entities) {
+                      try {
+                        if (Array.isArray(data.entities)) {
+                          parsedEntities = data.entities.map(entity => ({
+                            type: entity.type || 'other',
+                            name: entity.name || '',
+                            text: entity.text
+                          }));
+                        }
+                        else if (typeof data.entities === 'string') {
+                          const parsed = JSON.parse(data.entities);
+                          if (Array.isArray(parsed)) {
+                            parsedEntities = parsed.map(entity => ({
+                              type: entity.type || 'other',
+                              name: entity.name || '',
+                              text: entity.text
+                            }));
+                          }
+                        }
+                      } catch (err) {
+                        console.error('[JournalEntryCard] Error parsing entities:', err);
+                        parsedEntities = [];
+                      }
+                    }
+                    
                     return {
                       ...e,
                       master_themes: data.master_themes || [],
                       themes: data.master_themes || [],
                       sentiment: data.sentiment,
                       emotions: data.emotions,
-                      entities: data.entities
+                      entities: parsedEntities
                     };
                   }
                   return e;

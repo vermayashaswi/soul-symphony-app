@@ -11,12 +11,19 @@ export interface JournalEntry {
   duration?: number;
   emotions?: Json;
   sentiment?: string;
-  entities?: Json;
+  entities?: Array<{
+    type: string;
+    name: string;
+    text?: string;
+  }>;
   "foreign key"?: string;
   master_themes?: string[];
-  user_feedback?: string | null;  // Added this line
+  user_feedback?: string | null;
+  Edit_Status?: number | null;
 }
 
 export interface JournalEntryFormData extends JournalEntry {
   text?: string;
 }
+
+export { type Json } from '@/integrations/supabase/types';
