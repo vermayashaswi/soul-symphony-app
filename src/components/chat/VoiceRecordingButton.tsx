@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -7,6 +6,7 @@ import { formatTime } from "@/utils/format-time";
 import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
+import { getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -37,40 +37,27 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
     if (isRecording) {
       const setupRecording = async () => {
         try {
+          const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+          const isAndroid = /Android/.test(navigator.userAgent);
+          const platform = isIOS ? 'ios' : (isAndroid ? 'android' : 'web');
+          
           const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: {
-              echoCancellation: true,
-              noiseSuppression: true,
-              autoGainControl: true,
-              sampleRate: 44100, // Standard sample rate for better compatibility
-              sampleSize: 16,    // Standard bit depth for better compatibility
-              channelCount: 1,   // Mono for simpler processing and compatibility
-            } 
+            audio: getAudioConfig()
           });
           
           setStream(mediaStream);
           
-          const options = {
-            type: 'audio',
-            mimeType: 'audio/wav', // WAV format for better compatibility with OpenAI
-            recorderType: StereoAudioRecorder,
-            numberOfAudioChannels: 1, // Mono for simplicity and compatibility
-            desiredSampRate: 44100,   // Standard sample rate
-            checkForInactiveTracks: true,
-            timeSlice: 1000, // Record in 1-second chunks for better stability
-            audioBitsPerSecond: 128000, // Lower bitrate for smaller files
-          };
-          
+          const options = getRecorderOptions(platform);
           const rtcRecorder = new RecordRTC(mediaStream, options);
           rtcRecorder.startRecording();
           setRecorder(rtcRecorder);
           
-          // Auto-stop after 15 seconds
           const timeout = setTimeout(() => {
             if (isRecording) {
+              toast.info("Maximum recording duration reached (5 minutes)");
               handleVoiceRecording();
             }
-          }, 15000);
+          }, RECORDING_LIMITS.MAX_DURATION * 1000);
           
           cleanup = () => {
             clearTimeout(timeout);

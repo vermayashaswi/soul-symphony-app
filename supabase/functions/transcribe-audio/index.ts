@@ -229,7 +229,11 @@ serve(async (req) => {
       
       if (detectedFileType === 'webm') {
         // For WebM, use the recordingTime from the client if available, or estimate
-        audioDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : transcribedText.length / 15;
+        const estimatedDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : 0;
+        if (estimatedDuration > 300) { // 5 minutes
+          throw new Error('Recording exceeds maximum duration of 5 minutes');
+        }
+        audioDuration = estimatedDuration;
       } else if (detectedFileType === 'wav') {
         // For WAV (assuming 48kHz, 16-bit, stereo)
         audioDuration = Math.round(binaryAudio.length / 192000);

@@ -1,7 +1,8 @@
-
 /**
  * Audio recording utility for voice messages
  */
+import { getAudioConfig, RECORDING_LIMITS } from './audio/recording-config';
+
 export const recordAudio = async () => {
   // Check if browser supports audio recording
   if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
@@ -10,20 +11,16 @@ export const recordAudio = async () => {
   
   // Request microphone access with specific constraints for better compatibility
   const stream = await navigator.mediaDevices.getUserMedia({ 
-    audio: {
-      echoCancellation: true,
-      noiseSuppression: true,
-      autoGainControl: true,
-      channelCount: 1,     // Mono for better compatibility
-      sampleRate: 44100,   // Standard sample rate for better compatibility
-      sampleSize: 16       // Standard bit depth for better compatibility
-    } 
+    audio: getAudioConfig()
   });
   
-  // Set up the MediaRecorder with specific options for better compatibility
+  // Set up the MediaRecorder with platform-specific options
+  const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
+  const mimeType = isIOS ? 'audio/wav' : 'audio/webm';
+  
   const options = {
-    mimeType: 'audio/wav',  // WAV format for better compatibility with OpenAI
-    audioBitsPerSecond: 128000
+    mimeType,
+    audioBitsPerSecond: isIOS ? 128000 : 192000
   };
   
   // Try to use the preferred MIME type, fallback to browser default if not supported
