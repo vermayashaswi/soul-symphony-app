@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
@@ -252,7 +251,7 @@ export const reprocessJournalEntry = async (entryId: number): Promise<boolean> =
     try {
       console.log('[JournalService] Calling analyze-sentiment for entry:', entryId);
       const { data: sentimentData, error: sentimentError } = await supabase.functions.invoke('analyze-sentiment', {
-        body: { text: textToProcess }
+        body: { text: textToProcess, entryId }
       });
       
       if (sentimentError) {
@@ -260,19 +259,9 @@ export const reprocessJournalEntry = async (entryId: number): Promise<boolean> =
       } else if (sentimentData && sentimentData.sentiment) {
         console.log('[JournalService] Sentiment analysis result:', sentimentData);
         
-        // Update the entry with the sentiment score
-        const { error: updateSentimentError } = await supabase
-          .from('Journal Entries')
-          .update({ 
-            sentiment: sentimentData.sentiment 
-          })
-          .eq('id', entryId);
-          
-        if (updateSentimentError) {
-          console.error('[JournalService] Error updating sentiment in database:', updateSentimentError);
-        } else {
-          console.log('[JournalService] Updated sentiment for entry:', entryId);
-        }
+        // The sentiment score will be updated directly by the edge function
+        // We don't need to update it here since we passed the entryId to the function
+        console.log('[JournalService] Sentiment directly updated by edge function');
       }
     } catch (sentimentErr) {
       console.error('[JournalService] Error in sentiment analysis process:', sentimentErr);
