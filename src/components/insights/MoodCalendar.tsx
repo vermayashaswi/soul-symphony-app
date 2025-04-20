@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -30,26 +29,21 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
   const isMobile = useIsMobile();
   const { theme } = useTheme();
   
-  // Reset calendar to current date when timeRange changes
   useEffect(() => {
     setCurrentDate(new Date());
   }, [timeRange]);
   
-  // Process the data for both views
   const processedData = React.useMemo(() => {
     if (!sentimentData || sentimentData.length === 0) return [];
 
-    // Group by date and average sentiment for each day
     const dateMap = new Map<string, { total: number; count: number }>();
     
     sentimentData.forEach(point => {
-      // Validate the date
       if (!point.date || !isValid(new Date(point.date))) {
         console.warn('Invalid date in sentiment data:', point);
         return;
       }
 
-      // Validate the sentiment
       const sentimentValue = typeof point.sentiment === 'number' 
         ? point.sentiment 
         : typeof point.sentiment === 'string' 
@@ -72,14 +66,12 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
       existing.count += 1;
     });
     
-    // Convert to array of data points
     return Array.from(dateMap.entries()).map(([date, data]) => {
       const avgSentiment = data.total / data.count;
       return {
         date,
         formattedDate: format(parseISO(date), 'MMM d'),
         sentiment: avgSentiment,
-        // Categorize the sentiment
         category: avgSentiment >= 0.3 
           ? 'positive' 
           : avgSentiment >= -0.1 
@@ -89,35 +81,31 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     }).sort((a, b) => a.date.localeCompare(b.date));
   }, [sentimentData]);
 
-  // Get color based on sentiment category
   const getSentimentColor = (category: string): string => {
     switch (category) {
-      case 'positive': return '#4ade80'; // green-400
-      case 'neutral': return '#facc15';  // yellow-400
-      case 'negative': return '#ef4444'; // red-500
-      default: return '#94a3b8';         // slate-400
+      case 'positive': return '#4ade80';
+      case 'neutral': return '#facc15';
+      case 'negative': return '#ef4444';
+      default: return '#94a3b8';
     }
   };
 
-  // Generate days based on the current timeRange and date
   const calendarDays = React.useMemo(() => {
     if (timeRange === 'today') {
       return [currentDate];
     } else if (timeRange === 'week') {
-      const startDay = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday as first day
+      const startDay = startOfWeek(currentDate, { weekStartsOn: 1 });
       return eachDayOfInterval({ start: startDay, end: endOfWeek(currentDate, { weekStartsOn: 1 }) });
     } else if (timeRange === 'month') {
       const startDate = startOfMonth(currentDate);
       const endDate = endOfMonth(currentDate);
       return eachDayOfInterval({ start: startDate, end: endDate });
     } else if (timeRange === 'year') {
-      // For year view, we'll create a 12x31 grid representing months x days
-      return []; // We'll handle this differently in the render method
+      return [];
     }
     return [];
   }, [currentDate, timeRange]);
 
-  // Custom Tooltip for charts
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -138,7 +126,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     return null;
   };
 
-  // Navigation functions
   const goToPrevious = () => {
     if (timeRange === 'today') {
       setCurrentDate(prev => subDays(prev, 1));
@@ -163,13 +150,11 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     }
   };
 
-  // Get sentiment for a specific date
   const getSentimentForDate = (date: Date) => {
     const dateString = format(date, 'yyyy-MM-dd');
     return processedData.find(d => d.date === dateString);
   };
 
-  // Generate year view grid (12 months x 31 days)
   const renderYearView = () => {
     const year = getYear(currentDate);
     const months = Array.from({ length: 12 }, (_, i) => i);
@@ -177,7 +162,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     return (
       <div className="w-full overflow-auto">
         <div className="min-w-full">
-          {/* Month labels on top */}
           <div className="grid grid-cols-12 text-center mb-1">
             {months.map(month => (
               <div key={month} className="text-xs text-muted-foreground">
@@ -187,7 +171,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
           </div>
           
           <div className="flex">
-            {/* Day numbers on left */}
             <div className="flex flex-col mr-1">
               {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
                 <div key={day} className="h-[10px] text-[9px] text-muted-foreground flex items-center">
@@ -196,7 +179,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               ))}
             </div>
             
-            {/* Month columns */}
             <div className="grid grid-cols-12 gap-[2px] flex-1">
               {months.map(month => {
                 const daysInMonth = getDaysInMonth(new Date(year, month));
@@ -240,7 +222,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     );
   };
 
-  // Render day view
   const renderDayView = () => {
     const sentimentData = getSentimentForDate(currentDate);
     
@@ -261,7 +242,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     );
   };
 
-  // Render week view
   const renderWeekView = () => {
     return (
       <div className="py-4">
@@ -283,7 +263,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     );
   };
 
-  // Render a single day's mood indicator
   const renderDayMood = (day: Date) => {
     const sentimentData = getSentimentForDate(day);
     
@@ -306,7 +285,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     );
   };
 
-  // Render month view
   const renderMonthView = () => {
     const firstDayOfMonth = startOfMonth(currentDate);
     const firstDayWeekday = firstDayOfMonth.getDay();
@@ -426,7 +404,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
             />
             <Tooltip content={<CustomTooltip />} />
             
-            {/* Colored areas for sentiment ranges */}
             <Area
               yAxisId={0}
               dataKey="sentiment"
@@ -533,7 +510,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               </button>
             </div>
             
-            {/* Render appropriate view based on timeRange */}
             {timeRange === 'today' && renderDayView()}
             {timeRange === 'week' && renderWeekView()}
             {timeRange === 'month' && renderMonthView()}
