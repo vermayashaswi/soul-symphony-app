@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
+import { journalInsightsService } from "../journalInsightsService";
 
 interface SmartQueryResult {
   success: boolean;
@@ -9,6 +10,86 @@ interface SmartQueryResult {
   executionResults?: any[];
   error?: string;
 }
+
+/**
+ * Enhanced data generation capabilities for smart queries
+ */
+export const insightsFunctions = {
+  /**
+   * Detects patterns of emotional volatility in journal entries
+   */
+  async detectEmotionalVolatility(userId: string, timeframe: string = '30days') {
+    return journalInsightsService.detectEmotionalVolatility(
+      userId, 
+      timeframe as '7days' | '30days' | '90days'
+    );
+  },
+  
+  /**
+   * Summarizes journal entries by life areas and themes
+   */
+  async summarizeLifeAreas(userId: string, timeframe: string = '30days') {
+    return journalInsightsService.summarizeLifeAreasByTheme(
+      userId, 
+      timeframe as '7days' | '30days' | '90days'
+    );
+  },
+  
+  /**
+   * Suggests personalized journal prompts based on past entries
+   */
+  async suggestReflectionPrompts(userId: string, timeframe: string = '30days', count: number = 5) {
+    return journalInsightsService.suggestReflectionPrompts(
+      userId, 
+      timeframe as '7days' | '30days' | '90days',
+      count
+    );
+  },
+  
+  /**
+   * Compares current and past journaling periods
+   */
+  async compareTimePeriods(userId: string, currentPeriod: string = '30days', comparisonType: string = 'previous') {
+    return journalInsightsService.compareWithPastPeriods(
+      userId, 
+      currentPeriod as '7days' | '30days' | '90days',
+      comparisonType as 'previous' | 'year_ago'
+    );
+  },
+  
+  /**
+   * Recommends microhabits based on journal analysis
+   */
+  async recommendMicrohabits(userId: string, timeframe: string = '30days', count: number = 5) {
+    return journalInsightsService.recommendMicrohabits(
+      userId, 
+      timeframe as '7days' | '30days' | '90days',
+      count
+    );
+  },
+  
+  /**
+   * Identifies patterns of silence or gaps in journaling
+   */
+  async detectSilencePeriods(userId: string, timeframe: string = '90days', gapThreshold: number = 3) {
+    return journalInsightsService.detectSilencePeriods(
+      userId, 
+      timeframe as '30days' | '90days' | '180days' | '365days',
+      gapThreshold
+    );
+  },
+  
+  /**
+   * Recommends journal entries worth saving or sharing
+   */
+  async recommendShareableEntries(userId: string, timeframe: string = '90days', count: number = 3) {
+    return journalInsightsService.recommendSharedEntries(
+      userId, 
+      timeframe as '30days' | '90days' | '180days' | '365days',
+      count
+    );
+  }
+};
 
 /**
  * Process a query through the smart query orchestrator
@@ -29,7 +110,8 @@ export async function processSmartQuery(
       body: {
         message,
         userId,
-        threadId
+        threadId,
+        availableFunctions: Object.keys(insightsFunctions)
       }
     });
 
