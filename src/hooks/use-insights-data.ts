@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
@@ -126,26 +125,42 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
               let totalSentiment = 0;
               let count = 0;
               
-              Object.entries(emotions).forEach(([emotion, score]: [string, any]) => {
-                // Skip metadata fields like 'id' or 'intensity'
-                if (emotion.toLowerCase() === 'id' || 
-                    emotion.toLowerCase() === 'intensity' || 
-                    emotion.toLowerCase() === 'name' ||
-                    /^\d+$/.test(emotion) || 
-                    emotion.length < 2) {
-                  return;
-                }
-                
-                // Convert positive emotions to positive values, negative emotions to negative values
-                const emotionValue = Number(score);
-                if (!isNaN(emotionValue)) {
-                  // Map certain emotions to negative sentiment values
-                  const negativeEmotions = ['sad', 'angry', 'anxious', 'fearful', 'stressed', 'disappointed', 'frustrated'];
-                  const multiplier = negativeEmotions.includes(emotion.toLowerCase()) ? -1 : 1;
-                  totalSentiment += emotionValue * multiplier;
-                  count++;
-                }
-              });
+              // Handle the newer format with emotions array
+              if (Array.isArray(emotions.emotions)) {
+                emotions.emotions.forEach((emotion: any) => {
+                  if (emotion && emotion.name && emotion.intensity) {
+                    // Map certain emotions to negative sentiment values
+                    const negativeEmotions = ['sad', 'angry', 'anxious', 'fearful', 'stressed', 'disappointed', 'frustrated'];
+                    const emotionName = emotion.name.toLowerCase();
+                    const multiplier = negativeEmotions.includes(emotionName) ? -1 : 1;
+                    totalSentiment += emotion.intensity * multiplier;
+                    count++;
+                  }
+                });
+              } 
+              // Handle the older format with emotion keys
+              else {
+                Object.entries(emotions).forEach(([emotion, score]: [string, any]) => {
+                  // Skip metadata fields like 'id' or 'intensity'
+                  if (emotion.toLowerCase() === 'id' || 
+                      emotion.toLowerCase() === 'intensity' || 
+                      emotion.toLowerCase() === 'name' ||
+                      /^\d+$/.test(emotion) || 
+                      emotion.length < 2) {
+                    return;
+                  }
+                  
+                  // Convert positive emotions to positive values, negative emotions to negative values
+                  const emotionValue = Number(score);
+                  if (!isNaN(emotionValue)) {
+                    // Map certain emotions to negative sentiment values
+                    const negativeEmotions = ['sad', 'angry', 'anxious', 'fearful', 'stressed', 'disappointed', 'frustrated'];
+                    const multiplier = negativeEmotions.includes(emotion.toLowerCase()) ? -1 : 1;
+                    totalSentiment += emotionValue * multiplier;
+                    count++;
+                  }
+                });
+              }
               
               if (count > 0) {
                 // Normalize to range between -1 and 1
@@ -233,25 +248,41 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
           : entry.emotions;
         
         if (emotions && typeof emotions === 'object') {
-          Object.entries(emotions).forEach(([emotion, score]) => {
-            // Skip metadata fields like 'id' or 'intensity'
-            if (emotion.toLowerCase() === 'id' || 
-                emotion.toLowerCase() === 'intensity' || 
-                emotion.toLowerCase() === 'name' ||
-                /^\d+$/.test(emotion) || 
-                emotion.length < 2) {
-              console.log('Skipping invalid emotion key:', emotion);
-              return;
-            }
-            
-            // For actual emotion names, process them correctly
-            const emotionKey = emotion.toLowerCase();
-            if (!emotionCounts[emotionKey]) {
-              emotionCounts[emotionKey] = { count: 0, score: 0 };
-            }
-            emotionCounts[emotionKey].count += 1;
-            emotionCounts[emotionKey].score += Number(score);
-          });
+          // Handle the newer format with emotions array
+          if (Array.isArray(emotions.emotions)) {
+            emotions.emotions.forEach((emotion: any) => {
+              if (emotion && emotion.name && emotion.intensity) {
+                const emotionKey = emotion.name.toLowerCase();
+                if (!emotionCounts[emotionKey]) {
+                  emotionCounts[emotionKey] = { count: 0, score: 0 };
+                }
+                emotionCounts[emotionKey].count += 1;
+                emotionCounts[emotionKey].score += Number(emotion.intensity);
+              }
+            });
+          } 
+          // Handle the older format with emotion keys
+          else {
+            Object.entries(emotions).forEach(([emotion, score]) => {
+              // Skip metadata fields like 'id' or 'intensity'
+              if (emotion.toLowerCase() === 'id' || 
+                  emotion.toLowerCase() === 'intensity' || 
+                  emotion.toLowerCase() === 'name' ||
+                  /^\d+$/.test(emotion) || 
+                  emotion.length < 2) {
+                console.log('Skipping invalid emotion key:', emotion);
+                return;
+              }
+              
+              // For actual emotion names, process them correctly
+              const emotionKey = emotion.toLowerCase();
+              if (!emotionCounts[emotionKey]) {
+                emotionCounts[emotionKey] = { count: 0, score: 0 };
+              }
+              emotionCounts[emotionKey].count += 1;
+              emotionCounts[emotionKey].score += Number(score);
+            });
+          }
         }
       } catch (e) {
         console.error('Error parsing emotions:', e);
@@ -294,6 +325,7 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
     excited: '🤩',
     hopeful: '🙏',
     grateful: '🙌',
+    satisfaction: '😌',
   };
 
   return {
@@ -482,45 +514,92 @@ const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmo
           : entry.emotions;
         
         if (emotions && typeof emotions === 'object') {
-          Object.entries(emotions).forEach(([emotion, score]) => {
-            // Skip metadata fields
-            if (emotion.toLowerCase() === 'id' || 
-                emotion.toLowerCase() === 'intensity' || 
-                emotion.toLowerCase() === 'name' ||
-                /^\d+$/.test(emotion) || 
-                emotion.length < 2) {
-              return;
-            }
+          // Handle the newer format with emotions array
+          if (Array.isArray(emotions.emotions)) {
+            // Sort emotions by intensity to get top 5
+            const sortedEmotions = [...emotions.emotions].sort((a, b) => 
+              b.intensity - a.intensity
+            ).slice(0, 5); // Take only top 5
             
-            // Use actual emotion name with capitalized first letter
-            const emotionKey = emotion.toLowerCase();
-            const displayEmotion = emotionKey.charAt(0).toUpperCase() + emotionKey.slice(1);
+            sortedEmotions.forEach((emotion: any) => {
+              if (emotion && emotion.name && emotion.intensity) {
+                // Use actual emotion name with capitalized first letter
+                const emotionKey = emotion.name.toLowerCase();
+                const displayEmotion = emotionKey.charAt(0).toUpperCase() + emotionKey.slice(1);
+                
+                if (!emotionData[displayEmotion]) {
+                  emotionData[displayEmotion] = [];
+                }
+                
+                if (!emotionCounts.has(dateStr)) {
+                  emotionCounts.set(dateStr, new Map());
+                }
+                const dateEmotionCounts = emotionCounts.get(dateStr)!;
+                if (!dateEmotionCounts.has(displayEmotion)) {
+                  dateEmotionCounts.set(displayEmotion, 0);
+                }
+                dateEmotionCounts.set(displayEmotion, dateEmotionCounts.get(displayEmotion)! + 1);
+                
+                const existingPoint = emotionData[displayEmotion].find(point => point.date === dateStr);
+                
+                if (existingPoint) {
+                  existingPoint.value += Number(emotion.intensity);
+                } else {
+                  emotionData[displayEmotion].push({
+                    date: dateStr,
+                    value: Number(emotion.intensity),
+                    emotion: displayEmotion
+                  });
+                }
+              }
+            });
+          }
+          // Handle the older format with emotion keys
+          else {
+            // Get all emotions and sort by value to get top 5
+            const emotionEntries = Object.entries(emotions)
+              .filter(([key]) => {
+                // Filter out metadata fields
+                return !(key.toLowerCase() === 'id' || 
+                        key.toLowerCase() === 'intensity' || 
+                        key.toLowerCase() === 'name' ||
+                        /^\d+$/.test(key) || 
+                        key.length < 2);
+              })
+              .sort(([, valueA], [, valueB]) => Number(valueB) - Number(valueA))
+              .slice(0, 5); // Take only top 5
             
-            if (!emotionData[displayEmotion]) {
-              emotionData[displayEmotion] = [];
-            }
-            
-            if (!emotionCounts.has(dateStr)) {
-              emotionCounts.set(dateStr, new Map());
-            }
-            const dateEmotionCounts = emotionCounts.get(dateStr)!;
-            if (!dateEmotionCounts.has(displayEmotion)) {
-              dateEmotionCounts.set(displayEmotion, 0);
-            }
-            dateEmotionCounts.set(displayEmotion, dateEmotionCounts.get(displayEmotion)! + 1);
-            
-            const existingPoint = emotionData[displayEmotion].find(point => point.date === dateStr);
-            
-            if (existingPoint) {
-              existingPoint.value += Number(score);
-            } else {
-              emotionData[displayEmotion].push({
-                date: dateStr,
-                value: Number(score),
-                emotion: displayEmotion
-              });
-            }
-          });
+            emotionEntries.forEach(([emotion, score]) => {
+              // Use actual emotion name with capitalized first letter
+              const emotionKey = emotion.toLowerCase();
+              const displayEmotion = emotionKey.charAt(0).toUpperCase() + emotionKey.slice(1);
+              
+              if (!emotionData[displayEmotion]) {
+                emotionData[displayEmotion] = [];
+              }
+              
+              if (!emotionCounts.has(dateStr)) {
+                emotionCounts.set(dateStr, new Map());
+              }
+              const dateEmotionCounts = emotionCounts.get(dateStr)!;
+              if (!dateEmotionCounts.has(displayEmotion)) {
+                dateEmotionCounts.set(displayEmotion, 0);
+              }
+              dateEmotionCounts.set(displayEmotion, dateEmotionCounts.get(displayEmotion)! + 1);
+              
+              const existingPoint = emotionData[displayEmotion].find(point => point.date === dateStr);
+              
+              if (existingPoint) {
+                existingPoint.value += Number(score);
+              } else {
+                emotionData[displayEmotion].push({
+                  date: dateStr,
+                  value: Number(score),
+                  emotion: displayEmotion
+                });
+              }
+            });
+          }
         }
       } catch (e) {
         console.error('Error parsing emotions:', e);
