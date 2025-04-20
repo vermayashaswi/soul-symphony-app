@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -5,7 +6,8 @@ import {
   format, parseISO, isValid, 
   startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
   addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks,
-  addDays, subDays, getYear, getMonth, getDaysInMonth
+  addDays, subDays, getYear, getMonth, getDaysInMonth,
+  isWithinInterval, startOfYear, endOfYear
 } from 'date-fns';
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, 
@@ -80,6 +82,40 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
       };
     }).sort((a, b) => a.date.localeCompare(b.date));
   }, [sentimentData]);
+
+  // Filter data based on the current time range
+  const filteredChartData = React.useMemo(() => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date;
+    
+    switch (timeRange) {
+      case 'today':
+        startDate = startOfDay(currentDate);
+        endDate = endOfDay(currentDate);
+        break;
+      case 'week':
+        startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
+        endDate = endOfWeek(currentDate, { weekStartsOn: 1 });
+        break;
+      case 'month':
+        startDate = startOfMonth(currentDate);
+        endDate = endOfMonth(currentDate);
+        break;
+      case 'year':
+        startDate = startOfYear(currentDate);
+        endDate = endOfYear(currentDate);
+        break;
+      default:
+        startDate = startOfDay(now);
+        endDate = endOfDay(now);
+    }
+    
+    return processedData.filter(dataPoint => {
+      const date = parseISO(dataPoint.date);
+      return isWithinInterval(date, { start: startDate, end: endDate });
+    });
+  }, [processedData, timeRange, currentDate]);
 
   const getSentimentColor = (category: string): string => {
     switch (category) {
@@ -358,7 +394,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
   };
 
   const renderLineChart = () => {
-    if (processedData.length === 0) {
+    if (filteredChartData.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">No data available for this timeframe</p>
@@ -366,7 +402,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
       );
     }
     
-    const lineData = processedData.map(item => ({
+    const lineData = filteredChartData.map(item => ({
       day: item.formattedDate,
       sentiment: item.sentiment
     }));
