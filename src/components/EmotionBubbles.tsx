@@ -1,4 +1,4 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useLocation } from 'react-router-dom';
@@ -130,7 +130,12 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
   const handleEmotionClick = (emotion: string) => {
     if (emotion === '•' || !emotion) return;
     
-    setSelectedEmotion(emotion);
+    const selectedBubbleData = items.find(item => item.name === emotion);
+    
+    setSelectedEmotion(selectedBubbleData ? 
+      String(selectedBubbleData.percentage?.toFixed(1)) : 
+      null
+    );
     
     // Reset after 2 seconds
     setTimeout(() => {
@@ -685,7 +690,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       if (filteredEmotions.length === 0) return;
       
       // Calculate total value for percentage calculation
-      const totalValue = filteredEmotions.reduce((sum, [_, value]) => sum + value, 0);
+      const totalValue = filteredEmotions.reduce((sum, [value]) => sum + value, 0);
       
       const values = filteredEmotions.map(([_, value]) => value);
       const maxValue = Math.max(...values);
@@ -879,7 +884,6 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           <canvas 
             ref={canvasRef} 
             className="absolute top-0 left-0 w-full h-full z-10"
-            // Add touch-action CSS to prevent browser touch actions
             style={{ touchAction: 'none' }}
           />
           {bubblesRef.current.map((bubble, index) => (
