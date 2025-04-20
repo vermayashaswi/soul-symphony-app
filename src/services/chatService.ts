@@ -341,14 +341,14 @@ export const processChatMessage = async (
         details: "Retrieving relevant journal entries"
       });
     }
-    
+
     // Define the updated prompt here
     const prompt = `You are **SOuLO**, a smart, emotionally intelligent assistant that helps users reflect on their mental and emotional well-being through journal data.
 
 The user asked:
 "{query}"
 
-Relevant information has been retrieved from the user’s journal entries, including patterns, emotion trends, sentiment scores, and mentions of people, places, or events.
+Relevant information has been retrieved from the user's journal entries, including patterns, emotion trends, sentiment scores, and mentions of people, places, or events.
 
 Your role now is to:
 1. Analyze the information
@@ -376,12 +376,15 @@ Your role now is to:
 4. **Personalization & Sensitivity**
    - Tailor responses to the question.
    - Be objective and kind—especially when discussing sensitive topics or relationships.
-   - Don’t speculate or assume beyond what's in the journal data.
+   - Don't speculate or assume beyond what's in the journal data.
 
 ---
 
-Now generate a clear, emotionally intelligent, insight-driven response to the user's question:`;
+Now generate a clear, emotionally intelligent, insight-driven response to the user's question.`;
 
+    // Initialize conversation context array to be empty if not provided
+    const conversationContext = [];
+    
     // Prepare the messages array with system prompt and conversation context
     const messages = [];
     
@@ -410,6 +413,9 @@ Now generate a clear, emotionally intelligent, insight-driven response to the us
       console.log("No conversation context available, using only system prompt");
       messages.push({ role: 'user', content: message });
     }
+    
+    // Get OpenAI API key from environment or edge function
+    const apiKey = await getOpenAIKey();
     
     const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -446,8 +452,37 @@ Now generate a clear, emotionally intelligent, insight-driven response to the us
       });
     }
 
+    // Fetch relevant journal entries
+    const { data: entries, error: entriesError } = await supabase.functions.invoke('chat-with-rag', {
+      body: {
+        message,
+        userId,
+        queryTypes: queryTypes || {},
+        threadId,
+        retrieveOnly: true,
+        vectorSearch: {
+          matchThreshold,
+          matchCount
+        }
+      }
+    });
+
+    if (entriesError) {
+      console.error("Error retrieving entries:", entriesError);
+      if (enableDiagnostics) {
+        diagnostics.steps.push({
+          name: "Entry Retrieval",
+          status: "error",
+          details: entriesError.message
+        });
+      }
+    }
+
+    // Use empty array if no entries were retrieved
+    const journalEntries = entries?.references || [];
+
     // Process entries to ensure valid dates
-    const processedEntries = entries.map(entry => {
+    const processedEntries = journalEntries.map(entry => {
       // Make sure created_at is a valid date string
       let createdAt = entry.created_at;
       if (!createdAt || isNaN(new Date(createdAt).getTime())) {
@@ -486,3 +521,27 @@ Now generate a clear, emotionally intelligent, insight-driven response to the us
     };
   }
 };
+
+// Helper function to get OpenAI API key from environment or edge function
+async function getOpenAIKey(): Promise<string> {
+  try {
+    // Try to get the API key from an edge function
+    const { data, error } = await supabase.functions.invoke('get-openai-key', {
+      body: {}
+    });
+    
+    if (error) {
+      console.error("Error getting OpenAI API key:", error);
+      throw error;
+    }
+    
+    if (data?.apiKey) {
+      return data.apiKey;
+    } else {
+      throw new Error("No API key returned from edge function");
+    }
+  } catch (error) {
+    console.error("Failed to get OpenAI API key:", error);
+    throw new Error("Could not retrieve API key for OpenAI");
+  }
+}
