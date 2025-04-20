@@ -178,7 +178,7 @@ serve(async (req) => {
       }
     }
     
-    // NEW: First categorize if this is a general question or a journal-specific question
+    // Enhanced categorization logic with better examples and strict guidelines for greeting/simple messages
     console.log("Categorizing question type");
     const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -187,21 +187,36 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [
           {
             role: 'system',
-            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
-            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
-            
-            Examples:
-            - "How are you doing?" -> "GENERAL"
-            - "What is journaling?" -> "GENERAL"
-            - "Who is the president of India?" -> "GENERAL"
-            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
-            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
+            content: `You are a classifier that determines if a user's query is:
+1. A general question/greeting unrelated to their journal data (respond with "GENERAL")
+2. A question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC")
+
+Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC". No explanation.
+
+IMPORTANT GUIDELINES:
+- ALL greetings, small talk or simple messages like "hi", "hello", "hey", "good morning", etc. are ALWAYS "GENERAL"
+- ALL generic questions about mental health, journaling, or the app are "GENERAL"
+- Questions that can be answered WITHOUT analyzing journal entries are "GENERAL"
+- ONLY classify as "JOURNAL_SPECIFIC" if the query EXPLICITLY requires analyzing their journal data
+
+Examples:
+- "Hi" -> "GENERAL"
+- "Hey there" -> "GENERAL"
+- "How are you?" -> "GENERAL"
+- "What is journaling?" -> "GENERAL"
+- "What can you help with?" -> "GENERAL"
+- "How do I use this app?" -> "GENERAL"
+- "What's the weather today?" -> "GENERAL"
+- "Who is the president?" -> "GENERAL"
+- "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
+- "What did I write about yesterday?" -> "JOURNAL_SPECIFIC"
+- "Show me patterns in my anxiety" -> "JOURNAL_SPECIFIC"
+- "Am I happier on weekends?" -> "JOURNAL_SPECIFIC"
+- "What emotions do I mention most?" -> "JOURNAL_SPECIFIC"`
           },
           { role: 'user', content: message }
         ],
@@ -237,6 +252,8 @@ serve(async (req) => {
             ...(conversationContext.length > 0 ? conversationContext : []),
             { role: 'user', content: message }
           ],
+          temperature: 0.7,
+          max_tokens: 250  // Limit token length for general responses
         }),
       });
 
@@ -257,6 +274,8 @@ serve(async (req) => {
     }
     
     // If it's a journal-specific question, continue with the existing RAG flow
+    // ... keep existing code (handling journal-specific queries, embedding generation, vector search, etc.)
+    
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
