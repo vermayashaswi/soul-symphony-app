@@ -1,7 +1,9 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
 import { Button } from "@/components/ui/button";
+import { Switch } from "@/components/ui/switch";
 import { processChatMessage } from "@/services/chatService";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { useToast } from "@/hooks/use-toast";

@@ -1,65 +1,46 @@
 
 import React from "react";
-import { motion } from "framer-motion";
-import { MessageSquare, ArrowRight } from "lucide-react";
-import { Button } from "@/components/ui/button";
+import { MessageSquare } from "lucide-react";
 
-const EmptyChatState: React.FC = () => {
+interface EmptyChatStateProps {
+  isPlannerMode?: boolean;
+}
+
+const EmptyChatState: React.FC<EmptyChatStateProps> = ({ isPlannerMode = false }) => {
   return (
-    <motion.div
-      initial={{ opacity: 0 }}
-      animate={{ opacity: 1 }}
-      className="flex flex-col items-center justify-center p-6 text-center h-full"
-    >
-      <div className="w-16 h-16 bg-primary/10 rounded-full flex items-center justify-center mb-4">
+    <div className="flex flex-col items-center justify-center h-full p-4 text-center">
+      <div className="bg-primary/10 rounded-full p-4 mb-4">
         <MessageSquare className="h-8 w-8 text-primary" />
       </div>
       
-      <h3 className="text-xl font-bold mb-2">AI Assistant</h3>
+      <h3 className="text-xl font-medium mb-2">
+        {isPlannerMode ? "AI Planner Assistant" : "AI Journal Insights"}
+      </h3>
       
-      <p className="text-muted-foreground max-w-md">
-        Hey, I am Roha, your personal AI assistant. You can ask me anything about your mental well-being and I will answer your queries basis your own journal insights.
+      <p className="text-muted-foreground max-w-md mb-4">
+        {isPlannerMode 
+          ? "Ask complex questions about your journal entries. The planner will analyze your data step-by-step to provide detailed insights."
+          : "Ask about your journal entries and get personalized insights based on your writing."
+        }
       </p>
       
-      <div className="mt-6 text-sm text-muted-foreground/70">
-        <p>Try questions like:</p>
-        <ul className="mt-1 space-y-1 max-w-[280px] mx-auto">
-          <li className="flex items-start">
-            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left break-words whitespace-normal">What were my top emotions last week?</span>
-          </li>
-          <li className="flex items-start">
-            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left break-words whitespace-normal">What time of the day do I usually like journaling?</span>
-          </li>
-          <li className="flex items-start">
-            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left break-words whitespace-normal">Am i am introvert? Do i like people in general?</span>
-          </li>
-          <li className="flex items-start">
-            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left break-words whitespace-normal">What should i particularly do to help my mental health?</span>
-          </li>
-          <li className="flex items-start">
-            <ArrowRight className="h-3 w-3 mr-1 mt-1 flex-shrink-0 text-primary" />
-            <span className="text-left break-words whitespace-normal">Rate my top 3 negative traits out of 100? What do i do to improve them?</span>
-          </li>
-        </ul>
+      <div className="grid gap-2 mt-2 text-sm text-muted-foreground max-w-md">
+        <p className="font-medium mb-1">Try asking:</p>
+        {isPlannerMode ? (
+          <>
+            <div className="border rounded-lg p-2 bg-secondary/20">"How have things been with my wife and is it improving?"</div>
+            <div className="border rounded-lg p-2 bg-secondary/20">"What patterns do you see in my anxiety over the past month?"</div>
+            <div className="border rounded-lg p-2 bg-secondary/20">"Compare my mood on weekdays versus weekends"</div>
+          </>
+        ) : (
+          <>
+            <div className="border rounded-lg p-2 bg-secondary/20">"What emotions have I felt most often lately?"</div>
+            <div className="border rounded-lg p-2 bg-secondary/20">"What did I write about yesterday?"</div>
+            <div className="border rounded-lg p-2 bg-secondary/20">"Summarize my recent journal entries"</div>
+          </>
+        )}
       </div>
-      
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="mt-6"
-        onClick={() => {
-          // Trigger a new chat creation
-          const newChatButton = document.querySelector('[data-testid="new-chat-button"]') as HTMLButtonElement;
-          if (newChatButton) newChatButton.click();
-        }}
-      >
-        Start New Conversation
-      </Button>
-    </motion.div>
+    </div>
   );
 };
 

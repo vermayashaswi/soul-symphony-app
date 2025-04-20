@@ -1,239 +1,164 @@
 
 import React, { useRef, useEffect, useState } from "react";
-import ChatMessage from "./ChatMessage";
-import { motion, AnimatePresence } from "framer-motion";
-import { Loader2 } from "lucide-react";
-import { ChatMessage as ChatMessageType } from "@/services/chatPersistenceService";
-import JournalEntryLoadingSkeleton from "../journal/JournalEntryLoadingSkeleton";
+import { ChatMessage } from "@/services/chat";
+import ChatMessageItem from "./ChatMessageItem";
+import ChatTypingIndicator from "./ChatTypingIndicator";
+import { Button } from "@/components/ui/button";
+import { ChevronDown } from "lucide-react";
+import { Card, CardContent, CardHeader, CardTitle } from "../ui/card";
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from "../ui/collapsible";
 
 interface ChatAreaProps {
-  chatMessages: ChatMessageType[];
+  chatMessages: ChatMessage[];
   isLoading: boolean;
   processingStage?: string;
-  threadId?: string | null;
+  threadId: string | null;
+  plannerResults?: any;
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({ 
   chatMessages, 
   isLoading, 
   processingStage,
-  threadId
+  threadId,
+  plannerResults
 }) => {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const [prevMessageCount, setPrevMessageCount] = useState(0);
-  const [lastUserMessage, setLastUserMessage] = useState<ChatMessageType | null>(null);
-  const [localIsLoading, setLocalIsLoading] = useState(isLoading);
-  const [localProcessingStage, setLocalProcessingStage] = useState(processingStage);
-  
-  // When loading changes externally, update local loading state
-  useEffect(() => {
-    // If loading is starting, always update immediately
-    if (isLoading) {
-      setLocalIsLoading(true);
-      setLocalProcessingStage(processingStage);
-    } 
-    // If loading is ending, only update if we don't have an active processingStage stored
-    else if (!localProcessingStage || processingStage === null) {
-      setLocalIsLoading(false);
-      setLocalProcessingStage(null);
-    }
-  }, [isLoading, processingStage]);
-  
-  // Store loading state in sessionStorage to persist across navigation
-  useEffect(() => {
-    // Check for loading state on mount and make sure it's for this thread
-    const storedLoadingState = sessionStorage.getItem('chatLoadingState');
-    const storedProcessingStage = sessionStorage.getItem('chatProcessingStage');
-    const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
-    const timestamp = sessionStorage.getItem('chatProcessingTimestamp');
-    
-    // Check if we should clear a stale loading state (older than 5 minutes)
-    if (storedLoadingState === 'true' && timestamp) {
-      const now = Date.now();
-      const then = parseInt(timestamp);
-      const fiveMinutesMs = 5 * 60 * 1000;
-      
-      if (now - then > fiveMinutesMs) {
-        // Clear stale loading state
-        sessionStorage.removeItem('chatLoadingState');
-        sessionStorage.removeItem('chatProcessingStage');
-        sessionStorage.removeItem('chatProcessingThreadId');
-        sessionStorage.removeItem('chatProcessingTimestamp');
-        setLocalIsLoading(false);
-        setLocalProcessingStage(null);
-        return;
-      }
-    }
-    
-    // Only restore loading state if it's for this thread
-    if (storedLoadingState === 'true' && !isLoading && threadId && storedThreadId === threadId) {
-      setLocalIsLoading(true);
-      if (storedProcessingStage) {
-        setLocalProcessingStage(storedProcessingStage);
-      }
-    }
-    
-    // Update storage when loading state changes
-    if (localIsLoading && threadId) {
-      sessionStorage.setItem('chatLoadingState', 'true');
-      sessionStorage.setItem('chatProcessingThreadId', threadId);
-      
-      if (!timestamp) {
-        sessionStorage.setItem('chatProcessingTimestamp', Date.now().toString());
-      }
-      
-      if (localProcessingStage) {
-        sessionStorage.setItem('chatProcessingStage', localProcessingStage);
-      }
-    } else if (!localIsLoading) {
-      const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
-      
-      // Only clear if this is the same thread that was loading
-      if (!threadId || storedThreadId === threadId) {
-        sessionStorage.removeItem('chatLoadingState');
-        sessionStorage.removeItem('chatProcessingStage');
-        sessionStorage.removeItem('chatProcessingThreadId');
-        sessionStorage.removeItem('chatProcessingTimestamp');
-      }
-    }
-    
-    // Clean up storage when component unmounts if we're no longer loading
-    return () => {
-      if (!localIsLoading) {
-        const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
-        
-        // Only clear if this is the same thread that was loading
-        if (!threadId || storedThreadId === threadId) {
-          sessionStorage.removeItem('chatLoadingState');
-          sessionStorage.removeItem('chatProcessingStage');
-          sessionStorage.removeItem('chatProcessingThreadId');
-          sessionStorage.removeItem('chatProcessingTimestamp');
-        }
-      }
-    };
-  }, [localIsLoading, localProcessingStage, isLoading, threadId]);
-  
-  // Find the last user message
-  useEffect(() => {
-    if (chatMessages.length > 0) {
-      const lastMsg = [...chatMessages].reverse().find(msg => msg.role === 'user');
-      setLastUserMessage(lastMsg || null);
-    } else {
-      setLastUserMessage(null);
-    }
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const [showScrollButton, setShowScrollButton] = useState(false);
+  const [isAtBottom, setIsAtBottom] = useState(true);
+  const [openPlannerDetails, setOpenPlannerDetails] = useState(false);
+  const containerRef = useRef<HTMLDivElement>(null);
 
-    // Always scroll to bottom to ensure chat input is visible
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    setPrevMessageCount(chatMessages.length);
+  useEffect(() => {
+    if (isAtBottom) {
+      scrollToBottom();
+    }
+  }, [chatMessages, isLoading]);
+
+  useEffect(() => {
+    const handleScroll = () => {
+      if (!containerRef.current) return;
+      
+      const { scrollTop, scrollHeight, clientHeight } = containerRef.current;
+      const isScrolledToBottom = Math.abs(scrollHeight - scrollTop - clientHeight) < 50;
+      
+      setIsAtBottom(isScrolledToBottom);
+      setShowScrollButton(!isScrolledToBottom);
+    };
     
-    // If we have a completed response, clear the loading state
-    if (chatMessages.length > prevMessageCount && prevMessageCount > 0) {
-      const lastMessageIsAssistant = chatMessages[chatMessages.length - 1]?.role === 'assistant';
-      
-      if (lastMessageIsAssistant) {
-        setLocalIsLoading(false);
-        setLocalProcessingStage(null);
-        
-        const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
-        
-        // Only clear if this is the same thread that was loading
-        if (!threadId || storedThreadId === threadId) {
-          sessionStorage.removeItem('chatLoadingState');
-          sessionStorage.removeItem('chatProcessingStage');
-          sessionStorage.removeItem('chatProcessingThreadId');
-          sessionStorage.removeItem('chatProcessingTimestamp');
-        }
-      }
+    const container = containerRef.current;
+    if (container) {
+      container.addEventListener('scroll', handleScroll);
+      return () => container.removeEventListener('scroll', handleScroll);
     }
-  }, [chatMessages, localIsLoading, prevMessageCount, threadId]);
-  
-  // Check for duplicates by content to prevent doubled rendering
-  const uniqueMessages = chatMessages.reduce((acc: ChatMessageType[], current) => {
-    const isDuplicate = acc.find(item => 
-      item.id === current.id || 
-      (item.content === current.content && 
-       Math.abs(new Date(item.created_at).getTime() - new Date(current.created_at).getTime()) < 1000)
-    );
-    if (!isDuplicate) {
-      acc.push(current);
-    }
-    return acc;
   }, []);
-  
-  // Filter out the last user message when loading to show it in the sticky header
-  const filteredMessages = localIsLoading && lastUserMessage 
-    ? uniqueMessages.filter(msg => msg.id !== lastUserMessage.id)
-    : uniqueMessages;
-  
+
+  const scrollToBottom = () => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    setShowScrollButton(false);
+  };
+
   return (
-    <div className="flex flex-col h-full">
-      {localIsLoading && lastUserMessage && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b pb-3 pt-2 px-4">
-          <div className="flex items-start gap-3">
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-xs font-medium text-primary-foreground">
-              You
-            </div>
-            <div className="bg-muted p-3 rounded-xl max-w-[75%] text-sm">
-              {lastUserMessage.content}
-            </div>
-          </div>
-        </div>
-      )}
-      
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        <AnimatePresence initial={false}>
-          {filteredMessages.map((message, index) => {
-            // Map 'error' role to 'assistant' for display purposes if needed
-            const displayMessage = {
-              ...message,
-              // Use type assertion to allow for potential 'error' role which might come from elsewhere
-              role: (message.role as string) === 'error' ? 'assistant' : message.role
-            };
-            
-            return (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <ChatMessage 
-                  message={displayMessage}
-                  showAnalysis={false}
-                />
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
+    <div className="relative h-full flex flex-col">
+      <div 
+        ref={containerRef}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4 scrollbar-thin scrollbar-thumb-gray-300 scrollbar-track-transparent" 
+      >
+        {chatMessages.map((message, index) => (
+          <ChatMessageItem 
+            key={message.id || index} 
+            message={message}
+            isLastMessage={index === chatMessages.length - 1}
+            threadId={threadId}
+          />
+        ))}
         
-        <AnimatePresence>
-          {localIsLoading && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                </div>
-                <div className="bg-muted/40 rounded-xl p-3 max-w-[75%] text-sm">
-                  {localProcessingStage || "Processing your request..."}
-                </div>
+        {isLoading && (
+          <ChatTypingIndicator stage={processingStage} />
+        )}
+        
+        {plannerResults && (
+          <Collapsible
+            open={openPlannerDetails}
+            onOpenChange={setOpenPlannerDetails}
+            className="w-full mt-4 border rounded-lg overflow-hidden"
+          >
+            <div className="bg-secondary/50 px-4 py-2 flex justify-between items-center">
+              <div className="text-sm font-medium">Planner Analysis Details</div>
+              <CollapsibleTrigger asChild>
+                <Button variant="ghost" size="sm" className="h-7 w-7 p-0">
+                  <ChevronDown className={`h-4 w-4 transition-transform ${openPlannerDetails ? 'rotate-180' : ''}`} />
+                </Button>
+              </CollapsibleTrigger>
+            </div>
+            <CollapsibleContent className="p-4 bg-secondary/20">
+              <div className="space-y-4">
+                {plannerResults.planDetails?.steps && (
+                  <Card>
+                    <CardHeader className="py-3">
+                      <CardTitle className="text-sm">Execution Plan</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-xs space-y-2">
+                        {plannerResults.planDetails.steps.map((step, index) => (
+                          <div key={index} className="border-l-2 border-primary pl-2 py-1">
+                            <div className="font-medium">{step.name}</div>
+                            <div className="text-muted-foreground mt-1">
+                              {Object.entries(step.arguments || {}).map(([key, value]) => (
+                                <div key={key} className="flex">
+                                  <span className="w-24 font-mono">{key}:</span>
+                                  <span>{JSON.stringify(value)}</span>
+                                </div>
+                              ))}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
+                
+                {plannerResults.executionResults && (
+                  <Card>
+                    <CardHeader className="py-3">
+                      <CardTitle className="text-sm">Execution Results</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="text-xs space-y-3">
+                        {plannerResults.executionResults.map((result, index) => (
+                          <div key={index} className="border p-2 rounded">
+                            <div className="font-medium mb-1">{result.stepName}</div>
+                            <div className="text-muted-foreground">
+                              {result.error ? (
+                                <div className="text-red-500">{result.error}</div>
+                              ) : (
+                                <div>Found {Array.isArray(result.result) ? result.result.length : 0} results</div>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                )}
               </div>
-              
-              <JournalEntryLoadingSkeleton count={1} />
-            </motion.div>
-          )}
-        </AnimatePresence>
+            </CollapsibleContent>
+          </Collapsible>
+        )}
         
-        <div 
-          ref={bottomRef} 
-          className="h-20" // Add some height to ensure enough scroll space
-        />
+        <div ref={messagesEndRef} />
       </div>
+      
+      {showScrollButton && (
+        <Button
+          variant="secondary"
+          size="icon"
+          className="absolute bottom-4 right-4 rounded-full shadow-md"
+          onClick={scrollToBottom}
+        >
+          <ChevronDown className="h-4 w-4" />
+        </Button>
+      )}
     </div>
   );
 };
