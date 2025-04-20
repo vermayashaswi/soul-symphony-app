@@ -2,27 +2,17 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { GripVertical } from 'lucide-react';
-import { JournalEntry } from '@/types/journal';
 
 interface FloatingDotsToggleProps {
   onClick: () => void;
   isExpanded: boolean;
-  entry?: JournalEntry;
-  onDeleteClick?: () => void;
 }
 
-export function FloatingDotsToggle({ onClick, isExpanded, entry, onDeleteClick }: FloatingDotsToggleProps) {
+export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsToggleProps) {
   // Add a wrapper function to log when toggle is clicked
   const handleClick = () => {
     console.log('[FloatingDotsToggle] Toggle clicked, current state:', isExpanded);
     onClick();
-  };
-
-  // Make sure we have a handler for delete click if provided
-  const handleDeleteClick = () => {
-    if (onDeleteClick) {
-      onDeleteClick();
-    }
   };
 
   return (

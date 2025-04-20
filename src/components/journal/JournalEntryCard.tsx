@@ -16,11 +16,25 @@ import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType, Json } from '@/types/journal';
 
-// Using the type from types/journal.ts but extending it with required fields for this component
-export interface JournalEntry extends JournalEntryType {
+export interface JournalEntry {
   id: number;
   content: string;
   created_at: string;
+  audio_url?: string;
+  sentiment?: string | null;
+  themes?: string[] | null;
+  master_themes?: string[];
+  entities?: Array<{
+    type: string;
+    name: string;
+    text?: string;
+  }>;
+  foreignKey?: string;
+  predictedLanguages?: {
+    [key: string]: number;
+  } | null;
+  Edit_Status?: number | null;
+  user_feedback?: string | null;
 }
 
 interface JournalEntryCardProps {
@@ -46,287 +60,485 @@ export function JournalEntryCard({
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
     themes: Array.isArray(entry?.themes) ? entry.themes : [],
     Edit_Status: entry?.Edit_Status || null,
-    user_feedback: entry?.user_feedback || null,
-    emotions: entry?.emotions || null,
-    duration: entry?.duration || null
+    user_feedback: entry?.user_feedback || null
   };
 
-  const [showFullContent, setShowFullContent] = useState(false);
-  const [isMounted, setIsMounted] = useState(false);
-  const [isFeedbackGiven, setIsFeedbackGiven] = useState(safeEntry.user_feedback !== null);
-  const [feedbackType, setFeedbackType] = useState<string | null>(safeEntry.user_feedback);
-  const [isDeleting, setIsDeleting] = useState(false);
-  const cardRef = useRef<HTMLDivElement>(null);
-  const [cardHeight, setCardHeight] = useState<number | null>(null);
-  const [showScrollbar, setShowScrollbar] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [isLoadingFeedback, setIsLoadingFeedback] = useState(false);
-  const [isReprocessing, setIsReprocessing] = useState(false);
-  const [showReprocessButton, setShowReprocessButton] = useState(false);
-  const [showEditButton, setShowEditButton] = useState(false);
-  const [showThumbs, setShowThumbs] = useState(true);
-  const [showFloatingDots, setShowFloatingDots] = useState(true);
-  const [isEntryContentMounted, setIsEntryContentMounted] = useState(false);
+  const [isExpanded, setIsExpanded] = useState(isNew);
   const [showThemes, setShowThemes] = useState(false);
+  const [highlightNew, setHighlightNew] = useState(isNew);
+  const [deletionCompleted, setDeletionCompleted] = useState(false);
+  const [deletionInProgress, setDeletionInProgress] = useState(false);
+  const [hasError, setHasError] = useState(false);
+  const [contentLoaded, setContentLoaded] = useState(false);
+  const [thumbsUp, setThumbsUp] = useState(false);
+  const [thumbsDown, setThumbsDown] = useState(false);
+  const mountedRef = useRef<boolean>(true);
   
-  const contentRef = useRef<HTMLDivElement>(null);
-  const scrollContainerRef = useRef<HTMLDivElement>(null);
+  const extractThemes = (): string[] => {
+    try {
+      const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
+      const entryThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
+      
+      const filteredMasterThemes = masterThemes.filter(theme => 
+        theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
+      );
+      const filteredEntryThemes = entryThemes.filter(theme => 
+        theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
+      );
+      
+      if (filteredMasterThemes.length > 0) {
+        return filteredMasterThemes;
+      } else if (filteredEntryThemes.length > 0) {
+        return filteredEntryThemes;
+      }
+      
+      return [];
+    } catch (error) {
+      console.error("[JournalEntryCard] Error extracting themes:", error);
+      return [];
+    }
+  };
+  
+  const getSentimentBorderClass = (): string => {
+    if (!safeEntry.sentiment || isProcessing) {
+      return '';
+    }
 
-  const toggleShowFullContent = () => {
-    setShowFullContent(!showFullContent);
+    let score = 0;
+    try {
+      if (typeof safeEntry.sentiment === 'string') {
+        score = parseFloat(safeEntry.sentiment);
+      } else if (typeof safeEntry.sentiment === 'object' && safeEntry.sentiment !== null) {
+        score = (safeEntry.sentiment as any).score || 0;
+      }
+    } catch (error) {
+      console.error("[JournalEntryCard] Error parsing sentiment score:", error);
+      return '';
+    }
+
+    if (score > 0.2) {
+      return 'border-green-500 border-2';
+    } else if (score >= -0.1 && score <= 0.2) {
+      return 'border-[#FEF7CD] border-2';
+    } else {
+      return 'border-[#ea384c] border-2';
+    }
+  };
+  
+  useEffect(() => {
+    const hasValidContent = safeEntry.content && 
+                         safeEntry.content !== "Processing entry..." && 
+                         safeEntry.content !== "Loading..." &&
+                         safeEntry.content.trim() !== "";
+    
+    console.log(`[JournalEntryCard] Entry ${safeEntry.id} content status:`, {
+      hasValidContent,
+      contentLength: safeEntry.content?.length || 0,
+      isProcessing
+    });
+    
+    setContentLoaded(hasValidContent);
+    
+    if (isNew && hasValidContent && !isExpanded) {
+      setIsExpanded(true);
+    }
+  }, [safeEntry.content, isNew, isExpanded, isProcessing]);
+  
+  useEffect(() => {
+    console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);
+    mountedRef.current = true;
+    
+    return () => {
+      console.log(`[JournalEntryCard] Unmounted entry ${safeEntry.id}`);
+      mountedRef.current = false;
+    };
+  }, [safeEntry.id]);
+
+  useEffect(() => {
+    if (isNew) {
+      setIsExpanded(true);
+      setHighlightNew(true);
+      
+      const timer = setTimeout(() => {
+        if (mountedRef.current) {
+          setHighlightNew(false);
+        }
+      }, 5000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isNew]);
+
+  const toggleExpanded = () => {
+    console.log(`[JournalEntryCard] Toggling expansion for entry ${safeEntry.id}, current state:`, isExpanded);
+    setIsExpanded(!isExpanded);
   };
 
-  const toggleShowThemes = () => {
+  const toggleThemes = () => {
+    console.log(`[JournalEntryCard] Toggling themes visibility for entry ${safeEntry.id}, current state:`, showThemes);
     setShowThemes(!showThemes);
   };
 
-  const containerVariants = {
-    initial: { opacity: 0, y: 20 },
-    animate: { 
-      opacity: 1, 
-      y: 0,
-      transition: {
-        duration: 0.3,
-        delay: isNew ? 0.2 : 0
-      }
-    },
-    exit: {
-      opacity: 0,
-      y: -20,
-      transition: {
-        duration: 0.2
-      }
+  const handleDelete = async () => {
+    if (!safeEntry.id || deletionCompleted || deletionInProgress) {
+      console.log(`[JournalEntryCard] Skipping deletion for entry ${safeEntry.id} - already completed or in progress`);
+      return;
     }
-  };
-
-  const formatDate = (dateString: string) => {
-    try {
-      return formatShortDate(dateString);
-    } catch (error) {
-      console.error("Error formatting date:", error);
-      return "Invalid Date";
-    }
-  };
-
-  const handleDeleteClick = () => {
-    setShowDeleteDialog(true);
-  };
-
-  const handleCancelDelete = () => {
-    setShowDeleteDialog(false);
-  };
-
-  const confirmDelete = async () => {
-    setIsDeleting(true);
-    try {
-      if (onDelete) {
-        await onDelete(safeEntry.id);
-        toast.success("Entry deleted successfully!");
-      }
-    } catch (error) {
-      console.error("Error deleting entry:", error);
-      toast.error("Failed to delete entry.");
-    } finally {
-      setIsDeleting(false);
-      setShowDeleteDialog(false);
-    }
-  };
-
-  const handleFeedback = useCallback(async (feedback: string) => {
-    if (isLoadingFeedback) return;
-    
-    setIsLoadingFeedback(true);
     
     try {
-      const { data, error } = await supabase
+      console.log(`[JournalEntryCard] Starting deletion of entry ${safeEntry.id}`);
+      
+      setDeletionInProgress(true);
+      
+      const { error } = await supabase
         .from('Journal Entries')
-        .update({ user_feedback: feedback })
+        .delete()
         .eq('id', safeEntry.id);
         
       if (error) {
-        console.error("Error submitting feedback:", error);
-        toast.error("Failed to submit feedback.");
-      } else {
-        setIsFeedbackGiven(true);
-        setFeedbackType(feedback);
-        toast.success("Feedback submitted successfully!");
+        throw error;
       }
-    } catch (error) {
-      console.error("Error submitting feedback:", error);
-      toast.error("Failed to submit feedback.");
-    } finally {
-      setIsLoadingFeedback(false);
-    }
-  }, [safeEntry.id, isLoadingFeedback]);
-
-  const handleReprocess = async () => {
-    setIsReprocessing(true);
-    try {
-      const response = await supabase.functions.invoke('reprocess-entry', {
-        body: { entryId: safeEntry.id }
-      });
       
-      if (response.error) {
-        console.error("Error reprocessing entry:", response.error);
-        toast.error("Failed to reprocess entry.");
-      } else {
-        toast.success("Entry reprocessing started!");
+      console.log(`[JournalEntryCard] Successfully deleted entry ${safeEntry.id} from database`);
+      
+      setDeletionCompleted(true);
+      
+      if (onDelete && mountedRef.current) {
+        console.log(`[JournalEntryCard] Calling onDelete for entry ${safeEntry.id}`);
+        onDelete(safeEntry.id);
       }
+      
+      toast.success('Journal entry deleted');
     } catch (error) {
-      console.error("Error reprocessing entry:", error);
-      toast.error("Failed to reprocess entry.");
-    } finally {
-      setIsReprocessing(false);
+      console.error('[JournalEntryCard] Error deleting journal entry:', error);
+      
+      if (mountedRef.current) {
+        setDeletionInProgress(false);
+        setDeletionCompleted(false);
+        setHasError(true);
+      }
+      
+      toast.error('Failed to delete entry');
+      
+      if (onDelete && mountedRef.current) {
+        console.log(`[JournalEntryCard] Calling onDelete after error for entry ${safeEntry.id}`);
+        setTimeout(() => {
+          if (mountedRef.current) {
+            onDelete(safeEntry.id);
+          }
+        }, 100);
+      }
     }
   };
 
-  useEffect(() => {
-    setIsMounted(true);
-    
-    const observer = new IntersectionObserver(
-      (entries) => {
-        entries.forEach(entry => {
-          if (entry.isIntersecting) {
-            setShowReprocessButton(true);
-            setShowEditButton(true);
-            setShowThumbs(true);
-            setShowFloatingDots(true);
-          } else {
-            setShowReprocessButton(false);
-            setShowEditButton(false);
-            setShowThumbs(false);
-            setShowFloatingDots(false);
-          }
-        });
-      },
-      {
-        root: null,
-        rootMargin: '0px',
-        threshold: 0.1
+  const handleUserFeedback = async (feedback: number) => {
+    try {
+      // Toggle thumbs state
+      if (feedback === 1) {
+        if (!thumbsUp) {
+          setThumbsUp(true);
+          setThumbsDown(false);
+          toast.success('Glad you liked the translation');
+        } else {
+          setThumbsUp(false);
+          // No toast when deselecting
+        }
+      } else {
+        if (!thumbsDown) {
+          setThumbsDown(true);
+          setThumbsUp(false);
+          toast.error("We'll try and improve on the translation");
+        } else {
+          setThumbsDown(false);
+          // No toast when deselecting
+        }
       }
-    );
-    
-    if (cardRef.current) {
-      observer.observe(cardRef.current);
-    }
-    
-    return () => {
-      if (cardRef.current) {
-        observer.unobserve(cardRef.current);
-      }
-    };
-  }, []);
-
-  useEffect(() => {
-    if (contentRef.current) {
-      const scrollHeight = contentRef.current.scrollHeight;
-      const clientHeight = contentRef.current.clientHeight;
       
-      setShowScrollbar(scrollHeight > clientHeight);
+      const { error } = await supabase
+        .from('Journal Entries')
+        .update({ user_feedback: feedback.toString() })
+        .eq('id', safeEntry.id);
+    
+      if (error) {
+        console.error('Error saving user feedback:', error);
+        toast.error('Failed to save feedback');
+      }
+    } catch (error) {
+      console.error('Unexpected error saving feedback:', error);
+      toast.error('An unexpected error occurred');
     }
-  }, [showFullContent, isEntryContentMounted]);
+  };
 
-  return (
-    <motion.div
-      ref={cardRef}
-      className="relative rounded-lg shadow-md overflow-hidden"
-      variants={containerVariants}
-      initial="initial"
-      animate="animate"
-      exit="exit"
-    >
-      <Card className="w-full">
-        <div className="flex justify-between items-start p-4">
-          <div className="flex flex-col space-y-1">
-            <span className="text-sm text-muted-foreground">
-              {formatDate(safeEntry.created_at)}
-            </span>
-            <EntryContent 
-              content={safeEntry.content}
-              showFullContent={showFullContent}
-              contentRef={contentRef}
-              scrollContainerRef={scrollContainerRef}
-              setShowScrollbar={setShowScrollbar}
-              isEntryContentMounted={isEntryContentMounted}
-              setIsEntryContentMounted={setIsEntryContentMounted}
-              isProcessing={isProcessing}
-            />
-            {safeEntry.duration && (
-              <div className="mt-2 text-xs text-gray-500">
-                Duration: {safeEntry.duration} seconds
-              </div>
-            )}
-            {showScrollbar && (
-              <button 
-                onClick={toggleShowFullContent}
-                className="text-blue-500 hover:underline text-sm mt-2"
-              >
-                {showFullContent ? "Show Less" : "Show More"}
-              </button>
-            )}
-          </div>
+  const handleRefresh = () => {
+    if (onDelete) {
+      console.log(`[JournalEntryCard] Refreshing entry ${safeEntry.id}`);
+      onDelete(safeEntry.id);
+    }
+  };
 
-          <div className="flex items-center space-x-2">
-            {isMounted && showFloatingDots && (
-              <FloatingDotsToggle 
-                onClick={toggleShowThemes} 
-                isExpanded={showThemes}
-                entry={safeEntry}
-                onDeleteClick={handleDeleteClick}
-              />
-            )}
-          </div>
-        </div>
+  const createdAtFormatted = (() => {
+    try {
+      return formatShortDate(safeEntry.created_at);
+    } catch (error) {
+      console.error('[JournalEntryCard] Error formatting date:', error);
+      return 'Recently';
+    }
+  })();
+  
+  const initialThemes = extractThemes();
+  
+  const isContentProcessing = isProcessing && (!contentLoaded || !safeEntry.content || 
+                                              safeEntry.content === "Processing entry..." ||
+                                              safeEntry.content === "Loading...");
+  
+  const isThemesProcessing = isProcessing && !contentLoaded && 
+                           (!safeEntry.themes || safeEntry.themes.length === 0) && 
+                           (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
 
-        <div className="flex items-center justify-between p-4 border-t">
-          <div className="flex items-center space-x-4">
-            {isMounted && showThumbs && (
-              <>
-                {!isFeedbackGiven ? (
-                  <>
-                    <ThumbsUp 
-                      className="h-5 w-5 hover:text-green-500 cursor-pointer"
-                      onClick={() => handleFeedback('positive')}
-                    />
-                    <ThumbsDown 
-                      className="h-5 w-5 hover:text-red-500 cursor-pointer"
-                      onClick={() => handleFeedback('negative')}
-                    />
-                  </>
-                ) : (
-                  <div className="text-sm text-gray-500">
-                    Feedback given: {feedbackType === 'positive' ? 'Positive' : 'Negative'}
-                  </div>
-                )}
-              </>
-            )}
-          </div>
+  const handleEntryUpdate = (newContent: string) => {
+    console.log(`[JournalEntryCard] Updating entry ${entry.id} with new content: "${newContent.substring(0, 30)}..."`);
+    
+    setEntries(prevEntries => {
+      return prevEntries.map(e => {
+        if (e.id === entry.id) {
+          return {
+            ...e,
+            content: newContent,
+            Edit_Status: 1,
+            sentiment: null,
+            emotions: null,
+            master_themes: [],
+            entities: []
+          };
+        }
+        return e;
+      });
+    });
+    
+    setTimeout(() => {
+      console.log('[JournalEntryCard] Triggering re-fetch for updated analysis data');
+      
+      window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
+        detail: { entryId: entry.id }
+      }));
+      
+      const checkForUpdatedThemes = async () => {
+        try {
+          const { data, error } = await supabase
+            .from('Journal Entries')
+            .select('master_themes, emotions, sentiment, entities')
+            .eq('id', entry.id)
+            .single();
+            
+          if (error) {
+            console.error('[JournalEntryCard] Error fetching updated entry data:', error);
+            return false;
+          }
+          
+          if (data) {
+            if ((data.master_themes && data.master_themes.length > 0) || 
+                (data.emotions && Object.keys(data.emotions).length > 0)) {
+              
+              console.log('[JournalEntryCard] Found updated data for entry:', data);
+              
+              setEntries(prevEntries => {
+                return prevEntries.map(e => {
+                  if (e.id === entry.id) {
+                    let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
+                    
+                    if (data.entities) {
+                      try {
+                        if (Array.isArray(data.entities)) {
+                          parsedEntities = data.entities.map((entity: any) => ({
+                            type: entity.type || 'other',
+                            name: entity.name || '',
+                            text: entity.text
+                          }));
+                        }
+                        else if (typeof data.entities === 'string') {
+                          const parsed = JSON.parse(data.entities);
+                          if (Array.isArray(parsed)) {
+                            parsedEntities = parsed.map((entity: any) => ({
+                              type: entity.type || 'other',
+                              name: entity.name || '',
+                              text: entity.text
+                            }));
+                          }
+                        }
+                        else if (data.entities && typeof data.entities === 'object') {
+                          // Handle case where data.entities is already a JSON object
+                          const entities = Array.isArray(data.entities) ? data.entities : [data.entities];
+                          parsedEntities = entities.map((entity: any) => ({
+                            type: entity.type || 'other',
+                            name: entity.name || '',
+                            text: entity.text
+                          }));
+                        }
+                      } catch (err) {
+                        console.error('[JournalEntryCard] Error parsing entities:', err);
+                        parsedEntities = [];
+                      }
+                    }
+                    
+                    return {
+                      ...e,
+                      master_themes: data.master_themes || [],
+                      themes: data.master_themes || [],
+                      sentiment: data.sentiment,
+                      emotions: data.emotions,
+                      entities: parsedEntities
+                    };
+                  }
+                  return e;
+                });
+              });
+              
+              return true;
+            }
+          }
+          
+          return false;
+        } catch (err) {
+          console.error('[JournalEntryCard] Error in checkForUpdatedThemes:', err);
+          return false;
+        }
+      };
+      
+      let pollingAttempts = 0;
+      const maxPollingAttempts = 10;
+      
+      const pollingInterval = setInterval(async () => {
+        pollingAttempts++;
+        
+        const updated = await checkForUpdatedThemes();
+        
+        if (updated || pollingAttempts >= maxPollingAttempts) {
+          clearInterval(pollingInterval);
+          
+          if (pollingAttempts >= maxPollingAttempts && !updated) {
+            console.warn('[JournalEntryCard] Stopped polling for updated data after max attempts');
+          }
+        }
+      }, 3000);
+    }, 3000);
+  };
 
-          <div className="flex items-center space-x-2">
-            {isMounted && showEditButton && (
-              <EditEntryButton 
-                entryId={safeEntry.id} 
-                content={safeEntry.content}
-                setEntries={setEntries}
-              />
-            )}
-            {isMounted && showReprocessButton && (
-              <ThemeLoader 
-                onClick={handleReprocess} 
-                isLoading={isReprocessing} 
-                title="Reprocess" 
-              />
-            )}
-          </div>
+  if (hasError) {
+    return (
+      <Card className="bg-background shadow-md border-red-300">
+        <div className="p-4">
+          <h3 className="text-red-600">Error displaying entry</h3>
+          <p className="text-sm mt-2">There was a problem showing this entry.</p>
+          <button 
+            className="text-sm mt-2 text-blue-600 underline" 
+            onClick={() => setHasError(false)}
+          >
+            Try again
+          </button>
         </div>
       </Card>
+    );
+  }
 
-      <DeleteEntryDialog 
-        showDeleteDialog={showDeleteDialog}
-        handleCancelDelete={handleCancelDelete}
-        confirmDelete={confirmDelete}
-        isDeleting={isDeleting}
-      />
-    </motion.div>
+  return (
+    <ErrorBoundary>
+      <motion.div
+        initial={isNew ? { borderColor: 'rgba(var(--color-primary), 0.7)' } : {}}
+        animate={highlightNew 
+          ? { 
+              borderColor: ['rgba(var(--color-primary), 0.7)', 'rgba(var(--color-primary), 0)'],
+              boxShadow: ['0 0 15px rgba(var(--color-primary), 0.3)', '0 0 0px rgba(var(--color-primary), 0)']
+            } 
+          : {}}
+        transition={{ duration: 3 }}
+        className="journal-entry-card" 
+        data-entry-id={safeEntry.id}
+        data-processing={isProcessing ? "true" : "false"}
+        data-expanded={isExpanded ? "true" : "false"}
+        data-show-themes={showThemes ? "true" : "false"}
+      >
+        <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''} ${getSentimentBorderClass()}`}>
+          <div className="flex justify-between items-center p-3 md:p-4">
+            <div className="flex items-center space-x-3">
+              <div className="flex flex-col">
+                <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
+                  {createdAtFormatted}
+                </h3>
+                {entry.Edit_Status === 1 && (
+                  <span className="text-xs text-muted-foreground">(edited)</span>
+                )}
+              </div>
+            </div>
+
+            <div className="flex items-center space-x-2">
+              <FloatingDotsToggle 
+                onClick={toggleThemes} 
+                isExpanded={showThemes}
+              />
+              <EditEntryButton 
+                entryId={safeEntry.id}
+                content={safeEntry.content}
+                onEntryUpdated={handleEntryUpdate}
+              />
+              <DeleteEntryDialog onDelete={handleDelete} />
+            </div>
+          </div>
+
+          <div className="p-3 md:p-4">
+            <ErrorBoundary>
+              <EntryContent 
+                content={safeEntry.content} 
+                isExpanded={isExpanded} 
+                isProcessing={isContentProcessing}
+              />
+            </ErrorBoundary>
+            
+            <div className="mt-3 mb-2 flex items-center">
+              <div className="flex space-x-2">
+                <button
+                  onClick={() => handleUserFeedback(1)}
+                  className={`hover:bg-green-100 p-1 rounded-full ${thumbsUp ? 'text-green-600 bg-green-100' : 'text-green-500'}`}
+                  aria-label="Thumbs up for translation"
+                >
+                  <ThumbsUp size={16} />
+                </button>
+                <button
+                  onClick={() => handleUserFeedback(0)}
+                  className={`hover:bg-red-100 p-1 rounded-full ${thumbsDown ? 'text-red-600 bg-red-100' : 'text-red-500'}`}
+                  aria-label="Thumbs down for translation"
+                >
+                  <ThumbsDown size={16} />
+                </button>
+              </div>
+            </div>
+            
+            {showThemes && (
+              <div className="mt-2">
+                <ErrorBoundary>
+                  <ThemeLoader 
+                    entryId={safeEntry.id}
+                    initialThemes={initialThemes}
+                    content={safeEntry.content}
+                    isProcessing={isThemesProcessing}
+                    isNew={isNew}
+                  />
+                </ErrorBoundary>
+              </div>
+            )}
+          </div>
+
+          <div className="flex justify-end p-2">
+            <button
+              onClick={toggleExpanded}
+              className="text-sm text-muted-foreground hover:text-foreground"
+            >
+              {isExpanded ? '' : 'Show more'}
+            </button>
+          </div>
+        </Card>
+      </motion.div>
+    </ErrorBoundary>
   );
 }
+
+export default JournalEntryCard;

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,29 +9,23 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
 import { Loader2 } from 'lucide-react';
 import { reprocessJournalEntry } from '@/services/journalService';
-import { JournalEntry } from '@/types/journal';
 
 interface EditEntryButtonProps {
-  entryId?: number;
-  content?: string;
-  onEntryUpdated?: (newContent: string, isProcessing?: boolean) => void;
-  entry?: JournalEntry;
-  setEntries?: React.Dispatch<React.SetStateAction<any[]>>;
+  entryId: number;
+  content: string;
+  onEntryUpdated: (newContent: string, isProcessing?: boolean) => void;
 }
 
-export function EditEntryButton({ entryId, content, onEntryUpdated, entry, setEntries }: EditEntryButtonProps) {
-  const effectiveEntryId = entryId || entry?.id;
-  const effectiveContent = content || entry?.content || '';
-  
+export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryButtonProps) {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
-  const [editedContent, setEditedContent] = useState(effectiveContent);
+  const [editedContent, setEditedContent] = useState(content);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [updatedInBackground, setUpdatedInBackground] = useState(false);
   const isMobile = useIsMobile();
 
   const handleOpenDialog = () => {
-    setEditedContent(effectiveContent);
+    setEditedContent(content);
     setIsDialogOpen(true);
     setUpdatedInBackground(false);
   };
@@ -44,7 +37,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated, entry, setEn
   };
 
   const handleSaveChanges = async () => {
-    if (!editedContent.trim() || editedContent === effectiveContent || !effectiveEntryId) {
+    if (!editedContent.trim() || editedContent === content) {
       handleCloseDialog();
       return;
     }
@@ -52,70 +45,48 @@ export function EditEntryButton({ entryId, content, onEntryUpdated, entry, setEn
     try {
       setIsSubmitting(true);
       
-      const originalContent = effectiveContent;
+      const originalContent = content;
       const newContent = editedContent;
       
-      if (onEntryUpdated) {
-        onEntryUpdated(newContent, true);
-      }
-      
-      if (setEntries && entry) {
-        setEntries(prevEntries => 
-          prevEntries.map(e => 
-            e.id === effectiveEntryId 
-              ? { ...e, content: newContent, isProcessing: true } 
-              : e
-          )
-        );
-      }
-      
+      // Update UI with processing state IMMEDIATELY but keep dialog open
+      onEntryUpdated(newContent, true);
       setIsProcessing(true);
       
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
           "refined text": newContent,
-          "transcription text": newContent,
+          "transcription text": newContent, // Also update the transcription text to ensure we see the difference
           "Edit_Status": 1
         })
-        .eq('id', effectiveEntryId);
+        .eq('id', entryId);
         
       if (updateError) {
         console.error("Error updating entry:", updateError);
         toast.error(`Failed to update entry: ${updateError.message}`);
-        
-        if (onEntryUpdated) {
-          onEntryUpdated(originalContent, false);
-        }
-        
-        if (setEntries && entry) {
-          setEntries(prevEntries => 
-            prevEntries.map(e => 
-              e.id === effectiveEntryId 
-                ? { ...e, content: originalContent, isProcessing: false } 
-                : e
-            )
-          );
-        }
-        
+        onEntryUpdated(originalContent, false);
         setIsProcessing(false);
         setIsSubmitting(false);
         return;
       }
 
+      // Set updated flag and keep dialog open briefly
       setUpdatedInBackground(true);
       
       try {
-        const success = await reprocessJournalEntry(effectiveEntryId);
+        // Use the reprocessJournalEntry function to trigger all necessary processing
+        const success = await reprocessJournalEntry(entryId);
         
         if (!success) {
-          console.error('Reprocessing failed for entry:', effectiveEntryId);
+          console.error('Reprocessing failed for entry:', entryId);
           toast.error('Entry saved but analysis failed');
         }
         
-        const minProcessingTime = 1000;
+        // Ensure minimum processing time for UX consistency
+        const minProcessingTime = 1000; // 1 second minimum
         await new Promise(resolve => setTimeout(resolve, minProcessingTime));
         
+        // Close dialog and update UI
         setIsDialogOpen(false);
         setIsSubmitting(false);
         setIsProcessing(false);
@@ -184,7 +155,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated, entry, setEn
             ) : (
               <Button 
                 onClick={handleSaveChanges}
-                disabled={!editedContent.trim() || editedContent === effectiveContent}
+                disabled={!editedContent.trim() || editedContent === content}
                 className="rounded-full"
               >
                 Save Changes

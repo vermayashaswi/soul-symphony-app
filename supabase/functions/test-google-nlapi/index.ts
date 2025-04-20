@@ -36,8 +36,8 @@ serve(async (req) => {
     
     console.log("Performing Google NL API test...");
     
-    // Simple test with a sample text that should generate different emotions
-    const sampleText = "I'm feeling great today. This is wonderful! However, I was quite sad yesterday when I lost my keys, it was frustrating.";
+    // Simple test with a sample text
+    const sampleText = "This is a test of the Google Natural Language API. I feel happy today!";
     
     // Try to call the API
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${googleApiKey}`, {
@@ -80,10 +80,6 @@ serve(async (req) => {
     
     const result = await response.json();
     
-    // Test the sentiment specifically to see if we're getting non-zero values
-    const sentimentScore = result.documentSentiment?.score || 0;
-    const sentimentMagnitude = result.documentSentiment?.magnitude || 0;
-    
     return new Response(
       JSON.stringify({
         success: true,
@@ -97,10 +93,7 @@ serve(async (req) => {
           sentences: result.sentences?.map((s: any) => ({
             text: s.text.content,
             sentiment: s.sentiment
-          })),
-          sentimentScoreIsZero: sentimentScore === 0,
-          sentimentMagnitudeIsZero: sentimentMagnitude === 0,
-          sampleText
+          }))
         }
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }

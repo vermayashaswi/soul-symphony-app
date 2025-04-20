@@ -16,30 +16,12 @@ import { toast } from 'sonner';
 
 interface DeleteEntryDialogProps {
   entryId?: number;
-  onDelete?: () => Promise<void>;
-  showDeleteDialog?: boolean;
-  handleCancelDelete?: () => void;
-  confirmDelete?: () => Promise<void>;
-  isDeleting?: boolean;
+  onDelete: () => Promise<void>;
 }
 
-export function DeleteEntryDialog({ 
-  entryId, 
-  onDelete,
-  showDeleteDialog: externalShowDialog,
-  handleCancelDelete: externalHandleCancel,
-  confirmDelete: externalConfirmDelete,
-  isDeleting: externalIsDeleting
-}: DeleteEntryDialogProps) {
-  // Use either external state if provided or internal state
-  const [internalOpen, setInternalOpen] = useState(false);
-  const [internalIsDeleting, setInternalIsDeleting] = useState(false);
-  
-  // Determine which state to use based on props
-  const isControlled = externalShowDialog !== undefined;
-  const open = isControlled ? externalShowDialog : internalOpen;
-  const isDeleting = isControlled ? (externalIsDeleting || false) : internalIsDeleting;
-  
+export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [isDeleting, setIsDeleting] = useState(false);
   const isMobile = useIsMobile();
   const componentMounted = useRef(true);
   const deleteAttempted = useRef(false);
@@ -52,27 +34,19 @@ export function DeleteEntryDialog({
 
   const handleDelete = async () => {
     try {
-      if (!isControlled) {
-        setInternalIsDeleting(true);
-      }
+      setIsDeleting(true);
       deleteAttempted.current = true;
       
       // First close the dialog to prevent further user interactions
-      if (!isControlled) {
-        setInternalOpen(false);
-      }
+      setOpen(false);
       
       // Call the delete handler
-      if (externalConfirmDelete) {
-        await externalConfirmDelete();
-      } else if (onDelete) {
-        await onDelete();
-      }
+      await onDelete();
     } catch (error) {
       console.error('[DeleteEntryDialog] Error deleting entry:', error);
-      // Only update state if component is still mounted and we control our own state
-      if (componentMounted.current && !isControlled) {
-        setInternalIsDeleting(false);
+      // Only update state if component is still mounted
+      if (componentMounted.current) {
+        setIsDeleting(false);
       }
     }
   };
@@ -85,13 +59,8 @@ export function DeleteEntryDialog({
       if (!newOpenState && !deleteAttempted.current && isDeleting === false) {
         console.log('[DeleteEntryDialog] Dialog closed without deletion');
       }
-      
-      // Update state based on control mode
-      if (isControlled && externalHandleCancel && !newOpenState) {
-        externalHandleCancel();
-      } else if (!isControlled) {
-        setInternalOpen(newOpenState);
-      }
+      // Always update the open state
+      setOpen(newOpenState);
       
       // Reset the delete attempted flag when dialog opens
       if (newOpenState) {
@@ -116,18 +85,7 @@ export function DeleteEntryDialog({
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex flex-row justify-end space-x-2 mt-4">
-          <Button 
-            type="button" 
-            variant="secondary" 
-            onClick={() => {
-              if (isControlled && externalHandleCancel) {
-                externalHandleCancel();
-              } else {
-                handleDialogChange(false);
-              }
-            }} 
-            disabled={isDeleting}
-          >
+          <Button type="button" variant="secondary" onClick={() => handleDialogChange(false)} disabled={isDeleting}>
             Cancel
           </Button>
           <Button 
