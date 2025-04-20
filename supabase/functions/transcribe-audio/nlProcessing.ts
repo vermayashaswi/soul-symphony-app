@@ -130,7 +130,8 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
     // Process and format entities from entity analysis response
     const formattedEntities = entityResult.entities?.map(entity => ({
       type: mapEntityType(entity.type),
-      name: entity.name
+      name: entity.name,
+      text: entity.mentions?.[0]?.text?.content || entity.name
     })) || [];
     
     // Remove duplicate entities

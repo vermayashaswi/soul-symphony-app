@@ -68,11 +68,14 @@ serve(async (req) => {
     }
 
     // Regular sentiment analysis logic...
-    const { text } = requestData;
+    const { text, entryId } = requestData;
     
     if (!text) {
       throw new Error("No text provided for analysis");
     }
+    
+    console.log(`Processing text for sentiment analysis${entryId ? ` (Entry ID: ${entryId})` : ''}:`, 
+              text.length > 100 ? text.slice(0, 100) + '...' : text);
     
     // Get the Google Natural Language API key directly from environment
     const apiKey = Deno.env.get('GOOGLE_API');
@@ -81,7 +84,7 @@ serve(async (req) => {
       throw new Error("Google API key is not configured");
     }
     
-    console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
+    console.log('Analyzing sentiment using Google NL API...');
     
     // Call the Google Natural Language API specifically for sentiment analysis
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${apiKey}`, {
@@ -138,6 +141,30 @@ serve(async (req) => {
     }
     
     console.log('Sentiment category:', sentimentCategory);
+    
+    // If an entry ID was provided, update the entry directly
+    if (entryId && Deno.env.get('SUPABASE_URL') && Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')) {
+      try {
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+        
+        console.log(`Updating sentiment directly for entry ID: ${entryId}`);
+        
+        const { error: updateError } = await supabase
+          .from('Journal Entries')
+          .update({ sentiment: sentimentScore })
+          .eq('id', entryId);
+          
+        if (updateError) {
+          console.error('Error updating sentiment in database:', updateError);
+        } else {
+          console.log(`Successfully updated sentiment for entry ID: ${entryId}`);
+        }
+      } catch (updateError) {
+        console.error('Error updating entry sentiment:', updateError);
+      }
+    }
     
     return new Response(
       JSON.stringify({ 

@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -9,6 +8,7 @@ import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
 import { Loader2 } from 'lucide-react';
+import { reprocessJournalEntry } from '@/services/journalService';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -57,11 +57,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         .update({ 
           "refined text": newContent,
           "transcription text": newContent, // Also update the transcription text to ensure we see the difference
-          "Edit_Status": 1,
-          "sentiment": "0",
-          "emotions": { "Neutral": 0.5 },
-          "master_themes": ["Processing"],
-          "entities": []
+          "Edit_Status": 1
         })
         .eq('id', entryId);
         
@@ -78,7 +74,13 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       setUpdatedInBackground(true);
       
       try {
-        await triggerFullTextProcessing(entryId);
+        // Use the reprocessJournalEntry function to trigger all necessary processing
+        const success = await reprocessJournalEntry(entryId);
+        
+        if (!success) {
+          console.error('Reprocessing failed for entry:', entryId);
+          toast.error('Entry saved but analysis failed');
+        }
         
         // Ensure minimum processing time for UX consistency
         const minProcessingTime = 1000; // 1 second minimum

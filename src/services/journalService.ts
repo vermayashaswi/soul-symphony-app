@@ -248,12 +248,66 @@ export const reprocessJournalEntry = async (entryId: number): Promise<boolean> =
       return false;
     }
     
-    // Trigger processing with the text
-    // Now using the fully qualified import path to avoid name conflicts
-    const { triggerFullTextProcessing } = await import('@/utils/audio/theme-extractor');
-    await triggerFullTextProcessing(entryId);
+    // First, let's update sentiment using the analyze-sentiment function
+    try {
+      console.log('[JournalService] Calling analyze-sentiment for entry:', entryId);
+      const { data: sentimentData, error: sentimentError } = await supabase.functions.invoke('analyze-sentiment', {
+        body: { text: textToProcess }
+      });
+      
+      if (sentimentError) {
+        console.error('[JournalService] Error analyzing sentiment:', sentimentError);
+      } else if (sentimentData && sentimentData.sentiment) {
+        console.log('[JournalService] Sentiment analysis result:', sentimentData);
+        
+        // Update the entry with the sentiment score
+        const { error: updateSentimentError } = await supabase
+          .from('Journal Entries')
+          .update({ 
+            sentiment: sentimentData.sentiment 
+          })
+          .eq('id', entryId);
+          
+        if (updateSentimentError) {
+          console.error('[JournalService] Error updating sentiment in database:', updateSentimentError);
+        } else {
+          console.log('[JournalService] Updated sentiment for entry:', entryId);
+        }
+      }
+    } catch (sentimentErr) {
+      console.error('[JournalService] Error in sentiment analysis process:', sentimentErr);
+    }
     
-    console.log('[JournalService] Successfully triggered reprocessing for entry:', entryId);
+    // Now, extract entities using batch-extract-entities function
+    try {
+      console.log('[JournalService] Calling batch-extract-entities for entry:', entryId);
+      const { data: entitiesData, error: entitiesError } = await supabase.functions.invoke('batch-extract-entities', {
+        body: { 
+          entryIds: [entryId],
+          diagnosticMode: true
+        }
+      });
+      
+      if (entitiesError) {
+        console.error('[JournalService] Error extracting entities:', entitiesError);
+      } else {
+        console.log('[JournalService] Entity extraction result:', entitiesData);
+      }
+    } catch (entitiesErr) {
+      console.error('[JournalService] Error in entity extraction process:', entitiesErr);
+    }
+    
+    // Now trigger theme extraction
+    try {
+      // Use the fully qualified import path to avoid name conflicts
+      const { triggerFullTextProcessing } = await import('@/utils/audio/theme-extractor');
+      await triggerFullTextProcessing(entryId);
+      console.log('[JournalService] Successfully triggered theme extraction for entry:', entryId);
+    } catch (themeErr) {
+      console.error('[JournalService] Error triggering theme extraction:', themeErr);
+    }
+    
+    console.log('[JournalService] Reprocessing complete for entry:', entryId);
     return true;
   } catch (error: any) {
     console.error('[JournalService] Error reprocessing journal entry:', error);
