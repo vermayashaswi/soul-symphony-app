@@ -134,7 +134,10 @@ export function EmotionChart({
         return dataPoint;
       })
       .sort((a, b) => {
-        const dateA = new Date(a.day); const dateB = new Date(b.day);
+        const [aMonth, aDay] = a.day.split(' ');
+        const [bMonth, bDay] = b.day.split(' ');
+        const dateA = new Date(`${aMonth} ${aDay}`);
+        const dateB = new Date(`${bMonth} ${bDay}`);
         return dateA.getTime() - dateB.getTime();
       });
     // Always select all for multi-emotion line
