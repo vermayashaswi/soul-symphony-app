@@ -213,6 +213,12 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         enableSleeping: false,
         gravity: { x: 0, y: 0, scale: 0 }
       });
+      
+      // Increase collision iterations for better separation
+      engine.constraintIterations = 6;
+      engine.positionIterations = 6;
+      engine.velocityIterations = 6;
+      
       engineRef.current = engine;
       worldRef.current = engine.world;
       
@@ -294,7 +300,12 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
                 lineWidth: 0
               },
               density: 0.001 * (1 + Math.random() * 0.2),
-              label: item.name // Add label for identification
+              label: item.name, // Add label for identification
+              collisionFilter: {
+                group: 0,
+                category: 0x0002,
+                mask: 0xFFFFFFFF
+              }
             }
           );
           

@@ -2,6 +2,7 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import { useTheme } from '@/hooks/use-theme';
 
 interface EmotionBubbleDetailProps {
   name: string;
@@ -24,6 +25,7 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
 }) => {
   // Font size is now constant, 2px smaller than the "Trend" text in Mood Calendar
   const fontSize = '14px';
+  const { colorTheme } = useTheme();
   
   return (
     <motion.div
@@ -32,10 +34,14 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
         isDragging ? "cursor-grabbing" : "cursor-pointer"
       )}
       onClick={() => onClick(name)}
+      style={{
+        backgroundColor: `hsl(var(--primary))`,
+        color: `hsl(var(--primary-foreground))`
+      }}
       animate={{
         scale: isHighlighted ? 1.1 : 1,
         boxShadow: isHighlighted 
-          ? `0 0 20px 3px rgba(139, 92, 246, 0.5)` 
+          ? `0 0 20px 3px rgba(var(--theme-color-rgb), 0.5)` 
           : isDragging 
             ? `0 4px 8px rgba(0, 0, 0, 0.2)` 
             : `0 2px 4px rgba(0, 0, 0, 0.1)`
