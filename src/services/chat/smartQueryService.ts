@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
 
@@ -131,7 +132,7 @@ export async function processAndSaveSmartQuery(
       
       return {
         success: false,
-        userMessage: savedUserMsg,
+        userMessage: savedUserMsg as ChatMessage,
         error: errorMsg
       };
     }
@@ -159,8 +160,8 @@ export async function processAndSaveSmartQuery(
     
     return {
       success: true,
-      userMessage: savedUserMsg,
-      assistantMessage: savedAssistantMsg
+      userMessage: savedUserMsg as ChatMessage,
+      assistantMessage: savedAssistantMsg as ChatMessage
     };
   } catch (error: any) {
     console.error('[SmartQueryService] Error in processAndSaveSmartQuery:', error);

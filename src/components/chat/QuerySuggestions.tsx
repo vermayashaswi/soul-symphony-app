@@ -19,7 +19,7 @@ const QuerySuggestions: React.FC<QuerySuggestionsProps> = ({ onSuggestionClick, 
     <div className="absolute bottom-full mb-2 left-0 w-full max-w-md bg-white border rounded shadow-lg z-50 p-3">
       <div className="flex justify-between items-center mb-2">
         <h4 className="font-semibold text-sm">Query Suggestions</h4>
-        <Button variant="ghost" size="xs" onClick={onClose}>Close</Button>
+        <Button variant="ghost" size="sm" onClick={onClose}>Close</Button>
       </div>
       <ul className="space-y-1">
         {suggestions.map((suggestion, i) => (
