@@ -135,6 +135,12 @@ export function EmotionChart({
     if (initialRenderRef.current) {
       console.log('[EmotionChart] Initial render, forcing bubble update');
       setBubbleKey(prev => prev + 1);
+      
+      setTimeout(() => {
+        setBubbleKey(prev => prev + 1);
+        console.log('[EmotionChart] Forced additional bubble update after timeout');
+      }, 100);
+      
       initialRenderRef.current = false;
     }
   }, []);
@@ -149,7 +155,12 @@ export function EmotionChart({
       hasData: aggregatedData ? Object.keys(aggregatedData).length > 0 : false,
       bubbleDataSize: Object.keys(bubbleData).length
     });
+    
     setBubbleKey(prev => prev + 1);
+    
+    setTimeout(() => {
+      setBubbleKey(prev => prev + 1);
+    }, 50);
   }, [timeframe, aggregatedData, bubbleData]);
 
   const handleEmotionClick = (emotion: string) => {

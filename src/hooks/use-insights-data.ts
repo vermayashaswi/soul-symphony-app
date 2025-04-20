@@ -324,92 +324,94 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
     return null;
   }
   
-  const sortedEntries = [...allEntries].sort((a, b) => 
+  const currentEntries = [...timeRangeEntries].sort((a, b) => 
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
   );
   
-  const initialEmotionValues: Record<string, number> = {};
+  const earliestTimeRangeDate = new Date(
+    Math.min(...timeRangeEntries.map(entry => new Date(entry.created_at).getTime()))
+  );
   
-  const currentEmotionAverages: Record<string, { total: number, count: number }> = {};
+  const previousEntries = allEntries.filter(entry => 
+    new Date(entry.created_at) < earliestTimeRangeDate
+  );
   
-  for (const entry of sortedEntries) {
+  if (previousEntries.length === 0) {
+    if (currentEntries.length < 4) {
+      return {
+        emotion: currentEntries.length > 0 ? 'Peaceful' : 'Content',
+        percentage: 24
+      };
+    }
+    
+    const midpoint = Math.floor(currentEntries.length / 2);
+    const firstHalf = currentEntries.slice(0, midpoint);
+    const secondHalf = currentEntries.slice(midpoint);
+    
+    return calculateEmotionChanges(firstHalf, secondHalf);
+  }
+  
+  return calculateEmotionChanges(previousEntries, currentEntries);
+};
+
+function calculateEmotionChanges(previousEntries: any[], currentEntries: any[]): BiggestImprovement {
+  const previousEmotions: Record<string, { total: number, count: number }> = {};
+  const currentEmotions: Record<string, { total: number, count: number }> = {};
+  
+  for (const entry of previousEntries) {
     if (entry.emotions) {
       try {
         const emotions = typeof entry.emotions === 'string' 
           ? JSON.parse(entry.emotions) 
           : entry.emotions;
         
-        if (emotions && typeof emotions === 'object') {
-          Object.entries(emotions).forEach(([emotion, score]) => {
-            if (emotion.toLowerCase() === 'id' || 
-                emotion.toLowerCase() === 'intensity' || 
-                emotion.toLowerCase() === 'name' ||
-                /^\d+$/.test(emotion) || 
-                emotion.length < 2) {
-              return;
-            }
-            
-            const emotionKey = emotion.toLowerCase();
-            if (!(emotionKey in initialEmotionValues)) {
-              initialEmotionValues[emotionKey] = Number(score);
-            }
-          });
-        }
+        processEmotionsForEntry(emotions, previousEmotions);
       } catch (e) {
-        console.error('Error parsing emotions for initial values:', e);
+        console.error('Error parsing emotions for previous entries:', e);
       }
     }
   }
   
-  for (const entry of timeRangeEntries) {
+  for (const entry of currentEntries) {
     if (entry.emotions) {
       try {
         const emotions = typeof entry.emotions === 'string' 
           ? JSON.parse(entry.emotions) 
           : entry.emotions;
         
-        if (emotions && typeof emotions === 'object') {
-          Object.entries(emotions).forEach(([emotion, score]) => {
-            if (emotion.toLowerCase() === 'id' || 
-                emotion.toLowerCase() === 'intensity' || 
-                emotion.toLowerCase() === 'name' ||
-                /^\d+$/.test(emotion) || 
-                emotion.length < 2) {
-              return;
-            }
-            
-            const emotionKey = emotion.toLowerCase();
-            if (!currentEmotionAverages[emotionKey]) {
-              currentEmotionAverages[emotionKey] = { total: 0, count: 0 };
-            }
-            currentEmotionAverages[emotionKey].total += Number(score);
-            currentEmotionAverages[emotionKey].count += 1;
-          });
-        }
+        processEmotionsForEntry(emotions, currentEmotions);
       } catch (e) {
-        console.error('Error parsing emotions for current averages:', e);
+        console.error('Error parsing emotions for current entries:', e);
       }
     }
   }
   
   const emotionChanges: Array<{emotion: string, percentage: number}> = [];
   
-  Object.keys(initialEmotionValues).forEach(emotion => {
-    if (currentEmotionAverages[emotion] && currentEmotionAverages[emotion].count > 0) {
-      const initialValue = initialEmotionValues[emotion];
-      const currentAverage = currentEmotionAverages[emotion].total / currentEmotionAverages[emotion].count;
-      
-      if (initialValue === 0) return;
-      
-      const percentageChange = ((currentAverage - initialValue) / initialValue) * 100;
-      
-      const displayEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1);
-      
-      emotionChanges.push({
-        emotion: displayEmotion,
-        percentage: Math.round(percentageChange)
-      });
+  Object.keys({...previousEmotions, ...currentEmotions}).forEach(emotion => {
+    const prevAvg = previousEmotions[emotion] 
+      ? previousEmotions[emotion].total / previousEmotions[emotion].count 
+      : 0;
+    
+    const currAvg = currentEmotions[emotion] 
+      ? currentEmotions[emotion].total / currentEmotions[emotion].count 
+      : 0;
+    
+    if (prevAvg === 0 && currAvg === 0) return;
+    
+    let percentageChange = 0;
+    if (prevAvg === 0 && currAvg > 0) {
+      percentageChange = 100; // New emotion appeared
+    } else if (prevAvg > 0) {
+      percentageChange = ((currAvg - prevAvg) / prevAvg) * 100;
     }
+    
+    const displayEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1);
+    
+    emotionChanges.push({
+      emotion: displayEmotion,
+      percentage: Math.round(percentageChange)
+    });
   });
   
   emotionChanges.sort((a, b) => Math.abs(b.percentage) - Math.abs(a.percentage));
@@ -418,13 +420,49 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
     return emotionChanges[0];
   }
   
-  console.log('No emotion changes found, returning default');
-  
   return {
-    emotion: timeRangeEntries.length > 0 ? 'Peaceful' : 'Content',
+    emotion: currentEntries.length > 0 ? 'Peaceful' : 'Content',
     percentage: 24
   };
-};
+}
+
+function processEmotionsForEntry(emotions: any, emotionMap: Record<string, { total: number, count: number }>) {
+  if (!emotions || typeof emotions !== 'object') return;
+  
+  if (Array.isArray(emotions.emotions)) {
+    emotions.emotions.forEach((emotion: any) => {
+      if (emotion && emotion.name && emotion.intensity) {
+        const emotionKey = emotion.name.toLowerCase();
+        if (!emotionMap[emotionKey]) {
+          emotionMap[emotionKey] = { total: 0, count: 0 };
+        }
+        emotionMap[emotionKey].total += emotion.intensity;
+        emotionMap[emotionKey].count += 1;
+      }
+    });
+    return;
+  }
+  
+  Object.entries(emotions).forEach(([emotion, score]) => {
+    if (emotion.toLowerCase() === 'id' || 
+        emotion.toLowerCase() === 'intensity' || 
+        emotion.toLowerCase() === 'name' ||
+        /^\d+$/.test(emotion) || 
+        emotion.length < 2) {
+      return;
+    }
+    
+    const emotionValue = Number(score);
+    if (!isNaN(emotionValue)) {
+      const emotionKey = emotion.toLowerCase();
+      if (!emotionMap[emotionKey]) {
+        emotionMap[emotionKey] = { total: 0, count: 0 };
+      }
+      emotionMap[emotionKey].total += emotionValue;
+      emotionMap[emotionKey].count += 1;
+    }
+  });
+}
 
 const calculateJournalActivity = (entries: any[], timeRange: TimeRange): JournalActivity => {
   const entryCount = entries.length;

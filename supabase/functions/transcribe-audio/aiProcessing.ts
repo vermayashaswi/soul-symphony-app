@@ -1,4 +1,3 @@
-
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob,
   fileExtension: string,
@@ -206,7 +205,7 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
     console.log("[AI] Starting text refinement:", text.substring(0, 100) + "...");
     console.log("[AI] Detected languages:", detectedLanguages);
     
-    // Remove skip condition - ALL text must be processed
+    // IMPORTANT: Remove skip condition - ALL text MUST be processed
     const languageList = detectedLanguages.join(', ');
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -320,4 +319,3 @@ async function makeSecondAttempt(text: string, apiKey: string): Promise<{ refine
     return { refinedText: text.trim() + (text.trim().endsWith('.') ? '' : '.') };
   }
 }
-

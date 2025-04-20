@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -253,6 +254,18 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       audioDuration: (audioBlob as any).duration || 'unknown'
     });
     
+    // Force multiple custom event dispatches immediately to ensure loading state appears
+    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+      detail: { entries: updatedEntries, lastUpdate: Date.now(), forceUpdate: true }
+    }));
+    
+    // Also dispatch after a small delay - iOS needs this redundancy
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { entries: updatedEntries, lastUpdate: Date.now() + 1, forceUpdate: true }
+      }));
+    }, 50);
+    
     // Launch the processing without awaiting it
     console.log('[AudioProcessing] Launching background processing');
     processRecordingInBackground(audioBlob, userId, tempId)
@@ -275,18 +288,6 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
     
     // Return immediately with the temp ID
     console.log('[AudioProcessing] Returning success with tempId:', tempId);
-    
-    // Force multiple custom event dispatches to ensure UI updates - critical for iOS
-    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-      detail: { entries: updatedEntries, lastUpdate: Date.now(), forceUpdate: true }
-    }));
-    
-    // Also dispatch after a small delay - iOS needs this redundancy
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries: updatedEntries, lastUpdate: Date.now() + 1, forceUpdate: true }
-      }));
-    }, 100);
     
     return { success: true, tempId };
   } catch (error: any) {
