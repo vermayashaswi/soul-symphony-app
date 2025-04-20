@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -28,21 +27,17 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const isMobile = useIsMobile();
   
-  // Process the data for both views
   const processedData = React.useMemo(() => {
     if (!sentimentData || sentimentData.length === 0) return [];
 
-    // Group by date and average sentiment for each day
     const dateMap = new Map<string, { total: number; count: number }>();
     
     sentimentData.forEach(point => {
-      // Validate the date
       if (!point.date || !isValid(new Date(point.date))) {
         console.warn('Invalid date in sentiment data:', point);
         return;
       }
 
-      // Validate the sentiment
       const sentimentValue = typeof point.sentiment === 'number' 
         ? point.sentiment 
         : typeof point.sentiment === 'string' 
@@ -65,12 +60,10 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
       existing.count += 1;
     });
     
-    // Convert to array of data points
     return Array.from(dateMap.entries()).map(([date, data]) => ({
       date,
       formattedDate: format(parseISO(date), 'MMM d'),
       sentiment: data.total / data.count,
-      // Categorize the sentiment
       category: (data.total / data.count) >= 0.3 
         ? 'positive' 
         : (data.total / data.count) >= -0.1 
@@ -79,26 +72,23 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     })).sort((a, b) => a.date.localeCompare(b.date));
   }, [sentimentData]);
 
-  // Get color based on sentiment category
   const getSentimentColor = (category: string): string => {
     switch (category) {
-      case 'positive': return '#4ade80'; // green-400
-      case 'neutral': return '#facc15';  // yellow-400
-      case 'negative': return '#ef4444'; // red-500
-      default: return '#94a3b8';         // slate-400
+      case 'positive': return '#4ade80';
+      case 'neutral': return '#facc15';
+      case 'negative': return '#ef4444';
+      default: return '#94a3b8';
     }
   };
 
-  // Generate days for the current month calendar view
   const calendarDays = React.useMemo(() => {
     if (timeRange === 'month') {
       const startDate = startOfMonth(currentDate);
       const endDate = endOfMonth(currentDate);
       return eachDayOfInterval({ start: startDate, end: endDate });
     } else if (timeRange === 'week') {
-      // For week view, return the 7 days of the current week
       const startDate = new Date(currentDate);
-      startDate.setDate(currentDate.getDate() - currentDate.getDay()); // Start from Sunday
+      startDate.setDate(currentDate.getDate() - currentDate.getDay());
       const days = [];
       for (let i = 0; i < 7; i++) {
         const day = new Date(startDate);
@@ -107,15 +97,13 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
       }
       return days;
     } else if (timeRange === 'today') {
-      return [currentDate]; // Just today
+      return [currentDate];
     } else if (timeRange === 'year') {
-      // For year view, we'll handle it differently
       return [];
     }
     return [];
   }, [currentDate, timeRange]);
 
-  // Get months for year view
   const yearMonths = React.useMemo(() => {
     if (timeRange === 'year') {
       const startDate = startOfYear(currentDate);
@@ -125,7 +113,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     return [];
   }, [currentDate, timeRange]);
 
-  // Custom Tooltip for charts
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -143,7 +130,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     return null;
   };
 
-  // Navigation functions
   const navigatePrevious = () => {
     setCurrentDate(prev => {
       switch (timeRange) {
@@ -182,18 +168,15 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     });
   };
 
-  // Get sentiment for a specific date
   const getSentimentForDate = (date: Date) => {
     const dateString = format(date, 'yyyy-MM-dd');
     return processedData.find(d => d.date === dateString);
   };
 
-  // Reset to current period when timeRange changes
   React.useEffect(() => {
     setCurrentDate(new Date());
   }, [timeRange]);
 
-  // Render title based on current time range and date
   const renderTimeTitle = () => {
     switch (timeRange) {
       case 'today':
@@ -213,41 +196,34 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     }
   };
 
-  // Render the year view grid
   const renderYearGrid = () => {
     const year = currentDate.getFullYear();
     const days = Array.from({ length: 31 }, (_, i) => i + 1);
     
     return (
       <div className="w-full overflow-x-auto">
-        <div className="min-w-[900px]">
-          <div className="grid grid-cols-[auto_repeat(12,1fr)] gap-1">
-            {/* Corner cell */}
-            <div className="p-1 text-right font-medium text-xs text-muted-foreground">Day</div>
+        <div className="min-w-[800px]">
+          <div className="grid grid-cols-[auto_repeat(12,1fr)] gap-0.5">
+            <div className="p-0.5 text-right font-medium text-xs text-muted-foreground">Day</div>
             
-            {/* Month headers */}
             {yearMonths.map((month, idx) => (
-              <div key={idx} className="p-1 text-center text-xs font-medium text-muted-foreground">
+              <div key={idx} className="p-0.5 text-center text-xs font-medium text-muted-foreground">
                 {format(month, 'MMM')}
               </div>
             ))}
             
-            {/* Day rows */}
             {days.map(day => (
               <React.Fragment key={day}>
-                {/* Day number */}
-                <div className="p-1 text-right text-xs font-medium text-muted-foreground">
+                <div className="p-0.5 text-right text-xs font-medium text-muted-foreground">
                   {day}
                 </div>
                 
-                {/* Month cells */}
                 {yearMonths.map((month, monthIdx) => {
-                  // Check if this day exists in this month
                   const date = new Date(year, monthIdx, day);
                   const isValidDate = date.getDate() === day;
                   
                   if (!isValidDate) {
-                    return <div key={monthIdx} className="aspect-square"></div>;
+                    return <div key={monthIdx} className="h-4 w-4"></div>;
                   }
                   
                   const sentimentData = getSentimentForDate(date);
@@ -257,7 +233,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
                     <div 
                       key={monthIdx}
                       className={cn(
-                        "aspect-square flex items-center justify-center rounded-full text-[0.6rem]",
+                        "h-4 w-4 flex items-center justify-center rounded-full text-[0.5rem]",
                         isToday && "ring-1 ring-primary",
                         !sentimentData && "opacity-20"
                       )}
@@ -353,7 +329,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
                       <div 
                         key={day.toString()} 
                         className={cn(
-                          "relative aspect-square flex items-center justify-center rounded-full text-xs",
+                          "aspect-square flex items-center justify-center rounded-full text-xs",
                           isToday && "ring-2 ring-primary ring-offset-1",
                         )}
                       >
@@ -400,7 +376,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
                 </div>
               </div>
             ) : (
-              // Today view - just show one big circle
               <div className="flex flex-col items-center justify-center py-4">
                 <div className="text-sm text-muted-foreground mb-2">
                   Today's Mood
