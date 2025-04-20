@@ -62,6 +62,20 @@ export const createUserProfile = async (userId: string): Promise<boolean> => {
 };
 
 /**
+ * Type guard to check if an object has specific properties
+ */
+const hasNameAndIntensity = (obj: any): obj is { name: string; intensity: number } => {
+  return obj && typeof obj === 'object' && 'name' in obj && 'intensity' in obj;
+};
+
+/**
+ * Type guard for entity objects
+ */
+const isEntityObject = (obj: any): obj is { type: string; name: string; text?: string } => {
+  return obj && typeof obj === 'object' && 'type' in obj && 'name' in obj;
+};
+
+/**
  * Fetches journal entries for a user
  */
 export const fetchJournalEntries = async (
@@ -117,17 +131,41 @@ export const fetchJournalEntries = async (
     
     const typedEntries: JournalEntry[] = (data || []).map(item => {
       // Convert emotions if needed
-      let convertedEmotions = item.emotions;
+      let convertedEmotions: Record<string, number> = {};
       
-      // Check if emotions are in the array format and convert to the object format
-      if (Array.isArray(item.emotions)) {
-        console.log('[JournalService] Converting emotions from array to object format');
-        convertedEmotions = {};
-        item.emotions.forEach(emotion => {
-          if (emotion && emotion.name && emotion.intensity) {
-            convertedEmotions[emotion.name.toLowerCase()] = emotion.intensity;
-          }
-        });
+      if (item.emotions) {
+        if (Array.isArray(item.emotions)) {
+          console.log('[JournalService] Converting emotions from array to object format');
+          
+          // Handle array format
+          item.emotions.forEach(emotion => {
+            if (hasNameAndIntensity(emotion)) {
+              convertedEmotions[emotion.name.toLowerCase()] = emotion.intensity;
+            } else if (typeof emotion === 'object' && emotion !== null) {
+              // Try to extract name and intensity if available
+              const name = 'name' in emotion ? String(emotion.name) : null;
+              const intensity = 'intensity' in emotion ? Number(emotion.intensity) : null;
+              
+              if (name && intensity !== null) {
+                convertedEmotions[name.toLowerCase()] = intensity;
+              }
+            }
+          });
+        } 
+        else if (typeof item.emotions === 'object' && !Array.isArray(item.emotions)) {
+          // If emotions is already in object format {joy: 0.7, sadness: 0.5}
+          convertedEmotions = Object.entries(item.emotions).reduce((acc, [key, value]) => {
+            if (typeof value === 'number') {
+              acc[key.toLowerCase()] = value;
+            } else if (typeof value === 'string') {
+              const numValue = parseFloat(value);
+              if (!isNaN(numValue)) {
+                acc[key.toLowerCase()] = numValue;
+              }
+            }
+            return acc;
+          }, {} as Record<string, number>);
+        }
       }
       
       // Parse entities
@@ -135,16 +173,26 @@ export const fetchJournalEntries = async (
       if (item.entities) {
         try {
           if (Array.isArray(item.entities)) {
-            parsedEntities = item.entities.map(entity => ({
-              type: entity.type || 'other',
-              name: entity.name || '',
-              text: entity.text
-            }));
+            // Process array of entity objects
+            parsedEntities = item.entities
+              .filter(isEntityObject)
+              .map(entity => ({
+                type: entity.type,
+                name: entity.name,
+                text: entity.text
+              }));
           }
           else if (typeof item.entities === 'string') {
+            // Parse JSON string
             const parsed = JSON.parse(item.entities);
             if (Array.isArray(parsed)) {
-              parsedEntities = parsed;
+              parsedEntities = parsed
+                .filter(isEntityObject)
+                .map(entity => ({
+                  type: entity.type,
+                  name: entity.name,
+                  text: entity.text
+                }));
             }
           }
         } catch (err) {
