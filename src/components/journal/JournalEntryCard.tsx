@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -66,12 +67,17 @@ export function JournalEntryCard({
   const [showThumbs, setShowThumbs] = useState(true);
   const [showFloatingDots, setShowFloatingDots] = useState(true);
   const [isEntryContentMounted, setIsEntryContentMounted] = useState(false);
+  const [showThemes, setShowThemes] = useState(false);
   
   const contentRef = useRef<HTMLDivElement>(null);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
   const toggleShowFullContent = () => {
     setShowFullContent(!showFullContent);
+  };
+
+  const toggleShowThemes = () => {
+    setShowThemes(!showThemes);
   };
 
   const containerVariants = {
@@ -243,6 +249,7 @@ export function JournalEntryCard({
               setShowScrollbar={setShowScrollbar}
               isEntryContentMounted={isEntryContentMounted}
               setIsEntryContentMounted={setIsEntryContentMounted}
+              isProcessing={isProcessing}
             />
             {safeEntry.duration && (
               <div className="mt-2 text-xs text-gray-500">
@@ -261,7 +268,12 @@ export function JournalEntryCard({
 
           <div className="flex items-center space-x-2">
             {isMounted && showFloatingDots && (
-              <FloatingDotsToggle onDeleteClick={handleDeleteClick} entry={safeEntry} />
+              <FloatingDotsToggle 
+                onClick={toggleShowThemes} 
+                isExpanded={showThemes}
+                entry={safeEntry}
+                onDeleteClick={handleDeleteClick}
+              />
             )}
           </div>
         </div>
@@ -292,7 +304,11 @@ export function JournalEntryCard({
 
           <div className="flex items-center space-x-2">
             {isMounted && showEditButton && (
-              <EditEntryButton entry={safeEntry} setEntries={setEntries} />
+              <EditEntryButton 
+                entryId={safeEntry.id} 
+                content={safeEntry.content}
+                setEntries={setEntries}
+              />
             )}
             {isMounted && showReprocessButton && (
               <ThemeLoader 

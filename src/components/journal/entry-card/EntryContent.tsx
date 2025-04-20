@@ -6,11 +6,25 @@ import { useDebugLog } from '@/utils/debug/DebugContext';
 
 interface EntryContentProps {
   content: string;
-  isExpanded: boolean;
+  showFullContent: boolean;
   isProcessing?: boolean;
+  contentRef?: React.RefObject<HTMLDivElement>;
+  scrollContainerRef?: React.RefObject<HTMLDivElement>;
+  setShowScrollbar?: React.Dispatch<React.SetStateAction<boolean>>;
+  isEntryContentMounted?: boolean;
+  setIsEntryContentMounted?: React.Dispatch<React.SetStateAction<boolean>>;
 }
 
-export function EntryContent({ content, isExpanded, isProcessing = false }: EntryContentProps) {
+export function EntryContent({ 
+  content, 
+  showFullContent, 
+  isProcessing = false,
+  contentRef,
+  scrollContainerRef,
+  setShowScrollbar,
+  isEntryContentMounted,
+  setIsEntryContentMounted
+}: EntryContentProps) {
   const { addEvent } = useDebugLog();
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
@@ -49,37 +63,54 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     addEvent('EntryContent', 'State update', 'info', {
       contentLength: content?.length || 0,
       isProcessing,
-      isExpanded,
+      isExpanded: showFullContent,
       showLoading,
       contentEmpty: contentIsLoading,
       forceLoading
     });
     
-  }, [content, isProcessing, addEvent, forceLoading]);
-  // Removed isExpanded from dependencies as it shouldn't affect loader visibility
+    // Notify parent component that content is mounted if callback exists
+    if (setIsEntryContentMounted) {
+      setIsEntryContentMounted(true);
+    }
+    
+  }, [content, isProcessing, addEvent, forceLoading, showFullContent, setIsEntryContentMounted]);
+
+  useEffect(() => {
+    // Update scrollbar visibility when content or expanded state changes if we have refs
+    if (contentRef?.current && setShowScrollbar) {
+      const scrollHeight = contentRef.current.scrollHeight;
+      const clientHeight = contentRef.current.clientHeight;
+      setShowScrollbar(scrollHeight > clientHeight);
+    }
+  }, [showFullContent, isEntryContentMounted, contentRef, setShowScrollbar]);
 
   return (
     <AnimatePresence mode="wait" initial={false}>
       {(showLoading || forceLoading) ? (
         <LoadingEntryContent key="loading" />
-      ) : isExpanded ? (
+      ) : showFullContent ? (
         <motion.div
           key="expanded"
-          initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+          initial={{ opacity: 0.7 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+          exit={{ opacity: 0.7 }}
           transition={{ duration: 0.2 }}
+          ref={contentRef as React.RefObject<HTMLDivElement>}
         >
-          <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
+          <div ref={scrollContainerRef as React.RefObject<HTMLDivElement>}>
+            <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
+          </div>
         </motion.div>
       ) : (
         <motion.p
           key="collapsed" 
           className="text-xs md:text-sm text-foreground line-clamp-3"
-          initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+          initial={{ opacity: 0.7 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+          exit={{ opacity: 0.7 }}
           transition={{ duration: 0.2 }}
+          ref={contentRef as React.RefObject<HTMLDivElement>}
         >
           {stableContent}
         </motion.p>
