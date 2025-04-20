@@ -10,7 +10,7 @@ export interface JournalEntry {
   audio_url?: string;
   duration?: number;
   emotions?: Json;
-  sentiment?: string;
+  sentiment?: string | number;
   entities?: Array<{
     type: string;
     name: string;

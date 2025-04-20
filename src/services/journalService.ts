@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 
 /**
  * Checks if a user profile exists
@@ -204,15 +204,22 @@ export const fetchJournalEntries = async (
       }
       
       // Parse sentiment - ensure it's a number
-      let parsedSentiment = 0;
+      let parsedSentiment: string | number = 0;
       if (item.sentiment !== null && item.sentiment !== undefined) {
         if (typeof item.sentiment === 'number') {
           parsedSentiment = item.sentiment;
         } else if (typeof item.sentiment === 'string') {
           try {
-            parsedSentiment = parseFloat(item.sentiment);
+            // Try to parse as number but keep as string if it's the original format
+            const numValue = parseFloat(item.sentiment);
+            if (!isNaN(numValue)) {
+              parsedSentiment = numValue;
+            } else {
+              parsedSentiment = item.sentiment;
+            }
           } catch (err) {
             console.error(`[JournalService] Error parsing sentiment for entry ${item.id}:`, err);
+            parsedSentiment = item.sentiment; // Keep original value
           }
         }
       }
