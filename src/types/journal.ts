@@ -26,4 +26,10 @@ export interface JournalEntryFormData extends JournalEntry {
   text?: string;
 }
 
+export interface MoodDataPoint {
+  date: Date;
+  sentiment: number;
+  category?: 'positive' | 'neutral' | 'negative';
+}
+
 export { type Json } from '@/integrations/supabase/types';
