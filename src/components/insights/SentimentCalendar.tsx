@@ -1,10 +1,13 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
-import { format, parseISO, isValid } from 'date-fns';
-import { Bar, BarChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
-import { CalendarIcon } from 'lucide-react';
+import { format, parseISO, isValid, startOfMonth, endOfMonth, eachDayOfInterval, isSameDay } from 'date-fns';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface SentimentDataPoint {
   date: Date;
@@ -17,7 +20,11 @@ interface SentimentCalendarProps {
 }
 
 const SentimentCalendar = ({ sentimentData, timeRange }: SentimentCalendarProps) => {
-  // Process the data for the chart
+  const [selectedView, setSelectedView] = useState<'calendar' | 'chart'>('calendar');
+  const [currentMonth, setCurrentMonth] = useState<Date>(new Date());
+  const isMobile = useIsMobile();
+  
+  // Process the data for both views
   const processedData = React.useMemo(() => {
     if (!sentimentData || sentimentData.length === 0) return [];
 
@@ -78,6 +85,15 @@ const SentimentCalendar = ({ sentimentData, timeRange }: SentimentCalendarProps)
     }
   };
 
+  // Generate days for the current month calendar view
+  const calendarDays = React.useMemo(() => {
+    const startDate = startOfMonth(currentMonth);
+    const endDate = endOfMonth(currentMonth);
+    
+    return eachDayOfInterval({ start: startDate, end: endDate });
+  }, [currentMonth]);
+
+  // Custom Tooltip for charts
   const CustomTooltip = ({ active, payload }: any) => {
     if (active && payload && payload.length) {
       const data = payload[0].payload;
@@ -95,6 +111,28 @@ const SentimentCalendar = ({ sentimentData, timeRange }: SentimentCalendarProps)
     return null;
   };
 
+  // Navigate to previous month
+  const goToPreviousMonth = () => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev.getFullYear(), prev.getMonth() - 1, 1);
+      return newDate;
+    });
+  };
+
+  // Navigate to next month
+  const goToNextMonth = () => {
+    setCurrentMonth(prev => {
+      const newDate = new Date(prev.getFullYear(), prev.getMonth() + 1, 1);
+      return newDate;
+    });
+  };
+
+  // Get sentiment for a specific date
+  const getSentimentForDate = (date: Date) => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    return processedData.find(d => d.date === dateString);
+  };
+
   return (
     <Card className="rounded-xl border shadow-sm">
       <CardHeader className="pb-2">
@@ -105,6 +143,13 @@ const SentimentCalendar = ({ sentimentData, timeRange }: SentimentCalendarProps)
               <span>Sentiment Calendar</span>
             </div>
           </CardTitle>
+          
+          <Tabs value={selectedView} onValueChange={(v) => setSelectedView(v as 'calendar' | 'chart')} className="ml-auto">
+            <TabsList className="h-8">
+              <TabsTrigger value="calendar" className="h-7 px-3 text-xs">Calendar</TabsTrigger>
+              <TabsTrigger value="chart" className="h-7 px-3 text-xs">Trend</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
       </CardHeader>
       
@@ -113,10 +158,85 @@ const SentimentCalendar = ({ sentimentData, timeRange }: SentimentCalendarProps)
           <div className="h-[250px] flex items-center justify-center">
             <p className="text-muted-foreground">No sentiment data available for this period</p>
           </div>
+        ) : selectedView === 'calendar' ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <button 
+                onClick={goToPreviousMonth}
+                className="p-1 rounded-full hover:bg-secondary"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              
+              <h3 className="font-medium">
+                {format(currentMonth, 'MMMM yyyy')}
+              </h3>
+              
+              <button 
+                onClick={goToNextMonth}
+                className="p-1 rounded-full hover:bg-secondary"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+              {['Su', 'Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa'].map((day) => (
+                <div key={day} className="py-1">{day}</div>
+              ))}
+            </div>
+            
+            <div className="grid grid-cols-7 gap-1">
+              {Array.from({ length: new Date(currentMonth.getFullYear(), currentMonth.getMonth(), 1).getDay() }).map((_, i) => (
+                <div key={`empty-${i}`} className="aspect-square" />
+              ))}
+              
+              {calendarDays.map((day) => {
+                const sentimentData = getSentimentForDate(day);
+                const isToday = isSameDay(day, new Date());
+                
+                return (
+                  <div 
+                    key={day.toString()} 
+                    className={cn(
+                      "relative aspect-square flex items-center justify-center rounded-full text-xs font-medium",
+                      isToday && "ring-2 ring-primary ring-offset-2",
+                      !sentimentData && "hover:bg-secondary/50 cursor-pointer"
+                    )}
+                    style={{
+                      backgroundColor: sentimentData ? getSentimentColor(sentimentData.category) + '40' : undefined,
+                      color: sentimentData ? getSentimentColor(sentimentData.category) : undefined
+                    }}
+                    title={sentimentData ? `Sentiment: ${sentimentData.sentiment.toFixed(2)}` : 'No data'}
+                  >
+                    {day.getDate()}
+                    {sentimentData && (
+                      <div className="absolute bottom-0 left-1/2 transform -translate-x-1/2 w-1 h-1 rounded-full bg-current" />
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+            
+            <div className="flex justify-center items-center gap-4 text-xs text-muted-foreground pt-2">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-red-500/40" />
+                <span>Negative</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-yellow-400/40" />
+                <span>Neutral</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-green-400/40" />
+                <span>Positive</span>
+              </div>
+            </div>
+          </div>
         ) : (
           <div className="h-[250px] w-full">
             <ResponsiveContainer width="100%" height="100%">
-              <BarChart data={processedData} margin={{ top: 5, right: 0, left: -20, bottom: 5 }}>
+              <LineChart data={processedData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
                 <XAxis 
                   dataKey="formattedDate" 
                   scale="point" 
@@ -130,17 +250,16 @@ const SentimentCalendar = ({ sentimentData, timeRange }: SentimentCalendarProps)
                   tickFormatter={(value) => value.toFixed(1)}
                 />
                 <Tooltip content={<CustomTooltip />} />
-                <Bar 
+                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
+                <Line 
+                  type="monotone"
                   dataKey="sentiment" 
-                  radius={[4, 4, 0, 0]}
-                  barSize={timeRange === 'year' ? 4 : 20}
-                  fill="#8b5cf6"
-                  name="Sentiment"
-                  fillOpacity={0.8}
-                  strokeWidth={1}
                   stroke="#8b5cf6"
+                  strokeWidth={2}
+                  dot={{ stroke: '#8b5cf6', strokeWidth: 2, r: 4, fill: 'white' }}
+                  activeDot={{ r: 6, fill: '#8b5cf6' }}
                 />
-              </BarChart>
+              </LineChart>
             </ResponsiveContainer>
           </div>
         )}

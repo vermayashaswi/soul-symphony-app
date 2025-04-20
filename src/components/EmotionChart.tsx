@@ -1,4 +1,4 @@
-import { useState, useMemo, useEffect } from 'react';
+import { useState, useMemo, useEffect, useRef } from 'react';
 import { 
   LineChart, 
   Line, 
@@ -96,6 +96,7 @@ export function EmotionChart({
   } | null>(null);
   const { theme } = useTheme();
   const isMobile = useIsMobile();
+  const initialRenderRef = useRef(true);
   
   const chartTypes = [
     { id: 'line', label: 'Line' },
@@ -129,6 +130,14 @@ export function EmotionChart({
     
     return emotionScores;
   }, [aggregatedData, timeframe]);
+  
+  useEffect(() => {
+    if (initialRenderRef.current) {
+      console.log('[EmotionChart] Initial render, forcing bubble update');
+      setBubbleKey(prev => prev + 1);
+      initialRenderRef.current = false;
+    }
+  }, []);
   
   useEffect(() => {
     setBubbleKey(prev => prev + 1);
