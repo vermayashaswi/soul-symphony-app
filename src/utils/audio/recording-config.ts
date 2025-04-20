@@ -11,7 +11,7 @@ export function getAudioConfig() {
   
   const baseConfig = {
     echoCancellation: true,
-    noiseSuppression: true,
+    noiseSuppression: false, // Changed from true to false
     autoGainControl: true,
   };
 
@@ -28,7 +28,7 @@ export function getAudioConfig() {
   // Android and other platforms
   return {
     ...baseConfig,
-    sampleRate: 48000, // Higher sample rate for better quality on Android
+    sampleRate: 48000,
     sampleSize: 16,
     channelCount: 1,
     mimeType: 'audio/webm',
@@ -38,7 +38,7 @@ export function getAudioConfig() {
 export function getRecorderOptions(platform: 'ios' | 'android' | 'web' = 'web') {
   const baseOptions = {
     type: 'audio',
-    recorderType: null, // Will be set by RecordRTC
+    recorderType: null,
     timeSlice: 1000,
     checkForInactiveTracks: true,
     disableLogs: false,
@@ -52,6 +52,7 @@ export function getRecorderOptions(platform: 'ios' | 'android' | 'web' = 'web') 
         numberOfAudioChannels: 1,
         desiredSampRate: 44100,
         audioBitsPerSecond: 128000,
+        noiseSuppression: false, // Added explicit noise suppression setting
       };
     case 'android':
       return {
@@ -59,7 +60,8 @@ export function getRecorderOptions(platform: 'ios' | 'android' | 'web' = 'web') 
         mimeType: 'audio/webm',
         numberOfAudioChannels: 1,
         desiredSampRate: 48000,
-        audioBitsPerSecond: 192000, // Higher bitrate for Android
+        audioBitsPerSecond: 192000,
+        noiseSuppression: false, // Added explicit noise suppression setting
       };
     default:
       return {
@@ -68,6 +70,7 @@ export function getRecorderOptions(platform: 'ios' | 'android' | 'web' = 'web') 
         numberOfAudioChannels: 1,
         desiredSampRate: 48000,
         audioBitsPerSecond: 192000,
+        noiseSuppression: false, // Added explicit noise suppression setting
       };
   }
 }
