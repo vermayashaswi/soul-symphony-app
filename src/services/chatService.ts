@@ -342,89 +342,139 @@ export const processChatMessage = async (
       });
     }
     
-    // Call the Supabase Edge Function with fixed vector search parameters
-    const { data, error } = await supabase.functions.invoke('chat-with-rag', {
-      body: {
-        message,
-        userId,
-        queryTypes: queryTypes || {},
-        threadId, // Ensure threadId is passed for maintaining conversational context
-        includeDiagnostics: enableDiagnostics,
-        vectorSearch: {
-          matchThreshold,
-          matchCount
-        },
-        isEmotionQuery,
-        isWhyEmotionQuery,
-        isTimePatternQuery,
-        isTemporalQuery,
-        requiresTimeAnalysis,
-        timeRange
+    // Define the updated prompt here
+    const prompt = `You are **SOuLO**, a smart, emotionally intelligent assistant that helps users reflect on their mental and emotional well-being through journal data.
+
+The user asked:
+"{query}"
+
+Relevant information has been retrieved from the user’s journal entries, including patterns, emotion trends, sentiment scores, and mentions of people, places, or events.
+
+Your role now is to:
+1. Analyze the information
+2. Identify meaningful insights and emotional patterns
+3. Present a clear, thoughtful, and supportive response
+
+---
+
+**Response Guidelines:**
+
+1. **Tone & Style**
+   - Be warm, grounded, and emotionally aware—like a thoughtful guide.
+   - Avoid being robotic or overly formal. Speak like a calm, smart assistant.
+   - Keep it under **180 words** unless the query is complex.
+
+2. **Balance of Insight**
+   - Blend **quantitative** data (e.g. sentiment trends, recurring entities) with **qualitative** insights (emotional shifts, themes).
+   - Use numbers or frequencies only when they clearly support an insight.
+
+3. **Structure**
+   - Use **bullet points or short sections** when needed for readability.
+   - Avoid referencing **all** journal entries—mention specific ones **only if they directly support the answer.**
+   - If no useful data is found, acknowledge that honestly and suggest what the user might explore next.
+
+4. **Personalization & Sensitivity**
+   - Tailor responses to the question.
+   - Be objective and kind—especially when discussing sensitive topics or relationships.
+   - Don’t speculate or assume beyond what's in the journal data.
+
+---
+
+Now generate a clear, emotionally intelligent, insight-driven response to the user's question:`;
+
+    // Prepare the messages array with system prompt and conversation context
+    const messages = [];
+    
+    // Add system prompt with dynamic query insertion
+    messages.push({ role: 'system', content: prompt.replace('{query}', message) });
+    
+    // Add conversation context if available
+    if (conversationContext.length > 0) {
+      // Log that we're using conversation context
+      console.log(`Including ${conversationContext.length} messages of conversation context`);
+      if (enableDiagnostics) {
+        diagnostics.steps.push({
+          name: "Conversation Context", 
+          status: "success",
+          details: `Including ${conversationContext.length} previous messages for context`
+        });
       }
-    });
-
-    if (error) {
-      console.error("Edge function error:", error);
-      return {
-        role: "error",
-        content: `I'm having trouble processing your request. Technical details: ${error.message}`,
-        diagnostics: enableDiagnostics ? { 
-          steps: [{ name: "Edge Function Error", status: "error", details: error.message }]
-        } : undefined
-      };
-    }
-
-    if (!data) {
-      console.error("No data returned from edge function");
-      return {
-        role: "error",
-        content: "I'm having trouble retrieving a response. Please try again in a moment.",
-        diagnostics: enableDiagnostics ? { 
-          steps: [{ name: "No Data Returned", status: "error", details: "Empty response from edge function" }]
-        } : undefined
-      };
-    }
-
-    // Handle error responses that come with status 200
-    if (data.error) {
-      console.error("Error in data:", data.error);
-      return {
-        role: "error",
-        content: data.response || `There was an issue retrieving information: ${data.error}`,
-        diagnostics: enableDiagnostics ? data.diagnostics || {
-          steps: [{ name: "Processing Error", status: "error", details: data.error }]
-        } : undefined
-      };
-    }
-
-    // Prepare the response
-    const chatResponse: ChatMessage = {
-      role: "assistant",
-      content: data.response
-    };
-
-    // Include references if available
-    if (data.references && data.references.length > 0) {
-      chatResponse.references = data.references;
-    }
-
-    // Include analysis if available
-    if (data.analysis) {
-      chatResponse.analysis = data.analysis;
-      if (data.analysis.type === 'quantitative_emotion' || 
-          data.analysis.type === 'top_emotions' ||
-          data.analysis.type === 'time_patterns' ||
-          data.analysis.type === 'combined_analysis') {
-        chatResponse.hasNumericResult = true;
-      }
+      
+      // Add the conversation context messages
+      messages.push(...conversationContext);
+      
+      // Add the current user message
+      messages.push({ role: 'user', content: message });
+    } else {
+      // If no context, just use the system prompt
+      console.log("No conversation context available, using only system prompt");
+      messages.push({ role: 'user', content: message });
     }
     
-    // Include diagnostics if enabled
-    if (enableDiagnostics && data.diagnostics) {
-      chatResponse.diagnostics = data.diagnostics;
+    const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages,
+      }),
+    });
+
+    if (!completionResponse.ok) {
+      const error = await completionResponse.text();
+      console.error('Failed to get completion:', error);
+      if (enableDiagnostics) {
+        diagnostics.steps.push({
+          name: "Language Model Processing",
+          status: "error",
+          details: error
+        });
+      }
+      throw new Error('Failed to generate response');
     }
 
-    return chatResponse;
+    const completionData = await completionResponse.json();
+    const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+    console.log("Response generated successfully");
+    if (enableDiagnostics) {
+      diagnostics.steps.push({
+        name: "Language Model Processing",
+        status: "success"
+      });
+    }
+
+    // Process entries to ensure valid dates
+    const processedEntries = entries.map(entry => {
+      // Make sure created_at is a valid date string
+      let createdAt = entry.created_at;
+      if (!createdAt || isNaN(new Date(createdAt).getTime())) {
+        createdAt = new Date().toISOString();
+      }
+      
+      return {
+        id: entry.id,
+        content: entry.content,
+        created_at: createdAt,
+        similarity: entry.similarity || 0
+      };
+    });
+
+    // 5. Return response
+    return {
+      role: "assistant",
+      content: responseContent,
+      references: processedEntries.map(entry => ({
+        id: entry.id,
+        content: entry.content,
+        date: entry.created_at,
+        snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
+        similarity: entry.similarity
+      })),
+      diagnostics: enableDiagnostics ? diagnostics : undefined
+    };
   } catch (error) {
     console.error("Error in processChatMessage:", error);
     return {
