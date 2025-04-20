@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -55,6 +56,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         .from('Journal Entries')
         .update({ 
           "refined text": newContent,
+          "transcription text": newContent, // Also update the transcription text to ensure we see the difference
           "Edit_Status": 1,
           "sentiment": "0",
           "emotions": { "Neutral": 0.5 },

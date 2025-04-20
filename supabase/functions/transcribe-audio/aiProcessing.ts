@@ -1,3 +1,4 @@
+
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob,
   fileExtension: string,
@@ -205,6 +206,12 @@ export async function translateAndRefineText(text: string, apiKey: string, detec
     console.log("[AI] Refining text:", text.substring(0, 100) + "...");
     console.log("[AI] Detected languages:", detectedLanguages);
     
+    // Skip refinement only if text is extremely short (likely an error)
+    if (text.length < 5) {
+      console.warn("[AI] Text too short for refinement, returning original");
+      return { refinedText: text };
+    }
+    
     const languageList = detectedLanguages.join(', ');
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
@@ -228,7 +235,8 @@ Your task is to:
 3. Fix spelling mistakes
 4. Maintain the original tone and meaning
 5. Do not add or remove any information from the original text
-6. Preserve the original meaning and translate as is!`
+6. Preserve the original meaning and translate as is!
+7. ALWAYS make some improvements to the text, even if minor`
           },
           {
             role: "user",
@@ -242,19 +250,69 @@ Your task is to:
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[AI] Refinement API error:", errorText);
-      // Return original text if refinement fails
+      // Make a second attempt with a simpler prompt if first fails
+      console.log("[AI] Making second attempt with simpler prompt");
+      return await makeSecondAttempt(text, apiKey);
+    }
+    
+    const result = await response.json();
+    const refinedText = result.choices[0].message.content;
+    
+    // If the refined text is identical to original, make a second attempt
+    if (refinedText === text) {
+      console.log("[AI] Refined text identical to original, making second attempt");
+      return await makeSecondAttempt(text, apiKey);
+    }
+    
+    console.log("[AI] Text refined successfully, new length:", refinedText.length);
+    console.log("[AI] Original text sample:", text.substring(0, 50));
+    console.log("[AI] Refined text sample:", refinedText.substring(0, 50));
+    
+    return { refinedText };
+  } catch (error) {
+    console.error("[AI] Error in translateAndRefineText:", error);
+    // Try the simpler prompt as fallback
+    return await makeSecondAttempt(text, apiKey);
+  }
+}
+
+// Helper function for a second refinement attempt with simpler prompt
+async function makeSecondAttempt(text: string, apiKey: string): Promise<{ refinedText: string }> {
+  try {
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: 'POST',
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o-mini",
+        messages: [
+          {
+            role: "system",
+            content: "You are a text editor that improves text quality. Fix spelling, grammar, and improve clarity."
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        temperature: 0.2
+      })
+    });
+    
+    if (!response.ok) {
+      console.error("[AI] Second refinement attempt failed");
       return { refinedText: text };
     }
     
     const result = await response.json();
     const refinedText = result.choices[0].message.content;
     
-    console.log("[AI] Text refined successfully, new length:", refinedText.length);
-    
+    console.log("[AI] Second attempt refinement complete");
     return { refinedText };
   } catch (error) {
-    console.error("[AI] Error in translateAndRefineText:", error);
-    // Return original text if refinement fails
+    console.error("[AI] Error in second refinement attempt:", error);
     return { refinedText: text };
   }
 }

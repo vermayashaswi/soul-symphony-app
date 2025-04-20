@@ -38,23 +38,47 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
     if (isRecording) {
       const setupRecording = async () => {
         try {
+          console.log("[VoiceRecordingButton] Starting recording setup");
           const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
           const isAndroid = /Android/.test(navigator.userAgent);
           const platform = isIOS ? 'ios' : (isAndroid ? 'android' : 'web');
           
+          console.log(`[VoiceRecordingButton] Detected platform: ${platform}`);
+          
+          // Get audio configuration based on platform
+          const audioConfig = getAudioConfig();
+          console.log("[VoiceRecordingButton] Audio config:", audioConfig);
+          
+          // Request microphone access
           const mediaStream = await navigator.mediaDevices.getUserMedia({ 
-            audio: getAudioConfig()
+            audio: audioConfig
           });
           
           setStream(mediaStream);
+          console.log("[VoiceRecordingButton] MediaStream obtained successfully");
           
+          // Get recorder options based on platform
           const options = getRecorderOptions(platform);
-          const rtcRecorder = new RecordRTC(mediaStream, options);
+          console.log("[VoiceRecordingButton] Recorder options:", options);
+          
+          // Create and start recorder
+          const rtcRecorder = new RecordRTC(mediaStream, {
+            ...options,
+            type: 'audio',
+            recorderType: StereoAudioRecorder,
+            numberOfAudioChannels: platform === 'ios' ? 1 : 2, // Mono for iOS, stereo for others
+            desiredSampRate: platform === 'ios' ? 44100 : 48000,
+            disableLogs: false
+          });
+          
+          console.log("[VoiceRecordingButton] Starting recorder");
           rtcRecorder.startRecording();
           setRecorder(rtcRecorder);
           
+          // Set recording time limit
           const timeout = setTimeout(() => {
             if (isRecording) {
+              console.log("[VoiceRecordingButton] Maximum recording duration reached");
               toast({
                 title: "Recording limit reached",
                 description: "Maximum recording duration reached (5 minutes)",
@@ -65,6 +89,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           }, RECORDING_LIMITS.MAX_DURATION * 1000);
           
           cleanup = () => {
+            console.log("[VoiceRecordingButton] Cleaning up recording");
             clearTimeout(timeout);
             if (rtcRecorder) {
               rtcRecorder.stopRecording(() => {
@@ -74,7 +99,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
             }
           };
         } catch (error) {
-          console.error("Error recording audio:", error);
+          console.error("[VoiceRecordingButton] Error recording audio:", error);
           toast({
             title: "Recording error",
             description: "Could not access microphone. Check browser permissions.",
@@ -91,8 +116,16 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   
   const handleVoiceRecording = () => {
     if (isRecording && recorder) {
+      console.log("[VoiceRecordingButton] Stopping recording");
       recorder.stopRecording(() => {
         const blob = recorder.getBlob();
+        console.log("[VoiceRecordingButton] Recording stopped, blob size:", blob.size);
+        
+        // Add duration to blob for better processing
+        Object.defineProperty(blob, 'duration', {
+          value: recordingTime
+        });
+        
         onStopRecording(blob);
         
         if (stream) {
@@ -103,6 +136,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
         setRecorder(null);
       });
     } else {
+      console.log("[VoiceRecordingButton] Starting recording");
       onStartRecording();
     }
   };
