@@ -3,6 +3,40 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 
+const EMOTION_EMOJIS: Record<string, string> = {
+  joy: '😊',
+  happiness: '😄',
+  gratitude: '🙏',
+  calm: '😌',
+  anxiety: '😰',
+  sadness: '😢',
+  anger: '😠',
+  fear: '😨',
+  excitement: '🤩',
+  love: '❤️',
+  stress: '😓',
+  surprise: '😲',
+  confusion: '😕',
+  disappointment: '😞',
+  pride: '🦁',
+  shame: '😳',
+  guilt: '😔',
+  hope: '🌟',
+  boredom: '😑',
+  disgust: '🤢',
+  contentment: '😊',
+  trust: '🤝',
+  anticipation: '🤔',
+  pensiveness: '🤔',
+  serenity: '🧘',
+  annoyance: '😤',
+  vigilance: '👀',
+  interest: '🤓',
+  apprehension: '😟',
+  distraction: '🤪',
+  admiration: '🥰'
+};
+
 interface EmotionBubbleDetailProps {
   name: string;
   size: number;
@@ -17,22 +51,18 @@ interface EmotionBubbleDetailProps {
 const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   name,
   size,
-  color,
   isDisturbed = false,
   isDragging = false,
   isHighlighted = false,
-  percentage,
   onClick
 }) => {
-  const fontSize = Math.max(size / 4.5, 12);
-  const backgroundColorClass = color.split(' ')[0];
-  const textColorClass = color.split(' ')[1];
+  const emoji = EMOTION_EMOJIS[name.toLowerCase()] || '🙂';
+  const fontSize = Math.max(size / 2.5, 16); // Increased size ratio for emojis
 
   return (
     <motion.div
       className={cn(
-        "flex items-center justify-center w-full h-full rounded-full relative select-none",
-        backgroundColorClass,
+        "flex items-center justify-center w-full h-full rounded-full relative select-none bg-background/80 backdrop-blur-sm border border-border/50",
         isDragging ? "cursor-grabbing" : "cursor-pointer"
       )}
       onClick={() => onClick(name)}
@@ -52,12 +82,8 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
     >
-      <span className={cn(
-        textColorClass,
-        "font-medium text-center truncate px-2",
-        isHighlighted ? "font-bold" : ""
-      )}>
-        {name}
+      <span role="img" aria-label={name}>
+        {emoji}
       </span>
     </motion.div>
   );

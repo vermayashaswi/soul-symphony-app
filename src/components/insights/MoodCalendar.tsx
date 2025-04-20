@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -8,7 +7,7 @@ import {
   addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks,
   addDays, subDays, getYear, getMonth, getDaysInMonth
 } from 'date-fns';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine } from 'recharts';
+import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, Area } from 'recharts';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
@@ -24,6 +23,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
   const [selectedView, setSelectedView] = useState<'calendar' | 'chart'>('calendar');
   const [currentDate, setCurrentDate] = useState<Date>(new Date());
   const isMobile = useIsMobile();
+  const { theme } = useTheme();
   
   // Reset calendar to current date when timeRange changes
   useEffect(() => {
@@ -119,10 +119,13 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
       return (
         <div className="bg-background border p-2 rounded-md shadow-md">
           <p className="font-medium">{data.formattedDate}</p>
-          <p className="text-sm">
-            Sentiment: <span style={{ color: getSentimentColor(data.category) }}>
-              {data.sentiment.toFixed(2)}
-            </span>
+          <p className="text-sm text-muted-foreground">
+            {data.sentiment >= 0.3 
+              ? 'Positive' 
+              : data.sentiment >= -0.1 
+                ? 'Neutral' 
+                : 'Negative'
+            }
           </p>
         </div>
       );
@@ -246,19 +249,9 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
           style={{
             backgroundColor: sentimentData 
               ? getSentimentColor(sentimentData.category) + '40'
-              : undefined,
-            color: sentimentData 
-              ? getSentimentColor(sentimentData.category)
               : undefined
           }}
-        >
-          <span className="text-sm font-medium">
-            {sentimentData 
-              ? sentimentData.sentiment.toFixed(2)
-              : "No data"
-            }
-          </span>
-        </div>
+        />
       </div>
     );
   };
@@ -298,30 +291,21 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
         style={{
           backgroundColor: sentimentData 
             ? getSentimentColor(sentimentData.category) + '40'
-            : undefined,
-          color: sentimentData 
-            ? getSentimentColor(sentimentData.category)
             : undefined
         }}
         title={sentimentData 
           ? `Sentiment: ${sentimentData.sentiment.toFixed(2)}` 
           : 'No data'
         }
-      >
-        {sentimentData && (
-          <span className="text-xs font-medium">
-            {sentimentData.sentiment.toFixed(1)}
-          </span>
-        )}
-      </div>
+      />
     );
   };
 
   // Render month view
   const renderMonthView = () => {
     const firstDayOfMonth = startOfMonth(currentDate);
-    const firstDayWeekday = firstDayOfMonth.getDay(); // 0 for Sunday
-    const startOffset = firstDayWeekday === 0 ? 6 : firstDayWeekday - 1; // Adjust for Monday start
+    const firstDayWeekday = firstDayOfMonth.getDay();
+    const startOffset = firstDayWeekday === 0 ? 6 : firstDayWeekday - 1;
     
     return (
       <div className="space-y-4">
@@ -344,25 +328,18 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               <div 
                 key={day.toString()} 
                 className={cn(
-                  "relative aspect-square flex items-center justify-center text-xs font-medium",
+                  "relative aspect-square flex items-center justify-center",
                   isToday && "ring-2 ring-primary ring-offset-1"
                 )}
               >
-                <div className="absolute top-1 right-1 text-[10px]">
-                  {format(day, 'd')}
-                </div>
-                
                 <div 
                   className={cn(
-                    "h-7 w-7 rounded-full flex items-center justify-center",
+                    "h-8 w-8 rounded-full flex items-center justify-center text-sm",
                     !sentimentData && "bg-gray-100 dark:bg-gray-800 opacity-30"
                   )}
                   style={{
                     backgroundColor: sentimentData 
                       ? getSentimentColor(sentimentData.category) + '40'
-                      : undefined,
-                    color: sentimentData 
-                      ? getSentimentColor(sentimentData.category)
                       : undefined
                   }}
                   title={sentimentData 
@@ -370,15 +347,130 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
                     : 'No data'
                   }
                 >
-                  {sentimentData && (
-                    <span className="text-[9px]">
-                      {sentimentData.sentiment.toFixed(1)}
-                    </span>
-                  )}
+                  {format(day, 'd')}
                 </div>
               </div>
             );
           })}
+        </div>
+      </div>
+    );
+  };
+
+  const CustomDot = (props: any) => {
+    const { cx, cy, stroke, strokeWidth, r, value } = props;
+    
+    if (value === null) return null;
+    
+    return (
+      <circle 
+        cx={cx} 
+        cy={cy} 
+        r={r} 
+        fill={theme === 'dark' ? '#1e293b' : 'white'} 
+        stroke={stroke} 
+        strokeWidth={strokeWidth} 
+      />
+    );
+  };
+
+  const renderLineChart = () => {
+    if (processedData.length === 0) {
+      return (
+        <div className="flex items-center justify-center h-full">
+          <p className="text-muted-foreground">No data available for this timeframe</p>
+        </div>
+      );
+    }
+    
+    const lineData = processedData.map(item => ({
+      day: item.formattedDate,
+      sentiment: item.sentiment
+    }));
+    
+    return (
+      <div className="flex flex-col h-full">
+        <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
+          <LineChart
+            data={lineData}
+            margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
+          >
+            <defs>
+              <linearGradient id="positiveGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#4ade80" stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="neutralGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#facc15" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#facc15" stopOpacity={0}/>
+              </linearGradient>
+              <linearGradient id="negativeGradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
+                <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+              </linearGradient>
+            </defs>
+
+            <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
+            <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
+            <YAxis 
+              stroke="#888" 
+              fontSize={12} 
+              tickMargin={10} 
+              domain={[-1, 1]} 
+              ticks={[-1, -0.5, 0, 0.5, 1]}
+            />
+            <Tooltip content={<CustomTooltip />} />
+            
+            {/* Colored areas for sentiment ranges */}
+            <Area
+              yAxisId={0}
+              dataKey="sentiment"
+              stroke="none"
+              fill="url(#positiveGradient)"
+              baseValue={0.3}
+              isAnimationActive={false}
+            />
+            <Area
+              yAxisId={0}
+              dataKey="sentiment"
+              stroke="none"
+              fill="url(#neutralGradient)"
+              baseValue={-0.1}
+              isAnimationActive={false}
+            />
+            <Area
+              yAxisId={0}
+              dataKey="sentiment"
+              stroke="none"
+              fill="url(#negativeGradient)"
+              baseValue={-1}
+              isAnimationActive={false}
+            />
+            
+            <Line 
+              type="monotone"
+              dataKey="sentiment"
+              stroke="#8b5cf6"
+              strokeWidth={2}
+              dot={<CustomDot />}
+              activeDot={{ r: 6 }}
+            />
+          </LineChart>
+        </ResponsiveContainer>
+        
+        <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-green-400/40" />
+            <span>Positive</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-yellow-400/40" />
+            <span>Neutral</span>
+          </div>
+          <div className="flex items-center gap-1">
+            <div className="w-3 h-3 rounded-full bg-red-500/40" />
+            <span>Negative</span>
+          </div>
         </div>
       </div>
     );
@@ -458,34 +550,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
             </div>
           </div>
         ) : (
-          <div className="h-[250px] w-full">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={processedData} margin={{ top: 5, right: 5, left: -20, bottom: 5 }}>
-                <XAxis 
-                  dataKey="formattedDate" 
-                  scale="point" 
-                  padding={{ left: 10, right: 10 }}
-                  tick={{ fontSize: 12 }}
-                />
-                <YAxis 
-                  domain={[-1, 1]} 
-                  tickCount={5} 
-                  tick={{ fontSize: 12 }}
-                  tickFormatter={(value) => value.toFixed(1)}
-                />
-                <Tooltip content={<CustomTooltip />} />
-                <ReferenceLine y={0} stroke="#94a3b8" strokeDasharray="3 3" />
-                <Line 
-                  type="monotone"
-                  dataKey="sentiment" 
-                  stroke="#8b5cf6"
-                  strokeWidth={2}
-                  dot={{ stroke: '#8b5cf6', strokeWidth: 2, r: 4, fill: 'white' }}
-                  activeDot={{ r: 6, fill: '#8b5cf6' }}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
+          renderLineChart()
         )}
       </CardContent>
     </Card>
