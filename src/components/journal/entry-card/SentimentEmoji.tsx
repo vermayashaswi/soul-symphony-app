@@ -1,6 +1,7 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Skeleton } from '@/components/ui/skeleton';
+import twemoji from 'twemoji';
 
 interface SentimentEmojiProps {
   sentiment?: string | {
@@ -11,13 +12,26 @@ interface SentimentEmojiProps {
 }
 
 export function SentimentEmoji({ sentiment, isProcessing = false }: SentimentEmojiProps) {
+  const emojiRef = useRef<HTMLSpanElement>(null);
+  
+  useEffect(() => {
+    if (emojiRef.current) {
+      twemoji.parse(emojiRef.current, {
+        folder: 'svg',
+        ext: '.svg',
+        className: 'emoji-svg',
+        size: '72x72'
+      });
+    }
+  }, [sentiment]);
+  
   if (isProcessing) {
     return <Skeleton className="h-8 w-8 rounded-full" />;
   }
 
   // If sentiment is missing or invalid, show a neutral face
   if (!sentiment) {
-    return <span role="img" aria-label="pending sentiment" className="text-2xl text-muted-foreground">⌛</span>;
+    return <span ref={emojiRef} role="img" aria-label="pending sentiment" className="text-2xl text-muted-foreground">⌛</span>;
   }
 
   const getSentimentScore = (): number => {
@@ -42,11 +56,11 @@ export function SentimentEmoji({ sentiment, isProcessing = false }: SentimentEmo
   const score = getSentimentScore();
   
   if (score >= 0.3) {
-    return <span role="img" aria-label="positive sentiment" className="text-2xl" style={{ color: '#4ade80' }}>😊</span>;
+    return <span ref={emojiRef} role="img" aria-label="positive sentiment" className="text-2xl" style={{ color: '#4ade80' }}>😊</span>;
   } else if (score >= -0.1) {
-    return <span role="img" aria-label="neutral sentiment" className="text-2xl" style={{ color: '#facc15' }}>😐</span>;
+    return <span ref={emojiRef} role="img" aria-label="neutral sentiment" className="text-2xl" style={{ color: '#facc15' }}>😐</span>;
   } else {
-    return <span role="img" aria-label="negative sentiment" className="text-2xl" style={{ color: '#ef4444' }}>😔</span>;
+    return <span ref={emojiRef} role="img" aria-label="negative sentiment" className="text-2xl" style={{ color: '#ef4444' }}>😔</span>;
   }
 }
 

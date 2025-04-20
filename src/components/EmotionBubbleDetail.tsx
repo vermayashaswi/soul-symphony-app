@@ -66,8 +66,8 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
       twemoji.parse(emojiRef.current, {
         folder: 'svg',
         ext: '.svg',
-        size: 'svg',
-        className: 'emoji-svg'
+        className: 'emoji-svg',
+        size: '72x72'
       });
     }
   }, [emoji]);
