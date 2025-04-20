@@ -7,6 +7,7 @@ export interface JournalEntry {
   created_at?: string;
   "transcription text"?: string;
   "refined text"?: string;
+  content?: string; // Added to support JournalEntryCard
   audio_url?: string;
   duration?: number;
   emotions?: Json;
@@ -17,7 +18,9 @@ export interface JournalEntry {
     text?: string;
   }>;
   "foreign key"?: string;
+  foreignKey?: string; // Added to support JournalEntryCard
   master_themes?: string[];
+  themes?: string[]; // Added to support JournalEntryCard
   user_feedback?: string | null;
   Edit_Status?: number | null;
 }

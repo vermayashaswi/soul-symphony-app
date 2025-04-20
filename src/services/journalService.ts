@@ -203,7 +203,7 @@ export const fetchJournalEntries = async (
         }
       }
       
-      // Parse sentiment - ensure it's a number
+      // Parse sentiment - ensure it's the correct type
       let parsedSentiment: string | number = 0;
       if (item.sentiment !== null && item.sentiment !== undefined) {
         if (typeof item.sentiment === 'number') {
@@ -233,7 +233,9 @@ export const fetchJournalEntries = async (
         audio_url: item.audio_url,
         sentiment: parsedSentiment,
         themes: item.master_themes,
+        master_themes: item.master_themes,
         foreignKey: item["foreign key"],
+        "foreign key": item["foreign key"],
         entities: parsedEntities,
         emotions: convertedEmotions,
         duration: item.duration,
