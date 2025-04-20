@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -7,11 +8,15 @@ import {
   addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks,
   addDays, subDays, getYear, getMonth, getDaysInMonth
 } from 'date-fns';
-import { ResponsiveContainer, LineChart, Line, XAxis, YAxis, Tooltip, ReferenceLine, Area } from 'recharts';
+import { 
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, 
+  Tooltip, ReferenceLine, Area, CartesianGrid 
+} from 'recharts';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTheme } from '@/hooks/use-theme';
 import { MoodDataPoint } from '@/types/journal';
 
 interface MoodCalendarProps {
