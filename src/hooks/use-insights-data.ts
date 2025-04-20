@@ -259,6 +259,9 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
     }
   });
 
+  // Debug output to check what emotions are being found
+  console.log('Emotion counts:', emotionCounts);
+  
   let dominantEmotion = '';
   let highestScore = 0;
 
