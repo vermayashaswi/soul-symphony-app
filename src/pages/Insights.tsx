@@ -1,10 +1,9 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
-import SentimentCalendar from '@/components/insights/SentimentCalendar';
+import MoodCalendar from '@/components/insights/MoodCalendar';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
@@ -299,7 +298,7 @@ export default function Insights() {
               transition={{ duration: 0.4, delay: 0.4 }}
               className="mb-8"
             >
-              <SentimentCalendar 
+              <MoodCalendar 
                 sentimentData={getSentimentData()}
                 timeRange={timeRange}
               />

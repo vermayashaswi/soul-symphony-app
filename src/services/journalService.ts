@@ -122,6 +122,7 @@ export const fetchJournalEntries = async (
         text: data[0]["refined text"],
         created: data[0].created_at,
         emotions: data[0].emotions,
+        sentiment: data[0].sentiment,
         duration: data[0].duration
       });
     } else {
@@ -167,6 +168,9 @@ export const fetchJournalEntries = async (
         }
       }
       
+      // Log sentiment for debugging
+      console.log(`[JournalService] Entry ${item.id} sentiment:`, item.sentiment);
+      
       // Parse entities
       let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
       if (item.entities) {
@@ -199,12 +203,28 @@ export const fetchJournalEntries = async (
         }
       }
       
+      // Parse sentiment - ensure it's a number
+      let parsedSentiment = 0;
+      if (item.sentiment !== null && item.sentiment !== undefined) {
+        if (typeof item.sentiment === 'number') {
+          parsedSentiment = item.sentiment;
+        } else if (typeof item.sentiment === 'string') {
+          try {
+            parsedSentiment = parseFloat(item.sentiment);
+          } catch (err) {
+            console.error(`[JournalService] Error parsing sentiment for entry ${item.id}:`, err);
+          }
+        }
+      }
+      
+      console.log(`[JournalService] Parsed sentiment for entry ${item.id}:`, parsedSentiment);
+      
       return {
         id: item.id,
         content: item["refined text"] || item["transcription text"] || "",
         created_at: item.created_at,
         audio_url: item.audio_url,
-        sentiment: item.sentiment,
+        sentiment: parsedSentiment,
         themes: item.master_themes,
         foreignKey: item["foreign key"],
         entities: parsedEntities,
@@ -251,7 +271,11 @@ export const reprocessJournalEntry = async (entryId: number): Promise<boolean> =
     try {
       console.log('[JournalService] Calling analyze-sentiment for entry:', entryId);
       const { data: sentimentData, error: sentimentError } = await supabase.functions.invoke('analyze-sentiment', {
-        body: { text: textToProcess, entryId }
+        body: { 
+          text: textToProcess, 
+          entryId,
+          forceUpdate: true // Force update to ensure we get fresh data
+        }
       });
       
       if (sentimentError) {
@@ -273,7 +297,8 @@ export const reprocessJournalEntry = async (entryId: number): Promise<boolean> =
       const { data: entitiesData, error: entitiesError } = await supabase.functions.invoke('batch-extract-entities', {
         body: { 
           entryIds: [entryId],
-          diagnosticMode: true
+          diagnosticMode: true,
+          forceUpdate: true // Force update to ensure we get fresh data
         }
       });
       
@@ -294,6 +319,30 @@ export const reprocessJournalEntry = async (entryId: number): Promise<boolean> =
       console.log('[JournalService] Successfully triggered theme extraction for entry:', entryId);
     } catch (themeErr) {
       console.error('[JournalService] Error triggering theme extraction:', themeErr);
+    }
+    
+    // Manually verify that the entry was updated with new sentiment and entities
+    try {
+      const { data: updatedEntry, error: verifyError } = await supabase
+        .from('Journal Entries')
+        .select('sentiment, entities')
+        .eq('id', entryId)
+        .single();
+        
+      if (verifyError) {
+        console.error('[JournalService] Error verifying entry update:', verifyError);
+      } else {
+        console.log('[JournalService] Verified entry update, new data:', {
+          sentiment: updatedEntry.sentiment,
+          hasEntities: updatedEntry.entities ? 
+            (Array.isArray(updatedEntry.entities) ? 
+              updatedEntry.entities.length > 0 : 
+              updatedEntry.entities !== '[]') : 
+            false
+        });
+      }
+    } catch (verifyErr) {
+      console.error('[JournalService] Error in verification process:', verifyErr);
     }
     
     console.log('[JournalService] Reprocessing complete for entry:', entryId);
