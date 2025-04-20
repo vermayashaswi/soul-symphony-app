@@ -414,7 +414,7 @@ Now generate a clear, emotionally intelligent, insight-driven response to the us
       messages.push({ role: 'user', content: message });
     }
     
-    // Get OpenAI API key from environment or edge function
+    // Get OpenAI API key from edge function
     const apiKey = await getOpenAIKey();
     
     const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {

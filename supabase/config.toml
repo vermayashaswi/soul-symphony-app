@@ -155,3 +155,6 @@ backend = "postgres"
 [functions.smart-query-orchestrator]
 port = 54345
 verify_jwt = true
+
+[functions.get-openai-key]
+verify_jwt = true
