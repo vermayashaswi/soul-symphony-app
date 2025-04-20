@@ -1,4 +1,3 @@
-
 import { useState } from 'react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -66,6 +65,41 @@ const getEmotionColor = (emotion: string, index: number): string => {
   return fallbackColors[index % fallbackColors.length];
 };
 
+const extractEntityNames = (entities: any): string[] => {
+  if (!entities) return [];
+  
+  if (Array.isArray(entities)) {
+    return entities.map(entity => {
+      if (typeof entity === 'string') {
+        return entity;
+      } else if (entity && typeof entity === 'object' && entity.name) {
+        return entity.name;
+      } else if (entity && typeof entity === 'object' && entity.text) {
+        return entity.text;
+      }
+      return '';
+    }).filter(Boolean);
+  }
+  
+  if (typeof entities === 'string') {
+    try {
+      const parsed = JSON.parse(entities);
+      if (Array.isArray(parsed)) {
+        return extractEntityNames(parsed);
+      }
+      return [];
+    } catch (e) {
+      return entities.split(',').map(e => e.trim()).filter(Boolean);
+    }
+  }
+  
+  if (typeof entities === 'object' && entities !== null && !Array.isArray(entities)) {
+    return Object.keys(entities);
+  }
+  
+  return [];
+};
+
 export function EmotionChart({
   className, timeframe = 'week', aggregatedData, entries = []
 }: EmotionChartProps) {
@@ -90,89 +124,50 @@ export function EmotionChart({
 
   const entityCounts = (() => {
     let allEntities: string[] = [];
+    
     if (aggregatedData && Object.values(aggregatedData).length > 0) {
+      console.log("Processing entities from aggregatedData");
       Object.values(aggregatedData).forEach((arr: any) => {
         arr.forEach((point: any) => {
           if (point.entities) {
-            // Handle both array and string formats
-            if (Array.isArray(point.entities)) {
-              point.entities.forEach((entity: any) => {
-                if (typeof entity === 'string') {
-                  allEntities.push(entity);
-                } else if (entity && entity.name) {
-                  allEntities.push(entity.name);
-                }
-              });
-            } else if (typeof point.entities === 'string') {
-              try {
-                const parsedEntities = JSON.parse(point.entities);
-                if (Array.isArray(parsedEntities)) {
-                  parsedEntities.forEach((entity: any) => {
-                    if (typeof entity === 'string') {
-                      allEntities.push(entity);
-                    } else if (entity && entity.name) {
-                      allEntities.push(entity.name);
-                    }
-                  });
-                }
-              } catch (e) {
-                // If parsing fails, try to split by comma (assuming it's a comma-separated string)
-                const entities = point.entities.split(',').map((e: string) => e.trim());
-                allEntities.push(...entities);
-              }
-            }
+            const extractedNames = extractEntityNames(point.entities);
+            allEntities.push(...extractedNames);
           }
         });
       });
     }
     
-    // Also check entries directly if no entities found in aggregatedData
-    if ((!allEntities || allEntities.length === 0) && Array.isArray(entries) && entries.length > 0) {
+    if (allEntities.length === 0 && Array.isArray(entries) && entries.length > 0) {
+      console.log("Processing entities from entries array, count:", entries.length);
       entries.forEach((entry: any) => {
         if (entry.entities) {
-          if (Array.isArray(entry.entities)) {
-            entry.entities.forEach((entity: any) => {
-              if (typeof entity === 'string') {
-                allEntities.push(entity);
-              } else if (entity && entity.name) {
-                allEntities.push(entity.name);
-              }
-            });
-          } else if (typeof entry.entities === 'string') {
-            try {
-              const parsedEntities = JSON.parse(entry.entities);
-              if (Array.isArray(parsedEntities)) {
-                parsedEntities.forEach((entity: any) => {
-                  if (typeof entity === 'string') {
-                    allEntities.push(entity);
-                  } else if (entity && entity.name) {
-                    allEntities.push(entity.name);
-                  }
-                });
-              }
-            } catch (e) {
-              // If parsing fails, split by comma
-              const entities = entry.entities.split(',').map((e: string) => e.trim());
-              allEntities.push(...entities);
-            }
-          }
+          console.log("Entry has entities:", typeof entry.entities, Array.isArray(entry.entities) ? 'array' : 'not array');
+          const extractedNames = extractEntityNames(entry.entities);
+          allEntities.push(...extractedNames);
         }
       });
     }
 
+    console.log("Total entities extracted:", allEntities.length);
+    
     const counts: Record<string, number> = {};
-    allEntities.forEach(e => {
-      if (!e) return;
-      if (typeof e !== 'string') return;
-      const cleaned = e.trim();
-      if (!cleaned) return;
-      counts[cleaned] = (counts[cleaned] || 0) + 1;
+    allEntities.forEach(entity => {
+      if (!entity || typeof entity !== 'string') return;
+      
+      const cleaned = entity.trim();
+      if (cleaned) {
+        counts[cleaned] = (counts[cleaned] || 0) + 1;
+      }
     });
+    
+    console.log("Entity counts:", Object.entries(counts).length);
     
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
   })();
+
+  console.log("Final entity counts for display:", entityCounts);
 
   const handleLegendClick = (emotion: string) => {
     setVisibleEmotions(prev => {
@@ -305,10 +300,17 @@ export function EmotionChart({
       <div className="bg-card p-4 rounded-xl shadow-sm relative min-h-[300px]">
         {chartType === 'line' && renderLineChart()}
         {chartType === 'entities' && (
-          <TopEntitiesList
-            entityCounts={entityCounts}
-            baseColor="#8b5cf6"
-          />
+          <>
+            <TopEntitiesList
+              entityCounts={entityCounts}
+              baseColor="#8b5cf6"
+            />
+            {entityCounts.length === 0 && (
+              <div className="absolute inset-0 flex items-center justify-center">
+                <p className="text-muted-foreground">No entities found for this timeframe</p>
+              </div>
+            )}
+          </>
         )}
       </div>
     </div>
