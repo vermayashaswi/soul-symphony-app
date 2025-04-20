@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -202,7 +203,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     
     return (
       <div className="w-full overflow-x-auto">
-        <div className="min-w-[800px]">
+        <div className="min-w-full">
           <div className="grid grid-cols-[auto_repeat(12,1fr)] gap-0.5">
             <div className="p-0.5 text-right font-medium text-xs text-muted-foreground">Day</div>
             
@@ -223,7 +224,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
                   const isValidDate = date.getDate() === day;
                   
                   if (!isValidDate) {
-                    return <div key={monthIdx} className="h-4 w-4"></div>;
+                    return <div key={monthIdx} className="h-2 w-2"></div>;
                   }
                   
                   const sentimentData = getSentimentForDate(date);
@@ -233,7 +234,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
                     <div 
                       key={monthIdx}
                       className={cn(
-                        "h-4 w-4 flex items-center justify-center rounded-full text-[0.5rem]",
+                        "h-2 w-2 flex items-center justify-center rounded-full text-[0.5rem]",
                         isToday && "ring-1 ring-primary",
                         !sentimentData && "opacity-20"
                       )}
