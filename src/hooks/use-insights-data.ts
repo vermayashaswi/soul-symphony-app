@@ -225,11 +225,21 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
         
         if (emotions && typeof emotions === 'object') {
           Object.entries(emotions).forEach(([emotion, score]) => {
-            if (!emotionCounts[emotion]) {
-              emotionCounts[emotion] = { count: 0, score: 0 };
+            // Important: Normalize the emotion key to handle different formats
+            // Convert keys like "id" to proper emotion names
+            const emotionKey = emotion.toLowerCase();
+            
+            // Skip if emotion is literally "id" or looks like an ID (number or very short)
+            if (emotionKey === 'id' || /^\d+$/.test(emotionKey) || emotionKey.length < 2) {
+              console.log('Skipping invalid emotion key:', emotion);
+              return;
             }
-            emotionCounts[emotion].count += 1;
-            emotionCounts[emotion].score += Number(score);
+            
+            if (!emotionCounts[emotionKey]) {
+              emotionCounts[emotionKey] = { count: 0, score: 0 };
+            }
+            emotionCounts[emotionKey].count += 1;
+            emotionCounts[emotionKey].score += Number(score);
           });
         }
       } catch (e) {
@@ -249,6 +259,9 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
   });
 
   if (!dominantEmotion) return null;
+
+  // Capitalize the first letter of the emotion for display
+  dominantEmotion = dominantEmotion.charAt(0).toUpperCase() + dominantEmotion.slice(1);
 
   const emotionEmojis: Record<string, string> = {
     happy: '😊',
@@ -298,8 +311,14 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
         
         if (emotions && typeof emotions === 'object') {
           Object.entries(emotions).forEach(([emotion, score]) => {
-            if (!(emotion in initialEmotionValues)) {
-              initialEmotionValues[emotion] = Number(score);
+            // Normalize emotion key and skip IDs
+            const emotionKey = emotion.toLowerCase();
+            if (emotionKey === 'id' || /^\d+$/.test(emotionKey) || emotionKey.length < 2) {
+              return;
+            }
+            
+            if (!(emotionKey in initialEmotionValues)) {
+              initialEmotionValues[emotionKey] = Number(score);
             }
           });
         }
@@ -318,11 +337,17 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
         
         if (emotions && typeof emotions === 'object') {
           Object.entries(emotions).forEach(([emotion, score]) => {
-            if (!currentEmotionAverages[emotion]) {
-              currentEmotionAverages[emotion] = { total: 0, count: 0 };
+            // Normalize emotion key and skip IDs
+            const emotionKey = emotion.toLowerCase();
+            if (emotionKey === 'id' || /^\d+$/.test(emotionKey) || emotionKey.length < 2) {
+              return;
             }
-            currentEmotionAverages[emotion].total += Number(score);
-            currentEmotionAverages[emotion].count += 1;
+            
+            if (!currentEmotionAverages[emotionKey]) {
+              currentEmotionAverages[emotionKey] = { total: 0, count: 0 };
+            }
+            currentEmotionAverages[emotionKey].total += Number(score);
+            currentEmotionAverages[emotionKey].count += 1;
           });
         }
       } catch (e) {
@@ -342,8 +367,11 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
       
       const percentageChange = ((currentAverage - initialValue) / initialValue) * 100;
       
+      // Capitalize the first letter of the emotion for display
+      const displayEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1);
+      
       emotionChanges.push({
-        emotion,
+        emotion: displayEmotion,
         percentage: Math.round(percentageChange)
       });
     }
@@ -357,8 +385,9 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
   
   console.log('No emotion changes found, returning default');
   
+  // Default values with proper capitalization
   return {
-    emotion: timeRangeEntries.length > 0 ? 'peaceful' : 'content',
+    emotion: timeRangeEntries.length > 0 ? 'Peaceful' : 'Content',
     percentage: 24
   };
 };
@@ -432,28 +461,37 @@ const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmo
         
         if (emotions && typeof emotions === 'object') {
           Object.entries(emotions).forEach(([emotion, score]) => {
-            if (!emotionData[emotion]) {
-              emotionData[emotion] = [];
+            // Normalize emotion key and skip IDs
+            const emotionKey = emotion.toLowerCase();
+            if (emotionKey === 'id' || /^\d+$/.test(emotionKey) || emotionKey.length < 2) {
+              return;
+            }
+            
+            // Use normalized key but capitalize first letter for display
+            const displayEmotion = emotionKey.charAt(0).toUpperCase() + emotionKey.slice(1);
+            
+            if (!emotionData[displayEmotion]) {
+              emotionData[displayEmotion] = [];
             }
             
             if (!emotionCounts.has(dateStr)) {
               emotionCounts.set(dateStr, new Map());
             }
             const dateEmotionCounts = emotionCounts.get(dateStr)!;
-            if (!dateEmotionCounts.has(emotion)) {
-              dateEmotionCounts.set(emotion, 0);
+            if (!dateEmotionCounts.has(displayEmotion)) {
+              dateEmotionCounts.set(displayEmotion, 0);
             }
-            dateEmotionCounts.set(emotion, dateEmotionCounts.get(emotion)! + 1);
+            dateEmotionCounts.set(displayEmotion, dateEmotionCounts.get(displayEmotion)! + 1);
             
-            const existingPoint = emotionData[emotion].find(point => point.date === dateStr);
+            const existingPoint = emotionData[displayEmotion].find(point => point.date === dateStr);
             
             if (existingPoint) {
               existingPoint.value += Number(score);
             } else {
-              emotionData[emotion].push({
+              emotionData[displayEmotion].push({
                 date: dateStr,
                 value: Number(score),
-                emotion: emotion
+                emotion: displayEmotion
               });
             }
           });
