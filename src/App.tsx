@@ -1,8 +1,8 @@
-
 import React, { useEffect } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
+import './styles/emoji.css';
 
 const App: React.FC = () => {
   useEffect(() => {

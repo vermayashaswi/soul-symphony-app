@@ -1,7 +1,8 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
+import twemoji from 'twemoji';
 
 const EMOTION_EMOJIS: Record<string, string> = {
   joy: '😊',
@@ -56,8 +57,20 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
   isHighlighted = false,
   onClick
 }) => {
+  const emojiRef = useRef<HTMLDivElement>(null);
   const emoji = EMOTION_EMOJIS[name.toLowerCase()] || '🙂';
   const fontSize = Math.max(size / 2.5, 16); // Increased size ratio for emojis
+  
+  useEffect(() => {
+    if (emojiRef.current) {
+      twemoji.parse(emojiRef.current, {
+        folder: 'svg',
+        ext: '.svg',
+        size: 'svg',
+        className: 'emoji-svg'
+      });
+    }
+  }, [emoji]);
 
   return (
     <motion.div
@@ -82,9 +95,14 @@ const EmotionBubbleDetail: React.FC<EmotionBubbleDetailProps> = ({
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
     >
-      <span role="img" aria-label={name}>
+      <div 
+        ref={emojiRef} 
+        role="img" 
+        aria-label={name}
+        className="emoji-container"
+      >
         {emoji}
-      </span>
+      </div>
     </motion.div>
   );
 };
