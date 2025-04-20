@@ -1,8 +1,9 @@
+
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob,
   fileExtension: string,
   apiKey: string,
-  language: string = 'en'
+  language: string = 'auto'  // Changed default to 'auto' instead of hardcoded 'en'
 ): Promise<{ text: string, detectedLanguages: string[] }> {
   try {
     // Log incoming audio details for debugging
@@ -41,10 +42,11 @@ export async function transcribeAudioWithWhisper(
     const formData = new FormData();
     formData.append('file', audioBlob, filename);
     formData.append('model', 'gpt-4o-transcribe');  // Using full gpt-4o-transcribe model
-    // Important: Don't set language to 'auto', remove it if it's 'auto'
-    if (language !== 'auto') {
-      formData.append('language', language);
-    }
+    
+    // Don't set language parameter at all to allow automatic detection
+    // This is the key change - we're not setting a language parameter now
+    // The API will auto-detect the language
+    
     formData.append('response_format', 'json');
     formData.append('prompt', 'The following is a journal entry or conversation that may contain personal thoughts, feelings, or experiences.');
     
@@ -53,7 +55,8 @@ export async function transcribeAudioWithWhisper(
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: 'gpt-4o-transcribe'
+      model: 'gpt-4o-transcribe',
+      autoLanguageDetection: true
     });
     
     // Add timeout to prevent hanging requests
@@ -94,7 +97,7 @@ export async function transcribeAudioWithWhisper(
       });
       
       // Extract detected languages from the response
-      const detectedLanguages = result.language ? [result.language] : ['en'];
+      const detectedLanguages = result.language ? [result.language] : ['auto'];
       
       return {
         text: result.text,

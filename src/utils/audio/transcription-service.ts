@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from '@/utils/audio/blob-utils';
 
@@ -73,7 +72,8 @@ export async function sendAudioForTranscription(
           sampleRate: 44100,
           channels: 1,
           bitDepth: 16
-        }
+        },
+        autoDetectLanguage: true  // Added explicit flag for auto language detection
       }
     });
 
