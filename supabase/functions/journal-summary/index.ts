@@ -55,12 +55,37 @@ serve(async (req) => {
     // Process entities from all entries
     const entitiesMap = new Map();
     entries.forEach(entry => {
-      if (entry.entities && Array.isArray(entry.entities)) {
-        entry.entities.forEach(entity => {
-          if (entity && entity.name) {
-            const key = entity.name.toLowerCase();
+      if (entry.entities) {
+        // Handle different formats of entities
+        let entityList = [];
+        
+        if (Array.isArray(entry.entities)) {
+          entityList = entry.entities;
+        } else if (typeof entry.entities === 'string') {
+          try {
+            entityList = JSON.parse(entry.entities);
+          } catch (e) {
+            entityList = entry.entities.split(',').map(e => e.trim());
+          }
+        } else if (typeof entry.entities === 'object') {
+          entityList = [entry.entities];
+        }
+        
+        entityList.forEach(entity => {
+          let entityName = '';
+          if (typeof entity === 'string') {
+            entityName = entity.trim();
+          } else if (entity && entity.name) {
+            entityName = entity.name.trim();
+          }
+          
+          if (entityName) {
+            const key = entityName.toLowerCase();
             if (!entitiesMap.has(key)) {
-              entitiesMap.set(key, { count: 0, type: entity.type });
+              entitiesMap.set(key, { 
+                count: 0, 
+                type: (entity && entity.type) ? entity.type : 'unknown' 
+              });
             }
             entitiesMap.get(key).count += 1;
           }

@@ -1,3 +1,4 @@
+
 import { useState } from 'react';
 import { 
   LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer 
@@ -92,17 +93,73 @@ export function EmotionChart({
     if (aggregatedData && Object.values(aggregatedData).length > 0) {
       Object.values(aggregatedData).forEach((arr: any) => {
         arr.forEach((point: any) => {
-          if (point.entities && Array.isArray(point.entities)) allEntities.push(...point.entities);
+          if (point.entities) {
+            // Handle both array and string formats
+            if (Array.isArray(point.entities)) {
+              point.entities.forEach((entity: any) => {
+                if (typeof entity === 'string') {
+                  allEntities.push(entity);
+                } else if (entity && entity.name) {
+                  allEntities.push(entity.name);
+                }
+              });
+            } else if (typeof point.entities === 'string') {
+              try {
+                const parsedEntities = JSON.parse(point.entities);
+                if (Array.isArray(parsedEntities)) {
+                  parsedEntities.forEach((entity: any) => {
+                    if (typeof entity === 'string') {
+                      allEntities.push(entity);
+                    } else if (entity && entity.name) {
+                      allEntities.push(entity.name);
+                    }
+                  });
+                }
+              } catch (e) {
+                // If parsing fails, try to split by comma (assuming it's a comma-separated string)
+                const entities = point.entities.split(',').map((e: string) => e.trim());
+                allEntities.push(...entities);
+              }
+            }
+          }
         });
       });
     }
+    
+    // Also check entries directly if no entities found in aggregatedData
     if ((!allEntities || allEntities.length === 0) && Array.isArray(entries) && entries.length > 0) {
       entries.forEach((entry: any) => {
-        const entitiesAry = entry.entities || [];
-        if (Array.isArray(entitiesAry)) allEntities.push(...entitiesAry);
-        else if (typeof entitiesAry === 'string') allEntities.push(...entitiesAry.split(',').map(e => e.trim()));
+        if (entry.entities) {
+          if (Array.isArray(entry.entities)) {
+            entry.entities.forEach((entity: any) => {
+              if (typeof entity === 'string') {
+                allEntities.push(entity);
+              } else if (entity && entity.name) {
+                allEntities.push(entity.name);
+              }
+            });
+          } else if (typeof entry.entities === 'string') {
+            try {
+              const parsedEntities = JSON.parse(entry.entities);
+              if (Array.isArray(parsedEntities)) {
+                parsedEntities.forEach((entity: any) => {
+                  if (typeof entity === 'string') {
+                    allEntities.push(entity);
+                  } else if (entity && entity.name) {
+                    allEntities.push(entity.name);
+                  }
+                });
+              }
+            } catch (e) {
+              // If parsing fails, split by comma
+              const entities = entry.entities.split(',').map((e: string) => e.trim());
+              allEntities.push(...entities);
+            }
+          }
+        }
       });
     }
+
     const counts: Record<string, number> = {};
     allEntities.forEach(e => {
       if (!e) return;
@@ -111,6 +168,7 @@ export function EmotionChart({
       if (!cleaned) return;
       counts[cleaned] = (counts[cleaned] || 0) + 1;
     });
+    
     return Object.entries(counts)
       .sort((a, b) => b[1] - a[1])
       .slice(0, 10);
