@@ -177,6 +177,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       console.log('[VoiceRecorder] Starting save process');
       savingInProgressRef.current = true;
       
+      // Set processing state IMMEDIATELY before any other operations
+      setIsProcessing(true);
+      setRecordingError(null);
+      setHasSaved(true);
+      
       setWaitingForClear(true);
       
       await ensureAllToastsCleared();
@@ -200,9 +205,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       
       await new Promise(resolve => setTimeout(resolve, 100));
       
-      setIsProcessing(true);
-      setRecordingError(null);
-      setHasSaved(true);
       setWaitingForClear(false);
       setToastsCleared(true);
       
