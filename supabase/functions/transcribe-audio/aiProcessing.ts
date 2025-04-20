@@ -145,7 +145,7 @@ export async function generateEmbedding(text: string, apiKey: string): Promise<n
   }
 }
 
-export async function analyzeEmotions(text: string, emotionsData: any[], apiKey: string): Promise<any[]> {
+export async function analyzeEmotions(text: string, emotionsData: any[], apiKey: string): Promise<Record<string, number>> {
   try {
     console.log("[AI] Analyzing emotions in text:", text.substring(0, 100) + "...");
     
@@ -169,7 +169,7 @@ export async function analyzeEmotions(text: string, emotionsData: any[], apiKey:
             
             For each emotion you identify, provide an intensity score from 0.1 to 1.0 (with 1.0 being the strongest).
             Format your response as JSON without explanations, like this example:
-            [{"id": 3, "name": "Joy", "intensity": 0.8}, {"id": 7, "name": "Gratitude", "intensity": 0.6}]`
+            {"Joy": 0.8, "Gratitude": 0.6, "Curiosity": 0.4}`
           },
           {
             role: "user",
@@ -195,8 +195,8 @@ export async function analyzeEmotions(text: string, emotionsData: any[], apiKey:
     return emotions;
   } catch (error) {
     console.error("[AI] Error in analyzeEmotions:", error);
-    // Return empty array instead of throwing to avoid breaking the process
-    return [];
+    // Return empty object instead of throwing to avoid breaking the process
+    return {};
   }
 }
 

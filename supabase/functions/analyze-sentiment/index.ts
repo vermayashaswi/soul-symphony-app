@@ -31,10 +31,13 @@ serve(async (req) => {
         : null;
         
       // Check for Google NL API key directly
-      let googleNlApiKey = Deno.env.get('GOOGLE_API');
-      let googleNlApiConfigured = !!googleNlApiKey;
+      const googleNlApiKey = Deno.env.get('GOOGLE_API');
+      const googleNlApiConfigured = !!googleNlApiKey;
       
       console.log(`Google API key from env: ${googleNlApiConfigured ? 'Found' : 'Not found'}`);
+      if (googleNlApiKey) {
+        console.log(`API key format check: ${googleNlApiKey.length > 20 ? 'Passed' : 'Failed'}`);
+      }
       
       // Check for OpenAI API key
       const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -59,7 +62,6 @@ serve(async (req) => {
           message: "Environment check completed successfully"
         }),
         { 
-          status: 200,
           headers: { ...corsHeaders, 'Content-Type': 'application/json' }
         }
       );
@@ -98,6 +100,22 @@ serve(async (req) => {
     if (!response.ok) {
       const error = await response.text();
       console.error('Google NL API error:', error);
+      
+      // Try to parse the error for more details
+      try {
+        const errorJson = JSON.parse(error);
+        console.error('Detailed API error:', errorJson);
+        
+        // Check for common errors
+        if (errorJson.error && errorJson.error.status === 'INVALID_ARGUMENT') {
+          console.error('Invalid argument error - check text format');
+        } else if (errorJson.error && errorJson.error.status === 'PERMISSION_DENIED') {
+          console.error('Permission denied - check API key permissions');
+        }
+      } catch (e) {
+        // Continue if parsing fails
+      }
+      
       throw new Error(`Google API error: ${error}`);
     }
 

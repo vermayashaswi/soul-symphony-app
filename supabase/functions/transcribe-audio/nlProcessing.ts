@@ -52,9 +52,16 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
       return { sentiment: "0", entities: [] };
     }
     
+    // Validate API key format to detect obvious errors
+    if (googleNLApiKey.length < 20 || !googleNLApiKey.includes('-')) {
+      console.error('Google NL API key appears to be invalid:', googleNLApiKey.substring(0, 5) + '...');
+      return { sentiment: "0", entities: [] };
+    }
+    
     // Make two separate API calls - one for sentiment analysis and one for entity extraction
     
     // 1. Sentiment Analysis
+    console.log('Making sentiment analysis request to Google NL API...');
     const sentimentResponse = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${googleNLApiKey}`, {
       method: 'POST',
       headers: {
@@ -69,6 +76,7 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
     });
 
     // 2. Entity Extraction
+    console.log('Making entity extraction request to Google NL API...');
     const entityResponse = await fetch(`https://language.googleapis.com/v1/documents:analyzeEntities?key=${googleNLApiKey}`, {
       method: 'POST',
       headers: {
@@ -85,6 +93,22 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
     if (!sentimentResponse.ok) {
       const error = await sentimentResponse.text();
       console.error('Error analyzing sentiment with Google NL API:', error);
+      
+      // Log more details about the error
+      try {
+        const errorJson = JSON.parse(error);
+        console.error('Google NL API error details:', errorJson);
+        
+        // Check for common errors
+        if (errorJson.error && errorJson.error.status === 'INVALID_ARGUMENT') {
+          console.error('Invalid argument error - check text format and encoding');
+        } else if (errorJson.error && errorJson.error.status === 'PERMISSION_DENIED') {
+          console.error('Permission denied - check API key and ensure it has Natural Language API permissions');
+        }
+      } catch (e) {
+        console.error('Error parsing Google NL API error response:', e);
+      }
+      
       return { sentiment: "0", entities: [] };
     }
 
@@ -97,8 +121,8 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
     const sentimentResult = await sentimentResponse.json();
     const entityResult = await entityResponse.json();
     
-    console.log('Google NL API sentiment analysis complete');
-    console.log('Google NL API entity analysis complete');
+    console.log('Google NL API sentiment analysis complete:', sentimentResult.documentSentiment);
+    console.log('Google NL API entity analysis complete, found entities:', entityResult.entities?.length || 0);
     
     // Get sentiment score from sentiment analysis response
     const sentimentScore = sentimentResult.documentSentiment?.score?.toString() || "0";

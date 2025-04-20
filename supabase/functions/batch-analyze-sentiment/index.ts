@@ -1,9 +1,11 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+const googleNLApiKey = Deno.env.get('GOOGLE_API') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
@@ -16,12 +18,17 @@ async function analyzeSentiment(text: string) {
   try {
     console.log('Analyzing sentiment for text:', text.slice(0, 100) + '...');
     
-    const googleNLApiKey = Deno.env.get('GOOGLE_API');
-    
     if (!googleNLApiKey) {
       console.error('Google API key not found in environment');
       throw new Error('Google Natural Language API key is not configured');
     }
+    
+    if (googleNLApiKey.length < 20 || !googleNLApiKey.includes('-')) {
+      console.error('Google API key appears to be invalid:', googleNLApiKey.substring(0, 5) + '...');
+      return 0;
+    }
+    
+    console.log('Making request to Google NL API for sentiment analysis...');
     
     // Call the Google Natural Language API - specifying analyzeSentiment endpoint
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${googleNLApiKey}`, {
@@ -40,6 +47,15 @@ async function analyzeSentiment(text: string) {
     if (!response.ok) {
       const error = await response.text();
       console.error('Error analyzing sentiment:', error);
+      
+      // Try to parse the error for more details
+      try {
+        const errorJson = JSON.parse(error);
+        console.error('Detailed error:', errorJson);
+      } catch (e) {
+        // Continue if parsing fails
+      }
+      
       throw new Error(`Failed to analyze sentiment: ${error}`);
     }
 
@@ -47,7 +63,7 @@ async function analyzeSentiment(text: string) {
     console.log('Sentiment analysis complete:', JSON.stringify(result.documentSentiment, null, 2));
     
     // Return the document sentiment score
-    return result.documentSentiment?.score;
+    return result.documentSentiment?.score || 0;
   } catch (error) {
     console.error('Error in analyzeSentiment:', error);
     throw error;
@@ -65,8 +81,13 @@ serve(async (req) => {
     
     console.log('Processing request with params:', {
       userId: userId || 'not provided',
-      entryIds: entryIds ? `[${entryIds.join(', ')}]` : 'not provided'
+      entryIds: entryIds ? `[${entryIds.join(', ')}]` : 'not provided',
+      hasGoogleApiKey: !!googleNLApiKey
     });
+
+    if (!googleNLApiKey) {
+      throw new Error('Google API key is not configured in environment variables');
+    }
 
     let entries;
     
@@ -106,6 +127,7 @@ serve(async (req) => {
 
     console.log(`Found ${entries?.length || 0} entries to process`);
     let processedCount = 0;
+    let errorCount = 0;
 
     // Process each entry
     for (const entry of entries || []) {
@@ -115,6 +137,7 @@ serve(async (req) => {
           continue;
         }
 
+        console.log(`Processing entry ${entry.id} with text: "${entry["refined text"].substring(0, 50)}..."`);
         const sentimentScore = await analyzeSentiment(entry["refined text"]);
         
         // Update the database with the sentiment score
@@ -125,6 +148,7 @@ serve(async (req) => {
         
         if (updateError) {
           console.error(`Error updating sentiment for entry ${entry.id}:`, updateError);
+          errorCount++;
         } else {
           processedCount++;
           console.log(`Updated sentiment for entry ${entry.id}: ${sentimentScore}`);
@@ -143,6 +167,7 @@ serve(async (req) => {
         }
       } catch (error) {
         console.error(`Error processing entry ${entry.id}:`, error);
+        errorCount++;
       }
     }
 
@@ -150,6 +175,7 @@ serve(async (req) => {
       JSON.stringify({
         success: true,
         processed: processedCount,
+        errors: errorCount,
         total: entries?.length || 0
       }),
       {

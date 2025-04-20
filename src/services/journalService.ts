@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
@@ -107,28 +108,65 @@ export const fetchJournalEntries = async (
         id: data[0].id,
         text: data[0]["refined text"],
         created: data[0].created_at,
+        emotions: data[0].emotions,
         duration: data[0].duration
       });
     } else {
       console.log('[JournalService] No entries found for this user');
     }
     
-    const typedEntries: JournalEntry[] = (data || []).map(item => ({
-      id: item.id,
-      content: item["refined text"] || item["transcription text"] || "",
-      created_at: item.created_at,
-      audio_url: item.audio_url,
-      sentiment: item.sentiment,
-      themes: item.master_themes,
-      foreignKey: item["foreign key"],
-      entities: item.entities ? (item.entities as any[]).map(entity => ({
-        type: entity.type,
-        name: entity.name,
-        text: entity.text
-      })) : undefined,
-      duration: item.duration,
-      user_feedback: item.user_feedback || null
-    }));
+    const typedEntries: JournalEntry[] = (data || []).map(item => {
+      // Convert emotions if needed
+      let convertedEmotions = item.emotions;
+      
+      // Check if emotions are in the array format and convert to the object format
+      if (Array.isArray(item.emotions)) {
+        console.log('[JournalService] Converting emotions from array to object format');
+        convertedEmotions = {};
+        item.emotions.forEach(emotion => {
+          if (emotion && emotion.name && emotion.intensity) {
+            convertedEmotions[emotion.name.toLowerCase()] = emotion.intensity;
+          }
+        });
+      }
+      
+      // Parse entities
+      let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
+      if (item.entities) {
+        try {
+          if (Array.isArray(item.entities)) {
+            parsedEntities = item.entities.map(entity => ({
+              type: entity.type || 'other',
+              name: entity.name || '',
+              text: entity.text
+            }));
+          }
+          else if (typeof item.entities === 'string') {
+            const parsed = JSON.parse(item.entities);
+            if (Array.isArray(parsed)) {
+              parsedEntities = parsed;
+            }
+          }
+        } catch (err) {
+          console.error('[JournalService] Error parsing entities:', err);
+        }
+      }
+      
+      return {
+        id: item.id,
+        content: item["refined text"] || item["transcription text"] || "",
+        created_at: item.created_at,
+        audio_url: item.audio_url,
+        sentiment: item.sentiment,
+        themes: item.master_themes,
+        foreignKey: item["foreign key"],
+        entities: parsedEntities,
+        emotions: convertedEmotions,
+        duration: item.duration,
+        user_feedback: item.user_feedback || null,
+        Edit_Status: item.Edit_Status
+      };
+    });
     
     return typedEntries;
   } catch (error: any) {
