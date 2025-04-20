@@ -96,7 +96,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
 
   // Generate days based on the current timeRange and date
   const calendarDays = React.useMemo(() => {
-    if (timeRange === 'day') {
+    if (timeRange === 'today') {
       return [currentDate];
     } else if (timeRange === 'week') {
       const startDay = startOfWeek(currentDate, { weekStartsOn: 1 }); // Monday as first day
@@ -132,7 +132,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
 
   // Navigation functions
   const goToPrevious = () => {
-    if (timeRange === 'day') {
+    if (timeRange === 'today') {
       setCurrentDate(prev => subDays(prev, 1));
     } else if (timeRange === 'week') {
       setCurrentDate(prev => subWeeks(prev, 1));
@@ -144,7 +144,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
   };
 
   const goToNext = () => {
-    if (timeRange === 'day') {
+    if (timeRange === 'today') {
       setCurrentDate(prev => addDays(prev, 1));
     } else if (timeRange === 'week') {
       setCurrentDate(prev => addWeeks(prev, 1));
@@ -421,7 +421,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               </button>
               
               <h3 className="font-medium">
-                {timeRange === 'day' && format(currentDate, 'MMMM d, yyyy')}
+                {timeRange === 'today' && format(currentDate, 'MMMM d, yyyy')}
                 {timeRange === 'week' && `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'MMM d')} - ${format(endOfWeek(currentDate, { weekStartsOn: 1 }), 'MMM d, yyyy')}`}
                 {timeRange === 'month' && format(currentDate, 'MMMM yyyy')}
                 {timeRange === 'year' && format(currentDate, 'yyyy')}
@@ -437,7 +437,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
             </div>
             
             {/* Render appropriate view based on timeRange */}
-            {timeRange === 'day' && renderDayView()}
+            {timeRange === 'today' && renderDayView()}
             {timeRange === 'week' && renderWeekView()}
             {timeRange === 'month' && renderMonthView()}
             {timeRange === 'year' && renderYearView()}

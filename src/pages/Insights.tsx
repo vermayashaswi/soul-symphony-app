@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -23,7 +22,7 @@ export default function Insights() {
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
   const timeRanges = [
-    { value: 'day', label: 'Day' },
+    { value: 'today', label: 'Day' },
     { value: 'week', label: 'Week' },
     { value: 'month', label: 'Month' },
     { value: 'year', label: 'Year' },
