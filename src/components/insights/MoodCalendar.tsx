@@ -7,7 +7,7 @@ import {
   startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
   addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks,
   addDays, subDays, getYear, getMonth, getDaysInMonth,
-  isWithinInterval, startOfYear, endOfYear
+  isWithinInterval, startOfYear, endOfYear, startOfDay, endOfDay
 } from 'date-fns';
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, 
