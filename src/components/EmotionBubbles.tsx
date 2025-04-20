@@ -689,8 +689,8 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
       
       if (filteredEmotions.length === 0) return;
       
-      // Fix: Correct the reduce function to properly handle [string, number] tuples
-      const totalValue = filteredEmotions.reduce((sum, [value]) => sum + value, 0);
+      // Fixed: Correct the reduce function to properly handle [string, number] tuples
+      const totalValue = filteredEmotions.reduce((sum, [value]) => sum + Number(value), 0);
       
       const values = filteredEmotions.map(([_, value]) => value);
       const maxValue = Math.max(...values);
@@ -722,7 +722,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
           size = minSize + (normalizedValue * (maxBubbleSize - minSize) * 0.8);
         }
         
-        // Fix: Ensure value is treated as a number for calculation
+        // Fixed: Ensure value is treated as a number for calculation
         const percentage = (Number(value) / totalValue) * 100;
         
         return {
