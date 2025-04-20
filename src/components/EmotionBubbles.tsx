@@ -723,7 +723,7 @@ const EmotionBubbles: React.FC<EmotionBubblesProps> = ({
         }
         
         // Fix: Ensure value is treated as a number for calculation
-        const percentage = (value / totalValue) * 100;
+        const percentage = (Number(value) / totalValue) * 100;
         
         return {
           name: emotion,
