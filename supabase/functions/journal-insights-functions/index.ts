@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -341,7 +340,7 @@ async function summarizeLifeAreasByTheme(userId: string, params: any = {}) {
   // Map entries to life areas
   entries.forEach(entry => {
     const themes = entry.master_themes || [];
-    const content = entry.refined text || entry.transcription text || '';
+    const content = entry["refined text"] || entry["transcription text"] || '';
     const sentimentValue = entry.sentiment ? parseFloat(entry.sentiment) : null;
     const emotions = entry.emotions || {};
     
@@ -549,7 +548,7 @@ async function suggestReflectionPrompts(userId: string, params: any = {}) {
     }
     
     // Add content
-    const content = entry.refined text || entry.transcription text || '';
+    const content = entry["refined text"] || entry["transcription text"] || '';
     if (content) {
       totalContent += ' ' + content;
     }
@@ -1294,7 +1293,7 @@ async function recommendMicrohabits(userId: string, params: any = {}) {
     });
     
     // Check content for specific keywords
-    const content = (entry.refined text || entry.transcription text || '').toLowerCase();
+    const content = (entry["refined text"] || entry["transcription text"] || '').toLowerCase();
     
     // Physical health indicators
     if (/(tired|exhausted|fatigue|no energy|drained|sleep|insomnia)/i.test(content)) {
@@ -1956,7 +1955,7 @@ async function recommendSharedEntries(userId: string, params: any = {}) {
 
   // Process entries to score them for shareability
   const scoredEntries = entries.map(entry => {
-    const content = entry.refined text || entry.transcription text || '';
+    const content = entry["refined text"] || entry["transcription text"] || '';
     let shareScore = 0;
     
     // Content length score (longer entries often have more substance)
@@ -2116,4 +2115,3 @@ async function recommendSharedEntries(userId: string, params: any = {}) {
     totalEntriesAnalyzed: entries.length
   };
 }
-
