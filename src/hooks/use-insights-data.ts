@@ -127,6 +127,15 @@ export const useInsightsData = (userId: string | undefined, timeRange: TimeRange
               let count = 0;
               
               Object.entries(emotions).forEach(([emotion, score]: [string, any]) => {
+                // Skip metadata fields like 'id' or 'intensity'
+                if (emotion.toLowerCase() === 'id' || 
+                    emotion.toLowerCase() === 'intensity' || 
+                    emotion.toLowerCase() === 'name' ||
+                    /^\d+$/.test(emotion) || 
+                    emotion.length < 2) {
+                  return;
+                }
+                
                 // Convert positive emotions to positive values, negative emotions to negative values
                 const emotionValue = Number(score);
                 if (!isNaN(emotionValue)) {
@@ -225,16 +234,18 @@ const calculateDominantMood = (entries: any[]): DominantMood | null => {
         
         if (emotions && typeof emotions === 'object') {
           Object.entries(emotions).forEach(([emotion, score]) => {
-            // Important: Normalize the emotion key to handle different formats
-            // Convert keys like "id" to proper emotion names
-            const emotionKey = emotion.toLowerCase();
-            
-            // Skip if emotion is literally "id" or looks like an ID (number or very short)
-            if (emotionKey === 'id' || /^\d+$/.test(emotionKey) || emotionKey.length < 2) {
+            // Skip metadata fields like 'id' or 'intensity'
+            if (emotion.toLowerCase() === 'id' || 
+                emotion.toLowerCase() === 'intensity' || 
+                emotion.toLowerCase() === 'name' ||
+                /^\d+$/.test(emotion) || 
+                emotion.length < 2) {
               console.log('Skipping invalid emotion key:', emotion);
               return;
             }
             
+            // For actual emotion names, process them correctly
+            const emotionKey = emotion.toLowerCase();
             if (!emotionCounts[emotionKey]) {
               emotionCounts[emotionKey] = { count: 0, score: 0 };
             }
@@ -311,12 +322,16 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
         
         if (emotions && typeof emotions === 'object') {
           Object.entries(emotions).forEach(([emotion, score]) => {
-            // Normalize emotion key and skip IDs
-            const emotionKey = emotion.toLowerCase();
-            if (emotionKey === 'id' || /^\d+$/.test(emotionKey) || emotionKey.length < 2) {
+            // Skip metadata fields
+            if (emotion.toLowerCase() === 'id' || 
+                emotion.toLowerCase() === 'intensity' || 
+                emotion.toLowerCase() === 'name' ||
+                /^\d+$/.test(emotion) || 
+                emotion.length < 2) {
               return;
             }
             
+            const emotionKey = emotion.toLowerCase();
             if (!(emotionKey in initialEmotionValues)) {
               initialEmotionValues[emotionKey] = Number(score);
             }
@@ -337,12 +352,16 @@ const calculateBiggestImprovement = (allEntries: any[], timeRangeEntries: any[],
         
         if (emotions && typeof emotions === 'object') {
           Object.entries(emotions).forEach(([emotion, score]) => {
-            // Normalize emotion key and skip IDs
-            const emotionKey = emotion.toLowerCase();
-            if (emotionKey === 'id' || /^\d+$/.test(emotionKey) || emotionKey.length < 2) {
+            // Skip metadata fields
+            if (emotion.toLowerCase() === 'id' || 
+                emotion.toLowerCase() === 'intensity' || 
+                emotion.toLowerCase() === 'name' ||
+                /^\d+$/.test(emotion) || 
+                emotion.length < 2) {
               return;
             }
             
+            const emotionKey = emotion.toLowerCase();
             if (!currentEmotionAverages[emotionKey]) {
               currentEmotionAverages[emotionKey] = { total: 0, count: 0 };
             }
@@ -461,13 +480,17 @@ const processEmotionData = (entries: any[], timeRange: TimeRange): AggregatedEmo
         
         if (emotions && typeof emotions === 'object') {
           Object.entries(emotions).forEach(([emotion, score]) => {
-            // Normalize emotion key and skip IDs
-            const emotionKey = emotion.toLowerCase();
-            if (emotionKey === 'id' || /^\d+$/.test(emotionKey) || emotionKey.length < 2) {
+            // Skip metadata fields
+            if (emotion.toLowerCase() === 'id' || 
+                emotion.toLowerCase() === 'intensity' || 
+                emotion.toLowerCase() === 'name' ||
+                /^\d+$/.test(emotion) || 
+                emotion.length < 2) {
               return;
             }
             
-            // Use normalized key but capitalize first letter for display
+            // Use actual emotion name with capitalized first letter
+            const emotionKey = emotion.toLowerCase();
             const displayEmotion = emotionKey.charAt(0).toUpperCase() + emotionKey.slice(1);
             
             if (!emotionData[displayEmotion]) {
