@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
 
@@ -97,7 +96,8 @@ export async function processAndSaveSmartQuery(
       .insert({
         thread_id: threadId,
         content: message,
-        sender: 'user'
+        sender: 'user',
+        role: 'user'
       })
       .select()
       .single();
@@ -119,7 +119,8 @@ export async function processAndSaveSmartQuery(
         .insert({
           thread_id: threadId,
           content: `I'm having trouble processing your request. ${errorMsg}`,
-          sender: 'assistant'
+          sender: 'assistant',
+          role: 'assistant'
         })
         .select()
         .single();
@@ -142,6 +143,7 @@ export async function processAndSaveSmartQuery(
         thread_id: threadId,
         content: result.response,
         sender: 'assistant',
+        role: 'assistant',
         analysis_data: {
           planDetails: result.planDetails,
           executionResults: result.executionResults
