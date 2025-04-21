@@ -1,6 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
+import { isFactualGeneralKnowledgeQuery } from "@/utils/chat/queryAnalyzer";
 
 interface SmartQueryResult {
   success: boolean;
@@ -24,6 +24,15 @@ export async function processSmartQuery(
 ): Promise<SmartQueryResult> {
   try {
     console.log("[SmartQueryService] Processing query:", message.substring(0, 30) + "...");
+    
+    // Check early if this is a factual knowledge query that should be declined
+    if (isFactualGeneralKnowledgeQuery(message)) {
+      console.log('[SmartQueryService] Detected factual knowledge query, returning standard response');
+      return {
+        success: true,
+        response: "I'm your emotional well-being assistant. I'm here to support your journaling practice and mental wellness, not to provide general knowledge. Could I help you reflect on something in your journal or discuss mental well-being techniques instead?"
+      };
+    }
     
     // Call the Supabase edge function orchestrator directly
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {

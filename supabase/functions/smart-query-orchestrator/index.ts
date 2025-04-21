@@ -145,17 +145,15 @@ serve(async (req) => {
       });
     }
 
-    // --- Step 3: Planner Logic and Routing ---
-    
-    // Check if this is a factual question that we should directly decline
-    const factualQuestionPattern = /(who|what|where|when|why|how) (is|are|was|were|did) (the )?([a-z\s]+) (of|in|at|for|during) ([a-z\s]+)/i;
-    if (
-      message.toLowerCase().startsWith("who is") ||
-      message.toLowerCase().startsWith("what is the") ||
-      /who is the (president|prime minister|leader) of/i.test(message) ||
-      /what is the (capital|population|currency) of/i.test(message) ||
-      (factualQuestionPattern.test(message) && !message.toLowerCase().includes("journal") && !message.toLowerCase().includes("feel"))
-    ) {
+    // --- Step 3: Factual Query Check ---
+    // This is a simplified check that relies primarily on the category
+    // More specific factual checks are now done in the client-side service
+    if (category === "general" && 
+       (message.toLowerCase().startsWith("who is") ||
+        message.toLowerCase().startsWith("what is the capital") ||
+        /who is the (president|prime minister|leader) of/i.test(message) ||
+        /what is the (capital|population|currency) of/i.test(message))) {
+      
       const factualResponse = "I'm your emotional well-being assistant. I'm here to support your journaling practice and mental wellness, not to provide general knowledge. Could I help you reflect on something in your journal or discuss mental well-being techniques instead?";
       
       diagnosticSteps.push({
@@ -171,7 +169,7 @@ serve(async (req) => {
       }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // Process "general" or "general-journal-specific" queries with the SOuLO prompt
+    // --- Step 4: Process "general" or "general-journal-specific" queries with the SOuLO prompt ---
     if (category === "general" || category === "general-journal-specific") {
       // Directly use OpenAI with the user's special SOuLO prompt for all queries in these categories
       const finalPrompt = `
@@ -260,7 +258,7 @@ For factual questions (who is president, what is a capital city, etc), ALWAYS re
       }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
-    // --- Step 4: Get Database Schema for Planner ---
+    // --- Step 5: Get Database Schema for Planner ---
     const dbSchema = await getDatabaseSchema();
     diagnosticSteps.push({
       name: "Database Schema Retrieval",
@@ -269,7 +267,7 @@ For factual questions (who is president, what is a capital city, etc), ALWAYS re
       timestamp: new Date().toISOString()
     });
 
-    // --- Step 5: Enhanced Planner Agent ---
+    // --- Step 6: Enhanced Planner Agent ---
     // Analyze query complexity and formulate a plan
     const queryAnalysis = await analyzeQueryWithSchema(message, threadContext, category, dbSchema, userId);
     diagnosticSteps.push({
@@ -281,7 +279,7 @@ For factual questions (who is president, what is a capital city, etc), ALWAYS re
 
     let response, planDetails, executionResults;
 
-    // --- Step 6: Execute the plan ---
+    // --- Step 7: Execute the plan ---
     if (queryAnalysis.requiresSegmentation) {
       // --- Complex Query Execution ---
       diagnosticSteps.push({
@@ -474,7 +472,7 @@ For factual questions (who is president, what is a capital city, etc), ALWAYS re
       };
     }
 
-    // --- Step 7: Final response and diagnostics ---
+    // --- Step 8: Final response and diagnostics ---
     const totalTime = Date.now() - startTime;
     diagnosticSteps.push({
       name: "Query Processing Complete",

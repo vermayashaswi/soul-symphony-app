@@ -13,7 +13,7 @@ type QueryTypes = {
   isSpecificQuery: boolean;
   isThemeFocused: boolean;
   requiresTimeAnalysis: boolean;
-  isFactualQuery: boolean; // New property to identify factual queries
+  isFactualQuery: boolean;
   emotion?: string;
   theme?: string;
   timeRange: {
@@ -24,6 +24,70 @@ type QueryTypes = {
   startDate?: string;
   endDate?: string;
 };
+
+// Common patterns for factual queries that should be identified and blocked
+const FACTUAL_PATTERNS = {
+  STARTS_WITH: [
+    'who is', 
+    'what is', 
+    'when was', 
+    'where is'
+  ],
+  CONTAINS: [
+    'president of', 
+    'capital of', 
+    'prime minister of'
+  ],
+  REGEX: [
+    /who is the (president|prime minister|leader) of/i,
+    /what is the (capital|population|currency) of/i,
+    /when (was|is|did)/i
+  ]
+};
+
+/**
+ * Specifically checks if a query is a factual general knowledge query
+ * that should be declined as out of scope
+ */
+export function isFactualGeneralKnowledgeQuery(query: string): boolean {
+  const lowerQuery = query.toLowerCase();
+  
+  // Check starts with patterns
+  if (FACTUAL_PATTERNS.STARTS_WITH.some(pattern => lowerQuery.startsWith(pattern))) {
+    // If it mentions journal or feelings, it's probably not a general knowledge query
+    if (lowerQuery.includes("journal") || lowerQuery.includes("feel")) {
+      return false;
+    }
+    return true;
+  }
+  
+  // Check contains patterns
+  if (FACTUAL_PATTERNS.CONTAINS.some(pattern => lowerQuery.includes(pattern))) {
+    return true;
+  }
+  
+  // Check regex patterns
+  for (const pattern of FACTUAL_PATTERNS.REGEX) {
+    if (pattern.test(lowerQuery)) {
+      // Skip "when" questions about journals/feelings
+      if (pattern.toString().includes("when") && 
+         (lowerQuery.includes("journal") || lowerQuery.includes("feel"))) {
+        continue;
+      }
+      return true;
+    }
+  }
+  
+  // Additional check for complex factual patterns
+  const factualQuestionPattern = /(who|what|where|when|why|how) (is|are|was|were|did) (the )?([a-z\s]+) (of|in|at|for|during) ([a-z\s]+)/i;
+  if (factualQuestionPattern.test(lowerQuery) && 
+      !lowerQuery.includes("journal") && 
+      !lowerQuery.includes("feel")) {
+    return true;
+  }
+  
+  return false;
+}
 
 /**
  * Analyzes the user's query to determine what type of processing it needs
@@ -45,7 +109,7 @@ export function analyzeQueryTypes(query: string): QueryTypes {
     isSpecificQuery: false,
     isThemeFocused: false,
     requiresTimeAnalysis: false,
-    isFactualQuery: false, // Initialize new property
+    isFactualQuery: false,
     timeRange: {
       startDate: null,
       endDate: null,
@@ -54,16 +118,7 @@ export function analyzeQueryTypes(query: string): QueryTypes {
   };
   
   // Detect factual queries about general knowledge
-  result.isFactualQuery = lowerQuery.startsWith('who is') || 
-                          lowerQuery.startsWith('what is') || 
-                          lowerQuery.startsWith('when was') ||
-                          lowerQuery.startsWith('where is') ||
-                          lowerQuery.includes('president of') ||
-                          lowerQuery.includes('capital of') ||
-                          lowerQuery.includes('prime minister of') ||
-                          /who is the (president|prime minister|leader) of/i.test(lowerQuery) ||
-                          /what is the (capital|population|currency) of/i.test(lowerQuery) ||
-                          (/when (was|is|did)/i.test(lowerQuery) && !lowerQuery.includes("journal") && !lowerQuery.includes("feel"));
+  result.isFactualQuery = isFactualGeneralKnowledgeQuery(query);
   
   // Detect emotion-focused queries
   const emotionWords = ['feel', 'feeling', 'felt', 'emotion', 'emotions', 'mood', 'moods', 'happy', 'sad', 'angry', 'anxious', 'joy', 'fear', 'happiness'];
