@@ -25,4 +25,11 @@ export type DebugLogContextType = {
   clearLogs: () => void;
   isEnabled: boolean;
   toggleEnabled: () => void;
+  getLogs: () => Array<{
+    id: string;
+    event: string;
+    message: string;
+    level: LogLevel;
+    timestamp: string;
+  }>;
 };

@@ -3,10 +3,11 @@ import React from "react";
 import { X, Bug } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
+import { LogLevel } from "@/utils/debug/debugLogTypes";
 
 export interface ChatDiagnosticStep {
   name: string;
-  status: "pending" | "success" | "error" | "loading" | "warning";
+  status: "pending" | "success" | "error" | "loading" | "warning" | "info";
   details?: string;
   timestamp?: string;
   // Optionally, include raw data for GPT, API/fn calls, etc.

@@ -1,5 +1,5 @@
-
 import React, { createContext, useContext, useState } from 'react';
+import { DebugLogContextType, LogLevel } from './debugLogTypes';
 
 // Define the debug step type
 export type DebugStep = {
@@ -11,37 +11,15 @@ export type DebugStep = {
   duration?: number;
 };
 
-// Define the context type
-interface DebugContextType {
-  logs: any[];
-  addLog: (...args: any[]) => void;
-  addEvent: (...args: any[]) => void;
-  clearLogs: () => void;
-  isEnabled: boolean;
-  toggleEnabled: () => void;
-  // Voice recorder debugging
-  recorderSteps: DebugStep[];
-  addRecorderStep: (step: DebugStep) => void;
-  updateRecorderStep: (id: string, updates: Partial<DebugStep>) => void;
-  resetRecorderSteps: () => void;
-  showRecorderDebug: boolean;
-  toggleRecorderDebug: () => void;
-}
-
 // Create the context
-const DebugContext = createContext<DebugContextType>({
+const DebugContext = createContext<DebugLogContextType>({
   logs: [],
   addLog: (...args: any[]) => {},
   addEvent: (...args: any[]) => {},
   clearLogs: () => {},
   isEnabled: false,
   toggleEnabled: () => {},
-  recorderSteps: [],
-  addRecorderStep: () => {},
-  updateRecorderStep: () => {},
-  resetRecorderSteps: () => {},
-  showRecorderDebug: false,
-  toggleRecorderDebug: () => {},
+  getLogs: () => [],
 });
 
 // Create the provider component
@@ -74,8 +52,24 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     }
   };
 
-  const addEvent = (...args: any[]) => {
-    addLog('[EVENT]', ...args);
+  const addEvent = (category: string, message: string, level: LogLevel = 'info', details?: any) => {
+    if (!isEnabled) return;
+    
+    const timestamp = new Date();
+    setLogs(prevLogs => [
+      ...prevLogs,
+      {
+        id: timestamp.getTime() + Math.random().toString(36).substring(2, 9),
+        event: category,
+        message,
+        level,
+        timestamp: timestamp.toISOString(),
+        details
+      }
+    ]);
+    
+    // Also log to console if enabled
+    console.log(`[DEBUG][${level.toUpperCase()}][${category}]`, message, details || '');
   };
 
   const clearLogs = () => {
@@ -88,7 +82,18 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     setIsEnabled(newState);
   };
 
-  // Voice recorder debug methods
+  // Add the getLogs method to get formatted logs
+  const getLogs = () => {
+    return logs.filter(log => log.event && log.message).map(log => ({
+      id: log.id,
+      event: log.event,
+      message: log.message,
+      level: log.level || 'info',
+      timestamp: typeof log.timestamp === 'string' ? log.timestamp : new Date(log.timestamp).toISOString()
+    }));
+  };
+
+  // Voice recorder debug methods 
   const addRecorderStep = (step: DebugStep) => {
     setRecorderSteps(prev => [...prev, {
       ...step,
@@ -130,12 +135,7 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
     clearLogs,
     isEnabled,
     toggleEnabled,
-    recorderSteps,
-    addRecorderStep,
-    updateRecorderStep,
-    resetRecorderSteps,
-    showRecorderDebug,
-    toggleRecorderDebug
+    getLogs
   };
 
   return (
