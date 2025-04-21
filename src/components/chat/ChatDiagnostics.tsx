@@ -44,6 +44,14 @@ interface ChatDiagnosticsProps {
     totalTokens?: number;
     contextUtilization?: number;
     modelMaxTokens?: number;
+    filteredEntryCount?: number;
+    originalEntryCount?: number;
+  };
+  filteringInfo?: {
+    appliedFilters: string[];
+    filteredCount: number;
+    totalCount: number;
+    filteringTime?: number;
   };
   functionExecutions?: FunctionExecution[];
 }
@@ -53,7 +61,8 @@ export default function ChatDiagnostics({
   isVisible,
   ragSteps,
   queryAnalysis,
-  tokenUsage
+  tokenUsage,
+  filteringInfo
 }: ChatDiagnosticsProps) {
   if (!isVisible) return null;
   
@@ -81,6 +90,12 @@ export default function ChatDiagnostics({
               <span className="text-muted-foreground">Model Limit: </span>
               <span>{tokenUsage.modelMaxTokens || 16385}</span>
             </div>
+            {tokenUsage.filteredEntryCount !== undefined && (
+              <div>
+                <span className="text-muted-foreground">Filtered Entries: </span>
+                <span>{tokenUsage.filteredEntryCount} / {tokenUsage.originalEntryCount || '-'}</span>
+              </div>
+            )}
           </div>
           
           {tokenUsage.contextUtilization !== undefined && (
@@ -98,6 +113,31 @@ export default function ChatDiagnostics({
                   High context utilization - consider optimizing your query
                 </p>
               )}
+            </div>
+          )}
+        </div>
+      )}
+      
+      {filteringInfo && (
+        <div className="mb-3">
+          <h4 className="text-xs font-medium mb-1">Smart Filtering</h4>
+          <div className="grid grid-cols-2 gap-2 mb-2">
+            <div>
+              <span className="text-muted-foreground">Filtered Count: </span>
+              <span>{filteringInfo.filteredCount} / {filteringInfo.totalCount}</span>
+            </div>
+            {filteringInfo.filteringTime && (
+              <div>
+                <span className="text-muted-foreground">Processing Time: </span>
+                <span>{filteringInfo.filteringTime}ms</span>
+              </div>
+            )}
+          </div>
+          {filteringInfo.appliedFilters.length > 0 && (
+            <div className="flex flex-wrap gap-1 mt-1">
+              {filteringInfo.appliedFilters.map((filter, idx) => (
+                <Badge key={idx} variant="outline" className="text-[10px]">{filter}</Badge>
+              ))}
             </div>
           )}
         </div>

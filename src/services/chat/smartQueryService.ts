@@ -1,5 +1,5 @@
 import { supabase } from "@/integrations/supabase/client";
-import { ChatMessage, TokenOptimizationConfig } from "./types";
+import { ChatMessage, TokenOptimizationConfig, QueryFilterParams } from "./types";
 import { useToast } from "@/hooks/use-toast";
 
 // Default optimization configuration
@@ -9,7 +9,8 @@ const DEFAULT_OPTIMIZATION_CONFIG: TokenOptimizationConfig = {
   includeSentiment: true,     // Keep sentiment data
   includeEntities: false,     // Skip entities by default
   maxPreviousMessages: 5,     // Reduced from 10
-  optimizationLevel: 'light', // Default optimization level
+  optimizationLevel: 'light' as const, // Default optimization level
+  useSmartFiltering: true     // Enable smart filtering by default
 };
 
 // Gradually increase optimization based on query length
@@ -24,6 +25,10 @@ function getOptimizationConfig(queryLength: number): TokenOptimizationConfig {
       includeEntities: false,
       maxPreviousMessages: 3,
       optimizationLevel: 'aggressive' as const,
+      useSmartFiltering: true,
+      filterOptions: {
+        relevanceThreshold: 0.7  // Higher threshold for more aggressive filtering
+      }
     };
   } else if (queryLength > 500) {
     // Medium length queries need moderate optimization
@@ -32,6 +37,7 @@ function getOptimizationConfig(queryLength: number): TokenOptimizationConfig {
       maxEntries: 4,
       maxEntryLength: 180,
       optimizationLevel: 'light' as const,
+      useSmartFiltering: true
     };
   }
   
@@ -50,6 +56,15 @@ interface SmartQueryResult {
     promptTokens?: number;
     completionTokens?: number;
     totalTokens?: number;
+    contextUtilization?: number;
+    filteredEntryCount?: number;
+    originalEntryCount?: number;
+  };
+  filteringInfo?: {
+    appliedFilters: string[];
+    filteredCount: number;
+    totalCount: number;
+    filteringTime?: number;
   };
 }
 
@@ -65,7 +80,7 @@ export async function processSmartQuery(
     const optimizationConfig = getOptimizationConfig(message.length);
     
     console.log(`[SmartQueryService] Optimization level: ${optimizationConfig.optimizationLevel}`);
-    console.log(`[SmartQueryService] Max entries: ${optimizationConfig.maxEntries}`);
+    console.log(`[SmartQueryService] Smart filtering: ${optimizationConfig.useSmartFiltering ? 'enabled' : 'disabled'}`);
     
     const queryTimeout = isComplex ? 120000 : 45000; // 120s for complex, 45s for simple
     console.log(`[SmartQueryService] Query timeout set to ${queryTimeout}ms`);
@@ -74,10 +89,26 @@ export async function processSmartQuery(
       - Message Length: ${message.length}
       - Is Complex Query: ${isComplex}
       - Timeout Duration: ${queryTimeout}ms
-      - Token Optimization: ${optimizationConfig.optimizationLevel}`);
+      - Token Optimization: ${optimizationConfig.optimizationLevel}
+      - Smart Filtering: ${optimizationConfig.useSmartFiltering ? 'enabled' : 'disabled'}`);
+    
+    // Apply smart filtering if enabled
+    let filteringInfo = null;
+    if (optimizationConfig.useSmartFiltering) {
+      try {
+        filteringInfo = await applySmartFiltering(message, userId, optimizationConfig);
+        console.log(`[SmartQueryService] Smart filtering applied:
+          - Filtered entries: ${filteringInfo.filteredCount} / ${filteringInfo.totalCount}
+          - Applied filters: ${filteringInfo.appliedFilters.join(', ')}
+          - Processing time: ${filteringInfo.filteringTime}ms`);
+      } catch (filterError) {
+        console.error('[SmartQueryService] Error applying smart filtering:', filterError);
+        // Continue without filtering if an error occurs
+      }
+    }
     
     const queryResult = await Promise.race([
-      processQueryWithFallback(message, userId, threadId, isComplex, optimizationConfig),
+      processQueryWithFallback(message, userId, threadId, isComplex, optimizationConfig, filteringInfo),
       new Promise<SmartQueryResult>((_, reject) => 
         setTimeout(() => {
           console.error('[SmartQueryService] Query processing timed out');
@@ -86,7 +117,10 @@ export async function processSmartQuery(
       )
     ]);
 
-    return queryResult;
+    return {
+      ...queryResult,
+      filteringInfo
+    };
   } catch (error: any) {
     console.error('[SmartQueryService] Comprehensive error handling:', error);
     
@@ -121,6 +155,52 @@ export async function processSmartQuery(
   }
 }
 
+// New function to apply smart filtering
+async function applySmartFiltering(
+  message: string,
+  userId: string,
+  optimizationConfig: TokenOptimizationConfig
+): Promise<any> {
+  try {
+    const filterStartTime = Date.now();
+    
+    // Extract filter options from optimization config
+    const { filterOptions } = optimizationConfig;
+    
+    // Call the smart-query-filter edge function
+    const { data, error } = await supabase.functions.invoke('smart-query-filter', {
+      body: {
+        userId,
+        query: message,
+        dateRange: filterOptions?.dateRange,
+        emotions: filterOptions?.emotions,
+        themes: filterOptions?.themes,
+        contentKeywords: filterOptions?.contentKeywords,
+        relevanceThreshold: filterOptions?.relevanceThreshold || 0.6,
+        limit: optimizationConfig.maxEntries * 2 // Get more entries to have room for filtering
+      }
+    });
+    
+    if (error) {
+      console.error('[SmartQueryService] Error in smart filtering:', error);
+      throw error;
+    }
+    
+    // Return filtering results
+    return {
+      filteredEntries: data.entries || [],
+      appliedFilters: data.appliedFilters || [],
+      extractedFilters: data.extractedFilters || {},
+      filteredCount: data.filteredCount || 0,
+      totalCount: data.totalCount || 0,
+      filteringTime: Date.now() - filterStartTime
+    };
+  } catch (error) {
+    console.error('[SmartQueryService] Failed to apply smart filtering:', error);
+    throw error;
+  }
+}
+
 function detectComplexQuery(message: string): boolean {
   if (!message) return false;
   
@@ -143,7 +223,8 @@ async function processQueryWithFallback(
   userId: string, 
   threadId: string | null, 
   isComplex: boolean,
-  optimizationConfig: TokenOptimizationConfig
+  optimizationConfig: TokenOptimizationConfig,
+  filteringInfo: any = null
 ): Promise<SmartQueryResult> {
   try {
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
@@ -152,11 +233,13 @@ async function processQueryWithFallback(
         userId,
         threadId,
         optimizationConfig, // Pass optimization config to edge function
+        filteredEntries: filteringInfo?.filteredEntries || null, // Pass pre-filtered entries
         metadata: {
           isComplexQuery: isComplex,
           queryLength: message.length,
           processingAttempt: 'primary',
-          optimizationLevel: optimizationConfig.optimizationLevel
+          optimizationLevel: optimizationConfig.optimizationLevel,
+          useSmartFiltering: optimizationConfig.useSmartFiltering
         }
       }
     });
@@ -174,15 +257,20 @@ async function processQueryWithFallback(
           includeSentiment: false,
           includeEntities: false,
           maxPreviousMessages: 2,
-          optimizationLevel: 'aggressive',
+          optimizationLevel: 'aggressive' as const,
+          useSmartFiltering: true,
+          filterOptions: {
+            ...optimizationConfig.filterOptions,
+            relevanceThreshold: 0.8 // Even higher threshold for aggressive optimization
+          }
         };
         
         return await processQueryWithAggressiveOptimization(
-          message, userId, threadId, aggressiveConfig
+          message, userId, threadId, aggressiveConfig, filteringInfo
         );
       }
       
-      const fallbackResult = await attemptFallbackProcessing(message, userId, threadId);
+      const fallbackResult = await attemptFallbackProcessing(message, userId, threadId, filteringInfo);
       if (fallbackResult) return fallbackResult;
       
       throw error;
@@ -201,18 +289,30 @@ async function processQueryWithFallback(
           includeSentiment: false,
           includeEntities: false,
           maxPreviousMessages: 2,
-          optimizationLevel: 'aggressive',
+          optimizationLevel: 'aggressive' as const,
+          useSmartFiltering: true,
+          filterOptions: {
+            ...optimizationConfig.filterOptions,
+            relevanceThreshold: 0.8
+          }
         };
         
         return await processQueryWithAggressiveOptimization(
-          message, userId, threadId, aggressiveConfig
+          message, userId, threadId, aggressiveConfig, filteringInfo
         );
       }
       
-      const fallbackResult = await attemptFallbackProcessing(message, userId, threadId);
+      const fallbackResult = await attemptFallbackProcessing(message, userId, threadId, filteringInfo);
       if (fallbackResult) return fallbackResult;
       
       throw new Error(data.error);
+    }
+
+    // Add filtering info to the token usage stats
+    const tokenUsage = data.tokenUsage || {};
+    if (filteringInfo) {
+      tokenUsage.filteredEntryCount = filteringInfo.filteredCount;
+      tokenUsage.originalEntryCount = filteringInfo.totalCount;
     }
 
     return {
@@ -222,9 +322,20 @@ async function processQueryWithFallback(
       executionResults: data.executionResults,
       diagnostics: {
         ...data.diagnostics,
-        processingMethod: 'primary'
+        processingMethod: 'primary',
+        smartFiltering: filteringInfo ? {
+          applied: true,
+          filters: filteringInfo.appliedFilters,
+          extractedFilters: filteringInfo.extractedFilters
+        } : { applied: false }
       },
-      tokenUsage: data.tokenUsage
+      tokenUsage,
+      filteringInfo: filteringInfo ? {
+        appliedFilters: filteringInfo.appliedFilters || [],
+        filteredCount: filteringInfo.filteredCount || 0,
+        totalCount: filteringInfo.totalCount || 0,
+        filteringTime: filteringInfo.filteringTime
+      } : undefined
     };
   } catch (error: any) {
     console.error('[SmartQueryService] Fallback processing error:', error);
@@ -240,10 +351,28 @@ async function processQueryWithAggressiveOptimization(
   message: string,
   userId: string,
   threadId: string | null,
-  aggressiveConfig: TokenOptimizationConfig
+  aggressiveConfig: TokenOptimizationConfig,
+  filteringInfo: any = null
 ): Promise<SmartQueryResult> {
   try {
     console.log('[SmartQueryService] Attempting with aggressive token optimization');
+    
+    // If we already have filtering info but need aggressive optimization,
+    // apply even stricter filtering
+    let enhancedFilteringInfo = filteringInfo;
+    if (aggressiveConfig.useSmartFiltering) {
+      try {
+        // Apply more aggressive filtering
+        enhancedFilteringInfo = await applySmartFiltering(message, userId, aggressiveConfig);
+        console.log(`[SmartQueryService] Enhanced aggressive filtering applied:
+          - Filtered entries: ${enhancedFilteringInfo.filteredCount} / ${enhancedFilteringInfo.totalCount}
+          - Applied filters: ${enhancedFilteringInfo.appliedFilters.join(', ')}
+          - Processing time: ${enhancedFilteringInfo.filteringTime}ms`);
+      } catch (filterError) {
+        console.error('[SmartQueryService] Error applying enhanced filtering:', filterError);
+        // Continue with original filtering if error
+      }
+    }
     
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
       body: {
@@ -251,10 +380,12 @@ async function processQueryWithAggressiveOptimization(
         userId,
         threadId,
         optimizationConfig: aggressiveConfig,
+        filteredEntries: enhancedFilteringInfo?.filteredEntries || null,
         metadata: {
           processingAttempt: 'aggressive_optimization',
           queryLength: message.length,
-          optimizationLevel: 'aggressive' as const
+          optimizationLevel: 'aggressive' as const,
+          useSmartFiltering: aggressiveConfig.useSmartFiltering
         }
       }
     });
@@ -264,6 +395,13 @@ async function processQueryWithAggressiveOptimization(
       return await attemptFinalFallback(message, userId, threadId);
     }
 
+    // Add filtering info to the token usage stats
+    const tokenUsage = data.tokenUsage || {};
+    if (enhancedFilteringInfo) {
+      tokenUsage.filteredEntryCount = enhancedFilteringInfo.filteredCount;
+      tokenUsage.originalEntryCount = enhancedFilteringInfo.totalCount;
+    }
+
     return {
       success: true,
       response: data.response,
@@ -271,9 +409,20 @@ async function processQueryWithAggressiveOptimization(
       executionResults: data.executionResults,
       diagnostics: {
         ...data.diagnostics,
-        processingMethod: 'aggressive_optimization'
+        processingMethod: 'aggressive_optimization',
+        smartFiltering: enhancedFilteringInfo ? {
+          applied: true,
+          filters: enhancedFilteringInfo.appliedFilters,
+          extractedFilters: enhancedFilteringInfo.extractedFilters
+        } : { applied: false }
       },
-      tokenUsage: data.tokenUsage
+      tokenUsage,
+      filteringInfo: enhancedFilteringInfo ? {
+        appliedFilters: enhancedFilteringInfo.appliedFilters || [],
+        filteredCount: enhancedFilteringInfo.filteredCount || 0,
+        totalCount: enhancedFilteringInfo.totalCount || 0,
+        filteringTime: enhancedFilteringInfo.filteringTime
+      } : undefined
     };
   } catch (error) {
     console.error('[SmartQueryService] Aggressive optimization error:', error);
@@ -284,7 +433,8 @@ async function processQueryWithAggressiveOptimization(
 async function attemptFallbackProcessing(
   message: string, 
   userId: string, 
-  threadId: string | null
+  threadId: string | null,
+  filteringInfo: any = null
 ): Promise<SmartQueryResult | null> {
   try {
     console.log('[SmartQueryService] Attempting fallback processing');
@@ -294,14 +444,23 @@ async function attemptFallbackProcessing(
         message,
         userId,
         threadId,
+        filteredEntries: filteringInfo?.filteredEntries || null,
         metadata: {
           processingAttempt: 'fallback',
-          queryLength: message.length
+          queryLength: message.length,
+          useSmartFiltering: filteringInfo ? true : false
         }
       }
     });
 
     if (error || data?.error) return null;
+
+    // Add filtering info to the token usage stats if available
+    const tokenUsage = data.tokenUsage || {};
+    if (filteringInfo) {
+      tokenUsage.filteredEntryCount = filteringInfo.filteredCount;
+      tokenUsage.originalEntryCount = filteringInfo.totalCount;
+    }
 
     return {
       success: true,
@@ -310,8 +469,19 @@ async function attemptFallbackProcessing(
       executionResults: data.executionResults,
       diagnostics: {
         ...data.diagnostics,
-        processingMethod: 'fallback'
-      }
+        processingMethod: 'fallback',
+        smartFiltering: filteringInfo ? {
+          applied: true,
+          filters: filteringInfo.appliedFilters
+        } : { applied: false }
+      },
+      tokenUsage,
+      filteringInfo: filteringInfo ? {
+        appliedFilters: filteringInfo.appliedFilters || [],
+        filteredCount: filteringInfo.filteredCount || 0,
+        totalCount: filteringInfo.totalCount || 0,
+        filteringTime: filteringInfo.filteringTime
+      } : undefined
     };
   } catch {
     return null;
@@ -354,201 +524,4 @@ async function attemptFinalFallback(
   }
 }
 
-export async function processAndSaveSmartQuery(
-  message: string,
-  userId: string,
-  threadId: string
-): Promise<{ success: boolean; userMessage?: ChatMessage; assistantMessage?: ChatMessage; error?: string; diagnostics?: any }> {
-  try {
-    console.log("[SmartQueryService] Processing and saving query:", message.substring(0, 30) + "...");
-    
-    const isComplexQuery = detectComplexQuery(message);
-    const optimizationConfig = getOptimizationConfig(message.length);
-    
-    let analysisData: any = {
-      queryComplexity: isComplexQuery ? 'multi-part' : 'simple', 
-      queryLength: message.length,
-      optimizationLevel: optimizationConfig.optimizationLevel
-    };
-    
-    const { data: savedUserMsg, error: userMsgError } = await supabase
-      .from('chat_messages')
-      .insert({
-        thread_id: threadId,
-        content: message,
-        sender: 'user',
-        role: 'user',
-        analysis_data: analysisData
-      })
-      .select()
-      .single();
-      
-    if (userMsgError) {
-      console.error('[SmartQueryService] Error saving user message:', userMsgError);
-      throw userMsgError;
-    }
-    
-    const timeoutDuration = isComplexQuery ? 120000 : 45000; // 120 seconds for complex, 45 for simple
-    console.log(`[SmartQueryService] Setting timeout: ${timeoutDuration}ms for ${isComplexQuery ? 'complex' : 'simple'} query`);
-    
-    try {
-      const processingStartTime = Date.now();
-      
-      const result = await Promise.race([
-        processSmartQuery(message, userId, threadId),
-        new Promise<SmartQueryResult>((_, reject) => 
-          setTimeout(() => reject(new Error(`Query processing timeout after ${timeoutDuration}ms`)), timeoutDuration)
-        )
-      ]);
-      
-      const processingTime = Date.now() - processingStartTime;
-      console.log(`[SmartQueryService] Query processed in ${processingTime}ms`);
-      
-      if (!result.success) {
-        let errorMsg = result.error || 'Failed to process query';
-        console.error('[SmartQueryService] Processing error:', errorMsg, result.diagnostics);
-        
-        // Special handling for token limit errors
-        if (errorMsg.includes('context length') || errorMsg.includes('token')) {
-          errorMsg = "Your question contains too much information for me to process. Please try breaking it into smaller questions.";
-        } else if (isComplexQuery && processingTime < 5000) {
-          errorMsg = "I'm having trouble understanding your multi-part question. The query orchestrator encountered an early error. Please try asking one question at a time.";
-        } else if (errorMsg.includes('timeout') || processingTime >= timeoutDuration - 1000) {
-          errorMsg = "Your question is taking longer than expected to process. Please try asking a simpler or shorter question.";
-        }
-        
-        const { data: savedErrorMsg, error: errorMsgError } = await supabase
-          .from('chat_messages')
-          .insert({
-            thread_id: threadId,
-            content: errorMsg,
-            sender: 'assistant',
-            role: 'assistant',
-            analysis_data: {
-              error: result.error,
-              queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
-              processingTime,
-              diagnostics: result.diagnostics,
-              optimizationLevel: optimizationConfig.optimizationLevel,
-              tokenUsage: result.tokenUsage
-            }
-          })
-          .select()
-          .single();
-          
-        if (errorMsgError) {
-          console.error('[SmartQueryService] Error saving error message:', errorMsgError);
-        }
-        
-        return {
-          success: false,
-          userMessage: savedUserMsg as ChatMessage,
-          assistantMessage: savedErrorMsg as ChatMessage,
-          error: errorMsg,
-          diagnostics: result.diagnostics
-        };
-      }
-      
-      const analysisData = {
-        planDetails: result.planDetails,
-        executionResults: result.executionResults,
-        diagnostics: result.diagnostics,
-        queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
-        processingTime,
-        processingStages: ['query_analysis', 'orchestration', 'response_generation'],
-        optimizationLevel: optimizationConfig.optimizationLevel,
-        tokenUsage: result.tokenUsage
-      };
-      
-      const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: result.response,
-          sender: 'assistant',
-          role: 'assistant',
-          analysis_data: analysisData
-        })
-        .select()
-        .single();
-        
-      if (assistantMsgError) {
-        console.error('[SmartQueryService] Error saving assistant message:', assistantMsgError);
-        throw assistantMsgError;
-      }
-      
-      return {
-        success: true,
-        userMessage: savedUserMsg as ChatMessage,
-        assistantMessage: savedAssistantMsg as ChatMessage,
-        diagnostics: result.diagnostics
-      };
-    } catch (processingError: any) {
-      console.error('[SmartQueryService] Query processing error:', processingError);
-      
-      let errorMessage = processingError.message || 'An error occurred during processing';
-      
-      // Check for token limit errors
-      if (processingError.message?.includes('context length') || 
-          processingError.message?.includes('token limit') ||
-          processingError.message?.includes('too long')) {
-        errorMessage = 'Your question contains too much information for me to process. Please try breaking it into smaller questions.';
-      } else if (isComplexQuery) {
-        if (processingError.message?.includes('timeout')) {
-          errorMessage = 'Your multi-part question is taking longer than expected to process. Please try asking one question at a time for better results.';
-        } else if (processingError.message?.includes('AbortError') || processingError.message?.includes('failed to fetch')) {
-          errorMessage = 'There was a communication error while processing your complex question. Please try asking a simpler question or breaking it down into parts.';
-        } else {
-          errorMessage = 'I had trouble processing your multi-part question. Please try asking one question at a time for better results.';
-        }
-      } else {
-        if (message.length > 150) {
-          errorMessage = 'Your question seems detailed. Please try rephrasing it more concisely for better results.';
-        }
-      }
-      
-      const { data: errorResponse, error: saveError } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: `${errorMessage} I can better answer questions when they're asked one at a time.`,
-          sender: 'assistant',
-          role: 'assistant',
-          analysis_data: {
-            error: processingError.message,
-            queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
-            errorType: processingError.name || 'ProcessingError',
-            queryLength: message.length,
-            optimizationLevel: optimizationConfig.optimizationLevel
-          }
-        })
-        .select()
-        .single();
-      
-      if (saveError) {
-        console.error('[SmartQueryService] Error saving error response:', saveError);
-      }
-      
-      return {
-        success: false,
-        userMessage: savedUserMsg as ChatMessage,
-        assistantMessage: errorResponse as ChatMessage,
-        error: errorMessage
-      };
-    }
-  } catch (error: any) {
-    console.error('[SmartQueryService] Error in processAndSaveSmartQuery:', error);
-    
-    let errorMessage = error.message || 'Unknown error occurred';
-    if (errorMessage.includes('timeout') || errorMessage.includes('AbortError')) {
-      errorMessage = 'Your question is taking longer than expected to process. Please try again with a simpler question.';
-    } else if (errorMessage.includes('context length') || errorMessage.includes('token')) {
-      errorMessage = 'Your question contains too much information for me to process. Please try a shorter question.';
-    }
-    
-    return {
-      success: false,
-      error: errorMessage
-    };
-  }
-}
+// ... keep existing code (processAndSaveSmartQuery function remains the same)

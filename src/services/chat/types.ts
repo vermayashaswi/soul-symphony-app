@@ -39,7 +39,7 @@ export type ThemeUpdateEvent = {
   source?: string;
 };
 
-// Token optimization configuration type
+// Token optimization configuration type with enhanced filtering
 export type TokenOptimizationConfig = {
   maxEntries: number;         // Maximum number of entries to include in context
   maxEntryLength: number;     // Maximum length of each entry in characters
@@ -47,4 +47,32 @@ export type TokenOptimizationConfig = {
   includeEntities: boolean;   // Whether to include entity data
   maxPreviousMessages: number; // Maximum number of previous messages to include
   optimizationLevel: 'none' | 'light' | 'aggressive';
+  // New filtering options
+  useSmartFiltering: boolean; // Whether to use intelligent filtering
+  filterOptions?: {
+    dateRange?: {
+      startDate?: string;
+      endDate?: string;
+    };
+    emotions?: string[];      // Filter by specific emotions
+    themes?: string[];        // Filter by specific themes
+    relevanceThreshold?: number; // Minimum similarity score (0-1)
+    contentKeywords?: string[]; // Keywords to prioritize in content
+  };
 };
+
+// Data filter parameters for query optimization
+export type QueryFilterParams = {
+  userId: string;
+  query: string;
+  dateRange?: {
+    startDate?: string;
+    endDate?: string;
+  };
+  emotions?: string[];
+  themes?: string[];
+  relevanceThreshold?: number;
+  contentKeywords?: string[];
+  limit?: number;
+};
+
