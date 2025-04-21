@@ -145,23 +145,8 @@ serve(async (req) => {
     // Block or respond to "general" or "general-journal-specific" queries immediately per your SOuLO prompt
 
     if (category === "general" || category === "general-journal-specific") {
-      // Check if this is a very simple greeting that can be directly answered
-      let simpleGreeting = /^(hi|hello|hey)$/i.test(message.trim());
-      let resp = null;
-
-      // For very basic greetings, use a direct response to reduce unnecessary latency and cost.
-      if (simpleGreeting) {
-        resp = "Hi there! I'm always here when you need to talk or reflect.";
-        
-        diagnosticSteps.push({
-          name: "Simple Greeting Direct Response",
-          status: "success",
-          details: "Using quick canned response for simple greeting",
-          timestamp: new Date().toISOString()
-        });
-      } else {
-        // Otherwise, use OpenAI with the user's special SOuLO prompt.
-        const finalPrompt = `
+      // Directly use OpenAI with the user's special SOuLO prompt for all queries in these categories
+      const finalPrompt = `
 You are SOuLO, a personal mental well-being assistant that helps users reflect on their emotions, track their mental health, and grow through voice journaling.
 
 You have received a query attached herewith. 
@@ -187,35 +172,35 @@ Example Responses:
 "I'm designed to help you reflect on your thoughts and emotions. Feel free to ask me something about your journaling journey!"
 
 "Great question. Here are 5 proven ways to reduce anxiety:..."
-        `;
+  `;
 
-        // Forward the message as a "user" message with the above system prompt
-        const completion = await fetch('https://api.openai.com/v1/chat/completions', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${apiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini',
-            messages: [
-              { role: 'system', content: finalPrompt },
-              { role: 'user', content: message }
-            ],
-            temperature: 0.2,
-            max_tokens: 250
-          }),
-        });
+      const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: finalPrompt },
+            { role: 'user', content: message }
+          ],
+          temperature: 0.2,
+          max_tokens: 250
+        }),
+      });
 
-        if (!completion.ok) {
-          const errorText = await completion.text();
-          console.error('[Orchestrator] OpenAI general SOuLO prompt error:', errorText);
-          resp = "I'm here to help you reflect on your journaling and well-being. Please try again or ask another question!";
-        } else {
-          const completionData = await completion.json();
-          resp = completionData.choices?.[0]?.message?.content?.trim() ||
-            "I'm here to help you with your journaling and well-being.";
-        }
+      let resp;
+
+      if (!completion.ok) {
+        const errorText = await completion.text();
+        console.error('[Orchestrator] OpenAI general SOuLO prompt error:', errorText);
+        resp = "I'm here to help you reflect on your journaling and well-being. Please try again or ask another question!";
+      } else {
+        const completionData = await completion.json();
+        resp = completionData.choices?.[0]?.message?.content?.trim() ||
+          "I'm here to help you with your journaling and well-being.";
       }
 
       diagnosticSteps.push({
