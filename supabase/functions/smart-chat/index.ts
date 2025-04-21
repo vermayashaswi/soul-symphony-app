@@ -202,9 +202,13 @@ IMPORTANT GUIDELINES:
 - ALL generic questions about mental health, journaling, or the app are "GENERAL"
 - Questions that can be answered WITHOUT analyzing journal entries are "GENERAL"
 - ONLY classify as "JOURNAL_SPECIFIC" if the query EXPLICITLY requires analyzing their journal data
+- Single word messages like "hey", "hi", "hello" are ALWAYS "GENERAL"
+- Short phrases like "how are you" are ALWAYS "GENERAL"
+- If you're unsure whether a query requires journal data, default to "GENERAL"
 
 Examples:
 - "Hi" -> "GENERAL"
+- "Hey" -> "GENERAL"
 - "Hey there" -> "GENERAL"
 - "How are you?" -> "GENERAL"
 - "What is journaling?" -> "GENERAL"
