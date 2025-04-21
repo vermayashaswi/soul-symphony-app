@@ -3,6 +3,7 @@ import React from 'react';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Separator } from '@/components/ui/separator';
+import { cn } from '@/lib/utils';
 
 // This file has been updated to include token usage diagnostics
 
@@ -90,8 +91,7 @@ export default function ChatDiagnostics({
               </div>
               <Progress 
                 value={tokenUsage.contextUtilization * 100} 
-                className="h-1.5"
-                indicatorClassName={tokenUsage.contextUtilization > 0.8 ? "bg-destructive" : ""}
+                className={cn("h-1.5", tokenUsage.contextUtilization > 0.8 ? "bg-destructive" : "")}
               />
               {tokenUsage.contextUtilization > 0.8 && (
                 <p className="text-xs text-destructive mt-1">
@@ -117,9 +117,9 @@ export default function ChatDiagnostics({
             {ragSteps.map((step) => (
               <div key={step.id} className="flex items-center gap-2">
                 <Badge variant={
-                  step.status === 'success' ? 'success' :
+                  step.status === 'success' ? 'default' :
                   step.status === 'error' ? 'destructive' :
-                  step.status === 'warning' ? 'warning' :
+                  step.status === 'warning' ? 'secondary' :
                   step.status === 'loading' ? 'outline' : 'secondary'
                 } className="h-5 text-[10px]">
                   {step.status}

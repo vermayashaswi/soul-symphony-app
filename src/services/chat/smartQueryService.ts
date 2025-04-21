@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage, TokenOptimizationConfig } from "./types";
 import { useToast } from "@/hooks/use-toast";
@@ -24,7 +23,7 @@ function getOptimizationConfig(queryLength: number): TokenOptimizationConfig {
       includeSentiment: false,
       includeEntities: false,
       maxPreviousMessages: 3,
-      optimizationLevel: 'aggressive',
+      optimizationLevel: 'aggressive' as const,
     };
   } else if (queryLength > 500) {
     // Medium length queries need moderate optimization
@@ -32,7 +31,7 @@ function getOptimizationConfig(queryLength: number): TokenOptimizationConfig {
       ...DEFAULT_OPTIMIZATION_CONFIG,
       maxEntries: 4,
       maxEntryLength: 180,
-      optimizationLevel: 'light',
+      optimizationLevel: 'light' as const,
     };
   }
   
@@ -168,7 +167,7 @@ async function processQueryWithFallback(
       // If token limit error, try with more aggressive optimization
       if (error.message?.includes('context length') || error.message?.includes('token')) {
         console.log('[SmartQueryService] Token limit exceeded, trying with aggressive optimization');
-        const aggressiveConfig = {
+        const aggressiveConfig: TokenOptimizationConfig = {
           ...optimizationConfig,
           maxEntries: 2,
           maxEntryLength: 100,
@@ -195,7 +194,7 @@ async function processQueryWithFallback(
       // Check if token limit error
       if (data.error.includes('context length') || data.error.includes('token')) {
         console.log('[SmartQueryService] Token limit exceeded in response, trying with aggressive optimization');
-        const aggressiveConfig = {
+        const aggressiveConfig: TokenOptimizationConfig = {
           ...optimizationConfig,
           maxEntries: 2,
           maxEntryLength: 100,
@@ -255,7 +254,7 @@ async function processQueryWithAggressiveOptimization(
         metadata: {
           processingAttempt: 'aggressive_optimization',
           queryLength: message.length,
-          optimizationLevel: 'aggressive'
+          optimizationLevel: 'aggressive' as const
         }
       }
     });
@@ -411,7 +410,7 @@ export async function processAndSaveSmartQuery(
         
         // Special handling for token limit errors
         if (errorMsg.includes('context length') || errorMsg.includes('token')) {
-          errorMsg = "Your question contains too much information for me to process. Please try asking a shorter question or breaking it into multiple smaller questions.";
+          errorMsg = "Your question contains too much information for me to process. Please try breaking it into smaller questions.";
         } else if (isComplexQuery && processingTime < 5000) {
           errorMsg = "I'm having trouble understanding your multi-part question. The query orchestrator encountered an early error. Please try asking one question at a time.";
         } else if (errorMsg.includes('timeout') || processingTime >= timeoutDuration - 1000) {

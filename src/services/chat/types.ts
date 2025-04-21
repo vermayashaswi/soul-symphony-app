@@ -48,4 +48,3 @@ export type TokenOptimizationConfig = {
   maxPreviousMessages: number; // Maximum number of previous messages to include
   optimizationLevel: 'none' | 'light' | 'aggressive';
 };
-
