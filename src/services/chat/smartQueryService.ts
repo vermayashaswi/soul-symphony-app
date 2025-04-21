@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
-import { isFactualGeneralKnowledgeQuery } from "@/utils/chat/queryAnalyzer";
 
 interface SmartQueryResult {
   success: boolean;
@@ -13,7 +12,8 @@ interface SmartQueryResult {
 }
 
 /**
- * Process a query through the smart query orchestrator
+ * Process a query through the smart query orchestrator.
+ * (No more client-side query classification/analysis. All logic is in the edge function.)
  * @param message The user's query
  * @param userId The user's ID
  * @param threadId Optional thread ID for context
@@ -26,26 +26,16 @@ export async function processSmartQuery(
   try {
     console.log("[SmartQueryService] Processing query:", message.substring(0, 30) + "...");
     
-    // Check early if this is a factual knowledge query that should be declined
-    if (isFactualGeneralKnowledgeQuery(message)) {
-      console.log('[SmartQueryService] Detected factual knowledge query, returning standard response');
-      return {
-        success: true,
-        response: "I'm your emotional well-being assistant. I'm here to support your journaling practice and mental wellness, not to provide general knowledge. Could I help you reflect on something in your journal or discuss mental well-being techniques instead?"
-      };
-    }
-    
-    // Call the Supabase edge function orchestrator directly
+    // Do not attempt to classify the query client-side.
+    // All logic handled in edge function.
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
       body: {
         message,
         userId,
-        threadId,
-        isFactualQueryChecked: true // Flag to indicate factual check was already done
+        threadId
       }
     });
 
-    // Handle response errors
     if (error) {
       console.error('[SmartQueryService] Edge function error:', error);
       return {
@@ -54,7 +44,6 @@ export async function processSmartQuery(
       };
     }
 
-    // Check if the response has an error field
     if (data?.error) {
       console.error('[SmartQueryService] Processing error:', data.error);
       return {
@@ -63,7 +52,6 @@ export async function processSmartQuery(
       };
     }
 
-    // Validate that we have a response
     if (!data?.response) {
       console.error('[SmartQueryService] No response returned from orchestrator');
       return {
