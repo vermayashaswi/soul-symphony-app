@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -75,17 +76,73 @@ serve(async (req) => {
       timestamp: new Date().toISOString()
     });
     
-    // --- Step 1: Classify the query category
-    const category = classifyQueryCategory(message);
+    // --- Step 1: Gather thread context if available ---
+    let threadContext = null;
+    if (threadId) {
+      try {
+        // Fetch recent messages from the thread for context
+        const { data: recentMessages, error: threadError } = await supabase
+          .from('chat_messages')
+          .select('content, sender, created_at')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(5);
+          
+        if (!threadError && recentMessages && recentMessages.length > 0) {
+          threadContext = recentMessages.reverse(); // Chronological order
+          
+          diagnosticSteps.push({
+            name: "Thread Context Retrieval",
+            status: "success",
+            details: `Retrieved ${threadContext.length} messages for context`,
+            timestamp: new Date().toISOString()
+          });
+        }
+      } catch (threadFetchError) {
+        console.error('[Orchestrator] Error fetching thread context:', threadFetchError);
+        // Non-critical error, continue without thread context
+        diagnosticSteps.push({
+          name: "Thread Context Retrieval",
+          status: "warning",
+          details: `Failed to retrieve thread context: ${threadFetchError.message}`,
+          timestamp: new Date().toISOString()
+        });
+      }
+    }
 
-    diagnosticSteps.push({
-      name: "Query Category Classification",
-      status: "success",
-      details: `Query classified as "${category}"`,
-      timestamp: new Date().toISOString()
-    });
+    // --- Step 2: Classify the query category (using thread context if available) ---
+    const initialCategory = classifyQueryCategory(message);
+    let category = initialCategory;
+    
+    // If we have thread context and the query is ambiguous, use thread context to better classify
+    if (threadContext && (category === "uncategorized" || message.length < 15)) {
+      const threadBasedCategory = await classifyWithThreadContext(message, threadContext);
+      if (threadBasedCategory !== "uncategorized") {
+        category = threadBasedCategory;
+        diagnosticSteps.push({
+          name: "Query Category Classification",
+          status: "success",
+          details: `Query reclassified using thread context from "${initialCategory}" to "${category}"`,
+          timestamp: new Date().toISOString()
+        });
+      } else {
+        diagnosticSteps.push({
+          name: "Query Category Classification",
+          status: "success",
+          details: `Query classified as "${category}" (thread context didn't help)`,
+          timestamp: new Date().toISOString()
+        });
+      }
+    } else {
+      diagnosticSteps.push({
+        name: "Query Category Classification",
+        status: "success",
+        details: `Query classified as "${category}"`,
+        timestamp: new Date().toISOString()
+      });
+    }
 
-    // --- Step 2: Planner Logic and Routing ---
+    // --- Step 3: Planner Logic and Routing ---
     // Block or respond to "general" queries immediately
     if (category === "general") {
       let resp = "I'm designed to assist you with your journal insights and mental health queries. This question doesn't relate to your journal context.";
@@ -110,72 +167,130 @@ serve(async (req) => {
     if (category === "uncategorized") {
       diagnosticSteps.push({
         name: "Uncategorized Query Handling",
-        status: "error",
-        details: "Unable to classify the query. Response blocked for ambiguity.",
+        status: "warning",
+        details: "Unable to classify the query. Response offers clarification.",
         timestamp: new Date().toISOString()
       });
       return new Response(JSON.stringify({
-        error: "I couldn't determine how to process your question. Please rephrase, focusing on your journal or reflection.",
+        response: "I couldn't determine how to process your question. Could you rephrase it, focusing on your journal entries or reflections?",
         diagnostics: { steps: diagnosticSteps }
-      }), { status: 400, headers: corsHeaders });
+      }), { status: 200, headers: corsHeaders });
     }
 
-    // For "journal-specific" or "general-journal-specific" (those relating to journaling advice/counseling/entries)
-    // Continue with original planner logic, but keep classification basis
-
-    // --- Step 3: Analyzer Agent (decides segmentation/embedding/RAG plan) ---
-
-    // Analyze complexity (reuse existing analyzeQuery logic)
-    const queryAnalysis = await analyzeQuery(message);
+    // --- Step 4: Get Database Schema for Planner ---
+    const dbSchema = await getDatabaseSchema();
     diagnosticSteps.push({
-      name: "Query Analysis",
+      name: "Database Schema Retrieval",
       status: "success",
-      details: `Features: ${JSON.stringify(queryAnalysis.features)}`,
+      details: `Retrieved schema information for ${Object.keys(dbSchema).length} tables`,
+      timestamp: new Date().toISOString()
+    });
+
+    // --- Step 5: Enhanced Planner Agent ---
+    // Analyze query complexity and formulate a plan
+    const queryAnalysis = await analyzeQueryWithSchema(message, threadContext, category, dbSchema, userId);
+    diagnosticSteps.push({
+      name: "Enhanced Query Analysis",
+      status: "success",
+      details: `Analysis complete: ${queryAnalysis.planSummary}`,
       timestamp: new Date().toISOString()
     });
 
     let response, planDetails, executionResults;
 
-    if (queryAnalysis.isComplex) {
-      // --- Step 4: Complex query planner/segmenter ---
+    // --- Step 6: Execute the plan ---
+    if (queryAnalysis.requiresSegmentation) {
+      // --- Complex Query Execution ---
       diagnosticSteps.push({
-        name: "Planner: Complex Query Detected",
+        name: "Planner: Complex Query Execution",
         status: "in_progress",
-        details: "Planning segmentation and execution for complex query",
+        details: "Executing segmented query plan",
         timestamp: new Date().toISOString()
       });
 
-      // Only generate one embedding for whole query
+      // Generate a single embedding for the original query
       const queryEmbedding = await generateEmbedding(message);
-      diagnosticSteps.push({
-        name: "Generate Query Embedding",
-        status: "success",
-        details: "Generated query embedding for segmentation and RAG",
-        timestamp: new Date().toISOString()
-      });
-
-      // Get relevant entries for segmentation context
+      
+      // Fetch relevant entries for context
       const relevantEntries = await getRelevantJournalEntries(userId, queryEmbedding, 0.5, 10);
       diagnosticSteps.push({
         name: "Fetch Relevant Entries",
         status: "success",
-        details: `Found ${relevantEntries.length} entries for segmentation context`,
+        details: `Found ${relevantEntries.length} entries for context`,
         timestamp: new Date().toISOString()
       });
 
-      // Segment query (using segmentation function)
-      const segmentedQueries = await segmentQuery(message, relevantEntries);
+      // Create sub-queries based on the plan
+      const subQueries = await generateSubQueries(
+        message, 
+        relevantEntries, 
+        queryAnalysis.queryPlan, 
+        dbSchema
+      );
+      
       diagnosticSteps.push({
-        name: "Query Segmentation",
+        name: "Sub-Query Generation",
         status: "success",
-        details: `Segmented into ${segmentedQueries.length} sub-queries`,
+        details: `Generated ${subQueries.length} sub-queries from query plan`,
         timestamp: new Date().toISOString()
       });
 
-      // --- Step 5: Distributed Execution of Tasks/Segments ---
-      if (segmentedQueries.length <= 1) {
-        // Edge case: just run as simple RAG
-        const { data: ragData, error: ragError } = await supabase.functions.invoke('chat-with-rag', {
+      // Execute sub-queries in parallel
+      const subQueryPromises = subQueries.map(async (subQuery, index) => {
+        try {
+          const subQueryEmbedding = await generateEmbedding(subQuery.query);
+          const { data: subQueryData, error: subQueryErr } = await supabase.functions.invoke('chat-with-rag', {
+            body: {
+              message: subQuery.query,
+              userId,
+              threadId,
+              queryEmbedding: subQueryEmbedding,
+              includeDiagnostics: true,
+              originalQuery: message,
+              queryPurpose: subQuery.purpose
+            }
+          });
+          
+          if (subQueryErr) {
+            return { 
+              query: subQuery.query, 
+              purpose: subQuery.purpose,
+              error: subQueryErr.message, 
+              success: false 
+            };
+          }
+          
+          return {
+            query: subQuery.query,
+            purpose: subQuery.purpose,
+            response: subQueryData.data,
+            references: subQueryData.references,
+            success: true
+          };
+        } catch (err) {
+          return { 
+            query: subQuery.query, 
+            purpose: subQuery.purpose,
+            error: err.message, 
+            success: false 
+          };
+        }
+      });
+
+      const subQueryResults = await Promise.all(subQueryPromises);
+      diagnosticSteps.push({
+        name: "Sub-Query Execution",
+        status: "success",
+        details: `Completed ${subQueryResults.filter(r => r.success).length}/${subQueries.length} sub-queries successfully`,
+        timestamp: new Date().toISOString()
+      });
+
+      // Combine results if we have successful sub-queries
+      const successfulResults = subQueryResults.filter(r => r.success);
+      
+      if (successfulResults.length === 0) {
+        // Fall back to direct RAG if all sub-queries failed
+        const { data: directRagData, error: directRagError } = await supabase.functions.invoke('chat-with-rag', {
           body: {
             message,
             userId,
@@ -184,177 +299,99 @@ serve(async (req) => {
             includeDiagnostics: true
           }
         });
-        if (ragError) {
-          diagnosticSteps.push({
-            name: "Error - chat-with-rag execution",
-            status: "error",
-            details: ragError.message,
-            timestamp: new Date().toISOString()
-          });
-          return new Response(JSON.stringify({
-            error: ragError.message,
-            diagnostics: { steps: diagnosticSteps }
-          }), { status: 500, headers: corsHeaders });
+        
+        if (directRagError) {
+          throw new Error(`Failed to get direct RAG response: ${directRagError.message}`);
         }
-        response = ragData.data;
+        
+        response = directRagData.data;
         executionResults = [{
-          segment: message,
-          response: ragData.data,
-          references: ragData.references
+          query: message,
+          response: directRagData.data,
+          references: directRagData.references
         }];
+        
         planDetails = {
-          type: "simple_query",
-          analysis: queryAnalysis
+          type: "fallback_direct_query",
+          originalPlan: queryAnalysis.queryPlan,
+          reason: "All sub-queries failed"
+        };
+      } else if (successfulResults.length === 1) {
+        // Just use the single successful result
+        response = successfulResults[0].response;
+        executionResults = successfulResults;
+        planDetails = {
+          type: "single_sub_query",
+          plan: queryAnalysis.queryPlan,
+          executedQueries: 1
         };
       } else {
-        // Efficient, parallel processing of segment tasks
-        diagnosticSteps.push({
-          name: "Planner: Distributed Segment Processing",
-          status: "in_progress",
-          details: `Processing ${segmentedQueries.length} segments in parallel`,
-          timestamp: new Date().toISOString()
-        });
-
-        const segmentPromises = segmentedQueries.map(async segment => {
-          try {
-            const segmentEmbedding = await generateEmbedding(segment); // Parallel embeddings
-            const { data: segmentData, error: segmentErr } = await supabase.functions.invoke('chat-with-rag', {
-              body: {
-                message: segment,
-                userId,
-                threadId,
-                queryEmbedding: segmentEmbedding,
-                includeDiagnostics: true
-              }
-            });
-            if (segmentErr) {
-              return { segment, error: segmentErr.message, success: false };
-            }
-            return {
-              segment,
-              response: segmentData.data,
-              references: segmentData.references,
-              success: true
-            };
-          } catch (err) {
-            return { segment, error: err.message, success: false };
+        // Combine multiple sub-query results
+        const { data: combinedData, error: combineError } = await supabase.functions.invoke('combine-segment-responses', {
+          body: {
+            originalQuery: message,
+            segmentResults: successfulResults,
+            userId,
+            threadId,
+            queryPlan: queryAnalysis.queryPlan
           }
         });
-
-        const segmentResults = await Promise.all(segmentPromises);
-        diagnosticSteps.push({
-          name: "Parallel Segment Processing",
-          status: "success",
-          details: `Processed ${segmentResults.length} segments: ${segmentResults.filter(r => r.success).length} successful`,
-          timestamp: new Date().toISOString()
-        });
-
-        const successfulResults = segmentResults.filter(r => r.success);
-        if (!successfulResults.length) {
-          diagnosticSteps.push({
-            name: "No Successful Segment Results",
-            status: "error",
-            details: "Failed to get results for segments.",
-            timestamp: new Date().toISOString()
-          });
-          return new Response(JSON.stringify({
-            error: "Failed to process any query segments.",
-            diagnostics: { steps: diagnosticSteps }
-          }), { status: 500, headers: corsHeaders });
+        
+        if (combineError) {
+          throw new Error(`Failed to combine results: ${combineError.message}`);
         }
-        // Combine logic when >1 successful segment
-        if (successfulResults.length === 1) {
-          response = successfulResults[0].response;
-          executionResults = successfulResults;
-        } else {
-          // Combine result edge call
-          const { data: combinedData, error: combineError } = await supabase.functions.invoke('combine-segment-responses', {
-            body: {
-              originalQuery: message,
-              segmentResults: successfulResults,
-              userId,
-              threadId
-            }
-          });
-          if (combineError) {
-            diagnosticSteps.push({
-              name: "Error - Combining Responses",
-              status: "error",
-              details: combineError.message,
-              timestamp: new Date().toISOString()
-            });
-            return new Response(JSON.stringify({
-              error: "Failed to combine segment results.",
-              diagnostics: { steps: diagnosticSteps }
-            }), { status: 500, headers: corsHeaders });
-          }
-          response = combinedData.response;
-          executionResults = successfulResults;
-          diagnosticSteps.push({
-            name: "Final Response Combination",
-            status: "success",
-            details: `Combined responses from ${successfulResults.length} segments`,
-            timestamp: new Date().toISOString()
-          });
-        }
+        
+        response = combinedData.response;
+        executionResults = successfulResults;
+        
         planDetails = {
-          type: "segmented_query",
-          segments: segmentedQueries,
-          segmentCount: segmentedQueries.length,
-          analysis: queryAnalysis
+          type: "combined_sub_queries",
+          plan: queryAnalysis.queryPlan,
+          executedQueries: successfulResults.length
         };
       }
     } else {
-      // --- Step 6: Simple journal query (direct RAG) ---
+      // --- Simple Query Execution ---
       diagnosticSteps.push({
-        name: "Planner: Simple Query Chosen",
-        status: "success",
-        details: "Direct RAG for journal query",
+        name: "Planner: Simple Query Execution",
+        status: "in_progress",
+        details: "Executing direct query",
         timestamp: new Date().toISOString()
       });
-      // One direct embedding/call
+      
+      // Direct RAG for simple queries
       const queryEmbedding = await generateEmbedding(message);
-      diagnosticSteps.push({
-        name: "Generate Query Embedding",
-        status: "success",
-        details: "Generated query embedding for simple query",
-        timestamp: new Date().toISOString()
-      });
+      
       const { data: ragData, error: ragError } = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message,
           userId,
           threadId,
           queryEmbedding,
-          includeDiagnostics: true
+          includeDiagnostics: true,
+          analysisHint: queryAnalysis.processingHint || null
         }
       });
+      
       if (ragError) {
-        diagnosticSteps.push({
-          name: "Error - chat-with-rag execution",
-          status: "error",
-          details: ragError.message,
-          timestamp: new Date().toISOString()
-        });
-        return new Response(JSON.stringify({
-          error: ragError.message,
-          diagnostics: { steps: diagnosticSteps }
-        }), { status: 500, headers: corsHeaders });
+        throw new Error(`Failed to get RAG response: ${ragError.message}`);
       }
+      
       response = ragData.data;
       executionResults = [{
-        segment: message,
+        query: message,
         response: ragData.data,
         references: ragData.references
       }];
+      
       planDetails = {
-        type: "simple_query",
-        directRag: true,
+        type: "direct_query",
+        category: category,
         analysis: queryAnalysis
       };
     }
 
-    // --- Step 7: Diagnostics and wrap-up
+    // --- Step 7: Final response and diagnostics ---
     const totalTime = Date.now() - startTime;
     diagnosticSteps.push({
       name: "Query Processing Complete",
@@ -362,6 +399,7 @@ serve(async (req) => {
       details: `Total processing time: ${totalTime}ms`,
       timestamp: new Date().toISOString()
     });
+    
     return new Response(JSON.stringify({
       response,
       planDetails,
@@ -398,37 +436,195 @@ serve(async (req) => {
   }
 });
 
-// Helper function to analyze a query and determine if it's complex
-async function analyzeQuery(query) {
-  // Check complexity factors
-  const isComplexQuery = query.length > 120 || 
-                         query.includes(" and ") || 
-                         query.includes(" or ") ||
-                         query.includes("also") ||
-                         query.split("?").length > 2 ||
-                         query.includes("compare") ||
-                         query.includes("relationship between") ||
-                         query.includes("how has") ||
-                         query.includes("tell me about") && query.length > 80;
+// Helper function to analyze a query with database schema
+async function analyzeQueryWithSchema(query, threadContext, category, dbSchema, userId) {
+  try {
+    console.log("[Orchestrator] Analyzing query with schema knowledge");
+    
+    // Get the count of journal entries to inform the planner
+    const entryCount = await countJournalEntries(userId);
+    
+    // Prepare the prompt for the planning agent
+    const promptContent = {
+      query,
+      threadContext: threadContext || [],
+      category,
+      dbSchema,
+      entryCount
+    };
+    
+    // Call OpenAI to analyze the query with schema knowledge
+    const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          { 
+            role: 'system', 
+            content: `You are an expert planner agent for a journaling application that determines the best way to answer user queries.
+            
+            You will analyze user queries and determine:
+            1. If the query requires segmentation into sub-queries
+            2. The type of information needed from the database
+            3. The most efficient way to retrieve and process that information
+            4. Whether special processing is needed (emotion analysis, temporal queries, etc.)
+            
+            Return your analysis in JSON format with these fields:
+            - requiresSegmentation: boolean (true if query should be split)
+            - queryPlan: object describing how to execute the query
+            - processingHint: string (optional hints for RAG processing)
+            - planSummary: string (brief summary of the plan)
+            
+            For complex queries, the queryPlan should include:
+            - mainGoal: string
+            - approach: string
+            - subQueries: array of strings (if segmentation required)
+            - subQueryPurposes: array of strings (what each sub-query addresses)
+            - dataRequirements: object (what data fields are needed)
+            - specialProcessing: array of strings (any special processing needed)` 
+          },
+          { 
+            role: 'user', 
+            content: JSON.stringify(promptContent)
+          }
+        ],
+        temperature: 0.2,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!completion.ok) {
+      const errorText = await completion.text();
+      console.error('[Orchestrator] OpenAI analysis error:', errorText);
+      
+      // Return a simple default analysis on error
+      return {
+        requiresSegmentation: false,
+        processingHint: "Use general RAG approach due to analysis failure",
+        planSummary: "Direct query processing due to analysis failure",
+        queryPlan: null
+      };
+    }
+
+    const completionData = await completion.json();
+    const analysisResult = JSON.parse(completionData.choices[0].message.content);
+    
+    console.log("[Orchestrator] Analysis result:", JSON.stringify(analysisResult).substring(0, 200) + "...");
+    
+    return analysisResult;
+  } catch (error) {
+    console.error("[Orchestrator] Error in analyzeQueryWithSchema:", error);
+    
+    // Return a default analysis on error
+    return {
+      requiresSegmentation: false,
+      processingHint: "Use general RAG approach due to analysis error",
+      planSummary: "Direct query processing due to analysis error",
+      queryPlan: null
+    };
+  }
+}
+
+// Helper function to generate sub-queries
+async function generateSubQueries(originalQuery, relevantEntries, queryPlan, dbSchema) {
+  try {
+    console.log("[Orchestrator] Generating sub-queries from query plan");
+    
+    if (!queryPlan || !queryPlan.subQueries || !Array.isArray(queryPlan.subQueries)) {
+      // If the plan doesn't include sub-queries, generate them
+      const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            { 
+              role: 'system', 
+              content: `You are an expert query planner that decomposes complex questions into simpler, focused sub-queries.
+              
+              Original query: "${originalQuery}"
+              
+              Database tables: ${JSON.stringify(Object.keys(dbSchema))}
+              
+              Based on the relevant journal entries and database schema:
+              1. Break down the original query into 2-4 focused sub-queries
+              2. Each sub-query should address a specific aspect of the original question
+              3. Return the sub-queries as a JSON array of objects with:
+                 - query: the sub-query text
+                 - purpose: what aspect this sub-query addresses`
+            },
+            { 
+              role: 'user', 
+              content: `Here are some relevant journal entries to provide context:
+              ${JSON.stringify(relevantEntries.slice(0, 3).map(e => ({ 
+                content: e.content.substring(0, 150) + "...", 
+                date: e.created_at 
+              })))}
+              
+              Generate sub-queries for: "${originalQuery}"`
+            }
+          ],
+          temperature: 0.5,
+          response_format: { type: "json_object" }
+        }),
+      });
   
-  // Detect features
-  const features = {
-    isTemporalQuery: query.includes("yesterday") || 
-                    query.includes("last week") || 
-                    query.includes("last month") ||
-                    query.includes("this week") ||
-                    query.includes("this month") ||
-                    query.includes("today"),
-    isEmotionFocused: /feel|feeling|felt|emotion|mood|happy|sad|angry|anxious/i.test(query),
-    isQuantitative: /how much|how many|count|percentage|average|top/i.test(query),
-    isComparisonQuery: /compare|versus|vs|difference between/i.test(query),
-    requiresReasoning: /why|reason|explain|understand|analysis/i.test(query)
-  };
+      if (!completion.ok) {
+        const errorText = await completion.text();
+        console.error('[Orchestrator] OpenAI sub-query generation error:', errorText);
+        
+        // Return a fallback single query
+        return [{ 
+          query: originalQuery, 
+          purpose: "Answer the original query directly" 
+        }];
+      }
   
-  return {
-    isComplex: isComplexQuery,
-    features
-  };
+      const completionData = await completion.json();
+      try {
+        const generatedSubQueries = JSON.parse(completionData.choices[0].message.content);
+        
+        if (Array.isArray(generatedSubQueries)) {
+          return generatedSubQueries;
+        } else if (generatedSubQueries.subQueries && Array.isArray(generatedSubQueries.subQueries)) {
+          return generatedSubQueries.subQueries;
+        } else {
+          // A single fallback query if format is unexpected
+          return [{ 
+            query: originalQuery, 
+            purpose: "Answer the original query directly" 
+          }];
+        }
+      } catch (parseError) {
+        console.error('[Orchestrator] Error parsing sub-queries:', parseError);
+        return [{ 
+          query: originalQuery, 
+          purpose: "Answer the original query directly" 
+        }];
+      }
+    } else {
+      // Use the sub-queries already in the plan
+      return queryPlan.subQueries.map((query, index) => ({
+        query,
+        purpose: queryPlan.subQueryPurposes && queryPlan.subQueryPurposes[index] 
+          ? queryPlan.subQueryPurposes[index] 
+          : `Sub-query ${index + 1}`
+      }));
+    }
+  } catch (error) {
+    console.error("[Orchestrator] Error generating sub-queries:", error);
+    return [{ 
+      query: originalQuery, 
+      purpose: "Answer the original query directly" 
+    }];
+  }
 }
 
 // Helper function to generate an embedding for a text
@@ -494,35 +690,32 @@ async function getRelevantJournalEntries(userId, queryEmbedding, matchThreshold 
   }
 }
 
-// Helper function to segment a complex query
-async function segmentQuery(query, journalEntries) {
+// Helper function to classify with thread context
+async function classifyWithThreadContext(query, threadContext) {
   try {
-    console.log('Starting query segmentation');
+    // Convert thread context to a concise format
+    const threadSummary = threadContext.map(msg => {
+      return `${msg.sender}: ${msg.content.substring(0, 100)}${msg.content.length > 100 ? '...' : ''}`;
+    }).join('\n');
     
-    // Format entries to provide context
-    const entriesContext = journalEntries.map(entry => ({
-      content: entry.content.substring(0, 200),
-      date: entry.created_at
-    }));
-    
-    const prompt = `You are an AI assistant that segments complex user queries into simpler questions based on provided journal entries.
-      User Query: ${query}
-      Relevant Journal Entries: ${JSON.stringify(entriesContext)}
-      Instructions:
-      1. Analyze the user query and identify its main components.
-      2. Break down the complex query into simpler, more specific questions that can be answered using the journal entries.
-      3. Ensure each segmented question is clear, concise, and directly related to the original query.
-      4. If the query is already simple, return it as a single segment.
-      5. Provide the segmented questions in a JSON array format.
+    const prompt = `
+      You are classifying a user query into categories for a journaling app chatbot.
       
-      Example:
-      [
-        "What were the main topics I wrote about last week?",
-        "How did I feel about work during that time?",
-        "Were there any specific actions I planned to take?"
-      ]`;
+      Categories:
+      - "general": Basic greetings, small talk, or off-topic questions (e.g., "hi", "who is the president")
+      - "journal-specific": Questions about the user's own journal entries or personal insights (e.g., "what are my top emotions", "how did I feel last week")
+      - "general-journal-specific": Questions about journaling or mental health but not specific to the user's entries (e.g., "how should I journal", "tips for mental health")
+      - "uncategorized": Queries that don't clearly fit the other categories
+      
+      Recent conversation context:
+      ${threadSummary}
+      
+      Current user query: "${query}"
+      
+      Based on this conversation context and the current query, determine the most appropriate category.
+      Reply with just the category name: "general", "journal-specific", "general-journal-specific", or "uncategorized".
+    `;
 
-    console.log('Calling OpenAI to segment the query');
     const completion = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -530,40 +723,145 @@ async function segmentQuery(query, journalEntries) {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [{ role: 'system', content: prompt }],
-        temperature: 0.7,
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: prompt }],
+        temperature: 0.2,
+        max_tokens: 20,
       }),
     });
 
     if (!completion.ok) {
       const error = await completion.text();
-      console.error('Failed to segment the query:', error);
-      return [query]; // Fall back to the original query
+      console.error('Failed to classify with thread context:', error);
+      return "uncategorized"; // Fall back to uncategorized
     }
 
     const completionData = await completion.json();
-    if (!completionData.choices || completionData.choices.length === 0) {
-      console.error('Failed to segment the query - no choices returned');
-      return [query]; // Fall back to the original query
-    }
-
-    let segmentedQuery;
-    try {
-      // Parse the segmented queries
-      segmentedQuery = JSON.parse(completionData.choices[0].message.content);
-      if (!Array.isArray(segmentedQuery)) {
-        throw new Error("Expected array of query segments");
-      }
-    } catch (parseError) {
-      console.error("Failed to parse segmented queries:", parseError);
-      return [query]; // Fall back to the original query
+    const category = completionData.choices[0].message.content.trim().toLowerCase();
+    
+    // Only return if it matches one of our expected categories
+    if (["general", "journal-specific", "general-journal-specific", "uncategorized"].includes(category)) {
+      return category;
     }
     
-    console.log(`Segmented query into ${segmentedQuery.length} parts`);
-    return segmentedQuery;
+    return "uncategorized"; // Default if response doesn't match expected categories
   } catch (error) {
-    console.error('Error segmenting complex query:', error);
-    return [query]; // Fall back to the original query
+    console.error('Error classifying with thread context:', error);
+    return "uncategorized";
+  }
+}
+
+// Helper function to get database schema
+async function getDatabaseSchema() {
+  try {
+    // Start with a hardcoded schema for critical tables
+    const schema = {
+      "Journal Entries": {
+        columns: [
+          "id", "user_id", "created_at", "refined text", "transcription text", 
+          "emotions", "entities", "master_themes", "sentiment", "duration"
+        ],
+        columnTypes: {
+          "id": "bigint",
+          "user_id": "uuid",
+          "created_at": "timestamp with time zone",
+          "refined text": "text",
+          "transcription text": "text",
+          "emotions": "jsonb",
+          "entities": "jsonb",
+          "master_themes": "text[]",
+          "sentiment": "text",
+          "duration": "numeric"
+        }
+      },
+      "journal_embeddings": {
+        columns: ["id", "journal_entry_id", "content", "embedding", "created_at"],
+        columnTypes: {
+          "id": "bigint",
+          "journal_entry_id": "bigint",
+          "content": "text",
+          "embedding": "vector",
+          "created_at": "timestamp with time zone"
+        }
+      },
+      "chat_messages": {
+        columns: ["id", "thread_id", "content", "sender", "created_at", "analysis_data"],
+        columnTypes: {
+          "id": "uuid",
+          "thread_id": "uuid",
+          "content": "text",
+          "sender": "text",
+          "created_at": "timestamp with time zone",
+          "analysis_data": "jsonb"
+        }
+      },
+      "chat_threads": {
+        columns: ["id", "user_id", "title", "created_at", "updated_at"],
+        columnTypes: {
+          "id": "uuid",
+          "user_id": "uuid",
+          "title": "text",
+          "created_at": "timestamp with time zone",
+          "updated_at": "timestamp with time zone"
+        }
+      }
+    };
+    
+    // Try to get additional schema info from the database
+    try {
+      // Only check additional tables if needed
+      const { data: tableColumns, error: tableError } = await supabase.rpc(
+        'check_table_columns',
+        { table_name: 'emotions' }
+      );
+      
+      if (!tableError && tableColumns && tableColumns.length > 0) {
+        // Add the emotions table to our schema
+        schema["emotions"] = {
+          columns: tableColumns.map(col => col.column_name),
+          columnTypes: tableColumns.reduce((acc, col) => {
+            acc[col.column_name] = col.data_type;
+            return acc;
+          }, {})
+        };
+      }
+    } catch (schemaError) {
+      console.error('Error getting additional schema:', schemaError);
+      // Continue with hardcoded schema
+    }
+    
+    return schema;
+  } catch (error) {
+    console.error('Error getting database schema:', error);
+    
+    // Return a minimal default schema
+    return {
+      "Journal Entries": {
+        columns: ["id", "user_id", "created_at", "refined text", "emotions"],
+        columnTypes: {
+          "id": "bigint",
+          "user_id": "uuid",
+          "created_at": "timestamp with time zone",
+          "refined text": "text",
+          "emotions": "jsonb"
+        }
+      }
+    };
+  }
+}
+
+// Helper function to count journal entries
+async function countJournalEntries(userId) {
+  try {
+    const { count, error } = await supabase
+      .from('Journal Entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+    
+    if (error) throw error;
+    return count || 0;
+  } catch (error) {
+    console.error('Error counting journal entries:', error);
+    return 0; // Default to 0 on error
   }
 }
