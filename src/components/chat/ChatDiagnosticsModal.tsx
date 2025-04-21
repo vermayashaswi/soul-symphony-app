@@ -82,7 +82,7 @@ export const ChatDiagnosticsModal: React.FC<ChatDiagnosticsModalProps> = ({
                     <div key={idx} className="border rounded-md p-3">
                       <div className="flex justify-between items-start">
                         <div className="font-medium">{func.name}</div>
-                        <Badge variant={func.success ? "success" : "destructive"}>
+                        <Badge variant={func.success ? "default" : "destructive"}>
                           {func.success ? "Success" : "Failed"}
                         </Badge>
                       </div>
@@ -159,10 +159,10 @@ export const ChatDiagnosticsModal: React.FC<ChatDiagnosticsModalProps> = ({
 const StatusBadge: React.FC<{ status: string }> = ({ status }) => {
   const getVariant = () => {
     switch (status) {
-      case 'success': return 'success';
+      case 'success': return 'default';
       case 'error': return 'destructive';
-      case 'warning': return 'warning';
-      case 'info': return 'info';
+      case 'warning': return 'secondary';
+      case 'info': return 'secondary';
       case 'loading':
       case 'in_progress':
         return 'outline';

@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -287,7 +288,8 @@ function detectEmotionQuantitativeQuery(message: string) {
 // Update the function that searches journal entries using vector similarity
 async function searchJournalEntriesWithVector(
   userId: string, 
-  queryEmbedding: any[]
+  queryEmbedding: any[],
+  timeRange?: { startDate?: Date; endDate?: Date }
 ) {
   try {
     console.log(`Searching journal entries with vector for userId: ${userId}`);
@@ -328,14 +330,7 @@ serve(async (req) => {
   let similarityScores: {id: number, score: number}[] = [];
   
   try {
-    const { 
-      message, 
-      userId, 
-      threadId = null, 
-      isNewThread = false, 
-      includeDiagnostics = false,
-      queryEmbedding = null // Accept pre-generated embedding
-    } = await req.json();
+    const { message, userId, queryTypes, threadId = null, isNewThread = false, includeDiagnostics = false } = await req.json();
     
     if (!message) {
       throw new Error('No message provided');
@@ -368,7 +363,7 @@ serve(async (req) => {
     });
     
     // If we have a quantitative query about emotions, handle it directly
-    if (emotionQueryAnalysis.isQuantitativeEmotionQuery) {
+    if (queryTypes?.isQuantitative && emotionQueryAnalysis.isQuantitativeEmotionQuery) {
       console.log("Detected quantitative emotion query:", emotionQueryAnalysis);
       diagnosticSteps.push({
         name: "Quantitative Emotion Query", 
@@ -546,72 +541,61 @@ serve(async (req) => {
       });
     }
     
-    // Generate embedding for the user query if not provided
-    let embeddingExecution: FunctionExecution;
-    let actualQueryEmbedding: number[];
+    // Generate embedding for the user query
+    diagnosticSteps.push({
+      name: "Generate embedding for query", 
+      status: "loading"
+    });
     
-    if (queryEmbedding) {
-      // Use the pre-generated embedding from the orchestrator
-      actualQueryEmbedding = queryEmbedding;
-      diagnosticSteps.push({
-        name: "Query Embedding", 
-        status: "success",
-        details: `Using pre-generated embedding from orchestrator`
-      });
-    } else {
-      // Generate embedding if not provided
-      diagnosticSteps.push({
-        name: "Generate embedding for query", 
-        status: "loading"
-      });
-      
-      try {
-        const result = await generateEmbedding(message);
-        if (Array.isArray(result)) {
-          actualQueryEmbedding = result;
-          diagnosticSteps.push({
-            name: "Generate embedding for query", 
-            status: "success",
-            details: `Generated embedding with ${actualQueryEmbedding.length} dimensions`
-          });
-        } else {
-          // This is the function execution data
-          embeddingExecution = result as any;
-          functionExecutions.push(embeddingExecution);
-          if (!embeddingExecution.success) {
-            diagnosticSteps.push({
-              name: "Generate embedding for query", 
-              status: "error",
-              details: embeddingExecution.result?.error || "Unknown error"
-            });
-            throw new Error("Failed to generate embedding: " + embeddingExecution.result?.error);
-          }
-        }
-      } catch (error) {
-        console.error("Error generating embedding:", error);
+    let embeddingExecution: FunctionExecution;
+    let queryEmbedding: number[];
+    
+    try {
+      const result = await generateEmbedding(message);
+      if (Array.isArray(result)) {
+        queryEmbedding = result;
         diagnosticSteps.push({
           name: "Generate embedding for query", 
-          status: "error",
-          details: error instanceof Error ? error.message : String(error)
+          status: "success",
+          details: `Generated embedding with ${queryEmbedding.length} dimensions`
         });
-        
-        // Respond with the error but in a 200 status to avoid CORS issues
-        return new Response(
-          JSON.stringify({
-            response: "I'm having trouble understanding your request right now. There was an error processing your query's semantic meaning.",
-            error: error instanceof Error ? error.message : String(error),
-            diagnostics: includeDiagnostics ? {
-              steps: diagnosticSteps,
-              functionCalls: functionExecutions,
-              similarityScores
-            } : undefined
-          }),
-          { 
-            status: 200,
-            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-          }
-        );
+      } else {
+        // This is the function execution data
+        embeddingExecution = result as any;
+        functionExecutions.push(embeddingExecution);
+        if (!embeddingExecution.success) {
+          diagnosticSteps.push({
+            name: "Generate embedding for query", 
+            status: "error",
+            details: embeddingExecution.result?.error || "Unknown error"
+          });
+          throw new Error("Failed to generate embedding: " + embeddingExecution.result?.error);
+        }
       }
+    } catch (error) {
+      console.error("Error generating embedding:", error);
+      diagnosticSteps.push({
+        name: "Generate embedding for query", 
+        status: "error",
+        details: error instanceof Error ? error.message : String(error)
+      });
+      
+      // Respond with the error but in a 200 status to avoid CORS issues
+      return new Response(
+        JSON.stringify({
+          response: "I'm having trouble understanding your request right now. There was an error processing your query's semantic meaning.",
+          error: error instanceof Error ? error.message : String(error),
+          diagnostics: includeDiagnostics ? {
+            steps: diagnosticSteps,
+            functionCalls: functionExecutions,
+            similarityScores
+          } : undefined
+        }),
+        { 
+          status: 200,
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
     }
     
     // Search for relevant journal entries using vector similarity
@@ -624,7 +608,7 @@ serve(async (req) => {
     const startSearchTime = Date.now();
     const { data: similarEntries, error: searchError } = await searchJournalEntriesWithVector(
       userId,
-      actualQueryEmbedding
+      queryEmbedding
     );
     
     const searchExecution: FunctionExecution = {
@@ -872,4 +856,280 @@ RESPONSE GUIDELINES:
 - Use bullet points wherever possible
 - Don't make assumptions about information not provided
 - Keep your tone warm but direct
-- Focus
+- Focus on being helpful rather than diagnostic
+- Avoid lengthy explanations unless specifically requested
+`;
+
+    console.log("Sending to GPT with RAG context...");
+    diagnosticSteps.push({
+      name: "Generate AI response", 
+      status: "loading",
+      details: "Sending query with context to OpenAI"
+    });
+    
+    try {
+      // Send to GPT with RAG context
+      const startGptTime = Date.now();
+      const response = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${openAIApiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: systemPrompt
+            },
+            {
+              role: 'user',
+              content: message
+            }
+          ],
+        }),
+      });
+
+      if (!response.ok) {
+        const errorText = await response.text();
+        console.error("GPT API error:", errorText);
+        
+        const gptExecution: FunctionExecution = {
+          name: "openai_chat_completion",
+          params: { model: 'gpt-4o-mini' },
+          result: { error: errorText },
+          executionTime: Date.now() - startGptTime,
+          success: false
+        };
+        functionExecutions.push(gptExecution);
+        
+        diagnosticSteps.push({
+          name: "Generate AI response", 
+          status: "error",
+          details: `OpenAI API error: ${errorText}`
+        });
+        
+        throw new Error(`OpenAI API error: ${errorText}`);
+      }
+      
+      const result = await response.json();
+      const aiResponse = result.choices[0].message.content;
+      
+      const gptExecution: FunctionExecution = {
+        name: "openai_chat_completion",
+        params: { model: 'gpt-4o-mini' },
+        result: { 
+          responseLength: aiResponse.length,
+          firstChars: aiResponse.substring(0, 50) + "..."
+        },
+        executionTime: Date.now() - startGptTime,
+        success: true
+      };
+      functionExecutions.push(gptExecution);
+      
+      diagnosticSteps.push({
+        name: "Generate AI response", 
+        status: "success",
+        details: `Generated response with ${aiResponse.length} characters`
+      });
+      
+      // Save the message to the thread if it's not null
+      if (threadId !== null) {
+        diagnosticSteps.push({
+          name: "Save conversation", 
+          status: "loading"
+        });
+        
+        try {
+          // Get generated references to context entries
+          const references = contextEntries.length > 0 ? contextEntries.map(entry => ({
+            id: entry.id,
+            date: entry.date,
+            snippet: entry.snippet?.substring(0, 150) + (entry.snippet?.length > 150 ? "..." : ""),
+            emotions: entry.emotions,
+            similarity: entry.similarity
+          })) : null;
+          
+          // Store both user message and AI response if this is a new or ongoing thread
+          if (isNewThread) {
+            const saveUserStartTime = Date.now();
+            // Save user message
+            const { error: userMsgError } = await supabase
+              .from('chat_messages')
+              .insert({
+                thread_id: threadId,
+                content: message,
+                sender: 'user'
+              });
+              
+            const userSaveExecution: FunctionExecution = {
+              name: "save_user_message",
+              params: { thread_id: threadId },
+              result: userMsgError ? { error: userMsgError.message } : { success: true },
+              executionTime: Date.now() - saveUserStartTime,
+              success: !userMsgError
+            };
+            functionExecutions.push(userSaveExecution);
+              
+            if (userMsgError) {
+              console.error("Error saving user message:", userMsgError);
+              diagnosticSteps.push({
+                name: "Save user message", 
+                status: "error",
+                details: userMsgError.message
+              });
+            } else {
+              diagnosticSteps.push({
+                name: "Save user message", 
+                status: "success"
+              });
+            }
+          }
+          
+          // Save AI response
+          const saveAiStartTime = Date.now();
+          const { error: aiMsgError } = await supabase
+            .from('chat_messages')
+            .insert({
+              thread_id: threadId,
+              content: aiResponse,
+              sender: 'assistant',
+              reference_entries: references,
+              analysis_data: {
+                queryTypeDetection: emotionQueryAnalysis,
+                diagnosticSteps: diagnosticSteps
+              },
+              has_numeric_result: emotionQueryAnalysis.isQuantitativeEmotionQuery
+            });
+            
+          const aiSaveExecution: FunctionExecution = {
+            name: "save_assistant_message",
+            params: { thread_id: threadId },
+            result: aiMsgError ? { error: aiMsgError.message } : { success: true },
+            executionTime: Date.now() - saveAiStartTime,
+            success: !aiMsgError
+          };
+          functionExecutions.push(aiSaveExecution);
+            
+          if (aiMsgError) {
+            console.error("Error saving AI response:", aiMsgError);
+            diagnosticSteps.push({
+              name: "Save assistant response", 
+              status: "error",
+              details: aiMsgError.message
+            });
+          } else {
+            diagnosticSteps.push({
+              name: "Save assistant response", 
+              status: "success"
+            });
+          }
+          
+          // Update thread with latest message
+          const updateThreadStartTime = Date.now();
+          const { error: threadUpdateError } = await supabase
+            .from('chat_threads')
+            .update({ 
+              last_message: aiResponse.substring(0, 100) + (aiResponse.length > 100 ? "..." : ""),
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', threadId);
+            
+          const threadUpdateExecution: FunctionExecution = {
+            name: "update_thread",
+            params: { thread_id: threadId },
+            result: threadUpdateError ? { error: threadUpdateError.message } : { success: true },
+            executionTime: Date.now() - updateThreadStartTime,
+            success: !threadUpdateError
+          };
+          functionExecutions.push(threadUpdateExecution);
+            
+          if (threadUpdateError) {
+            console.error("Error updating thread:", threadUpdateError);
+            diagnosticSteps.push({
+              name: "Update thread", 
+              status: "error",
+              details: threadUpdateError.message
+            });
+          } else {
+            diagnosticSteps.push({
+              name: "Update thread", 
+              status: "success"
+            });
+          }
+        } catch (saveError) {
+          console.error("Error saving conversation:", saveError);
+          diagnosticSteps.push({
+            name: "Save conversation", 
+            status: "error",
+            details: saveError instanceof Error ? saveError.message : String(saveError)
+          });
+        }
+      }
+      
+      // Return the final response
+      return new Response(
+        JSON.stringify({ 
+          response: aiResponse,
+          references: contextEntries.map(entry => ({
+            id: entry.id,
+            date: entry.date,
+            snippet: entry.snippet?.substring(0, 150) + (entry.snippet?.length > 150 ? "..." : ""),
+            emotions: entry.emotions,
+            themes: entry.themes,
+            similarity: entry.similarity,
+            type: entry.type
+          })),
+          diagnostics: includeDiagnostics ? {
+            steps: diagnosticSteps,
+            functionCalls: functionExecutions,
+            similarityScores
+          } : undefined
+        }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (error) {
+      console.error("Error in GPT response generation:", error);
+      diagnosticSteps.push({
+        name: "Generate AI response", 
+        status: "error",
+        details: error instanceof Error ? error.message : String(error)
+      });
+      
+      return new Response(
+        JSON.stringify({
+          response: "I'm having trouble generating a response right now. There was an error connecting to the AI service. Please try again later.",
+          error: error instanceof Error ? error.message : String(error),
+          diagnostics: includeDiagnostics ? {
+            steps: diagnosticSteps,
+            functionCalls: functionExecutions,
+            similarityScores
+          } : undefined
+        }),
+        { 
+          status: 200, // Use 200 even for errors to avoid CORS issues
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+        }
+      );
+    }
+  } catch (error) {
+    console.error("Unhandled error in chat-rag function:", error);
+    
+    return new Response(
+      JSON.stringify({
+        response: "An unexpected error occurred. Please try again later.",
+        error: error instanceof Error ? error.message : String(error),
+        diagnostics: {
+          steps: diagnosticSteps,
+          functionCalls: functionExecutions,
+          similarityScores
+        }
+      }),
+      { 
+        status: 200, // Use 200 even for errors to avoid CORS issues
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
+  }
+});
