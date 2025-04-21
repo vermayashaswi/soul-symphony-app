@@ -35,99 +35,7 @@ const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice jo
 // Maximum number of previous messages to include for context
 const MAX_CONTEXT_MESSAGES = 10;
 
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
-
-  try {
-    const { message, userId, threadId, includeDiagnostics, vectorSearch, retrieveOnly } = await req.json();
-
-    if (!message) {
-      throw new Error('Message is required');
-    }
-
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
-    console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
-
-    // Add this where appropriate in the main request handler:
-    const diagnostics = {
-      steps: [],
-      similarityScores: [],
-      functionCalls: [],
-      references: []
-    };
-    
-    // Fetch previous messages from this thread if a threadId is provided
-    let conversationContext = [];
-    if (threadId) {
-      diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "loading"));
-      try {
-        const { data: previousMessages, error } = await supabase
-          .from('chat_messages')
-          .select('content, sender, created_at')
-          .eq('thread_id', threadId)
-          .order('created_at', { ascending: false })
-          .limit(MAX_CONTEXT_MESSAGES * 2); // Get more messages than needed to ensure we have message pairs
-        
-        if (error) {
-          console.error('Error fetching thread context:', error);
-          diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", error.message));
-        } else if (previousMessages && previousMessages.length > 0) {
-          // Process messages to create conversation context
-          // We need to reverse the messages to get them in chronological order
-          const chronologicalMessages = [...previousMessages].reverse();
-          
-          // Format as conversation context
-          conversationContext = chronologicalMessages.map(msg => ({
-            role: msg.sender === 'user' ? 'user' : 'assistant',
-            content: msg.content
-          }));
-          
-          // Limit to the most recent messages to avoid context length issues
-          if (conversationContext.length > MAX_CONTEXT_MESSAGES) {
-            conversationContext = conversationContext.slice(-MAX_CONTEXT_MESSAGES);
-          }
-          
-          diagnostics.steps.push(createDiagnosticStep(
-            "Thread Context Retrieval", 
-            "success", 
-            `Retrieved ${conversationContext.length} messages for context`
-          ));
-          
-          console.log(`Added ${conversationContext.length} previous messages as context`);
-        } else {
-          diagnostics.steps.push(createDiagnosticStep(
-            "Thread Context Retrieval", 
-            "success", 
-            "No previous messages found in thread"
-          ));
-        }
-      } catch (contextError) {
-        console.error('Error processing thread context:', contextError);
-        diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", contextError.message));
-      }
-    }
-    
-    // Enhanced categorization logic with improved classifier prompt
-    diagnostics.steps.push(createDiagnosticStep("Question Categorization", "loading"));
-    console.log("Categorizing question type");
-    const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a classifier that determines if a user's query is:
+const updatedCategorizerPrompt = `You are a classifier that determines if a user's query is:
 1. A general question/greeting unrelated to their journal data (respond with "GENERAL")
 2. A question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC")
 3. If the question concerns random and ambiguous questions not related to Mental health, journaling or similar lines, respond with "GENERAL" and feel free to deny politely.
@@ -153,7 +61,96 @@ Examples:
 - "What did I write about yesterday?" -> "JOURNAL_SPECIFIC"
 - "Show me patterns in my anxiety" -> "JOURNAL_SPECIFIC"
 - "Am I happier on weekends?" -> "JOURNAL_SPECIFIC"
-- "What emotions do I mention most?" -> "JOURNAL_SPECIFIC"`
+- "What emotions do I mention most?" -> "JOURNAL_SPECIFIC"`;
+
+
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  try {
+    const { message, userId, threadId, includeDiagnostics, vectorSearch, retrieveOnly } = await req.json();
+
+    if (!message) {
+      throw new Error('Message is required');
+    }
+
+    if (!userId) {
+      throw new Error('User ID is required');
+    }
+
+    console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
+
+    const diagnostics = {
+      steps: [],
+      similarityScores: [],
+      functionCalls: [],
+      references: []
+    };
+
+    // Fetch previous messages from this thread if a threadId is provided
+    let conversationContext = [];
+    if (threadId) {
+      diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "loading"));
+      try {
+        const { data: previousMessages, error } = await supabase
+          .from('chat_messages')
+          .select('content, sender, created_at')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(MAX_CONTEXT_MESSAGES * 2);
+          
+        if (error) {
+          console.error('Error fetching thread context:', error);
+          diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", error.message));
+        } else if (previousMessages && previousMessages.length > 0) {
+          const chronologicalMessages = [...previousMessages].reverse();
+          
+          conversationContext = chronologicalMessages.map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          }));
+          
+          if (conversationContext.length > MAX_CONTEXT_MESSAGES) {
+            conversationContext = conversationContext.slice(-MAX_CONTEXT_MESSAGES);
+          }
+          
+          diagnostics.steps.push(createDiagnosticStep(
+            "Thread Context Retrieval", 
+            "success", 
+            `Retrieved ${conversationContext.length} messages for context`
+          ));
+          
+          console.log(`Added ${conversationContext.length} previous messages as context`);
+        } else {
+          diagnostics.steps.push(createDiagnosticStep(
+            "Thread Context Retrieval", 
+            "success", 
+            "No previous messages found in thread"
+          ));
+        }
+      } catch (contextError) {
+        console.error('Error processing thread context:', contextError);
+        diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", contextError.message));
+      }
+    }
+    
+    diagnostics.steps.push(createDiagnosticStep("Question Categorization", "loading"));
+    console.log("Categorizing question type");
+    const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: updatedCategorizerPrompt
           },
           { role: 'user', content: message }
         ],
@@ -174,7 +171,6 @@ Examples:
     console.log(`Question categorized as: ${questionType}`);
     diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", `Classified as ${questionType}`));
 
-    // If it's a general question, respond directly without journal entry retrieval
     if (questionType === "GENERAL") {
       console.log("Processing as general question, skipping journal entry retrieval");
       diagnostics.steps.push(createDiagnosticStep("General Question Processing", "loading"));
@@ -193,7 +189,7 @@ Examples:
             { role: 'user', content: message }
           ],
           temperature: 0.7,
-          max_tokens: 250  // Limit token length for general responses
+          max_tokens: 250
         }),
       });
 
@@ -218,7 +214,7 @@ Examples:
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
-    
+
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "loading"));
