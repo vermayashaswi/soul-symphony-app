@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -25,6 +24,7 @@ import {
 import { ChatMessage } from "@/services/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
+import ChatDiagnosticsModal, { ChatDiagnosticStep } from "./ChatDiagnosticsModal";
 
 const SmartChatInterface = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -35,6 +35,8 @@ const SmartChatInterface = () => {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [diagnosticsModalOpen, setDiagnosticsModalOpen] = useState(false);
+  const [currentDiagnostics, setCurrentDiagnostics] = useState<any | null>(null);
   const { toast } = useToast();
   const { user } = useAuth();
   const chatBottomRef = useRef<HTMLDivElement>(null);
@@ -228,7 +230,7 @@ const SmartChatInterface = () => {
         user.id, 
         queryTypes, 
         threadId,
-        false
+        true
       );
       
       const responseInfo = {
@@ -438,13 +440,21 @@ const SmartChatInterface = () => {
     <div className="chat-interface flex flex-col h-full">
       <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
         <h2 className="text-xl font-semibold">Rūḥ</h2>
-        
         <div className="flex items-center gap-2">
+          <Button
+            variant="outline"
+            size="sm"
+            className="text-xs"
+            onClick={() => setDiagnosticsModalOpen(true)}
+            title="View last chat diagnostics"
+          >
+            Diagnostics
+          </Button>
           {currentThreadId && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-9 w-9 text-muted-foreground hover:text-destructive" 
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-9 w-9 text-muted-foreground hover:text-destructive"
               onClick={() => setShowDeleteDialog(true)}
               title="Delete current conversation"
             >
@@ -510,6 +520,12 @@ const SmartChatInterface = () => {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
+      
+      <ChatDiagnosticsModal
+        isOpen={diagnosticsModalOpen}
+        onClose={() => setDiagnosticsModalOpen(false)}
+        diagnostics={currentDiagnostics}
+      />
     </div>
   );
 };
