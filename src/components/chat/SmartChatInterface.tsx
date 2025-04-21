@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -445,16 +444,6 @@ const SmartChatInterface = () => {
       <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
         <h2 className="text-xl font-semibold">Rūḥ</h2>
         <div className="flex items-center gap-2">
-          <Button
-            variant="outline"
-            size="sm"
-            className="flex items-center gap-1 fixed top-16 right-6 z-50 shadow-md"
-            onClick={() => setDiagnosticsModalOpen(true)}
-            title="View last chat diagnostics"
-          >
-            <Bug className="h-4 w-4" />
-            Diagnostics
-          </Button>
           {currentThreadId && (
             <Button
               variant="ghost"

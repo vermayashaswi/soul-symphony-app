@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2, Bug } from "lucide-react";
+import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
@@ -559,32 +559,6 @@ const MobileChatInterfaceContent = ({
         <h2 className="text-lg font-semibold flex-1 text-center">Rūḥ</h2>
         
         <div className="flex items-center">
-          <Button
-            variant="ghost"
-            size="sm"
-            className="z-50 flex items-center gap-1 mr-1"
-            onClick={() => {
-              const diagnosticSteps: ChatDiagnosticStep[] = debugLog.getLogs().map(log => ({
-                name: log.event,
-                status: log.level === 'error' ? 'error' : 
-                       log.level === 'warning' ? 'warning' : 
-                       log.level === 'success' ? 'success' : 'info',
-                details: log.message,
-                timestamp: log.timestamp
-              }));
-              
-              setCurrentDiagnostics({
-                steps: diagnosticSteps,
-                gptResponses: [],
-                functionResponses: []
-              });
-              setDiagnosticsModalOpen(true);
-            }}
-          >
-            <Bug className="h-4 w-4" />
-            <span className="hidden sm:inline">Diagnostics</span>
-          </Button>
-          
           {currentThreadId && messages.length > 0 && (
             <Button 
               variant="ghost" 

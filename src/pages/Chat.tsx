@@ -1,15 +1,23 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { Button } from '@/components/ui/button';
+import { Bug } from 'lucide-react';
+import { useDebugLog } from '@/utils/debug/DebugContext';
+import ChatDiagnosticsModal, { ChatDiagnosticStep } from '@/components/chat/ChatDiagnosticsModal';
+import { DebugProvider } from '@/utils/debug/DebugContext';
 
 const Chat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const debugLog = useDebugLog();
+  const [diagnosticsModalOpen, setDiagnosticsModalOpen] = useState(false);
+  const [currentDiagnostics, setCurrentDiagnostics] = useState<any | null>(null);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -77,10 +85,47 @@ const Chat = () => {
     };
   }, []);
 
+  const handleOpenDiagnostics = () => {
+    const diagnosticSteps: ChatDiagnosticStep[] = debugLog.getLogs().map(log => ({
+      name: log.event,
+      status: log.level === 'error' ? 'error' : 
+             log.level === 'warning' ? 'warning' : 
+             log.level === 'success' ? 'success' : 'info',
+      details: log.message,
+      timestamp: log.timestamp
+    }));
+    
+    setCurrentDiagnostics({
+      steps: diagnosticSteps,
+      gptResponses: [],
+      functionResponses: []
+    });
+    
+    setDiagnosticsModalOpen(true);
+  };
+
   return (
-    <div className="w-full h-full flex flex-col">
-      <SmartChatInterface />
-    </div>
+    <DebugProvider>
+      <div className="w-full h-full flex flex-col relative">
+        <Button
+          variant="outline"
+          size="sm"
+          className="fixed top-4 right-4 z-50 flex items-center gap-1 bg-purple-100 text-purple-800 hover:bg-purple-200 hover:text-purple-900 shadow-md"
+          onClick={handleOpenDiagnostics}
+        >
+          <Bug className="h-4 w-4" />
+          <span className="hidden sm:inline">Diagnostics</span>
+        </Button>
+        
+        <SmartChatInterface />
+        
+        <ChatDiagnosticsModal
+          isOpen={diagnosticsModalOpen}
+          onClose={() => setDiagnosticsModalOpen(false)}
+          diagnostics={currentDiagnostics}
+        />
+      </div>
+    </DebugProvider>
   );
 };
 
