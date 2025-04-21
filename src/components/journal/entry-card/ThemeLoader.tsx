@@ -39,6 +39,7 @@ export function ThemeLoader({
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const themeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const pollStartedRef = useRef<boolean>(false);
 
   // Log when the component is mounted/unmounted
   useEffect(() => {
@@ -81,6 +82,8 @@ export function ThemeLoader({
         );
         
         if (filteredThemes.length > 0) {
+          console.log(`[ThemeLoader] Found ${filteredThemes.length} initial themes for entry ${entryId}:`, filteredThemes);
+          
           // Add stability - use a short timeout to set themes
           // This prevents flickering when themes are updated multiple times in quick succession
           clearTimeout(themeUpdateTimeoutRef.current || undefined);
@@ -113,6 +116,80 @@ export function ThemeLoader({
     }
   }, [initialThemes, isProcessing, isNew, entryId]);
 
+  // Function to poll for themes - extracted to be reusable
+  const pollForThemes = async () => {
+    if (!mountedRef.current || !entryId) return;
+    
+    try {
+      console.log(`[ThemeLoader] Polling for themes for entry ${entryId}`);
+      
+      const { data, error } = await supabase
+        .from('Journal Entries')
+        .select('master_themes, themes')
+        .eq('id', entryId)
+        .maybeSingle();
+        
+      if (error) {
+        console.warn(`[ThemeLoader] Error polling for themes: ${error.message}`);
+        return;
+      }
+        
+      // Check if data exists and is not an error with additional null checks and type casting
+      if (data && typeof data === 'object') {
+        const entryData = data as JournalEntry;
+        
+        // Safely extract themes with fallbacks using the typed interface
+        const updatedMasterThemes = Array.isArray(entryData.master_themes)
+          ? entryData.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+          : [];
+          
+        const updatedThemes = Array.isArray(entryData.themes)
+          ? entryData.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+          : [];
+          
+        const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
+        
+        // If we now have themes, update them and stop loading
+        if (updatedCurrentThemes.length > 0 && mountedRef.current) {
+          console.log(`[ThemeLoader] Found themes for entry ${entryId}:`, updatedCurrentThemes);
+          
+          // Immediately set hasFoundThemes and stable themes to trigger UI update
+          setHasFoundThemes(true);
+          setStableThemes(updatedCurrentThemes);
+          
+          // Update UI state with minimal delay to avoid layout thrashing
+          clearTimeout(themeUpdateTimeoutRef.current || undefined);
+          themeUpdateTimeoutRef.current = setTimeout(() => {
+            if (mountedRef.current) {
+              setThemes(updatedCurrentThemes);
+              setIsThemesLoading(false);
+              setThemesLoaded(true);
+            }
+          }, 200); // Reduced from 500ms to 200ms for faster visual feedback
+          
+          // Stop polling since we found the themes
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+          
+          // Also clear safety timeout as we succeeded
+          if (safetyTimeoutRef.current) {
+            clearTimeout(safetyTimeoutRef.current);
+            safetyTimeoutRef.current = null;
+          }
+          
+          return true; // Return true to indicate themes were found
+        }
+      }
+      
+      return false; // Return false to indicate no themes were found yet
+    } catch (err) {
+      console.error(`[ThemeLoader] Error in theme polling: ${err}`);
+      return false;
+    }
+  };
+
   // Dedicated theme polling mechanism with improved error handling and retry logic
   useEffect(() => {
     if (!mountedRef.current || !entryId) return;
@@ -129,6 +206,14 @@ export function ThemeLoader({
       return;
     }
     
+    // Prevent multiple polling attempts
+    if (pollStartedRef.current) {
+      console.log(`[ThemeLoader] Polling already started for entry ${entryId}`);
+      return;
+    }
+    
+    pollStartedRef.current = true;
+    
     // Clean up previous intervals
     if (pollIntervalRef.current) {
       clearInterval(pollIntervalRef.current);
@@ -143,106 +228,41 @@ export function ThemeLoader({
     console.log(`[ThemeLoader] Setting up theme polling for entry ${entryId}`);
     setIsThemesLoading(true);
     
-    const pollForThemes = async () => {
-      if (!mountedRef.current) return;
-      
-      try {
-        console.log(`[ThemeLoader] Polling for themes for entry ${entryId}`);
+    // Initial check immediately
+    pollForThemes().then(themesFound => {
+      // If themes not found in first attempt, set up polling
+      if (!themesFound && mountedRef.current) {
+        // Then set up interval polling - more frequent polling initially (1.5 seconds)
+        pollIntervalRef.current = setInterval(pollForThemes, 1500);
         
-        const { data, error } = await supabase
-          .from('Journal Entries')
-          .select('master_themes, themes')
-          .eq('id', entryId)
-          .maybeSingle();
+        // Safety timeout: after 30 seconds, stop trying and use fallback
+        safetyTimeoutRef.current = setTimeout(() => {
+          if (!mountedRef.current) return;
           
-        if (error) {
-          console.warn(`[ThemeLoader] Error polling for themes: ${error.message}`);
-          return;
-        }
+          console.log(`[ThemeLoader] Safety timeout reached for entry ${entryId}`);
           
-        // Check if data exists and is not an error with additional null checks and type casting
-        if (data && typeof data === 'object') {
-          const entryData = data as JournalEntry;
-          
-          // Safely extract themes with fallbacks using the typed interface
-          const updatedMasterThemes = Array.isArray(entryData.master_themes)
-            ? entryData.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
-            : [];
-            
-          const updatedThemes = Array.isArray(entryData.themes)
-            ? entryData.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
-            : [];
-            
-          const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
-          
-          // If we now have themes, update them and stop loading
-          if (updatedCurrentThemes.length > 0 && mountedRef.current) {
-            console.log(`[ThemeLoader] Found themes for entry ${entryId}:`, updatedCurrentThemes);
-            
-            // Critical fix for theme flickering: Set stable themes first, then set displayed themes with delay
-            setStableThemes(updatedCurrentThemes);
-            setHasFoundThemes(true);
-            
-            // Add a slight delay before updating the displayed themes to prevent flickering
-            clearTimeout(themeUpdateTimeoutRef.current || undefined);
-            themeUpdateTimeoutRef.current = setTimeout(() => {
-              if (mountedRef.current) {
-                setThemes(updatedCurrentThemes);
-                setIsThemesLoading(false);
-                setThemesLoaded(true);
-              }
-            }, 500);
-            
-            // Stop polling since we found the themes
-            if (pollIntervalRef.current) {
-              clearInterval(pollIntervalRef.current);
-              pollIntervalRef.current = null;
-            }
-            
-            // Also clear safety timeout as we succeeded
-            if (safetyTimeoutRef.current) {
-              clearTimeout(safetyTimeoutRef.current);
-              safetyTimeoutRef.current = null;
+          // If we still don't have themes after timeout, try fallback
+          if (themes.length === 0 && content && mountedRef.current) {
+            const fallbackThemes = generateFallbackThemes(content);
+            if (fallbackThemes.length > 0) {
+              console.log(`[ThemeLoader] Using fallback themes for entry ${entryId}`);
+              setStableThemes(fallbackThemes);
+              setThemes(fallbackThemes);
+              setThemesLoaded(true);
             }
           }
-        }
-      } catch (err) {
-        console.error(`[ThemeLoader] Error in theme polling: ${err}`);
+          
+          // Always ensure we stop showing the loading state
+          setIsThemesLoading(false);
+          
+          // Clear polling interval
+          if (pollIntervalRef.current) {
+            clearInterval(pollIntervalRef.current);
+            pollIntervalRef.current = null;
+          }
+        }, 30000);
       }
-    };
-    
-    // Initial check immediately
-    pollForThemes();
-    
-    // Then set up interval polling - less frequent polling to reduce flickering
-    pollIntervalRef.current = setInterval(pollForThemes, 3000);
-    
-    // Safety timeout: after 30 seconds (increased from 20), stop trying and use fallback
-    safetyTimeoutRef.current = setTimeout(() => {
-      if (!mountedRef.current) return;
-      
-      console.log(`[ThemeLoader] Safety timeout reached for entry ${entryId}`);
-      
-      // If we still don't have themes after timeout, try fallback
-      if (themes.length === 0 && content && mountedRef.current) {
-        const fallbackThemes = generateFallbackThemes(content);
-        if (fallbackThemes.length > 0) {
-          console.log(`[ThemeLoader] Using fallback themes for entry ${entryId}`);
-          setStableThemes(fallbackThemes);
-          setThemes(fallbackThemes);
-          setThemesLoaded(true);
-        }
-      }
-      
-      // Always ensure we stop showing the loading state
-      setIsThemesLoading(false);
-      
-      // Clear polling interval
-      if (pollIntervalRef.current) {
-        clearInterval(pollIntervalRef.current);
-        pollIntervalRef.current = null;
-      }
-    }, 30000);
+    });
     
     // Cleanup on component unmount or deps change
     return () => {
@@ -260,6 +280,8 @@ export function ThemeLoader({
         clearTimeout(themeUpdateTimeoutRef.current);
         themeUpdateTimeoutRef.current = null;
       }
+      
+      pollStartedRef.current = false;
     };
   }, [entryId, isNew, isProcessing, themesLoaded, content, themes.length, stableThemes.length, hasFoundThemes]);
 
@@ -289,22 +311,48 @@ export function ThemeLoader({
     setRetryCount(prev => prev + 1);
     setIsThemesLoading(true);
     setThemesLoaded(false);
+    pollStartedRef.current = false;
     
     // Trigger a new attempt to fetch themes
     if (entryId && content) {
       setTimeout(() => {
         if (mountedRef.current && themes.length === 0) {
-          const fallbackThemes = generateFallbackThemes(content);
-          if (fallbackThemes.length > 0) {
-            setThemes(fallbackThemes);
-            setStableThemes(fallbackThemes);
-          }
-          setIsThemesLoading(false);
-          setThemesLoaded(true);
+          // Try polling first
+          pollForThemes().then(themesFound => {
+            if (!themesFound) {
+              // Fall back to generated themes if polling fails
+              const fallbackThemes = generateFallbackThemes(content);
+              if (fallbackThemes.length > 0) {
+                setThemes(fallbackThemes);
+                setStableThemes(fallbackThemes);
+              }
+            }
+            setIsThemesLoading(false);
+            setThemesLoaded(true);
+          });
         }
-      }, 3000);
+      }, 1000);
     }
   };
+
+  // Custom event listener for theme updates
+  useEffect(() => {
+    const handleThemeUpdate = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId === entryId) {
+        console.log(`[ThemeLoader] Theme update event received for entry ${entryId}`);
+        // Force a poll when we get a theme update event
+        pollForThemes();
+      }
+    };
+
+    // Add event listener
+    window.addEventListener('journalThemesUpdated', handleThemeUpdate as EventListener);
+    
+    // Clean up
+    return () => {
+      window.removeEventListener('journalThemesUpdated', handleThemeUpdate as EventListener);
+    };
+  }, [entryId]);
 
   // Show an error state with retry button if needed
   if (hasError && themes.length === 0) {

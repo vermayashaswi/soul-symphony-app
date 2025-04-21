@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from 'framer-motion';
 import { useDebugLog } from '@/utils/debug/DebugContext';
 
 interface EntryContentProps {
-  content: string; // This will now always be the refined text
+  content: string;
   isExpanded: boolean;
   isProcessing?: boolean;
 }

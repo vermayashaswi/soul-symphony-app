@@ -34,7 +34,6 @@ export async function transcribeAudioWithWhisper(
     const formData = new FormData();
     formData.append('file', audioBlob, filename);
     formData.append('model', 'gpt-4o-transcribe');
-    
     formData.append('response_format', 'json');
     formData.append('prompt', 'The following is a journal entry or conversation that may contain personal thoughts, feelings, or experiences.');
     
@@ -213,7 +212,7 @@ Instructions:
 2. Fix spelling, grammar, and clarity issues while preserving the original meaning.
 3. Do NOT summarize or remove content — preserve all details.
 4. ALWAYS improve the structure or word choice — even if the input is already in English.
-5. NEVER return the original input text — ensure the output is a refined version in English.`
+5. NEVER return the original input text ��� ensure the output is a refined version in English.`
           },
           {
             role: "user",
@@ -227,6 +226,7 @@ Instructions:
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[AI] Refinement API error:", errorText);
+      console.log("[AI] Making second attempt with simpler prompt");
       return await makeSecondAttempt(text, apiKey);
     }
     
@@ -243,7 +243,7 @@ Instructions:
     console.log("[AI] Refined text sample:", refinedText.substring(0, 50));
     
     return { refinedText };
-  } catch (error: any) {
+  } catch (error) {
     console.error("[AI] Error in translateAndRefineText:", error);
     return await makeSecondAttempt(text, apiKey);
   }

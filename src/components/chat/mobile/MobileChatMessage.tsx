@@ -10,16 +10,10 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatShortDate } from "@/utils/format-time";
+import { ChatMessage } from "@/services/chat/types";
 
 interface MobileChatMessageProps {
-  message: {
-    role: 'user' | 'assistant' | 'error';
-    content: string;
-    analysis?: any;
-    references?: any[];
-    diagnostics?: any;
-    hasNumericResult?: boolean;
-  };
+  message: ChatMessage;
   showAnalysis?: boolean;
 }
 
@@ -27,7 +21,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
   const [showReferences, setShowReferences] = useState(false);
   const { user } = useAuth();
   
-  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
+  const hasReferences = message.role === 'assistant' && message.reference_entries && message.reference_entries.length > 0;
   
   const formattedContent = React.useMemo(() => {
     return message.content;
@@ -71,16 +65,16 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
           <p className="break-words">{message.content}</p>
         )}
         
-        {showAnalysis && displayRole === 'assistant' && message.analysis && (
+        {showAnalysis && displayRole === 'assistant' && message.analysis_data && (
           <div className="mt-3 text-xs opacity-70">
             <Separator className="my-2" />
             <div className="font-semibold">Analysis:</div>
-            <p>{message.analysis.analysis}</p>
-            {message.analysis.requiresSql && (
+            {typeof message.analysis_data.analysis === 'string' && <p>{message.analysis_data.analysis}</p>}
+            {message.analysis_data.requiresSql && (
               <>
                 <div className="font-semibold mt-1">SQL Query:</div>
                 <pre className="text-[10px] bg-black/10 p-1 rounded overflow-x-auto">
-                  {message.analysis.sqlQuery}
+                  {message.analysis_data.sqlQuery}
                 </pre>
               </>
             )}
@@ -96,7 +90,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
               onClick={() => setShowReferences(!showReferences)}
             >
               <FileText className="h-3 w-3 mr-1" />
-              {message.references!.length} journal entries
+              {message.reference_entries!.length} journal entries
               {showReferences ? (
                 <ChevronUp className="h-3 w-3 ml-1" />
               ) : (
@@ -112,7 +106,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                   exit={{ opacity: 0, height: 0 }}
                   className="mt-1 text-xs max-h-32 overflow-y-auto border-l-2 border-primary/30 pl-2 pr-1"
                 >
-                  {message.references!.slice(0, 2).map((ref, idx) => (
+                  {message.reference_entries!.slice(0, 2).map((ref: any, idx: number) => (
                     <div key={idx} className="mb-1 py-1">
                       <div className="font-medium dark:text-white/90">
                         {ref.date && !isNaN(new Date(ref.date).getTime()) 
@@ -122,9 +116,9 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                       <div className="text-muted-foreground dark:text-white/70">{ref.snippet}</div>
                     </div>
                   ))}
-                  {message.references!.length > 2 && (
+                  {message.reference_entries!.length > 2 && (
                     <div className="text-xs text-muted-foreground dark:text-white/60">
-                      +{message.references!.length - 2} more entries
+                      +{message.reference_entries!.length - 2} more entries
                     </div>
                   )}
                 </motion.div>

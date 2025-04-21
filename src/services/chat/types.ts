@@ -16,8 +16,23 @@ export type ChatMessage = {
   content: string;
   sender: 'user' | 'assistant';
   created_at: string;
-  reference_entries?: any[];
-  analysis_data?: any;
+  reference_entries?: Json[];
+  analysis_data?: {
+    analysis?: string;
+    requiresSql?: boolean;
+    sqlQuery?: string;
+    processingStages?: string[];
+    queryComplexity?: 'simple' | 'complex' | 'multi-part';
+    [key: string]: any;
+  };
   has_numeric_result?: boolean;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'error';
 };
+
+// Add a theme notification type for more structured event handling
+export type ThemeUpdateEvent = {
+  entryId: number;
+  timestamp: number;
+  source?: string;
+};
+

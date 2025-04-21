@@ -180,39 +180,92 @@ serve(async (req) => {
         throw new Error('Failed to get transcription from OpenAI API');
       }
 
-      // If direct transcription mode, we still process through translation for consistency
-      // Process with GPT for translation and refinement with detected languages
-      console.log("Processing transcription with GPT for refinement...");
-      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey, detectedLanguages);
-    
+      // If direct transcription mode, return just the transcription
       if (directTranscription) {
         return createSuccessResponse({ 
-          transcription: refinedText, // Changed from transcribedText to refinedText
+          transcription: transcribedText,
           detectedLanguages
         });
       }
-
-      // Save the assistant response with refined text
-      const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: threadId,
-          content: refinedText, // Always use refined text
-          sender: 'assistant',
-          role: 'assistant',
-          analysis_data: {
-            originalTranscription: transcribedText, // Keep original for reference
-            refinedText: refinedText,
-            detectedLanguages: detectedLanguages
-          }
-        })
-        .select()
-        .single();
       
-    if (assistantMsgError) {
-      console.error('[SmartQueryService] Error saving assistant message:', assistantMsgError);
-      throw assistantMsgError;
-    }
+      // Process with GPT for translation and refinement with detected languages
+      console.log("Processing transcription with GPT for refinement...");
+      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey, detectedLanguages);
+
+      // Get emotions from the refined text - run inside try/catch to avoid failure
+      let emotions = null;
+      try {
+        const { data: emotionsData, error: emotionsError } = await supabase
+          .from('emotions')
+          .select('name, description')
+          .order('id', { ascending: true });
+          
+        if (emotionsError) {
+          console.error('Error fetching emotions from database:', emotionsError);
+        } else {
+          emotions = await analyzeEmotions(refinedText, emotionsData, openAIApiKey);
+        }
+      } catch (emotionsErr) {
+        console.error("Error analyzing emotions:", emotionsErr);
+      }
+
+      // Analyze sentiment and extract entities using Google NL API - wrap in try/catch
+      let sentimentScore = "0";
+      let entities = [];
+      try {
+        if (GOOGLE_NL_API_KEY) {
+          const nlResults = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
+          sentimentScore = nlResults.sentiment;
+          entities = nlResults.entities;
+        } else {
+          console.log("Skipping Google NL analysis - API key not provided");
+        }
+      } catch (nlErr) {
+        console.error("Error in Google NL analysis:", nlErr);
+      }
+
+      // Calculate audio duration more accurately based on file type and bytes
+      let audioDuration = 0;
+      
+      if (detectedFileType === 'webm') {
+        // For WebM, use the recordingTime from the client if available, or estimate
+        const estimatedDuration = payload.recordingTime ? Math.floor(payload.recordingTime / 1000) : 0;
+        if (estimatedDuration > 300) { // 5 minutes
+          throw new Error('Recording exceeds maximum duration of 5 minutes');
+        }
+        audioDuration = estimatedDuration;
+      } else if (detectedFileType === 'wav') {
+        // For WAV (assuming 48kHz, 16-bit, stereo)
+        audioDuration = Math.round(binaryAudio.length / 192000);
+      } else {
+        // Fallback estimation based on transcription length
+        const wordCount = transcribedText.split(/\s+/).length;
+        audioDuration = Math.max(1, Math.round(wordCount / 2.5)); 
+      }
+      
+      console.log(`Calculated audio duration: ${audioDuration} seconds`);
+
+      // Store journal entry in database
+      console.log("Storing journal entry...");
+      let entryId = null;
+      try {
+        entryId = await storeJournalEntry(
+          supabase,
+          transcribedText,
+          refinedText,
+          audioUrl,
+          userId,
+          audioDuration,
+          emotions,
+          sentimentScore,
+          entities
+        );
+        
+        console.log("Journal entry stored with ID:", entryId);
+      } catch (dbErr) {
+        console.error("Error storing journal entry:", dbErr);
+        throw new Error(`Failed to store journal entry: ${dbErr.message}`);
+      }
 
       // Start background tasks for post-processing if entry was stored successfully
       if (entryId) {        
@@ -312,7 +365,7 @@ serve(async (req) => {
       // Return success response
       return createSuccessResponse({
         transcription: transcribedText,
-        refinedText: refinedText, // Always include refined text
+        refinedText: refinedText,
         audioUrl: audioUrl,
         entryId: entryId,
         emotions: emotions,
