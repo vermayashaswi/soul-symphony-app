@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
 import { useToast } from "@/hooks/use-toast";
@@ -12,13 +11,6 @@ interface SmartQueryResult {
   diagnostics?: any;
 }
 
-/**
- * Process a query through the smart query orchestrator.
- * All query classification happens server-side in the edge function.
- * @param message The user's query
- * @param userId The user's ID
- * @param threadId Optional thread ID for context
- */
 export async function processSmartQuery(
   message: string,
   userId: string,
@@ -27,17 +19,70 @@ export async function processSmartQuery(
   try {
     console.log("[SmartQueryService] Processing query:", message.substring(0, 30) + "...");
     
-    // Enhanced complex query detection with additional patterns
     const isComplex = detectComplexQuery(message);
-    if (isComplex) {
-      console.log("[SmartQueryService] Detected complex multi-part query");
-    }
     
-    // Add query length logging to help diagnose issues with long queries
-    const queryLength = message.length;
-    console.log(`[SmartQueryService] Query length: ${queryLength} characters`);
+    const queryTimeout = isComplex ? 120000 : 45000; // 120s for complex, 45s for simple
+    console.log(`[SmartQueryService] Query timeout set to ${queryTimeout}ms`);
     
-    // Send the query directly to the orchestrator with enhanced metadata
+    console.log(`[SmartQueryService] Query Complexity Analysis:
+      - Message Length: ${message.length}
+      - Is Complex Query: ${isComplex}
+      - Timeout Duration: ${queryTimeout}ms`);
+    
+    const queryResult = await Promise.race([
+      processQueryWithFallback(message, userId, threadId, isComplex),
+      new Promise<SmartQueryResult>((_, reject) => 
+        setTimeout(() => {
+          console.error('[SmartQueryService] Query processing timed out');
+          reject(new Error(`Query processing timed out after ${queryTimeout}ms`));
+        }, queryTimeout)
+      )
+    ]);
+
+    return queryResult;
+  } catch (error: any) {
+    console.error('[SmartQueryService] Comprehensive error handling:', error);
+    
+    const errorResponse: SmartQueryResult = {
+      success: false,
+      error: error.message || 'Unexpected query processing error',
+      diagnostics: {
+        stage: 'query_processing',
+        isComplex: detectComplexQuery(message),
+        queryLength: message.length,
+        fullError: error.toString(),
+        timestamp: new Date().toISOString()
+      }
+    };
+    
+    return errorResponse;
+  }
+}
+
+function detectComplexQuery(message: string): boolean {
+  if (!message) return false;
+  
+  const complexityIndicators = [
+    (message.match(/\b(how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|did|am|have|has|had)\b/gi) || []).length > 1,
+    (message.match(/[?!.]/g) || []).length > 1,
+    message.length > 100,
+    /\b(and|but|or|additionally|moreover|furthermore)\b/i.test(message)
+  ];
+  
+  const complexityScore = complexityIndicators.filter(Boolean).length;
+  
+  console.log(`[SmartQueryService] Complexity Score: ${complexityScore}`);
+  
+  return complexityScore >= 2;
+}
+
+async function processQueryWithFallback(
+  message: string, 
+  userId: string, 
+  threadId: string | null, 
+  isComplex: boolean
+): Promise<SmartQueryResult> {
+  try {
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
       body: {
         message,
@@ -45,121 +90,109 @@ export async function processSmartQuery(
         threadId,
         metadata: {
           isComplexQuery: isComplex,
-          queryLength: queryLength,
-          clientTimestamp: new Date().toISOString()
+          queryLength: message.length,
+          processingAttempt: 'primary'
         }
       }
     });
 
     if (error) {
-      console.error('[SmartQueryService] Edge function error:', error);
-      return {
-        success: false,
-        error: error.message || 'Failed to process query',
-        diagnostics: {
-          stage: 'edge_function_invocation',
-          error: error
-        }
-      };
+      console.error('[SmartQueryService] Primary query processing failed:', error);
+      
+      const fallbackResult = await attemptFallbackProcessing(message, userId, threadId);
+      if (fallbackResult) return fallbackResult;
+      
+      throw error;
     }
 
     if (data?.error) {
-      console.error('[SmartQueryService] Processing error:', data.error);
-      return {
-        success: false,
-        error: data.error || 'Unknown error in query processing',
-        diagnostics: data.diagnostics || { 
-          stage: 'query_processing', 
-          error: data.error 
-        }
-      };
+      console.error('[SmartQueryService] Query processing error:', data.error);
+      
+      const fallbackResult = await attemptFallbackProcessing(message, userId, threadId);
+      if (fallbackResult) return fallbackResult;
+      
+      throw new Error(data.error);
     }
 
-    if (!data?.response) {
-      console.error('[SmartQueryService] No response returned from orchestrator');
-      return {
-        success: false,
-        error: 'No response returned from server',
-        diagnostics: data?.diagnostics || { 
-          stage: 'response_generation',
-          error: 'Empty response'
-        }
-      };
-    }
-
-    console.log('[SmartQueryService] Query processed successfully');
-    
     return {
       success: true,
       response: data.response,
       planDetails: data.planDetails,
       executionResults: data.executionResults,
-      diagnostics: data.diagnostics
-    };
-  } catch (error: any) {
-    console.error('[SmartQueryService] Error in processSmartQuery:', error);
-    return {
-      success: false,
-      error: error.message || 'Unknown error occurred',
       diagnostics: {
-        stage: 'client_side_processing',
-        error: error.toString(),
-        stack: error.stack
+        ...data.diagnostics,
+        processingMethod: 'primary'
       }
     };
+  } catch (error: any) {
+    console.error('[SmartQueryService] Fallback processing error:', error);
+    
+    const finalFallbackResult = await attemptFinalFallback(message, userId, threadId);
+    if (finalFallbackResult) return finalFallbackResult;
+    
+    throw error;
   }
 }
 
-/**
- * Improved complex query detection with more comprehensive patterns
- * @param message The user's query
- * @returns boolean indicating if the query is complex
- */
-function detectComplexQuery(message: string): boolean {
-  if (!message) return false;
-  
-  // Count question marks as a basic heuristic
-  const questionMarkCount = (message.match(/\?/g) || []).length;
-  
-  // Check for long query length - long queries may need segmentation
-  const isLongQuery = message.length > 100;
-  
-  // Look for multiple questions within the query - expanded pattern matching
-  const hasMultipleQuestionWords = 
-    (message.match(/\b(how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|did|am|have|has|had)\b/gi) || []).length > 1;
-  
-  // Look for conjunctions followed by question patterns - expanded with more conjunction patterns
-  const conjunctionPatterns = [
-    /and\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am|have|has|had)/i,
-    /also\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am|have|has|had)/i,
-    /additionally\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am|have|has|had)/i,
-    /but\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am|have|has|had)/i,
-    /or\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am|have|has|had)/i,
-    /yet\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am|have|has|had)/i
-  ];
-  
-  const hasConjunctionPattern = conjunctionPatterns.some(pattern => pattern.test(message));
-  
-  // Consider a query complex if it matches any of our complexity indicators
-  const isComplex = questionMarkCount > 1 || hasConjunctionPattern || (isLongQuery && hasMultipleQuestionWords);
-  
-  // Log the detection results for troubleshooting
-  console.log(`[SmartQueryService] Query complexity analysis:
-    - Length: ${message.length} chars ${isLongQuery ? '(long)' : '(short)'}
-    - Question marks: ${questionMarkCount}
-    - Multiple question words: ${hasMultipleQuestionWords}
-    - Conjunction patterns: ${hasConjunctionPattern}
-    - Final assessment: ${isComplex ? 'Complex' : 'Simple'}`);
-  
-  return isComplex;
+async function attemptFallbackProcessing(
+  message: string, 
+  userId: string, 
+  threadId: string | null
+): Promise<SmartQueryResult | null> {
+  try {
+    console.log('[SmartQueryService] Attempting fallback processing');
+    
+    const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
+      body: {
+        message,
+        userId,
+        threadId,
+        metadata: {
+          processingAttempt: 'fallback',
+          queryLength: message.length
+        }
+      }
+    });
+
+    if (error || data?.error) return null;
+
+    return {
+      success: true,
+      response: data.response,
+      planDetails: data.planDetails,
+      executionResults: data.executionResults,
+      diagnostics: {
+        ...data.diagnostics,
+        processingMethod: 'fallback'
+      }
+    };
+  } catch {
+    return null;
+  }
 }
 
-/**
- * Process a query and save it as a chat message
- * @param message The user's query
- * @param userId The user's ID
- * @param threadId Thread ID for the conversation
- */
+async function attemptFinalFallback(
+  message: string, 
+  userId: string, 
+  threadId: string | null
+): Promise<SmartQueryResult | null> {
+  try {
+    console.log('[SmartQueryService] Attempting final fallback processing');
+    
+    return {
+      success: true,
+      response: "I'm having trouble processing your complex query. Could you rephrase it more simply or break it down into smaller questions?",
+      diagnostics: {
+        processingMethod: 'final_fallback',
+        queryLength: message.length,
+        timestamp: new Date().toISOString()
+      }
+    };
+  } catch {
+    return null;
+  }
+}
+
 export async function processAndSaveSmartQuery(
   message: string,
   userId: string,
@@ -168,7 +201,6 @@ export async function processAndSaveSmartQuery(
   try {
     console.log("[SmartQueryService] Processing and saving query:", message.substring(0, 30) + "...");
     
-    // Check if this is a complex query with improved detection
     const isComplexQuery = detectComplexQuery(message);
     let analysisData = {};
     
@@ -180,7 +212,6 @@ export async function processAndSaveSmartQuery(
       };
     }
     
-    // Save the user message first with enhanced metadata
     const { data: savedUserMsg, error: userMsgError } = await supabase
       .from('chat_messages')
       .insert({
@@ -198,15 +229,12 @@ export async function processAndSaveSmartQuery(
       throw userMsgError;
     }
     
-    // Use a more appropriate timeout for different query types
-    // Long/complex queries need more time, but we don't want to wait too long for simple queries
     const timeoutDuration = isComplexQuery ? 120000 : 45000; // 120 seconds for complex, 45 for simple
     console.log(`[SmartQueryService] Setting timeout: ${timeoutDuration}ms for ${isComplexQuery ? 'complex' : 'simple'} query`);
     
     try {
       const processingStartTime = Date.now();
       
-      // Use Promise.race to implement timeout
       const result = await Promise.race([
         processSmartQuery(message, userId, threadId),
         new Promise<SmartQueryResult>((_, reject) => 
@@ -221,14 +249,12 @@ export async function processAndSaveSmartQuery(
         let errorMsg = result.error || 'Failed to process query';
         console.error('[SmartQueryService] Processing error:', errorMsg, result.diagnostics);
         
-        // Provide more helpful error messages for specific error conditions
         if (isComplexQuery && processingTime < 5000) {
           errorMsg = "I'm having trouble understanding your multi-part question. The query orchestrator encountered an early error. Please try asking one question at a time.";
         } else if (errorMsg.includes('timeout') || processingTime >= timeoutDuration - 1000) {
           errorMsg = "Your question is taking longer than expected to process. Please try asking a simpler or shorter question.";
         }
         
-        // Save error message as assistant response
         const { data: savedErrorMsg, error: errorMsgError } = await supabase
           .from('chat_messages')
           .insert({
@@ -259,7 +285,6 @@ export async function processAndSaveSmartQuery(
         };
       }
       
-      // Save the assistant response with enhanced metadata
       const analysisData = {
         planDetails: result.planDetails,
         executionResults: result.executionResults,
@@ -295,27 +320,22 @@ export async function processAndSaveSmartQuery(
     } catch (processingError: any) {
       console.error('[SmartQueryService] Query processing error:', processingError);
       
-      // Provide more detailed error messages based on the type of error and query
       let errorMessage = processingError.message || 'An error occurred during processing';
       
-      // Specially handle complex query errors with more helpful messaging
       if (isComplexQuery) {
         if (processingError.message?.includes('timeout')) {
           errorMessage = 'Your multi-part question is taking longer than expected to process. Please try asking one question at a time for better results.';
         } else if (processingError.message?.includes('AbortError') || processingError.message?.includes('failed to fetch')) {
           errorMessage = 'There was a communication error while processing your complex question. Please try asking a simpler question or breaking it down into parts.';
         } else {
-          // For unexpected errors with complex queries
           errorMessage = 'I had trouble processing your multi-part question. Please try asking one question at a time for better results.';
         }
       } else {
-        // For simple queries - could be a long single question
         if (message.length > 150) {
           errorMessage = 'Your question seems detailed. Please try rephrasing it more concisely for better results.';
         }
       }
       
-      // Save specific error message as assistant response
       const { data: errorResponse, error: saveError } = await supabase
         .from('chat_messages')
         .insert({
@@ -347,7 +367,6 @@ export async function processAndSaveSmartQuery(
   } catch (error: any) {
     console.error('[SmartQueryService] Error in processAndSaveSmartQuery:', error);
     
-    // Handle specific known errors
     let errorMessage = error.message || 'Unknown error occurred';
     if (errorMessage.includes('timeout') || errorMessage.includes('AbortError')) {
       errorMessage = 'Your question is taking longer than expected to process. Please try again with a simpler question.';
