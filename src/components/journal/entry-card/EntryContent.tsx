@@ -8,26 +8,15 @@ interface EntryContentProps {
   content: string;
   isExpanded: boolean;
   isProcessing?: boolean;
-  maxLength?: number; // Optional max length for content optimization
 }
 
-export function EntryContent({ 
-  content, 
-  isExpanded, 
-  isProcessing = false,
-  maxLength
-}: EntryContentProps) {
+export function EntryContent({ content, isExpanded, isProcessing = false }: EntryContentProps) {
   const { addEvent } = useDebugLog();
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
   
   // Force a minimum loading time of 2 seconds for better UX
   const [forceLoading, setForceLoading] = useState(false);
-
-  // Optimize content if maxLength is provided
-  const optimizedContent = maxLength && content && content.length > maxLength
-    ? `${content.substring(0, maxLength)}...`
-    : content;
 
   useEffect(() => {
     // When processing flag is true, always show loading state and preserve stable content
@@ -54,15 +43,11 @@ export function EntryContent({
       // Only update stable content and hide loader when not processing
       // and we have valid content, and not in forced loading state
       setShowLoading(false);
-      setStableContent(maxLength && content.length > maxLength
-        ? `${content.substring(0, maxLength)}...`
-        : content);
+      setStableContent(content);
     }
     
     addEvent('EntryContent', 'State update', 'info', {
       contentLength: content?.length || 0,
-      optimizedLength: optimizedContent?.length || 0,
-      isOptimized: maxLength ? content?.length > maxLength : false,
       isProcessing,
       isExpanded,
       showLoading,
@@ -70,7 +55,7 @@ export function EntryContent({
       forceLoading
     });
     
-  }, [content, isProcessing, addEvent, forceLoading, maxLength, optimizedContent]);
+  }, [content, isProcessing, addEvent, forceLoading]);
   // Removed isExpanded from dependencies as it shouldn't affect loader visibility
 
   return (

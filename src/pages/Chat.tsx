@@ -78,7 +78,7 @@ const Chat = () => {
   }, []);
 
   return (
-    <div className="w-full h-full flex flex-col relative">
+    <div className="w-full h-full flex flex-col">
       <SmartChatInterface />
     </div>
   );

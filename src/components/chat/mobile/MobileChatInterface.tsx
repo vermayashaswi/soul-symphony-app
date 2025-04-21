@@ -5,6 +5,7 @@ import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2 } from "lucide-react"
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
+import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { v4 as uuidv4 } from 'uuid';
@@ -24,7 +25,6 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDebugLog } from "@/utils/debug/DebugContext";
-import ChatDiagnosticsModal, { ChatDiagnosticStep } from "../ChatDiagnosticsModal";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -70,8 +70,6 @@ const MobileChatInterfaceContent = ({
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
-  const [diagnosticsModalOpen, setDiagnosticsModalOpen] = useState(false);
-  const [currentDiagnostics, setCurrentDiagnostics] = useState<any | null>(null);
   const debugLog = useDebugLog();
   
   const suggestionQuestions = [
@@ -312,12 +310,26 @@ const MobileChatInterfaceContent = ({
       debugLog.addEvent("Query Analysis", `[Mobile] Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
+      const queryTypes = analyzeQueryTypes(message);
       
+      const analysisDetails = {
+        isEmotionFocused: queryTypes.isEmotionFocused,
+        isQuantitative: queryTypes.isQuantitative,
+        isWhyQuestion: queryTypes.isWhyQuestion,
+        isTemporalQuery: queryTypes.isTemporalQuery,
+        timeRange: queryTypes.timeRange.periodName,
+        emotion: queryTypes.emotion || 'none detected'
+      };
+      
+      debugLog.addEvent("Query Analysis", `[Mobile] Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
+      console.log("[Mobile] Query analysis result:", queryTypes);
+      
+      setProcessingStage("Searching for insights...");
       debugLog.addEvent("AI Processing", "[Mobile] Sending query to AI for processing", "info");
       const response = await processChatMessage(
         message, 
         user.id, 
-        {}, // Empty object instead of queryTypes
+        queryTypes, 
         threadId,
         false
       );
@@ -543,19 +555,17 @@ const MobileChatInterfaceContent = ({
         </Sheet>
         <h2 className="text-lg font-semibold flex-1 text-center">Rūḥ</h2>
         
-        <div className="flex items-center">
-          {currentThreadId && messages.length > 0 && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="ml-1 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
-              onClick={() => setShowDeleteDialog(true)}
-              aria-label="Delete conversation"
-            >
-              <Trash2 className="h-5 w-5" />
-            </Button>
-          )}
-        </div>
+        {currentThreadId && messages.length > 0 && (
+          <Button 
+            variant="ghost" 
+            size="icon" 
+            className="ml-1 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
+            onClick={() => setShowDeleteDialog(true)}
+            aria-label="Delete conversation"
+          >
+            <Trash2 className="h-5 w-5" />
+          </Button>
+        )}
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
@@ -602,17 +612,7 @@ const MobileChatInterfaceContent = ({
             {messages.map((message, index) => (
               <MobileChatMessage 
                 key={index} 
-                message={{
-                  id: `msg-${index}`,
-                  thread_id: currentThreadId || '',
-                  content: message.content,
-                  sender: message.role === 'user' ? 'user' : 'assistant',
-                  created_at: new Date().toISOString(),
-                  role: message.role,
-                  reference_entries: message.references,
-                  analysis_data: message.analysis,
-                  has_numeric_result: message.hasNumericResult
-                }}
+                message={message} 
                 showAnalysis={false}
               />
             ))}
@@ -656,12 +656,6 @@ const MobileChatInterfaceContent = ({
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-      
-      <ChatDiagnosticsModal
-        isOpen={diagnosticsModalOpen}
-        onClose={() => setDiagnosticsModalOpen(false)}
-        diagnostics={currentDiagnostics}
-      />
     </div>
   );
 };
