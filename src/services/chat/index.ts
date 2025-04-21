@@ -4,3 +4,4 @@ export * from './types';
 export * from './threadService';
 export * from './messageService';
 export * from './useChatPersistence';
+export * from './smartQueryService';
