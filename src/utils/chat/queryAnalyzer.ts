@@ -1,4 +1,3 @@
-
 // This file contains functions to analyze the type of query a user is asking
 
 type QueryTypes = {
@@ -61,7 +60,10 @@ export function analyzeQueryTypes(query: string): QueryTypes {
                           lowerQuery.startsWith('where is') ||
                           lowerQuery.includes('president of') ||
                           lowerQuery.includes('capital of') ||
-                          lowerQuery.includes('prime minister of');
+                          lowerQuery.includes('prime minister of') ||
+                          /who is the (president|prime minister|leader) of/i.test(lowerQuery) ||
+                          /what is the (capital|population|currency) of/i.test(lowerQuery) ||
+                          (/when (was|is|did)/i.test(lowerQuery) && !lowerQuery.includes("journal") && !lowerQuery.includes("feel"));
   
   // Detect emotion-focused queries
   const emotionWords = ['feel', 'feeling', 'felt', 'emotion', 'emotions', 'mood', 'moods', 'happy', 'sad', 'angry', 'anxious', 'joy', 'fear', 'happiness'];
