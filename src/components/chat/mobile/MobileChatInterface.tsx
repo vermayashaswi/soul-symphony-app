@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "../ChatInput";
 import ChatArea from "../ChatArea";
@@ -190,7 +191,12 @@ const MobileChatInterface = ({
           <EmptyChatState />
         ) : (
           chatHistory.map((msg) => (
-            <ChatArea key={msg.id} chatMessages={[msg]} isLoading={false} />
+            <ChatArea 
+              key={msg.id} 
+              chatMessages={[msg]} 
+              isLoading={false}
+              threadId={currentThreadId} // Add the missing threadId prop here
+            />
           ))
         )}
         <div ref={chatBottomRef} />
