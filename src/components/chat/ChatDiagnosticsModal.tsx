@@ -30,6 +30,7 @@ const statusColorMap: Record<string, string> = {
   loading: "bg-yellow-100 text-yellow-800",
   warning: "bg-orange-100 text-orange-900",
   pending: "bg-gray-100 text-gray-800",
+  info: "bg-blue-100 text-blue-800",
 };
 
 export const ChatDiagnosticsModal: React.FC<ChatDiagnosticsModalProps> = ({
@@ -41,7 +42,7 @@ export const ChatDiagnosticsModal: React.FC<ChatDiagnosticsModalProps> = ({
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-2xl">
+      <DialogContent className="max-w-md sm:max-w-2xl w-[95vw] sm:w-auto max-h-[90vh] overflow-hidden flex flex-col">
         <DialogHeader className="flex flex-row items-center justify-between">
           <DialogTitle className="flex items-center gap-2">
             <Bug className="h-5 w-5" />
@@ -51,7 +52,7 @@ export const ChatDiagnosticsModal: React.FC<ChatDiagnosticsModalProps> = ({
             <X className="h-5 w-5" />
           </button>
         </DialogHeader>
-        <div className="max-h-96 overflow-y-auto space-y-4">
+        <div className="overflow-y-auto max-h-[calc(90vh-80px)] space-y-4 p-1">
           {/* Step-by-step high-level & granular diagnostics */}
           {diagnostics.steps && diagnostics.steps.length > 0 && (
             <div>
@@ -62,19 +63,19 @@ export const ChatDiagnosticsModal: React.FC<ChatDiagnosticsModalProps> = ({
                     className="rounded border p-2 bg-muted/20"
                     key={step.timestamp || i}
                   >
-                    <div className="flex gap-2 items-center">
+                    <div className="flex gap-2 items-center flex-wrap">
                       <Badge className={statusColorMap[step.status] || "bg-gray-200"}>
                         {step.status}
                       </Badge>
-                      <span className="font-medium">{step.name}</span>
+                      <span className="font-medium text-sm">{step.name}</span>
                       {step.timestamp && (
-                        <span className="text-xs text-muted-foreground ml-2">
+                        <span className="text-xs text-muted-foreground ml-auto">
                           {new Date(step.timestamp).toLocaleTimeString()}
                         </span>
                       )}
                     </div>
                     {step.details && (
-                      <div className="text-sm mt-1 text-muted-foreground whitespace-pre-line">
+                      <div className="text-xs mt-1 text-muted-foreground whitespace-pre-line">
                         {typeof step.details === "string"
                           ? step.details
                           : JSON.stringify(step.details, null, 2)}

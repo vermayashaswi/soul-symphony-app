@@ -4,7 +4,7 @@ import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
-import { AlertCircle, Trash2 } from "lucide-react";
+import { AlertCircle, Trash2, Bug } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";

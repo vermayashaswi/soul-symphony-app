@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -447,7 +448,7 @@ const SmartChatInterface = () => {
           <Button
             variant="outline"
             size="sm"
-            className="flex items-center gap-1 z-50 fixed top-16 right-6 shadow-md"
+            className="flex items-center gap-1 fixed top-16 right-6 z-50 shadow-md"
             onClick={() => setDiagnosticsModalOpen(true)}
             title="View last chat diagnostics"
           >
