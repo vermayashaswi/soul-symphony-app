@@ -524,4 +524,117 @@ async function attemptFinalFallback(
   }
 }
 
-// ... keep existing code (processAndSaveSmartQuery function remains the same)
+export async function processAndSaveSmartQuery(
+  message: string,
+  userId: string,
+  threadId: string
+): Promise<{
+  success: boolean;
+  userMessage?: ChatMessage;
+  assistantMessage?: ChatMessage;
+  error?: string;
+}> {
+  try {
+    // Process the query
+    const queryResult = await processSmartQuery(message, userId, threadId);
+    
+    if (!queryResult.success || queryResult.error) {
+      console.error('Error processing smart query:', queryResult.error);
+      return {
+        success: false,
+        error: queryResult.error || 'Failed to process query'
+      };
+    }
+    
+    // Save user message
+    const { data: userData, error: userError } = await supabase
+      .from('chat_messages')
+      .insert({
+        thread_id: threadId,
+        content: message,
+        sender: 'user',
+        role: 'user',
+        created_at: new Date().toISOString()
+      })
+      .select('*')
+      .single();
+      
+    if (userError) {
+      console.error('Error saving user message:', userError);
+      return {
+        success: false,
+        error: `Failed to save user message: ${userError.message}`
+      };
+    }
+    
+    const userMessage: ChatMessage = userData as ChatMessage;
+    
+    // Save assistant message with the query result
+    const { data: assistantData, error: assistantError } = await supabase
+      .from('chat_messages')
+      .insert({
+        thread_id: threadId,
+        content: queryResult.response || 'Sorry, I couldn\'t generate a response.',
+        sender: 'assistant',
+        role: 'assistant',
+        created_at: new Date().toISOString(),
+        analysis_data: {
+          tokenCount: queryResult.tokenUsage?.totalTokens,
+          contextSize: queryResult.tokenUsage?.filteredEntryCount,
+          optimizationLevel: queryResult.diagnostics?.processingMethod || 'primary',
+          queryComplexity: queryResult.diagnostics?.isComplex ? 'complex' : 'simple',
+          processingStages: queryResult.diagnostics?.stages
+        }
+      })
+      .select('*')
+      .single();
+      
+    if (assistantError) {
+      console.error('Error saving assistant message:', assistantError);
+      return {
+        success: false,
+        error: `Failed to save assistant message: ${assistantError.message}`,
+        userMessage
+      };
+    }
+    
+    const assistantMessage: ChatMessage = assistantData as ChatMessage;
+    
+    // Update the thread's updated_at timestamp
+    await supabase
+      .from('chat_threads')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', threadId);
+    
+    // Update the thread title if this is the first message
+    const { count } = await supabase
+      .from('chat_messages')
+      .select('id', { count: 'exact', head: true })
+      .eq('thread_id', threadId);
+    
+    if (count === 2) { // Just created the first user and assistant messages
+      // Dispatch event for thread title generation
+      window.dispatchEvent(
+        new CustomEvent('messageCreated', { 
+          detail: { 
+            threadId: threadId,
+            isFirstMessage: true,
+            userMessage: message
+          } 
+        })
+      );
+    }
+    
+    return {
+      success: true,
+      userMessage,
+      assistantMessage
+    };
+  } catch (error) {
+    console.error('Error in processAndSaveSmartQuery:', error);
+    return {
+      success: false,
+      error: error instanceof Error ? error.message : 'An unknown error occurred'
+    };
+  }
+}
