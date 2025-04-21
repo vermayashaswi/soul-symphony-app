@@ -4,7 +4,7 @@ import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
-import { AlertCircle, Trash2, Bug } from "lucide-react";
+import { AlertCircle, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -15,9 +15,6 @@ import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import { generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useToast } from "@/hooks/use-toast";
-import { DebugProvider } from "@/utils/debug/DebugContext";
-import { useDebugLog } from "@/utils/debug/DebugContext";
-import ChatDiagnosticsModal, { ChatDiagnosticStep } from "@/components/chat/ChatDiagnosticsModal";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,9 +42,6 @@ export default function SmartChat() {
   const titleGeneratedForThreads = useRef<Set<string>>(new Set());
   const hasInitializedRef = useRef<boolean>(false);
   const threadCheckInProgressRef = useRef<boolean>(false);
-  const debugLog = useDebugLog();
-  const [diagnosticsModalOpen, setDiagnosticsModalOpen] = useState(false);
-  const [currentDiagnostics, setCurrentDiagnostics] = useState<any | null>(null);
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -303,40 +297,8 @@ export default function SmartChat() {
     }
   };
 
-  const handleOpenDiagnostics = () => {
-    const diagnosticSteps: ChatDiagnosticStep[] = debugLog.getLogs().map(log => ({
-      name: log.event,
-      status: log.level === 'error' ? 'error' : 
-             log.level === 'warning' ? 'warning' : 
-             log.level === 'success' ? 'success' : 'info',
-      details: log.message,
-      timestamp: log.timestamp
-    }));
-    
-    setCurrentDiagnostics({
-      steps: diagnosticSteps,
-      gptResponses: [],
-      functionResponses: []
-    });
-    
-    setDiagnosticsModalOpen(true);
-  };
-
-  const FloatingDebugButton = () => (
-    <Button
-      variant="outline"
-      size="sm"
-      className="fixed top-4 right-4 z-50 flex items-center gap-1 bg-purple-100 text-purple-800 hover:bg-purple-200 hover:text-purple-900 shadow-md"
-      onClick={handleOpenDiagnostics}
-    >
-      <Bug className="h-4 w-4" />
-      <span className="hidden sm:inline">Diagnostics</span>
-    </Button>
-  );
-
   const desktopContent = (
     <>
-      <FloatingDebugButton />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -409,18 +371,11 @@ export default function SmartChat() {
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
-
-      <ChatDiagnosticsModal
-        isOpen={diagnosticsModalOpen}
-        onClose={() => setDiagnosticsModalOpen(false)}
-        diagnostics={currentDiagnostics}
-      />
     </>
   );
 
   const mobileContent = (
     <div className="flex flex-col h-full" ref={chatContainerRef}>
-      <FloatingDebugButton />
       <motion.div
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
@@ -454,20 +409,14 @@ export default function SmartChat() {
           />
         </div>
       </motion.div>
-
-      <ChatDiagnosticsModal
-        isOpen={diagnosticsModalOpen}
-        onClose={() => setDiagnosticsModalOpen(false)}
-        diagnostics={currentDiagnostics}
-      />
     </div>
   );
   
   const content = shouldRenderMobile ? mobileContent : desktopContent;
   
   return (
-    <DebugProvider>
+    <>
       {mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content}
-    </DebugProvider>
+    </>
   );
 }
