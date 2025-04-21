@@ -13,7 +13,7 @@ interface SmartQueryResult {
 
 /**
  * Process a query through the smart query orchestrator.
- * (No more client-side query classification/analysis. All logic is in the edge function.)
+ * All query classification happens server-side in the edge function.
  * @param message The user's query
  * @param userId The user's ID
  * @param threadId Optional thread ID for context
@@ -26,8 +26,7 @@ export async function processSmartQuery(
   try {
     console.log("[SmartQueryService] Processing query:", message.substring(0, 30) + "...");
     
-    // Do not attempt to classify the query client-side.
-    // All logic handled in edge function.
+    // Send the query directly to the orchestrator without any client-side classification
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
       body: {
         message,

@@ -16,8 +16,8 @@ export type ChatMessage = {
   content: string;
   sender: 'user' | 'assistant';
   created_at: string;
-  reference_entries?: any[];
-  analysis_data?: any;
+  reference_entries?: Json[];
+  analysis_data?: Json;
   has_numeric_result?: boolean;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'error';
 };

@@ -1,5 +1,5 @@
 
-// This file has been emptied as part of the Debug Mode removal.
+// This file has been emptied as part of the query analyzer removal.
 // It remains in place to prevent import errors, but its functionality has been removed.
 
 export interface FunctionExecution {
