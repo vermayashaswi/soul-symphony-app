@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -143,20 +142,81 @@ serve(async (req) => {
     }
 
     // --- Step 3: Planner Logic and Routing ---
-    // Block or respond to "general" queries immediately
-    if (category === "general") {
-      let resp = "I'm designed to assist you with your journal insights and mental health queries. This question doesn't relate to your journal context.";
-      if (/^(hi|hello|hey)$/i.test(message.trim())) {
-        resp = "Hello! How can I help you reflect on your journaling today?";
-      } else if (/who is the president/i.test(message)) {
-        resp = "I'm focused on helping you with your personal journaling and cannot answer general knowledge questions.";
+    // Block or respond to "general" or "general-journal-specific" queries immediately per your SOuLO prompt
+
+    if (category === "general" || category === "general-journal-specific") {
+      let simpleGreeting = /^(hi|hello|hey)$/i.test(message.trim());
+      let resp = null;
+
+      // For very basic greetings, use a direct response to reduce unnecessary latency and cost.
+      if (simpleGreeting) {
+        resp = "Hi there! I’m always here when you need to talk or reflect.";
+      } else {
+        // Otherwise, use OpenAI with the user's special SOuLO prompt.
+        const finalPrompt = `
+You are SOuLO, a personal mental well-being assistant that helps users reflect on their emotions, track their mental health, and grow through voice journaling.
+
+You have received a query attached herewith. 
+
+If it's a casual message (e.g., "hi", "hello", "how are you?") — respond briefly and kindly with a warm, human-like tone.
+
+If it’s unrelated to mental well-being or journal entries (e.g., "Who is the President of India?", "What's the capital of France?") — gently explain that you are only here to support the user’s emotional well-being through journal reflection and mental health tools.
+
+If it’s a general mental health–related question (e.g., “What are 5 ways to reduce anxiety?”, “How can I sleep better?”) — answer directly and helpfully with evidence-informed, actionable advice. Be concise, empathetic, and practical.
+
+Response Style
+
+Be emotionally intelligent, supportive, and non-judgmental
+
+Keep answers short and friendly (under 120 words unless more is needed)
+
+Don't pretend to access or analyze journal data unless the query requires it
+
+Example Responses:
+
+"Hi there! I’m always here when you need to talk or reflect."
+
+"I'm designed to help you reflect on your thoughts and emotions. Feel free to ask me something about your journaling journey!"
+
+"Great question. Here are 5 proven ways to reduce anxiety:..."
+        `;
+
+        // Forward the message as a "user" message with the above system prompt
+        const completion = await fetch('https://api.openai.com/v1/chat/completions', {
+          method: 'POST',
+          headers: {
+            'Authorization': `Bearer ${apiKey}`,
+            'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+            model: 'gpt-4o-mini',
+            messages: [
+              { role: 'system', content: finalPrompt },
+              { role: 'user', content: message }
+            ],
+            temperature: 0.2,
+            max_tokens: 250
+          }),
+        });
+
+        if (!completion.ok) {
+          const errorText = await completion.text();
+          console.error('[Orchestrator] OpenAI general SOuLO prompt error:', errorText);
+          resp = "I'm here to help you reflect on your journaling and well-being. Please try again or ask another question!";
+        } else {
+          const completionData = await completion.json();
+          resp = completionData.choices?.[0]?.message?.content?.trim() ||
+            "I'm here to help you with your journaling and well-being.";
+        }
       }
+
       diagnosticSteps.push({
-        name: "General Query Direct Response",
+        name: "General/Journal-Generic Query Direct Response",
         status: "success",
-        details: "Responded directly without accessing journal data.",
+        details: "Responded with the SOuLO-style general response.",
         timestamp: new Date().toISOString()
       });
+
       return new Response(JSON.stringify({
         response: resp,
         diagnostics: { steps: diagnosticSteps }
@@ -704,7 +764,7 @@ async function classifyWithThreadContext(query, threadContext) {
       Categories:
       - "general": Basic greetings, small talk, or off-topic questions (e.g., "hi", "who is the president")
       - "journal-specific": Questions about the user's own journal entries or personal insights (e.g., "what are my top emotions", "how did I feel last week")
-      - "general-journal-specific": Questions about journaling or mental health but not specific to the user's entries (e.g., "how should I journal", "tips for mental health")
+      - "general-journal-specific": Questions about journaling or mental health but not specific to the user's entries (e.g., "how should i journal", "tips for mental health")
       - "uncategorized": Queries that don't clearly fit the other categories
       
       Recent conversation context:
