@@ -894,4 +894,43 @@ async function getDatabaseSchema() {
       );
       
       if (!tableError && tableColumns && tableColumns.length > 0) {
-        // Add
+        // Add emotions table to schema if available
+        schema['emotions'] = {
+          columns: tableColumns.map(col => col.column_name),
+          columnTypes: tableColumns.reduce((acc, col) => {
+            acc[col.column_name] = col.data_type;
+            return acc;
+          }, {})
+        };
+      }
+    } catch (err) {
+      console.error("Error getting additional schema info:", err);
+      // Continue with hardcoded schema
+    }
+    
+    return schema;
+  } catch (error) {
+    console.error("Error getting database schema:", error);
+    return {}; // Return empty schema on error
+  }
+}
+
+// Helper function to count journal entries for a user
+async function countJournalEntries(userId) {
+  try {
+    const { count, error } = await supabase
+      .from('Journal')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+      
+    if (error) {
+      console.error("Error counting journal entries:", error);
+      return 0;
+    }
+    
+    return count || 0;
+  } catch (error) {
+    console.error("Error counting journal entries:", error);
+    return 0;
+  }
+}

@@ -5,7 +5,6 @@ import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2 } from "lucide-react"
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { v4 as uuidv4 } from 'uuid';
@@ -313,26 +312,12 @@ const MobileChatInterfaceContent = ({
       debugLog.addEvent("Query Analysis", `[Mobile] Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
-      const queryTypes = analyzeQueryTypes(message);
       
-      const analysisDetails = {
-        isEmotionFocused: queryTypes.isEmotionFocused,
-        isQuantitative: queryTypes.isQuantitative,
-        isWhyQuestion: queryTypes.isWhyQuestion,
-        isTemporalQuery: queryTypes.isTemporalQuery,
-        timeRange: queryTypes.timeRange.periodName,
-        emotion: queryTypes.emotion || 'none detected'
-      };
-      
-      debugLog.addEvent("Query Analysis", `[Mobile] Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
-      console.log("[Mobile] Query analysis result:", queryTypes);
-      
-      setProcessingStage("Searching for insights...");
       debugLog.addEvent("AI Processing", "[Mobile] Sending query to AI for processing", "info");
       const response = await processChatMessage(
         message, 
         user.id, 
-        queryTypes, 
+        {}, // Empty object instead of queryTypes
         threadId,
         false
       );

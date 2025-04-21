@@ -22,7 +22,6 @@ import { ChatMessage } from "@/services/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { processAndSaveSmartQuery } from "@/services/chat/smartQueryService";
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import ChatDiagnosticsModal, { ChatDiagnosticStep } from "./ChatDiagnosticsModal";
 
 const SmartChatInterface = () => {
@@ -179,7 +178,6 @@ const SmartChatInterface = () => {
     
     try {
       debugLog.addEvent("Query Analysis", `Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
-      const queryTypes = analyzeQueryTypes(message);
       
       setProcessingStage("Processing through smart query orchestrator...");
       
