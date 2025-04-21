@@ -16,7 +16,7 @@ interface MobileChatInputProps {
   onStopRecording: () => void;
 }
 
-export default function MobileChatInput({
+const MobileChatInput: React.FC<MobileChatInputProps> = ({
   onSendMessage,
   isLoading,
   userId,
@@ -26,7 +26,7 @@ export default function MobileChatInput({
   recordingTime,
   onStartRecording,
   onStopRecording
-}: MobileChatInputProps) {
+}) => {
   const [inputValue, setInputValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -204,3 +204,5 @@ export default function MobileChatInput({
     </div>
   );
 };
+
+export default MobileChatInput;

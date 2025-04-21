@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, Dispatch, SetStateAction } from "react";
-import { useSwipeable } from "react-swipeable";
+import { useSwipeable, SwipeableHandlers } from "react-swipeable";
 import { Menu, X, ArrowLeft, Trash2, MessageSquare, Plus } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
@@ -56,7 +56,6 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
   const swipeHandlers = useSwipeable({
     onSwipedRight: () => setIsSidebarOpen(true),
     onSwipedLeft: () => setIsSidebarOpen(false),
-    preventDefaultTouchmoveEvent: true,
     trackMouse: false
   });
 
@@ -378,7 +377,10 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
           </div>
           <ChatThreadList 
             userId={userId} 
-            onSelectThread={onSelectThread}
+            onSelectThread={(threadId) => {
+              onSelectThread(threadId);
+              setIsSidebarOpen(false);
+            }}
             onStartNewThread={handleNewChat}
             currentThreadId={currentThreadId}
             showDeleteButtons={false}
