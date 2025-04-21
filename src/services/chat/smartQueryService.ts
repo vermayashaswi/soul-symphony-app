@@ -100,9 +100,9 @@ function detectComplexQuery(message: string): boolean {
   
   // Look for conjunctions followed by question patterns
   const conjunctionPatterns = [
-    /and\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will)/i,
-    /also\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will)/i,
-    /additionally\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will)/i
+    /and\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am)/i,
+    /also\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am)/i,
+    /additionally\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|am)/i
   ];
   
   const hasConjunctionPattern = conjunctionPatterns.some(pattern => pattern.test(message));
@@ -150,84 +150,131 @@ export async function processAndSaveSmartQuery(
     }
     
     // Process the query through the orchestrator with additional timeout for complex queries
-    const result = await Promise.race([
-      processSmartQuery(message, userId, threadId),
-      new Promise<SmartQueryResult>((_, reject) => 
-        setTimeout(() => reject(new Error('Query processing timeout')), 
-          isComplexQuery ? 60000 : 30000)  // Longer timeout for complex queries
-      )
-    ]);
+    // Use a longer timeout for complex queries to prevent premature timeouts
+    const timeoutDuration = isComplexQuery ? 90000 : 30000; // 90 seconds for complex, 30 for simple
     
-    if (!result.success) {
-      const errorMsg = result.error || 'Failed to process query';
+    try {
+      const result = await Promise.race([
+        processSmartQuery(message, userId, threadId),
+        new Promise<SmartQueryResult>((_, reject) => 
+          setTimeout(() => reject(new Error('Query processing timeout')), timeoutDuration)
+        )
+      ]);
       
-      // Save error message as assistant response
-      const { data: savedErrorMsg, error: errorMsgError } = await supabase
+      if (!result.success) {
+        const errorMsg = result.error || 'Failed to process query';
+        
+        // Save error message as assistant response
+        const { data: savedErrorMsg, error: errorMsgError } = await supabase
+          .from('chat_messages')
+          .insert({
+            thread_id: threadId,
+            content: `I'm having trouble processing your complex query. ${errorMsg} For multi-part questions, try breaking them into separate questions for better results.`,
+            sender: 'assistant',
+            role: 'assistant',
+            analysis_data: {
+              error: errorMsg,
+              queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
+              processingStage: result.diagnostics?.steps?.at(-1)?.name || 'unknown'
+            }
+          })
+          .select()
+          .single();
+          
+        if (errorMsgError) {
+          console.error('[SmartQueryService] Error saving error message:', errorMsgError);
+        }
+        
+        return {
+          success: false,
+          userMessage: savedUserMsg as ChatMessage,
+          error: errorMsg,
+          diagnostics: result.diagnostics
+        };
+      }
+      
+      // Save the assistant response with enhanced metadata
+      const analysisData = {
+        planDetails: result.planDetails,
+        executionResults: result.executionResults,
+        diagnostics: result.diagnostics,
+        queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
+        processingStages: ['query_analysis', 'orchestration', 'response_generation']
+      };
+      
+      const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
         .from('chat_messages')
         .insert({
           thread_id: threadId,
-          content: `I'm having trouble processing your request. ${errorMsg}`,
+          content: result.response,
           sender: 'assistant',
           role: 'assistant',
-          analysis_data: {
-            error: errorMsg,
-            queryComplexity: isComplexQuery ? 'multi-part' : 'simple'
-          }
+          analysis_data: analysisData
         })
         .select()
         .single();
         
-      if (errorMsgError) {
-        console.error('[SmartQueryService] Error saving error message:', errorMsgError);
+      if (assistantMsgError) {
+        console.error('[SmartQueryService] Error saving assistant message:', assistantMsgError);
+        throw assistantMsgError;
+      }
+      
+      return {
+        success: true,
+        userMessage: savedUserMsg as ChatMessage,
+        assistantMessage: savedAssistantMsg as ChatMessage,
+        diagnostics: result.diagnostics
+      };
+    } catch (processingError: any) {
+      console.error('[SmartQueryService] Query processing error:', processingError);
+      
+      // Provide more helpful error message for complex queries
+      let errorMessage = processingError.message || 'An error occurred during processing';
+      
+      // Specially handle complex query errors with more helpful messaging
+      if (isComplexQuery && (
+        errorMessage.includes('timeout') || 
+        errorMessage.includes('AbortError') ||
+        errorMessage.includes('failed to fetch')
+      )) {
+        errorMessage = 'Your multi-part question is complex and might need to be broken down. Try asking one question at a time for better results.';
+      }
+      
+      // Save specific error message as assistant response
+      const { data: errorResponse, error: saveError } = await supabase
+        .from('chat_messages')
+        .insert({
+          thread_id: threadId,
+          content: `${errorMessage} I can better answer questions when they're asked one at a time.`,
+          sender: 'assistant',
+          role: 'assistant',
+          analysis_data: {
+            error: processingError.message,
+            queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
+            errorType: processingError.name || 'ProcessingError'
+          }
+        })
+        .select()
+        .single();
+      
+      if (saveError) {
+        console.error('[SmartQueryService] Error saving error response:', saveError);
       }
       
       return {
         success: false,
         userMessage: savedUserMsg as ChatMessage,
-        error: errorMsg,
-        diagnostics: result.diagnostics
+        assistantMessage: errorResponse as ChatMessage,
+        error: errorMessage
       };
     }
-    
-    // Save the assistant response with enhanced metadata
-    const analysisData = {
-      planDetails: result.planDetails,
-      executionResults: result.executionResults,
-      diagnostics: result.diagnostics,
-      queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
-      processingStages: ['query_analysis', 'orchestration', 'response_generation']
-    };
-    
-    const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
-      .from('chat_messages')
-      .insert({
-        thread_id: threadId,
-        content: result.response,
-        sender: 'assistant',
-        role: 'assistant',
-        analysis_data: analysisData
-      })
-      .select()
-      .single();
-      
-    if (assistantMsgError) {
-      console.error('[SmartQueryService] Error saving assistant message:', assistantMsgError);
-      throw assistantMsgError;
-    }
-    
-    return {
-      success: true,
-      userMessage: savedUserMsg as ChatMessage,
-      assistantMessage: savedAssistantMsg as ChatMessage,
-      diagnostics: result.diagnostics
-    };
   } catch (error: any) {
     console.error('[SmartQueryService] Error in processAndSaveSmartQuery:', error);
     
     // Handle specific known errors
     let errorMessage = error.message || 'Unknown error occurred';
     if (errorMessage.includes('timeout') || errorMessage.includes('AbortError')) {
-      errorMessage = 'Your query is complex and is taking longer than expected to process. Please try breaking it into smaller, more specific questions.';
+      errorMessage = 'Your multi-part question is taking longer than expected to process. Please try breaking it into smaller, more specific questions.';
     }
     
     return {
@@ -236,3 +283,4 @@ export async function processAndSaveSmartQuery(
     };
   }
 }
+
