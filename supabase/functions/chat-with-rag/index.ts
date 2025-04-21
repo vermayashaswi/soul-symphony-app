@@ -42,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, queryTypes, threadId, includeDiagnostics, vectorSearch, isEmotionQuery, isWhyEmotionQuery, isTimePatternQuery, isTemporalQuery, requiresTimeAnalysis, timeRange } = await req.json();
+    const { message, userId, threadId, includeDiagnostics, vectorSearch, retrieveOnly } = await req.json();
 
     if (!message) {
       throw new Error('Message is required');
@@ -53,7 +53,6 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
-    console.log("Time range received:", timeRange);
 
     // Add this where appropriate in the main request handler:
     const diagnostics = {
@@ -62,22 +61,6 @@ serve(async (req) => {
       functionCalls: [],
       references: []
     };
-    
-    // Safely check properties before using them
-    const safeQueryTypes = {
-      isEmotionQuery: isEmotionQuery || false,
-      isWhyEmotionQuery: isWhyEmotionQuery || false,
-      isTemporalQuery: isTemporalQuery || false,
-      timeRange: timeRange ? 
-        `${timeRange.startDate || 'unspecified'} to ${timeRange.endDate || 'unspecified'}` : 
-        "none"
-    };
-    
-    diagnostics.steps.push(createDiagnosticStep(
-      "Query Type Analysis", 
-      "success", 
-      JSON.stringify(safeQueryTypes)
-    ));
     
     // Fetch previous messages from this thread if a threadId is provided
     let conversationContext = [];
@@ -274,36 +257,26 @@ Examples:
     
     // Use different search function based on whether we have a time range
     let entries = [];
-    if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-      console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
-    } else {
-      console.log("Using standard vector search without time filtering");
-      entries = await searchEntriesWithVector(userId, queryEmbedding);
+    console.log("Using standard vector search without time filtering");
+    const { data, error } = await supabase.rpc(
+      'match_journal_entries_fixed',
+      {
+        query_embedding: queryEmbedding,
+        match_threshold: 0.5,
+        match_count: 10,
+        user_id_filter: userId
+      }
+    );
+    
+    if (error) {
+      console.error(`Error in vector search: ${error.message}`);
+      throw error;
     }
+    
+    entries = data || [];
     
     console.log(`Found ${entries.length} relevant entries`);
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "success", `Found ${entries.length} entries`));
-    
-    // Check if we found any entries for the requested time period when a time range was specified
-    if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
-      console.log("No entries found for the specified time range");
-      diagnostics.steps.push(createDiagnosticStep("Time Range Check", "warning", "No entries found in specified time range"));
-      
-      // Process empty entries to ensure valid dates for the response format
-      const processedEntries = [];
-      
-      // Return a response with no entries but proper message
-      return new Response(
-        JSON.stringify({ 
-          response: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
-          diagnostics: includeDiagnostics ? diagnostics : undefined,
-          references: processedEntries,
-          noEntriesForTimeRange: true
-        }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-      );
-    }
 
     // Format entries for the prompt with dates
     const entriesWithDates = entries.map(entry => {
