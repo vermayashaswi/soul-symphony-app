@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -25,8 +26,12 @@ function classifyQueryCategory(query) {
 
   // Direct greetings, general stop or small-talk, and off-topic open-ended queries 
   if (
-    ["hi", "hello", "hey", "who are you", "who is the president of india", "stop", "exit"].includes(lower) ||
-    lower.startsWith("who is") || lower.startsWith("what is your")
+    ["hi", "hello", "hey", "who are you", "stop", "exit"].includes(lower) ||
+    lower.startsWith("who is") || 
+    lower.startsWith("what is your") ||
+    /who is the (president|prime minister|leader) of/i.test(lower) ||
+    /what is the (capital|population|currency) of/i.test(lower) ||
+    /when (was|is|did)/i.test(lower) && !lower.includes("journal") && !lower.includes("feel")
   ) {
     return "general";
   }
@@ -142,7 +147,7 @@ serve(async (req) => {
     }
 
     // --- Step 3: Planner Logic and Routing ---
-    // Block or respond to "general" or "general-journal-specific" queries immediately per your SOuLO prompt
+    // Process "general" or "general-journal-specific" queries with the SOuLO prompt
 
     if (category === "general" || category === "general-journal-specific") {
       // Directly use OpenAI with the user's special SOuLO prompt for all queries in these categories

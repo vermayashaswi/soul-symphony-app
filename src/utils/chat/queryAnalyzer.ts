@@ -14,6 +14,7 @@ type QueryTypes = {
   isSpecificQuery: boolean;
   isThemeFocused: boolean;
   requiresTimeAnalysis: boolean;
+  isFactualQuery: boolean; // New property to identify factual queries
   emotion?: string;
   theme?: string;
   timeRange: {
@@ -45,12 +46,22 @@ export function analyzeQueryTypes(query: string): QueryTypes {
     isSpecificQuery: false,
     isThemeFocused: false,
     requiresTimeAnalysis: false,
+    isFactualQuery: false, // Initialize new property
     timeRange: {
       startDate: null,
       endDate: null,
       periodName: "recently"
     }
   };
+  
+  // Detect factual queries about general knowledge
+  result.isFactualQuery = lowerQuery.startsWith('who is') || 
+                          lowerQuery.startsWith('what is') || 
+                          lowerQuery.startsWith('when was') ||
+                          lowerQuery.startsWith('where is') ||
+                          lowerQuery.includes('president of') ||
+                          lowerQuery.includes('capital of') ||
+                          lowerQuery.includes('prime minister of');
   
   // Detect emotion-focused queries
   const emotionWords = ['feel', 'feeling', 'felt', 'emotion', 'emotions', 'mood', 'moods', 'happy', 'sad', 'angry', 'anxious', 'joy', 'fear', 'happiness'];
