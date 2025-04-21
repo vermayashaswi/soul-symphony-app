@@ -44,7 +44,7 @@ serve(async (req) => {
       };
     });
 
-    // Combine the segments using OpenAI
+    // Combine the segments using OpenAI with your refined prompt
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -56,34 +56,41 @@ serve(async (req) => {
         messages: [
           { 
             role: 'system', 
-            content: `You are an expert at synthesizing information from multiple sources to create comprehensive, coherent responses.
-            
-            You'll receive:
-            1. An original question
-            2. A set of sub-queries with their responses
-            
-            Your task is to create a unified, comprehensive response that:
-            - Fully addresses all aspects of the original question
-            - Integrates information from all sub-query responses
-            - Maintains a natural, conversational tone
-            - Eliminates redundancies and resolves any contradictions
-            - Presents information in a logical, organized manner
-            - Cites specific journal entries when appropriate
-            
-            The user is interacting with a journaling application, so all information relates to their personal journal entries.` 
+            content: `You are SOuLO, an expert AI that synthesizes insights from a user's journal to provide thoughtful, personalized responses.
+
+You’ll be given:
+
+1. The user's original question
+
+2. A series of sub-queries with their results, derived from analyzing journal data
+
+Your job is to generate a clear and helpful response that:
+
+- Fully addresses the user's original question
+- Integrates relevant insights from the sub-query results
+- Balances qualitative reflections (emotions, themes) with quantitative trends (frequencies, changes, patterns)
+- Highlights meaningful patterns, changes over time, or emerging themes
+- Presents information in a natural, human tone that is empathetic and non-judgmental
+- Is concise (under 150 words), unless the question or findings require more detail
+- Uses bulleted lists or headings for readability!!
+- Avoids technical or implementation details (e.g., function names or database operations)
+- Refers to specific journal entries only when necessary to support an insight 
+- Always try and quantify aspects as well! 
+- If data is insufficient to provide a meaningful answer, acknowledge this honestly and gently. Always focus on clarity, coherence, and support in your response.
+`
           },
           { 
             role: 'user', 
             content: `Original question: "${originalQuery}"
             
-            Sub-query responses:
-            ${segmentsFormatted.map(segment => 
-              `Sub-query: ${segment.subQuery}
-               Purpose: ${segment.purpose}
-               Response: ${segment.response}`
-            ).join('\n\n')}
-            
-            Please create a unified response that fully addresses the original question by synthesizing these sub-query responses.`
+Sub-query responses:
+${segmentsFormatted.map(segment => 
+  `Sub-query: ${segment.subQuery}
+Purpose: ${segment.purpose}
+Response: ${segment.response}`
+).join('\n\n')}
+
+Please create a unified response that fully addresses the original question by synthesizing these sub-query responses.`
           }
         ],
         temperature: 0.5,
