@@ -1,9 +1,11 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { processChatMessage } from "@/services/chatService";
+import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import EmptyChatState from "./EmptyChatState";
@@ -180,6 +182,8 @@ const SmartChatInterface = () => {
         debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
         savedUserMessage = await saveMessage(threadId, message, 'user');
         debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
+        console.log("User message saved with ID:", savedUserMessage?.id);
+        
         if (savedUserMessage) {
           debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
           setChatHistory(prev => prev.map(msg => 
@@ -187,10 +191,12 @@ const SmartChatInterface = () => {
           ));
         } else {
           debugLog.addEvent("Database", "Failed to save user message - null response", "error");
+          console.error("Failed to save user message - null response");
           throw new Error("Failed to save message");
         }
       } catch (saveError: any) {
         debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
+        console.error("Error saving user message:", saveError);
         toast({
           title: "Error saving message",
           description: saveError.message || "Could not save your message",
@@ -198,14 +204,29 @@ const SmartChatInterface = () => {
         });
       }
       
-      debugLog.addEvent("Query Analysis", `Query analysis step removed.`, "info");
+      debugLog.addEvent("Query Analysis", `Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
+      console.log("Performing comprehensive query analysis for:", message);
+      setProcessingStage("Analyzing patterns in your journal...");
+      const queryTypes = analyzeQueryTypes(message);
+      
+      const analysisDetails = {
+        isEmotionFocused: queryTypes.isEmotionFocused,
+        isQuantitative: queryTypes.isQuantitative,
+        isWhyQuestion: queryTypes.isWhyQuestion,
+        isTemporalQuery: queryTypes.isTemporalQuery,
+        timeRange: queryTypes.timeRange.periodName,
+        emotion: queryTypes.emotion || 'none detected'
+      };
+      
+      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
+      console.log("Query analysis result:", queryTypes);
+      
       setProcessingStage("Searching for insights...");
       debugLog.addEvent("AI Processing", "Sending query to AI for processing", "info");
-      
       const response = await processChatMessage(
         message, 
         user.id, 
-        undefined,
+        queryTypes, 
         threadId,
         false
       );
@@ -214,7 +235,7 @@ const SmartChatInterface = () => {
         role: response.role,
         hasReferences: !!response.references?.length,
         refCount: response.references?.length || 0,
-        hasAnalysis: response.analysis !== undefined,
+        hasAnalysis: !!response.analysis,
         hasNumericResult: response.hasNumericResult,
         errorState: response.role === 'error'
       };
@@ -234,6 +255,7 @@ const SmartChatInterface = () => {
         );
         
         debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
+        console.log("Assistant response saved with ID:", savedResponse?.id);
         
         if (savedResponse) {
           debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
@@ -243,6 +265,7 @@ const SmartChatInterface = () => {
         }
       } catch (saveError: any) {
         debugLog.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
+        console.error("Error saving assistant response:", saveError);
         const assistantMessage: ChatMessage = {
           id: `temp-response-${Date.now()}`,
           thread_id: threadId,
@@ -254,8 +277,11 @@ const SmartChatInterface = () => {
           analysis_data: response.analysis,
           has_numeric_result: response.hasNumericResult
         };
+        
         debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
         setChatHistory(prev => [...prev, assistantMessage]);
+        console.error("Failed to save assistant response to database, using temporary message");
+        
         toast({
           title: "Warning",
           description: "Response displayed but couldn't be saved to your conversation history",
@@ -264,8 +290,11 @@ const SmartChatInterface = () => {
       }
     } catch (error: any) {
       debugLog.addEvent("Error", `Error in message handling: ${error?.message || "Unknown error"}`, "error");
-      const errorContent = "I'm having trouble processing your request. Please try again later. " +
+      console.error("Error sending message:", error);
+      
+      const errorContent = "I'm having trouble processing your request. Please try again later. " + 
                (error?.message ? `Error: ${error.message}` : "");
+      
       try {
         debugLog.addEvent("Error Handling", "Saving error message to database", "info");
         const savedErrorMessage = await saveMessage(
@@ -273,6 +302,7 @@ const SmartChatInterface = () => {
           errorContent,
           'assistant'
         );
+        
         if (savedErrorMessage) {
           debugLog.addEvent("UI Update", "Adding error message to chat history", "warning");
           setChatHistory(prev => [...prev, savedErrorMessage]);
@@ -285,12 +315,17 @@ const SmartChatInterface = () => {
             role: 'assistant',
             created_at: new Date().toISOString()
           };
+          
           debugLog.addEvent("UI Update", "Adding fallback error message to chat history", "warning");
           setChatHistory(prev => [...prev, errorMessage]);
         }
+        
         debugLog.addEvent("Error Handling", "Error message saved to database", "success");
+        console.log("Error message saved to database");
       } catch (e) {
         debugLog.addEvent("Error Handling", `Failed to save error message: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
+        console.error("Failed to save error message:", e);
+        
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
           thread_id: threadId,
@@ -299,6 +334,7 @@ const SmartChatInterface = () => {
           role: 'assistant',
           created_at: new Date().toISOString()
         };
+        
         debugLog.addEvent("UI Update", "Adding last-resort error message to chat history", "warning");
         setChatHistory(prev => [...prev, errorMessage]);
       }

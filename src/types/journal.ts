@@ -15,7 +15,7 @@ export interface JournalEntry {
     type: string;
     name: string;
     text?: string;
-  }> | string | Json;
+  }>;
   "foreign key"?: string;
   master_themes?: string[];
   user_feedback?: string | null;

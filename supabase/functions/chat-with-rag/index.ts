@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -30,64 +29,11 @@ function createDiagnosticStep(name: string, status: string, details: any = null)
   };
 }
 
-// Define the general question prompt with stronger instructions about unrelated topics
-const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot.
-
-IF the query contains greetings or introductory messages, respond briefly and warmly.
-
-IF the query is about mental health, journaling, emotions, or the app itself, provide helpful information related to these topics.
-
-IF the query is about ANY topic unrelated to mental health or journaling (like politics, science, history, celebrities, sports, etc.):
-- ALWAYS politely decline to answer
-- Explain that you're specifically designed to help with journaling and mental health
-- Redirect the conversation to how you can help them with journaling or mental wellbeing
-
-Examples of redirection responses:
-- "I'm designed to help with your journaling and mental wellbeing, not general knowledge questions. How about we talk about your journaling practice instead?"
-- "I'm a specialized assistant for SOuLO, focused on journaling and mental health. I can't provide information about [topic]. Is there something about journaling or emotional wellbeing I can help with?"
-
-KEEP ALL RESPONSES BRIEF AND FOCUSED. Never pretend to have information about unrelated topics.`;
+// Define the general question prompt
+const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
 
 // Maximum number of previous messages to include for context
 const MAX_CONTEXT_MESSAGES = 10;
-
-const updatedCategorizerPrompt = `You are a classifier that determines if a user's query is:
-1. A general question/greeting unrelated to their journal data (respond with "GENERAL")
-2. A question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC")
-3. If the question concerns random and ambiguous questions not related to Mental health, journaling or similar lines, respond with "GENERAL" and feel free to deny politely.
-
-Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC". No explanation.
-
-IMPORTANT GUIDELINES:
-- ALL greetings, small talk or simple messages like "hi", "hello", "hey", "good morning", etc. are ALWAYS "GENERAL"
-- ALL generic questions about mental health, journaling, or the app are "GENERAL"
-- Questions that can be answered WITHOUT analyzing journal entries are "GENERAL"
-- ONLY classify as "JOURNAL_SPECIFIC" if the query EXPLICITLY requires analyzing their journal data
-- Single word messages like "hey", "hi", "hello" are ALWAYS "GENERAL"
-- Short phrases like "how are you" are ALWAYS "GENERAL"
-- If you're unsure whether a query requires journal data, default to "GENERAL"
-- ANY questions about facts, people, places, history, news, or other general knowledge are ALWAYS "GENERAL"
-- Questions about politics, world leaders, countries, science, math, or any academic topics are ALWAYS "GENERAL"
-
-Examples:
-- "Hi" -> "GENERAL"
-- "Hey" -> "GENERAL"
-- "Hey there" -> "GENERAL"
-- "How are you?" -> "GENERAL"
-- "What is journaling?" -> "GENERAL"
-- "What can you help with?" -> "GENERAL"
-- "How do I use this app?" -> "GENERAL"
-- "What's the weather today?" -> "GENERAL"
-- "Who is the president?" -> "GENERAL"
-- "Who is the president of India?" -> "GENERAL"
-- "Tell me about quantum physics" -> "GENERAL"
-- "What's happening in the news?" -> "GENERAL"
-- "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-- "What did I write about yesterday?" -> "JOURNAL_SPECIFIC"
-- "Show me patterns in my anxiety" -> "JOURNAL_SPECIFIC"
-- "Am I happier on weekends?" -> "JOURNAL_SPECIFIC"
-- "What emotions do I mention most?" -> "JOURNAL_SPECIFIC"`;
-
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -96,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, threadId, includeDiagnostics, vectorSearch, retrieveOnly } = await req.json();
+    const { message, userId, queryTypes, threadId, includeDiagnostics, vectorSearch, isEmotionQuery, isWhyEmotionQuery, isTimePatternQuery, isTemporalQuery, requiresTimeAnalysis, timeRange } = await req.json();
 
     if (!message) {
       throw new Error('Message is required');
@@ -107,14 +53,32 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
+    console.log("Time range received:", timeRange);
 
+    // Add this where appropriate in the main request handler:
     const diagnostics = {
       steps: [],
       similarityScores: [],
       functionCalls: [],
       references: []
     };
-
+    
+    // Safely check properties before using them
+    const safeQueryTypes = {
+      isEmotionQuery: isEmotionQuery || false,
+      isWhyEmotionQuery: isWhyEmotionQuery || false,
+      isTemporalQuery: isTemporalQuery || false,
+      timeRange: timeRange ? 
+        `${timeRange.startDate || 'unspecified'} to ${timeRange.endDate || 'unspecified'}` : 
+        "none"
+    };
+    
+    diagnostics.steps.push(createDiagnosticStep(
+      "Query Type Analysis", 
+      "success", 
+      JSON.stringify(safeQueryTypes)
+    ));
+    
     // Fetch previous messages from this thread if a threadId is provided
     let conversationContext = [];
     if (threadId) {
@@ -125,19 +89,23 @@ serve(async (req) => {
           .select('content, sender, created_at')
           .eq('thread_id', threadId)
           .order('created_at', { ascending: false })
-          .limit(MAX_CONTEXT_MESSAGES * 2);
-          
+          .limit(MAX_CONTEXT_MESSAGES * 2); // Get more messages than needed to ensure we have message pairs
+        
         if (error) {
           console.error('Error fetching thread context:', error);
           diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", error.message));
         } else if (previousMessages && previousMessages.length > 0) {
+          // Process messages to create conversation context
+          // We need to reverse the messages to get them in chronological order
           const chronologicalMessages = [...previousMessages].reverse();
           
+          // Format as conversation context
           conversationContext = chronologicalMessages.map(msg => ({
             role: msg.sender === 'user' ? 'user' : 'assistant',
             content: msg.content
           }));
           
+          // Limit to the most recent messages to avoid context length issues
           if (conversationContext.length > MAX_CONTEXT_MESSAGES) {
             conversationContext = conversationContext.slice(-MAX_CONTEXT_MESSAGES);
           }
@@ -162,6 +130,7 @@ serve(async (req) => {
       }
     }
     
+    // NEW: First categorize if this is a general question or a journal-specific question
     diagnostics.steps.push(createDiagnosticStep("Question Categorization", "loading"));
     console.log("Categorizing question type");
     const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -171,11 +140,21 @@ serve(async (req) => {
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-4o-mini',
+        model: 'gpt-3.5-turbo',
         messages: [
           {
             role: 'system',
-            content: updatedCategorizerPrompt
+            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
+            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
+            
+            Examples:
+            - "How are you doing?" -> "GENERAL"
+            - "What is journaling?" -> "GENERAL"
+            - "Who is the president of India?" -> "GENERAL"
+            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
+            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
+            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
+            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
           },
           { role: 'user', content: message }
         ],
@@ -196,6 +175,7 @@ serve(async (req) => {
     console.log(`Question categorized as: ${questionType}`);
     diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", `Classified as ${questionType}`));
 
+    // If it's a general question, respond directly without journal entry retrieval
     if (questionType === "GENERAL") {
       console.log("Processing as general question, skipping journal entry retrieval");
       diagnostics.steps.push(createDiagnosticStep("General Question Processing", "loading"));
@@ -213,8 +193,6 @@ serve(async (req) => {
             ...(conversationContext.length > 0 ? conversationContext : []),
             { role: 'user', content: message }
           ],
-          temperature: 0.7,
-          max_tokens: 250
         }),
       });
 
@@ -239,7 +217,8 @@ serve(async (req) => {
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
-
+    
+    // If it's a journal-specific question, continue with the existing RAG flow
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "loading"));
@@ -278,26 +257,36 @@ serve(async (req) => {
     
     // Use different search function based on whether we have a time range
     let entries = [];
-    console.log("Using standard vector search without time filtering");
-    const { data, error } = await supabase.rpc(
-      'match_journal_entries_fixed',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 10,
-        user_id_filter: userId
-      }
-    );
-    
-    if (error) {
-      console.error(`Error in vector search: ${error.message}`);
-      throw error;
+    if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+      console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
+      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+    } else {
+      console.log("Using standard vector search without time filtering");
+      entries = await searchEntriesWithVector(userId, queryEmbedding);
     }
-    
-    entries = data || [];
     
     console.log(`Found ${entries.length} relevant entries`);
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "success", `Found ${entries.length} entries`));
+    
+    // Check if we found any entries for the requested time period when a time range was specified
+    if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
+      console.log("No entries found for the specified time range");
+      diagnostics.steps.push(createDiagnosticStep("Time Range Check", "warning", "No entries found in specified time range"));
+      
+      // Process empty entries to ensure valid dates for the response format
+      const processedEntries = [];
+      
+      // Return a response with no entries but proper message
+      return new Response(
+        JSON.stringify({ 
+          response: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
+          diagnostics: includeDiagnostics ? diagnostics : undefined,
+          references: processedEntries,
+          noEntriesForTimeRange: true
+        }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    }
 
     // Format entries for the prompt with dates
     const entriesWithDates = entries.map(entry => {
@@ -423,7 +412,7 @@ Now generate your thoughtful, emotionally intelligent response:`;
     // 5. Return response
     return new Response(
       JSON.stringify({ 
-        response: responseContent,
+        response: responseContent, 
         diagnostics: includeDiagnostics ? diagnostics : undefined,
         references: processedEntries.map(entry => ({
           id: entry.id,
@@ -438,17 +427,7 @@ Now generate your thoughtful, emotionally intelligent response:`;
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ 
-        error: error.message,
-        diagnostics: {
-          steps: [{ 
-            name: "Error", 
-            status: "error", 
-            details: error.message,
-            timestamp: new Date().toISOString()
-          }]
-        }
-      }),
+      JSON.stringify({ error: error.message }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
