@@ -68,6 +68,44 @@ The user has now asked:
 
 Now, generate a smart, structured, emotionally intelligent response grounded in the user's journaling:`;
 
+// Updated classifier prompt
+const updatedCategorizerPrompt = `You are a classifier that determines if a user's query is:
+1. A general question/greeting unrelated to their journal data (respond with "GENERAL")
+2. A question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC")
+3. A question about topics unrelated to mental health, journaling, or the app (respond with "GENERAL")
+
+Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC". No explanation.
+
+IMPORTANT GUIDELINES:
+- ALL greetings, small talk or simple messages like "hi", "hello", "hey", "good morning", etc. are ALWAYS "GENERAL"
+- ALL generic questions about mental health, journaling, or the app are "GENERAL"
+- Questions that can be answered WITHOUT analyzing journal entries are "GENERAL"
+- ONLY classify as "JOURNAL_SPECIFIC" if the query EXPLICITLY requires analyzing their journal data
+- Single word messages like "hey", "hi", "hello" are ALWAYS "GENERAL"
+- Short phrases like "how are you" are ALWAYS "GENERAL"
+- Questions about unrelated topics (presidents, countries, science, etc.) are ALWAYS "GENERAL"
+- If a query combines greeting with unrelated question (e.g., "hi! who is the president?"), classify as "GENERAL"
+- If you're unsure whether a query requires journal data, default to "GENERAL"
+
+Examples:
+- "Hi" -> "GENERAL"
+- "Hey" -> "GENERAL"
+- "Hey there" -> "GENERAL"
+- "How are you?" -> "GENERAL"
+- "What is journaling?" -> "GENERAL"
+- "What can you help with?" -> "GENERAL"
+- "How do I use this app?" -> "GENERAL"
+- "What's the weather today?" -> "GENERAL"
+- "Who is the president?" -> "GENERAL"
+- "Hey! Who's the president of India?" -> "GENERAL"
+- "Can you tell me about quantum physics?" -> "GENERAL"
+- "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
+- "What did I write about yesterday?" -> "JOURNAL_SPECIFIC"
+- "Show me patterns in my anxiety" -> "JOURNAL_SPECIFIC"
+- "Am I happier on weekends?" -> "JOURNAL_SPECIFIC"
+- "What emotions do I mention most?" -> "JOURNAL_SPECIFIC"`;
+
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -191,36 +229,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a classifier that determines if a user's query is:
-1. A general question/greeting unrelated to their journal data (respond with "GENERAL")
-2. A question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC")
-
-Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC". No explanation.
-
-IMPORTANT GUIDELINES:
-- ALL greetings, small talk or simple messages like "hi", "hello", "hey", "good morning", etc. are ALWAYS "GENERAL"
-- ALL generic questions about mental health, journaling, or the app are "GENERAL"
-- Questions that can be answered WITHOUT analyzing journal entries are "GENERAL"
-- ONLY classify as "JOURNAL_SPECIFIC" if the query EXPLICITLY requires analyzing their journal data
-- Single word messages like "hey", "hi", "hello" are ALWAYS "GENERAL"
-- Short phrases like "how are you" are ALWAYS "GENERAL"
-- If you're unsure whether a query requires journal data, default to "GENERAL"
-
-Examples:
-- "Hi" -> "GENERAL"
-- "Hey" -> "GENERAL"
-- "Hey there" -> "GENERAL"
-- "How are you?" -> "GENERAL"
-- "What is journaling?" -> "GENERAL"
-- "What can you help with?" -> "GENERAL"
-- "How do I use this app?" -> "GENERAL"
-- "What's the weather today?" -> "GENERAL"
-- "Who is the president?" -> "GENERAL"
-- "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-- "What did I write about yesterday?" -> "JOURNAL_SPECIFIC"
-- "Show me patterns in my anxiety" -> "JOURNAL_SPECIFIC"
-- "Am I happier on weekends?" -> "JOURNAL_SPECIFIC"
-- "What emotions do I mention most?" -> "JOURNAL_SPECIFIC"`
+            content: updatedCategorizerPrompt
           },
           { role: 'user', content: message }
         ],
