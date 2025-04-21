@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from "react";
+import React, { useState, useEffect, useRef, Dispatch, SetStateAction } from "react";
 import { useSwipeable } from "react-swipeable";
 import { Menu, X, ArrowLeft, Trash2, MessageSquare, Plus } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
@@ -278,7 +278,6 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
       recordingIntervalRef.current = null;
     }
     
-    // Placeholder: Implement actual voice recording processing here
     console.log(`Stopped recording after ${recordingTime} seconds.`);
     toast({
       title: "Voice recording",
@@ -347,7 +346,6 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
 
   return (
     <div className="mobile-chat-interface h-full flex flex-col" {...swipeHandlers}>
-      {/* Header */}
       <div className="mobile-chat-header flex items-center justify-between p-4 border-b bg-white">
         <button onClick={() => setIsSidebarOpen(true)} className="text-gray-600">
           <Menu className="h-6 w-6" />
@@ -366,7 +364,6 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
         )}
       </div>
 
-      {/* Sidebar */}
       <div
         className={`mobile-chat-sidebar fixed top-0 left-0 h-full w-3/4 bg-white shadow-md transform transition-transform duration-300 ease-in-out ${
           isSidebarOpen ? 'translate-x-0' : '-translate-x-full'
@@ -389,7 +386,6 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
         </div>
       </div>
 
-      {/* Content */}
       <div className="mobile-chat-content flex-1 overflow-hidden">
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
@@ -412,11 +408,11 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
         )}
       </div>
 
-      {/* Input */}
       <div className="mobile-chat-input-area bg-white border-t p-4">
         <MobileChatInput
           onSendMessage={handleSendMessage}
           isLoading={loading}
+          userId={userId}
           messageText={messageText}
           setMessageText={setMessageText}
           isRecording={isRecording}
