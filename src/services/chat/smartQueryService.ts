@@ -8,6 +8,7 @@ interface SmartQueryResult {
   planDetails?: any;
   executionResults?: any[];
   error?: string;
+  diagnostics?: any;
 }
 
 /**
@@ -24,7 +25,7 @@ export async function processSmartQuery(
   try {
     console.log("[SmartQueryService] Processing query:", message.substring(0, 30) + "...");
     
-    // Call the Supabase edge function
+    // Call the Supabase edge function orchestrator directly
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
       body: {
         message,
@@ -66,7 +67,8 @@ export async function processSmartQuery(
       success: true,
       response: data.response,
       planDetails: data.planDetails,
-      executionResults: data.executionResults
+      executionResults: data.executionResults,
+      diagnostics: data.diagnostics
     };
   } catch (error: any) {
     console.error('[SmartQueryService] Error in processSmartQuery:', error);
@@ -87,7 +89,7 @@ export async function processAndSaveSmartQuery(
   message: string,
   userId: string,
   threadId: string
-): Promise<{ success: boolean; userMessage?: ChatMessage; assistantMessage?: ChatMessage; error?: string }> {
+): Promise<{ success: boolean; userMessage?: ChatMessage; assistantMessage?: ChatMessage; error?: string; diagnostics?: any }> {
   try {
     console.log("[SmartQueryService] Processing and saving query:", message.substring(0, 30) + "...");
     
@@ -108,7 +110,7 @@ export async function processAndSaveSmartQuery(
       throw userMsgError;
     }
     
-    // Process the query
+    // Process the query through the orchestrator
     const result = await processSmartQuery(message, userId, threadId);
     
     if (!result.success) {
@@ -133,7 +135,8 @@ export async function processAndSaveSmartQuery(
       return {
         success: false,
         userMessage: savedUserMsg as ChatMessage,
-        error: errorMsg
+        error: errorMsg,
+        diagnostics: result.diagnostics
       };
     }
     
@@ -147,7 +150,8 @@ export async function processAndSaveSmartQuery(
         role: 'assistant',
         analysis_data: {
           planDetails: result.planDetails,
-          executionResults: result.executionResults
+          executionResults: result.executionResults,
+          diagnostics: result.diagnostics
         }
       })
       .select()
@@ -161,7 +165,8 @@ export async function processAndSaveSmartQuery(
     return {
       success: true,
       userMessage: savedUserMsg as ChatMessage,
-      assistantMessage: savedAssistantMsg as ChatMessage
+      assistantMessage: savedAssistantMsg as ChatMessage,
+      diagnostics: result.diagnostics
     };
   } catch (error: any) {
     console.error('[SmartQueryService] Error in processAndSaveSmartQuery:', error);

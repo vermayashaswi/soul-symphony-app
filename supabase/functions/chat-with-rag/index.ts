@@ -1,449 +1,298 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
-// Define Supabase client
+const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+
+// Initialize Supabase client with service role key
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Get OpenAI API key from environment variable
-const apiKey = Deno.env.get('OPENAI_API_KEY');
-if (!apiKey) {
-  console.error('OPENAI_API_KEY is not set');
-  Deno.exit(1);
-}
-
-// Define CORS headers directly in the function
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Add diagnostic helper function at the beginning of the edge function
-function createDiagnosticStep(name: string, status: string, details: any = null) {
-  return {
-    name,
-    status,
-    details,
-    timestamp: new Date().toISOString()
-  };
+// Track function execution for diagnostics
+interface FunctionExecution {
+  name: string;
+  params?: Record<string, any>;
+  result?: any;
+  executionTime?: number;
+  success: boolean;
 }
 
-// Define the general question prompt
-const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
-
-// Maximum number of previous messages to include for context
-const MAX_CONTEXT_MESSAGES = 10;
-
-serve(async (req) => {
-  // Handle CORS preflight requests
-  if (req.method === 'OPTIONS') {
-    return new Response(null, { headers: corsHeaders });
-  }
+// Generate embeddings using OpenAI
+async function generateEmbedding(text: string): Promise<number[]> {
+  const startTime = Date.now();
+  let functionResult: FunctionExecution = {
+    name: 'generateEmbedding',
+    params: { text: text.substring(0, 50) + "..." },
+    success: false
+  };
 
   try {
-    const { message, userId, queryTypes, threadId, includeDiagnostics, vectorSearch, isEmotionQuery, isWhyEmotionQuery, isTimePatternQuery, isTemporalQuery, requiresTimeAnalysis, timeRange } = await req.json();
-
-    if (!message) {
-      throw new Error('Message is required');
-    }
-
-    if (!userId) {
-      throw new Error('User ID is required');
-    }
-
-    console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
-    console.log("Time range received:", timeRange);
-
-    // Add this where appropriate in the main request handler:
-    const diagnostics = {
-      steps: [],
-      similarityScores: [],
-      functionCalls: [],
-      references: []
-    };
-    
-    // Safely check properties before using them
-    const safeQueryTypes = {
-      isEmotionQuery: isEmotionQuery || false,
-      isWhyEmotionQuery: isWhyEmotionQuery || false,
-      isTemporalQuery: isTemporalQuery || false,
-      timeRange: timeRange ? 
-        `${timeRange.startDate || 'unspecified'} to ${timeRange.endDate || 'unspecified'}` : 
-        "none"
-    };
-    
-    diagnostics.steps.push(createDiagnosticStep(
-      "Query Type Analysis", 
-      "success", 
-      JSON.stringify(safeQueryTypes)
-    ));
-    
-    // Fetch previous messages from this thread if a threadId is provided
-    let conversationContext = [];
-    if (threadId) {
-      diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "loading"));
-      try {
-        const { data: previousMessages, error } = await supabase
-          .from('chat_messages')
-          .select('content, sender, created_at')
-          .eq('thread_id', threadId)
-          .order('created_at', { ascending: false })
-          .limit(MAX_CONTEXT_MESSAGES * 2); // Get more messages than needed to ensure we have message pairs
-        
-        if (error) {
-          console.error('Error fetching thread context:', error);
-          diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", error.message));
-        } else if (previousMessages && previousMessages.length > 0) {
-          // Process messages to create conversation context
-          // We need to reverse the messages to get them in chronological order
-          const chronologicalMessages = [...previousMessages].reverse();
-          
-          // Format as conversation context
-          conversationContext = chronologicalMessages.map(msg => ({
-            role: msg.sender === 'user' ? 'user' : 'assistant',
-            content: msg.content
-          }));
-          
-          // Limit to the most recent messages to avoid context length issues
-          if (conversationContext.length > MAX_CONTEXT_MESSAGES) {
-            conversationContext = conversationContext.slice(-MAX_CONTEXT_MESSAGES);
-          }
-          
-          diagnostics.steps.push(createDiagnosticStep(
-            "Thread Context Retrieval", 
-            "success", 
-            `Retrieved ${conversationContext.length} messages for context`
-          ));
-          
-          console.log(`Added ${conversationContext.length} previous messages as context`);
-        } else {
-          diagnostics.steps.push(createDiagnosticStep(
-            "Thread Context Retrieval", 
-            "success", 
-            "No previous messages found in thread"
-          ));
-        }
-      } catch (contextError) {
-        console.error('Error processing thread context:', contextError);
-        diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", contextError.message));
-      }
-    }
-    
-    // NEW: First categorize if this is a general question or a journal-specific question
-    diagnostics.steps.push(createDiagnosticStep("Question Categorization", "loading"));
-    console.log("Categorizing question type");
-    const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    console.log("Generating embedding for query:", text.substring(0, 50) + "...");
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
-            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
-            
-            Examples:
-            - "How are you doing?" -> "GENERAL"
-            - "What is journaling?" -> "GENERAL"
-            - "Who is the president of India?" -> "GENERAL"
-            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
-            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
-          },
-          { role: 'user', content: message }
-        ],
-        temperature: 0.1,
-        max_tokens: 10
-      }),
-    });
-
-    if (!categorizationResponse.ok) {
-      const error = await categorizationResponse.text();
-      console.error('Failed to categorize question:', error);
-      diagnostics.steps.push(createDiagnosticStep("Question Categorization", "error", error));
-      throw new Error('Failed to categorize question');
-    }
-
-    const categorization = await categorizationResponse.json();
-    const questionType = categorization.choices[0]?.message?.content.trim();
-    console.log(`Question categorized as: ${questionType}`);
-    diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", `Classified as ${questionType}`));
-
-    // If it's a general question, respond directly without journal entry retrieval
-    if (questionType === "GENERAL") {
-      console.log("Processing as general question, skipping journal entry retrieval");
-      diagnostics.steps.push(createDiagnosticStep("General Question Processing", "loading"));
-      
-      const generalCompletionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: GENERAL_QUESTION_PROMPT },
-            ...(conversationContext.length > 0 ? conversationContext : []),
-            { role: 'user', content: message }
-          ],
-        }),
-      });
-
-      if (!generalCompletionResponse.ok) {
-        const error = await generalCompletionResponse.text();
-        console.error('Failed to get general completion:', error);
-        diagnostics.steps.push(createDiagnosticStep("General Question Processing", "error", error));
-        throw new Error('Failed to generate response');
-      }
-
-      const generalCompletionData = await generalCompletionResponse.json();
-      const generalResponse = generalCompletionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-      console.log("General response generated successfully");
-      diagnostics.steps.push(createDiagnosticStep("General Question Processing", "success"));
-
-      return new Response(
-        JSON.stringify({ 
-          response: generalResponse, 
-          diagnostics: includeDiagnostics ? diagnostics : undefined,
-          references: []
-        }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-      );
-    }
-    
-    // If it's a journal-specific question, continue with the existing RAG flow
-    // 1. Generate embedding for the message
-    console.log("Generating embedding for message");
-    diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "loading"));
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
+        'Authorization': `Bearer ${openAIApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
         model: 'text-embedding-ada-002',
-        input: message,
+        input: text
       }),
     });
 
-    if (!embeddingResponse.ok) {
-      const error = await embeddingResponse.text();
-      console.error('Failed to generate embedding:', error);
-      diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "error", error));
-      throw new Error('Could not generate embedding for the message');
+    if (!response.ok) {
+      const error = await response.text();
+      console.error('Error generating embedding:', error);
+      functionResult.executionTime = Date.now() - startTime;
+      functionResult.result = { error };
+      throw new Error('Failed to generate embedding');
     }
 
-    const embeddingData = await embeddingResponse.json();
-    if (!embeddingData.data || embeddingData.data.length === 0) {
-      diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "error", "No embedding data returned"));
-      throw new Error('Could not generate embedding for the message');
-    }
-
-    const queryEmbedding = embeddingData.data[0].embedding;
-    console.log("Embedding generated successfully");
-    diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "success"));
-
-    // 2. Search for relevant entries with proper temporal filtering
-    console.log("Searching for relevant entries");
-    diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "loading"));
-    
-    // Use different search function based on whether we have a time range
-    let entries = [];
-    if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-      console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
-    } else {
-      console.log("Using standard vector search without time filtering");
-      entries = await searchEntriesWithVector(userId, queryEmbedding);
-    }
-    
-    console.log(`Found ${entries.length} relevant entries`);
-    diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "success", `Found ${entries.length} entries`));
-    
-    // Check if we found any entries for the requested time period when a time range was specified
-    if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
-      console.log("No entries found for the specified time range");
-      diagnostics.steps.push(createDiagnosticStep("Time Range Check", "warning", "No entries found in specified time range"));
-      
-      // Process empty entries to ensure valid dates for the response format
-      const processedEntries = [];
-      
-      // Return a response with no entries but proper message
-      return new Response(
-        JSON.stringify({ 
-          response: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
-          diagnostics: includeDiagnostics ? diagnostics : undefined,
-          references: processedEntries,
-          noEntriesForTimeRange: true
-        }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-      );
-    }
-
-    // Format entries for the prompt with dates
-    const entriesWithDates = entries.map(entry => {
-      const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      });
-      return `- Entry from ${formattedDate}: ${entry.content}`;
-    }).join('\n\n');
-
-    // 3. Prepare prompt with updated instructions
-    const prompt = `You are SOuLO, a personal mental well-being assistant designed to help users reflect on their emotions, understand patterns in their thoughts, and gain insight from their journaling practice and sometimes also give quantitative assessments, if asked to. If you are responding to an existing conversation thread, don't provide repetitive information.
-
-Below are excerpts from the user's journal entries, along with dates:
-${entriesWithDates}
-
-The user has now asked:
-"${message}"
-
-Please respond with the following guidelines:
-
-1. **Tone & Purpose**
-   - Be emotionally supportive, non-judgmental, and concise.
-   - Avoid generic advice—make your response feel personal, grounded in the user's own journal reflections.
-
-2. **Data Grounding**
-   - Use the user's past entries as the primary source of truth.
-   - Reference journal entries with specific bullet points that include dates.
-   - Do not make assumptions or speculate beyond what the user has written.
-
-3. **Handling Ambiguity**
-   - If the user's question is broad, philosophical, or ambiguous (e.g., "Am I introverted?"), respond with thoughtful reflection:
-     - Acknowledge the ambiguity or complexity of the question.
-     - Offer the most likely patterns or insights based on journal entries.
-     - Clearly state when there isn't enough information to give a definitive answer, and gently suggest what the user could explore further in their journaling.
-   - If user asks you to rate them, do it! 
-
-4. **Insight & Structure**
-   - Highlight recurring patterns, emotional trends, or changes over time.
-   - Suggest gentle, practical self-reflections or actions, only if relevant.
-   - Keep responses between 120–180 words, formatted for easy reading.
-   - Always use bulleted pointers wherever necessary!!
-
-Example format (only to be used when you feel the need to) :
-- "On Mar 18 and Mar 20, you mentioned feeling drained after social interactions."
-- "Your entry on Apr 2 reflects a desire for deeper connection with others."
-- "Based on these entries, it seems you may lean toward introversion, but more context would help."
-
-**MAKE SURE YOUR RESPONES ARE STRUCTURED WITH BULLETS, POINTERS, BOLD HEADERS, and other boldened information that's important. Don't need lengthy paragraphs that are difficult to read. Use headers and sub headers wisely**
-
-Now generate your thoughtful, emotionally intelligent response:`;
-
-    // 4. Call OpenAI
-    console.log("Calling OpenAI for completion");
-    diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "loading"));
-    
-    // Prepare the messages array with system prompt and conversation context
-    const messages = [];
-    
-    // Add system prompt
-    messages.push({ role: 'system', content: prompt });
-    
-    // Add conversation context if available
-    if (conversationContext.length > 0) {
-      // Log that we're using conversation context
-      console.log(`Including ${conversationContext.length} messages of conversation context`);
-      diagnostics.steps.push(createDiagnosticStep(
-        "Conversation Context", 
-        "success",
-        `Including ${conversationContext.length} previous messages for context`
-      ));
-      
-      // Add the conversation context messages
-      messages.push(...conversationContext);
-      
-      // Add the current user message
-      messages.push({ role: 'user', content: message });
-    } else {
-      // If no context, just use the system prompt
-      console.log("No conversation context available, using only system prompt");
-    }
-    
-    const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: prompt }],
-      }),
-    });
-
-    if (!completionResponse.ok) {
-      const error = await completionResponse.text();
-      console.error('Failed to get completion:', error);
-      diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "error", error));
-      throw new Error('Failed to generate response');
-    }
-
-    const completionData = await completionResponse.json();
-    const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-    console.log("Response generated successfully");
-    diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "success"));
-
-    // Process entries to ensure valid dates
-    const processedEntries = entries.map(entry => {
-      // Make sure created_at is a valid date string
-      let createdAt = entry.created_at;
-      if (!createdAt || isNaN(new Date(createdAt).getTime())) {
-        createdAt = new Date().toISOString();
-      }
-      
-      return {
-        id: entry.id,
-        content: entry.content,
-        created_at: createdAt,
-        similarity: entry.similarity || 0
-      };
-    });
-
-    // 5. Return response
-    return new Response(
-      JSON.stringify({ 
-        response: responseContent, 
-        diagnostics: includeDiagnostics ? diagnostics : undefined,
-        references: processedEntries.map(entry => ({
-          id: entry.id,
-          content: entry.content,
-          date: entry.created_at,
-          snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
-          similarity: entry.similarity
-        }))
-      }),
-      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-    );
+    const result = await response.json();
+    functionResult.success = true;
+    functionResult.executionTime = Date.now() - startTime;
+    functionResult.result = { 
+      model: result.model,
+      embeddingLength: result.data[0].embedding.length
+    };
+    return result.data[0].embedding;
   } catch (error) {
-    console.error('Error:', error);
-    return new Response(
-      JSON.stringify({ error: error.message }),
-      {
-        status: 500,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders },
-      }
-    );
+    console.error('Error in generateEmbedding:', error);
+    functionResult.success = false;
+    if (!functionResult.executionTime) functionResult.executionTime = Date.now() - startTime;
+    functionResult.result = { error: error instanceof Error ? error.message : String(error) };
+    throw error;
+  } finally {
+    // Return function execution data in diagnostics
+    return functionResult;
   }
-});
+}
 
-// Standard vector search without time filtering
-async function searchEntriesWithVector(
+// Format emotions data into a readable string
+function formatEmotions(emotions: Record<string, number> | null | undefined): string {
+  if (!emotions) return "No emotion data available";
+  
+  // Sort emotions by intensity (highest first)
+  const sortedEmotions = Object.entries(emotions)
+    .sort(([, a], [, b]) => b - a)
+    .slice(0, 3); // Take top 3 emotions for brevity
+    
+  return sortedEmotions
+    .map(([emotion, intensity]) => {
+      // Convert intensity to percentage and format emotion name
+      const percentage = Math.round(intensity * 100);
+      const formattedEmotion = emotion.charAt(0).toUpperCase() + emotion.slice(1);
+      return `${formattedEmotion} (${percentage}%)`;
+    })
+    .join(", ");
+}
+
+// Calculate average emotion score for quantitative analysis
+async function calculateAverageEmotionScore(userId: string, emotionType: string = 'happiness', timeRange: string = 'month') {
+  try {
+    let startDate = new Date();
+    
+    // Set time range
+    if (timeRange === 'week') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (timeRange === 'month') {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (timeRange === 'year') {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    }
+    
+    // Query entries within the time range
+    const { data: entries, error } = await supabase
+      .from('Journal Entries')
+      .select('emotions, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching entries for emotion calculation:", error);
+      return { averageScore: null, entryCount: 0, error: error.message };
+    }
+    
+    if (!entries || entries.length === 0) {
+      return { averageScore: null, entryCount: 0, error: 'No entries found' };
+    }
+    
+    // Calculate average emotion score
+    let totalScore = 0;
+    let validEntries = 0;
+    
+    entries.forEach(entry => {
+      if (entry.emotions && entry.emotions[emotionType]) {
+        totalScore += parseFloat(entry.emotions[emotionType]);
+        validEntries++;
+      }
+    });
+    
+    const averageScore = validEntries > 0 ? (totalScore / validEntries) * 100 : null;
+    
+    return { 
+      averageScore: averageScore ? Math.round(averageScore) : null, 
+      entryCount: entries.length,
+      validEntryCount: validEntries
+    };
+  } catch (error) {
+    console.error("Error calculating average emotion score:", error);
+    return { averageScore: null, entryCount: 0, error: error.message };
+  }
+}
+
+// Calculate top emotions over a time period
+async function calculateTopEmotions(userId: string, timeRange: string = 'month', limit: number = 3) {
+  try {
+    let startDate = new Date();
+    
+    // Set time range
+    if (timeRange === 'week') {
+      startDate.setDate(startDate.getDate() - 7);
+    } else if (timeRange === 'month') {
+      startDate.setMonth(startDate.getMonth() - 1);
+    } else if (timeRange === 'year') {
+      startDate.setFullYear(startDate.getFullYear() - 1);
+    } else if (timeRange === 'day' || timeRange === 'today') {
+      startDate.setHours(0, 0, 0, 0);
+    } else if (timeRange === 'yesterday') {
+      startDate.setDate(startDate.getDate() - 1);
+      startDate.setHours(0, 0, 0, 0);
+    }
+    
+    // Query entries within the time range
+    const { data: entries, error } = await supabase
+      .from('Journal Entries')
+      .select('emotions, created_at')
+      .eq('user_id', userId)
+      .gte('created_at', startDate.toISOString())
+      .order('created_at', { ascending: false });
+    
+    if (error) {
+      console.error("Error fetching entries for top emotions calculation:", error);
+      return { topEmotions: [], entryCount: 0, error: error.message };
+    }
+    
+    if (!entries || entries.length === 0) {
+      return { topEmotions: [], entryCount: 0, error: 'No entries found' };
+    }
+    
+    // Aggregate emotions across all entries
+    const emotionScores: Record<string, {total: number, count: number}> = {};
+    
+    entries.forEach(entry => {
+      if (entry.emotions) {
+        Object.entries(entry.emotions).forEach(([emotion, score]) => {
+          if (!emotionScores[emotion]) {
+            emotionScores[emotion] = { total: 0, count: 0 };
+          }
+          emotionScores[emotion].total += parseFloat(score as string);
+          emotionScores[emotion].count += 1;
+        });
+      }
+    });
+    
+    // Calculate average for each emotion and sort
+    const averagedEmotions = Object.entries(emotionScores)
+      .map(([emotion, data]) => ({
+        emotion,
+        score: data.total / data.count,
+        frequency: data.count
+      }))
+      .sort((a, b) => b.score - a.score)
+      .slice(0, limit);
+    
+    return { 
+      topEmotions: averagedEmotions, 
+      entryCount: entries.length
+    };
+  } catch (error) {
+    console.error("Error calculating top emotions:", error);
+    return { topEmotions: [], entryCount: 0, error: error.message };
+  }
+}
+
+// Detect quantitative queries about emotions
+function detectEmotionQuantitativeQuery(message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Match patterns like "how happy am I", "rate my happiness", etc.
+  const emotionPatterns = {
+    happiness: /how (happy|content|satisfied|joyful|cheerful)|(happiness|joy|satisfaction) (score|rating|level)/i,
+    sadness: /how (sad|unhappy|depressed|down|blue)|(sadness|depression|unhappiness) (score|rating|level)/i,
+    anger: /how (angry|mad|frustrated|irritated)|(anger|frustration|irritation) (score|rating|level)/i,
+    anxiety: /how (anxious|worried|nervous|stressed)|(anxiety|stress|worry) (score|rating|level)/i,
+    fear: /how (afraid|scared|fearful|frightened)|(fear) (score|rating|level)/i
+  };
+  
+  // Check for numeric rating requests
+  const ratingPattern = /(rate|score|percentage|level|out of \d+|scale|quantify)/i;
+  const hasRatingRequest = ratingPattern.test(lowerMessage);
+  
+  // Check for time periods
+  const timePatterns = {
+    week: /(this|last|past) week|7 days/i,
+    month: /(this|last|past) month|30 days/i,
+    year: /(this|last|past) year|365 days/i
+  };
+  
+  // Check for top emotions request
+  const topEmotionsPattern = /top (\d+|three|3|five|5) emotions/i;
+  const isTopEmotionsQuery = topEmotionsPattern.test(lowerMessage);
+  
+  // Extract number of emotions requested if applicable
+  let topCount = 3; // Default
+  if (isTopEmotionsQuery) {
+    const match = lowerMessage.match(/top (\d+|three|five)/i);
+    if (match && match[1]) {
+      if (match[1] === "three") topCount = 3;
+      else if (match[1] === "five") topCount = 5;
+      else topCount = parseInt(match[1], 10);
+    }
+  }
+  
+  // Determine emotion type and time range
+  let emotionType = null;
+  for (const [emotion, pattern] of Object.entries(emotionPatterns)) {
+    if (pattern.test(lowerMessage)) {
+      emotionType = emotion;
+      break;
+    }
+  }
+  
+  let timeRange = 'month'; // Default
+  for (const [time, pattern] of Object.entries(timePatterns)) {
+    if (pattern.test(lowerMessage)) {
+      timeRange = time;
+      break;
+    }
+  }
+  
+  return {
+    isQuantitativeEmotionQuery: emotionType !== null || hasRatingRequest || isTopEmotionsQuery,
+    emotionType: emotionType || 'happiness', // Default to happiness if no specific emotion
+    timeRange,
+    isTopEmotionsQuery,
+    topCount
+  };
+}
+
+// Update the function that searches journal entries using vector similarity
+async function searchJournalEntriesWithVector(
   userId: string, 
   queryEmbedding: any[]
 ) {
   try {
-    console.log(`Searching entries with vector similarity for userId: ${userId}`);
+    console.log(`Searching journal entries with vector for userId: ${userId}`);
     
+    // Use the fixed function we created
     const { data, error } = await supabase.rpc(
       'match_journal_entries_fixed',
       {
@@ -462,42 +311,565 @@ async function searchEntriesWithVector(
     console.log(`Found ${data?.length || 0} entries with vector similarity`);
     return data || [];
   } catch (error) {
-    console.error('Error searching entries with vector:', error);
+    console.error('Error searching journal entries with vector:', error);
     throw error;
   }
 }
 
-// Time-filtered vector search
-async function searchEntriesWithTimeRange(
-  userId: string, 
-  queryEmbedding: any[], 
-  timeRange: { startDate?: string; endDate?: string }
-) {
+serve(async (req) => {
+  // Handle CORS preflight requests
+  if (req.method === 'OPTIONS') {
+    return new Response(null, { headers: corsHeaders });
+  }
+
+  // For tracking RAG process steps
+  const diagnosticSteps: {name: string, status: string, details?: string}[] = [];
+  const functionExecutions: FunctionExecution[] = [];
+  let similarityScores: {id: number, score: number}[] = [];
+  
   try {
-    console.log(`Searching entries with time range for userId: ${userId}`);
-    console.log(`Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'}`);
+    const { 
+      message, 
+      userId, 
+      threadId = null, 
+      isNewThread = false, 
+      includeDiagnostics = false,
+      queryEmbedding = null // Accept pre-generated embedding
+    } = await req.json();
     
-    const { data, error } = await supabase.rpc(
-      'match_journal_entries_with_date',
-      {
-        query_embedding: queryEmbedding,
-        match_threshold: 0.5,
-        match_count: 10,
-        user_id_filter: userId,
-        start_date: timeRange.startDate || null,
-        end_date: timeRange.endDate || null
-      }
-    );
+    if (!message) {
+      throw new Error('No message provided');
+    }
+
+    console.log("Processing chat request for user:", userId);
+    console.log("Message:", message.substring(0, 50) + "...");
+    diagnosticSteps.push({
+      name: "Initialize Request", 
+      status: "success",
+      details: `Processing message: "${message.substring(0, 30)}..." for user: ${userId}`
+    });
     
-    if (error) {
-      console.error(`Error in time-filtered vector search: ${error.message}`);
-      throw error;
+    // Check if OpenAI API key is valid
+    if (!openAIApiKey || openAIApiKey === '') {
+      diagnosticSteps.push({
+        name: "Check API configuration", 
+        status: "error",
+        details: "OpenAI API key is missing or invalid"
+      });
+      throw new Error("OpenAI API key is not configured");
     }
     
-    console.log(`Found ${data?.length || 0} entries with time-filtered vector similarity`);
-    return data || [];
-  } catch (error) {
-    console.error('Error searching entries with time range:', error);
-    throw error;
-  }
-}
+    // Check if this is a quantitative query about emotions
+    const emotionQueryAnalysis = detectEmotionQuantitativeQuery(message);
+    diagnosticSteps.push({
+      name: "Analyze Query Type", 
+      status: "success",
+      details: `Query type analysis complete: ${JSON.stringify(emotionQueryAnalysis)}`
+    });
+    
+    // If we have a quantitative query about emotions, handle it directly
+    if (emotionQueryAnalysis.isQuantitativeEmotionQuery) {
+      console.log("Detected quantitative emotion query:", emotionQueryAnalysis);
+      diagnosticSteps.push({
+        name: "Quantitative Emotion Query", 
+        status: "success",
+        details: `Detected quantitative emotion query: ${JSON.stringify(emotionQueryAnalysis)}`
+      });
+      
+      if (emotionQueryAnalysis.isTopEmotionsQuery) {
+        // Handle request for top emotions
+        try {
+          diagnosticSteps.push({
+            name: "Calculate Top Emotions", 
+            status: "loading",
+            details: `Timeframe: ${emotionQueryAnalysis.timeRange}, Count: ${emotionQueryAnalysis.topCount}`
+          });
+          
+          const startTime = Date.now();
+          const emotionStats = await calculateTopEmotions(
+            userId,
+            emotionQueryAnalysis.timeRange,
+            emotionQueryAnalysis.topCount
+          );
+          
+          // Track function execution for diagnostics
+          functionExecutions.push({
+            name: "calculateTopEmotions",
+            params: {
+              userId: "***",
+              timeRange: emotionQueryAnalysis.timeRange,
+              topCount: emotionQueryAnalysis.topCount
+            },
+            result: emotionStats,
+            executionTime: Date.now() - startTime,
+            success: !emotionStats.error
+          });
+          
+          console.log("Calculated top emotions:", emotionStats);
+          
+          if (emotionStats.error) {
+            diagnosticSteps.push({
+              name: "Calculate Top Emotions", 
+              status: "error",
+              details: emotionStats.error
+            });
+          } else {
+            diagnosticSteps.push({
+              name: "Calculate Top Emotions", 
+              status: "success",
+              details: `Found ${emotionStats.topEmotions.length} emotions from ${emotionStats.entryCount} entries`
+            });
+          }
+          
+          // If we have valid emotion data, provide a direct answer
+          if (emotionStats.topEmotions.length > 0) {
+            const emotionsFormatted = emotionStats.topEmotions.map((emotion, index) => {
+              return `${index + 1}. ${emotion.emotion.charAt(0).toUpperCase() + emotion.emotion.slice(1)} (${Math.round(emotion.score * 100)}%)`;
+            }).join(', ');
+            
+            let directResponse = `Based on your journal entries from the past ${emotionQueryAnalysis.timeRange}, `;
+            directResponse += `your top ${emotionStats.topEmotions.length} emotions were: ${emotionsFormatted}. `;
+            directResponse += `This analysis is based on ${emotionStats.entryCount} journal entries. `;
+            directResponse += `Would you like me to provide more insights about any of these emotions?`;
+            
+            return new Response(
+              JSON.stringify({ 
+                response: directResponse,
+                analysis: {
+                  type: 'top_emotions',
+                  data: emotionStats
+                },
+                diagnostics: includeDiagnostics ? {
+                  steps: diagnosticSteps,
+                  functionCalls: functionExecutions,
+                  similarityScores
+                } : undefined
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        } catch (error) {
+          console.error("Error calculating top emotions:", error);
+          diagnosticSteps.push({
+            name: "Calculate Top Emotions", 
+            status: "error",
+            details: error instanceof Error ? error.message : String(error)
+          });
+        }
+      } else {
+        // Handle request for specific emotion score
+        try {
+          diagnosticSteps.push({
+            name: "Calculate Emotion Score", 
+            status: "loading",
+            details: `Emotion: ${emotionQueryAnalysis.emotionType}, Timeframe: ${emotionQueryAnalysis.timeRange}`
+          });
+          
+          const startTime = Date.now();
+          const emotionStats = await calculateAverageEmotionScore(
+            userId, 
+            emotionQueryAnalysis.emotionType, 
+            emotionQueryAnalysis.timeRange
+          );
+          
+          functionExecutions.push({
+            name: "calculateAverageEmotionScore",
+            params: {
+              userId: "***",
+              emotionType: emotionQueryAnalysis.emotionType,
+              timeRange: emotionQueryAnalysis.timeRange
+            },
+            result: emotionStats,
+            executionTime: Date.now() - startTime,
+            success: emotionStats.averageScore !== null
+          });
+          
+          console.log("Calculated emotion stats:", emotionStats);
+          
+          if (emotionStats.error) {
+            diagnosticSteps.push({
+              name: "Calculate Emotion Score", 
+              status: "error",
+              details: emotionStats.error
+            });
+          } else {
+            diagnosticSteps.push({
+              name: "Calculate Emotion Score", 
+              status: "success",
+              details: `Score: ${emotionStats.averageScore}, Entries: ${emotionStats.entryCount}`
+            });
+          }
+          
+          // If we have valid emotion data, provide a direct answer
+          if (emotionStats.averageScore !== null) {
+            let directResponse = `Based on your journal entries from the past ${emotionQueryAnalysis.timeRange}, `;
+            directResponse += `your average ${emotionQueryAnalysis.emotionType} score is ${emotionStats.averageScore} out of 100. `;
+            
+            if (emotionStats.validEntryCount < emotionStats.entryCount) {
+              directResponse += `This is calculated from ${emotionStats.validEntryCount} entries that had ${emotionQueryAnalysis.emotionType} data out of ${emotionStats.entryCount} total entries in this period. `;
+            }
+            
+            directResponse += `Would you like me to analyze this further or suggest ways to improve your ${emotionQueryAnalysis.emotionType}?`;
+            
+            return new Response(
+              JSON.stringify({ 
+                response: directResponse,
+                analysis: {
+                  type: 'quantitative_emotion',
+                  data: emotionStats
+                },
+                diagnostics: includeDiagnostics ? {
+                  steps: diagnosticSteps,
+                  functionCalls: functionExecutions,
+                  similarityScores
+                } : undefined
+              }),
+              { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+            );
+          }
+        } catch (error) {
+          console.error("Error calculating emotion score:", error);
+          diagnosticSteps.push({
+            name: "Calculate Emotion Score", 
+            status: "error",
+            details: error instanceof Error ? error.message : String(error)
+          });
+        }
+      }
+      
+      // If we couldn't handle the quantitative query as expected, fall back to the general approach
+      console.log("Couldn't process quantitative query with direct method, falling back to general approach");
+      diagnosticSteps.push({
+        name: "Direct Query Processing", 
+        status: "error",
+        details: "Could not process quantitative query directly, falling back to general approach"
+      });
+    }
+    
+    // Generate embedding for the user query if not provided
+    let embeddingExecution: FunctionExecution;
+    let actualQueryEmbedding: number[];
+    
+    if (queryEmbedding) {
+      // Use the pre-generated embedding from the orchestrator
+      actualQueryEmbedding = queryEmbedding;
+      diagnosticSteps.push({
+        name: "Query Embedding", 
+        status: "success",
+        details: `Using pre-generated embedding from orchestrator`
+      });
+    } else {
+      // Generate embedding if not provided
+      diagnosticSteps.push({
+        name: "Generate embedding for query", 
+        status: "loading"
+      });
+      
+      try {
+        const result = await generateEmbedding(message);
+        if (Array.isArray(result)) {
+          actualQueryEmbedding = result;
+          diagnosticSteps.push({
+            name: "Generate embedding for query", 
+            status: "success",
+            details: `Generated embedding with ${actualQueryEmbedding.length} dimensions`
+          });
+        } else {
+          // This is the function execution data
+          embeddingExecution = result as any;
+          functionExecutions.push(embeddingExecution);
+          if (!embeddingExecution.success) {
+            diagnosticSteps.push({
+              name: "Generate embedding for query", 
+              status: "error",
+              details: embeddingExecution.result?.error || "Unknown error"
+            });
+            throw new Error("Failed to generate embedding: " + embeddingExecution.result?.error);
+          }
+        }
+      } catch (error) {
+        console.error("Error generating embedding:", error);
+        diagnosticSteps.push({
+          name: "Generate embedding for query", 
+          status: "error",
+          details: error instanceof Error ? error.message : String(error)
+        });
+        
+        // Respond with the error but in a 200 status to avoid CORS issues
+        return new Response(
+          JSON.stringify({
+            response: "I'm having trouble understanding your request right now. There was an error processing your query's semantic meaning.",
+            error: error instanceof Error ? error.message : String(error),
+            diagnostics: includeDiagnostics ? {
+              steps: diagnosticSteps,
+              functionCalls: functionExecutions,
+              similarityScores
+            } : undefined
+          }),
+          { 
+            status: 200,
+            headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+          }
+        );
+      }
+    }
+    
+    // Search for relevant journal entries using vector similarity
+    diagnosticSteps.push({
+      name: "Search for relevant entries", 
+      status: "loading",
+      details: "Using vector similarity search"
+    });
+    
+    const startSearchTime = Date.now();
+    const { data: similarEntries, error: searchError } = await searchJournalEntriesWithVector(
+      userId,
+      actualQueryEmbedding
+    );
+    
+    const searchExecution: FunctionExecution = {
+      name: "match_journal_entries_fixed",
+      params: {
+        match_threshold: 0.5,
+        match_count: 10,
+        user_id_filter: userId
+      },
+      result: searchError ? { error: searchError.message } : { count: similarEntries?.length || 0 },
+      executionTime: Date.now() - startSearchTime,
+      success: !searchError
+    };
+    functionExecutions.push(searchExecution);
+    
+    if (searchError) {
+      console.error("Error searching for similar entries:", searchError);
+      console.error("Search error details:", JSON.stringify(searchError));
+      diagnosticSteps.push({
+        name: "Search for relevant entries", 
+        status: "error",
+        details: searchError.message
+      });
+    } else if (similarEntries && similarEntries.length > 0) {
+      console.log("Found similar entries:", similarEntries.length);
+      diagnosticSteps.push({
+        name: "Search for relevant entries", 
+        status: "success",
+        details: `Found ${similarEntries.length} relevant entries`
+      });
+      
+      // Track similarity scores for diagnostics
+      similarityScores = similarEntries.map(entry => ({
+        id: entry.id,
+        score: entry.similarity
+      }));
+    } else {
+      console.log("No similar entries found");
+      diagnosticSteps.push({
+        name: "Search for relevant entries", 
+        status: "warning",
+        details: "No similar entries found with vector search"
+      });
+    }
+    
+    // Create RAG context from relevant entries
+    let journalContext = "";
+    let contextEntries = [];
+    
+    if (similarEntries && similarEntries.length > 0) {
+      diagnosticSteps.push({
+        name: "Fetch full entries", 
+        status: "loading"
+      });
+      
+      // Fetch full entries for context
+      const startFetchTime = Date.now();
+      const entryIds = similarEntries.map(entry => entry.id);
+      const { data: entries, error: entriesError } = await supabase
+        .from('Journal Entries')
+        .select('"refined text", created_at, emotions, master_themes')
+        .in('id', entryIds);
+      
+      const fetchExecution: FunctionExecution = {
+        name: "fetch_journal_entries",
+        params: { ids: entryIds },
+        result: entriesError ? { error: entriesError.message } : { count: entries?.length || 0 },
+        executionTime: Date.now() - startFetchTime,
+        success: !entriesError
+      };
+      functionExecutions.push(fetchExecution);
+      
+      if (entriesError) {
+        console.error("Error retrieving journal entries:", entriesError);
+        diagnosticSteps.push({
+          name: "Fetch full entries", 
+          status: "error",
+          details: entriesError.message
+        });
+      } else if (entries && entries.length > 0) {
+        console.log("Retrieved full entries:", entries.length);
+        diagnosticSteps.push({
+          name: "Fetch full entries", 
+          status: "success",
+          details: `Retrieved ${entries.length} full entries`
+        });
+        
+        // Format entries as context with emotions data
+        contextEntries = entries.map((entry, index) => {
+          const entryWithSimilarity = similarEntries.find(e => e.id === entryIds[index]);
+          const similarity = entryWithSimilarity ? entryWithSimilarity.similarity : null;
+          
+          return {
+            id: entryIds[index],
+            date: entry.created_at,
+            snippet: entry["refined text"],
+            emotions: entry.emotions,
+            themes: entry.master_themes,
+            similarity,
+            type: 'journal entry'
+          };
+        });
+        
+        journalContext = "Here are some of your journal entries that might be relevant to your question:\n\n" + 
+          entries.map((entry, index) => {
+            const date = new Date(entry.created_at).toLocaleDateString();
+            const emotionsText = formatEmotions(entry.emotions);
+            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+          }).join('\n\n') + "\n\n";
+          
+        diagnosticSteps.push({
+          name: "Build context from entries", 
+          status: "success",
+          details: `Built context with ${entries.length} entries`
+        });
+      }
+    } else {
+      console.log("No similar entries found, falling back to recent entries");
+      diagnosticSteps.push({
+        name: "Fallback to recent entries", 
+        status: "loading",
+        details: "No similar entries found, using recent entries instead"
+      });
+      
+      // Fallback to recent entries if no similar ones found
+      const startRecentTime = Date.now();
+      const { data: recentEntries, error: recentError } = await supabase
+        .from('Journal Entries')
+        .select('id, "refined text", created_at, emotions, master_themes')
+        .eq('user_id', userId)
+        .order('created_at', { ascending: false })
+        .limit(3);
+      
+      const recentExecution: FunctionExecution = {
+        name: "fetch_recent_journal_entries",
+        params: { user_id: "***", limit: 3 },
+        result: recentError ? { error: recentError.message } : { count: recentEntries?.length || 0 },
+        executionTime: Date.now() - startRecentTime,
+        success: !recentError
+      };
+      functionExecutions.push(recentExecution);
+      
+      if (recentError) {
+        console.error("Error retrieving recent entries:", recentError);
+        diagnosticSteps.push({
+          name: "Fallback to recent entries", 
+          status: "error",
+          details: recentError.message
+        });
+      } else if (recentEntries && recentEntries.length > 0) {
+        console.log("Retrieved recent entries:", recentEntries.length);
+        diagnosticSteps.push({
+          name: "Fallback to recent entries", 
+          status: "success",
+          details: `Retrieved ${recentEntries.length} recent entries`
+        });
+        
+        contextEntries = recentEntries.map(entry => ({
+          id: entry.id,
+          date: entry.created_at,
+          snippet: entry["refined text"],
+          emotions: entry.emotions,
+          themes: entry.master_themes,
+          similarity: null,
+          type: 'recent entry'
+        }));
+        
+        journalContext = "Here are some of your recent journal entries:\n\n" + 
+          recentEntries.map((entry, index) => {
+            const date = new Date(entry.created_at).toLocaleDateString();
+            const emotionsText = formatEmotions(entry.emotions);
+            return `Entry ${index+1} (${date}):\n${entry["refined text"]}\nPrimary emotions: ${emotionsText}`;
+          }).join('\n\n') + "\n\n";
+          
+        diagnosticSteps.push({
+          name: "Build context from entries", 
+          status: "success",
+          details: `Built context with ${recentEntries.length} recent entries`
+        });
+      } else {
+        console.log("No recent entries found either, proceeding with empty context");
+        diagnosticSteps.push({
+          name: "Build context from entries", 
+          status: "warning",
+          details: "No entries found, proceeding with empty context"
+        });
+      }
+    }
+    
+    // Get user's first name for personalized response
+    let firstName = "";
+    try {
+      diagnosticSteps.push({
+        name: "Fetch user profile", 
+        status: "loading"
+      });
+      
+      const startProfileTime = Date.now();
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('full_name')
+        .eq('id', userId)
+        .single();
+        
+      const profileExecution: FunctionExecution = {
+        name: "fetch_user_profile",
+        params: { user_id: "***" },
+        result: profileError ? { error: profileError.message } : { full_name: profileData?.full_name },
+        executionTime: Date.now() - startProfileTime,
+        success: !profileError && !!profileData
+      };
+      functionExecutions.push(profileExecution);
+        
+      if (profileError) {
+        diagnosticSteps.push({
+          name: "Fetch user profile", 
+          status: "error",
+          details: profileError.message
+        });
+      } else if (profileData?.full_name) {
+        firstName = profileData.full_name.split(' ')[0];
+        diagnosticSteps.push({
+          name: "Fetch user profile", 
+          status: "success",
+          details: `User: ${firstName}`
+        });
+      }
+    } catch (error) {
+      console.error("Error fetching user profile:", error);
+      diagnosticSteps.push({
+        name: "Fetch user profile", 
+        status: "error",
+        details: error instanceof Error ? error.message : String(error)
+      });
+    }
+    
+    // Prepare system prompt with RAG context
+    const systemPrompt = `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
+${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
+Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
+${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}
+
+RESPONSE GUIDELINES:
+- Be extremely concise and to the point
+- Use bullet points wherever possible
+- Don't make assumptions about information not provided
+- Keep your tone warm but direct
+- Focus
