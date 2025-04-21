@@ -21,6 +21,8 @@ export type ChatMessage = {
     analysis?: string;
     requiresSql?: boolean;
     sqlQuery?: string;
+    processingStages?: string[];
+    queryComplexity?: 'simple' | 'complex' | 'multi-part';
     [key: string]: any;
   };
   has_numeric_result?: boolean;
@@ -33,3 +35,4 @@ export type ThemeUpdateEvent = {
   timestamp: number;
   source?: string;
 };
+

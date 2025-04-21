@@ -26,12 +26,22 @@ export async function processSmartQuery(
   try {
     console.log("[SmartQueryService] Processing query:", message.substring(0, 30) + "...");
     
-    // Send the query directly to the orchestrator without any client-side classification
+    // Detect if this is a complex query with multiple questions
+    const isComplex = detectComplexQuery(message);
+    if (isComplex) {
+      console.log("[SmartQueryService] Detected complex multi-part query");
+    }
+    
+    // Send the query directly to the orchestrator with additional metadata
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
       body: {
         message,
         userId,
-        threadId
+        threadId,
+        metadata: {
+          isComplexQuery: isComplex,
+          clientTimestamp: new Date().toISOString()
+        }
       }
     });
 
@@ -78,6 +88,30 @@ export async function processSmartQuery(
 }
 
 /**
+ * Helper function to detect if a query is complex (contains multiple questions)
+ * @param message The user's query
+ * @returns boolean indicating if the query is complex
+ */
+function detectComplexQuery(message: string): boolean {
+  if (!message) return false;
+  
+  // Count question marks as a basic heuristic
+  const questionMarkCount = (message.match(/\?/g) || []).length;
+  
+  // Look for conjunctions followed by question patterns
+  const conjunctionPatterns = [
+    /and\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will)/i,
+    /also\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will)/i,
+    /additionally\s+(?:how|what|why|when|where|who|which|can|could|would|should|is|are|will)/i
+  ];
+  
+  const hasConjunctionPattern = conjunctionPatterns.some(pattern => pattern.test(message));
+  
+  // Consider a query complex if it has multiple question marks or conjunction patterns
+  return questionMarkCount > 1 || hasConjunctionPattern;
+}
+
+/**
  * Process a query and save it as a chat message
  * @param message The user's query
  * @param userId The user's ID
@@ -91,6 +125,12 @@ export async function processAndSaveSmartQuery(
   try {
     console.log("[SmartQueryService] Processing and saving query:", message.substring(0, 30) + "...");
     
+    // Check if this is a complex query
+    const isComplexQuery = detectComplexQuery(message);
+    if (isComplexQuery) {
+      console.log("[SmartQueryService] Detected complex multi-part query, using enhanced processing");
+    }
+    
     // Save the user message first
     const { data: savedUserMsg, error: userMsgError } = await supabase
       .from('chat_messages')
@@ -98,7 +138,8 @@ export async function processAndSaveSmartQuery(
         thread_id: threadId,
         content: message,
         sender: 'user',
-        role: 'user'
+        role: 'user',
+        analysis_data: isComplexQuery ? { queryComplexity: 'multi-part' } : undefined
       })
       .select()
       .single();
@@ -108,8 +149,14 @@ export async function processAndSaveSmartQuery(
       throw userMsgError;
     }
     
-    // Process the query through the orchestrator
-    const result = await processSmartQuery(message, userId, threadId);
+    // Process the query through the orchestrator with additional timeout for complex queries
+    const result = await Promise.race([
+      processSmartQuery(message, userId, threadId),
+      new Promise<SmartQueryResult>((_, reject) => 
+        setTimeout(() => reject(new Error('Query processing timeout')), 
+          isComplexQuery ? 60000 : 30000)  // Longer timeout for complex queries
+      )
+    ]);
     
     if (!result.success) {
       const errorMsg = result.error || 'Failed to process query';
@@ -121,7 +168,11 @@ export async function processAndSaveSmartQuery(
           thread_id: threadId,
           content: `I'm having trouble processing your request. ${errorMsg}`,
           sender: 'assistant',
-          role: 'assistant'
+          role: 'assistant',
+          analysis_data: {
+            error: errorMsg,
+            queryComplexity: isComplexQuery ? 'multi-part' : 'simple'
+          }
         })
         .select()
         .single();
@@ -138,7 +189,15 @@ export async function processAndSaveSmartQuery(
       };
     }
     
-    // Save the assistant response
+    // Save the assistant response with enhanced metadata
+    const analysisData = {
+      planDetails: result.planDetails,
+      executionResults: result.executionResults,
+      diagnostics: result.diagnostics,
+      queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
+      processingStages: ['query_analysis', 'orchestration', 'response_generation']
+    };
+    
     const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
       .from('chat_messages')
       .insert({
@@ -146,11 +205,7 @@ export async function processAndSaveSmartQuery(
         content: result.response,
         sender: 'assistant',
         role: 'assistant',
-        analysis_data: {
-          planDetails: result.planDetails,
-          executionResults: result.executionResults,
-          diagnostics: result.diagnostics
-        }
+        analysis_data: analysisData
       })
       .select()
       .single();
@@ -168,9 +223,16 @@ export async function processAndSaveSmartQuery(
     };
   } catch (error: any) {
     console.error('[SmartQueryService] Error in processAndSaveSmartQuery:', error);
+    
+    // Handle specific known errors
+    let errorMessage = error.message || 'Unknown error occurred';
+    if (errorMessage.includes('timeout') || errorMessage.includes('AbortError')) {
+      errorMessage = 'Your query is complex and is taking longer than expected to process. Please try breaking it into smaller, more specific questions.';
+    }
+    
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: errorMessage
     };
   }
 }
