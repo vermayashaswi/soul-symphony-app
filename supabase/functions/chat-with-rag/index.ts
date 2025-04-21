@@ -30,7 +30,7 @@ function createDiagnosticStep(name: string, status: string, details: any = null)
 }
 
 // Define the general question prompt
-const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
+const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely. If the question concerns random and ambiguous questions not related to Mental health, journaling or similar lines, feel free to deny politely.`;
 
 // Maximum number of previous messages to include for context
 const MAX_CONTEXT_MESSAGES = 10;
@@ -147,6 +147,7 @@ serve(async (req) => {
             content: `You are a classifier that determines if a user's query is:
 1. A general question/greeting unrelated to their journal data (respond with "GENERAL")
 2. A question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC")
+3. If the question concerns random and ambiguous questions not related to Mental health, journaling or similar lines, respond with "GENERAL" and feel free to deny politely.
 
 Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC". No explanation.
 
