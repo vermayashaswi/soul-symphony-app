@@ -1,6 +1,44 @@
+
 import { supabase } from "@/integrations/supabase/client";
-import { ChatMessage } from "./types";
+import { ChatMessage, TokenOptimizationConfig } from "./types";
 import { useToast } from "@/hooks/use-toast";
+
+// Default optimization configuration
+const DEFAULT_OPTIMIZATION_CONFIG: TokenOptimizationConfig = {
+  maxEntries: 5,              // Reduced from 10
+  maxEntryLength: 200,        // Truncate entries to 200 chars
+  includeSentiment: true,     // Keep sentiment data
+  includeEntities: false,     // Skip entities by default
+  maxPreviousMessages: 5,     // Reduced from 10
+  optimizationLevel: 'light', // Default optimization level
+};
+
+// Gradually increase optimization based on query length
+function getOptimizationConfig(queryLength: number): TokenOptimizationConfig {
+  if (queryLength > 1000) {
+    // Very long queries need aggressive optimization
+    return {
+      ...DEFAULT_OPTIMIZATION_CONFIG,
+      maxEntries: 3,
+      maxEntryLength: 150, 
+      includeSentiment: false,
+      includeEntities: false,
+      maxPreviousMessages: 3,
+      optimizationLevel: 'aggressive',
+    };
+  } else if (queryLength > 500) {
+    // Medium length queries need moderate optimization
+    return {
+      ...DEFAULT_OPTIMIZATION_CONFIG,
+      maxEntries: 4,
+      maxEntryLength: 180,
+      optimizationLevel: 'light',
+    };
+  }
+  
+  // Default optimization for short queries
+  return DEFAULT_OPTIMIZATION_CONFIG;
+}
 
 interface SmartQueryResult {
   success: boolean;
@@ -9,6 +47,11 @@ interface SmartQueryResult {
   executionResults?: any[];
   error?: string;
   diagnostics?: any;
+  tokenUsage?: {
+    promptTokens?: number;
+    completionTokens?: number;
+    totalTokens?: number;
+  };
 }
 
 export async function processSmartQuery(
@@ -20,6 +63,10 @@ export async function processSmartQuery(
     console.log("[SmartQueryService] Processing query:", message.substring(0, 30) + "...");
     
     const isComplex = detectComplexQuery(message);
+    const optimizationConfig = getOptimizationConfig(message.length);
+    
+    console.log(`[SmartQueryService] Optimization level: ${optimizationConfig.optimizationLevel}`);
+    console.log(`[SmartQueryService] Max entries: ${optimizationConfig.maxEntries}`);
     
     const queryTimeout = isComplex ? 120000 : 45000; // 120s for complex, 45s for simple
     console.log(`[SmartQueryService] Query timeout set to ${queryTimeout}ms`);
@@ -27,10 +74,11 @@ export async function processSmartQuery(
     console.log(`[SmartQueryService] Query Complexity Analysis:
       - Message Length: ${message.length}
       - Is Complex Query: ${isComplex}
-      - Timeout Duration: ${queryTimeout}ms`);
+      - Timeout Duration: ${queryTimeout}ms
+      - Token Optimization: ${optimizationConfig.optimizationLevel}`);
     
     const queryResult = await Promise.race([
-      processQueryWithFallback(message, userId, threadId, isComplex),
+      processQueryWithFallback(message, userId, threadId, isComplex, optimizationConfig),
       new Promise<SmartQueryResult>((_, reject) => 
         setTimeout(() => {
           console.error('[SmartQueryService] Query processing timed out');
@@ -43,15 +91,30 @@ export async function processSmartQuery(
   } catch (error: any) {
     console.error('[SmartQueryService] Comprehensive error handling:', error);
     
+    // Check for token limit errors specifically
+    const isTokenLimitError = error.message?.includes('context length') || 
+                              error.message?.includes('token') ||
+                              error.message?.includes('too long');
+    
+    let errorMessage = error.message || 'Unexpected query processing error';
+    let suggestedAction = '';
+    
+    if (isTokenLimitError) {
+      errorMessage = 'Your query exceeds the model\'s token limit. Please try a shorter or simpler question.';
+      suggestedAction = 'Break your question into smaller parts or provide less context.';
+    }
+    
     const errorResponse: SmartQueryResult = {
       success: false,
-      error: error.message || 'Unexpected query processing error',
+      error: errorMessage,
       diagnostics: {
         stage: 'query_processing',
         isComplex: detectComplexQuery(message),
         queryLength: message.length,
         fullError: error.toString(),
-        timestamp: new Date().toISOString()
+        timestamp: new Date().toISOString(),
+        isTokenLimitError,
+        suggestedAction
       }
     };
     
@@ -80,7 +143,8 @@ async function processQueryWithFallback(
   message: string, 
   userId: string, 
   threadId: string | null, 
-  isComplex: boolean
+  isComplex: boolean,
+  optimizationConfig: TokenOptimizationConfig
 ): Promise<SmartQueryResult> {
   try {
     const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
@@ -88,16 +152,36 @@ async function processQueryWithFallback(
         message,
         userId,
         threadId,
+        optimizationConfig, // Pass optimization config to edge function
         metadata: {
           isComplexQuery: isComplex,
           queryLength: message.length,
-          processingAttempt: 'primary'
+          processingAttempt: 'primary',
+          optimizationLevel: optimizationConfig.optimizationLevel
         }
       }
     });
 
     if (error) {
       console.error('[SmartQueryService] Primary query processing failed:', error);
+      
+      // If token limit error, try with more aggressive optimization
+      if (error.message?.includes('context length') || error.message?.includes('token')) {
+        console.log('[SmartQueryService] Token limit exceeded, trying with aggressive optimization');
+        const aggressiveConfig = {
+          ...optimizationConfig,
+          maxEntries: 2,
+          maxEntryLength: 100,
+          includeSentiment: false,
+          includeEntities: false,
+          maxPreviousMessages: 2,
+          optimizationLevel: 'aggressive',
+        };
+        
+        return await processQueryWithAggressiveOptimization(
+          message, userId, threadId, aggressiveConfig
+        );
+      }
       
       const fallbackResult = await attemptFallbackProcessing(message, userId, threadId);
       if (fallbackResult) return fallbackResult;
@@ -107,6 +191,24 @@ async function processQueryWithFallback(
 
     if (data?.error) {
       console.error('[SmartQueryService] Query processing error:', data.error);
+      
+      // Check if token limit error
+      if (data.error.includes('context length') || data.error.includes('token')) {
+        console.log('[SmartQueryService] Token limit exceeded in response, trying with aggressive optimization');
+        const aggressiveConfig = {
+          ...optimizationConfig,
+          maxEntries: 2,
+          maxEntryLength: 100,
+          includeSentiment: false,
+          includeEntities: false,
+          maxPreviousMessages: 2,
+          optimizationLevel: 'aggressive',
+        };
+        
+        return await processQueryWithAggressiveOptimization(
+          message, userId, threadId, aggressiveConfig
+        );
+      }
       
       const fallbackResult = await attemptFallbackProcessing(message, userId, threadId);
       if (fallbackResult) return fallbackResult;
@@ -122,7 +224,8 @@ async function processQueryWithFallback(
       diagnostics: {
         ...data.diagnostics,
         processingMethod: 'primary'
-      }
+      },
+      tokenUsage: data.tokenUsage
     };
   } catch (error: any) {
     console.error('[SmartQueryService] Fallback processing error:', error);
@@ -131,6 +234,51 @@ async function processQueryWithFallback(
     if (finalFallbackResult) return finalFallbackResult;
     
     throw error;
+  }
+}
+
+async function processQueryWithAggressiveOptimization(
+  message: string,
+  userId: string,
+  threadId: string | null,
+  aggressiveConfig: TokenOptimizationConfig
+): Promise<SmartQueryResult> {
+  try {
+    console.log('[SmartQueryService] Attempting with aggressive token optimization');
+    
+    const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
+      body: {
+        message,
+        userId,
+        threadId,
+        optimizationConfig: aggressiveConfig,
+        metadata: {
+          processingAttempt: 'aggressive_optimization',
+          queryLength: message.length,
+          optimizationLevel: 'aggressive'
+        }
+      }
+    });
+
+    if (error || data?.error) {
+      console.error('[SmartQueryService] Aggressive optimization failed:', error || data?.error);
+      return await attemptFinalFallback(message, userId, threadId);
+    }
+
+    return {
+      success: true,
+      response: data.response,
+      planDetails: data.planDetails,
+      executionResults: data.executionResults,
+      diagnostics: {
+        ...data.diagnostics,
+        processingMethod: 'aggressive_optimization'
+      },
+      tokenUsage: data.tokenUsage
+    };
+  } catch (error) {
+    console.error('[SmartQueryService] Aggressive optimization error:', error);
+    return await attemptFinalFallback(message, userId, threadId);
   }
 }
 
@@ -179,6 +327,20 @@ async function attemptFinalFallback(
   try {
     console.log('[SmartQueryService] Attempting final fallback processing');
     
+    // For very long queries, suggest breaking them down
+    if (message.length > 800) {
+      return {
+        success: true,
+        response: "I'm having trouble processing your detailed question due to token limits. Could you break it down into smaller, simpler questions? This helps me provide more accurate responses.",
+        diagnostics: {
+          processingMethod: 'final_fallback',
+          queryLength: message.length,
+          timestamp: new Date().toISOString(),
+          reason: 'token_limit_exceeded'
+        }
+      };
+    }
+    
     return {
       success: true,
       response: "I'm having trouble processing your complex query. Could you rephrase it more simply or break it down into smaller questions?",
@@ -202,15 +364,13 @@ export async function processAndSaveSmartQuery(
     console.log("[SmartQueryService] Processing and saving query:", message.substring(0, 30) + "...");
     
     const isComplexQuery = detectComplexQuery(message);
-    let analysisData = {};
+    const optimizationConfig = getOptimizationConfig(message.length);
     
-    if (isComplexQuery) {
-      console.log("[SmartQueryService] Detected complex multi-part query, using enhanced processing");
-      analysisData = { 
-        queryComplexity: 'multi-part', 
-        queryLength: message.length 
-      };
-    }
+    let analysisData: any = {
+      queryComplexity: isComplexQuery ? 'multi-part' : 'simple', 
+      queryLength: message.length,
+      optimizationLevel: optimizationConfig.optimizationLevel
+    };
     
     const { data: savedUserMsg, error: userMsgError } = await supabase
       .from('chat_messages')
@@ -249,7 +409,10 @@ export async function processAndSaveSmartQuery(
         let errorMsg = result.error || 'Failed to process query';
         console.error('[SmartQueryService] Processing error:', errorMsg, result.diagnostics);
         
-        if (isComplexQuery && processingTime < 5000) {
+        // Special handling for token limit errors
+        if (errorMsg.includes('context length') || errorMsg.includes('token')) {
+          errorMsg = "Your question contains too much information for me to process. Please try asking a shorter question or breaking it into multiple smaller questions.";
+        } else if (isComplexQuery && processingTime < 5000) {
           errorMsg = "I'm having trouble understanding your multi-part question. The query orchestrator encountered an early error. Please try asking one question at a time.";
         } else if (errorMsg.includes('timeout') || processingTime >= timeoutDuration - 1000) {
           errorMsg = "Your question is taking longer than expected to process. Please try asking a simpler or shorter question.";
@@ -266,7 +429,9 @@ export async function processAndSaveSmartQuery(
               error: result.error,
               queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
               processingTime,
-              diagnostics: result.diagnostics
+              diagnostics: result.diagnostics,
+              optimizationLevel: optimizationConfig.optimizationLevel,
+              tokenUsage: result.tokenUsage
             }
           })
           .select()
@@ -291,7 +456,9 @@ export async function processAndSaveSmartQuery(
         diagnostics: result.diagnostics,
         queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
         processingTime,
-        processingStages: ['query_analysis', 'orchestration', 'response_generation']
+        processingStages: ['query_analysis', 'orchestration', 'response_generation'],
+        optimizationLevel: optimizationConfig.optimizationLevel,
+        tokenUsage: result.tokenUsage
       };
       
       const { data: savedAssistantMsg, error: assistantMsgError } = await supabase
@@ -322,7 +489,12 @@ export async function processAndSaveSmartQuery(
       
       let errorMessage = processingError.message || 'An error occurred during processing';
       
-      if (isComplexQuery) {
+      // Check for token limit errors
+      if (processingError.message?.includes('context length') || 
+          processingError.message?.includes('token limit') ||
+          processingError.message?.includes('too long')) {
+        errorMessage = 'Your question contains too much information for me to process. Please try breaking it into smaller questions.';
+      } else if (isComplexQuery) {
         if (processingError.message?.includes('timeout')) {
           errorMessage = 'Your multi-part question is taking longer than expected to process. Please try asking one question at a time for better results.';
         } else if (processingError.message?.includes('AbortError') || processingError.message?.includes('failed to fetch')) {
@@ -347,7 +519,8 @@ export async function processAndSaveSmartQuery(
             error: processingError.message,
             queryComplexity: isComplexQuery ? 'multi-part' : 'simple',
             errorType: processingError.name || 'ProcessingError',
-            queryLength: message.length
+            queryLength: message.length,
+            optimizationLevel: optimizationConfig.optimizationLevel
           }
         })
         .select()
@@ -370,6 +543,8 @@ export async function processAndSaveSmartQuery(
     let errorMessage = error.message || 'Unknown error occurred';
     if (errorMessage.includes('timeout') || errorMessage.includes('AbortError')) {
       errorMessage = 'Your question is taking longer than expected to process. Please try again with a simpler question.';
+    } else if (errorMessage.includes('context length') || errorMessage.includes('token')) {
+      errorMessage = 'Your question contains too much information for me to process. Please try a shorter question.';
     }
     
     return {

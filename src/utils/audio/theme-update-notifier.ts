@@ -19,3 +19,30 @@ export const notifyThemeUpdate = (entryId: number) => {
     detail: eventPayload
   }));
 };
+
+/**
+ * Estimate the token count of a text string
+ * This is a rough approximation: 1 token ≈ 4 characters for English text
+ */
+export const estimateTokenCount = (text: string): number => {
+  if (!text) return 0;
+  // Roughly 4 characters per token for English text
+  return Math.ceil(text.length / 4);
+};
+
+/**
+ * Truncate text to fit within a token limit
+ * @param text The text to truncate
+ * @param maxTokens Maximum number of tokens
+ * @returns Truncated text
+ */
+export const truncateToTokenLimit = (text: string, maxTokens: number): string => {
+  if (!text) return '';
+  
+  const estimatedTokens = estimateTokenCount(text);
+  if (estimatedTokens <= maxTokens) return text;
+  
+  // Truncate to approximately the right number of characters
+  const charLimit = maxTokens * 4;
+  return text.substring(0, charLimit) + '...';
+};

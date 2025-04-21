@@ -23,6 +23,9 @@ export type ChatMessage = {
     sqlQuery?: string;
     processingStages?: string[];
     queryComplexity?: 'simple' | 'complex' | 'multi-part';
+    tokenCount?: number;  // Track token usage
+    contextSize?: number; // Track context size
+    optimizationLevel?: 'none' | 'light' | 'aggressive'; // Track optimization level
     [key: string]: any;
   };
   has_numeric_result?: boolean;
@@ -34,5 +37,15 @@ export type ThemeUpdateEvent = {
   entryId: number;
   timestamp: number;
   source?: string;
+};
+
+// Token optimization configuration type
+export type TokenOptimizationConfig = {
+  maxEntries: number;         // Maximum number of entries to include in context
+  maxEntryLength: number;     // Maximum length of each entry in characters
+  includeSentiment: boolean;  // Whether to include sentiment data
+  includeEntities: boolean;   // Whether to include entity data
+  maxPreviousMessages: number; // Maximum number of previous messages to include
+  optimizationLevel: 'none' | 'light' | 'aggressive';
 };
 
