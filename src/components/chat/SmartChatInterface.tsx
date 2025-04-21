@@ -9,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import EmptyChatState from "./EmptyChatState";
 import VoiceRecordingButton from "./VoiceRecordingButton";
-import { Trash } from "lucide-react";
+import { Trash, Bug } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AlertDialog,
@@ -211,17 +211,20 @@ const SmartChatInterface = () => {
       setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
       
-      const analysisDetails = {
-        isEmotionFocused: queryTypes.isEmotionFocused,
-        isQuantitative: queryTypes.isQuantitative,
-        isWhyQuestion: queryTypes.isWhyQuestion,
-        isTemporalQuery: queryTypes.isTemporalQuery,
-        timeRange: queryTypes.timeRange.periodName,
-        emotion: queryTypes.emotion || 'none detected'
-      };
-      
-      debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
-      console.log("Query analysis result:", queryTypes);
+      const diagnosticSteps: ChatDiagnosticStep[] = debugLog.getLogs().map(log => ({
+        name: log.event,
+        status: log.level === 'error' ? 'error' : 
+               log.level === 'warning' ? 'warning' : 
+               log.level === 'success' ? 'success' : 'info',
+        details: log.message,
+        timestamp: log.timestamp
+      }));
+
+      setCurrentDiagnostics({
+        steps: diagnosticSteps,
+        gptResponses: [],
+        functionResponses: []
+      });
       
       setProcessingStage("Searching for insights...");
       debugLog.addEvent("AI Processing", "Sending query to AI for processing", "info");
@@ -444,10 +447,11 @@ const SmartChatInterface = () => {
           <Button
             variant="outline"
             size="sm"
-            className="text-xs"
+            className="flex items-center gap-1 z-50 fixed top-16 right-6 shadow-md"
             onClick={() => setDiagnosticsModalOpen(true)}
             title="View last chat diagnostics"
           >
+            <Bug className="h-4 w-4" />
             Diagnostics
           </Button>
           {currentThreadId && (

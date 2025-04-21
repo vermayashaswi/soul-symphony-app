@@ -1,6 +1,6 @@
 
 import React from "react";
-import { X } from "lucide-react";
+import { X, Bug } from "lucide-react";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Badge } from "@/components/ui/badge";
 
@@ -42,7 +42,10 @@ export const ChatDiagnosticsModal: React.FC<ChatDiagnosticsModalProps> = ({
     <Dialog open={isOpen} onOpenChange={onClose}>
       <DialogContent className="max-w-2xl">
         <DialogHeader className="flex flex-row items-center justify-between">
-          <DialogTitle>Chat Diagnostics</DialogTitle>
+          <DialogTitle className="flex items-center gap-2">
+            <Bug className="h-5 w-5" />
+            Chat Diagnostics
+          </DialogTitle>
           <button onClick={onClose} className="ml-auto">
             <X className="h-5 w-5" />
           </button>
