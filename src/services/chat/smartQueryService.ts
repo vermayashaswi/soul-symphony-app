@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage } from "./types";
 import { isFactualGeneralKnowledgeQuery } from "@/utils/chat/queryAnalyzer";
@@ -39,7 +40,8 @@ export async function processSmartQuery(
       body: {
         message,
         userId,
-        threadId
+        threadId,
+        isFactualQueryChecked: true // Flag to indicate factual check was already done
       }
     });
 

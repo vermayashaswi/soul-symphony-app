@@ -26,11 +26,8 @@ function classifyQueryCategory(query) {
   // Direct greetings, general stop or small-talk, and off-topic open-ended queries 
   if (
     ["hi", "hello", "hey", "who are you", "stop", "exit"].includes(lower) ||
-    lower.startsWith("who is") || 
-    lower.startsWith("what is your") ||
-    /who is the (president|prime minister|leader) of/i.test(lower) ||
-    /what is the (capital|population|currency) of/i.test(lower) ||
-    /when (was|is|did)/i.test(lower) && !lower.includes("journal") && !lower.includes("feel")
+    lower.startsWith("who is your") ||
+    lower.startsWith("what is your")
   ) {
     return "general";
   }
@@ -61,7 +58,7 @@ serve(async (req) => {
   let startTime = Date.now();
   
   try {
-    const { message, userId, threadId } = await req.json();
+    const { message, userId, threadId, isFactualQueryChecked } = await req.json();
 
     if (!message) {
       throw new Error('Message is required');
@@ -145,28 +142,28 @@ serve(async (req) => {
       });
     }
 
-    // --- Step 3: Factual Query Check ---
-    // This is a simplified check that relies primarily on the category
-    // More specific factual checks are now done in the client-side service
-    if (category === "general" && 
-       (message.toLowerCase().startsWith("who is") ||
-        message.toLowerCase().startsWith("what is the capital") ||
-        /who is the (president|prime minister|leader) of/i.test(message) ||
-        /what is the (capital|population|currency) of/i.test(message))) {
-      
-      const factualResponse = "I'm your emotional well-being assistant. I'm here to support your journaling practice and mental wellness, not to provide general knowledge. Could I help you reflect on something in your journal or discuss mental well-being techniques instead?";
-      
-      diagnosticSteps.push({
-        name: "Factual Query Direct Response",
-        status: "success",
-        details: "Detected a factual query, providing standard response.",
-        timestamp: new Date().toISOString()
-      });
-      
-      return new Response(JSON.stringify({
-        response: factualResponse,
-        diagnostics: { steps: diagnosticSteps }
-      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    // --- Step 3: Factual Query Check - Skip if already checked client-side ---
+    if (!isFactualQueryChecked && category === "general") {
+      // Simple check for the most obvious factual questions
+      if (message.toLowerCase().startsWith("who is") || 
+          message.toLowerCase().startsWith("what is the capital") ||
+          /who is the (president|prime minister|leader) of/i.test(message) ||
+          /what is the (capital|population|currency) of/i.test(message)) {
+        
+        const factualResponse = "I'm your emotional well-being assistant. I'm here to support your journaling practice and mental wellness, not to provide general knowledge. Could I help you reflect on something in your journal or discuss mental well-being techniques instead?";
+        
+        diagnosticSteps.push({
+          name: "Factual Query Direct Response",
+          status: "success",
+          details: "Detected a factual query in edge function, providing standard response.",
+          timestamp: new Date().toISOString()
+        });
+        
+        return new Response(JSON.stringify({
+          response: factualResponse,
+          diagnostics: { steps: diagnosticSteps }
+        }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+      }
     }
 
     // --- Step 4: Process "general" or "general-journal-specific" queries with the SOuLO prompt ---
@@ -897,52 +894,4 @@ async function getDatabaseSchema() {
       );
       
       if (!tableError && tableColumns && tableColumns.length > 0) {
-        // Add the emotions table to our schema
-        schema["emotions"] = {
-          columns: tableColumns.map(col => col.column_name),
-          columnTypes: tableColumns.reduce((acc, col) => {
-            acc[col.column_name] = col.data_type;
-            return acc;
-          }, {})
-        };
-      }
-    } catch (schemaError) {
-      console.error('Error getting additional schema:', schemaError);
-      // Continue with hardcoded schema
-    }
-    
-    return schema;
-  } catch (error) {
-    console.error('Error getting database schema:', error);
-    
-    // Return a minimal default schema
-    return {
-      "Journal Entries": {
-        columns: ["id", "user_id", "created_at", "refined text", "emotions"],
-        columnTypes: {
-          "id": "bigint",
-          "user_id": "uuid",
-          "created_at": "timestamp with time zone",
-          "refined text": "text",
-          "emotions": "jsonb"
-        }
-      }
-    };
-  }
-}
-
-// Helper function to count journal entries
-async function countJournalEntries(userId) {
-  try {
-    const { count, error } = await supabase
-      .from('Journal Entries')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
-    
-    if (error) throw error;
-    return count || 0;
-  } catch (error) {
-    console.error('Error counting journal entries:', error);
-    return 0; // Default to 0 on error
-  }
-}
+        // Add
