@@ -69,7 +69,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
           <div className="mt-3 text-xs opacity-70">
             <Separator className="my-2" />
             <div className="font-semibold">Analysis:</div>
-            <p>{message.analysis_data.analysis}</p>
+            {typeof message.analysis_data.analysis === 'string' && <p>{message.analysis_data.analysis}</p>}
             {message.analysis_data.requiresSql && (
               <>
                 <div className="font-semibold mt-1">SQL Query:</div>
