@@ -602,17 +602,7 @@ const MobileChatInterfaceContent = ({
             {messages.map((message, index) => (
               <MobileChatMessage 
                 key={index} 
-                message={{
-                  id: `msg-${index}`,
-                  thread_id: currentThreadId || '',
-                  content: message.content,
-                  sender: message.role === 'user' ? 'user' : 'assistant',
-                  created_at: new Date().toISOString(),
-                  role: message.role,
-                  reference_entries: message.references,
-                  analysis_data: message.analysis,
-                  has_numeric_result: message.hasNumericResult
-                }}
+                message={message} 
                 showAnalysis={false}
               />
             ))}

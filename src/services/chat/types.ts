@@ -16,13 +16,8 @@ export type ChatMessage = {
   content: string;
   sender: 'user' | 'assistant';
   created_at: string;
-  reference_entries?: Json[];
-  analysis_data?: {
-    analysis?: string;
-    requiresSql?: boolean;
-    sqlQuery?: string;
-    [key: string]: any;
-  };
+  reference_entries?: any[];
+  analysis_data?: any;
   has_numeric_result?: boolean;
-  role: 'user' | 'assistant' | 'error';
+  role: 'user' | 'assistant';
 };
