@@ -116,7 +116,6 @@ const MobileChatInterface = ({
           thread_id: currentThreadId,
           content: message,
           sender: 'user',
-          role: 'user',
           created_at: new Date().toISOString()
         })
         .select()
@@ -195,7 +194,7 @@ const MobileChatInterface = ({
               key={msg.id} 
               chatMessages={[msg]} 
               isLoading={false}
-              threadId={currentThreadId} // Add the missing threadId prop here
+              threadId={currentThreadId}
             />
           ))
         )}
@@ -207,10 +206,12 @@ const MobileChatInterface = ({
       <div className="chat-footer flex justify-between p-4 border-t">
         <Button
           variant="destructive"
+          size="icon"
+          className="ml-auto"
           onClick={() => setShowDeleteDialog(true)}
           disabled={loading || !currentThreadId}
         >
-          <Trash className="mr-2 h-4 w-4" /> Delete Conversation
+          <Trash className="h-4 w-4" />
         </Button>
       </div>
       {showDeleteDialog && (

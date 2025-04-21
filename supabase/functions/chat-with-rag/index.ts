@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -65,6 +66,8 @@ IMPORTANT GUIDELINES:
 - Single word messages like "hey", "hi", "hello" are ALWAYS "GENERAL"
 - Short phrases like "how are you" are ALWAYS "GENERAL"
 - If you're unsure whether a query requires journal data, default to "GENERAL"
+- ANY questions about facts, people, places, history, news, or other general knowledge are ALWAYS "GENERAL"
+- Questions about politics, world leaders, countries, science, math, or any academic topics are ALWAYS "GENERAL"
 
 Examples:
 - "Hi" -> "GENERAL"
@@ -76,6 +79,9 @@ Examples:
 - "How do I use this app?" -> "GENERAL"
 - "What's the weather today?" -> "GENERAL"
 - "Who is the president?" -> "GENERAL"
+- "Who is the president of India?" -> "GENERAL"
+- "Tell me about quantum physics" -> "GENERAL"
+- "What's happening in the news?" -> "GENERAL"
 - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
 - "What did I write about yesterday?" -> "JOURNAL_SPECIFIC"
 - "Show me patterns in my anxiety" -> "JOURNAL_SPECIFIC"
