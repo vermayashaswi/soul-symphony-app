@@ -145,12 +145,20 @@ serve(async (req) => {
     // Block or respond to "general" or "general-journal-specific" queries immediately per your SOuLO prompt
 
     if (category === "general" || category === "general-journal-specific") {
+      // Check if this is a very simple greeting that can be directly answered
       let simpleGreeting = /^(hi|hello|hey)$/i.test(message.trim());
       let resp = null;
 
       // For very basic greetings, use a direct response to reduce unnecessary latency and cost.
       if (simpleGreeting) {
-        resp = "Hi there! I’m always here when you need to talk or reflect.";
+        resp = "Hi there! I'm always here when you need to talk or reflect.";
+        
+        diagnosticSteps.push({
+          name: "Simple Greeting Direct Response",
+          status: "success",
+          details: "Using quick canned response for simple greeting",
+          timestamp: new Date().toISOString()
+        });
       } else {
         // Otherwise, use OpenAI with the user's special SOuLO prompt.
         const finalPrompt = `
@@ -160,9 +168,9 @@ You have received a query attached herewith.
 
 If it's a casual message (e.g., "hi", "hello", "how are you?") — respond briefly and kindly with a warm, human-like tone.
 
-If it’s unrelated to mental well-being or journal entries (e.g., "Who is the President of India?", "What's the capital of France?") — gently explain that you are only here to support the user’s emotional well-being through journal reflection and mental health tools.
+If it's unrelated to mental well-being or journal entries (e.g., "Who is the President of India?", "What's the capital of France?") — gently explain that you are only here to support the user's emotional well-being through journal reflection and mental health tools.
 
-If it’s a general mental health–related question (e.g., “What are 5 ways to reduce anxiety?”, “How can I sleep better?”) — answer directly and helpfully with evidence-informed, actionable advice. Be concise, empathetic, and practical.
+If it's a general mental health–related question (e.g., "What are 5 ways to reduce anxiety?", "How can I sleep better?") — answer directly and helpfully with evidence-informed, actionable advice. Be concise, empathetic, and practical.
 
 Response Style
 
@@ -174,7 +182,7 @@ Don't pretend to access or analyze journal data unless the query requires it
 
 Example Responses:
 
-"Hi there! I’m always here when you need to talk or reflect."
+"Hi there! I'm always here when you need to talk or reflect."
 
 "I'm designed to help you reflect on your thoughts and emotions. Feel free to ask me something about your journaling journey!"
 
@@ -220,7 +228,7 @@ Example Responses:
       return new Response(JSON.stringify({
         response: resp,
         diagnostics: { steps: diagnosticSteps }
-      }), { headers: corsHeaders });
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // For ambiguous or unsupported queries, block/clarify
@@ -234,7 +242,7 @@ Example Responses:
       return new Response(JSON.stringify({
         response: "I couldn't determine how to process your question. Could you rephrase it, focusing on your journal entries or reflections?",
         diagnostics: { steps: diagnosticSteps }
-      }), { status: 200, headers: corsHeaders });
+      }), { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
     }
 
     // --- Step 4: Get Database Schema for Planner ---
