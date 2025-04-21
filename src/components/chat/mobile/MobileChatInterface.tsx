@@ -285,12 +285,13 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
     setRecordingTime(0);
   };
 
-  const handleNewChat = async () => {
+  const handleNewChat = async (): Promise<string | null> => {
     setIsSidebarOpen(false);
     const newThreadId = await onCreateNewThread();
     if (newThreadId) {
       loadThreadMessages(newThreadId);
     }
+    return newThreadId;
   };
 
   const handleDeleteCurrentThread = async () => {
