@@ -1,5 +1,5 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { notifyThemeUpdate } from './theme-update-notifier';
 
 /**
  * Triggers theme extraction for a journal entry
@@ -22,8 +22,6 @@ export const triggerThemeExtraction = async (entryId: number): Promise<boolean> 
       return false;
     } else {
       console.log("[theme-extractor] Theme extraction triggered successfully:", data);
-      // Notify listeners that themes have been updated
-      notifyThemeUpdate(entryId);
       return true;
     }
   } catch (error) {
@@ -54,8 +52,6 @@ export const triggerFullTextProcessing = async (entryId: number): Promise<void> 
       console.error("[theme-extractor] Error triggering theme extraction:", themeError);
     } else {
       console.log("[theme-extractor] Theme extraction triggered successfully:", themeData);
-      // Notify listeners that themes have been updated
-      notifyThemeUpdate(entryId);
     }
 
     // Step 2: Trigger entity extraction
