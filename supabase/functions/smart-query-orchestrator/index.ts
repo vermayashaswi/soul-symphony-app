@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -147,8 +146,32 @@ serve(async (req) => {
     }
 
     // --- Step 3: Planner Logic and Routing ---
-    // Process "general" or "general-journal-specific" queries with the SOuLO prompt
+    
+    // Check if this is a factual question that we should directly decline
+    const factualQuestionPattern = /(who|what|where|when|why|how) (is|are|was|were|did) (the )?([a-z\s]+) (of|in|at|for|during) ([a-z\s]+)/i;
+    if (
+      message.toLowerCase().startsWith("who is") ||
+      message.toLowerCase().startsWith("what is the") ||
+      /who is the (president|prime minister|leader) of/i.test(message) ||
+      /what is the (capital|population|currency) of/i.test(message) ||
+      (factualQuestionPattern.test(message) && !message.toLowerCase().includes("journal") && !message.toLowerCase().includes("feel"))
+    ) {
+      const factualResponse = "I'm your emotional well-being assistant. I'm here to support your journaling practice and mental wellness, not to provide general knowledge. Could I help you reflect on something in your journal or discuss mental well-being techniques instead?";
+      
+      diagnosticSteps.push({
+        name: "Factual Query Direct Response",
+        status: "success",
+        details: "Detected a factual query, providing standard response.",
+        timestamp: new Date().toISOString()
+      });
+      
+      return new Response(JSON.stringify({
+        response: factualResponse,
+        diagnostics: { steps: diagnosticSteps }
+      }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    }
 
+    // Process "general" or "general-journal-specific" queries with the SOuLO prompt
     if (category === "general" || category === "general-journal-specific") {
       // Directly use OpenAI with the user's special SOuLO prompt for all queries in these categories
       const finalPrompt = `
