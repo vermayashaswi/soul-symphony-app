@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -877,7 +876,7 @@ RESPONSE GUIDELINES:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o', // Changed from gpt-4o-mini to gpt-4o
           messages: [
             {
               role: 'system',
@@ -897,7 +896,7 @@ RESPONSE GUIDELINES:
         
         const gptExecution: FunctionExecution = {
           name: "openai_chat_completion",
-          params: { model: 'gpt-4o-mini' },
+          params: { model: 'gpt-4o' },
           result: { error: errorText },
           executionTime: Date.now() - startGptTime,
           success: false
@@ -918,7 +917,7 @@ RESPONSE GUIDELINES:
       
       const gptExecution: FunctionExecution = {
         name: "openai_chat_completion",
-        params: { model: 'gpt-4o-mini' },
+        params: { model: 'gpt-4o' },
         result: { 
           responseLength: aiResponse.length,
           firstChars: aiResponse.substring(0, 50) + "..."
