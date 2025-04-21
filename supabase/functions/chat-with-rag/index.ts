@@ -235,8 +235,6 @@ Examples:
       );
     }
     
-    // ... keep existing code (handling journal-specific queries, embedding generation, vector search, etc.)
-    
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "loading"));
@@ -430,7 +428,7 @@ Now generate your thoughtful, emotionally intelligent response:`;
     // 5. Return response
     return new Response(
       JSON.stringify({ 
-        response: responseContent, 
+        response: responseContent,
         diagnostics: includeDiagnostics ? diagnostics : undefined,
         references: processedEntries.map(entry => ({
           id: entry.id,
@@ -445,7 +443,17 @@ Now generate your thoughtful, emotionally intelligent response:`;
   } catch (error) {
     console.error('Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
+      JSON.stringify({ 
+        error: error.message,
+        diagnostics: {
+          steps: [{ 
+            name: "Error", 
+            status: "error", 
+            details: error.message,
+            timestamp: new Date().toISOString()
+          }]
+        }
+      }),
       {
         status: 500,
         headers: { 'Content-Type': 'application/json', ...corsHeaders },
