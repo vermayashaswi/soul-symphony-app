@@ -2,32 +2,41 @@ import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage, TokenOptimizationConfig, QueryFilterParams } from "./types";
 import { useToast } from "@/hooks/use-toast";
 
-// Default optimization configuration
+// Enhanced optimization configuration with better defaults for complex queries
 const DEFAULT_OPTIMIZATION_CONFIG: TokenOptimizationConfig = {
-  maxEntries: 5,              // Reduced from 10
-  maxEntryLength: 200,        // Truncate entries to 200 chars
-  includeSentiment: true,     // Keep sentiment data
-  includeEntities: false,     // Skip entities by default
-  maxPreviousMessages: 5,     // Reduced from 10
-  optimizationLevel: 'light' as const, // Default optimization level
-  useSmartFiltering: true     // Enable smart filtering by default
+  maxEntries: 5,              
+  maxEntryLength: 250,        // Increased from 200 to allow more context per entry
+  includeSentiment: true,     
+  includeEntities: true,      // Changed to true to capture entity mentions for complex queries
+  maxPreviousMessages: 5,     
+  optimizationLevel: 'light' as const,
+  useSmartFiltering: true,
+  filterOptions: {
+    relevanceThreshold: 0.55, // Slightly reduced threshold to include more relevant context
+    extractKeywords: true     // Enable keyword extraction
+  }
 };
 
-// Gradually increase optimization based on query length
-function getOptimizationConfig(queryLength: number): TokenOptimizationConfig {
-  if (queryLength > 1000) {
-    // Very long queries need aggressive optimization
+// Enhanced optimization based on query complexity and length
+function getOptimizationConfig(queryLength: number, isComplex = false): TokenOptimizationConfig {
+  // Detect trait analysis or improvement-seeking queries
+  const isTraitQuery = isComplex && queryLength > 30;
+  
+  if (queryLength > 1000 || isTraitQuery) {
+    // Very long or complex trait queries need targeted optimization
     return {
       ...DEFAULT_OPTIMIZATION_CONFIG,
-      maxEntries: 3,
-      maxEntryLength: 150, 
-      includeSentiment: false,
-      includeEntities: false,
+      maxEntries: 5,
+      maxEntryLength: 200, 
+      includeSentiment: true, // Keep sentiment for trait analysis
+      includeEntities: true,  // Keep entities for trait analysis
       maxPreviousMessages: 3,
-      optimizationLevel: 'aggressive' as const,
+      optimizationLevel: 'medium' as const,
       useSmartFiltering: true,
       filterOptions: {
-        relevanceThreshold: 0.7  // Higher threshold for more aggressive filtering
+        relevanceThreshold: 0.6,  // Balance between precision and recall
+        extractKeywords: true,
+        prioritizeSentiment: true // Prioritize entries with clear sentiment for trait analysis
       }
     };
   } else if (queryLength > 500) {
@@ -35,7 +44,7 @@ function getOptimizationConfig(queryLength: number): TokenOptimizationConfig {
     return {
       ...DEFAULT_OPTIMIZATION_CONFIG,
       maxEntries: 4,
-      maxEntryLength: 180,
+      maxEntryLength: 220,
       optimizationLevel: 'light' as const,
       useSmartFiltering: true
     };
@@ -43,6 +52,39 @@ function getOptimizationConfig(queryLength: number): TokenOptimizationConfig {
   
   // Default optimization for short queries
   return DEFAULT_OPTIMIZATION_CONFIG;
+}
+
+// More robust complex query detection
+function detectComplexQuery(message: string): boolean {
+  if (!message) return false;
+  
+  const lowerMessage = message.toLowerCase();
+  
+  // Enhanced detection patterns for complex queries
+  const complexityIndicators = [
+    // Original indicators
+    (message.match(/\b(how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|did|am|have|has|had)\b/gi) || []).length > 1,
+    (message.match(/[?!.]/g) || []).length > 1,
+    message.length > 100,
+    /\b(and|but|or|additionally|moreover|furthermore)\b/i.test(message),
+    
+    // New indicators for trait analysis and improvement queries
+    /\b(trait|quality|characteristic|personality|improve|better|growth|develop|negative|positive)\b/i.test(lowerMessage),
+    /\b(top|best|worst|main|primary|key)\b.*?\b(\d+|three|five|several)\b/i.test(lowerMessage),
+    /\b(rate|score|rank|grade|evaluate|assess)\b/i.test(lowerMessage),
+    /\b(out of|from|between)\b.*?\b(\d+)\b/i.test(lowerMessage),
+    /\b(steps|ways|methods|strategies|techniques|tips|advice)\b.*?\b(improve|develop|grow|enhance|strengthen)\b/i.test(lowerMessage)
+  ];
+  
+  const complexityScore = complexityIndicators.filter(Boolean).length;
+  
+  console.log(`[SmartQueryService] Enhanced Complexity Score: ${complexityScore}`);
+  console.log(`[SmartQueryService] Detected trait analysis query: ${/\b(trait|quality|characteristic|personality)\b/i.test(lowerMessage)}`);
+  
+  // Consider a query complex if it scores 2+ or contains specific trait-related patterns
+  return complexityScore >= 2 || 
+         (/\b(trait|quality|characteristic|personality)\b/i.test(lowerMessage) && 
+          /\b(improve|better|growth|develop)\b/i.test(lowerMessage));
 }
 
 interface SmartQueryResult {
@@ -75,28 +117,46 @@ export async function processSmartQuery(
 ): Promise<SmartQueryResult> {
   try {
     console.log("[SmartQueryService] Processing query:", message.substring(0, 30) + "...");
+    console.log("[SmartQueryService] Full query length:", message.length);
     
     const isComplex = detectComplexQuery(message);
-    const optimizationConfig = getOptimizationConfig(message.length);
+    const optimizationConfig = getOptimizationConfig(message.length, isComplex);
     
-    console.log(`[SmartQueryService] Optimization level: ${optimizationConfig.optimizationLevel}`);
-    console.log(`[SmartQueryService] Smart filtering: ${optimizationConfig.useSmartFiltering ? 'enabled' : 'disabled'}`);
-    
-    const queryTimeout = isComplex ? 120000 : 45000; // 120s for complex, 45s for simple
-    console.log(`[SmartQueryService] Query timeout set to ${queryTimeout}ms`);
-    
-    console.log(`[SmartQueryService] Query Complexity Analysis:
+    console.log(`[SmartQueryService] Query complexity analysis:
+      - Is Complex: ${isComplex}
       - Message Length: ${message.length}
-      - Is Complex Query: ${isComplex}
-      - Timeout Duration: ${queryTimeout}ms
-      - Token Optimization: ${optimizationConfig.optimizationLevel}
+      - Contains trait keywords: ${/\b(trait|quality|characteristic|personality)\b/i.test(message.toLowerCase())}
+      - Contains improvement keywords: ${/\b(improve|better|growth|develop)\b/i.test(message.toLowerCase())}
+      - Contains rating keywords: ${/\b(rate|score|rank|grade)\b/i.test(message.toLowerCase())}
+      - Optimization Level: ${optimizationConfig.optimizationLevel}
       - Smart Filtering: ${optimizationConfig.useSmartFiltering ? 'enabled' : 'disabled'}`);
     
-    // Apply smart filtering if enabled
+    const queryTimeout = isComplex ? 150000 : 45000; // 150s for complex queries (increased from 120s)
+    console.log(`[SmartQueryService] Query timeout set to ${queryTimeout}ms`);
+    
+    // Apply smart filtering with enhanced options for trait analysis
     let filteringInfo = null;
     if (optimizationConfig.useSmartFiltering) {
       try {
-        filteringInfo = await applySmartFiltering(message, userId, optimizationConfig);
+        // Extract query characteristics for better filtering
+        const isTraitAnalysis = /\b(trait|quality|characteristic|personality)\b/i.test(message.toLowerCase());
+        const isImprovementQuery = /\b(improve|better|growth|develop)\b/i.test(message.toLowerCase());
+        const isRatingQuery = /\b(rate|score|rank|grade)\b/i.test(message.toLowerCase());
+        
+        const filteringOptions = {
+          ...optimizationConfig.filterOptions,
+          queryType: isTraitAnalysis ? 'trait_analysis' : 
+                     isImprovementQuery ? 'improvement' : 
+                     isRatingQuery ? 'rating' : 'general',
+          expandContextForTraits: isTraitAnalysis
+        };
+        
+        console.log(`[SmartQueryService] Enhanced filtering options:
+          - Query type: ${filteringOptions.queryType}
+          - Expand context: ${filteringOptions.expandContextForTraits}
+          - Relevance threshold: ${filteringOptions.relevanceThreshold}`);
+          
+        filteringInfo = await applySmartFiltering(message, userId, optimizationConfig, filteringOptions);
         console.log(`[SmartQueryService] Smart filtering applied:
           - Filtered entries: ${filteringInfo.filteredCount} / ${filteringInfo.totalCount}
           - Applied filters: ${filteringInfo.appliedFilters.join(', ')}
@@ -155,11 +215,12 @@ export async function processSmartQuery(
   }
 }
 
-// New function to apply smart filtering
+// Enhanced smart filtering with better options for trait analysis
 async function applySmartFiltering(
   message: string,
   userId: string,
-  optimizationConfig: TokenOptimizationConfig
+  optimizationConfig: TokenOptimizationConfig,
+  additionalOptions: any = {}
 ): Promise<any> {
   try {
     const filterStartTime = Date.now();
@@ -167,24 +228,40 @@ async function applySmartFiltering(
     // Extract filter options from optimization config
     const { filterOptions } = optimizationConfig;
     
+    // Prepare body with enhanced options
+    const filterBody = {
+      userId,
+      query: message,
+      dateRange: filterOptions?.dateRange,
+      emotions: filterOptions?.emotions,
+      themes: filterOptions?.themes,
+      contentKeywords: filterOptions?.contentKeywords,
+      relevanceThreshold: filterOptions?.relevanceThreshold || 0.6,
+      limit: optimizationConfig.maxEntries * 2, // Get more entries to have room for filtering
+      queryType: additionalOptions?.queryType || 'general',
+      expandContextForTraits: additionalOptions?.expandContextForTraits || false,
+      prioritizeSentiment: additionalOptions?.prioritizeSentiment || 
+                          filterOptions?.prioritizeSentiment || false
+    };
+    
+    console.log("[SmartQueryService] Smart filter request options:", JSON.stringify({
+      ...filterBody,
+      userId: "***" // Mask the actual userId for logging
+    }));
+    
     // Call the smart-query-filter edge function
     const { data, error } = await supabase.functions.invoke('smart-query-filter', {
-      body: {
-        userId,
-        query: message,
-        dateRange: filterOptions?.dateRange,
-        emotions: filterOptions?.emotions,
-        themes: filterOptions?.themes,
-        contentKeywords: filterOptions?.contentKeywords,
-        relevanceThreshold: filterOptions?.relevanceThreshold || 0.6,
-        limit: optimizationConfig.maxEntries * 2 // Get more entries to have room for filtering
-      }
+      body: filterBody
     });
     
     if (error) {
       console.error('[SmartQueryService] Error in smart filtering:', error);
       throw error;
     }
+    
+    console.log(`[SmartQueryService] Smart filter response stats:
+      - Filtered entries: ${data.filteredCount || 0} / ${data.totalCount || 0}
+      - Filters applied: ${(data.appliedFilters || []).join(', ')}`);
     
     // Return filtering results
     return {
@@ -201,151 +278,7 @@ async function applySmartFiltering(
   }
 }
 
-function detectComplexQuery(message: string): boolean {
-  if (!message) return false;
-  
-  const complexityIndicators = [
-    (message.match(/\b(how|what|why|when|where|who|which|can|could|would|should|is|are|will|do|does|did|am|have|has|had)\b/gi) || []).length > 1,
-    (message.match(/[?!.]/g) || []).length > 1,
-    message.length > 100,
-    /\b(and|but|or|additionally|moreover|furthermore)\b/i.test(message)
-  ];
-  
-  const complexityScore = complexityIndicators.filter(Boolean).length;
-  
-  console.log(`[SmartQueryService] Complexity Score: ${complexityScore}`);
-  
-  return complexityScore >= 2;
-}
-
-async function processQueryWithFallback(
-  message: string, 
-  userId: string, 
-  threadId: string | null, 
-  isComplex: boolean,
-  optimizationConfig: TokenOptimizationConfig,
-  filteringInfo: any = null
-): Promise<SmartQueryResult> {
-  try {
-    const { data, error } = await supabase.functions.invoke('smart-query-orchestrator', {
-      body: {
-        message,
-        userId,
-        threadId,
-        optimizationConfig, // Pass optimization config to edge function
-        filteredEntries: filteringInfo?.filteredEntries || null, // Pass pre-filtered entries
-        metadata: {
-          isComplexQuery: isComplex,
-          queryLength: message.length,
-          processingAttempt: 'primary',
-          optimizationLevel: optimizationConfig.optimizationLevel,
-          useSmartFiltering: optimizationConfig.useSmartFiltering
-        }
-      }
-    });
-
-    if (error) {
-      console.error('[SmartQueryService] Primary query processing failed:', error);
-      
-      // If token limit error, try with more aggressive optimization
-      if (error.message?.includes('context length') || error.message?.includes('token')) {
-        console.log('[SmartQueryService] Token limit exceeded, trying with aggressive optimization');
-        const aggressiveConfig: TokenOptimizationConfig = {
-          ...optimizationConfig,
-          maxEntries: 2,
-          maxEntryLength: 100,
-          includeSentiment: false,
-          includeEntities: false,
-          maxPreviousMessages: 2,
-          optimizationLevel: 'aggressive' as const,
-          useSmartFiltering: true,
-          filterOptions: {
-            ...optimizationConfig.filterOptions,
-            relevanceThreshold: 0.8 // Even higher threshold for aggressive optimization
-          }
-        };
-        
-        return await processQueryWithAggressiveOptimization(
-          message, userId, threadId, aggressiveConfig, filteringInfo
-        );
-      }
-      
-      const fallbackResult = await attemptFallbackProcessing(message, userId, threadId, filteringInfo);
-      if (fallbackResult) return fallbackResult;
-      
-      throw error;
-    }
-
-    if (data?.error) {
-      console.error('[SmartQueryService] Query processing error:', data.error);
-      
-      // Check if token limit error
-      if (data.error.includes('context length') || data.error.includes('token')) {
-        console.log('[SmartQueryService] Token limit exceeded in response, trying with aggressive optimization');
-        const aggressiveConfig: TokenOptimizationConfig = {
-          ...optimizationConfig,
-          maxEntries: 2,
-          maxEntryLength: 100,
-          includeSentiment: false,
-          includeEntities: false,
-          maxPreviousMessages: 2,
-          optimizationLevel: 'aggressive' as const,
-          useSmartFiltering: true,
-          filterOptions: {
-            ...optimizationConfig.filterOptions,
-            relevanceThreshold: 0.8
-          }
-        };
-        
-        return await processQueryWithAggressiveOptimization(
-          message, userId, threadId, aggressiveConfig, filteringInfo
-        );
-      }
-      
-      const fallbackResult = await attemptFallbackProcessing(message, userId, threadId, filteringInfo);
-      if (fallbackResult) return fallbackResult;
-      
-      throw new Error(data.error);
-    }
-
-    // Add filtering info to the token usage stats
-    const tokenUsage = data.tokenUsage || {};
-    if (filteringInfo) {
-      tokenUsage.filteredEntryCount = filteringInfo.filteredCount;
-      tokenUsage.originalEntryCount = filteringInfo.totalCount;
-    }
-
-    return {
-      success: true,
-      response: data.response,
-      planDetails: data.planDetails,
-      executionResults: data.executionResults,
-      diagnostics: {
-        ...data.diagnostics,
-        processingMethod: 'primary',
-        smartFiltering: filteringInfo ? {
-          applied: true,
-          filters: filteringInfo.appliedFilters,
-          extractedFilters: filteringInfo.extractedFilters
-        } : { applied: false }
-      },
-      tokenUsage,
-      filteringInfo: filteringInfo ? {
-        appliedFilters: filteringInfo.appliedFilters || [],
-        filteredCount: filteringInfo.filteredCount || 0,
-        totalCount: filteringInfo.totalCount || 0,
-        filteringTime: filteringInfo.filteringTime
-      } : undefined
-    };
-  } catch (error: any) {
-    console.error('[SmartQueryService] Fallback processing error:', error);
-    
-    const finalFallbackResult = await attemptFinalFallback(message, userId, threadId);
-    if (finalFallbackResult) return finalFallbackResult;
-    
-    throw error;
-  }
-}
+// ... keep existing code (for processQueryWithFallback, processQueryWithAggressiveOptimization, attemptFallbackProcessing, attemptFinalFallback)
 
 async function processQueryWithAggressiveOptimization(
   message: string,
@@ -362,8 +295,23 @@ async function processQueryWithAggressiveOptimization(
     let enhancedFilteringInfo = filteringInfo;
     if (aggressiveConfig.useSmartFiltering) {
       try {
+        // For trait analysis queries, retain sentiment data even with aggressive optimization
+        const isTraitAnalysis = /\b(trait|quality|characteristic|personality)\b/i.test(message.toLowerCase());
+        
+        // Adjust the aggressive config if it's a trait analysis
+        if (isTraitAnalysis) {
+          aggressiveConfig.includeSentiment = true;
+          if (!aggressiveConfig.filterOptions) aggressiveConfig.filterOptions = {};
+          aggressiveConfig.filterOptions.prioritizeSentiment = true;
+          console.log('[SmartQueryService] Trait analysis detected, keeping sentiment data even with aggressive optimization');
+        }
+        
         // Apply more aggressive filtering
-        enhancedFilteringInfo = await applySmartFiltering(message, userId, aggressiveConfig);
+        enhancedFilteringInfo = await applySmartFiltering(message, userId, aggressiveConfig, {
+          queryType: isTraitAnalysis ? 'trait_analysis' : 'general',
+          expandContextForTraits: isTraitAnalysis,
+          prioritizeSentiment: isTraitAnalysis
+        });
         console.log(`[SmartQueryService] Enhanced aggressive filtering applied:
           - Filtered entries: ${enhancedFilteringInfo.filteredCount} / ${enhancedFilteringInfo.totalCount}
           - Applied filters: ${enhancedFilteringInfo.appliedFilters.join(', ')}
@@ -395,7 +343,7 @@ async function processQueryWithAggressiveOptimization(
       return await attemptFinalFallback(message, userId, threadId);
     }
 
-    // Add filtering info to the token usage stats
+    // Add filtering info to the token usage stats if available
     const tokenUsage = data.tokenUsage || {};
     if (enhancedFilteringInfo) {
       tokenUsage.filteredEntryCount = enhancedFilteringInfo.filteredCount;

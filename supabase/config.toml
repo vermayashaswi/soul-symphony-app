@@ -2,3 +2,4 @@
 project_id = "kwnwhgucnzqxndzjayyq"
 [functions.smart-query-filter]
 verify_jwt = false
+import_map = "supabase/functions/importmap.json"
