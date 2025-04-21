@@ -876,7 +876,7 @@ RESPONSE GUIDELINES:
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-4o-mini',
+          model: 'gpt-4o',
           messages: [
             {
               role: 'system',
@@ -896,7 +896,7 @@ RESPONSE GUIDELINES:
         
         const gptExecution: FunctionExecution = {
           name: "openai_chat_completion",
-          params: { model: 'gpt-4o-mini' },
+          params: { model: 'gpt-4o' },
           result: { error: errorText },
           executionTime: Date.now() - startGptTime,
           success: false
@@ -917,7 +917,7 @@ RESPONSE GUIDELINES:
       
       const gptExecution: FunctionExecution = {
         name: "openai_chat_completion",
-        params: { model: 'gpt-4o-mini' },
+        params: { model: 'gpt-4o' },
         result: { 
           responseLength: aiResponse.length,
           firstChars: aiResponse.substring(0, 50) + "..."
