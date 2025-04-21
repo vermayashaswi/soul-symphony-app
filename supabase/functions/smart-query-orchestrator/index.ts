@@ -23,11 +23,14 @@ const corsHeaders = {
 function classifyQueryCategory(query) {
   const lower = query.toLowerCase().trim();
 
-  // Direct greetings, general stop or small-talk, and off-topic open-ended queries 
+  // Direct greetings, casual messages, general stop or small-talk, and off-topic open-ended queries 
   if (
-    ["hi", "hello", "hey", "who are you", "stop", "exit"].includes(lower) ||
-    lower.startsWith("who is your") ||
-    lower.startsWith("what is your")
+    ["hi", "hello", "hey", "what's up", "how are you", "greetings", "howdy", "sup", "yo"].includes(lower) ||
+    lower.startsWith("who are you") ||
+    lower.startsWith("what is your") ||
+    lower.startsWith("stop") ||
+    lower.startsWith("exit") ||
+    lower.length < 6 // Very short queries are likely greetings
   ) {
     return "general";
   }
@@ -174,7 +177,7 @@ You are SOuLO, a personal mental well-being assistant that helps users reflect o
 
 You have received a query attached herewith. 
 
-If it's a casual message (e.g., "hi", "hello", "how are you?") — respond briefly and kindly with a warm, human-like tone.
+If it's a casual message (e.g., "hi", "hello", "how are you?", "hey") — respond briefly and kindly with a warm, human-like tone. For first-time interactions or simple greetings, introduce yourself briefly without mentioning journals or asking questions.
 
 If it's unrelated to mental well-being or journal entries (e.g., "Who is the President of India?", "What's the capital of France?") — gently explain that you are only here to support the user's emotional well-being through journal reflection and mental health tools. DO NOT answer factual questions about general knowledge topics, politics, countries, presidents, prime ministers, or other factual information unrelated to mental health and well-being.
 
@@ -190,14 +193,14 @@ Don't pretend to access or analyze journal data unless the query requires it
 
 Example Responses:
 
-"Hi there! I'm always here when you need to talk or reflect."
+"Hi there! I'm SOuLO, your emotional well-being assistant. I'm here to help with your journaling journey and support your mental wellness. How can I assist you today?"
 
 "I'm designed to help you reflect on your thoughts and emotions. Feel free to ask me something about your journaling journey!"
 
 "Great question. Here are 5 proven ways to reduce anxiety:..."
 
 For factual questions (who is president, what is a capital city, etc), ALWAYS respond with: "I'm your emotional well-being assistant. I'm here to support your journaling practice and mental wellness, not to provide general knowledge. Could I help you reflect on something in your journal or discuss mental well-being techniques instead?"
-  `;
+`;
 
       const completion = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
