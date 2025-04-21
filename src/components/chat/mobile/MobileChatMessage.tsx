@@ -1,10 +1,10 @@
 
-import React, { useState } from "react";
+import React from "react";
 import ReactMarkdown from 'react-markdown';
-import { ChatMessage } from "@/services/chat";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -12,13 +12,19 @@ import { useAuth } from "@/contexts/AuthContext";
 import { formatShortDate } from "@/utils/format-time";
 
 interface MobileChatMessageProps {
-  message: ChatMessage;
-  isOwnMessage: boolean;
+  message: {
+    role: 'user' | 'assistant' | 'error';
+    content: string;
+    analysis?: any;
+    references?: any[];
+    diagnostics?: any;
+    hasNumericResult?: boolean;
+  };
+  showAnalysis?: boolean;
 }
 
-const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, isOwnMessage }) => {
+const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false }) => {
   const [showReferences, setShowReferences] = useState(false);
-  const [showAnalysis, setShowAnalysis] = useState(false);
   const { user } = useAuth();
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;

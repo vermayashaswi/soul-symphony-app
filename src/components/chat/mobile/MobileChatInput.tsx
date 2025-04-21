@@ -1,32 +1,21 @@
-import React, { useState, useRef, useEffect, Dispatch, SetStateAction } from "react";
+
+import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { Input } from "@/components/ui/input";
 
 interface MobileChatInputProps {
-  onSendMessage: (message: string) => Promise<void>;
+  onSendMessage: (message: string, isAudio?: boolean) => void;
   isLoading: boolean;
   userId?: string;
-  messageText: string;
-  setMessageText: Dispatch<SetStateAction<string>>;
-  isRecording: boolean;
-  recordingTime: number;
-  onStartRecording: () => void;
-  onStopRecording: () => void;
 }
 
-const MobileChatInput: React.FC<MobileChatInputProps> = ({
+export default function MobileChatInput({
   onSendMessage,
   isLoading,
-  userId,
-  messageText,
-  setMessageText,
-  isRecording,
-  recordingTime,
-  onStartRecording,
-  onStopRecording
-}) => {
+  userId
+}: MobileChatInputProps) {
   const [inputValue, setInputValue] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
@@ -34,17 +23,22 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
   const inputContainerRef = useRef<HTMLDivElement>(null);
   const chatDebug = useDebugLog();
 
+  // Effect to ensure input stays visible and detect keyboard
   useEffect(() => {
+    // Function to detect keyboard visibility with multiple signals
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
+        // More aggressive detection threshold
         const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
         
         if (isKeyboardVisible !== isKeyboard) {
           setIsKeyboardVisible(isKeyboard);
           
+          // Dispatch events to notify other components about keyboard state
           const eventName = isKeyboard ? 'keyboardOpen' : 'keyboardClose';
           window.dispatchEvent(new Event(eventName));
           
+          // Add class to body and interface for CSS targeting
           if (isKeyboard) {
             document.body.classList.add('keyboard-visible');
             document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
@@ -52,6 +46,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
             document.body.classList.remove('keyboard-visible');
             document.querySelector('.mobile-chat-interface')?.classList.remove('keyboard-visible');
             
+            // When keyboard closes, ensure we're scrolled to the bottom
             setTimeout(() => {
               window.scrollTo({
                 top: document.body.scrollHeight,
@@ -63,6 +58,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       }
     };
 
+    // Run immediately and set up listeners
     handleVisualViewportResize();
     
     if (window.visualViewport) {
@@ -70,10 +66,13 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       window.addEventListener('resize', handleVisualViewportResize);
     }
     
+    // Also listen for focus events on the input
     const handleFocus = () => {
+      // Assume keyboard will be visible soon after focus
       document.body.classList.add('keyboard-visible');
       document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
       
+      // Short delay to ensure keyboard has time to appear
       setTimeout(() => {
         if (inputRef.current) {
           inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
@@ -86,6 +85,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       inputElement.addEventListener('focus', handleFocus);
     }
     
+    // Ensure input visibility with a periodic check
     const ensureInputVisibility = () => {
       if (inputContainerRef.current) {
         inputContainerRef.current.style.visibility = 'visible';
@@ -93,6 +93,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       }
     };
     
+    // Run immediately and set interval
     ensureInputVisibility();
     const visibilityInterval = setInterval(ensureInputVisibility, 500);
     
@@ -132,7 +133,7 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
         setIsSubmitting(true);
         
         chatDebug.addEvent("Send Message", "Calling onSendMessage handler", "info");
-        await onSendMessage(trimmedValue);
+        onSendMessage(trimmedValue);
         
         setInputValue("");
         if (inputRef.current) {
@@ -157,20 +158,20 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
       }`}
       style={{
         position: 'fixed',
-        bottom: isKeyboardVisible ? 0 : '69px',
+        bottom: isKeyboardVisible ? 0 : '69px', // Key change: position based on keyboard visibility
         left: 0,
         right: 0,
         paddingBottom: isKeyboardVisible ? '5px' : 'env(safe-area-inset-bottom, 8px)',
         marginBottom: 0,
-        zIndex: 60,
+        zIndex: 60, // High z-index to be above the navigation bar
         boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
         transition: 'all 0.2s ease',
         borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
         borderBottom: !isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
         visibility: 'visible',
         opacity: 1,
-        transform: 'translateZ(0)',
-        willChange: 'transform, bottom',
+        transform: 'translateZ(0)', // Force hardware acceleration
+        willChange: 'transform, bottom', // Optimize for animation
       }}
     >
       <div className="flex-1 relative">
@@ -204,5 +205,3 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({
     </div>
   );
 };
-
-export default MobileChatInput;

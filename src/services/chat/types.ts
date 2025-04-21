@@ -1,4 +1,6 @@
 
+import { Json } from "@/integrations/supabase/types";
+
 // Types for chat persistence
 export type ChatThread = {
   id: string;
@@ -17,14 +19,5 @@ export type ChatMessage = {
   reference_entries?: any[];
   analysis_data?: any;
   has_numeric_result?: boolean;
-  role: 'user' | 'assistant' | 'error';
-  references?: {
-    date?: string;
-    snippet: string;
-  }[];
-  analysis?: {
-    analysis: string;
-    requiresSql?: boolean;
-    sqlQuery?: string;
-  };
+  role: 'user' | 'assistant';
 };
