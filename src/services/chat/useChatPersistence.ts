@@ -151,7 +151,13 @@ export function useChatPersistence(userId?: string | null) {
         return [];
       }
       
-      return data || [];
+      // Add the role property based on sender
+      const messagesWithRole = data?.map(msg => ({
+        ...msg,
+        role: msg.sender as 'user' | 'assistant'
+      })) || [];
+      
+      return messagesWithRole;
     } catch (err: any) {
       console.error("Exception loading chat messages:", err);
       setError(err.message || 'An error occurred while loading messages');

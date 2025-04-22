@@ -18,7 +18,13 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       throw error;
     }
     
-    return data || [];
+    // Add the role property based on sender
+    const messagesWithRole = data?.map(msg => ({
+      ...msg,
+      role: msg.sender as 'user' | 'assistant'
+    })) || [];
+    
+    return messagesWithRole;
   } catch (error) {
     console.error("Exception fetching thread messages:", error);
     throw error;
