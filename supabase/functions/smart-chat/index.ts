@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -67,6 +68,293 @@ The user has now asked:
 ---
 
 Now, generate a smart, structured, emotionally intelligent response grounded in the user's journaling:`;
+
+// New function for query planning
+async function planQuery(query) {
+  try {
+    console.log("Planning query execution for:", query);
+    
+    // Get database schema information for context
+    const tables = ['Journal Entries', 'chat_messages', 'chat_threads', 'emotions', 'journal_embeddings'];
+    let dbSchemaContext = '';
+    
+    for (const table of tables) {
+      const { data, error } = await supabase.rpc('check_table_columns', { table_name: table });
+      if (error) {
+        console.error(`Error getting schema for ${table}:`, error);
+        continue;
+      }
+      
+      dbSchemaContext += `Table: ${table}\nColumns: ${data.map(col => `${col.column_name} (${col.data_type})`).join(', ')}\n\n`;
+    }
+    
+    // Get available functions for context
+    const functionsContext = `
+    Available functions:
+    - match_journal_entries_fixed: Vector similarity search on journal entries
+    - match_journal_entries_with_date: Vector similarity search with date filtering
+    - match_journal_entries_by_emotion: Find entries with specific emotions
+    - match_journal_entries_by_theme: Find entries with specific themes
+    - get_top_emotions: Get most frequent emotions in a time period
+    - get_top_emotions_with_entries: Get top emotions with sample journal entries
+    `;
+    
+    // Send to OpenAI for planning
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a task planning assistant in a voice journaling app. A user has asked a question related to their journal entries. Your job is to break this question into smaller, logical analysis steps or sub-queries (limit the sub-queries to a maximum of 3), if required, or feel free to return original query as is if it can be answered without this complex breakdown of original query.
+
+Each step/sub-query should:
+- Be specific and focused on a single aspect of the analysis
+- Map to an available backend function (like emotion tracking, sentiment analysis, theme detection, etc.)
+- Include the parameters required to execute that function
+- Use available metadata such as dates, goal tags, or emotions if mentioned
+- Aim to generate both qualitative and quantitative insights for synthesis
+
+Your response should be a list of clearly named steps that a downstream orchestrator can use to call analysis functions and finally synthesize a response for the user.
+
+Important rules:
+- Don't generate results, only generate the analysis plan
+- Do not reference journal entries directly
+- Skip the plan if the user question is unrelated to journaling
+- Output ONLY the queries, one per line, with no extra text or explanation
+
+Database Schema:
+${dbSchemaContext}
+
+${functionsContext}
+
+The user asked: "${query}"
+
+Now generate a breakdown of steps using the available tools, database schema and column fields.`
+          }
+        ],
+        temperature: 0.3
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Error in query planning:", error);
+      return [query]; // Fall back to original query
+    }
+
+    const result = await response.json();
+    const planText = result.choices[0]?.message?.content || '';
+    
+    // Parse the response into individual sub-queries
+    const subQueries = planText
+      .split('\n')
+      .map(line => line.trim())
+      .filter(line => line.length > 0);
+    
+    console.log("Generated sub-queries:", subQueries);
+    
+    // If no sub-queries or just one, use the original query
+    if (subQueries.length <= 1) {
+      return [query];
+    }
+    
+    // Limit to max 3 sub-queries
+    return subQueries.slice(0, 3);
+  } catch (error) {
+    console.error("Error planning query execution:", error);
+    return [query]; // Fall back to original query
+  }
+}
+
+// New function to process a single sub-query
+async function processSubQuery(subQuery, userId, timeRange) {
+  console.log(`Processing sub-query: ${subQuery}`);
+  
+  // Generate embedding for the sub-query
+  const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'text-embedding-ada-002',
+      input: subQuery,
+    }),
+  });
+
+  if (!embeddingResponse.ok) {
+    const error = await embeddingResponse.text();
+    console.error('Failed to generate embedding for sub-query:', error);
+    throw new Error(`Failed to generate embedding for sub-query: ${error}`);
+  }
+
+  const embeddingData = await embeddingResponse.json();
+  const queryEmbedding = embeddingData.data[0].embedding;
+  
+  // Search for relevant entries
+  let entries = [];
+  if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+    entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+  } else {
+    entries = await searchEntriesWithVector(userId, queryEmbedding);
+  }
+  
+  if (entries.length === 0) {
+    return {
+      query: subQuery,
+      response: "I couldn't find any journal entries related to this specific aspect of your question."
+    };
+  }
+  
+  // Format entries for the prompt
+  const entriesWithDates = entries.map(entry => {
+    const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
+      month: 'short',
+      day: 'numeric'
+    });
+    
+    let entityInfo = '';
+    if (entry.entities && Array.isArray(entry.entities)) {
+      const entityTypes = {};
+      entry.entities.forEach(entity => {
+        if (!entityTypes[entity.type]) {
+          entityTypes[entity.type] = [];
+        }
+        entityTypes[entity.type].push(entity.name);
+      });
+      
+      const entityStrings = [];
+      for (const [type, names] of Object.entries(entityTypes)) {
+        entityStrings.push(`${type}: ${names.join(', ')}`);
+      }
+      if (entityStrings.length > 0) {
+        entityInfo = `\nMentioned: ${entityStrings.join(' | ')}`;
+      }
+    }
+
+    const sentimentInfo = entry.sentiment 
+      ? `\nSentiment: ${entry.sentiment} (${
+          entry.sentiment <= -0.2 ? 'negative' :
+          entry.sentiment >= 0.2 ? 'positive' : 'neutral'
+        })`
+      : '';
+
+    return `- Entry from ${formattedDate}: ${entry.content}${entityInfo}${sentimentInfo}`;
+  }).join('\n\n');
+  
+  // Create a modified prompt specifically for the sub-query
+  const subQueryPrompt = JOURNAL_SPECIFIC_PROMPT
+    .replace('{journalData}', entriesWithDates)
+    .replace('{userMessage}', subQuery);
+  
+  // Call OpenAI for this sub-query
+  const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+    method: 'POST',
+    headers: {
+      'Authorization': `Bearer ${apiKey}`,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify({
+      model: 'gpt-3.5-turbo',
+      messages: [{ role: 'system', content: subQueryPrompt }],
+    }),
+  });
+
+  if (!completionResponse.ok) {
+    const error = await completionResponse.text();
+    console.error(`Failed to get completion for sub-query: ${subQuery}`, error);
+    return {
+      query: subQuery,
+      response: "I encountered an error while analyzing this aspect of your question."
+    };
+  }
+
+  const completionData = await completionResponse.json();
+  const responseContent = completionData.choices[0]?.message?.content || 'I could not generate a response for this aspect.';
+  
+  return {
+    query: subQuery,
+    response: responseContent,
+    references: entries.map(entry => ({
+      id: entry.id,
+      date: entry.created_at,
+      snippet: entry.content?.substring(0, 150) + (entry.content?.length > 150 ? "..." : ""),
+      similarity: entry.similarity
+    }))
+  };
+}
+
+// New function to synthesize multiple sub-query responses
+async function synthesizeResponses(originalQuery, subQueries, subQueryResponses) {
+  try {
+    console.log("Synthesizing responses for query:", originalQuery);
+    
+    // Format the sub-query outputs for the prompt
+    const subQueryOutputsText = subQueryResponses.map((sqr, index) => {
+      return `Sub-query ${index + 1}: "${sqr.query}"\nResults: ${sqr.response}\n`;
+    }).join('\n');
+    
+    // Send to OpenAI for synthesis
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an expert journaling assistant helping users reflect on their emotional and mental well-being.
+
+The user asked:
+"${originalQuery}"
+
+We have analyzed this using multiple sub-queries, and here are their results:
+${subQueryOutputsText}
+
+Your task is to:
+1. Synthesize the information from all sub-query outputs into a single, clear, well-structured response
+2. Fully address the user's original question, referencing patterns, trends, or insights as needed
+3. Combine both **quantitative analysis** (e.g., frequency, trends, scores) and **qualitative interpretation** (e.g., what this means emotionally or behaviorally)
+4. Be empathetic and supportive in tone
+5. Use short paragraphs or bullet points if needed to enhance readability
+6. Avoid repeating content or listing all journal entries unless explicitly asked
+7. Present a meaningful takeaway or reflection for the user
+8. Do not mention sub-queries or technical function names
+
+Be concise and insightful. Keep the tone conversational, supportive, and emotionally intelligent.`
+          }
+        ],
+        temperature: 0.5
+      }),
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      console.error("Error in response synthesis:", error);
+      return "I'm having trouble synthesizing information from your journal. Could you try asking a more specific question?";
+    }
+
+    const result = await response.json();
+    const synthesizedResponse = result.choices[0]?.message?.content || '';
+    
+    console.log("Generated synthesized response:", synthesizedResponse.substring(0, 100) + "...");
+    
+    return synthesizedResponse;
+  } catch (error) {
+    console.error("Error synthesizing responses:", error);
+    return "I encountered an error while analyzing your journal entries. Please try again with a different question.";
+  }
+}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -256,162 +544,282 @@ serve(async (req) => {
       );
     }
     
-    // If it's a journal-specific question, continue with the existing RAG flow
-    // 1. Generate embedding for the message
-    console.log("Generating embedding for message");
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-ada-002',
-        input: message,
-      }),
-    });
-
-    if (!embeddingResponse.ok) {
-      const error = await embeddingResponse.text();
-      console.error('Failed to generate embedding:', error);
-      throw new Error('Could not generate embedding for the message');
-    }
-
-    const embeddingData = await embeddingResponse.json();
-    if (!embeddingData.data || embeddingData.data.length === 0) {
-      throw new Error('Could not generate embedding for the message');
-    }
-
-    const queryEmbedding = embeddingData.data[0].embedding;
-    console.log("Embedding generated successfully");
-
-    // 2. Search for relevant entries with proper temporal filtering
-    console.log("Searching for relevant entries");
+    // If it's a journal-specific question, continue with the enhanced RAG flow
+    // 1. Plan the query into sub-queries if needed
+    console.log("Planning query into sub-queries");
+    const subQueries = await planQuery(message);
+    console.log(`Generated ${subQueries.length} sub-queries:`, subQueries);
     
-    // Use different search function based on whether we have a time range
-    let entries = [];
-    if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-      console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
-    } else {
-      console.log("Using standard vector search without time filtering");
-      entries = await searchEntriesWithVector(userId, queryEmbedding);
-    }
-    
-    console.log(`Found ${entries.length} relevant entries`);
-
-    // Check if we found any entries for the requested time period
-    if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
-      console.log("No entries found for the specified time range");
+    // If only one sub-query that matches the original query, use standard processing
+    if (subQueries.length === 1 && subQueries[0] === message) {
+      console.log("Single query matches original, using standard processing");
       
-      // Return a friendly message indicating no entries were found
+      // 2. Generate embedding for the message
+      console.log("Generating embedding for message");
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'text-embedding-ada-002',
+          input: message,
+        }),
+      });
+
+      if (!embeddingResponse.ok) {
+        const error = await embeddingResponse.text();
+        console.error('Failed to generate embedding:', error);
+        throw new Error('Could not generate embedding for the message');
+      }
+
+      const embeddingData = await embeddingResponse.json();
+      if (!embeddingData.data || embeddingData.data.length === 0) {
+        throw new Error('Could not generate embedding for the message');
+      }
+
+      const queryEmbedding = embeddingData.data[0].embedding;
+      console.log("Embedding generated successfully");
+
+      // 3. Search for relevant entries with proper temporal filtering
+      console.log("Searching for relevant entries");
+      
+      // Use different search function based on whether we have a time range
+      let entries = [];
+      if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+        console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
+        entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+      } else {
+        console.log("Using standard vector search without time filtering");
+        entries = await searchEntriesWithVector(userId, queryEmbedding);
+      }
+      
+      console.log(`Found ${entries.length} relevant entries`);
+
+      // Check if we found any entries for the requested time period
+      if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
+        console.log("No entries found for the specified time range");
+        
+        // Return a friendly message indicating no entries were found
+        return new Response(
+          JSON.stringify({ 
+            data: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
+            noEntriesForTimeRange: true
+          }),
+          { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      }
+
+      // Format entries for the prompt with dates
+      const entriesWithDates = entries.map(entry => {
+        const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric'
+        });
+        
+        // Format entities for display if they exist
+        let entityInfo = '';
+        if (entry.entities && Array.isArray(entry.entities)) {
+          const entityTypes = {};
+          entry.entities.forEach(entity => {
+            if (!entityTypes[entity.type]) {
+              entityTypes[entity.type] = [];
+            }
+            entityTypes[entity.type].push(entity.name);
+          });
+          
+          // Create a readable string of entities
+          const entityStrings = [];
+          for (const [type, names] of Object.entries(entityTypes)) {
+            entityStrings.push(`${type}: ${names.join(', ')}`);
+          }
+          if (entityStrings.length > 0) {
+            entityInfo = `\nMentioned: ${entityStrings.join(' | ')}`;
+          }
+        }
+
+        // Format sentiment info
+        const sentimentInfo = entry.sentiment 
+          ? `\nSentiment: ${entry.sentiment} (${
+              entry.sentiment <= -0.2 ? 'negative' :
+              entry.sentiment >= 0.2 ? 'positive' : 'neutral'
+            })`
+          : '';
+
+        return `- Entry from ${formattedDate}: ${entry.content}${entityInfo}${sentimentInfo}`;
+      }).join('\n\n');
+
+      // 4. Prepare prompt with updated instructions
+      const promptFormatted = JOURNAL_SPECIFIC_PROMPT
+        .replace('{journalData}', entriesWithDates)
+        .replace('{userMessage}', message);
+        
+      // 5. Call OpenAI
+      console.log("Calling OpenAI for completion");
+      
+      // Prepare the messages array with system prompt and conversation context
+      const messages = [];
+      
+      // Add system prompt
+      messages.push({ role: 'system', content: promptFormatted });
+      
+      // Add conversation context if available
+      if (conversationContext.length > 0) {
+        // Log that we're using conversation context
+        console.log(`Including ${conversationContext.length} messages of conversation context`);
+        
+        // Add the conversation context messages
+        messages.push(...conversationContext);
+        
+        // Add the current user message
+        messages.push({ role: 'user', content: message });
+      } else {
+        // If no context, just use the system prompt
+        console.log("No conversation context available, using only system prompt");
+      }
+      
+      const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-3.5-turbo',
+          messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: promptFormatted }],
+        }),
+      });
+
+      if (!completionResponse.ok) {
+        const error = await completionResponse.text();
+        console.error('Failed to get completion:', error);
+        throw new Error('Failed to generate response');
+      }
+
+      const completionData = await completionResponse.json();
+      const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+      console.log("Response generated successfully");
+
+      // Save the sub-queries even for standard processing (where there's only one)
+      if (threadId) {
+        try {
+          // Store the queries in the database
+          const { error } = await supabase
+            .from('chat_messages')
+            .update({
+              sub_query1: subQueries[0],
+            })
+            .eq('thread_id', threadId)
+            .eq('sender', 'user')
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          if (error) {
+            console.error("Error storing sub-query:", error);
+          }
+        } catch (updateError) {
+          console.error("Error storing sub-query:", updateError);
+        }
+      }
+
+      // Return the response
       return new Response(
         JSON.stringify({ 
-          data: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
-          noEntriesForTimeRange: true
+          data: responseContent,
+          processingComplete: true 
+        }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    } else {
+      // Process multiple sub-queries and synthesize the results
+      console.log(`Processing ${subQueries.length} sub-queries`);
+      
+      // Save the sub-queries in the database
+      if (threadId) {
+        try {
+          // Store the queries in the database
+          const updateData = {};
+          subQueries.forEach((query, idx) => {
+            if (idx < 3) { // We only have 3 columns
+              updateData[`sub_query${idx + 1}`] = query;
+            }
+          });
+          
+          const { error } = await supabase
+            .from('chat_messages')
+            .update(updateData)
+            .eq('thread_id', threadId)
+            .eq('sender', 'user')
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          if (error) {
+            console.error("Error storing sub-queries:", error);
+          }
+        } catch (updateError) {
+          console.error("Error storing sub-queries:", updateError);
+        }
+      }
+      
+      // Process each sub-query
+      const subQueryResponses = [];
+      for (const query of subQueries) {
+        try {
+          const response = await processSubQuery(query, userId, timeRange);
+          subQueryResponses.push(response);
+        } catch (error) {
+          console.error(`Error processing sub-query "${query}":`, error);
+          subQueryResponses.push({
+            query,
+            response: "I encountered an error processing this aspect of your question."
+          });
+        }
+      }
+      
+      // Save the sub-query responses
+      if (threadId) {
+        try {
+          const { error } = await supabase
+            .from('chat_messages')
+            .update({
+              sub_query_responses: subQueryResponses
+            })
+            .eq('thread_id', threadId)
+            .eq('sender', 'user')
+            .order('created_at', { ascending: false })
+            .limit(1);
+            
+          if (error) {
+            console.error("Error storing sub-query responses:", error);
+          }
+        } catch (updateError) {
+          console.error("Error storing sub-query responses:", updateError);
+        }
+      }
+      
+      // Synthesize the responses
+      const synthesizedResponse = await synthesizeResponses(message, subQueries, subQueryResponses);
+      
+      // Collect references from all sub-queries
+      const allReferences = subQueryResponses
+        .filter(sqr => sqr.references)
+        .flatMap(sqr => sqr.references)
+        // Remove duplicates by entry ID
+        .filter((ref, index, self) => 
+          index === self.findIndex((r) => r.id === ref.id)
+        );
+      
+      // Return the final synthesized response
+      return new Response(
+        JSON.stringify({ 
+          data: synthesizedResponse,
+          processingComplete: true,
+          references: allReferences.length > 0 ? allReferences : undefined
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
-
-    // Format entries for the prompt with dates
-    const entriesWithDates = entries.map(entry => {
-      const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
-      });
-      
-      // Format entities for display if they exist
-      let entityInfo = '';
-      if (entry.entities && Array.isArray(entry.entities)) {
-        const entityTypes = {};
-        entry.entities.forEach(entity => {
-          if (!entityTypes[entity.type]) {
-            entityTypes[entity.type] = [];
-          }
-          entityTypes[entity.type].push(entity.name);
-        });
-        
-        // Create a readable string of entities
-        const entityStrings = [];
-        for (const [type, names] of Object.entries(entityTypes)) {
-          entityStrings.push(`${type}: ${names.join(', ')}`);
-        }
-        if (entityStrings.length > 0) {
-          entityInfo = `\nMentioned: ${entityStrings.join(' | ')}`;
-        }
-      }
-
-      // Format sentiment info
-      const sentimentInfo = entry.sentiment 
-        ? `\nSentiment: ${entry.sentiment} (${
-            entry.sentiment <= -0.2 ? 'negative' :
-            entry.sentiment >= 0.2 ? 'positive' : 'neutral'
-          })`
-        : '';
-
-      return `- Entry from ${formattedDate}: ${entry.content}${entityInfo}${sentimentInfo}`;
-    }).join('\n\n');
-
-    // 3. Prepare prompt with updated instructions
-    const promptFormatted = JOURNAL_SPECIFIC_PROMPT
-      .replace('{journalData}', entriesWithDates)
-      .replace('{userMessage}', message);
-      
-    // 4. Call OpenAI
-    console.log("Calling OpenAI for completion");
-    
-    // Prepare the messages array with system prompt and conversation context
-    const messages = [];
-    
-    // Add system prompt
-    messages.push({ role: 'system', content: promptFormatted });
-    
-    // Add conversation context if available
-    if (conversationContext.length > 0) {
-      // Log that we're using conversation context
-      console.log(`Including ${conversationContext.length} messages of conversation context`);
-      
-      // Add the conversation context messages
-      messages.push(...conversationContext);
-      
-      // Add the current user message
-      messages.push({ role: 'user', content: message });
-    } else {
-      // If no context, just use the system prompt
-      console.log("No conversation context available, using only system prompt");
-    }
-    
-    const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: promptFormatted }],
-      }),
-    });
-
-    if (!completionResponse.ok) {
-      const error = await completionResponse.text();
-      console.error('Failed to get completion:', error);
-      throw new Error('Failed to generate response');
-    }
-
-    const completionData = await completionResponse.json();
-    const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-    console.log("Response generated successfully");
-
-    // 5. Return response
-    return new Response(
-      JSON.stringify({ 
-        data: responseContent,
-        processingComplete: true 
-      }),
-      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-    );
   } catch (error) {
     console.error('Error:', error);
     return new Response(

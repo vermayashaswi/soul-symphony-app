@@ -20,4 +20,16 @@ export type ChatMessage = {
   analysis_data?: any;
   has_numeric_result?: boolean;
   role: 'user' | 'assistant';
+  sub_query1?: string;
+  sub_query2?: string;
+  sub_query3?: string;
+  sub_query_responses?: SubQueryResponse[];
 };
+
+export type SubQueryResponse = {
+  query: string;
+  response: string;
+  references?: any[];
+  analysis_data?: any;
+};
+

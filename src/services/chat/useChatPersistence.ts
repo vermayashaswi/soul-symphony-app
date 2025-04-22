@@ -1,191 +1,243 @@
 
-import { useState, useEffect } from 'react';
-import { ChatThread, ChatMessage } from './types';
-import { getUserChatThreads } from './threadService';
-import { getThreadMessages } from './messageService';
-import { supabase } from '@/integrations/supabase/client';
+import { useEffect, useState } from "react";
+import { supabase } from "@/integrations/supabase/client";
+import { ChatMessage, ChatThread, SubQueryResponse } from "./types";
 
 /**
- * Hook for managing chat persistence
- * Provides threads, messages, and loading states
+ * Custom hook to manage chat persistence with Supabase
  */
-export const useChatPersistence = (userId: string | undefined, initialThreadId?: string) => {
+export function useChatPersistence(userId?: string | null) {
   const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(initialThreadId || null);
-  const [messages, setMessages] = useState<ChatMessage[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [threadsLoading, setThreadsLoading] = useState(true);
-  const [messagesLoading, setMessagesLoading] = useState(false);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
   
-  // Listen for real-time updates to threads
+  // Load user's chat threads
   useEffect(() => {
     if (!userId) {
       setThreads([]);
-      setThreadsLoading(false);
+      setIsLoading(false);
       return;
     }
     
     const loadThreads = async () => {
-      setThreadsLoading(true);
       try {
-        const threads = await getUserChatThreads(userId);
-        setThreads(threads);
-      } catch (error) {
-        console.error("Error loading chat threads:", error);
+        setIsLoading(true);
+        setError(null);
+        
+        const { data, error } = await supabase
+          .from('chat_threads')
+          .select('*')
+          .eq('user_id', userId)
+          .order('updated_at', { ascending: false });
+          
+        if (error) {
+          console.error("Error loading chat threads:", error);
+          setError(error.message);
+        } else {
+          setThreads(data || []);
+        }
+      } catch (err: any) {
+        console.error("Exception loading chat threads:", err);
+        setError(err.message || 'An error occurred while loading conversations');
       } finally {
-        setThreadsLoading(false);
-        setLoading(false);
+        setIsLoading(false);
       }
     };
     
     loadThreads();
     
-    // Subscribe to changes in the chat_threads table
-    const threadsSubscription = supabase
-      .channel('chat_threads_changes')
+    // Set up real-time subscription for thread updates
+    const subscription = supabase
+      .channel(`threads_for_${userId}`)
       .on('postgres_changes', {
         event: '*',
         schema: 'public',
         table: 'chat_threads',
         filter: `user_id=eq.${userId}`
-      }, (payload) => {
-        console.log('Real-time thread update:', payload);
+      }, () => {
         loadThreads();
       })
       .subscribe();
       
-    // Also listen for thread title updates via custom event
-    const handleThreadTitleUpdate = (event: CustomEvent) => {
-      if (event.detail?.threadId && event.detail?.title) {
-        setThreads(prevThreads => 
-          prevThreads.map(thread => 
-            thread.id === event.detail.threadId 
-              ? { ...thread, title: event.detail.title } 
-              : thread
-          )
-        );
-      }
-    };
-    
-    window.addEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
-    
     return () => {
-      threadsSubscription.unsubscribe();
-      window.removeEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
+      subscription.unsubscribe();
     };
   }, [userId]);
   
-  // Load messages for the current thread
-  useEffect(() => {
-    if (!currentThreadId) {
-      setMessages([]);
-      return;
-    }
-    
-    const loadMessages = async () => {
-      setMessagesLoading(true);
-      try {
-        const messages = await getThreadMessages(currentThreadId);
-        setMessages(messages);
-      } catch (error) {
-        console.error(`Error loading messages for thread ${currentThreadId}:`, error);
-      } finally {
-        setMessagesLoading(false);
-      }
-    };
-    
-    loadMessages();
-    
-    // Subscribe to message changes for the current thread
-    const messagesSubscription = supabase
-      .channel(`messages_${currentThreadId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'chat_messages',
-        filter: `thread_id=eq.${currentThreadId}`
-      }, (payload) => {
-        console.log('Real-time message update:', payload);
-        loadMessages();
-      })
-      .subscribe();
-      
-    return () => {
-      messagesSubscription.unsubscribe();
-    };
-  }, [currentThreadId]);
-  
-  // Add a message to the current thread
-  const addMessage = async (content: string, sender: 'user' | 'assistant') => {
-    if (!currentThreadId) return null;
-    
+  // Function to create a new thread
+  const createThread = async (title: string = "New Conversation"): Promise<ChatThread | null> => {
     try {
-      // Send directly to the database
+      if (!userId) {
+        setError('You must be logged in to create a conversation');
+        return null;
+      }
+      
       const { data, error } = await supabase
-        .from('chat_messages')
-        .insert({
-          thread_id: currentThreadId,
-          content,
-          sender
-        })
-        .select('*')
-        .single();
-      
-      if (error) throw error;
-      
-      // Also update thread timestamp
-      await supabase
         .from('chat_threads')
-        .update({ updated_at: new Date().toISOString() })
-        .eq('id', currentThreadId);
+        .insert({
+          title,
+          user_id: userId,
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        })
+        .select()
+        .single();
+        
+      if (error) {
+        console.error("Error creating chat thread:", error);
+        setError(error.message);
+        return null;
+      }
       
-      // Return the new message
-      return data as ChatMessage;
-    } catch (error) {
-      console.error("Error adding message:", error);
+      // Update local state
+      setThreads(prevThreads => [data, ...prevThreads]);
+      return data;
+    } catch (err: any) {
+      console.error("Exception creating chat thread:", err);
+      setError(err.message || 'An error occurred while creating the conversation');
       return null;
     }
   };
   
-  // Create a new thread
-  const createThread = async (title: string = "New Conversation") => {
-    if (!userId) return null;
-    
+  // Function to delete a thread
+  const deleteThread = async (threadId: string): Promise<boolean> => {
     try {
-      // Create a new thread
-      const { data, error } = await supabase
+      // First delete all messages in the thread
+      const { error: messagesError } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('thread_id', threadId);
+        
+      if (messagesError) {
+        console.error("Error deleting messages:", messagesError);
+        setError(messagesError.message);
+        return false;
+      }
+      
+      // Then delete the thread
+      const { error: threadError } = await supabase
         .from('chat_threads')
-        .insert({
-          user_id: userId,
-          title,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
+        .delete()
+        .eq('id', threadId);
+        
+      if (threadError) {
+        console.error("Error deleting thread:", threadError);
+        setError(threadError.message);
+        return false;
+      }
+      
+      // Update local state
+      setThreads(prevThreads => prevThreads.filter(thread => thread.id !== threadId));
+      return true;
+    } catch (err: any) {
+      console.error("Exception deleting chat thread:", err);
+      setError(err.message || 'An error occurred while deleting the conversation');
+      return false;
+    }
+  };
+  
+  // Function to get messages for a thread
+  const getMessages = async (threadId: string): Promise<ChatMessage[]> => {
+    try {
+      const { data, error } = await supabase
+        .from('chat_messages')
         .select('*')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: true });
+        
+      if (error) {
+        console.error("Error loading chat messages:", error);
+        setError(error.message);
+        return [];
+      }
+      
+      return data || [];
+    } catch (err: any) {
+      console.error("Exception loading chat messages:", err);
+      setError(err.message || 'An error occurred while loading messages');
+      return [];
+    }
+  };
+  
+  // Function to save a message
+  const saveMessage = async (
+    threadId: string,
+    content: string,
+    sender: 'user' | 'assistant',
+    references?: any[],
+    analysisData?: any,
+    hasNumericResult?: boolean,
+    subQueries?: string[],
+    subQueryResponses?: SubQueryResponse[]
+  ): Promise<ChatMessage | null> => {
+    try {
+      const messageData: Partial<ChatMessage> = {
+        thread_id: threadId,
+        content,
+        sender,
+        created_at: new Date().toISOString(),
+        role: sender
+      };
+      
+      if (references) {
+        messageData.reference_entries = references;
+      }
+      
+      if (analysisData) {
+        messageData.analysis_data = analysisData;
+      }
+      
+      if (hasNumericResult !== undefined) {
+        messageData.has_numeric_result = hasNumericResult;
+      }
+      
+      // Add sub-queries if provided
+      if (subQueries && subQueries.length > 0) {
+        if (subQueries[0]) messageData.sub_query1 = subQueries[0];
+        if (subQueries[1]) messageData.sub_query2 = subQueries[1];
+        if (subQueries[2]) messageData.sub_query3 = subQueries[2];
+      }
+      
+      // Add sub-query responses if provided
+      if (subQueryResponses && subQueryResponses.length > 0) {
+        messageData.sub_query_responses = subQueryResponses;
+      }
+      
+      const { data, error } = await supabase
+        .from('chat_messages')
+        .insert(messageData)
+        .select()
         .single();
+        
+      if (error) {
+        console.error("Error saving chat message:", error);
+        setError(error.message);
+        return null;
+      }
       
-      if (error) throw error;
-      
-      // Set as current thread
-      setCurrentThreadId(data.id);
-      
-      // Return the new thread
-      return data as ChatThread;
-    } catch (error) {
-      console.error("Error creating thread:", error);
+      // Update thread's updated_at timestamp
+      await supabase
+        .from('chat_threads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', threadId);
+        
+      return data;
+    } catch (err: any) {
+      console.error("Exception saving chat message:", err);
+      setError(err.message || 'An error occurred while saving the message');
       return null;
     }
   };
   
   return {
     threads,
-    messages,
-    loading,
-    threadsLoading,
-    messagesLoading,
-    currentThreadId,
-    setCurrentThreadId,
-    addMessage,
-    createThread
+    isLoading,
+    error,
+    createThread,
+    deleteThread,
+    getMessages,
+    saveMessage
   };
-};
+}
+
+export default useChatPersistence;

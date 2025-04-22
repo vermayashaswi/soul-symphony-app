@@ -1,14 +1,12 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { ChatMessage } from "./types";
-import { Json } from "@/integrations/supabase/types";
+import { ChatMessage, SubQueryResponse } from "./types";
 
 /**
- * Get all messages for a specific thread
+ * Get all messages for a thread
  */
 export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]> => {
   try {
-    console.log(`Fetching messages for thread ${threadId}`);
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
@@ -16,28 +14,14 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       .order('created_at', { ascending: true });
       
     if (error) {
-      console.error("Error fetching chat messages:", error);
+      console.error("Error fetching thread messages:", error);
       throw error;
     }
     
-    // Map the DB fields to the ChatMessage type
-    const messages: ChatMessage[] = data.map(msg => ({
-      id: msg.id,
-      thread_id: msg.thread_id,
-      content: msg.content,
-      sender: msg.sender as 'user' | 'assistant',
-      created_at: msg.created_at,
-      reference_entries: msg.reference_entries as any[] | undefined,
-      analysis_data: msg.analysis_data as any,
-      has_numeric_result: msg.has_numeric_result,
-      role: msg.sender as 'user' | 'assistant'
-    }));
-    
-    console.log(`Found ${messages.length} messages for thread ${threadId}`);
-    return messages;
+    return data || [];
   } catch (error) {
-    console.error("Failed to get chat messages:", error);
-    return [];
+    console.error("Exception fetching thread messages:", error);
+    throw error;
   }
 };
 
@@ -45,26 +29,50 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
  * Save a message to a thread
  */
 export const saveMessage = async (
-  threadId: string, 
-  content: string, 
+  threadId: string,
+  content: string,
   sender: 'user' | 'assistant',
-  references?: any[] | null,
-  analysis?: any | null,
-  hasNumericResult?: boolean
+  references?: any[],
+  analysisData?: any,
+  hasNumericResult?: boolean,
+  subQueries?: string[],
+  subQueryResponses?: SubQueryResponse[]
 ): Promise<ChatMessage | null> => {
   try {
-    console.log(`Saving message to thread ${threadId}`);
+    const messageData: Partial<ChatMessage> = {
+      thread_id: threadId,
+      content,
+      sender,
+      role: sender
+    };
+    
+    if (references) {
+      messageData.reference_entries = references;
+    }
+    
+    if (analysisData) {
+      messageData.analysis_data = analysisData;
+    }
+    
+    if (hasNumericResult !== undefined) {
+      messageData.has_numeric_result = hasNumericResult;
+    }
+    
+    // Add sub-queries if provided
+    if (subQueries && subQueries.length > 0) {
+      if (subQueries[0]) messageData.sub_query1 = subQueries[0];
+      if (subQueries[1]) messageData.sub_query2 = subQueries[1];
+      if (subQueries[2]) messageData.sub_query3 = subQueries[2];
+    }
+    
+    // Add sub-query responses if provided
+    if (subQueryResponses && subQueryResponses.length > 0) {
+      messageData.sub_query_responses = subQueryResponses;
+    }
     
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({
-        thread_id: threadId,
-        content,
-        sender,
-        reference_entries: references || null,
-        analysis_data: analysis || null,
-        has_numeric_result: hasNumericResult || false
-      })
+      .insert(messageData)
       .select()
       .single();
       
@@ -73,23 +81,66 @@ export const saveMessage = async (
       throw error;
     }
     
-    // Map the DB response to the ChatMessage type
-    const message: ChatMessage = {
-      id: data.id,
-      thread_id: data.thread_id,
-      content: data.content,
-      sender: data.sender as 'user' | 'assistant',
-      created_at: data.created_at,
-      reference_entries: data.reference_entries as any[] | undefined,
-      analysis_data: data.analysis_data as any,
-      has_numeric_result: data.has_numeric_result,
-      role: data.sender as 'user' | 'assistant'
-    };
-    
-    console.log(`Message saved with ID ${data.id}`);
-    return message;
+    // Update thread's updated_at timestamp
+    await supabase
+      .from('chat_threads')
+      .update({ updated_at: new Date().toISOString() })
+      .eq('id', threadId);
+      
+    return data;
   } catch (error) {
-    console.error("Failed to save message:", error);
-    return null;
+    console.error("Exception saving message:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get sub-queries for a message
+ */
+export const getMessageSubQueries = async (messageId: string): Promise<string[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('sub_query1, sub_query2, sub_query3')
+      .eq('id', messageId)
+      .single();
+      
+    if (error) {
+      console.error("Error fetching message sub-queries:", error);
+      throw error;
+    }
+    
+    const subQueries: string[] = [];
+    if (data?.sub_query1) subQueries.push(data.sub_query1);
+    if (data?.sub_query2) subQueries.push(data.sub_query2);
+    if (data?.sub_query3) subQueries.push(data.sub_query3);
+    
+    return subQueries;
+  } catch (error) {
+    console.error("Exception fetching message sub-queries:", error);
+    throw error;
+  }
+};
+
+/**
+ * Get sub-query responses for a message
+ */
+export const getMessageSubQueryResponses = async (messageId: string): Promise<SubQueryResponse[]> => {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('sub_query_responses')
+      .eq('id', messageId)
+      .single();
+      
+    if (error) {
+      console.error("Error fetching message sub-query responses:", error);
+      throw error;
+    }
+    
+    return data?.sub_query_responses || [];
+  } catch (error) {
+    console.error("Exception fetching message sub-query responses:", error);
+    throw error;
   }
 };

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -218,6 +219,9 @@ const SmartChatInterface = () => {
       
       debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
       console.log("Query analysis result:", queryTypes);
+      
+      setProcessingStage("Planning search strategy...");
+      debugLog.addEvent("Query Planning", "Breaking down complex query into sub-queries if needed", "info");
       
       setProcessingStage("Searching for insights...");
       debugLog.addEvent("AI Processing", "Sending query to AI for processing", "info");
