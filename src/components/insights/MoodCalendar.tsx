@@ -413,17 +413,17 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
             margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
           >
             <defs>
-              <linearGradient id="red-gradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ea384c" stopOpacity={0.22}/>
-                <stop offset="95%" stopColor="#ea384c" stopOpacity={0.03}/>
+              <linearGradient id="red-strip" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#ea384c" stopOpacity={0.25} />
+                <stop offset="100%" stopColor="#ea384c" stopOpacity={0.10} />
               </linearGradient>
-              <linearGradient id="yellow-gradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#FEF7CD" stopOpacity={0.23}/>
-                <stop offset="95%" stopColor="#FEF7CD" stopOpacity={0.04}/>
+              <linearGradient id="yellow-strip" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#FEF7CD" stopOpacity={0.3} />
+                <stop offset="100%" stopColor="#FEF7CD" stopOpacity={0.10} />
               </linearGradient>
-              <linearGradient id="green-gradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#F2FCE2" stopOpacity={0.22}/>
-                <stop offset="95%" stopColor="#F2FCE2" stopOpacity={0.03}/>
+              <linearGradient id="green-strip" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#4ade80" stopOpacity={0.22} />
+                <stop offset="100%" stopColor="#4ade80" stopOpacity={0.12} />
               </linearGradient>
             </defs>
 
@@ -442,19 +442,19 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               type="monotone"
               dataKey="sentiment"
               stroke="none"
-              fill="url(#red-gradient)"
+              fill="url(#green-strip)"
               isAnimationActive={false}
               yAxisId={0}
               connectNulls
               dot={false}
               activeDot={false}
-              baseValue={-1}
+              baseValue={0.2}
             />
             <Area
               type="monotone"
               dataKey="sentiment"
               stroke="none"
-              fill="url(#yellow-gradient)"
+              fill="url(#yellow-strip)"
               isAnimationActive={false}
               yAxisId={0}
               connectNulls
@@ -466,13 +466,13 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               type="monotone"
               dataKey="sentiment"
               stroke="none"
-              fill="url(#green-gradient)"
+              fill="url(#red-strip)"
               isAnimationActive={false}
               yAxisId={0}
               connectNulls
               dot={false}
               activeDot={false}
-              baseValue={0.2}
+              baseValue={-1}
             />
 
             <Line 
@@ -498,7 +498,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
             <span>Neutral</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ background: "#F2FCE2" }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: "#4ade80" }} />
             <span>Positive</span>
           </div>
         </div>
