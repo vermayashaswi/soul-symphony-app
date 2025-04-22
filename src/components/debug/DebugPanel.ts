@@ -1,18 +1,19 @@
 
-// Empty debug panel export (all UI and actual logic removed)
+// Empty debug panel export with no-op functions that accept arguments but do nothing
 export const debugLogger = {
-  log: () => {},
-  logInfo: () => {},
-  logError: () => {},
-  logWarning: () => {},
-  setLastProfileError: () => {}
+  log: (..._: any[]) => {},
+  logInfo: (..._: any[]) => {},
+  logError: (..._: any[]) => {},
+  logWarning: (..._: any[]) => {},
+  setLastProfileError: (..._: any[]) => {}
 };
 
-export const logInfo = () => {};
-export const logError = () => {};
-export const logAuthError = () => {};
-export const logProfile = () => {};
-export const logAuth = () => {};
+// Define these functions to accept parameters but do nothing with them
+export const logInfo = (..._: any[]) => {};
+export const logError = (..._: any[]) => {};
+export const logAuthError = (..._: any[]) => {};
+export const logProfile = (..._: any[]) => {};
+export const logAuth = (..._: any[]) => {};
 
 const DebugPanel = () => null;
 export default DebugPanel;

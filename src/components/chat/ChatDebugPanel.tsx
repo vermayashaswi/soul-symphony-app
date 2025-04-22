@@ -6,8 +6,8 @@ export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) =
 
 export const useChatDebug = () => ({
   logs: [],
-  addLog: () => {},
-  addEvent: () => {},
+  addLog: (..._: any[]) => {},
+  addEvent: (..._: any[]) => {},
   clearLogs: () => {},
   isEnabled: false,
   toggleEnabled: () => {},
