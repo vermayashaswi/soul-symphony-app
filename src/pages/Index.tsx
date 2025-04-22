@@ -41,7 +41,7 @@ const Index = () => {
   return (
     <>
       <div className="fixed top-0 right-0 z-50 m-4">
-        <ConnectionStatus showSpeed />
+        <ConnectionStatus />
       </div>
       
       <NetworkAwareContent
@@ -78,3 +78,4 @@ const Index = () => {
 };
 
 export default Index;
+

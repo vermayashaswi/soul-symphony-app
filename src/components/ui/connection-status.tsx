@@ -9,7 +9,10 @@ interface ConnectionStatusProps {
   showSpeed?: boolean;
 }
 
-export function ConnectionStatus({ className, showSpeed = false }: ConnectionStatusProps) {
+export function ConnectionStatus({ 
+  className, 
+  showSpeed = false 
+}: ConnectionStatusProps) {
   const networkStatus = useNetworkStatus();
   
   return (
@@ -46,3 +49,4 @@ export function ConnectionStatus({ className, showSpeed = false }: ConnectionSta
 }
 
 export default ConnectionStatus;
+
