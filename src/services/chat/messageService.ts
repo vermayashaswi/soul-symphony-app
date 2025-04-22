@@ -18,13 +18,13 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       throw error;
     }
     
-    // Add the role property based on sender
+    // Add the role property based on sender if not present
     const messagesWithRole = data?.map(msg => ({
       ...msg,
-      role: msg.sender as 'user' | 'assistant'
+      role: msg.role || msg.sender as 'user' | 'assistant'
     })) || [];
     
-    return messagesWithRole;
+    return messagesWithRole as ChatMessage[];
   } catch (error) {
     console.error("Exception fetching thread messages:", error);
     throw error;
@@ -45,40 +45,44 @@ export const saveMessage = async (
   subQueryResponses?: SubQueryResponse[]
 ): Promise<ChatMessage | null> => {
   try {
-    const messageData: Partial<ChatMessage> = {
+    // Create the base message data
+    const messageData = {
       thread_id: threadId,
       content,
       sender,
       role: sender
     };
     
+    // Add optional fields if provided
+    const insertData: Record<string, any> = { ...messageData };
+    
     if (references) {
-      messageData.reference_entries = references;
+      insertData.reference_entries = references;
     }
     
     if (analysisData) {
-      messageData.analysis_data = analysisData;
+      insertData.analysis_data = analysisData;
     }
     
     if (hasNumericResult !== undefined) {
-      messageData.has_numeric_result = hasNumericResult;
+      insertData.has_numeric_result = hasNumericResult;
     }
     
     // Add sub-queries if provided
     if (subQueries && subQueries.length > 0) {
-      if (subQueries[0]) messageData.sub_query1 = subQueries[0];
-      if (subQueries[1]) messageData.sub_query2 = subQueries[1];
-      if (subQueries[2]) messageData.sub_query3 = subQueries[2];
+      if (subQueries[0]) insertData.sub_query1 = subQueries[0];
+      if (subQueries[1]) insertData.sub_query2 = subQueries[1];
+      if (subQueries[2]) insertData.sub_query3 = subQueries[2];
     }
     
     // Add sub-query responses if provided
     if (subQueryResponses && subQueryResponses.length > 0) {
-      messageData.sub_query_responses = subQueryResponses;
+      insertData.sub_query_responses = subQueryResponses;
     }
     
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert(messageData)
+      .insert(insertData)
       .select()
       .single();
       
@@ -93,7 +97,7 @@ export const saveMessage = async (
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId);
       
-    return data;
+    return data as ChatMessage;
   } catch (error) {
     console.error("Exception saving message:", error);
     throw error;
@@ -144,10 +148,9 @@ export const getMessageSubQueryResponses = async (messageId: string): Promise<Su
       throw error;
     }
     
-    return data?.sub_query_responses || [];
+    return (data?.sub_query_responses || []) as SubQueryResponse[];
   } catch (error) {
     console.error("Exception fetching message sub-query responses:", error);
     throw error;
   }
 };
-

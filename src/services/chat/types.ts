@@ -14,7 +14,7 @@ export type ChatMessage = {
   id: string;
   thread_id: string;
   content: string;
-  sender: 'user' | 'assistant';
+  sender: string;
   created_at: string;
   reference_entries?: any[];
   analysis_data?: any;
@@ -32,4 +32,3 @@ export type SubQueryResponse = {
   references?: any[];
   analysis_data?: any;
 };
-

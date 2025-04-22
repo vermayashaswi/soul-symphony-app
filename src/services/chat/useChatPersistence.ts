@@ -1,3 +1,4 @@
+
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage, ChatThread, SubQueryResponse } from "./types";
@@ -150,13 +151,13 @@ export function useChatPersistence(userId?: string | null) {
         return [];
       }
       
-      // Add the role property based on sender
+      // Add the role property based on sender if needed
       const messagesWithRole = data?.map(msg => ({
         ...msg,
-        role: msg.sender as 'user' | 'assistant'
+        role: msg.role || msg.sender as 'user' | 'assistant'
       })) || [];
       
-      return messagesWithRole;
+      return messagesWithRole as ChatMessage[];
     } catch (err: any) {
       console.error("Exception loading chat messages:", err);
       setError(err.message || 'An error occurred while loading messages');
@@ -176,7 +177,8 @@ export function useChatPersistence(userId?: string | null) {
     subQueryResponses?: SubQueryResponse[]
   ): Promise<ChatMessage | null> => {
     try {
-      const messageData: Partial<ChatMessage> = {
+      // Create the base message data
+      const messageData = {
         thread_id: threadId,
         content,
         sender,
@@ -184,33 +186,36 @@ export function useChatPersistence(userId?: string | null) {
         created_at: new Date().toISOString()
       };
       
+      // Add optional fields if provided
+      const insertData: Record<string, any> = { ...messageData };
+      
       if (references) {
-        messageData.reference_entries = references;
+        insertData.reference_entries = references;
       }
       
       if (analysisData) {
-        messageData.analysis_data = analysisData;
+        insertData.analysis_data = analysisData;
       }
       
       if (hasNumericResult !== undefined) {
-        messageData.has_numeric_result = hasNumericResult;
+        insertData.has_numeric_result = hasNumericResult;
       }
       
       // Add sub-queries if provided
       if (subQueries && subQueries.length > 0) {
-        if (subQueries[0]) messageData.sub_query1 = subQueries[0];
-        if (subQueries[1]) messageData.sub_query2 = subQueries[1];
-        if (subQueries[2]) messageData.sub_query3 = subQueries[2];
+        if (subQueries[0]) insertData.sub_query1 = subQueries[0];
+        if (subQueries[1]) insertData.sub_query2 = subQueries[1];
+        if (subQueries[2]) insertData.sub_query3 = subQueries[2];
       }
       
       // Add sub-query responses if provided
       if (subQueryResponses && subQueryResponses.length > 0) {
-        messageData.sub_query_responses = subQueryResponses;
+        insertData.sub_query_responses = subQueryResponses;
       }
       
       const { data, error } = await supabase
         .from('chat_messages')
-        .insert(messageData)
+        .insert(insertData)
         .select()
         .single();
         
@@ -226,7 +231,7 @@ export function useChatPersistence(userId?: string | null) {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
         
-      return data;
+      return data as ChatMessage;
     } catch (err: any) {
       console.error("Exception saving chat message:", err);
       setError(err.message || 'An error occurred while saving the message');
