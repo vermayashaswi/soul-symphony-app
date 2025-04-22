@@ -44,12 +44,14 @@ async function getKnownEmotions() {
   try {
     const { data, error } = await supabase.from('emotions').select('name');
     if (error) {
+      console.error('Error fetching emotions list:', error);
       return [
         "joy", "sadness", "anger", "fear", "surprise", "disgust", "trust", "anticipation", "shame", "guilt", "curiosity", "anxiety", "pride", "gratitude", "calm", "boredom", "stress", "love"
       ];
     }
     return data.map(e => typeof e.name === "string" ? e.name.toLowerCase() : "").filter(Boolean);
-  } catch (_) {
+  } catch (err) {
+    console.error('Exception in getKnownEmotions:', err);
     return [];
   }
 }
@@ -76,44 +78,53 @@ Journal entry:
 ${text}
 `;
 
-  const response = await fetch('https://api.openai.com/v1/chat/completions', {
-    method: 'POST',
-    headers: {
-      'Authorization': `Bearer ${openAIApiKey}`,
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify({
-      model: 'gpt-4o-mini',
-      messages: [
-        {
-          role: 'system',
-          content: 'Extract relevant categories (from provided list) and core emotions with strength per category for a journal entry. Output ONLY compact JSON as described by the user.'
-        },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.25,
-      response_format: { type: "json_object" }
-    }),
-  });
-
-  if (!response.ok) {
-    return { categories: [], entityemotion: {} };
-  }
-
   try {
-    const result = await response.json();
-    let parsed;
-    if (result.choices && result.choices[0]?.message?.content) {
-      parsed = JSON.parse(result.choices[0].message.content);
-    } else {
-      parsed = result;
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${openAIApiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: 'Extract relevant categories (from provided list) and core emotions with strength per category for a journal entry. Output ONLY compact JSON as described by the user.'
+          },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.25,
+        response_format: { type: "json_object" }
+      }),
+    });
+
+    if (!response.ok) {
+      console.error(`OpenAI API error: ${response.status}`);
+      return { categories: [], entityemotion: {} };
     }
 
-    return {
-      categories: Array.isArray(parsed.categories) ? parsed.categories : [],
-      entityemotion: typeof parsed.entityemotion === "object" && parsed.entityemotion !== null ? parsed.entityemotion : {},
-    };
+    try {
+      const result = await response.json();
+      console.log("OpenAI response:", JSON.stringify(result).substring(0, 200) + "...");
+      
+      let parsed;
+      if (result.choices && result.choices[0]?.message?.content) {
+        parsed = JSON.parse(result.choices[0].message.content);
+      } else {
+        parsed = result;
+      }
+
+      return {
+        categories: Array.isArray(parsed.categories) ? parsed.categories : [],
+        entityemotion: typeof parsed.entityemotion === "object" && parsed.entityemotion !== null ? parsed.entityemotion : {},
+      };
+    } catch (err) {
+      console.error('Error parsing GPT response:', err);
+      return { categories: [], entityemotion: {} };
+    }
   } catch (err) {
+    console.error('Error calling OpenAI API:', err);
     return { categories: [], entityemotion: {} };
   }
 }
@@ -124,48 +135,100 @@ serve(async (req) => {
   }
 
   try {
+    console.log("Starting temporary function to process journal entries");
+    
     // UPDATE: Get all Journal Entries, not just where entityemotion is null
     const { data: entries, error } = await supabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text"')
       .limit(25); // for practical reasons, process max 25 at a time
 
-    if (error || !entries || !entries.length) {
-      return new Response(JSON.stringify({ updated: 0 }), { headers: { ...corsHeaders, 'Content-Type': 'application/json' } });
+    if (error) {
+      console.error("Database error fetching entries:", error);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Database error fetching entries', 
+          detail: error.message,
+          updated: 0 
+        }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+    
+    if (!entries || !entries.length) {
+      console.log("No entries found to process");
+      return new Response(
+        JSON.stringify({ 
+          message: 'No entries found to process',
+          updated: 0 
+        }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
+    console.log(`Found ${entries.length} entries to process`);
     const knownEmotions = await getKnownEmotions();
+    console.log(`Using ${knownEmotions.length} known emotions for analysis`);
 
     let updated = 0;
+    let failed = 0;
     for (const entry of entries) {
       const text = entry["refined text"] || entry["transcription text"];
-      if (!text) continue;
+      if (!text) {
+        console.log(`Entry ${entry.id} has no text content, skipping`);
+        continue;
+      }
 
-      // Analyze this entry
-      const { categories, entityemotion } = await analyzeText(text, knownEmotions);
+      try {
+        // Analyze this entry
+        console.log(`Processing entry ${entry.id} (text length: ${text.length})`);
+        const { categories, entityemotion } = await analyzeText(text, knownEmotions);
+        console.log(`Analysis complete for entry ${entry.id}: ${categories.length} categories found`);
 
-      // Update the entry in database
-      const { error: updateErr } = await supabase
-        .from('Journal Entries')
-        .update({
-          entities: categories,
-          entityemotion: entityemotion
-        })
-        .eq('id', entry.id);
+        // Update the entry in database
+        const { error: updateErr } = await supabase
+          .from('Journal Entries')
+          .update({
+            entities: categories,
+            entityemotion: entityemotion
+          })
+          .eq('id', entry.id);
 
-      if (!updateErr) updated++;
+        if (updateErr) {
+          console.error(`Error updating entry ${entry.id}:`, updateErr);
+          failed++;
+        } else {
+          console.log(`Successfully updated entry ${entry.id}`);
+          updated++;
+        }
+      } catch (processErr) {
+        console.error(`Error processing entry ${entry.id}:`, processErr);
+        failed++;
+      }
     }
 
+    console.log(`Processing complete. Updated: ${updated}, Failed: ${failed}`);
     return new Response(
       JSON.stringify({
-        updated
+        updated,
+        failed,
+        total: entries.length,
+        message: `Processing complete. Updated: ${updated}, Failed: ${failed}`
       }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
-    return new Response(JSON.stringify({ error: 'Edge function error', detail: err.message }), {
-      status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-    });
+    console.error('Global error in edge function:', err);
+    return new Response(
+      JSON.stringify({ 
+        error: 'Edge function error', 
+        detail: err.message,
+        updated: 0 
+      }), 
+      {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      }
+    );
   }
 });

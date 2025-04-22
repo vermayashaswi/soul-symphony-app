@@ -113,16 +113,54 @@ const Home = () => {
           }
         }
       );
+      
+      if (!resp.ok) {
+        const errorText = await resp.text();
+        setProcessResult(`API Error (${resp.status}): ${errorText}`);
+        toast({
+          title: "Processing Error",
+          description: `Failed to process entries: Server returned ${resp.status}`,
+          variant: "destructive"
+        });
+        setProcessing(false);
+        return;
+      }
+      
       const data = await resp.json();
+      console.log("Edge function response:", data);
+      
       if (data.updated !== undefined) {
-        setProcessResult(`Processed entries updated: ${data.updated}`);
+        const message = `Processed ${data.total || "?"} entries. Updated: ${data.updated}${data.failed ? `, Failed: ${data.failed}` : ''}`;
+        setProcessResult(message);
+        toast({
+          title: "Processing Complete",
+          description: message
+        });
       } else if (data.error) {
-        setProcessResult('Error: ' + (data.detail || data.error));
+        const errorMsg = 'Error: ' + (data.detail || data.error || 'Unknown error');
+        setProcessResult(errorMsg);
+        toast({
+          title: "Processing Error",
+          description: errorMsg,
+          variant: "destructive"
+        });
       } else {
-        setProcessResult('Unknown response.');
+        setProcessResult('Unknown response format. Check console for details.');
+        console.error("Unexpected response format:", data);
+        toast({
+          title: "Unexpected Response",
+          description: "Received unexpected response format from server",
+          variant: "destructive"
+        });
       }
     } catch (err) {
-      setProcessResult('Network or server error');
+      console.error("Error processing entries:", err);
+      setProcessResult(`Network or client error: ${err.message || 'Unknown error'}`);
+      toast({
+        title: "Connection Error",
+        description: "Failed to connect to processing service",
+        variant: "destructive"
+      });
     }
     setProcessing(false);
   };
@@ -265,7 +303,7 @@ const Home = () => {
         <InspirationalQuote />
       </div>
 
-      {/* Add NEW BUTTON: Bulk Run GPT Entityemotion extraction */}
+      {/* Edge Function Processing Button */}
       <div className="fixed right-6 bottom-24 z-50">
         <button
           onClick={runBulkEntityEmotion}
