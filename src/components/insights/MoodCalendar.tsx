@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -83,7 +82,6 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
     }).sort((a, b) => a.date.localeCompare(b.date));
   }, [sentimentData]);
 
-  // Filter data based on the current time range
   const filteredChartData = React.useMemo(() => {
     const now = new Date();
     let startDate: Date;
@@ -406,7 +404,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
       day: item.formattedDate,
       sentiment: item.sentiment
     }));
-    
+
     return (
       <div className="flex flex-col h-full">
         <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
@@ -415,17 +413,17 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
             margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
           >
             <defs>
-              <linearGradient id="positiveGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#4ade80" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#4ade80" stopOpacity={0}/>
+              <linearGradient id="red-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#ea384c" stopOpacity={0.22}/>
+                <stop offset="95%" stopColor="#ea384c" stopOpacity={0.03}/>
               </linearGradient>
-              <linearGradient id="neutralGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#facc15" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#facc15" stopOpacity={0}/>
+              <linearGradient id="yellow-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#FEF7CD" stopOpacity={0.23}/>
+                <stop offset="95%" stopColor="#FEF7CD" stopOpacity={0.04}/>
               </linearGradient>
-              <linearGradient id="negativeGradient" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="5%" stopColor="#ef4444" stopOpacity={0.3}/>
-                <stop offset="95%" stopColor="#ef4444" stopOpacity={0}/>
+              <linearGradient id="green-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="5%" stopColor="#F2FCE2" stopOpacity={0.22}/>
+                <stop offset="95%" stopColor="#F2FCE2" stopOpacity={0.03}/>
               </linearGradient>
             </defs>
 
@@ -439,32 +437,44 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               ticks={[-1, -0.5, 0, 0.5, 1]}
             />
             <Tooltip content={<CustomTooltip />} />
-            
+
             <Area
-              yAxisId={0}
+              type="monotone"
               dataKey="sentiment"
               stroke="none"
-              fill="url(#positiveGradient)"
-              baseValue={0.3}
+              fill="url(#red-gradient)"
               isAnimationActive={false}
+              yAxisId={0}
+              connectNulls
+              dot={false}
+              activeDot={false}
+              baseValue={() => -1}
             />
             <Area
-              yAxisId={0}
+              type="monotone"
               dataKey="sentiment"
               stroke="none"
-              fill="url(#neutralGradient)"
-              baseValue={-0.1}
+              fill="url(#yellow-gradient)"
               isAnimationActive={false}
+              yAxisId={0}
+              connectNulls
+              dot={false}
+              activeDot={false}
+              baseValue={() => -0.2}
             />
             <Area
-              yAxisId={0}
+              type="monotone"
               dataKey="sentiment"
               stroke="none"
-              fill="url(#negativeGradient)"
-              baseValue={-1}
+              fill="url(#green-gradient)"
               isAnimationActive={false}
+              yAxisId={0}
+              connectNulls
+              dot={false}
+              activeDot={false}
+              baseValue={() => 0.2}
             />
-            
+
             <Line 
               type="monotone"
               dataKey="sentiment"
@@ -473,21 +483,23 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               dot={<CustomDot />}
               activeDot={{ r: 6 }}
             />
+            <ReferenceLine y={-0.2} stroke="#facc15" strokeDasharray="4 2" ifOverflow="visible" strokeWidth={1} />
+            <ReferenceLine y={0.2} stroke="#4ade80" strokeDasharray="4 2" ifOverflow="visible" strokeWidth={1} />
           </LineChart>
         </ResponsiveContainer>
         
         <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-green-400/40" />
-            <span>Positive</span>
+            <div className="w-3 h-3 rounded-full" style={{ background: "#ea384c" }} />
+            <span>Negative</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-yellow-400/40" />
+            <div className="w-3 h-3 rounded-full" style={{ background: "#FEF7CD" }} />
             <span>Neutral</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full bg-red-500/40" />
-            <span>Negative</span>
+            <div className="w-3 h-3 rounded-full" style={{ background: "#F2FCE2" }} />
+            <span>Positive</span>
           </div>
         </div>
       </div>
