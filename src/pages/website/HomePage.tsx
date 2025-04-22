@@ -691,7 +691,7 @@ const HomePage = () => {
         </div>
       </section>
       
-      <section className="py-16 md:py-24 bg-gradient-to-br from-blue-50 to-purple-50">
+      <section className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="text-center mb-12">
             <span className="px-3 py-1 rounded-full bg-primary/10 text-primary text-sm font-medium mb-4 inline-block">Testimonials</span>
@@ -777,7 +777,7 @@ const HomePage = () => {
         </div>
       </section>
       
-      <section className="py-16 md:py-24 bg-gradient-to-br from-blue-50 to-purple-50">
+      <section className="py-16 md:py-24 bg-white">
         <div className="container mx-auto px-4">
           <div className="max-w-3xl mx-auto text-center">
             <h2 className="text-3xl md:text-4xl font-bold mb-6">Ready to start your journaling journey?</h2>

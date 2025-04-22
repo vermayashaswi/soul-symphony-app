@@ -1,4 +1,3 @@
-
 import React, { useEffect, lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -8,11 +7,8 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import Navbar from '@/components/Navbar';
-import { useNetworkStatus } from '@/utils/network';
-import { ConnectionStatus } from '@/components/ui/connection-status';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
 
-// Use lazy loading for components that aren't immediately needed
 const HomePageLazy = lazy(() => import('@/pages/website/HomePage'));
 
 const Index = () => {
@@ -28,22 +24,16 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
-  // Show toast notification if on slow connection
   useEffect(() => {
     if (networkStatus.speed === 'slow') {
       console.log('Slow network detected, optimizing experience...');
     }
   }, [networkStatus.speed]);
 
-  // For the main domain, render the modern marketing homepage with features
   console.log('Rendering modern marketing homepage on main domain');
   
   return (
     <>
-      <div className="fixed top-0 right-0 z-50 m-4">
-        <ConnectionStatus />
-      </div>
-      
       <NetworkAwareContent
         lowBandwidthFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -78,4 +68,3 @@ const Index = () => {
 };
 
 export default Index;
-
