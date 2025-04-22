@@ -21,7 +21,9 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
     // Add the role property based on sender if not present
     const messagesWithRole = data?.map(msg => ({
       ...msg,
-      role: msg.role || msg.sender as 'user' | 'assistant'
+      role: msg.role || msg.sender,
+      // Ensure sender is either 'user' or 'assistant'
+      sender: (msg.sender === 'user' || msg.sender === 'assistant') ? msg.sender : 'assistant'
     })) || [];
     
     return messagesWithRole as ChatMessage[];
@@ -45,7 +47,7 @@ export const saveMessage = async (
   subQueryResponses?: SubQueryResponse[]
 ): Promise<ChatMessage | null> => {
   try {
-    // Create the base message data
+    // Create the base message data with required fields
     const messageData = {
       thread_id: threadId,
       content,
@@ -80,6 +82,11 @@ export const saveMessage = async (
       insertData.sub_query_responses = subQueryResponses;
     }
     
+    // Ensure all required fields are present before insertion
+    if (!insertData.thread_id || !insertData.content || !insertData.sender) {
+      throw new Error("Missing required fields for message insertion");
+    }
+    
     const { data, error } = await supabase
       .from('chat_messages')
       .insert(insertData)
@@ -97,7 +104,11 @@ export const saveMessage = async (
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId);
       
-    return data as ChatMessage;
+    return {
+      ...data,
+      sender: data.sender as 'user' | 'assistant',
+      role: data.role as 'user' | 'assistant'
+    } as ChatMessage;
   } catch (error) {
     console.error("Exception saving message:", error);
     throw error;
