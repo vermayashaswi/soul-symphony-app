@@ -1,3 +1,4 @@
+
 import React, { useEffect, lazy, Suspense } from 'react';
 import { motion } from 'framer-motion';
 import { useNavigate } from 'react-router-dom';
@@ -8,6 +9,7 @@ import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import Navbar from '@/components/Navbar';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
+import { useNetworkStatus } from '@/utils/network';
 
 const HomePageLazy = lazy(() => import('@/pages/website/HomePage'));
 
