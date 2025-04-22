@@ -124,11 +124,10 @@ serve(async (req) => {
   }
 
   try {
-    // Get all Journal Entries where entityemotion is null
+    // UPDATE: Get all Journal Entries, not just where entityemotion is null
     const { data: entries, error } = await supabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text"')
-      .or('entityemotion.is.null')
       .limit(25); // for practical reasons, process max 25 at a time
 
     if (error || !entries || !entries.length) {
