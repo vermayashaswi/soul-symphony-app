@@ -1,18 +1,18 @@
 
-// No-op debugging utilities that accept any arguments
+// All debug utilities disabled for production build
 
-export const debugLog = (...args: any[]) => {};
-export const debugInfo = (...args: any[]) => {};
-export const debugError = (...args: any[]) => {};
-export const debugWarn = (...args: any[]) => {};
-export const debugTrace = (...args: any[]) => {};
+export const debugLog = () => {};
+export const debugInfo = () => {};
+export const debugError = () => {};
+export const debugWarn = () => {};
+export const debugTrace = () => {};
 
-export const createDebugger = (namespace: string) => ({
-  log: (...args: any[]) => {},
-  info: (...args: any[]) => {},
-  error: (...args: any[]) => {},
-  warn: (...args: any[]) => {},
-  trace: (...args: any[]) => {},
+export const createDebugger = (_: string) => ({
+  log: () => {},
+  info: () => {},
+  error: () => {},
+  warn: () => {},
+  trace: () => {},
 });
 
 export default {

@@ -1,6 +1,5 @@
 
-// This file has been emptied as part of the Debug Mode removal.
-// It remains in place to prevent import errors, but its functionality has been removed.
+// Diagnostics facility is removed, always returns null
 
 export interface FunctionExecution {
   name: string;
@@ -36,11 +35,6 @@ interface ChatDiagnosticsProps {
   functionExecutions?: FunctionExecution[];
 }
 
-export default function ChatDiagnostics({
-  queryText,
-  isVisible,
-  ragSteps,
-  queryAnalysis
-}: ChatDiagnosticsProps) {
+export default function ChatDiagnostics(_: ChatDiagnosticsProps) {
   return null;
 }

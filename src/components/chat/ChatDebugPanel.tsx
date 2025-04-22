@@ -1,22 +1,16 @@
 
-// Simple stub component that doesn't render anything
+// Empty stub for compatibility, renders nothing and provides no debug
 const ChatDebugPanel = () => null;
 
-// Simple stub provider for backward compatibility
-export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) => {
-  return children;
-};
+export const ChatDebugProvider = ({ children }: { children: React.ReactNode }) => children;
 
-// Simple stub hook for backward compatibility
-export const useChatDebug = () => {
-  return {
-    logs: [],
-    addLog: (...args: any[]) => {},
-    addEvent: (...args: any[]) => {},
-    clearLogs: (...args: any[]) => {},
-    isEnabled: false,
-    toggleEnabled: (...args: any[]) => {}
-  };
-};
+export const useChatDebug = () => ({
+  logs: [],
+  addLog: () => {},
+  addEvent: () => {},
+  clearLogs: () => {},
+  isEnabled: false,
+  toggleEnabled: () => {},
+});
 
 export default ChatDebugPanel;
