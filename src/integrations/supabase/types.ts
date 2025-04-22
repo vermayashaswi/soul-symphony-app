@@ -118,6 +118,7 @@ export type Database = {
           Edit_Status: number
           emotions: Json | null
           entities: Json | null
+          entityemotion: Json | null
           "foreign key": string | null
           id: number
           master_themes: string[] | null
@@ -134,6 +135,7 @@ export type Database = {
           Edit_Status?: number
           emotions?: Json | null
           entities?: Json | null
+          entityemotion?: Json | null
           "foreign key"?: string | null
           id?: number
           master_themes?: string[] | null
@@ -150,6 +152,7 @@ export type Database = {
           Edit_Status?: number
           emotions?: Json | null
           entities?: Json | null
+          entityemotion?: Json | null
           "foreign key"?: string | null
           id?: number
           master_themes?: string[] | null
