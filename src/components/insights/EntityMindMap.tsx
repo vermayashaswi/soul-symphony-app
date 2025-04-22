@@ -364,7 +364,7 @@ const EntityMindMap: React.FC<EntityMindMapProps> = ({ entries, timeRange }) => 
                   return '#d9e1ff';
                 }}
               />
-              <Background variant={BackgroundVariant.DOTS} gap={12} size={1} />
+              <Background variant={BackgroundVariant.Dots} gap={12} size={1} />
             </ReactFlow>
             <div className="text-xs text-muted-foreground mt-2 text-center">
               Click on nodes to expand/collapse. Use mouse wheel to zoom, drag to pan.
