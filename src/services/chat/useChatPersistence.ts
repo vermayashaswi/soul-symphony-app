@@ -180,7 +180,20 @@ export function useChatPersistence(userId?: string | null) {
   ): Promise<ChatMessage | null> => {
     try {
       // Create the base message data with required fields
-      const messageData = {
+      const messageData: {
+        thread_id: string;
+        content: string;
+        sender: 'user' | 'assistant';
+        role: 'user' | 'assistant';
+        created_at: string;
+        reference_entries?: any;
+        analysis_data?: any;
+        has_numeric_result?: boolean;
+        sub_query1?: string;
+        sub_query2?: string;
+        sub_query3?: string;
+        sub_query_responses?: any;
+      } = {
         thread_id: threadId,
         content,
         sender,
@@ -189,40 +202,38 @@ export function useChatPersistence(userId?: string | null) {
       };
       
       // Add optional fields if provided
-      const insertData: Record<string, any> = { ...messageData };
-      
       if (references) {
-        insertData.reference_entries = references;
+        messageData.reference_entries = references;
       }
       
       if (analysisData) {
-        insertData.analysis_data = analysisData;
+        messageData.analysis_data = analysisData;
       }
       
       if (hasNumericResult !== undefined) {
-        insertData.has_numeric_result = hasNumericResult;
+        messageData.has_numeric_result = hasNumericResult;
       }
       
       // Add sub-queries if provided
       if (subQueries && subQueries.length > 0) {
-        if (subQueries[0]) insertData.sub_query1 = subQueries[0];
-        if (subQueries[1]) insertData.sub_query2 = subQueries[1];
-        if (subQueries[2]) insertData.sub_query3 = subQueries[2];
+        if (subQueries[0]) messageData.sub_query1 = subQueries[0];
+        if (subQueries[1]) messageData.sub_query2 = subQueries[1];
+        if (subQueries[2]) messageData.sub_query3 = subQueries[2];
       }
       
       // Add sub-query responses if provided
       if (subQueryResponses && subQueryResponses.length > 0) {
-        insertData.sub_query_responses = subQueryResponses;
+        messageData.sub_query_responses = subQueryResponses;
       }
       
       // Ensure all required fields are present before insertion
-      if (!insertData.thread_id || !insertData.content || !insertData.sender) {
+      if (!messageData.thread_id || !messageData.content || !messageData.sender) {
         throw new Error("Missing required fields for message insertion");
       }
       
       const { data, error } = await supabase
         .from('chat_messages')
-        .insert(insertData)
+        .insert(messageData)
         .select()
         .single();
         

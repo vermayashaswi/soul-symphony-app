@@ -188,7 +188,7 @@ const MobileChatInterfaceContent = ({
         const uiMessages = chatMessages.map(msg => ({
           role: msg.sender as 'user' | 'assistant',
           content: msg.content,
-          references: msg.reference_entries,
+          references: msg.reference_entries ? Array.isArray(msg.reference_entries) ? msg.reference_entries : [] : undefined,
           hasNumericResult: msg.has_numeric_result
         }));
         
