@@ -2,6 +2,7 @@
 /**
  * Utility functions for detecting network conditions and optimizing loading
  */
+import React, { useState, useEffect } from 'react';
 
 // Types for network speed
 export type NetworkSpeed = 'fast' | 'medium' | 'slow' | 'offline';
@@ -64,9 +65,9 @@ export function getNetworkStatus(): NetworkStatus {
  * Custom hook for monitoring network status
  */
 export function useNetworkStatus() {
-  const [status, setStatus] = React.useState<NetworkStatus>(getNetworkStatus());
+  const [status, setStatus] = useState<NetworkStatus>(getNetworkStatus());
   
-  React.useEffect(() => {
+  useEffect(() => {
     const handleOnline = () => {
       setStatus(prev => ({ ...prev, online: true }));
     };
