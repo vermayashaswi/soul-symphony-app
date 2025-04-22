@@ -4,7 +4,6 @@ import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } fro
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
-import EntityMindMap from '@/components/insights/EntityMindMap';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
@@ -304,16 +303,7 @@ export default function Insights() {
               />
             </motion.div>
             
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.4, delay: 0.5 }}
-            >
-              <EntityMindMap 
-                entries={insightsData.allEntries || []}
-                timeRange={timeRange}
-              />
-            </motion.div>
+            {/* EntityMindMap removed */}
           </>
         )}
       </div>
