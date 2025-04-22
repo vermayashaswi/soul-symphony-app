@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,9 +9,10 @@ import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EnergyAnimation from '@/components/EnergyAnimation';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/components/ui/use-toast';
+import { Button } from '@/components/ui/button';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -18,6 +20,7 @@ const Home = () => {
   const { colorTheme, theme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [isProcessing, setIsProcessing] = useState<boolean>(false);
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
@@ -125,6 +128,53 @@ const Home = () => {
     }
   };
 
+  const processAllEntries = async () => {
+    if (!user) {
+      toast({
+        title: "Authentication required",
+        description: "You need to be logged in to process entries.",
+        variant: "destructive"
+      });
+      return;
+    }
+
+    setIsProcessing(true);
+    toast({
+      title: "Processing started",
+      description: "Processing all journal entries. This might take a while...",
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('temporary-process-entries');
+      
+      if (error) {
+        throw new Error(error.message);
+      }
+      
+      if (data.success) {
+        toast({
+          title: "Processing complete",
+          description: `Successfully processed ${data.successCount} out of ${data.totalProcessed} entries.`,
+        });
+      } else {
+        toast({
+          title: "Processing failed",
+          description: data.error || "An unknown error occurred",
+          variant: "destructive"
+        });
+      }
+    } catch (error) {
+      console.error("Error processing entries:", error);
+      toast({
+        title: "Processing failed",
+        description: error instanceof Error ? error.message : "An unknown error occurred",
+        variant: "destructive"
+      });
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       <div className="absolute inset-0 z-0">
@@ -178,6 +228,22 @@ const Home = () => {
           </div>
         </div>
       </div>
+      
+      {/* Admin Process All Button */}
+      {user && (
+        <div className="absolute top-16 right-4 z-50">
+          <Button
+            size="sm"
+            variant="outline"
+            className="gap-2 bg-background/80 backdrop-blur-sm"
+            onClick={processAllEntries}
+            disabled={isProcessing}
+          >
+            <RefreshCw className={`h-4 w-4 ${isProcessing ? 'animate-spin' : ''}`} />
+            <span>Process All Entries</span>
+          </Button>
+        </div>
+      )}
       
       {/* Arrow button with glowing effect - always visible for all users */}
       <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
