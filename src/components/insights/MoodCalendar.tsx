@@ -448,7 +448,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               connectNulls
               dot={false}
               activeDot={false}
-              baseValue={() => -1}
+              baseValue={-1}
             />
             <Area
               type="monotone"
@@ -460,7 +460,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               connectNulls
               dot={false}
               activeDot={false}
-              baseValue={() => -0.2}
+              baseValue={-0.2}
             />
             <Area
               type="monotone"
@@ -472,7 +472,7 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
               connectNulls
               dot={false}
               activeDot={false}
-              baseValue={() => 0.2}
+              baseValue={0.2}
             />
 
             <Line 
