@@ -10,7 +10,7 @@ import {
 } from 'date-fns';
 import { 
   ResponsiveContainer, LineChart, Line, XAxis, YAxis, 
-  Tooltip, ReferenceLine, Area, CartesianGrid 
+  Tooltip, ReferenceLine, Area, CartesianGrid, ReferenceArea
 } from 'recharts';
 import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
@@ -412,18 +412,11 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
             data={lineData}
             margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
           >
+            {/* Gradient defs remain for line or dot usage if you want */}
             <defs>
-              <linearGradient id="red-strip" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#ea384c" stopOpacity={0.25} />
-                <stop offset="100%" stopColor="#ea384c" stopOpacity={0.10} />
-              </linearGradient>
-              <linearGradient id="yellow-strip" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#FEF7CD" stopOpacity={0.3} />
-                <stop offset="100%" stopColor="#FEF7CD" stopOpacity={0.10} />
-              </linearGradient>
-              <linearGradient id="green-strip" x1="0" y1="0" x2="0" y2="1">
-                <stop offset="0%" stopColor="#4ade80" stopOpacity={0.22} />
-                <stop offset="100%" stopColor="#4ade80" stopOpacity={0.12} />
+              <linearGradient id="line-gradient" x1="0" y1="0" x2="0" y2="1">
+                <stop offset="0%" stopColor="#8b5cf6" stopOpacity="0.8" />
+                <stop offset="100%" stopColor="#8b5cf6" stopOpacity="0.15" />
               </linearGradient>
             </defs>
 
@@ -438,47 +431,15 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
             />
             <Tooltip content={<CustomTooltip />} />
 
-            <Area
-              type="monotone"
-              dataKey="sentiment"
-              stroke="none"
-              fill="url(#green-strip)"
-              isAnimationActive={false}
-              yAxisId={0}
-              connectNulls
-              dot={false}
-              activeDot={false}
-              baseValue={0.2}
-            />
-            <Area
-              type="monotone"
-              dataKey="sentiment"
-              stroke="none"
-              fill="url(#yellow-strip)"
-              isAnimationActive={false}
-              yAxisId={0}
-              connectNulls
-              dot={false}
-              activeDot={false}
-              baseValue={-0.2}
-            />
-            <Area
-              type="monotone"
-              dataKey="sentiment"
-              stroke="none"
-              fill="url(#red-strip)"
-              isAnimationActive={false}
-              yAxisId={0}
-              connectNulls
-              dot={false}
-              activeDot={false}
-              baseValue={-1}
-            />
+            {/* ReferenceAreas for coloring the bands */}
+            <ReferenceArea y1={0.2} y2={1} fill="#4ade80" fillOpacity={0.18} ifOverflow="visible" />
+            <ReferenceArea y1={-0.2} y2={0.2} fill="#facc15" fillOpacity={0.20} ifOverflow="visible" />
+            <ReferenceArea y1={-1} y2={-0.2} fill="#ea384c" fillOpacity={0.18} ifOverflow="visible" />
 
             <Line 
               type="monotone"
               dataKey="sentiment"
-              stroke="#8b5cf6"
+              stroke="#3b82f6" // blue-500 for bright line as in screenshot
               strokeWidth={2}
               dot={<CustomDot />}
               activeDot={{ r: 6 }}
@@ -490,16 +451,16 @@ const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
         
         <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ background: "#ea384c" }} />
-            <span>Negative</span>
+            <div className="w-3 h-3 rounded-full" style={{ background: "#4ade80" }} />
+            <span>Positive</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ background: "#FEF7CD" }} />
+            <div className="w-3 h-3 rounded-full" style={{ background: "#facc15" }} />
             <span>Neutral</span>
           </div>
           <div className="flex items-center gap-1">
-            <div className="w-3 h-3 rounded-full" style={{ background: "#4ade80" }} />
-            <span>Positive</span>
+            <div className="w-3 h-3 rounded-full" style={{ background: "#ea384c" }} />
+            <span>Negative</span>
           </div>
         </div>
       </div>
