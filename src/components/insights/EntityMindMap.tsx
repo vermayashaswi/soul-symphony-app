@@ -21,15 +21,12 @@ import { JournalEntry } from '@/types/journal';
 import { useAuth } from '@/contexts/AuthContext';
 import { Network } from 'lucide-react';
 
-// Node types for different levels in the mind map
 enum NodeLevel {
   ROOT = 'root',
-  ENTITY_TYPE = 'entity_type',
   ENTITY = 'entity',
   EMOTION = 'emotion',
 }
 
-// Entity types we want to visualize
 const ENTITY_TYPES = ['person', 'location', 'organization', 'event', 'work_of_art', 'other'];
 
 interface EntityMindMapProps {
@@ -37,7 +34,6 @@ interface EntityMindMapProps {
   timeRange: TimeRange;
 }
 
-// Custom node styles based on type
 const getNodeStyle = (nodeType: NodeLevel, theme: string) => {
   const baseStyle = {
     padding: '10px',
@@ -55,7 +51,6 @@ const getNodeStyle = (nodeType: NodeLevel, theme: string) => {
 
   const isDark = theme === 'dark';
 
-  // Different colors for different node types
   switch (nodeType) {
     case NodeLevel.ROOT:
       return {
@@ -63,13 +58,6 @@ const getNodeStyle = (nodeType: NodeLevel, theme: string) => {
         background: isDark ? '#6366f1' : '#818cf8',
         color: 'white',
         boxShadow: '0 4px 6px -1px rgba(99, 102, 241, 0.4)',
-      };
-    case NodeLevel.ENTITY_TYPE:
-      return {
-        ...baseStyle,
-        background: isDark ? '#2dd4bf' : '#5eead4',
-        color: isDark ? 'white' : '#134e4a',
-        boxShadow: '0 4px 6px -1px rgba(45, 212, 191, 0.4)',
       };
     case NodeLevel.ENTITY:
       return {
@@ -107,64 +95,53 @@ const EntityMindMap: React.FC<EntityMindMapProps> = ({ entries, timeRange }) => 
     [setEdges]
   );
 
-  // Process entities from journal entries
   const processEntityData = useCallback(() => {
-    // Count entities by type and name
-    const entityCounts: Record<string, Record<string, number>> = {};
-    const entityEmotions: Record<string, Record<string, Record<string, number>>> = {};
-    
-    // Initialize all entity types
-    ENTITY_TYPES.forEach(type => {
-      entityCounts[type] = {};
-      entityEmotions[type] = {};
-    });
+    const entityCounts: Record<string, { count: number, type: string }> = {};
+    const entityEmotions: Record<string, Record<string, number>> = {};
 
-    // Process each entry
     entries.forEach(entry => {
       if (!entry.entities || entry.entities.length === 0) return;
-      
-      // Process entities
       entry.entities.forEach(entity => {
         const entityType = entity.type.toLowerCase();
         const entityName = entity.name.toLowerCase();
-        
-        // Skip if not one of our target entity types
-        if (!ENTITY_TYPES.includes(entityType)) return;
-        
-        // Count entity occurrences
-        if (!entityCounts[entityType][entityName]) {
-          entityCounts[entityType][entityName] = 0;
+        const entityKey = `${entityType}::${entityName}`;
+        if (!entityCounts[entityKey]) {
+          entityCounts[entityKey] = { count: 0, type: entityType };
         }
-        entityCounts[entityType][entityName] += 1;
-        
-        // Track emotions associated with this entity
-        if (entry.emotions) {
-          if (!entityEmotions[entityType][entityName]) {
-            entityEmotions[entityType][entityName] = {};
+        entityCounts[entityKey].count += 1;
+
+        if (entry.emotions && typeof entry.emotions === 'object') {
+          if (!entityEmotions[entityKey]) {
+            entityEmotions[entityKey] = {};
           }
-          
           Object.entries(entry.emotions).forEach(([emotion, intensity]) => {
-            if (!entityEmotions[entityType][entityName][emotion]) {
-              entityEmotions[entityType][entityName][emotion] = 0;
+            if (!entityEmotions[entityKey][emotion]) {
+              entityEmotions[entityKey][emotion] = 0;
             }
-            // Add emotion intensity to this entity
-            entityEmotions[entityType][entityName][emotion] += 
-              typeof intensity === 'number' ? intensity : parseFloat(intensity.toString());
+            entityEmotions[entityKey][emotion] += typeof intensity === 'number' ? intensity : parseFloat(intensity.toString());
           });
         }
       });
     });
-    
-    return { entityCounts, entityEmotions };
+
+    const entityArray = Object.entries(entityCounts)
+      .map(([key, value]) => ({
+        entityKey: key,
+        entityType: value.type,
+        entityName: key.split('::')[1],
+        count: value.count
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10);
+
+    return { entityArray, entityEmotions };
   }, [entries]);
 
-  // Build nodes and edges based on entity data
   const buildGraph = useCallback(() => {
-    const { entityCounts, entityEmotions } = processEntityData();
+    const { entityArray, entityEmotions } = processEntityData();
     const newNodes: Node[] = [];
     const newEdges: Edge[] = [];
-    
-    // Create root node (user)
+
     const rootNodeId = 'root';
     newNodes.push({
       id: rootNodeId,
@@ -173,34 +150,31 @@ const EntityMindMap: React.FC<EntityMindMapProps> = ({ entries, timeRange }) => 
       type: 'default',
       style: getNodeStyle(NodeLevel.ROOT, theme)
     });
-    
-    // Add entity type nodes - first level
-    let angleStep = (2 * Math.PI) / ENTITY_TYPES.length;
-    let radius = 200;
-    
-    ENTITY_TYPES.forEach((entityType, index) => {
-      const nodeId = `type-${entityType}`;
+
+    const entityCount = entityArray.length;
+    const angleStep = (2 * Math.PI) / entityCount;
+    const radius = 220;
+
+    entityArray.forEach((entity, index) => {
+      const { entityKey, entityName } = entity;
+      const nodeId = `entity-${entityKey}`;
       const angle = index * angleStep;
-      
-      // Calculate position in a circle around the root
       const x = radius * Math.cos(angle);
       const y = radius * Math.sin(angle);
-      
-      // Format the label (capitalize, replace underscores)
-      const formattedLabel = entityType
-        .replace(/_/g, ' ')
-        .replace(/\b\w/g, c => c.toUpperCase());
-      
-      // Add entity type node
+
+      const formattedEntityName = entityName
+        .split(' ')
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1))
+        .join(' ');
+
       newNodes.push({
         id: nodeId,
-        data: { label: formattedLabel },
+        data: { label: formattedEntityName },
         position: { x, y },
         type: 'default',
-        style: getNodeStyle(NodeLevel.ENTITY_TYPE, theme)
+        style: getNodeStyle(NodeLevel.ENTITY, theme)
       });
-      
-      // Connect root to entity type
+
       newEdges.push({
         id: `edge-root-${nodeId}`,
         source: rootNodeId,
@@ -208,118 +182,55 @@ const EntityMindMap: React.FC<EntityMindMapProps> = ({ entries, timeRange }) => 
         markerEnd: { type: MarkerType.ArrowClosed },
         style: { stroke: '#9ca3af' }
       });
-      
-      // If this node is expanded, add its child nodes (specific entities)
+
       if (expandedNodes.has(nodeId)) {
-        const entities = Object.entries(entityCounts[entityType])
-          .sort((a, b) => b[1] - a[1]) // Sort by count
-          .slice(0, 3); // Get top 3
-        
-        if (entities.length > 0) {
-          // Add entity nodes - second level
-          const entityAngleStep = (Math.PI / 2) / Math.max(entities.length, 1);
-          const entityRadius = 120;
-          
-          entities.forEach((entity, entityIndex) => {
-            const [entityName, entityCount] = entity;
-            const entityNodeId = `entity-${entityType}-${entityName}`;
-            
-            // Position in a segment around the entity type node
-            const entityAngle = angle - Math.PI/4 + entityIndex * entityAngleStep;
-            const entityX = x + entityRadius * Math.cos(entityAngle);
-            const entityY = y + entityRadius * Math.sin(entityAngle);
-            
-            // Capitalize entity name
-            const formattedEntityName = entityName
-              .split(' ')
-              .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-              .join(' ');
-            
-            // Add entity node
+        const emotions = entityEmotions[entityKey]
+          ? Object.entries(entityEmotions[entityKey]).sort((a, b) => b[1] - a[1]).slice(0, 5)
+          : [];
+        if (emotions.length > 0) {
+          const emotionAngleStep = (Math.PI / 2) / Math.max(emotions.length, 1);
+          const emotionRadius = 110;
+          emotions.forEach((emotion, emotionIndex) => {
+            const [emotionName, intensity] = emotion;
+            const emotionNodeId = `emotion-${entityKey}-${emotionName}`;
+            const emotionAngle = angle - Math.PI / 4 + emotionIndex * emotionAngleStep;
+            const emotionX = x + emotionRadius * Math.cos(emotionAngle);
+            const emotionY = y + emotionRadius * Math.sin(emotionAngle);
+            const formattedEmotionName = emotionName.charAt(0).toUpperCase() + emotionName.slice(1);
+
             newNodes.push({
-              id: entityNodeId,
-              data: { label: formattedEntityName },
-              position: { x: entityX, y: entityY },
+              id: emotionNodeId,
+              data: { label: formattedEmotionName },
+              position: { x: emotionX, y: emotionY },
               type: 'default',
-              style: getNodeStyle(NodeLevel.ENTITY, theme)
+              style: getNodeStyle(NodeLevel.EMOTION, theme)
             });
-            
-            // Connect entity type to entity
+
             newEdges.push({
-              id: `edge-${nodeId}-${entityNodeId}`,
+              id: `edge-${nodeId}-${emotionNodeId}`,
               source: nodeId,
-              target: entityNodeId,
+              target: emotionNodeId,
               markerEnd: { type: MarkerType.ArrowClosed },
               style: { stroke: '#9ca3af' }
             });
-            
-            // If this entity node is expanded, add its emotions - third level
-            if (expandedNodes.has(entityNodeId) && entityEmotions[entityType][entityName]) {
-              const emotions = Object.entries(entityEmotions[entityType][entityName])
-                .sort((a, b) => b[1] - a[1]) // Sort by intensity
-                .slice(0, 5); // Get top 5
-              
-              if (emotions.length > 0) {
-                const emotionAngleStep = (Math.PI / 2) / Math.max(emotions.length, 1);
-                const emotionRadius = 100;
-                
-                emotions.forEach((emotion, emotionIndex) => {
-                  const [emotionName, intensity] = emotion;
-                  const emotionNodeId = `emotion-${entityType}-${entityName}-${emotionName}`;
-                  
-                  // Position in a segment around the entity node
-                  const emotionAngle = entityAngle - Math.PI/4 + emotionIndex * emotionAngleStep;
-                  const emotionX = entityX + emotionRadius * Math.cos(emotionAngle);
-                  const emotionY = entityY + emotionRadius * Math.sin(emotionAngle);
-                  
-                  // Capitalize emotion name
-                  const formattedEmotionName = emotionName
-                    .charAt(0).toUpperCase() + emotionName.slice(1);
-                  
-                  // Add emotion node
-                  newNodes.push({
-                    id: emotionNodeId,
-                    data: { label: formattedEmotionName },
-                    position: { x: emotionX, y: emotionY },
-                    type: 'default',
-                    style: getNodeStyle(NodeLevel.EMOTION, theme)
-                  });
-                  
-                  // Connect entity to emotion
-                  newEdges.push({
-                    id: `edge-${entityNodeId}-${emotionNodeId}`,
-                    source: entityNodeId,
-                    target: emotionNodeId,
-                    markerEnd: { type: MarkerType.ArrowClosed },
-                    style: { stroke: '#9ca3af' }
-                  });
-                });
-              }
-            }
           });
         }
       }
     });
-    
+
     return { newNodes, newEdges };
   }, [expandedNodes, processEntityData, theme, user]);
 
-  // Handle node click to expand/collapse
   const onNodeClick = useCallback((event: React.MouseEvent, node: Node) => {
     event.preventDefault();
-    
     setExpandedNodes(prev => {
       const newSet = new Set(prev);
-      if (newSet.has(node.id)) {
-        newSet.delete(node.id);
-      } else {
-        newSet.add(node.id);
-      }
+      if (newSet.has(node.id)) newSet.delete(node.id);
+      else newSet.add(node.id);
       return newSet;
     });
   }, []);
 
-  // Update graph when relevant data changes
   useEffect(() => {
     const { newNodes, newEdges } = buildGraph();
     setNodes(newNodes);
@@ -336,7 +247,6 @@ const EntityMindMap: React.FC<EntityMindMapProps> = ({ entries, timeRange }) => 
           </div>
         </CardTitle>
       </CardHeader>
-      
       <CardContent>
         {entries.length === 0 ? (
           <div className="h-[350px] flex items-center justify-center">
