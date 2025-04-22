@@ -18,8 +18,6 @@ const Home = () => {
   const { colorTheme, theme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
-  const [processing, setProcessing] = useState(false);
-  const [processResult, setProcessResult] = useState<string | null>(null);
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
@@ -97,76 +95,6 @@ const Home = () => {
       return name.endsWith('s') ? `${name}' Journal` : `${name}'s Journal`;
     }
     return 'Your Journal';
-  };
-
-  const runBulkEntityEmotion = async () => {
-    setProcessing(true);
-    setProcessResult(null);
-    try {
-      const { data: sessionData } = await supabase.auth.getSession();
-      const token = sessionData?.session?.access_token;
-      
-      const resp = await fetch(
-        'https://kwnwhgucnzqxndzjayyq.functions.supabase.co/temporary',
-        {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${token}`,
-            'apikey': 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bndoZ3VjbnpxeG5kempheXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzMzk4ODMsImV4cCI6MjA1NzkxNTg4M30.UAB3e5b44iJa9kKT391xyJKoQmlUOtsAi-yp4UEqZrc'
-          }
-        }
-      );
-      
-      if (!resp.ok) {
-        const errorText = await resp.text();
-        setProcessResult(`API Error (${resp.status}): ${errorText}`);
-        toast({
-          title: "Processing Error",
-          description: `Failed to process entries: Server returned ${resp.status}`,
-          variant: "destructive"
-        });
-        setProcessing(false);
-        return;
-      }
-      
-      const data = await resp.json();
-      console.log("Edge function response:", data);
-      
-      if (data.updated !== undefined) {
-        const message = `Processed ${data.total || "?"} entries. Updated: ${data.updated}${data.failed ? `, Failed: ${data.failed}` : ''}`;
-        setProcessResult(message);
-        toast({
-          title: "Processing Complete",
-          description: message
-        });
-      } else if (data.error) {
-        const errorMsg = 'Error: ' + (data.detail || data.error || 'Unknown error');
-        setProcessResult(errorMsg);
-        toast({
-          title: "Processing Error",
-          description: errorMsg,
-          variant: "destructive"
-        });
-      } else {
-        setProcessResult('Unknown response format. Check console for details.');
-        console.error("Unexpected response format:", data);
-        toast({
-          title: "Unexpected Response",
-          description: "Received unexpected response format from server",
-          variant: "destructive"
-        });
-      }
-    } catch (err) {
-      console.error("Error processing entries:", err);
-      setProcessResult(`Network or client error: ${err.message || 'Unknown error'}`);
-      toast({
-        title: "Connection Error",
-        description: "Failed to connect to processing service",
-        variant: "destructive"
-      });
-    }
-    setProcessing(false);
   };
 
   const containerVariants = {
@@ -305,22 +233,6 @@ const Home = () => {
       
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
-      </div>
-
-      {/* Edge Function Processing Button */}
-      <div className="fixed right-6 bottom-24 z-50">
-        <button
-          onClick={runBulkEntityEmotion}
-          className="bg-primary text-primary-foreground px-5 py-2 rounded-xl font-semibold shadow-xl hover:bg-primary/80 transition disabled:opacity-60"
-          disabled={processing}
-        >
-          {processing ? "Processing..." : "GPT: Fill All Entityemotion"}
-        </button>
-        {processResult && (
-          <div className="mt-2 text-[15px] text-foreground bg-white/90 shadow p-2 rounded-md border border-muted-foreground/30">
-            {processResult}
-          </div>
-        )}
       </div>
     </div>
   );
