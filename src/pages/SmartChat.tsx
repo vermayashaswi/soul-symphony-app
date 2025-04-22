@@ -264,7 +264,7 @@ export default function SmartChat() {
         .from('chat_messages')
         .delete()
         .eq('thread_id', currentThreadId);
-        
+      
       if (messagesError) {
         console.error("Error deleting messages:", messagesError);
         throw messagesError;
@@ -274,14 +274,34 @@ export default function SmartChat() {
         .from('chat_threads')
         .delete()
         .eq('id', currentThreadId);
-        
+      
       if (threadError) {
         console.error("Error deleting thread:", threadError);
         throw threadError;
       }
-      
-      await createNewThread();
-      
+
+      const { data: threads, error } = await supabase
+        .from('chat_threads')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (threads && threads.length > 0) {
+        setCurrentThreadId(threads[0].id);
+        previousThreadIdRef.current = threads[0].id;
+        localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
+        window.dispatchEvent(
+          new CustomEvent('threadSelected', { 
+            detail: { threadId: threads[0].id } 
+          })
+        );
+      } else {
+        await createNewThread();
+      }
+
       toast({
         title: "Success",
         description: "Conversation deleted successfully",

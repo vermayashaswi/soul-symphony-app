@@ -361,7 +361,7 @@ const SmartChatInterface = () => {
         .from('chat_messages')
         .delete()
         .eq('thread_id', currentThreadId);
-        
+      
       if (messagesError) {
         console.error("[Desktop] Error deleting messages:", messagesError);
         throw messagesError;
@@ -371,34 +371,37 @@ const SmartChatInterface = () => {
         .from('chat_threads')
         .delete()
         .eq('id', currentThreadId);
-        
+      
       if (threadError) {
         console.error("[Desktop] Error deleting thread:", threadError);
         throw threadError;
       }
-      
+
       setChatHistory([]);
       setShowSuggestions(true);
       loadedThreadRef.current = null;
-      
-      const { data } = await supabase
+
+      // Fetch the most recent thread for this user, after deletion
+      const { data: threads, error } = await supabase
         .from('chat_threads')
-        .select('id')
+        .select('*')
         .eq('user_id', user.id)
         .order('updated_at', { ascending: false })
         .limit(1);
-        
-      if (data && data.length > 0) {
-        setCurrentThreadId(data[0].id);
-        loadThreadMessages(data[0].id);
-        
+
+      if (error) throw error;
+
+      if (threads && threads.length > 0) {
+        setCurrentThreadId(threads[0].id);
+        loadThreadMessages(threads[0].id);
         window.dispatchEvent(
           new CustomEvent('threadSelected', { 
-            detail: { threadId: data[0].id } 
+            detail: { threadId: threads[0].id } 
           })
         );
       } else {
-        const { data: newThread, error } = await supabase
+        // Create a new thread if none remain
+        const { data: newThread, error: insertError } = await supabase
           .from('chat_threads')
           .insert({
             user_id: user.id,
@@ -408,10 +411,9 @@ const SmartChatInterface = () => {
           })
           .select()
           .single();
-          
-        if (!error && newThread) {
+
+        if (!insertError && newThread) {
           setCurrentThreadId(newThread.id);
-          
           window.dispatchEvent(
             new CustomEvent('threadSelected', { 
               detail: { threadId: newThread.id } 
@@ -419,7 +421,7 @@ const SmartChatInterface = () => {
           );
         }
       }
-      
+
       toast({
         title: "Success",
         description: "Conversation deleted successfully",

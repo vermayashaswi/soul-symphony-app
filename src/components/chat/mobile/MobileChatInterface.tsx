@@ -484,39 +484,33 @@ const MobileChatInterfaceContent = ({
       setMessages([]);
       setShowSuggestions(true);
       loadedThreadRef.current = null;
-      
-      if (onCreateNewThread) {
-        const newThreadId = await onCreateNewThread();
-        if (newThreadId) {
-          setCurrentThreadId(newThreadId);
-        }
+
+      const { data: threads, error } = await supabase
+        .from('chat_threads')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
+
+      if (error) throw error;
+
+      if (threads && threads.length > 0) {
+        setCurrentThreadId(threads[0].id);
+        loadThreadMessages(threads[0].id);
       } else {
-        const { data } = await supabase
+        const newThreadId = uuidv4();
+        await supabase
           .from('chat_threads')
-          .select('id')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(1);
-          
-        if (data && data.length > 0) {
-          setCurrentThreadId(data[0].id);
-          loadThreadMessages(data[0].id);
-        } else {
-          const newThreadId = uuidv4();
-          await supabase
-            .from('chat_threads')
-            .insert({
-              id: newThreadId,
-              user_id: user.id,
-              title: "New Conversation",
-              created_at: new Date().toISOString(),
-              updated_at: new Date().toISOString()
-            });
-            
-          setCurrentThreadId(newThreadId);
-        }
+          .insert({
+            id: newThreadId,
+            user_id: user.id,
+            title: "New Conversation",
+            created_at: new Date().toISOString(),
+            updated_at: new Date().toISOString()
+          });
+        setCurrentThreadId(newThreadId);
       }
-      
+
       toast({
         title: "Success",
         description: "Conversation deleted successfully",
