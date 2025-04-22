@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -13,6 +12,31 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
+
+const allowedCategories = [
+  "Self & Identity",
+  "Body & Health",
+  "Mental Health",
+  "Romantic Relationships",
+  "Family",
+  "Friendships & Social Circle",
+  "Sexuality & Gender",
+  "Career & Workplace",
+  "Money & Finances",
+  "Education & Learning",
+  "Habits & Routines",
+  "Sleep & Rest",
+  "Creativity & Hobbies",
+  "Spirituality & Beliefs",
+  "Technology & Social Media",
+  "Environment & Living Space",
+  "Time & Productivity",
+  "Travel & Movement",
+  "Loss & Grief",
+  "Purpose & Fulfillment",
+  "Conflict & Trauma",
+  "Celebration & Achievement"
+];
 
 async function getKnownEmotions(): Promise<string[]> {
   // Query the emotions table for emotion names
@@ -49,33 +73,34 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       };
     }
 
-    // Prompt for combined extraction: themes, entities, entityemotion
+    // -- Updated prompt to restrict categories to allowedCategories only --
     const prompt = `
       Analyze the following journal entry and:
-      1. Extract the main themes or topics (max 5) described succinctly, as before.
-      2. Detect key entities or topics discussed (like love, relationship, life, work, money, parents, organizations, philosophy, etc). Give 3-10 such entities. Entities should be categories/labels, not specific people names, and capture any concepts, aspects, relationships, or social constructs present in the text.
-      3. For each entity, select the top 3 strongest matching emotions from this list: [${knownEmotions.join(', ')}]
-         - Provide the strength/score of each detected emotion for the entity (between 0 and 1, rounded to 1 decimal).
-         - Only include emotions that are clearly relevant for the entity.
-      Format your response as compact JSON with these keys:
+      1. Extract the main themes or topics (max 5) described succinctly.
+      2. From ONLY the following list of Categories, select all that are relevant to this journal entry (list of up to 10 maximum). Do NOT make up new categories, pick only from the list provided below:
+         Categories:
+         [${allowedCategories.map(cat => `"${cat}"`).join(', ')}]
+      3. For each selected category, select the top 3 strongest matching emotions from this list: [${knownEmotions.join(', ')}]
+         - Provide the strength/score of each detected emotion for the category (between 0 and 1, rounded to 1 decimal).
+         - Only include emotions that are clearly relevant for the category.
+      Format your response as compact valid JSON with these keys:
       {
         "themes": [...],
-        "entities": [...],
+        "categories": [...], 
         "entityemotion": {
-          "entity1": { "emotion1": score, "emotion2": score, ... },
-          "entity2": { ... }
+          "Category 1": { "emotion1": score, "emotion2": score, ... },
+          "Category 2": { ... }
         }
       }
       For example:
       {
         "themes": ["work stress", "personal growth"],
-        "entities": ["relationship", "workplace", "life"],
+        "categories": ["Career & Workplace", "Self & Identity"],
         "entityemotion": {
-          "relationship": { "anxiety": 0.7, "joy": 0.2 },
-          "workplace": { "stress": 0.8, "boredom": 0.5 }
+          "Career & Workplace": { "stress": 0.8, "boredom": 0.5 },
+          "Self & Identity": { "anxiety": 0.7, "joy": 0.2 }
         }
       }
-
       Only output valid JSON. Do not explain.
       
       Journal entry:
@@ -134,7 +159,9 @@ async function extract_themes_and_entities(text: string, knownEmotions: string[]
       // Defensive defaults:
       return {
         themes: Array.isArray(parsed.themes) ? parsed.themes : [],
-        entities: Array.isArray(parsed.entities) ? parsed.entities : [],
+        // Support both keys: "categories" (new) or "entities"/"categories" for legacy compatibility
+        entities: Array.isArray(parsed.categories) ? parsed.categories :
+                 (Array.isArray(parsed.entities) ? parsed.entities : []),
         entityemotion: typeof parsed.entityemotion === "object" && parsed.entityemotion !== null ? parsed.entityemotion : {}
       };
     } catch (err) {
