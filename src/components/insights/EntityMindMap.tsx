@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect } from 'react';
 import ReactFlow, {
   MiniMap,
@@ -11,6 +10,7 @@ import ReactFlow, {
   Node,
   Edge,
   MarkerType,
+  BackgroundVariant,
 } from 'reactflow';
 import 'reactflow/dist/style.css';
 import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
@@ -168,7 +168,7 @@ const EntityMindMap: React.FC<EntityMindMapProps> = ({ entries, timeRange }) => 
     const rootNodeId = 'root';
     newNodes.push({
       id: rootNodeId,
-      data: { label: `${user?.displayName || 'Your'}'s Soul` },
+      data: { label: `${user?.email?.split('@')[0] || 'Your'}'s Soul` },
       position: { x: 0, y: 0 },
       type: 'default',
       style: getNodeStyle(NodeLevel.ROOT, theme)
@@ -364,7 +364,7 @@ const EntityMindMap: React.FC<EntityMindMapProps> = ({ entries, timeRange }) => 
                   return '#d9e1ff';
                 }}
               />
-              <Background variant="dots" gap={12} size={1} />
+              <Background variant={BackgroundVariant.DOTS} gap={12} size={1} />
             </ReactFlow>
             <div className="text-xs text-muted-foreground mt-2 text-center">
               Click on nodes to expand/collapse. Use mouse wheel to zoom, drag to pan.
