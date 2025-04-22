@@ -137,8 +137,30 @@ serve(async (req) => {
   try {
     console.log("Starting temporary function to process journal entries");
     
+    // Handle authentication - extract headers from request
+    const authHeader = req.headers.get('Authorization');
+    const clientInfoHeader = req.headers.get('x-client-info');
+    
+    // Log received headers for debugging
+    console.log("Auth header received:", authHeader ? "Yes" : "No");
+    console.log("Client info header received:", clientInfoHeader ? "Yes" : "No");
+
+    // Create a new Supabase client using the user's auth token
+    let userSupabase = supabase;
+    if (authHeader) {
+      userSupabase = createClient(supabaseUrl, supabaseServiceKey, {
+        global: {
+          headers: {
+            Authorization: authHeader
+          }
+        }
+      });
+    } else {
+      console.log("Warning: No auth header present, using service role key");
+    }
+    
     // UPDATE: Get all Journal Entries, not just where entityemotion is null
-    const { data: entries, error } = await supabase
+    const { data: entries, error } = await userSupabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text"')
       .limit(25); // for practical reasons, process max 25 at a time
@@ -186,7 +208,7 @@ serve(async (req) => {
         console.log(`Analysis complete for entry ${entry.id}: ${categories.length} categories found`);
 
         // Update the entry in database
-        const { error: updateErr } = await supabase
+        const { error: updateErr } = await userSupabase
           .from('Journal Entries')
           .update({
             entities: categories,
