@@ -18,6 +18,8 @@ const Home = () => {
   const { colorTheme, theme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [processing, setProcessing] = useState(false);
+  const [processResult, setProcessResult] = useState<string | null>(null);
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
@@ -95,6 +97,33 @@ const Home = () => {
       return name.endsWith('s') ? `${name}' Journal` : `${name}'s Journal`;
     }
     return 'Your Journal';
+  };
+
+  const runBulkEntityEmotion = async () => {
+    setProcessing(true);
+    setProcessResult(null);
+    try {
+      const resp = await fetch(
+        'https://kwnwhgucnzqxndzjayyq.functions.supabase.co/temporary',
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+      const data = await resp.json();
+      if (data.updated !== undefined) {
+        setProcessResult(\`Processed entries updated: \${data.updated}\`);
+      } else if (data.error) {
+        setProcessResult('Error: ' + (data.detail || data.error));
+      } else {
+        setProcessResult('Unknown response.');
+      }
+    } catch (err) {
+      setProcessResult('Network or server error');
+    }
+    setProcessing(false);
   };
 
   const containerVariants = {
@@ -233,6 +262,22 @@ const Home = () => {
       
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
+      </div>
+
+      {/* Add NEW BUTTON: Bulk Run GPT Entityemotion extraction */}
+      <div className="fixed right-6 bottom-24 z-50">
+        <button
+          onClick={runBulkEntityEmotion}
+          className="bg-primary text-primary-foreground px-5 py-2 rounded-xl font-semibold shadow-xl hover:bg-primary/80 transition disabled:opacity-60"
+          disabled={processing}
+        >
+          {processing ? "Processing..." : "GPT: Fill All Entityemotion"}
+        </button>
+        {processResult && (
+          <div className="mt-2 text-[15px] text-foreground bg-white/90 shadow p-2 rounded-md border border-muted-foreground/30">
+            {processResult}
+          </div>
+        )}
       </div>
     </div>
   );
