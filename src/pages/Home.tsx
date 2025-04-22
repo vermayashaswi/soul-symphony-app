@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -114,7 +115,7 @@ const Home = () => {
       );
       const data = await resp.json();
       if (data.updated !== undefined) {
-        setProcessResult(\`Processed entries updated: \${data.updated}\`);
+        setProcessResult(`Processed entries updated: ${data.updated}`);
       } else if (data.error) {
         setProcessResult('Error: ' + (data.detail || data.error));
       } else {
