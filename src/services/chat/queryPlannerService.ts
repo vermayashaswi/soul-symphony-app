@@ -179,3 +179,4 @@ Be concise and insightful. Keep the tone conversational, supportive, and emotion
     return "I encountered an error while analyzing your journal entries. Please try again with a different question.";
   }
 }
+

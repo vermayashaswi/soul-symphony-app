@@ -1,4 +1,3 @@
-
 import { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { ChatMessage, ChatThread, SubQueryResponse } from "./types";
@@ -181,8 +180,8 @@ export function useChatPersistence(userId?: string | null) {
         thread_id: threadId,
         content,
         sender,
-        created_at: new Date().toISOString(),
-        role: sender
+        role: sender,
+        created_at: new Date().toISOString()
       };
       
       if (references) {

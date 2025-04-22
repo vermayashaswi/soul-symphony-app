@@ -17,7 +17,12 @@ export type Database = {
           has_numeric_result: boolean | null
           id: string
           reference_entries: Json | null
+          role: string | null
           sender: string
+          sub_query_responses: Json | null
+          sub_query1: string | null
+          sub_query2: string | null
+          sub_query3: string | null
           thread_id: string
         }
         Insert: {
@@ -27,7 +32,12 @@ export type Database = {
           has_numeric_result?: boolean | null
           id?: string
           reference_entries?: Json | null
+          role?: string | null
           sender: string
+          sub_query_responses?: Json | null
+          sub_query1?: string | null
+          sub_query2?: string | null
+          sub_query3?: string | null
           thread_id: string
         }
         Update: {
@@ -37,7 +47,12 @@ export type Database = {
           has_numeric_result?: boolean | null
           id?: string
           reference_entries?: Json | null
+          role?: string | null
           sender?: string
+          sub_query_responses?: Json | null
+          sub_query1?: string | null
+          sub_query2?: string | null
+          sub_query3?: string | null
           thread_id?: string
         }
         Relationships: [
