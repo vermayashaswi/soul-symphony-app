@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,7 +8,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EnergyAnimation from '@/components/EnergyAnimation';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
-import { ArrowRight, LoaderCircle } from 'lucide-react';
+import { ArrowRight, LoaderCircle, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
@@ -35,6 +34,7 @@ const Home = () => {
 
   useEffect(() => {
     console.log('Home component mounted');
+    console.log('Current user:', user?.email);
 
     setRefreshKey(prev => prev + 1);
 
@@ -133,6 +133,7 @@ const Home = () => {
 
   // --- ADMIN ONLY: Reprocess All Entries ---
   const isAdmin = user?.email === "admin@soulo.app";
+  console.log('Is admin:', isAdmin);
 
   // Actual call to edge function
   const handleForceReprocess = async () => {
@@ -192,26 +193,25 @@ const Home = () => {
       </div>
 
       {/* --- ADMIN Button: Only visible to designated admin */}
-      {isAdmin && (
-        <div className="absolute top-6 right-6 z-40">
+      {(isAdmin || process.env.NODE_ENV === 'development') && (
+        <div className="absolute top-6 right-6 z-40 admin-button">
           <Button
-            variant="outline"
-            className="border border-destructive text-destructive shadow px-4 py-2 font-semibold"
+            variant="destructive"
+            className="shadow px-4 py-2 font-semibold flex items-center gap-2"
             onClick={() => setShowConfirm(true)}
             disabled={processing}
           >
-            {processing
-              ? (
-                <>
-                  <span className="animate-spin mr-2">
-                    <svg className="w-4 h-4" viewBox="0 0 24 24" fill="none">
-                      <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4" />
-                      <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z" />
-                    </svg>
-                  </span>
-                  Processing...
-                </>
-              ) : 'Reprocess All Entries'}
+            {processing ? (
+              <>
+                <LoaderCircle className="w-4 h-4 animate-spin" />
+                Processing...
+              </>
+            ) : (
+              <>
+                <RefreshCw className="w-4 h-4" />
+                Reprocess All Entries
+              </>
+            )}
           </Button>
           {/* Confirmation Dialog (simple custom) */}
           {showConfirm && (
@@ -334,4 +334,3 @@ const Home = () => {
 };
 
 export default Home;
-
