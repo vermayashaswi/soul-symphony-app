@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
@@ -71,7 +72,8 @@ const Node: React.FC<{
   showLabel: boolean;
   dimmed: boolean;
   themeHex: string;
-}> = ({ node, isSelected, onClick, highlightedNodes, showLabel, dimmed, themeHex }) => {
+  selectedNodeId: string | null; // Add this prop to make selectedNode available
+}> = ({ node, isSelected, onClick, highlightedNodes, showLabel, dimmed, themeHex, selectedNodeId }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
   const isHighlighted = isSelected || highlightedNodes.has(node.id);
@@ -105,7 +107,7 @@ const Node: React.FC<{
   });
 
   const shouldShowLabel = 
-    (node.type === 'entity' && !selectedNode) || // Always show entity labels with no selection
+    (node.type === 'entity' && !selectedNodeId) || // Fix: Use selectedNodeId instead of selectedNode
     isHighlighted || // Show if highlighted (selected or connected)
     (node.type === 'entity' && showLabel); // Additional condition for entities
 
@@ -279,6 +281,7 @@ const SoulNetVisualization: React.FC<{
             showLabel={showLabel}
             dimmed={dimmed}
             themeHex={themeHex}
+            selectedNodeId={selectedNode} // Pass selectedNode as selectedNodeId prop
           />
         );
       })}
