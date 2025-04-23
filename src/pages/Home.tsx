@@ -9,7 +9,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EnergyAnimation from '@/components/EnergyAnimation';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
-import { ArrowRight, loaderCircle } from 'lucide-react';
+import { ArrowRight, LoaderCircle } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from '@/hooks/use-toast';
 import { Button } from '@/components/ui/button';
