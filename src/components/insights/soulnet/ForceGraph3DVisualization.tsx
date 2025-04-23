@@ -2,6 +2,7 @@
 import React, { useRef, useEffect } from "react";
 import ForceGraph3D from "react-force-graph-3d";
 import * as THREE from "three";
+import { getTwemojiUrlForEntity } from "./entityEmojiUtils";
 
 // Emoji mapping logic from your prompt
 const getEmojiForCategory = (category: string) => {
@@ -36,50 +37,50 @@ const ForceGraph3DVisualization: React.FC<ForceGraph3DVisualizationProps> = ({ d
     }
   }, [data]);
 
+  // Preload entity emojis to ensure they're available when needed
+  useEffect(() => {
+    // Preload all entity emojis
+    data.nodes.forEach(node => {
+      if (node.type === "entity") {
+        const img = new Image();
+        img.src = getTwemojiUrlForEntity(node.name || node.id);
+      }
+    });
+  }, [data]);
+
   return (
     <div style={{ width: "100%", height: "600px" }}>
       <ForceGraph3D
         ref={fgRef}
         graphData={data}
         backgroundColor="#181826"
+        nodeLabel={node => node.id}
         nodeThreeObject={node => {
           if (node.type === "category" || node.type === "entity") {
-            // Create canvas to draw emoji large and crisp
-            const emoji = getEmojiForCategory(node.name || node.id);
-
-            // Create a canvas for high-res emoji rendering
-            const canvas = document.createElement("canvas");
-            const size = 256; // Very large base size
-            canvas.width = size;
-            canvas.height = size;
-            const ctx = canvas.getContext("2d");
-            if (ctx) {
-              ctx.textAlign = "center";
-              ctx.textBaseline = "middle";
-              // Black drop shadow for contrast
-              ctx.shadowColor = "#000";
-              ctx.shadowBlur = 32;
-              ctx.font = `bold 200px sans-serif`;
-              ctx.fillText(emoji, size / 2, size / 2);
-            }
-            const texture = new THREE.CanvasTexture(canvas);
-            const spriteMaterial = new THREE.SpriteMaterial({
+            // For entity nodes, use the SVG Twemoji
+            const emojiUrl = getTwemojiUrlForEntity(node.name || node.id);
+            
+            // Create a sprite using the Twemoji SVG URL
+            const texture = new THREE.TextureLoader().load(emojiUrl);
+            const material = new THREE.SpriteMaterial({ 
               map: texture,
               transparent: true,
+              depthWrite: false,
+              sizeAttenuation: true
             });
-            const sprite = new THREE.Sprite(spriteMaterial);
-
-            // Make the emoji node sprite huge
-            sprite.scale.set(14, 14, 1); // width, height, depth (tune as needed)
+            const sprite = new THREE.Sprite(material);
+            
+            // Make the sprite much larger
+            sprite.scale.set(25, 25, 1);
             return sprite;
           } else {
-            // Optional: return a small dot for other types
-            const geometry = new THREE.SphereGeometry(0.6, 16, 16);
-            const material = new THREE.MeshBasicMaterial({ color: "#666" });
+            // For emotion nodes, use colored cubes
+            const geometry = new THREE.BoxGeometry(5, 5, 5);
+            const material = new THREE.MeshLambertMaterial({ color: "#9b87f5" });
             return new THREE.Mesh(geometry, material);
           }
         }}
-        nodeRelSize={8} // just to be safe, but we override with sprite scale
+        nodeRelSize={8}
         enableNodeDrag={true}
         nodeAutoColorBy="type"
         linkWidth={2}
