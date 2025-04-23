@@ -192,7 +192,7 @@ serve(async (req) => {
       console.log("Processing transcription with GPT for refinement...");
       const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey, detectedLanguages);
 
-      // Get emotions from the refined text - run inside try/catch to avoid failure
+      // Get emotions from the refined text
       let emotions = null;
       try {
         const { data: emotionsData, error: emotionsError } = await supabase
@@ -209,14 +209,12 @@ serve(async (req) => {
         console.error("Error analyzing emotions:", emotionsErr);
       }
 
-      // Analyze sentiment and extract entities using Google NL API - wrap in try/catch
+      // Analyze sentiment using Google NL API - wrap in try/catch
       let sentimentScore = "0";
-      let entities = [];
       try {
         if (GOOGLE_NL_API_KEY) {
           const nlResults = await analyzeWithGoogleNL(refinedText, GOOGLE_NL_API_KEY);
           sentimentScore = nlResults.sentiment;
-          entities = nlResults.entities;
         } else {
           console.log("Skipping Google NL analysis - API key not provided");
         }
@@ -224,7 +222,7 @@ serve(async (req) => {
         console.error("Error in Google NL analysis:", nlErr);
       }
 
-      // Calculate audio duration more accurately based on file type and bytes
+      // Calculate audio duration
       let audioDuration = 0;
       
       if (detectedFileType === 'webm') {
@@ -258,7 +256,7 @@ serve(async (req) => {
           audioDuration,
           emotions,
           sentimentScore,
-          entities
+          null  // Removed entities parameter
         );
         
         console.log("Journal entry stored with ID:", entryId);
@@ -267,17 +265,15 @@ serve(async (req) => {
         throw new Error(`Failed to store journal entry: ${dbErr.message}`);
       }
 
-      // Start background tasks for post-processing if entry was stored successfully
+      // Start background tasks for post-processing
       if (entryId) {        
-        // Use waitUntil for background tasks
         try {
-          // Extract themes in the background
+          // Extract themes and generate embedding in the background
           const themeExtractionPromise = extractThemes(supabase, refinedText, entryId)
             .catch(err => {
               console.error("Background theme extraction failed:", err);
             });
           
-          // Generate embedding in the background
           const embeddingPromise = (async () => {
             try {
               const embedding = await generateEmbedding(refinedText, openAIApiKey);
@@ -287,78 +283,22 @@ serve(async (req) => {
             }
           })();
           
-          // Entity extraction calling with proper URL construction
-          const entityExtractionPromise = (async () => {
-            try {
-              // First check if there's already entities data
-              const { data: entryData } = await supabase
-                .from('Journal Entries')
-                .select('entities')
-                .eq('id', entryId)
-                .single();
-                
-              // Only call batch-extract-entities if entities field is null
-              if (!entryData?.entities) {
-                console.log("Calling batch-extract-entities for entry:", entryId);
-                
-                // Construct the full URL carefully, ensuring correct formatting
-                const baseUrl = supabaseUrl.replace(/^https:\/\//, '');
-                const functionUrl = `https://${baseUrl}/functions/v1/batch-extract-entities`;
-                
-                console.log("Calling function URL:", functionUrl);
-                
-                const response = await fetch(functionUrl, {
-                  method: 'POST',
-                  headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${supabaseServiceKey}`
-                  },
-                  body: JSON.stringify({
-                    entryIds: [entryId],
-                    userId: userId,
-                    diagnosticMode: true
-                  })
-                });
-                
-                if (!response.ok) {
-                  const responseText = await response.text();
-                  console.error("Error calling batch-extract-entities:", responseText);
-                  console.error("Status:", response.status);
-                  console.error("Status Text:", response.statusText);
-                  throw new Error(`Failed to call batch-extract-entities: ${response.status} - ${responseText}`);
-                } else {
-                  const result = await response.json();
-                  console.log("batch-extract-entities result:", result);
-                }
-              } else {
-                console.log("Entry already has entities, skipping batch-extract-entities");
-              }
-            } catch (entityErr) {
-              console.error("Error in entity extraction:", entityErr);
-              console.error("Error details:", entityErr.stack || entityErr);
-            }
-          })();
-          
           // Run background tasks
           if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
             EdgeRuntime.waitUntil(Promise.all([
               themeExtractionPromise,
-              embeddingPromise,
-              entityExtractionPromise
+              embeddingPromise
             ]));
           } else {
-            // For environments without waitUntil, still run the tasks
             Promise.all([
               themeExtractionPromise,
-              embeddingPromise,
-              entityExtractionPromise
+              embeddingPromise
             ]).catch(err => {
               console.error("Error in background tasks:", err);
             });
           }
         } catch (bgErr) {
           console.error("Error setting up background tasks:", bgErr);
-          // Don't fail the entire function for background task errors
         }
       }
 
@@ -370,7 +310,6 @@ serve(async (req) => {
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        entities: entities,
         detectedLanguages: detectedLanguages
       });
     } catch (error) {

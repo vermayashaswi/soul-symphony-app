@@ -1,113 +1,92 @@
-
-/**
- * Database operations for the transcribe-audio function
- */
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
+import { SupabaseClient } from '@supabase/supabase-js';
+import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
+import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
 
 /**
  * Creates a Supabase client with admin privileges
  */
 export function createSupabaseAdmin(supabaseUrl: string, supabaseServiceKey: string) {
-  return createClient(supabaseUrl, supabaseServiceKey);
+  return new SupabaseClient(supabaseUrl, supabaseServiceKey, {
+    auth: {
+      persistSession: false,
+      autoRefreshToken: false
+    }
+  });
 }
 
 /**
- * Ensures a user profile exists, creates one if it doesn't
+ * Checks if a user profile exists and creates one if it doesn't
  */
-export async function createProfileIfNeeded(supabase: any, userId: string) {
-  if (!userId) return;
-  
+export async function createProfileIfNeeded(supabase: SupabaseClient, userId: string) {
   try {
-    console.log("Checking if profile exists for user:", userId);
-    // Check if user profile exists
-    const { data: profile, error } = await supabase
+    const { data, error } = await supabase
       .from('profiles')
       .select('id')
       .eq('id', userId)
       .single();
-      
-    // If profile doesn't exist, create one
-    if (error || !profile) {
-      console.log("Profile not found, creating one");
-      
-      // Get user data from auth
-      const { data: userData, error: userError } = await supabase.auth.admin.getUserById(userId);
-      if (userError) {
-        console.error("Error getting user data:", userError);
-        
-        // Fallback method if admin API fails
-        const { data: fallbackUserData, error: fallbackError } = await supabase.auth.getUser(userId);
-        if (fallbackError) {
-          console.error("Fallback method also failed:", fallbackError);
-          return;
-        }
-        
-        if (fallbackUserData?.user) {
-          // Create profile
-          const { error: insertError } = await supabase
-            .from('profiles')
-            .insert([{ 
-              id: userId,
-              email: fallbackUserData.user.email,
-              full_name: fallbackUserData.user?.user_metadata?.full_name || '',
-              avatar_url: fallbackUserData.user?.user_metadata?.avatar_url || ''
-            }]);
-            
-          if (insertError) {
-            console.error('Error creating user profile:', insertError);
-          } else {
-            console.log("Profile created successfully for user:", userId);
-          }
-        }
-        
-        return;
-      }
-      
-      if (userData?.user) {
-        // Create profile
-        const { error: insertError } = await supabase
-          .from('profiles')
-          .insert([{ 
-            id: userId,
-            email: userData.user.email,
-            full_name: userData.user?.user_metadata?.full_name || '',
-            avatar_url: userData.user?.user_metadata?.avatar_url || ''
-          }]);
-          
-        if (insertError) {
-          console.error('Error creating user profile:', insertError);
-        } else {
-          console.log("Profile created successfully for user:", userId);
-        }
-      }
-    } else {
-      console.log("Profile exists for user:", userId);
+
+    if (error && error.status !== 406) {
+      console.error('Error checking profile:', error);
+      throw error;
     }
-  } catch (err) {
-    console.error("Error checking/creating profile:", err);
+
+    if (!data) {
+      console.log('Creating profile for user:', userId);
+      const { data: userData, error: userError } = await supabase.auth.getUser();
+      if (userError) {
+        throw userError;
+      }
+
+      const { error: insertError } = await supabase
+        .from('profiles')
+        .insert([{
+          id: userId,
+          email: userData.user?.email,
+          full_name: userData.user?.user_metadata?.full_name || '',
+          avatar_url: userData.user?.user_metadata?.avatar_url || '',
+          onboarding_completed: false
+        }]);
+
+      if (insertError) {
+        console.error('Error creating profile:', insertError);
+        throw insertError;
+      }
+
+      console.log('Profile created successfully');
+    } else {
+      console.log('Profile already exists for user:', userId);
+    }
+  } catch (error) {
+    console.error('Error in createProfileIfNeeded:', error);
+    throw error;
   }
 }
 
 /**
- * Extracts themes from text for a journal entry
+ * Extracts themes from text using a simple regex
  */
-export async function extractThemes(supabase: any, text: string, entryId: number): Promise<void> {
+export async function extractThemes(supabase: SupabaseClient, text: string, entryId: number) {
   try {
-    console.log(`Automatically extracting themes for entry ${entryId}`);
-    
-    // Call the generate-themes function (we keep this for theme extraction only)
-    const { data, error } = await supabase.functions.invoke('generate-themes', {
-      body: { text, entryId }
-    });
-    
-    if (error) {
-      console.error('Error calling generate-themes function:', error);
-      return;
+    // Basic regex-based theme extraction
+    const themeRegex = /\b(anxiety|stress|happiness|joy|sadness|anger|fear|love|gratitude|health|work|relationships)\b/gi;
+    const matches = text.match(themeRegex);
+    const themes = [...new Set(matches ? matches.map(theme => theme.toLowerCase()) : [])];
+
+    console.log(`Extracted themes: ${themes.join(', ')}`);
+
+    // Store themes in the database
+    if (themes.length > 0) {
+      const { error } = await supabase
+        .from('Journal Entries')
+        .update({ master_themes: themes })
+        .eq('id', entryId);
+
+      if (error) {
+        console.error('Error storing themes in database:', error);
+      }
     }
-    
-    console.log('Themes generated successfully:', data);
   } catch (error) {
-    console.error('Error in extractThemes:', error);
+    console.error('Error extracting themes:', error);
   }
 }
 
@@ -115,160 +94,89 @@ export async function extractThemes(supabase: any, text: string, entryId: number
  * Stores a journal entry in the database
  */
 export async function storeJournalEntry(
-  supabase: any,
+  supabase,
   transcribedText: string,
   refinedText: string,
   audioUrl: string | null,
-  userId: string | null,
-  audioDuration: number,
+  userId: string,
+  duration: number,
   emotions: any,
   sentimentScore: string,
-  entities: any[]
 ) {
   try {
-    // Ensure userId is in the correct format
-    const userIdForDb = userId || null;
-    
-    console.log("Inserting entry with data:", {
-      transcribed_text_length: transcribedText?.length || 0,
-      refined_text_length: refinedText?.length || 0,
-      has_audio_url: !!audioUrl,
-      user_id_present: !!userIdForDb,
-      has_emotions: !!emotions,
-      sentiment: sentimentScore,
-      entities_count: entities?.length || 0,
-      duration: audioDuration
-    });
-    
-    // Perform insert with detailed error handling
-    try {
-      const { data: entryData, error: insertError } = await supabase
-        .from('Journal Entries')
-        .insert([{ 
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .insert([
+        {
           "transcription text": transcribedText,
           "refined text": refinedText,
-          "audio_url": audioUrl,
-          "user_id": userIdForDb,
-          "duration": audioDuration,
-          "emotions": emotions,
-          "sentiment": sentimentScore,
-          "entities": entities
-        }])
-        .select();
-      
-      if (insertError) {
-        console.error('Error creating entry in database:', insertError);
-        console.error('Error details:', JSON.stringify(insertError));
-        
-        // Check for common issues like missing columns
-        if (insertError.message.includes('column') && insertError.message.includes('does not exist')) {
-          console.error('Database schema issue: Column does not exist');
+          audio_url: audioUrl,
+          user_id: userId,
+          duration: duration,
+          emotions: emotions,
+          sentiment: sentimentScore,
+          created_at: new Date().toISOString()
         }
-        
-        // Check for RLS issues
-        if (insertError.message.includes('new row violates row-level security')) {
-          console.error('RLS policy violation - check that user_id is correctly set and RLS policies allow insert');
-        }
-        
-        throw new Error(`Database insert error: ${insertError.message}`);
-      } else if (entryData && entryData.length > 0) {
-        console.log("Journal entry saved to database successfully:", entryData[0].id);
-        return entryData[0].id;
-      } else {
-        console.error("No data returned from insert operation");
-        throw new Error("Failed to create journal entry in database");
-      }
-    } catch (dbInsertErr) {
-      console.error("Database insert operation error:", dbInsertErr);
-      
-      // Try a fallback approach with basic insert
-      try {
-        console.log("Attempting fallback insert with minimal data");
-        const { data: fallbackData, error: fallbackError } = await supabase
-          .from('Journal Entries')
-          .insert([{ 
-            "transcription text": transcribedText,
-            "refined text": refinedText,
-            "user_id": userIdForDb
-          }])
-          .select();
-          
-        if (fallbackError) {
-          console.error('Fallback insert also failed:', fallbackError);
-          throw fallbackError;
-        }
-        
-        if (fallbackData && fallbackData.length > 0) {
-          console.log("Fallback journal entry saved with basic data:", fallbackData[0].id);
-          return fallbackData[0].id;
-        }
-        
-        throw new Error("Fallback insert returned no data");
-      } catch (fallbackErr) {
-        console.error("Fallback insert also failed:", fallbackErr);
-        throw fallbackErr;
-      }
+      ])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error storing journal entry:', error);
+      throw error;
     }
-  } catch (dbErr) {
-    console.error("Database error:", dbErr);
-    throw new Error(`Database error: ${dbErr.message}`);
+
+    return data.id;
+  } catch (error) {
+    console.error('Error in storeJournalEntry:', error);
+    throw error;
   }
 }
 
 /**
- * Stores an embedding for a journal entry
+ * Stores an embedding in the database
  */
-export async function storeEmbedding(
-  supabase: any,
-  entryId: number,
-  refinedText: string,
-  embedding: number[]
-) {
+export async function storeEmbedding(supabase: SupabaseClient, entryId: number, content: string, embedding: number[]) {
   try {
-    const { error: embeddingError } = await supabase
-      .from('journal_embeddings')
-      .insert([{ 
-        journal_entry_id: entryId,
-        content: refinedText,
+    const { error } = await supabase
+      .from('embeddings')
+      .insert([{
+        entry_id: entryId,
+        content: content,
         embedding: embedding
       }]);
-        
-    if (embeddingError) {
-      console.error('Error storing embedding:', embeddingError);
-      console.error('Embedding error details:', JSON.stringify(embeddingError));
-      return false;
-    } else {
-      console.log("Embedding stored successfully for entry:", entryId);
-      return true;
+
+    if (error) {
+      console.error('Error storing embedding:', error);
+      throw error;
     }
-  } catch (embErr) {
-    console.error("Error storing embedding:", embErr);
-    return false;
+
+    console.log('Embedding stored successfully for entry ID:', entryId);
+  } catch (error) {
+    console.error('Error in storeEmbedding:', error);
+    throw error;
   }
 }
 
 /**
- * Verifies that a journal entry was successfully stored
+ * Verifies a journal entry
  */
-export async function verifyJournalEntry(supabase: any, entryId: number) {
+export async function verifyJournalEntry(supabase: SupabaseClient, entryId: number) {
   try {
-    if (!entryId) return false;
-    
-    const { data: verifyEntry, error: verifyError } = await supabase
+    const { data, error } = await supabase
       .from('Journal Entries')
-      .select('id')
+      .select('*')
       .eq('id', entryId)
       .single();
-        
-    if (verifyError || !verifyEntry) {
-      console.error('Failed to verify entry in database:', verifyError);
-      return false;
-    } else {
-      console.log('Entry successfully verified in database:', verifyEntry.id);
-      return true;
+
+    if (error) {
+      console.error('Error fetching journal entry:', error);
+      throw error;
     }
-  } catch (verifyErr) {
-    console.error('Error verifying entry in database:', verifyErr);
-    return false;
+
+    console.log('Journal entry verified:', data);
+  } catch (error) {
+    console.error('Error in verifyJournalEntry:', error);
+    throw error;
   }
 }
