@@ -10,6 +10,7 @@ interface EntityInfoPanelProps {
 
 export const EntityInfoPanel: React.FC<EntityInfoPanelProps> = ({ selectedEntity, entityData }) => {
   const { theme } = useTheme();
+  
   if (!selectedEntity || !entityData[selectedEntity]) return null;
   const entityInfo = entityData[selectedEntity];
 

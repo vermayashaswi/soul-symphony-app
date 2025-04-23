@@ -109,8 +109,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       {data.nodes.map(node => {
-        // Show all labels when no node is selected.
-        const showLabel = !selectedNode || node.type === 'emotion' || node.id === selectedNode || highlightedNodes.has(node.id);
+        // Only show labels when needed
+        const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         return (
           <Node

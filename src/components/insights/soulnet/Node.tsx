@@ -1,4 +1,5 @@
-import React, { useRef } from 'react';
+
+import React, { useRef, useCallback } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
@@ -66,24 +67,23 @@ export const Node: React.FC<NodeProps> = ({
     }
   });
 
-  // Always show all labels
-  const shouldShowLabel = true;
+  // Only show label if the node is highlighted or if no node is selected
+  const shouldShowLabel = !selectedNodeId || isHighlighted;
 
   let cameraZ = cameraZoom !== undefined 
     ? cameraZoom 
     : (camera && (camera as any).position ? (camera as any).position.z : 26);
   if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
 
-  // Increase base font size by 35%
-  let dynamicFontSize = 12.825 + Math.max(0, (cameraZ - 18) * 0.8); // Increased from 9.45 to 12.825
-  dynamicFontSize = Math.max(dynamicFontSize, 11.88); // Increased min from 8.8 to 11.88
-  dynamicFontSize = Math.min(dynamicFontSize, 32.4);   // Increased max from 24 to 32.4
+  let dynamicFontSize = 12.825 + Math.max(0, (cameraZ - 18) * 0.8);
+  dynamicFontSize = Math.max(dynamicFontSize, 11.88);
+  dynamicFontSize = Math.min(dynamicFontSize, 32.4);
 
-  const handleInteraction = (e: any) => {
+  // Simplified to immediately select on first interaction
+  const handleInteraction = useCallback((e: any) => {
     e.stopPropagation();
-    // Immediate selection on any interaction
     onClick(node.id);
-  };
+  }, [node.id, onClick]);
 
   return (
     <group position={node.position}>
@@ -126,14 +126,15 @@ export const Node: React.FC<NodeProps> = ({
         >
           <div className={`
             px-2 py-1 rounded-lg font-bold whitespace-nowrap
-            bg-white shadow-xl transition-all duration-200
-            select-text
             ${isHighlighted ? 'scale-110 font-black' : 'opacity-95'}
+            select-text
           `}
             style={{
-              color: themeHex,
+              color: node.type === 'entity' ? '#fff' : themeHex,
+              backgroundColor: node.type === 'entity' ? 'rgba(0, 0, 0, 0.85)' : 'white',
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
+              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
             }}
           >
             {node.id}
