@@ -288,9 +288,10 @@ serve(async (req) => {
   }
 
   if (req.method === "POST") {
-    // Check for "make_null" action in the body
     try {
       const body = await req.json();
+
+      // Make NULL for a single entry (existing, unchanged)
       if (body && body.action === "make_null" && body.entryId) {
         console.log(`Received make_null request for entryId: ${body.entryId}`);
 
@@ -320,9 +321,42 @@ serve(async (req) => {
           { headers: { ...corsHeaders, "Content-Type": "application/json" } }
         );
       }
+
+      // New: Make NULL for ALL journal entries (user-triggered from Home page)
+      if (body && body.action === "make_null_all") {
+        console.log("Received make_null_all request for all journal entries");
+
+        // Update ALL entries, set both fields to null
+        const { error } = await supabase
+          .from('Journal Entries')
+          .update({
+            entities: null,
+            entityemotion: null
+          })
+          .neq('entities', null)
+          .neq('entityemotion', null);
+
+        if (error) {
+          console.error("Error setting all entities/entityemotion to null:", error);
+          return new Response(
+            JSON.stringify({ error: "Failed to set all entries as null", detail: error.message }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+
+        console.log("Successfully set fields as null for all journal entries");
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+
     } catch (e) {
-      // Fall through / log error
-      console.error("Error in make_null handler:", e);
+      console.error("Error in POST handler:", e);
+      return new Response(
+        JSON.stringify({ error: "Internal server error", detail: e.message }),
+        { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+      );
     }
   }
 

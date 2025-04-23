@@ -19,6 +19,8 @@ const Home = () => {
   const { colorTheme, theme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [makeNullProcessing, setMakeNullProcessing] = useState(false);
+  const [showMakeNullConfirm, setShowMakeNullConfirm] = useState(false);
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
@@ -168,6 +170,42 @@ const Home = () => {
     }
   };
 
+  const handleMakeNullAll = async () => {
+    setShowMakeNullConfirm(false);
+    setMakeNullProcessing(true);
+
+    toast.info("Nullifying started...", {
+      description: "Setting entities and entityemotion to null for ALL journal entries.",
+      duration: 4000,
+    });
+
+    try {
+      const { data, error } = await supabase.functions.invoke('temporary', {
+        method: 'POST',
+        body: { action: 'make_null_all' },
+      });
+
+      setMakeNullProcessing(false);
+      if (error) {
+        toast.error("Nullifying failed", {
+          description: `Error: ${error.message}`,
+          duration: 7000,
+        });
+      } else {
+        toast.success("All entries cleared!", {
+          description: "All 'entities' and 'entityemotion' fields set to null.",
+          duration: 7000,
+        });
+      }
+    } catch (e) {
+      setMakeNullProcessing(false);
+      toast.error("Nullifying failed", {
+        description: e?.message || 'Unknown error',
+        duration: 7000,
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       <div className="absolute inset-0 z-0">
@@ -183,7 +221,7 @@ const Home = () => {
         />
       </div>
 
-      <div className="absolute top-6 right-6 z-40 admin-button">
+      <div className="absolute top-6 right-6 z-40 flex gap-2 admin-button">
         <Button
           variant="destructive"
           className="shadow px-4 py-2 font-semibold flex items-center gap-2"
@@ -202,6 +240,23 @@ const Home = () => {
             </>
           )}
         </Button>
+        <Button
+          variant="outline"
+          className="shadow px-4 py-2 font-semibold flex items-center gap-2"
+          onClick={() => setShowMakeNullConfirm(true)}
+          disabled={makeNullProcessing}
+        >
+          {makeNullProcessing ? (
+            <>
+              <LoaderCircle className="w-4 h-4 animate-spin" />
+              Clearing...
+            </>
+          ) : (
+            <>
+              <span className="text-muted-foreground">Make Null</span>
+            </>
+          )}
+        </Button>
         {showConfirm && (
           <div className="fixed z-50 inset-0 bg-black/40 flex items-center justify-center">
             <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 relative max-w-xs w-full">
@@ -214,6 +269,25 @@ const Home = () => {
                   Yes, reprocess
                 </Button>
                 <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={processing}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          </div>
+        )}
+        {showMakeNullConfirm && (
+          <div className="fixed z-50 inset-0 bg-black/40 flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 relative max-w-xs w-full">
+              <h3 className="font-bold mb-2 text-lg text-primary">Make All Null?</h3>
+              <p className="mb-4 text-sm text-muted-foreground">
+                This will set <b>entities</b> and <b>entityemotion</b> to <b>NULL</b> for <b>ALL</b> journal entries.
+                <br />Are you sure you want to proceed?
+              </p>
+              <div className="flex gap-3">
+                <Button variant="destructive" onClick={handleMakeNullAll} disabled={makeNullProcessing}>
+                  Yes, make all null
+                </Button>
+                <Button variant="outline" onClick={() => setShowMakeNullConfirm(false)} disabled={makeNullProcessing}>
                   Cancel
                 </Button>
               </div>
