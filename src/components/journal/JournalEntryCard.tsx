@@ -277,40 +277,6 @@ export function JournalEntryCard({
     }
   };
 
-  const handleMakeNull = async () => {
-    try {
-      const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL || ""}/functions/v1/temporary`,
-        {
-          method: "POST",
-          headers: {
-            "Content-Type": "application/json",
-            ...(window?.localStorage?.getItem("sb-access-token")
-              ? { Authorization: `Bearer ${window.localStorage.getItem("sb-access-token")}` }
-              : {})
-          },
-          body: JSON.stringify({
-            action: "make_null",
-            entryId: entry.id,
-          }),
-        }
-      );
-
-      if (!response.ok) {
-        toast.error("Failed to set fields as null");
-        return;
-      }
-
-      // Refresh the entry
-      toast.success("Emotions and entities cleared for this entry!");
-      if (onDelete) {
-        onDelete(entry.id);
-      }
-    } catch (error) {
-      toast.error("Error: Could not clear fields.");
-    }
-  };
-
   const createdAtFormatted = (() => {
     try {
       return formatShortDate(safeEntry.created_at);
@@ -515,17 +481,6 @@ export function JournalEntryCard({
                 onEntryUpdated={handleEntryUpdate}
               />
               <DeleteEntryDialog onDelete={handleDelete} />
-              <Button
-                onClick={handleMakeNull}
-                variant="outline"
-                size="sm"
-                className="flex items-center gap-1 text-xs"
-                title="Set emotions and entities as null"
-                aria-label="Make Null"
-              >
-                <X size={16} className="text-muted-foreground" />
-                Make Null
-              </Button>
             </div>
           </div>
 
