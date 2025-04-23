@@ -33,16 +33,14 @@ export default function Insights() {
     const handleScroll = () => {
       scrollPositionRef.current = window.scrollY;
       
-      // Use same threshold for both mobile and desktop for consistent sticky behavior
       const scrollThreshold = 90;
       setIsSticky(window.scrollY > scrollThreshold);
     };
 
     window.addEventListener('scroll', handleScroll);
-    // Initial check in case page loads with scroll already
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);  // Removed isMobile dependency since we want same behavior
+  }, []);  // No isMobile dependency to ensure consistent behavior
 
   const handleEmotionClick = (emotion: string) => {
     setSelectedEmotion(emotion);
