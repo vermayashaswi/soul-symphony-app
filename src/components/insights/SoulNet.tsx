@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
@@ -106,13 +105,10 @@ const Node: React.FC<{
     }
   });
 
-  // Updated label visibility logic to ensure:
-  // 1. Emotion labels are always visible
-  // 2. Entity labels are visible unless they are dimmed during selection
   const shouldShowLabel = 
-    node.type === 'emotion' || // Always show emotion labels
-    isHighlighted || // Show if highlighted (selected or connected)
-    (node.type === 'entity' && !selectedNodeId); // Show entity labels when no selection
+    !selectedNodeId || 
+    node.id === selectedNodeId || 
+    highlightedNodes.has(node.id);
 
   return (
     <group position={node.position}>
@@ -270,11 +266,7 @@ const SoulNetVisualization: React.FC<{
         );
       })}
       {data.nodes.map(node => {
-        // Updated showLabel logic to ensure all emotions are visible
-        const showLabel = node.type === 'emotion' || 
-                         !selectedNode || 
-                         node.id === selectedNode || 
-                         highlightedNodes.has(node.id);
+        const showLabel = true;
         
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         
@@ -310,19 +302,19 @@ const EntityInfoPanel: React.FC<{
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
       className={`
-        absolute top-4 right-4 p-4 rounded-lg shadow-lg w-72 max-h-[60vh] overflow-y-auto
+        absolute top-4 right-4 p-3 rounded-lg shadow-lg max-w-[250px] max-h-[40vh] overflow-y-auto
         ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}
       `}
     >
       <h3 className="text-lg font-bold mb-2 pb-2 border-b">{selectedEntity}</h3>
-      <h4 className="text-sm font-semibold mt-3 mb-2">Top Emotions</h4>
+      <h4 className="text-sm font-semibold mt-2 mb-1">Top Emotions</h4>
       <div className="space-y-1">
         {Object.entries(entityInfo.emotions)
           .sort(([, a], [, b]) => b - a)
           .map(([emotion, score]) => (
             <div key={emotion} className="flex items-center justify-between">
               <span className="text-sm">{emotion}</span>
-              <div className="w-24 h-3 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+              <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
                 <div 
                   className="h-full" 
                   style={{ 
@@ -334,23 +326,6 @@ const EntityInfoPanel: React.FC<{
             </div>
           ))}
       </div>
-      {entityInfo.entries && entityInfo.entries.length > 0 && (
-        <>
-          <h4 className="text-sm font-semibold mt-4 mb-2">Journal Excerpts</h4>
-          <div className="space-y-2 text-xs">
-            {entityInfo.entries.map(entry => (
-              <div 
-                key={entry.id}
-                className={`p-2 rounded ${theme === 'dark' ? 'bg-gray-700' : 'bg-gray-100'}`}
-              >
-                {entry.content.length > 120 
-                  ? `${entry.content.substring(0, 120)}...` 
-                  : entry.content}
-              </div>
-            ))}
-          </div>
-        </>
-      )}
     </motion.div>
   );
 };
