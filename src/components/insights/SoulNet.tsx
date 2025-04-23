@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -7,7 +6,6 @@ import { useTheme } from '@/hooks/use-theme';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 import { SoulNetVisualization } from './soulnet/SoulNetVisualization';
-import { EntityInfoPanel } from './soulnet/EntityInfoPanel';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Expand, Minimize } from 'lucide-react';
@@ -42,13 +40,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const isMobile = useIsMobile();
 
-  // Optimize swipe gesture to reduce unnecessary renders
   useSwipeGesture(containerRef, {
     onSwipeLeft: () => {},
     minDistance: 30
   });
 
-  // Memoize date calculation to prevent unnecessary recalculation
   const getStartDate = useCallback((range: TimeRange) => {
     const now = new Date();
     switch (range) {
@@ -73,7 +69,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     }
   }, []);
 
-  // Fetch data using useEffect with proper dependencies
   useEffect(() => {
     if (!userId) return;
 
@@ -125,7 +120,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
         setEntityData(entityEmotionMap);
 
-        // Generate graph nodes and links
         const generateGraph = () => {
           const nodes: NodeData[] = [];
           const links: LinkData[] = [];
@@ -181,7 +175,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           return { nodes, links };
         };
 
-        // Set the graph data
         setGraphData(generateGraph());
       } catch (error) {
         console.error('Error processing entity-emotion data:', error);
@@ -207,7 +200,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setIsFullScreen(prev => !prev);
   }, []);
 
-  // Memoize canvas style to prevent unnecessary style recalculations
   const canvasStyle = useMemo(() => ({
     width: '100%',
     height: '100%',
@@ -245,7 +237,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         relative overflow-hidden transition-all duration-300 flex justify-center items-center
         ${isFullScreen 
           ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-transparent' 
-          : 'w-full h-[337px] rounded-xl border bg-transparent mx-2 md:mx-4 my-4'
+          : 'w-full h-[400px] rounded-xl border bg-transparent mx-2 md:mx-4 my-4'
         }
       `}
       layout
@@ -257,14 +249,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         onPointerMissed={() => setSelectedEntity(null)}
         gl={{ 
           preserveDrawingBuffer: true,
-          // Add optimizations for mobile devices
-          antialias: !isMobile, // Disable antialiasing on mobile for performance
+          antialias: !isMobile,
           powerPreference: 'high-performance',
           alpha: true,
-          // Optimize depth for mobile
           depth: true,
           stencil: false,
-          // Set precision based on device capability
           precision: isMobile ? 'mediump' : 'highp'
         }}
       >
@@ -288,21 +277,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         )}
       </button>
 
-      <div className="absolute bottom-4 left-4 p-3 rounded-lg bg-background/80 backdrop-blur-sm">
+      <div className="w-full text-center mt-2 px-4">
         <p className="text-xs text-muted-foreground">
           <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
         </p>
       </div>
-      
-      {selectedEntity && (
-        <EntityInfoPanel
-          selectedEntity={selectedEntity}
-          entityData={entityData}
-        />
-      )}
     </motion.div>
   );
 };
 
 export default SoulNet;
-
