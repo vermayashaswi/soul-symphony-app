@@ -97,7 +97,6 @@ serve(async (req) => {
           type: 'PLAIN_TEXT',
           content: text,
         },
-        encodingType: 'UTF8' // Add explicit encoding type
       }),
     });
 

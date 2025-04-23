@@ -1,5 +1,5 @@
 
-import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
@@ -71,76 +71,49 @@ export const Node: React.FC<NodeProps> = ({
     }
   });
 
-  // Calculate dynamic font size based on current camera zoom
-  const dynamicFontSize = useMemo(() => {
-    let cameraZ = cameraZoom !== undefined 
-      ? cameraZoom 
-      : (camera && (camera as any).position ? (camera as any).position.z : 26);
-    
-    if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
-    
-    let fontSize = 12.825 + Math.max(0, (cameraZ - 18) * 0.8);
-    fontSize = Math.max(fontSize, 11.88);
-    fontSize = Math.min(fontSize, 32.4);
-    
-    return fontSize;
-  }, [cameraZoom, camera]);
-  
   // Only show labels for highlighted nodes or when no node is selected
-  const shouldShowLabel = useMemo(() => 
-    showLabel && (!selectedNodeId || isHighlighted), 
-  [showLabel, selectedNodeId, isHighlighted]);
+  const shouldShowLabel = showLabel && (!selectedNodeId || isHighlighted);
 
-  // Touch handling with improved detection and responsiveness
-  const [touchTimeout, setTouchTimeout] = useState<number | null>(null);
+  // Calculate appropriate font size based on camera zoom
+  let cameraZ = cameraZoom !== undefined 
+    ? cameraZoom 
+    : (camera && (camera as any).position ? (camera as any).position.z : 26);
+  if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
+
+  let dynamicFontSize = 12.825 + Math.max(0, (cameraZ - 18) * 0.8);
+  dynamicFontSize = Math.max(dynamicFontSize, 11.88);
+  dynamicFontSize = Math.min(dynamicFontSize, 32.4);
+
+  // Improved touch handling with timers to ensure selection happens
+  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   
   const handlePointerDown = useCallback((e: any) => {
     e.stopPropagation();
     setIsTouching(true);
+    setTouchStartTime(Date.now());
     
-    // Clear any existing timeout
-    if (touchTimeout) window.clearTimeout(touchTimeout);
-    
-    // Set a new timeout for selection
-    const timeout = window.setTimeout(() => {
-      onClick(node.id);
-    }, 100); // Small delay improves reliability
-    
-    setTouchTimeout(timeout);
-  }, [node.id, onClick, touchTimeout]);
+    // Immediately select on pointer down for better responsiveness
+    onClick(node.id);
+  }, [node.id, onClick]);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
     setIsTouching(false);
-    
-    // Ensure selection happens if it hasn't already
-    onClick(node.id);
-    
-    // Clear timeout
-    if (touchTimeout) {
-      window.clearTimeout(touchTimeout);
-      setTouchTimeout(null);
-    }
-  }, [node.id, onClick, touchTimeout]);
+    setTouchStartTime(null);
+  }, []);
 
-  const handlePointerLeave = useCallback(() => {
-    setIsTouching(false);
-    
-    // Clear timeout if the user leaves before clicking
-    if (touchTimeout) {
-      window.clearTimeout(touchTimeout);
-      setTouchTimeout(null);
-    }
-  }, [touchTimeout]);
-
-  // Clean up timeout on unmount
+  // This ensures selection persists even with light touches
   useEffect(() => {
-    return () => {
-      if (touchTimeout) {
-        window.clearTimeout(touchTimeout);
-      }
-    };
-  }, [touchTimeout]);
+    if (isTouching && touchStartTime) {
+      const timer = setTimeout(() => {
+        if (isTouching) {
+          onClick(node.id); // Ensure selection happens
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTouching, touchStartTime, node.id, onClick]);
 
   return (
     <group position={node.position}>
@@ -153,8 +126,8 @@ export const Node: React.FC<NodeProps> = ({
         }}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        onPointerOut={handlePointerLeave}
-        onPointerLeave={handlePointerLeave}
+        onPointerOut={() => setIsTouching(false)}
+        onPointerLeave={() => setIsTouching(false)}
       >
         {Geometry}
         <meshStandardMaterial
@@ -173,20 +146,18 @@ export const Node: React.FC<NodeProps> = ({
           occlude={false}
           className="z-40"
           style={{
-            transform: 'translate3d(0,0,0)', // Force GPU acceleration
+            transform: 'scale(1) !important',
             minWidth: 'auto',
             minHeight: 'auto',
             pointerEvents: 'none',
-            fontSize: `${dynamicFontSize}px`,
+            fontSize: `${dynamicFontSize}rem`,
             fontWeight: 700,
             lineHeight: 1.1,
             zIndex: 99999,
             userSelect: 'text',
             whiteSpace: 'nowrap',
-            transition: 'opacity 0.3s ease',
+            transition: 'opacity 0.2s ease', // Smoother transitions
             opacity: shouldShowLabel ? 1 : 0,
-            willChange: 'transform, opacity', // Hint to browser for optimization
-            backfaceVisibility: 'hidden', // Reduce flickering
           }}
         >
           <div className={`
@@ -200,8 +171,6 @@ export const Node: React.FC<NodeProps> = ({
               backdropFilter: 'blur(8px)',
               WebkitBackdropFilter: 'blur(8px)',
               boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-              transform: 'translate3d(0,0,0)', // Force GPU acceleration
-              backfaceVisibility: 'hidden', // Reduce flickering
             }}
           >
             {node.id}
