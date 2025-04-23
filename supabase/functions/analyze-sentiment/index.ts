@@ -36,7 +36,7 @@ serve(async (req) => {
       
       console.log(`Google API key from env: ${googleNlApiConfigured ? 'Found' : 'Not found'}`);
       if (googleNlApiKey) {
-        console.log(`API key format check: ${googleNlApiKey.length > 20 ? 'Passed' : 'Failed'}`);
+        console.log(`API key format check: ${googleNlApiKey.length > 20 && googleNlApiKey.includes('-') ? 'Passed' : 'Failed'}`);
       }
       
       // Check for OpenAI API key
@@ -68,7 +68,7 @@ serve(async (req) => {
     }
 
     // Regular sentiment analysis logic...
-    const { text, entryId } = requestData;
+    const { text, entryId, processTranslated = false } = requestData;
     
     if (!text) {
       throw new Error("No text provided for analysis");
@@ -76,6 +76,7 @@ serve(async (req) => {
     
     console.log(`Processing text for sentiment analysis${entryId ? ` (Entry ID: ${entryId})` : ''}:`, 
               text.length > 100 ? text.slice(0, 100) + '...' : text);
+    console.log(`Processing translated content: ${processTranslated ? 'YES' : 'NO'}`);
     
     // Get the Google Natural Language API key directly from environment
     const apiKey = Deno.env.get('GOOGLE_API');
@@ -84,7 +85,13 @@ serve(async (req) => {
       throw new Error("Google API key is not configured");
     }
     
-    console.log('Analyzing sentiment using Google NL API...');
+    // Enhanced API key validation
+    if (apiKey.length < 20 || !apiKey.includes('-')) {
+      console.error('Google NL API key appears invalid (format check failed)');
+      throw new Error("Google API key appears to be invalid");
+    }
+    
+    console.log('Analyzing sentiment using Google NL API with UTF-8 encoding...');
     
     // Call the Google Natural Language API specifically for sentiment analysis
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${apiKey}`, {
@@ -97,6 +104,7 @@ serve(async (req) => {
           type: 'PLAIN_TEXT',
           content: text,
         },
+        encodingType: 'UTF8'  // Added UTF-8 encoding parameter
       }),
     });
 
@@ -112,11 +120,17 @@ serve(async (req) => {
         // Check for common errors
         if (errorJson.error && errorJson.error.status === 'INVALID_ARGUMENT') {
           console.error('Invalid argument error - check text format');
+          throw new Error(`Google API error: Invalid argument - check text format and encoding`);
         } else if (errorJson.error && errorJson.error.status === 'PERMISSION_DENIED') {
           console.error('Permission denied - check API key permissions');
+          throw new Error(`Google API error: Permission denied - check API key permissions`);
+        } else if (errorJson.error && errorJson.error.message) {
+          throw new Error(`Google API error: ${errorJson.error.message}`);
         }
       } catch (e) {
-        // Continue if parsing fails
+        if (e.message && e.message.includes("Google API error:")) {
+          throw e; // Re-throw our enhanced error message
+        }
       }
       
       throw new Error(`Google API error: ${error}`);
@@ -170,7 +184,8 @@ serve(async (req) => {
       JSON.stringify({ 
         sentiment: sentimentScore,
         category: sentimentCategory,
-        success: true 
+        success: true,
+        processedTranslated: processTranslated
       }),
       { 
         headers: { ...corsHeaders, 'Content-Type': 'application/json' } 

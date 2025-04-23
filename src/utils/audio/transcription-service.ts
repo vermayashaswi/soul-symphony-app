@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from '@/utils/audio/blob-utils';
 
@@ -12,11 +13,13 @@ interface TranscriptionResult {
  * @param base64Audio - Base64 encoded audio data
  * @param userId - User ID for association with the transcription
  * @param directTranscription - If true, just returns the transcription without processing
+ * @param processSentiment - If true, ensure sentiment analysis is performed with UTF-8 encoding
  */
 export async function sendAudioForTranscription(
   base64Audio: string,
   userId: string | undefined,
-  directTranscription: boolean = false
+  directTranscription: boolean = false,
+  processSentiment: boolean = true
 ): Promise<TranscriptionResult> {
   try {
     if (!base64Audio) {
@@ -27,6 +30,7 @@ export async function sendAudioForTranscription(
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
     console.log('[TranscriptionService] Using transcription model: gpt-4o-transcribe');
+    console.log(`[TranscriptionService] Process sentiment with UTF-8 encoding: ${processSentiment ? 'YES' : 'NO'}`);
     
     // Add more diagnostic info about the audio data being sent
     console.log('[TranscriptionService] Audio data sample (first 100 chars):', base64Audio.substring(0, 100));
@@ -68,6 +72,7 @@ export async function sendAudioForTranscription(
         recordingTime: estimatedDuration,
         modelName: 'gpt-4o-transcribe', // Use the full model
         format: 'wav', // Tell the server we're sending WAV format
+        processSentiment: processSentiment, // Flag to process sentiment with UTF-8 encoding
         audioConfig: {
           sampleRate: 44100,
           channels: 1,
@@ -112,6 +117,7 @@ export async function sendAudioForTranscription(
       hasEntryId: !!response.data?.entryId,
       entryId: response.data?.entryId || 'none',
       audioUrl: response.data?.audioUrl ? 'exists' : 'none',
+      sentimentProcessed: processSentiment,
       model: 'gpt-4o-transcribe',
       detectedLanguages: response.data?.detectedLanguages || 'none',
       responseData: JSON.stringify(response.data).substring(0, 200) + '...' // Log a sample of the response
@@ -135,11 +141,13 @@ export async function sendAudioForTranscription(
  * @param audioBlob - The audio blob to transcribe
  * @param userId - User ID for association with the transcription
  * @param directTranscription - If true, just returns the transcription without processing
+ * @param processSentiment - If true, ensure sentiment analysis is performed with UTF-8 encoding
  */
 export async function transcribeAudioBlob(
   audioBlob: Blob,
   userId: string | undefined,
-  directTranscription: boolean = false
+  directTranscription: boolean = false,
+  processSentiment: boolean = true
 ): Promise<TranscriptionResult> {
   try {
     console.log('[TranscriptionService] Converting audio blob to base64...');
@@ -168,7 +176,7 @@ export async function transcribeAudioBlob(
     console.log(`[TranscriptionService] Base64 conversion successful, length: ${base64Audio.length}`);
     
     // Send for transcription
-    return await sendAudioForTranscription(base64Audio, userId, directTranscription);
+    return await sendAudioForTranscription(base64Audio, userId, directTranscription, processSentiment);
   } catch (error: any) {
     console.error('[TranscriptionService] Error in transcribeAudioBlob:', error);
     return {

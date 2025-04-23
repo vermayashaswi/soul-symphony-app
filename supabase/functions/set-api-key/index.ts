@@ -31,6 +31,21 @@ serve(async (req) => {
     
     // For security, we don't log the actual value
     console.log(`Secret value length: ${value.length} characters`);
+    
+    // Enhanced API key validation based on the key type
+    if (key === 'GOOGLE_NL_API_KEY') {
+      // Google API keys usually contain hyphens and are relatively long
+      if (value.length < 20 || !value.includes('-')) {
+        throw new Error(`The provided Google NL API key appears to be invalid. Google API keys are typically longer than 20 characters and contain hyphens.`);
+      }
+      console.log(`Google NL API key format validation passed`);
+    } else if (key === 'OPENAI_API_KEY') {
+      // OpenAI API keys usually start with "sk-" and are long
+      if (!value.startsWith('sk-') || value.length < 30) {
+        throw new Error(`The provided OpenAI API key appears to be invalid. OpenAI API keys typically start with "sk-" and are longer than 30 characters.`);
+      }
+      console.log(`OpenAI API key format validation passed`);
+    }
 
     // Set the environment variable directly
     Deno.env.set(key, value);

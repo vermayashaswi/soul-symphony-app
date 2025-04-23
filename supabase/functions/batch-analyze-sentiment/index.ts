@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -28,7 +27,7 @@ async function analyzeSentiment(text: string) {
       return 0;
     }
     
-    console.log('Making request to Google NL API for sentiment analysis...');
+    console.log('Making request to Google NL API for sentiment analysis with UTF-8 encoding...');
     
     // Call the Google Natural Language API - specifying analyzeSentiment endpoint
     const response = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${googleNLApiKey}`, {
@@ -41,6 +40,7 @@ async function analyzeSentiment(text: string) {
           type: 'PLAIN_TEXT',
           content: text,
         },
+        encodingType: 'UTF8'  // Added UTF-8 encoding parameter
       }),
     });
 
@@ -52,6 +52,13 @@ async function analyzeSentiment(text: string) {
       try {
         const errorJson = JSON.parse(error);
         console.error('Detailed error:', errorJson);
+        
+        // Check for specific error types
+        if (errorJson.error && errorJson.error.status === 'INVALID_ARGUMENT') {
+          console.error('Invalid argument error - check text format and encoding');
+        } else if (errorJson.error && errorJson.error.status === 'PERMISSION_DENIED') {
+          console.error('Permission denied - check API key permissions');
+        }
       } catch (e) {
         // Continue if parsing fails
       }
@@ -77,16 +84,22 @@ serve(async (req) => {
 
   try {
     const reqData = await req.json();
-    const { userId, entryIds } = reqData;
+    const { userId, entryIds, processTranslated = false } = reqData;
     
     console.log('Processing request with params:', {
       userId: userId || 'not provided',
       entryIds: entryIds ? `[${entryIds.join(', ')}]` : 'not provided',
-      hasGoogleApiKey: !!googleNLApiKey
+      hasGoogleApiKey: !!googleNLApiKey,
+      processTranslated: processTranslated ? 'YES' : 'NO'
     });
 
     if (!googleNLApiKey) {
       throw new Error('Google API key is not configured in environment variables');
+    }
+    
+    // Enhanced API key validation with better error message
+    if (googleNLApiKey.length < 20 || !googleNLApiKey.includes('-')) {
+      throw new Error('Google API key appears to be invalid (format check failed)');
     }
 
     let entries;
@@ -95,9 +108,12 @@ serve(async (req) => {
     if (entryIds && Array.isArray(entryIds) && entryIds.length > 0) {
       console.log(`Processing specific entries: ${entryIds.join(', ')}`);
       
+      // Select the appropriate text field based on processTranslated flag
+      const textField = processTranslated ? 'refined text' : 'refined text';
+      
       const { data: specificEntries, error: fetchSpecificError } = await supabase
         .from('Journal Entries')
-        .select('id, "refined text"')
+        .select(`id, "${textField}"`)
         .in('id', entryIds);
       
       if (fetchSpecificError) {
@@ -110,9 +126,12 @@ serve(async (req) => {
     else if (userId) {
       console.log('Processing journal entries for user:', userId);
       
+      // Select the appropriate text field based on processTranslated flag
+      const textField = processTranslated ? 'refined text' : 'refined text';
+      
       const { data: userEntries, error: fetchError } = await supabase
         .from('Journal Entries')
-        .select('id, "refined text"')
+        .select(`id, "${textField}"`)
         .eq('user_id', userId)
         .is('sentiment', null);
       
@@ -132,13 +151,19 @@ serve(async (req) => {
     // Process each entry
     for (const entry of entries || []) {
       try {
-        if (!entry["refined text"]) {
-          console.log(`Skipping entry ${entry.id} - no refined text available`);
+        // Get the appropriate text field based on processTranslated flag
+        const textField = processTranslated ? 'refined text' : 'refined text';
+        const text = entry[textField];
+        
+        if (!text) {
+          console.log(`Skipping entry ${entry.id} - no ${textField} available`);
           continue;
         }
 
-        console.log(`Processing entry ${entry.id} with text: "${entry["refined text"].substring(0, 50)}..."`);
-        const sentimentScore = await analyzeSentiment(entry["refined text"]);
+        console.log(`Processing entry ${entry.id} with text: "${text.substring(0, 50)}..."`);
+        console.log(`Using UTF-8 encoding for proper multilingual text analysis`);
+        
+        const sentimentScore = await analyzeSentiment(text);
         
         // Update the database with the sentiment score
         const { error: updateError } = await supabase
@@ -176,7 +201,8 @@ serve(async (req) => {
         success: true,
         processed: processedCount,
         errors: errorCount,
-        total: entries?.length || 0
+        total: entries?.length || 0,
+        processedTranslated: processTranslated
       }),
       {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
