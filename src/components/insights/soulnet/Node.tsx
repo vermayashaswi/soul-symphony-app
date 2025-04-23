@@ -1,5 +1,5 @@
 
-import React, { useRef, useCallback } from 'react';
+import React, { useRef, useCallback, useState, useEffect } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
@@ -30,6 +30,7 @@ export const Node: React.FC<NodeProps> = ({
   isSelected,
   onClick,
   highlightedNodes,
+  showLabel,
   dimmed,
   themeHex,
   selectedNodeId,
@@ -38,11 +39,13 @@ export const Node: React.FC<NodeProps> = ({
   const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
   const { camera } = useThree();
+  const [isTouching, setIsTouching] = useState(false);
 
   const isHighlighted = isSelected || highlightedNodes.has(node.id);
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = baseScale * (0.8 + node.value * 0.5);
 
+  // Determine color based on type and state
   let displayColor = node.type === 'entity'
     ? (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : '#fff')
     : (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : themeHex);
@@ -51,6 +54,7 @@ export const Node: React.FC<NodeProps> = ({
     ? <sphereGeometry args={[1, 32, 32]} />
     : <boxGeometry args={[1.2, 1.2, 1.2]} />;
 
+  // Animation for highlighted nodes
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     if (isHighlighted && !dimmed) {
@@ -67,9 +71,10 @@ export const Node: React.FC<NodeProps> = ({
     }
   });
 
-  // Only show label if the node is highlighted or if no node is selected
-  const shouldShowLabel = !selectedNodeId || isHighlighted;
+  // Only show labels for highlighted nodes or when no node is selected
+  const shouldShowLabel = showLabel && (!selectedNodeId || isHighlighted);
 
+  // Calculate appropriate font size based on camera zoom
   let cameraZ = cameraZoom !== undefined 
     ? cameraZoom 
     : (camera && (camera as any).position ? (camera as any).position.z : 26);
@@ -79,21 +84,50 @@ export const Node: React.FC<NodeProps> = ({
   dynamicFontSize = Math.max(dynamicFontSize, 11.88);
   dynamicFontSize = Math.min(dynamicFontSize, 32.4);
 
-  // Simplified to immediately select on first interaction
-  const handleInteraction = useCallback((e: any) => {
+  // Improved touch handling with timers to ensure selection happens
+  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
+  
+  const handlePointerDown = useCallback((e: any) => {
     e.stopPropagation();
+    setIsTouching(true);
+    setTouchStartTime(Date.now());
+    
+    // Immediately select on pointer down for better responsiveness
     onClick(node.id);
   }, [node.id, onClick]);
+
+  const handlePointerUp = useCallback((e: any) => {
+    e.stopPropagation();
+    setIsTouching(false);
+    setTouchStartTime(null);
+  }, []);
+
+  // This ensures selection persists even with light touches
+  useEffect(() => {
+    if (isTouching && touchStartTime) {
+      const timer = setTimeout(() => {
+        if (isTouching) {
+          onClick(node.id); // Ensure selection happens
+        }
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTouching, touchStartTime, node.id, onClick]);
 
   return (
     <group position={node.position}>
       <mesh
         ref={meshRef}
         scale={[scale, scale, scale]}
-        onClick={handleInteraction}
-        onPointerDown={handleInteraction}
-        onPointerUp={(e) => e.stopPropagation()}
-        onPointerOver={(e) => e.stopPropagation()}
+        onClick={(e) => {
+          e.stopPropagation();
+          onClick(node.id);
+        }}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerOut={() => setIsTouching(false)}
+        onPointerLeave={() => setIsTouching(false)}
       >
         {Geometry}
         <meshStandardMaterial
@@ -122,6 +156,8 @@ export const Node: React.FC<NodeProps> = ({
             zIndex: 99999,
             userSelect: 'text',
             whiteSpace: 'nowrap',
+            transition: 'opacity 0.2s ease', // Smoother transitions
+            opacity: shouldShowLabel ? 1 : 0,
           }}
         >
           <div className={`
