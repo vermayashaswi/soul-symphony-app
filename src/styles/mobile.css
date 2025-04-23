@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -873,4 +874,15 @@
     position: relative;
   }
   
-  .chat-thread-list .thread-action
+  /* Fixed incomplete rule - Added proper declaration block */
+  .chat-thread-list .thread-action-button {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background-color: transparent;
+    border-radius: 4px;
+    padding: 4px;
+    transition: background-color 0.2s ease;
+  }
+}
+
