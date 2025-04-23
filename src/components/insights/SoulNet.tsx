@@ -1,6 +1,6 @@
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
-import { OrbitControls, Text, Html } from '@react-three/drei';
+import { OrbitControls, Html } from '@react-three/drei';
 import * as THREE from 'three';
 import { useTheme } from '@/hooks/use-theme';
 import { motion } from 'framer-motion';
@@ -27,57 +27,69 @@ interface SoulNetProps {
 }
 
 const colorMap: Record<string, string> = {
-  joy: '#4CAF50',      // Green
-  love: '#E91E63',     // Pink
-  anger: '#F44336',    // Red
-  fear: '#FF9800',     // Orange
-  sadness: '#2196F3',  // Blue
-  surprise: '#9C27B0', // Purple
-  disgust: '#795548',  // Brown
-  trust: '#00BCD4',    // Cyan
-  anticipation: '#FFEB3B', // Yellow
-  calm: '#8BC34A',     // Light Green
-  anxiety: '#FFC107',  // Amber
-  stress: '#FF5722',   // Deep Orange
-  guilt: '#607D8B',    // Blue Gray
-  shame: '#9E9E9E',    // Gray
-  pride: '#CDDC39',    // Lime
-  gratitude: '#3F51B5', // Indigo
-  hope: '#03A9F4',     // Light Blue
-  confusion: '#673AB7', // Deep Purple
-  amazement: '#009688', // Teal
-  curiosity: '#2196F3', // Light Blue
+  joy: '#4CAF50',
+  love: '#E91E63',
+  anger: '#F44336',
+  fear: '#FF9800',
+  sadness: '#2196F3',
+  surprise: '#9C27B0',
+  disgust: '#795548',
+  trust: '#00BCD4',
+  anticipation: '#FFEB3B',
+  calm: '#8BC34A',
+  anxiety: '#FFC107',
+  stress: '#FF5722',
+  guilt: '#607D8B',
+  shame: '#9E9E9E',
+  pride: '#CDDC39',
+  gratitude: '#3F51B5',
+  hope: '#03A9F4',
+  confusion: '#673AB7',
+  amazement: '#009688',
+  curiosity: '#2196F3',
 };
 
 const getEmotionColor = (emotion: string): string => {
   const lowerEmotion = emotion.toLowerCase();
-  return colorMap[lowerEmotion] || '#9C27B0'; // Default to purple if not found
+  return colorMap[lowerEmotion] || '#9C27B0';
 };
+
+function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
+  const connected = new Set<string>();
+  links.forEach(link => {
+    if (link.source === nodeId) connected.add(link.target);
+    if (link.target === nodeId) connected.add(link.source);
+  });
+  return connected;
+}
 
 const Node: React.FC<{
   node: NodeData; 
   isSelected: boolean;
   onClick: (id: string) => void;
   highlightedNodes: Set<string>;
-}> = ({ node, isSelected, onClick, highlightedNodes }) => {
+  showLabel: boolean;
+  dimmed: boolean;
+}> = ({ node, isSelected, onClick, highlightedNodes, showLabel, dimmed }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
   const isHighlighted = isSelected || highlightedNodes.has(node.id);
-  
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = baseScale * (0.8 + node.value * 0.5);
-  
+
+  const displayColor = dimmed
+    ? (theme === 'dark' ? '#8E9196' : '#ccc')
+    : node.color;
+
   const Geometry = node.type === 'entity' 
     ? <sphereGeometry args={[1, 32, 32]} /> 
     : <boxGeometry args={[1.2, 1.2, 1.2]} />;
-  
+
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
-    
     if (isHighlighted) {
       const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.1 + 1;
       meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
-      
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
         meshRef.current.material.emissiveIntensity = 0.5 + Math.sin(clock.getElapsedTime() * 5) * 0.2;
       }
@@ -101,29 +113,30 @@ const Node: React.FC<{
       >
         {Geometry}
         <meshStandardMaterial 
-          color={node.color}
+          color={displayColor}
           transparent
           opacity={isHighlighted ? 1 : 0.7}
-          emissive={node.color}
+          emissive={displayColor}
           emissiveIntensity={isHighlighted ? 0.5 : 0}
         />
       </mesh>
-      
-      <Html
-        position={[0, node.type === 'entity' ? 1.2 : 1.4, 0]}
-        center
-        distanceFactor={15}
-        occlude
-      >
-        <div className={`
-          px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap
-          ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}
-          ${isHighlighted ? 'scale-110 font-bold' : 'opacity-80'}
-          transform transition-all duration-200
-        `}>
-          {node.id}
-        </div>
-      </Html>
+      {showLabel && (
+        <Html
+          position={[0, node.type === 'entity' ? 1.2 : 1.4, 0]}
+          center
+          distanceFactor={15}
+          occlude
+        >
+          <div className={`
+            px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap
+            ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}
+            ${isHighlighted ? 'scale-110 font-bold' : 'opacity-80'}
+            transform transition-all duration-200
+          `}>
+            {node.id}
+          </div>
+        </Html>
+      )}
     </group>
   );
 };
@@ -133,52 +146,49 @@ const Edge: React.FC<{
   end: [number, number, number];
   value: number;
   isHighlighted: boolean;
-}> = ({ start, end, value, isHighlighted }) => {
+  dimmed: boolean;
+}> = ({ start, end, value, isHighlighted, dimmed }) => {
   const ref = useRef<THREE.Group>(null);
   const lineRef = useRef<THREE.LineSegments>(null);
-  
+
   const points = useMemo(() => {
     const startVec = new THREE.Vector3(...start);
     const endVec = new THREE.Vector3(...end);
-    
     const midPoint = startVec.clone().add(endVec).multiplyScalar(0.5);
     const midOffset = 0.5;
     midPoint.y += midOffset;
-    
     const curve = new THREE.QuadraticBezierCurve3(
       startVec,
       midPoint,
       endVec
     );
-    
     return curve.getPoints(20);
   }, [start, end]);
-  
+
   useFrame(({ clock }) => {
     if (!lineRef.current || !lineRef.current.material) return;
-    
-    if (isHighlighted) {
+    if (isHighlighted && !dimmed) {
       const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.3 + 0.7;
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
         lineRef.current.material.opacity = 0.5 + value * 0.5 * pulse;
       }
     } else {
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        lineRef.current.material.opacity = 0.1 + value * 0.2;
+        lineRef.current.material.opacity = dimmed ? 0.08 : (0.15 + value * 0.15);
       }
     }
   });
-  
+
   const thickness = 1 + value * 4;
-  
+
   return (
     <group ref={ref}>
       <primitive object={new THREE.LineSegments(
         new THREE.BufferGeometry().setFromPoints(points),
         new THREE.LineBasicMaterial({
-          color: isHighlighted ? "#ffffff" : "#aaaaaa",
+          color: dimmed ? '#BBB' : (isHighlighted ? "#ffffff" : "#aaaaaa"),
           transparent: true,
-          opacity: isHighlighted ? 0.8 : 0.2,
+          opacity: dimmed ? 0.08 : (isHighlighted ? 0.8 : 0.25),
           linewidth: thickness
         })
       )} ref={lineRef} />
@@ -188,57 +198,34 @@ const Edge: React.FC<{
 
 const SoulNetVisualization: React.FC<{
   data: { nodes: NodeData[]; links: LinkData[] };
-}> = ({ data }) => {
-  const [selectedNode, setSelectedNode] = useState<string | null>(null);
+  selectedNode: string | null;
+  onNodeClick: (id: string) => void;
+}> = ({ data, selectedNode, onNodeClick }) => {
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
-  
+
   const highlightedNodes = useMemo(() => {
-    const highlighted = new Set<string>();
-    if (selectedNode) {
-      highlighted.add(selectedNode);
-      
-      data.links.forEach(link => {
-        if (link.source === selectedNode) {
-          highlighted.add(link.target);
-        } else if (link.target === selectedNode) {
-          highlighted.add(link.source);
-        }
-      });
-    }
-    return highlighted;
+    if (!selectedNode) return new Set<string>();
+    return getConnectedNodes(selectedNode, data.links);
   }, [selectedNode, data.links]);
-  
+
   const highlightedLinks = useMemo(() => {
     if (!selectedNode) return new Set<string>();
-    
-    const highlighted = new Set<string>();
-    data.links.forEach((link, index) => {
+    const connected = new Set<string>();
+    data.links.forEach((link, idx) => {
       if (link.source === selectedNode || link.target === selectedNode) {
-        highlighted.add(`${link.source}-${link.target}`);
+        connected.add(`${link.source}-${link.target}`);
       }
     });
-    return highlighted;
+    return connected;
   }, [selectedNode, data.links]);
-  
-  const handleNodeClick = (id: string) => {
-    if (selectedNode === id) {
-      setSelectedNode(null);
-    } else {
-      setSelectedNode(id);
-      
-      const node = data.nodes.find(n => n.id === id);
-      if (node && controlsRef.current) {
-        controlsRef.current.target.set(...node.position);
-      }
-    }
-  };
-  
+
+  const shouldDim = !!selectedNode;
+
   return (
     <>
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} intensity={0.8} />
-      
       <OrbitControls 
         ref={controlsRef}
         enableDamping
@@ -247,35 +234,46 @@ const SoulNetVisualization: React.FC<{
         minDistance={5}
         maxDistance={30}
       />
-      
       {data.links.map((link, index) => {
         const sourceNode = data.nodes.find(n => n.id === link.source);
         const targetNode = data.nodes.find(n => n.id === link.target);
-        
         if (!sourceNode || !targetNode) return null;
-        
-        const isHighlighted = highlightedLinks.has(`${link.source}-${link.target}`);
-        
+        const isHighlight = selectedNode &&
+          (link.source === selectedNode || link.target === selectedNode);
+        const dimmedStatus = shouldDim && !isHighlight;
         return (
           <Edge
             key={`edge-${index}`}
             start={sourceNode.position}
             end={targetNode.position}
             value={link.value}
-            isHighlighted={isHighlighted}
+            isHighlighted={!!isHighlight}
+            dimmed={dimmedStatus}
           />
         );
       })}
-      
-      {data.nodes.map(node => (
-        <Node
-          key={`node-${node.id}`}
-          node={node}
-          isSelected={selectedNode === node.id}
-          onClick={handleNodeClick}
-          highlightedNodes={highlightedNodes}
-        />
-      ))}
+      {data.nodes.map(node => {
+        let showLabel = false;
+        if (!selectedNode) {
+          showLabel = true;
+        } else if (selectedNode === node.id || highlightedNodes.has(node.id)) {
+          showLabel = true;
+        } else {
+          showLabel = false;
+        }
+        const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
+        return (
+          <Node
+            key={`node-${node.id}`}
+            node={node}
+            isSelected={selectedNode === node.id}
+            onClick={onNodeClick}
+            highlightedNodes={highlightedNodes}
+            showLabel={showLabel}
+            dimmed={dimmed}
+          />
+        );
+      })}
     </>
   );
 };
@@ -285,11 +283,8 @@ const EntityInfoPanel: React.FC<{
   entityData: Record<string, {emotions: Record<string, number>, entries?: Array<{id: number, content: string}>}>;
 }> = ({ selectedEntity, entityData }) => {
   const { theme } = useTheme();
-  
   if (!selectedEntity || !entityData[selectedEntity]) return null;
-  
   const entityInfo = entityData[selectedEntity];
-  
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -301,7 +296,6 @@ const EntityInfoPanel: React.FC<{
       `}
     >
       <h3 className="text-lg font-bold mb-2 pb-2 border-b">{selectedEntity}</h3>
-      
       <h4 className="text-sm font-semibold mt-3 mb-2">Top Emotions</h4>
       <div className="space-y-1">
         {Object.entries(entityInfo.emotions)
@@ -322,7 +316,6 @@ const EntityInfoPanel: React.FC<{
             </div>
           ))}
       </div>
-      
       {entityInfo.entries && entityInfo.entries.length > 0 && (
         <>
           <h4 className="text-sm font-semibold mt-4 mb-2">Journal Excerpts</h4>
@@ -350,17 +343,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [loading, setLoading] = useState(true);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { theme } = useTheme();
-  
+
   useEffect(() => {
     if (!userId) return;
-    
+
     const fetchEntityEmotionData = async () => {
       setLoading(true);
-      
       try {
         const now = new Date();
         let startDate;
-        
         switch (timeRange) {
           case 'today':
             startDate = new Date(now.setHours(0, 0, 0, 0));
@@ -381,51 +372,46 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             startDate = new Date(now);
             startDate.setDate(startDate.getDate() - 7);
         }
-        
+
         const { data: entries, error } = await supabase
           .from('Journal Entries')
           .select('id, entityemotion, "refined text", "transcription text"')
           .eq('user_id', userId)
           .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: false });
-        
+
         if (error) {
           console.error('Error fetching entity emotion data:', error);
           return;
         }
-        
+
         if (!entries || entries.length === 0) {
           setLoading(false);
+          setGraphData({ nodes: [], links: [] });
           return;
         }
-        
+
         const entityEmotionMap: Record<string, {emotions: Record<string, number>, entries: Array<{id: number, content: string}>}> = {};
-        
+
         entries.forEach(entry => {
           if (!entry.entityemotion) return;
-          
           const content = entry["refined text"] || entry["transcription text"] || "";
-          
           Object.entries(entry.entityemotion).forEach(([category, emotions]) => {
             if (typeof emotions !== 'object') return;
-            
             Object.entries(emotions).forEach(([emotion, score]) => {
               if (typeof score !== 'number') return;
-              
               if (!entityEmotionMap[category]) {
                 entityEmotionMap[category] = { 
                   emotions: {},
                   entries: []
                 };
               }
-              
               if (entityEmotionMap[category].emotions[emotion]) {
                 entityEmotionMap[category].emotions[emotion] = 
                   (entityEmotionMap[category].emotions[emotion] + score) / 2;
               } else {
                 entityEmotionMap[category].emotions[emotion] = score;
               }
-              
               if (content) {
                 entityEmotionMap[category].entries.push({
                   id: entry.id,
@@ -435,23 +421,22 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             });
           });
         });
-        
+
         setEntityData(entityEmotionMap);
-        
+
         const nodes: NodeData[] = [];
         const links: LinkData[] = [];
         const entityNodes = new Set<string>();
         const emotionNodes = new Set<string>();
-        
+
         Object.entries(entityEmotionMap).forEach(([entity, data], entityIndex) => {
           entityNodes.add(entity);
-          
           const entityAngle = (entityIndex / Object.keys(entityEmotionMap).length) * Math.PI * 2;
           const entityRadius = 5;
           const entityX = Math.cos(entityAngle) * entityRadius;
           const entityY = (Math.random() - 0.5) * 3;
           const entityZ = Math.sin(entityAngle) * entityRadius;
-          
+
           nodes.push({
             id: entity,
             type: 'entity',
@@ -459,10 +444,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             color: '#ffffff',
             position: [entityX, entityY, entityZ]
           });
-          
+
           Object.entries(data.emotions).forEach(([emotion, score]) => {
             emotionNodes.add(emotion);
-            
             links.push({
               source: entity,
               target: emotion,
@@ -470,14 +454,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             });
           });
         });
-        
+
         Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
           const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
           const emotionRadius = 10;
           const emotionX = Math.cos(emotionAngle) * emotionRadius;
           const emotionY = (Math.random() - 0.5) * 6;
           const emotionZ = Math.sin(emotionAngle) * emotionRadius;
-          
           nodes.push({
             id: emotion,
             type: 'emotion',
@@ -486,7 +469,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             position: [emotionX, emotionY, emotionZ]
           });
         });
-        
+
         setGraphData({ nodes, links });
       } catch (error) {
         console.error('Error processing entity-emotion data:', error);
@@ -494,20 +477,23 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         setLoading(false);
       }
     };
-    
+
     fetchEntityEmotionData();
   }, [userId, timeRange]);
-  
+
   const handleCanvasClick = () => {
     setSelectedEntity(null);
   };
-  
+
   const handleNodeSelect = (id: string) => {
-    if (graphData.nodes.find(node => node.id === id)?.type === 'entity') {
+    const node = graphData.nodes.find(node => node.id === id);
+    if (node && node.type === 'entity') {
+      setSelectedEntity(id === selectedEntity ? null : id);
+    } else if (node && node.type === 'emotion') {
       setSelectedEntity(id === selectedEntity ? null : id);
     }
   };
-  
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -515,7 +501,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       </div>
     );
   }
-  
+
   if (graphData.nodes.length === 0) {
     return (
       <div className={`
@@ -530,21 +516,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       </div>
     );
   }
-  
+
   return (
     <div className="relative w-full h-[600px] rounded-xl overflow-hidden border">
       <Canvas onClick={handleCanvasClick} camera={{ position: [0, 0, 15] }}>
         <SoulNetVisualization 
           data={graphData} 
+          selectedNode={selectedEntity}
+          onNodeClick={handleNodeSelect}
         />
       </Canvas>
-      
       <div className="absolute bottom-4 left-4 p-3 rounded-lg bg-background/80 backdrop-blur-sm">
         <p className="text-xs text-muted-foreground">
           <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Click</b> a node to highlight connections
         </p>
       </div>
-      
       {selectedEntity && (
         <EntityInfoPanel 
           selectedEntity={selectedEntity}
