@@ -86,7 +86,7 @@ export const Node: React.FC<NodeProps> = ({
         <Html
           center
           position={[0, 0, 0]}
-          distanceFactor={9}
+          distanceFactor={5}
           occlude
         >
           <img
@@ -94,18 +94,18 @@ export const Node: React.FC<NodeProps> = ({
             alt={node.id}
             draggable={false}
             style={{
-              width: 47,
-              height: 47,
+              width: 120,
+              height: 120,
               filter: dimmed ? "grayscale(0.7) opacity(0.5)" : "",
-              transform: isHighlighted ? "scale(1.13)" : "scale(1.00)",
+              transform: isHighlighted ? "scale(1.2)" : "scale(1.00)",
               pointerEvents: "auto",
               userSelect: "none",
               cursor: "pointer",
               transition: "transform 0.15s, filter 0.15s",
-              boxShadow: isHighlighted ? (theme === "dark" ? "0 0 10px #fff5" : "0 0 10px #0003") : "",
+              boxShadow: isHighlighted ? (theme === "dark" ? "0 0 15px #fff5" : "0 0 15px #0003") : "",
               zIndex: isHighlighted ? 5 : 1,
               borderRadius: "50%",
-              border: isHighlighted ? "2.5px solid #60a5fa" : "none",
+              border: isHighlighted ? "3px solid #60a5fa" : "none",
               background: "transparent",
             }}
             onClick={handleInteraction}
