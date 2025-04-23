@@ -3,7 +3,7 @@ import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 import { SoulNetVisualization } from './soulnet/SoulNetVisualization';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
@@ -276,12 +276,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <Expand className="w-5 h-5 text-foreground" />
         )}
       </button>
-
-      <div className="w-full text-center mt-2 px-4">
-        <p className="text-xs text-muted-foreground">
-          <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
-        </p>
-      </div>
     </motion.div>
   );
 };

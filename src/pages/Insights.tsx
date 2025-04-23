@@ -338,6 +338,12 @@ export default function Insights() {
                   </p>
                 </div>
                 <SoulNet userId={user?.id} timeRange={timeRange} />
+                
+                <div className="w-full text-center mt-2 px-4">
+                  <p className="text-xs text-muted-foreground">
+                    <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
+                  </p>
+                </div>
               </div>
             </motion.div>
           </>
