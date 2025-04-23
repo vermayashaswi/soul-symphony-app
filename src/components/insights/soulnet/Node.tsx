@@ -1,7 +1,7 @@
 
 import React, { useRef } from 'react';
 import * as THREE from 'three';
-import { useFrame } from '@react-three/fiber';
+import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { useTheme } from '@/hooks/use-theme';
 
@@ -22,6 +22,7 @@ interface NodeProps {
   dimmed: boolean;
   themeHex: string;
   selectedNodeId: string | null;
+  cameraZoom?: number; // new, comes from parent via prop (pass camera.position.z or camera.zoom as appropriate)
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -33,9 +34,12 @@ export const Node: React.FC<NodeProps> = ({
   dimmed,
   themeHex,
   selectedNodeId,
+  cameraZoom, // value provided by parent visualization
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
+  const { camera } = useThree();
+
   const isHighlighted = isSelected || highlightedNodes.has(node.id);
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = baseScale * (0.8 + node.value * 0.5);
@@ -67,6 +71,20 @@ export const Node: React.FC<NodeProps> = ({
   // All labels must always be visible at fixed size in any viewport, any selection.
   const shouldShowLabel = true;
 
+  // Dynamic font size logic based on camera distance (camera.position.z)
+  // Empirically: closer camera => bigger font, farther camera => even bigger font, but never too small
+  // We want a minimum, and a scaling relation with zoom/distance.
+  // Perspective camera: larger z = further out, so increase font size as z increases
+  // Clamp min and max for usability
+  let cameraZ = cameraZoom !== undefined 
+    ? cameraZoom 
+    : (camera && (camera as any).position ? (camera as any).position.z : 26);
+  if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
+
+  let dynamicFontSize = 1.06 + Math.max(0, (cameraZ - 18) * 0.08); // e.g. camera at 26 => ~1.7rem, 22 => ~1.4rem
+  dynamicFontSize = Math.max(dynamicFontSize, 1); // min 1rem for legibility
+  dynamicFontSize = Math.min(dynamicFontSize, 2.2); // max 2.2rem
+
   // Combined handler for all pointer/touch events
   const handleInteraction = (e: any) => {
     e.stopPropagation();
@@ -96,22 +114,19 @@ export const Node: React.FC<NodeProps> = ({
         <Html
           position={[0, node.type === 'entity' ? 1.2 : 1.4, 0]}
           center
-          distanceFactor={1} // Keep constant size regardless of camera/distance!
-          occlude={false} // Never occlude labels
+          distanceFactor={1}
+          occlude={false}
           className="z-40"
           style={{
-            // NEVER scale label with 3D. Always render at constant screen size.
-            // (tailwind below can be overridden by this style)
             transform: 'scale(1) !important',
             minWidth: 'auto',
             minHeight: 'auto',
-            pointerEvents: 'none', // Prevents 3D events interference.
-            fontSize: '1.06rem', // Fixed readable size
+            pointerEvents: 'none',
+            fontSize: `${dynamicFontSize}rem`,
             fontWeight: 500,
             lineHeight: 1.1,
             zIndex: 99999,
             userSelect: 'text',
-            // Add more styles for akways-legible rendering if required:
             whiteSpace: 'nowrap',
             textShadow: theme === 'dark'
               ? "0 2px 6px #000, 0px 0px 9px #000"
