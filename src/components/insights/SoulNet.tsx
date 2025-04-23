@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text, Html } from '@react-three/drei';
@@ -169,11 +168,13 @@ const Edge: React.FC<{
     
     if (isHighlighted) {
       const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.3 + 0.7;
-      // @ts-ignore: Material properties
-      lineRef.current.material.opacity = 0.5 + value * 0.5 * pulse;
+      if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
+        lineRef.current.material.opacity = 0.5 + value * 0.5 * pulse;
+      }
     } else {
-      // @ts-ignore: Material properties
-      lineRef.current.material.opacity = 0.1 + value * 0.2;
+      if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
+        lineRef.current.material.opacity = 0.1 + value * 0.2;
+      }
     }
   });
   
