@@ -12,6 +12,34 @@
   .settings-container {
     padding-bottom: 4rem !important;
   }
+
+  /* FIXED: Make cards take full width in mobile view and remove horizontal padding */
+  .insights-container .grid-cols-1 > div,
+  .insights-container .bg-background,
+  .insights-container .mb-8 > div {
+    width: 100% !important;
+    max-width: 100% !important;
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+    border-radius: 10px !important;
+  }
+  
+  /* Ensure insights page has minimal horizontal padding */
+  .insights-page-content {
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+  
+  /* Remove horizontal margins on cards */
+  .insights-container .max-w-5xl > div {
+    margin-left: 0 !important;
+    margin-right: 0 !important;
+  }
+  
+  /* Remove padding in SoulNet component when in normal (non-fullscreen) view */
+  .insights-container .mb-8 .bg-background .rounded-xl:not(.fixed) {
+    padding: 0 !important;
+  }
   
   /* iOS-specific padding for safe areas */
   @supports (padding: max(0px)) {
@@ -20,8 +48,36 @@
     .insights-container,
     .settings-container {
       padding-bottom: max(4rem, env(safe-area-inset-bottom) + 4rem) !important;
-      padding-left: max(1rem, env(safe-area-inset-left) + 0.5rem) !important;
-      padding-right: max(1rem, env(safe-area-inset-right) + 0.5rem) !important;
+      padding-left: max(8px, env(safe-area-inset-left) + 0px) !important;
+      padding-right: max(8px, env(safe-area-inset-right) + 0px) !important;
+    }
+  }
+
+  /* Fixed: SoulNet fullscreen behavior */
+  .fixed.inset-0.z-50 {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important; /* Ultra high z-index to ensure it's above everything */
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+  
+  /* Improve fullscreen exit button visibility */
+  .fixed.inset-0.z-50 button {
+    background-color: rgba(0, 0, 0, 0.3) !important;
+    color: white !important;
+  }
+  
+  /* Add safe area insets for fullscreen mode */
+  @supports (padding: max(0px)) {
+    .fixed.inset-0.z-50 {
+      padding-bottom: env(safe-area-inset-bottom) !important;
+      padding-top: env(safe-area-inset-top) !important;
     }
   }
   

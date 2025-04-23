@@ -220,10 +220,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   return (
     <motion.div
       ref={containerRef}
-      className={`relative rounded-xl overflow-hidden border touch-action-none transition-all duration-300 ${
+      className={`relative overflow-hidden transition-all duration-300 ${
         isFullScreen 
-          ? 'fixed inset-0 z-50 m-0 rounded-none border-none'
-          : 'w-full h-[600px]'
+          ? 'fixed inset-0 z-50 m-0 rounded-none border-none bg-background'
+          : 'w-full h-[600px] rounded-xl border'
       }`}
       layout
     >
@@ -241,18 +241,16 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         />
       </Canvas>
       
-      {isMobile && (
-        <button
-          onClick={toggleFullScreen}
-          className="absolute top-4 right-16 z-50 p-2 rounded-lg bg-background/80 backdrop-blur-sm shadow-lg"
-        >
-          {isFullScreen ? (
-            <Minimize className="w-5 h-5 text-foreground" />
-          ) : (
-            <Expand className="w-5 h-5 text-foreground" />
-          )}
-        </button>
-      )}
+      <button
+        onClick={toggleFullScreen}
+        className="absolute top-4 right-4 z-50 p-2 rounded-lg bg-background/80 backdrop-blur-sm shadow-lg"
+      >
+        {isFullScreen ? (
+          <Minimize className="w-5 h-5 text-foreground" />
+        ) : (
+          <Expand className="w-5 h-5 text-foreground" />
+        )}
+      </button>
 
       <div className="absolute bottom-4 left-4 p-3 rounded-lg bg-background/80 backdrop-blur-sm">
         <p className="text-xs text-muted-foreground">

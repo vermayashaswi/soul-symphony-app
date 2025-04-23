@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -30,12 +29,11 @@ export default function Insights() {
     { value: 'year', label: 'Year' },
   ];
 
-  // Improved scroll handler with better mobile support
   useEffect(() => {
     const handleScroll = () => {
       scrollPositionRef.current = window.scrollY;
       
-      const scrollThreshold = isMobile ? 70 : 90; // Lower threshold for mobile
+      const scrollThreshold = isMobile ? 50 : 90; // Lower threshold for mobile
       setIsSticky(window.scrollY > scrollThreshold);
     };
 
@@ -43,7 +41,7 @@ export default function Insights() {
     handleScroll(); // Initialize state based on current scroll position
     
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []); // No dependencies to ensure consistent initialization
+  }, [isMobile]); 
 
   const handleEmotionClick = (emotion: string) => {
     setSelectedEmotion(emotion);
@@ -111,17 +109,19 @@ export default function Insights() {
 
   return (
     <div className="min-h-screen pb-20 insights-container">
-      {/* Mobile-optimized sticky header */}
       {isSticky && (
         <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-page-time-toggle">
-          <div className="max-w-5xl w-full flex justify-end">
+          <div className={cn(
+            "w-full flex justify-end",
+            isMobile ? "max-w-full px-1" : "max-w-5xl"
+          )}>
             {renderTimeToggle()}
           </div>
         </div>
       )}
       
       <div className={cn(
-        "max-w-5xl mx-auto px-2",
+        isMobile ? "w-full px-1" : "max-w-5xl mx-auto px-2",
         "pt-4 md:pt-8 insights-page-content",
         isMobile ? "mt-2" : "mt-4",
         isSticky && isMobile ? "pt-16" : ""
@@ -156,7 +156,10 @@ export default function Insights() {
           </div>
         ) : (
           <>
-            <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8">
+            <div className={cn(
+              "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8",
+              isMobile && "px-0"
+            )}>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -291,7 +294,10 @@ export default function Insights() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.3 }}
-              className="bg-background p-6 md:p-8 rounded-xl shadow-sm mb-8 border"
+              className={cn(
+                "bg-background rounded-xl shadow-sm mb-8 border",
+                isMobile ? "p-4 md:p-8" : "p-6 md:p-8"
+              )}
               whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
             >
               <EmotionChart 
@@ -318,7 +324,10 @@ export default function Insights() {
               transition={{ duration: 0.4, delay: 0.5 }}
               className="mb-8"
             >
-              <div className="bg-background p-6 md:p-8 rounded-xl shadow-sm border">
+              <div className={cn(
+                "bg-background rounded-xl shadow-sm border",
+                isMobile ? "p-4 md:p-8" : "p-6 md:p-8"
+              )}>
                 <h2 className="text-xl font-semibold mb-4">Soul-Net</h2>
                 <p className="text-muted-foreground mb-4">
                   Explore connections between life aspects and emotions in your journal.
