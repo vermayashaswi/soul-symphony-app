@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { Node } from './Node';
 import { Edge } from './Edge';
+import * as THREE from 'three';
 
 interface NodeData {
   id: string;
@@ -116,12 +117,11 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   const shouldDim = !!selectedNode;
 
-  // Memoize camera target to reduce recalculations
-  const cameraTarget = useMemo(() => [
-    sceneCenter.x,
-    sceneCenter.y,
-    0
-  ], [sceneCenter]);
+  // Memoize camera target to reduce recalculations - Fix type error by using Vector3
+  const cameraTarget = useMemo(() => {
+    // Create a proper THREE.Vector3 object
+    return new THREE.Vector3(sceneCenter.x, sceneCenter.y, 0);
+  }, [sceneCenter]);
 
   return (
     <>
