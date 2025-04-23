@@ -223,8 +223,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       ref={containerRef}
       className={`relative overflow-hidden transition-all duration-300 ${
         isFullScreen 
-          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-background'
-          : 'w-full h-[600px] rounded-xl border'
+          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-transparent'
+          : 'w-full h-[450px] rounded-xl border bg-transparent'
       }`}
       layout
     >

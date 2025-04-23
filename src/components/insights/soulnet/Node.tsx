@@ -116,24 +116,26 @@ export const Node: React.FC<NodeProps> = ({
             minWidth: 'auto',
             minHeight: 'auto',
             pointerEvents: 'none',
-            fontSize: `${dynamicFontSize}rem`, // Increased font size by 35%
+            fontSize: `${dynamicFontSize}rem`,
             fontWeight: 700,
             lineHeight: 1.1,
             zIndex: 99999,
             userSelect: 'text',
             whiteSpace: 'nowrap',
-            textShadow: theme === 'dark'
-              ? "0 2px 6px #000, 0px 0px 9px #000, 0px 0px 5px #000"
-              : "0 2px 8px #fff, 0px 0px 7px #fff, 0px 0px 5px #fff"
           }}
         >
           <div className={`
             px-2 py-1 rounded-lg font-bold whitespace-nowrap
-            ${theme === 'dark' ? 'bg-gray-800/90 text-white' : 'bg-white/90 text-gray-800'}
-            ${isHighlighted ? 'scale-110 font-black' : 'opacity-95'}
-            shadow-xl transition-all duration-200
+            bg-white shadow-xl transition-all duration-200
             select-text
-          `}>
+            ${isHighlighted ? 'scale-110 font-black' : 'opacity-95'}
+          `}
+            style={{
+              color: themeHex,
+              backdropFilter: 'blur(8px)',
+              WebkitBackdropFilter: 'blur(8px)',
+            }}
+          >
             {node.id}
           </div>
         </Html>
