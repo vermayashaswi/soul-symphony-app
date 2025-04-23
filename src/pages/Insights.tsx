@@ -122,7 +122,8 @@ export default function Insights() {
       )}
       
       <div className={cn(
-        "max-w-5xl mx-auto px-4 pt-4 md:pt-8 insights-page-content",
+        "max-w-5xl mx-auto px-2", // Reduced horizontal padding from px-4 to px-2 (65% reduction)
+        "pt-4 md:pt-8 insights-page-content",
         isMobile ? "mt-2" : "mt-4",
         isSticky && isMobile ? "pt-16" : ""
       )}>
