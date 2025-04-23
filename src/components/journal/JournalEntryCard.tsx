@@ -279,14 +279,14 @@ export function JournalEntryCard({
   const handleMakeNull = async () => {
     try {
       const response = await fetch(
-        `${process.env.NEXT_PUBLIC_SUPABASE_URL || ""}/functions/v1/temporary",
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL || ""}/functions/v1/temporary`,
         {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
             ...(window?.localStorage?.getItem("sb-access-token")
               ? { Authorization: `Bearer ${window.localStorage.getItem("sb-access-token")}` }
-              : {}),
+              : {})
           },
           body: JSON.stringify({
             action: "make_null",
