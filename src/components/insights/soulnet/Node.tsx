@@ -29,7 +29,7 @@ export const Node: React.FC<NodeProps> = ({
   isSelected,
   onClick,
   highlightedNodes,
-  showLabel,
+  // showLabel, // UNUSED – unconditional label display
   dimmed,
   themeHex,
   selectedNodeId,
@@ -64,16 +64,8 @@ export const Node: React.FC<NodeProps> = ({
     }
   });
 
-  // All emotion/entity labels must be visible if no selection.
-  const shouldShowLabel =
-    showLabel && (
-      !selectedNodeId // all labels when nothing selected
-      || node.id === selectedNodeId
-      || highlightedNodes.has(node.id)
-      || node.type === 'emotion'
-      // ensures emotion always visible
-      // fallback for all non-dimmed nodes
-    );
+  // All labels must always be visible at fixed size in any viewport, any selection.
+  const shouldShowLabel = true;
 
   // Combined handler for all pointer/touch events
   const handleInteraction = (e: any) => {
@@ -104,15 +96,34 @@ export const Node: React.FC<NodeProps> = ({
         <Html
           position={[0, node.type === 'entity' ? 1.2 : 1.4, 0]}
           center
-          distanceFactor={15}
-          occlude
-          className="z-40" // Ensure labels appear above other UI elements
+          distanceFactor={1} // Keep constant size regardless of camera/distance!
+          occlude={false} // Never occlude labels
+          className="z-40"
+          style={{
+            // NEVER scale label with 3D. Always render at constant screen size.
+            // (tailwind below can be overridden by this style)
+            transform: 'scale(1) !important',
+            minWidth: 'auto',
+            minHeight: 'auto',
+            pointerEvents: 'none', // Prevents 3D events interference.
+            fontSize: '1.06rem', // Fixed readable size
+            fontWeight: 500,
+            lineHeight: 1.1,
+            zIndex: 99999,
+            userSelect: 'text',
+            // Add more styles for akways-legible rendering if required:
+            whiteSpace: 'nowrap',
+            textShadow: theme === 'dark'
+              ? "0 2px 6px #000, 0px 0px 9px #000"
+              : "0 2px 8px #fff, 0px 0px 7px #fff"
+          }}
         >
           <div className={`
-            px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap
+            px-2 py-1 rounded-md font-medium whitespace-nowrap
             ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}
             ${isHighlighted ? 'scale-110 font-bold' : 'opacity-90'}
             shadow transition-all duration-200
+            select-text
           `}>
             {node.id}
           </div>
