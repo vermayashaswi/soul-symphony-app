@@ -5,13 +5,14 @@ import { Layers3 } from 'lucide-react';
 
 interface AnimatedMindMapButtonProps {
   onClick: () => void;
+  className?: string;
 }
 
-const AnimatedMindMapButton: React.FC<AnimatedMindMapButtonProps> = ({ onClick }) => {
+const AnimatedMindMapButton: React.FC<AnimatedMindMapButtonProps> = ({ onClick, className = '' }) => {
   return (
     <motion.button
       onClick={onClick}
-      className="w-24 h-24 rounded-full bg-background border shadow-lg flex items-center justify-center relative overflow-hidden"
+      className={`w-24 h-24 rounded-full bg-background border shadow-lg flex items-center justify-center relative overflow-hidden ${className}`}
       whileHover={{ scale: 1.05 }}
       whileTap={{ scale: 0.95 }}
     >

@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -222,17 +221,22 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     <motion.div
       ref={containerRef}
       className={`
-        relative overflow-hidden transition-all duration-300 flex justify-center items-center
+        relative bg-background transition-all duration-300
         ${isFullScreen 
-          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-background' 
-          : 'w-full h-[337px] rounded-xl border bg-background mx-2 md:mx-4 my-4'
+          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none' 
+          : 'w-full h-[337px] rounded-xl border'
         }
       `}
       layout
     >
-      {isMobile && !isFullScreen ? (
-        <AnimatedMindMapButton onClick={toggleFullScreen} />
-      ) : (
+      {isMobile && !isFullScreen && (
+        <AnimatedMindMapButton 
+          onClick={toggleFullScreen} 
+          className="absolute left-1/2 -translate-x-1/2 top-[45%] -translate-y-1/2" 
+        />
+      )}
+      
+      {(!isMobile || isFullScreen) && (
         <>
           <Canvas
             className="w-full h-full"
@@ -278,4 +282,3 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 };
 
 export default SoulNet;
-
