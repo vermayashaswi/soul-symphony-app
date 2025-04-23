@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
@@ -105,8 +104,10 @@ const Node: React.FC<{
     }
   });
 
-  // Always show labels on startup or when highlighted
-  const shouldShowLabel = showLabel || isSelected || highlightedNodes.has(node.id);
+  const shouldShowLabel = 
+    (node.type === 'entity' && !selectedNode) || // Always show entity labels with no selection
+    isHighlighted || // Show if highlighted (selected or connected)
+    (node.type === 'entity' && showLabel); // Additional condition for entities
 
   return (
     <group position={node.position}>
@@ -216,7 +217,6 @@ const SoulNetVisualization: React.FC<{
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
 
-  // Set initial camera position
   useEffect(() => {
     if (camera) {
       camera.position.set(0, 0, 26);
@@ -265,8 +265,6 @@ const SoulNetVisualization: React.FC<{
         );
       })}
       {data.nodes.map(node => {
-        // Always show labels on initial render (when no selection)
-        // OR show label if node is selected or connected to selected node
         let showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
@@ -311,7 +309,6 @@ const EntityInfoPanel: React.FC<{
       <div className="space-y-1">
         {Object.entries(entityInfo.emotions)
           .sort(([, a], [, b]) => b - a)
-          // Show all emotions, not just top 5
           .map(([emotion, score]) => (
             <div key={emotion} className="flex items-center justify-between">
               <span className="text-sm">{emotion}</span>
