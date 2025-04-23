@@ -72,7 +72,7 @@ const Node: React.FC<{
   showLabel: boolean;
   dimmed: boolean;
   themeHex: string;
-  selectedNodeId: string | null; // Add this prop to make selectedNode available
+  selectedNodeId: string | null;
 }> = ({ node, isSelected, onClick, highlightedNodes, showLabel, dimmed, themeHex, selectedNodeId }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
@@ -106,10 +106,13 @@ const Node: React.FC<{
     }
   });
 
+  // Updated label visibility logic to ensure:
+  // 1. Emotion labels are always visible
+  // 2. Entity labels are visible unless they are dimmed during selection
   const shouldShowLabel = 
-    (node.type === 'entity' && !selectedNodeId) || // Fix: Use selectedNodeId instead of selectedNode
+    node.type === 'emotion' || // Always show emotion labels
     isHighlighted || // Show if highlighted (selected or connected)
-    (node.type === 'entity' && showLabel); // Additional condition for entities
+    (node.type === 'entity' && !selectedNodeId); // Show entity labels when no selection
 
   return (
     <group position={node.position}>
@@ -267,7 +270,11 @@ const SoulNetVisualization: React.FC<{
         );
       })}
       {data.nodes.map(node => {
-        let showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
+        // Updated showLabel logic to ensure all emotions are visible
+        const showLabel = node.type === 'emotion' || 
+                         !selectedNode || 
+                         node.id === selectedNode || 
+                         highlightedNodes.has(node.id);
         
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         
@@ -281,7 +288,7 @@ const SoulNetVisualization: React.FC<{
             showLabel={showLabel}
             dimmed={dimmed}
             themeHex={themeHex}
-            selectedNodeId={selectedNode} // Pass selectedNode as selectedNodeId prop
+            selectedNodeId={selectedNode}
           />
         );
       })}
