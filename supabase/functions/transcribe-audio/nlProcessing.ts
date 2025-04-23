@@ -72,6 +72,7 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
           type: 'PLAIN_TEXT',
           content: text,
         },
+        encodingType: 'UTF8' // Add explicit encoding type
       }),
     });
 
@@ -87,6 +88,7 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
           type: 'PLAIN_TEXT',
           content: text,
         },
+        encodingType: 'UTF8' // Add explicit encoding type
       }),
     });
 

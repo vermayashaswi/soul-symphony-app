@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from '@/utils/audio/blob-utils';
 
@@ -73,7 +74,8 @@ export async function sendAudioForTranscription(
           channels: 1,
           bitDepth: 16
         },
-        autoDetectLanguage: true  // Added explicit flag for auto language detection
+        autoDetectLanguage: true,  // Added explicit flag for auto language detection
+        processSentiment: true     // Add explicit flag to request sentiment analysis
       }
     });
 
@@ -114,6 +116,7 @@ export async function sendAudioForTranscription(
       audioUrl: response.data?.audioUrl ? 'exists' : 'none',
       model: 'gpt-4o-transcribe',
       detectedLanguages: response.data?.detectedLanguages || 'none',
+      sentiment: response.data?.sentiment || 'not set',
       responseData: JSON.stringify(response.data).substring(0, 200) + '...' // Log a sample of the response
     });
 

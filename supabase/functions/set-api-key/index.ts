@@ -32,6 +32,11 @@ serve(async (req) => {
     // For security, we don't log the actual value
     console.log(`Secret value length: ${value.length} characters`);
 
+    // Validate Google API key format if that's what we're setting
+    if (key === 'GOOGLE_NL_API_KEY' && (value.length < 20 || !value.includes('-'))) {
+      console.log('WARNING: The Google NL API key format looks invalid');
+    }
+
     // Set the environment variable directly
     Deno.env.set(key, value);
     

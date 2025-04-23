@@ -41,6 +41,7 @@ async function analyzeSentiment(text: string) {
           type: 'PLAIN_TEXT',
           content: text,
         },
+        encodingType: 'UTF8'
       }),
     });
 
