@@ -75,29 +75,21 @@ export const Node: React.FC<NodeProps> = ({
       // fallback for all non-dimmed nodes
     );
 
+  // Combined handler for all pointer/touch events
+  const handleInteraction = (e: any) => {
+    e.stopPropagation();
+    onClick(node.id);
+  };
+
   return (
     <group position={node.position}>
       <mesh
         ref={meshRef}
         scale={[scale, scale, scale]}
-        onClick={e => {
-          e.stopPropagation();
-          onClick(node.id);
-        }}
-        onPointerDown={e => {
-          e.stopPropagation();
-          onClick(node.id);
-        }}
-        onPointerUp={e => {
-          e.stopPropagation();
-        }}
-        onPointerOver={e => {
-          e.stopPropagation();
-        }}
-        onTouchStart={e => {
-          e.stopPropagation();
-          onClick(node.id);
-        }}
+        onClick={handleInteraction}
+        onPointerDown={handleInteraction}
+        onPointerUp={(e) => e.stopPropagation()}
+        onPointerOver={(e) => e.stopPropagation()}
       >
         {Geometry}
         <meshStandardMaterial
@@ -128,4 +120,3 @@ export const Node: React.FC<NodeProps> = ({
     </group>
   );
 };
-

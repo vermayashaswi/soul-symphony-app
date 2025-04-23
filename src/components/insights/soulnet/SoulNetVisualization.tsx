@@ -1,6 +1,7 @@
 
 import React, { useRef, useEffect, useMemo } from 'react';
-import { OrbitControls, useThree } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
+import { useThree } from '@react-three/fiber';
 import { Node } from './Node';
 import { Edge } from './Edge';
 

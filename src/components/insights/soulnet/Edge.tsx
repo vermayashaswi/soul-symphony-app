@@ -59,4 +59,3 @@ export const Edge: React.FC<EdgeProps> = ({ start, end, value, isHighlighted, di
     </group>
   );
 };
-
