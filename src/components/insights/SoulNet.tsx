@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -225,17 +224,24 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         relative overflow-hidden transition-all duration-300 flex justify-center items-center
         ${isFullScreen 
           ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-transparent' 
-          : 'w-full h-[337px] rounded-xl border bg-transparent mx-2 md:mx-4 my-4'
+          : 'w-full h-[337px] rounded-xl border bg-transparent mx-4 my-4'
         }
       `}
       layout
     >
       <Canvas
-        className="w-full h-full max-w-[800px] max-h-[500px]" // Added max dimensions to prevent oversized canvas
+        className="w-full h-[calc(100%-8px)] max-w-[800px]" 
+        style={{
+          position: 'absolute',
+          top: '4px',
+          bottom: '4px',
+          left: '0',
+          right: '0',
+        }}
         onClick={handleCanvasClick}
         camera={{ position: [0, 0, 26] }}
         onPointerMissed={() => setSelectedEntity(null)}
-        gl={{ preserveDrawingBuffer: true }}
+        gl={{ preserveDrawingBuffer: true, antialias: true, alpha: true }}
       >
         <SoulNetVisualization
           data={graphData}
@@ -274,4 +280,3 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 };
 
 export default SoulNet;
-

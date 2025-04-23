@@ -1,4 +1,5 @@
-import React, { useRef, useEffect, useMemo, useState } from 'react';
+
+import React, { useRef, useEffect, useMemo, useState, useCallback } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { Node } from './Node';
@@ -41,32 +42,72 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(26);
+  const [cameraUpdateCount, setCameraUpdateCount] = useState(0);
 
+  // Calculate scene center based on node positions
+  const sceneCenter = useMemo(() => {
+    if (data.nodes.length === 0) return { x: 0, y: 0, z: 0 };
+    
+    const positions = data.nodes.map(node => node.position);
+    const x = positions.reduce((sum, pos) => sum + pos[0], 0) / positions.length;
+    const y = positions.reduce((sum, pos) => sum + pos[1], 0) / positions.length;
+    const z = positions.reduce((sum, pos) => sum + pos[2], 0) / positions.length;
+    
+    return { x, y, z };
+  }, [data.nodes]);
+
+  // Center camera on initial load
   useEffect(() => {
     if (camera) {
-      const nodePositions = data.nodes.map(node => node.position);
-      const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / nodePositions.length;
-      const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / nodePositions.length;
-      const centerZ = nodePositions.reduce((sum, pos) => sum + pos[2], 0) / nodePositions.length;
-
-      camera.position.set(centerX, centerY, 26);
-      camera.lookAt(centerX, centerY, 0);
+      camera.position.set(sceneCenter.x, sceneCenter.y, 26);
+      camera.lookAt(sceneCenter.x, sceneCenter.y, 0);
     }
-  }, [camera, data.nodes]);
+  }, [camera, sceneCenter]);
 
-  useEffect(() => {
-    const updateCameraDistance = () => {
-      if (camera) {
-        const z = camera.position.z;
-        setCameraZoom(z);
-      }
-    };
-
-    updateCameraDistance();
-
-    const intervalId = setInterval(updateCameraDistance, 100);
-    return () => clearInterval(intervalId);
+  // Throttled camera zoom updates to reduce flickering
+  const updateCameraDistance = useCallback(() => {
+    if (camera) {
+      const z = camera.position.z;
+      setCameraZoom(z);
+    }
   }, [camera]);
+
+  // Use debounced camera position updates
+  useEffect(() => {
+    let isMounted = true;
+    
+    // Initial update
+    updateCameraDistance();
+    
+    // Create debounced update function
+    let debounceTimeout: number | null = null;
+    
+    const throttledUpdate = () => {
+      if (!isMounted) return;
+      
+      // Clear existing timeout
+      if (debounceTimeout) {
+        window.clearTimeout(debounceTimeout);
+      }
+      
+      // Set new timeout for update
+      debounceTimeout = window.setTimeout(() => {
+        if (isMounted) {
+          updateCameraDistance();
+          setCameraUpdateCount(prev => prev + 1);
+        }
+      }, 100); // Debounce time in ms
+    };
+    
+    // Set up interval for smooth updates
+    const intervalId = setInterval(throttledUpdate, 200);
+    
+    return () => {
+      isMounted = false;
+      if (debounceTimeout) window.clearTimeout(debounceTimeout);
+      clearInterval(intervalId);
+    };
+  }, [camera, updateCameraDistance]);
 
   const highlightedNodes = useMemo(() => {
     if (!selectedNode) return new Set<string>();
@@ -74,6 +115,13 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   }, [selectedNode, data.links]);
 
   const shouldDim = !!selectedNode;
+
+  // Memoize camera target to reduce recalculations
+  const cameraTarget = useMemo(() => [
+    sceneCenter.x,
+    sceneCenter.y,
+    0
+  ], [sceneCenter]);
 
   return (
     <>
@@ -86,13 +134,14 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         rotateSpeed={0.5}
         minDistance={5}
         maxDistance={30}
-        target={[
-          data.nodes.reduce((sum, node) => sum + node.position[0], 0) / data.nodes.length,
-          data.nodes.reduce((sum, node) => sum + node.position[1], 0) / data.nodes.length,
-          0
-        ]}
+        target={cameraTarget}
         onChange={() => {
-          if (camera) setCameraZoom(camera.position.z);
+          // Use the callback sparingly to avoid frequent updates
+          if (camera) {
+            requestAnimationFrame(() => {
+              updateCameraDistance();
+            });
+          }
         }}
       />
       {data.links.map((link, index) => {
