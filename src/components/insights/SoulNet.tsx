@@ -223,20 +223,20 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       className={`
         relative overflow-hidden transition-all duration-300 flex justify-center items-center
         ${isFullScreen 
-          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-transparent' 
-          : 'w-full h-[337px] rounded-xl border bg-transparent mx-2 md:mx-4 my-4'
+          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-background' 
+          : 'w-full h-[337px] rounded-xl border bg-background mx-2 md:mx-4 my-4'
         }
       `}
       layout
     >
       {isMobile && !isFullScreen ? (
-        <div className="w-full h-full flex items-center justify-center bg-background/5 backdrop-blur-sm">
+        <div className="w-full h-full flex items-center justify-center">
           <AnimatedMindMapButton onClick={toggleFullScreen} />
         </div>
       ) : (
         <>
           <Canvas
-            className="w-full h-full max-w-[800px] max-h-[500px]"
+            className="w-full h-full"
             onClick={handleCanvasClick}
             camera={{ position: [0, 0, 26] }}
             onPointerMissed={() => setSelectedEntity(null)}
@@ -250,12 +250,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             />
           </Canvas>
 
-          <div className="absolute bottom-4 left-4 p-3 rounded-lg bg-background/80 backdrop-blur-sm">
-            <p className="text-xs text-muted-foreground">
-              <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
-            </p>
-          </div>
-          
           {selectedEntity && (
             <EntityInfoPanel
               selectedEntity={selectedEntity}
@@ -263,7 +257,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             />
           )}
           
-          {isMobile && (
+          {isMobile && isFullScreen && (
             <button
               onClick={toggleFullScreen}
               className="absolute top-4 right-4 z-[10000] p-2 rounded-lg bg-background/80 backdrop-blur-sm shadow-lg"
@@ -274,7 +268,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
                 animate={{ scale: 1 }}
                 exit={{ scale: 0.9 }}
               >
-                {isFullScreen && <AnimatedMindMapButton onClick={toggleFullScreen} />}
+                <AnimatedMindMapButton onClick={toggleFullScreen} />
               </motion.div>
             </button>
           )}
