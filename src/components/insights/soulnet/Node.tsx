@@ -1,4 +1,3 @@
-
 import React, { useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -77,9 +76,9 @@ export const Node: React.FC<NodeProps> = ({
   if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
 
   // 5x previous base: was ~1.5rem, we'll start at 7.5rem and scale up aggressively.
-  let dynamicFontSize = 7 + Math.max(0, (cameraZ - 18) * 0.8); // e.g. camera at 26 => 13.4rem
-  dynamicFontSize = Math.max(dynamicFontSize, 6.5); // min 6.5rem
-  dynamicFontSize = Math.min(dynamicFontSize, 18);   // max 18rem for sanity
+  let dynamicFontSize = 9.45 + Math.max(0, (cameraZ - 18) * 0.8); // Increased from 7 to 9.45 (35% increase)
+  dynamicFontSize = Math.max(dynamicFontSize, 8.8); // Increased min from 6.5 to 8.8 (35% increase)
+  dynamicFontSize = Math.min(dynamicFontSize, 24);   // Increased max from 18 to 24 (33% increase)
 
   const handleInteraction = (e: any) => {
     e.stopPropagation();

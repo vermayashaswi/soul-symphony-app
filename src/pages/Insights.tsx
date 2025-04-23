@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -34,8 +33,8 @@ export default function Insights() {
     const handleScroll = () => {
       scrollPositionRef.current = window.scrollY;
       
-      // Lower threshold for mobile to ensure it sticks earlier
-      const scrollThreshold = isMobile ? 50 : 90;
+      // Use same threshold for both mobile and desktop for consistent sticky behavior
+      const scrollThreshold = 90;
       setIsSticky(window.scrollY > scrollThreshold);
     };
 
@@ -43,7 +42,7 @@ export default function Insights() {
     // Initial check in case page loads with scroll already
     handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobile]); // Add isMobile as dependency to recalculate on resize
+  }, []);  // Removed isMobile dependency since we want same behavior
 
   const handleEmotionClick = (emotion: string) => {
     setSelectedEmotion(emotion);
@@ -111,8 +110,6 @@ export default function Insights() {
 
   return (
     <div className="min-h-screen pb-20 insights-container">
-      {/* Navbar removed from here */}
-      
       {isSticky && (
         <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-page-time-toggle">
           <div className="max-w-5xl w-full flex justify-end">
@@ -122,7 +119,7 @@ export default function Insights() {
       )}
       
       <div className={cn(
-        "max-w-5xl mx-auto px-2", // Reduced horizontal padding from px-4 to px-2 (65% reduction)
+        "max-w-5xl mx-auto px-2",
         "pt-4 md:pt-8 insights-page-content",
         isMobile ? "mt-2" : "mt-4",
         isSticky && isMobile ? "pt-16" : ""
@@ -313,7 +310,6 @@ export default function Insights() {
               />
             </motion.div>
             
-            {/* Soul-Net visualization - renamed from SoulMesh */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
