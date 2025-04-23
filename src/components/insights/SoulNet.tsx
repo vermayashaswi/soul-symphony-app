@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -230,9 +231,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       layout
     >
       {isMobile && !isFullScreen ? (
-        <div className="w-full h-full flex items-center justify-center">
-          <AnimatedMindMapButton onClick={toggleFullScreen} />
-        </div>
+        <AnimatedMindMapButton onClick={toggleFullScreen} />
       ) : (
         <>
           <Canvas
@@ -279,3 +278,4 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 };
 
 export default SoulNet;
+
