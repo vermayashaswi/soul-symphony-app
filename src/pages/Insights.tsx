@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -125,7 +126,7 @@ export default function Insights() {
       )}
       
       <div className={cn(
-        isMobile ? "w-full px-0" : "max-w-5xl mx-auto px-2",
+        isMobile ? "w-full px-0" : "max-w-5xl mx-auto px-4", // Adjusted padding
         "pt-4 md:pt-8 insights-page-content",
         isMobile ? "mt-2" : "mt-4",
         isSticky && isMobile ? "pt-16" : ""
@@ -161,7 +162,7 @@ export default function Insights() {
         ) : (
           <>
             <div className={cn(
-              "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-2"
+              "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-2 md:px-0" // Adjusted padding
             )}>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
@@ -313,7 +314,7 @@ export default function Insights() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.4 }}
-              className="mb-8 w-full px-2"
+              className="mb-8 w-full px-2 md:px-0" // Adjusted padding
             >
               <MoodCalendar 
                 sentimentData={getSentimentData()}
@@ -325,13 +326,13 @@ export default function Insights() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.5 }}
-              className="mb-8 w-full px-0"
+              className="mb-8 w-full px-0 md:px-2" // Adjusted padding
             >
               <div className={cn(
                 "bg-background rounded-xl shadow-sm border w-full",
                 isMobile ? "p-0" : "p-6 md:p-8"
               )}>
-                <div className={isMobile ? "p-4" : ""}>
+                <div className={isMobile ? "p-4" : "px-4 pt-4"}>
                   <h2 className="text-xl font-semibold mb-4">Soul-Net</h2>
                   <p className="text-muted-foreground mb-4">
                     Explore connections between life aspects and emotions in your journal.
@@ -339,7 +340,7 @@ export default function Insights() {
                 </div>
                 <SoulNet userId={user?.id} timeRange={timeRange} />
                 
-                <div className="w-full text-center mt-2 px-4">
+                <div className="w-full text-center mt-2 px-4 md:px-8">
                   <p className="text-xs text-muted-foreground">
                     <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
                   </p>
