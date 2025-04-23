@@ -19,22 +19,23 @@ export const EntityInfoPanel: React.FC<EntityInfoPanelProps> = ({ selectedEntity
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
       className={`
-        absolute top-2 right-2 p-2.5 rounded-lg shadow-lg
+        absolute top-2 right-2 p-2 rounded-lg shadow-lg
         ${theme === 'dark' ? 'bg-gray-800/95 text-white' : 'bg-white/95 text-gray-800'}
         backdrop-blur-sm
         max-w-[180px] max-h-[35vh]
         overflow-y-auto
         border border-border/50
+        z-[10000]
       `}
     >
-      <h3 className="text-base font-semibold mb-1.5 pb-1.5 border-b border-border/30">{selectedEntity}</h3>
+      <h3 className="text-base font-semibold mb-1 pb-1 border-b border-border/30">{selectedEntity}</h3>
       <div className="space-y-1">
         {Object.entries(entityInfo.emotions)
           .sort(([, a], [, b]) => b - a)
           .map(([emotion, score]) => (
-            <div key={emotion} className="flex items-center justify-between gap-2 text-sm">
+            <div key={emotion} className="flex items-center justify-between gap-2 text-xs">
               <span className="text-xs truncate flex-1">{emotion}</span>
-              <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex-shrink-0">
+              <div className="w-12 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex-shrink-0">
                 <div
                   className="h-full transition-all"
                   style={{

@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -222,7 +223,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       ref={containerRef}
       className={`relative overflow-hidden transition-all duration-300 ${
         isFullScreen 
-          ? 'fixed inset-0 z-50 m-0 rounded-none border-none bg-background'
+          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-background'
           : 'w-full h-[600px] rounded-xl border'
       }`}
       layout
@@ -243,7 +244,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       
       <button
         onClick={toggleFullScreen}
-        className="absolute top-4 right-4 z-50 p-2 rounded-lg bg-background/80 backdrop-blur-sm shadow-lg"
+        className="absolute top-4 right-4 z-[10000] p-2 rounded-lg bg-background/80 backdrop-blur-sm shadow-lg"
       >
         {isFullScreen ? (
           <Minimize className="w-5 h-5 text-foreground" />

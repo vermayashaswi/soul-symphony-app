@@ -33,15 +33,19 @@ export default function Insights() {
     const handleScroll = () => {
       scrollPositionRef.current = window.scrollY;
       
-      const scrollThreshold = isMobile ? 50 : 90; // Lower threshold for mobile
-      setIsSticky(window.scrollY > scrollThreshold);
+      const scrollThreshold = isMobile ? 40 : 90; // Lower threshold for mobile
+      const nextIsSticky = window.scrollY > scrollThreshold;
+      
+      if (isSticky !== nextIsSticky) {
+        setIsSticky(nextIsSticky);
+      }
     };
 
     window.addEventListener('scroll', handleScroll);
     handleScroll(); // Initialize state based on current scroll position
     
     return () => window.removeEventListener('scroll', handleScroll);
-  }, [isMobile]); 
+  }, [isMobile, isSticky]); 
 
   const handleEmotionClick = (emotion: string) => {
     setSelectedEmotion(emotion);
@@ -62,7 +66,7 @@ export default function Insights() {
   };
 
   const renderTimeToggle = () => (
-    <div className="flex items-center gap-3">
+    <div className="insights-time-toggle flex items-center gap-3">
       <span className="text-sm text-muted-foreground">View:</span>
       <ToggleGroup 
         type="single" 
@@ -110,7 +114,7 @@ export default function Insights() {
   return (
     <div className="min-h-screen pb-20 insights-container">
       {isSticky && (
-        <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-page-time-toggle">
+        <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-sticky-header">
           <div className={cn(
             "w-full flex justify-end",
             isMobile ? "max-w-full px-1" : "max-w-5xl"
@@ -121,12 +125,12 @@ export default function Insights() {
       )}
       
       <div className={cn(
-        isMobile ? "w-full px-1" : "max-w-5xl mx-auto px-2",
+        isMobile ? "w-full px-0" : "max-w-5xl mx-auto px-2",
         "pt-4 md:pt-8 insights-page-content",
         isMobile ? "mt-2" : "mt-4",
         isSticky && isMobile ? "pt-16" : ""
       )}>
-        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
+        <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 px-2">
           <div>
             <h1 className="text-3xl font-bold mb-2">Insights</h1>
             <p className="text-muted-foreground">Discover patterns in your emotional journey</p>
@@ -145,7 +149,7 @@ export default function Insights() {
             <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
           </div>
         ) : insightsData.entries.length === 0 ? (
-          <div className="bg-background rounded-xl p-8 text-center border">
+          <div className="bg-background rounded-xl p-8 text-center border mx-2">
             <h2 className="text-xl font-semibold mb-4">No journal data available</h2>
             <p className="text-muted-foreground mb-6">
               Start recording journal entries to see your emotional insights.
@@ -157,14 +161,13 @@ export default function Insights() {
         ) : (
           <>
             <div className={cn(
-              "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8",
-              isMobile && "px-0"
+              "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-2"
             )}>
               <motion.div
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4 }}
-                className="bg-background p-6 rounded-xl shadow-sm border"
+                className="bg-background p-6 rounded-xl shadow-sm border w-full"
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Dominant Mood</h2>
@@ -199,7 +202,7 @@ export default function Insights() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.1 }}
-                className="bg-background p-6 rounded-xl shadow-sm border"
+                className="bg-background p-6 rounded-xl shadow-sm border w-full"
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Biggest Change</h2>
@@ -264,7 +267,7 @@ export default function Insights() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.2 }}
-                className="bg-background p-6 rounded-xl shadow-sm border"
+                className="bg-background p-6 rounded-xl shadow-sm border w-full"
               >
                 <div className="flex justify-between items-start mb-4">
                   <h2 className="font-semibold text-lg">Journal Activity</h2>
@@ -295,7 +298,7 @@ export default function Insights() {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.3 }}
               className={cn(
-                "bg-background rounded-xl shadow-sm mb-8 border",
+                "bg-background rounded-xl shadow-sm mb-8 border w-full mx-auto",
                 isMobile ? "p-4 md:p-8" : "p-6 md:p-8"
               )}
               whileHover={{ boxShadow: "0 10px 25px -5px rgba(0, 0, 0, 0.1)" }}
@@ -310,7 +313,7 @@ export default function Insights() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.4 }}
-              className="mb-8"
+              className="mb-8 w-full px-2"
             >
               <MoodCalendar 
                 sentimentData={getSentimentData()}
@@ -322,16 +325,18 @@ export default function Insights() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.4, delay: 0.5 }}
-              className="mb-8"
+              className="mb-8 w-full px-0"
             >
               <div className={cn(
-                "bg-background rounded-xl shadow-sm border",
-                isMobile ? "p-4 md:p-8" : "p-6 md:p-8"
+                "bg-background rounded-xl shadow-sm border w-full",
+                isMobile ? "p-0" : "p-6 md:p-8"
               )}>
-                <h2 className="text-xl font-semibold mb-4">Soul-Net</h2>
-                <p className="text-muted-foreground mb-4">
-                  Explore connections between life aspects and emotions in your journal.
-                </p>
+                <div className={isMobile ? "p-4" : ""}>
+                  <h2 className="text-xl font-semibold mb-4">Soul-Net</h2>
+                  <p className="text-muted-foreground mb-4">
+                    Explore connections between life aspects and emotions in your journal.
+                  </p>
+                </div>
                 <SoulNet userId={user?.id} timeRange={timeRange} />
               </div>
             </motion.div>
