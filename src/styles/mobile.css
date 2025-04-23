@@ -92,3 +92,30 @@
     margin: 0 8px !important;
   }
 }
+
+/* SoulNet mobile styles */
+@media (max-width: 768px) {
+  /* Full screen SoulNet visualization */
+  .fixed.inset-0.z-\[9999\] {
+    position: fixed !important;
+    top: 0 !important;
+    left: 0 !important;
+    right: 0 !important;
+    bottom: 0 !important;
+    width: 100vw !important;
+    height: 100vh !important;
+    z-index: 9999 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background-color: hsl(var(--background)) !important;
+  }
+
+  /* Animated mind map button container */
+  .soulnet-button-container {
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    width: 100% !important;
+    height: 100% !important;
+  }
+}
