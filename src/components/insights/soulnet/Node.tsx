@@ -94,18 +94,18 @@ export const Node: React.FC<NodeProps> = ({
             alt={node.id}
             draggable={false}
             style={{
-              width: 120,
-              height: 120,
+              width: 220,
+              height: 220,
               filter: dimmed ? "grayscale(0.7) opacity(0.5)" : "",
               transform: isHighlighted ? "scale(1.2)" : "scale(1.00)",
               pointerEvents: "auto",
               userSelect: "none",
               cursor: "pointer",
               transition: "transform 0.15s, filter 0.15s",
-              boxShadow: isHighlighted ? (theme === "dark" ? "0 0 15px #fff5" : "0 0 15px #0003") : "",
+              boxShadow: isHighlighted ? (theme === "dark" ? "0 0 30px #fff5" : "0 0 30px #0003") : "",
               zIndex: isHighlighted ? 5 : 1,
               borderRadius: "50%",
-              border: isHighlighted ? "3px solid #60a5fa" : "none",
+              border: isHighlighted ? "5px solid #60a5fa" : "none",
               background: "transparent",
             }}
             onClick={handleInteraction}
