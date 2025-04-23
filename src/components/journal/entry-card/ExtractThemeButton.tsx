@@ -36,7 +36,7 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
       size="sm"
       onClick={handleExtractThemes}
       disabled={isExtracting}
-      className="mt-2"
+      className="mt-2 w-full bg-background hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
     >
       <RefreshCw className="h-4 w-4 mr-2" />
       {isExtracting ? 'Extracting...' : 'Refresh Themes'}

@@ -10,7 +10,7 @@ import EnergyAnimation from '@/components/EnergyAnimation';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { ArrowRight, LoaderCircle, RefreshCw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { toast } from '@/hooks/use-toast';
+import { toast } from 'sonner';
 import { Button } from '@/components/ui/button';
 
 const Home = () => {
@@ -135,40 +135,35 @@ const Home = () => {
   const handleForceReprocess = async () => {
     setShowConfirm(false);
     setProcessing(true);
-    const promise = supabase.functions.invoke('temporary', { method: 'POST' });
-
-    toast({
-      title: "Processing started...",
+    
+    toast.info("Processing started...", {
       description: "Journal entries are being reprocessed and entityemotion data cleaned.",
       duration: 4000,
-      variant: "default"
     });
 
     try {
-      const { data, error } = await promise;
+      const { data, error } = await supabase.functions.invoke('temporary', { 
+        method: 'POST',
+        body: { action: 'reprocess_all' }
+      });
+      
       setProcessing(false);
       if (error) {
-        toast({
-          title: "Processing failed",
+        toast.error("Processing failed", {
           description: `Error: ${error.message}`,
           duration: 7000,
-          variant: "destructive"
         });
       } else {
-        toast({
-          title: "Reprocessing complete!",
+        toast.success("Reprocessing complete!", {
           description: `Updated: ${data?.updated ?? 0}, Failed: ${data?.failed ?? 0}`,
           duration: 7000,
-          variant: "default"
         });
       }
-    } catch (e: any) {
+    } catch (e) {
       setProcessing(false);
-      toast({
-        title: "Processing failed",
+      toast.error("Processing failed", {
         description: e?.message || 'Unknown error',
         duration: 7000,
-        variant: "destructive"
       });
     }
   };

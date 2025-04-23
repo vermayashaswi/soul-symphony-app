@@ -15,6 +15,7 @@ import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Trash, X } from "lucide-react";
 import { JournalEntry as JournalEntryType, Json } from '@/types/journal';
+import { Button } from '@/components/ui/button';
 
 export interface JournalEntry {
   id: number;
@@ -514,15 +515,17 @@ export function JournalEntryCard({
                 onEntryUpdated={handleEntryUpdate}
               />
               <DeleteEntryDialog onDelete={handleDelete} />
-              <button
+              <Button
                 onClick={handleMakeNull}
-                className="border border-muted-foreground rounded-md px-2 py-1 ml-2 flex items-center gap-1 text-xs hover:bg-red-50 dark:hover:bg-red-900 transition"
+                variant="outline"
+                size="sm"
+                className="flex items-center gap-1 text-xs"
                 title="Set emotions and entities as null"
                 aria-label="Make Null"
               >
                 <X size={16} className="text-muted-foreground" />
                 Make Null
-              </button>
+              </Button>
             </div>
           </div>
 
