@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
@@ -39,19 +38,22 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   onNodeClick,
   themeHex,
 }) => {
-  const { camera } = useThree();
+  const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(26);
 
-  // Update camera position and track zoom changes
   useEffect(() => {
     if (camera) {
-      camera.position.set(0, 0, 26);
-      camera.lookAt(0, 0, 0);
-    }
-  }, [camera]);
+      const nodePositions = data.nodes.map(node => node.position);
+      const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / nodePositions.length;
+      const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / nodePositions.length;
+      const centerZ = nodePositions.reduce((sum, pos) => sum + pos[2], 0) / nodePositions.length;
 
-  // Monitor camera position for zoom changes
+      camera.position.set(centerX, centerY, 26);
+      camera.lookAt(centerX, centerY, 0);
+    }
+  }, [camera, data.nodes]);
+
   useEffect(() => {
     const updateCameraDistance = () => {
       if (camera) {
@@ -60,10 +62,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       }
     };
 
-    // Initial update
     updateCameraDistance();
 
-    // Setup an interval to check camera position frequently
     const intervalId = setInterval(updateCameraDistance, 100);
     return () => clearInterval(intervalId);
   }, [camera]);
@@ -86,7 +86,11 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         rotateSpeed={0.5}
         minDistance={5}
         maxDistance={30}
-        target={[0, 0, 0]}
+        target={[
+          data.nodes.reduce((sum, node) => sum + node.position[0], 0) / data.nodes.length,
+          data.nodes.reduce((sum, node) => sum + node.position[1], 0) / data.nodes.length,
+          0
+        ]}
         onChange={() => {
           if (camera) setCameraZoom(camera.position.z);
         }}
@@ -109,7 +113,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       {data.nodes.map(node => {
-        // Only show labels when needed
         const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         return (
