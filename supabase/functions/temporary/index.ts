@@ -361,7 +361,7 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Starting force-reprocess function for ALL journal entries");
+    console.log("Starting force-reprocess function for ONLY NULL journal entries (not already processed)");
     const authHeader = req.headers.get('Authorization');
     const clientInfoHeader = req.headers.get('x-client-info');
 
@@ -382,11 +382,9 @@ serve(async (req) => {
     try {
       knownEmotions = await getKnownEmotions();
       console.log(`Using ${knownEmotions.length} known emotions for analysis`);
-      
+
       if (knownEmotions.length < 30) {
-        console.error("WARNING: Found fewer emotions than expected. This might indicate a database issue.");
-        
-        // Let's try to debug by listing some table information
+        // Debugging
         const { data: tablesData, error: tablesError } = await userSupabase
           .from('emotions')
           .select('id, name')
@@ -410,22 +408,24 @@ serve(async (req) => {
       );
     }
 
-    // Fetch ALL journal entries with pagination to handle large datasets
+    // Fetch ONLY entries that have both entities and entityemotion as NULL (not processed yet)
     const pageSize = 25;
     let allEntries = [];
     let lastId = 0;
     let hasMore = true;
-    
+
     while (hasMore) {
-      console.log(`Fetching page of entries starting from ID > ${lastId}...`);
-      
+      console.log(`Fetching page of NULL entries starting from ID > ${lastId}...`);
+
       const { data: entries, error } = await userSupabase
         .from('Journal Entries')
-        .select('id, "refined text", "transcription text"')
+        .select('id, "refined text", "transcription text", entities, entityemotion')
         .order('id', { ascending: true })
         .gt('id', lastId)
+        .is('entities', null)
+        .is('entityemotion', null)
         .limit(pageSize);
-      
+
       if (error) {
         console.error("Database error fetching entries:", error);
         return new Response(
@@ -437,38 +437,37 @@ serve(async (req) => {
           { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
         );
       }
-      
+
       if (!entries || entries.length === 0) {
         hasMore = false;
         break;
       }
-      
-      console.log(`Fetched ${entries.length} entries`);
+
+      console.log(`Fetched ${entries.length} entries where entities and entityemotion are NULL`);
       allEntries = allEntries.concat(entries);
       lastId = entries[entries.length - 1].id;
-      
-      // If we got fewer entries than the page size, we've reached the end
+
       if (entries.length < pageSize) {
         hasMore = false;
       }
     }
-    
-    console.log(`Found ${allEntries.length} total entries to process`);
-    
+
+    console.log(`Found ${allEntries.length} total NULL entries to process`);
+
     if (allEntries.length === 0) {
-      console.log("No entries found to process");
+      console.log("No unprocessed (NULL) entries found");
       return new Response(
-        JSON.stringify({ 
-          message: 'No entries found to process',
-          updated: 0 
-        }), 
+        JSON.stringify({
+          message: 'No unprocessed (NULL) entries found to process',
+          updated: 0
+        }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
     let updated = 0;
     let failed = 0;
-    
+
     // Process entries in batches to avoid overwhelming the server
     const batchSize = 5;
     for (let i = 0; i < allEntries.length; i += batchSize) {
