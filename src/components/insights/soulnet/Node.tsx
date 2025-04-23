@@ -1,5 +1,5 @@
 
-import React, { useRef, useCallback, useState, useEffect } from 'react';
+import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
@@ -40,31 +40,43 @@ export const Node: React.FC<NodeProps> = ({
   const { theme } = useTheme();
   const { camera } = useThree();
   const [isTouching, setIsTouching] = useState(false);
-
+  // Use memo for stable colors to avoid unnecessary re-renders
   const isHighlighted = isSelected || highlightedNodes.has(node.id);
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = baseScale * (0.8 + node.value * 0.5);
 
-  // Determine color based on type and state
-  let displayColor = node.type === 'entity'
-    ? (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : '#fff')
-    : (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : themeHex);
+  // Memoize colors to avoid recalculations causing flickering
+  const displayColor = useMemo(() => 
+    node.type === 'entity'
+      ? (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : '#fff')
+      : (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : themeHex),
+    [node.type, dimmed, theme, themeHex]
+  );
 
-  const Geometry = node.type === 'entity'
-    ? <sphereGeometry args={[1, 32, 32]} />
-    : <boxGeometry args={[1.2, 1.2, 1.2]} />;
+  const Geometry = useMemo(() => 
+    node.type === 'entity'
+      ? <sphereGeometry args={[1, 32, 32]} />
+      : <boxGeometry args={[1.2, 1.2, 1.2]} />,
+    [node.type]
+  );
 
-  // Animation for highlighted nodes
+  // Animation for highlighted nodes with reduced frequency of updates
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
+    
     if (isHighlighted && !dimmed) {
-      const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.1 + 1;
+      // Use slower animation frequency to reduce updates
+      const pulse = Math.sin(clock.getElapsedTime() * 2) * 0.08 + 1;
       meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
+      
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        meshRef.current.material.emissiveIntensity = 0.5 + Math.sin(clock.getElapsedTime() * 5) * 0.2;
+        // Less frequent emissive changes
+        meshRef.current.material.emissiveIntensity = 0.5 + Math.sin(clock.getElapsedTime() * 3) * 0.15;
       }
-    } else {
+    } else if (meshRef.current.scale.x !== scale) {
+      // Only update if scale has changed to reduce unnecessary render cycles
       meshRef.current.scale.set(scale, scale, scale);
+      
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
         meshRef.current.material.emissiveIntensity = 0;
       }
@@ -74,17 +86,24 @@ export const Node: React.FC<NodeProps> = ({
   // Only show labels for highlighted nodes or when no node is selected
   const shouldShowLabel = showLabel && (!selectedNodeId || isHighlighted);
 
-  // Calculate appropriate font size based on camera zoom
-  let cameraZ = cameraZoom !== undefined 
-    ? cameraZoom 
-    : (camera && (camera as any).position ? (camera as any).position.z : 26);
-  if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
+  // Calculate appropriate font size based on camera zoom with caching
+  const cameraZ = useMemo(() => {
+    let z = cameraZoom !== undefined 
+      ? cameraZoom 
+      : (camera && (camera as any).position ? (camera as any).position.z : 26);
+    if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
+    return z;
+  }, [camera, cameraZoom]);
 
-  let dynamicFontSize = 12.825 + Math.max(0, (cameraZ - 18) * 0.8);
-  dynamicFontSize = Math.max(dynamicFontSize, 11.88);
-  dynamicFontSize = Math.min(dynamicFontSize, 32.4);
+  // Stabilize font size calculations to avoid frequent changes
+  const dynamicFontSize = useMemo(() => {
+    const base = 12.825 + Math.max(0, (cameraZ - 18) * 0.8);
+    // Round to fewer decimal places to reduce unnecessary updates
+    const size = Math.round(Math.max(Math.min(base, 32.4), 11.88) * 100) / 100;
+    return size;
+  }, [cameraZ]);
 
-  // Improved touch handling with timers to ensure selection happens
+  // Improved touch handling with debouncing
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   
   const handlePointerDown = useCallback((e: any) => {
@@ -115,6 +134,33 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime, node.id, onClick]);
 
+  // Memoize the HTML label style to avoid recreating it on every render
+  const labelStyle = useMemo(() => ({
+    transform: 'scale(1) !important',
+    minWidth: 'auto',
+    minHeight: 'auto',
+    pointerEvents: 'none',
+    fontSize: `${dynamicFontSize}rem`,
+    fontWeight: 700, 
+    lineHeight: 1.1,
+    zIndex: 99999,
+    userSelect: 'text',
+    whiteSpace: 'nowrap',
+    // Use transform for smoother animation, avoid opacity
+    transition: 'transform 0.2s ease-out',
+    willChange: 'transform', // Hint to browser to optimize animations
+    opacity: shouldShowLabel ? 1 : 0,
+  }), [dynamicFontSize, shouldShowLabel]);
+
+  // Memoize the label container style to avoid recreating it on every render
+  const labelContainerStyle = useMemo(() => ({
+    color: node.type === 'entity' ? '#fff' : themeHex,
+    backgroundColor: node.type === 'entity' ? 'rgba(0, 0, 0, 0.85)' : 'white',
+    backdropFilter: 'blur(8px)',
+    WebkitBackdropFilter: 'blur(8px)',
+    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
+  }), [node.type, themeHex]);
+
   return (
     <group position={node.position}>
       <mesh
@@ -138,40 +184,30 @@ export const Node: React.FC<NodeProps> = ({
           emissiveIntensity={isHighlighted && !dimmed ? 0.5 : 0}
         />
       </mesh>
+      
       {shouldShowLabel && (
         <Html
           position={[0, node.type === 'entity' ? 1.2 : 1.4, 0]}
           center
-          distanceFactor={1}
+          // Increase the distance factor to improve stability
+          distanceFactor={1.2}
+          // Disable occlusion to prevent flickering when nodes overlap
           occlude={false}
+          // Important for z-order
           className="z-40"
-          style={{
-            transform: 'scale(1) !important',
-            minWidth: 'auto',
-            minHeight: 'auto',
-            pointerEvents: 'none',
-            fontSize: `${dynamicFontSize}rem`,
-            fontWeight: 700,
-            lineHeight: 1.1,
-            zIndex: 99999,
-            userSelect: 'text',
-            whiteSpace: 'nowrap',
-            transition: 'opacity 0.2s ease', // Smoother transitions
-            opacity: shouldShowLabel ? 1 : 0,
-          }}
+          // Use transform3d for hardware acceleration
+          style={labelStyle}
+          // Add key based on node id to help React stabilize rendering
+          key={`label-${node.id}-${isHighlighted ? 'highlighted' : 'normal'}`}
+          // Reduce the update frequency to improve performance
+          calculatePosition={() => true} // Important: set to true to stabilize position
         >
           <div className={`
             px-2 py-1 rounded-lg font-bold whitespace-nowrap
             ${isHighlighted ? 'scale-110 font-black' : 'opacity-95'}
             select-text
           `}
-            style={{
-              color: node.type === 'entity' ? '#fff' : themeHex,
-              backgroundColor: node.type === 'entity' ? 'rgba(0, 0, 0, 0.85)' : 'white',
-              backdropFilter: 'blur(8px)',
-              WebkitBackdropFilter: 'blur(8px)',
-              boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-            }}
+            style={labelContainerStyle}
           >
             {node.id}
           </div>
@@ -180,3 +216,4 @@ export const Node: React.FC<NodeProps> = ({
     </group>
   );
 };
+

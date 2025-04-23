@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
@@ -41,33 +42,41 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(26);
+  
+  // Use memoization to prevent recalculation of center position on every render
+  const centerPosition = useMemo(() => {
+    const nodePositions = data.nodes.map(node => node.position);
+    const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / Math.max(nodePositions.length, 1);
+    const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / Math.max(nodePositions.length, 1);
+    const centerZ = 0;
+    return [centerX, centerY, centerZ];
+  }, [data.nodes]);
 
   useEffect(() => {
-    if (camera) {
-      const nodePositions = data.nodes.map(node => node.position);
-      const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / nodePositions.length;
-      const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / nodePositions.length;
-      const centerZ = nodePositions.reduce((sum, pos) => sum + pos[2], 0) / nodePositions.length;
-
+    if (camera && data.nodes.length > 0) {
+      const [centerX, centerY] = centerPosition;
       camera.position.set(centerX, centerY, 26);
       camera.lookAt(centerX, centerY, 0);
     }
-  }, [camera, data.nodes]);
+  }, [camera, data.nodes, centerPosition]);
 
+  // Use a more efficient way to track camera zoom with throttling
   useEffect(() => {
     const updateCameraDistance = () => {
       if (camera) {
-        const z = camera.position.z;
-        setCameraZoom(z);
+        const currentZ = camera.position.z;
+        if (Math.abs(currentZ - cameraZoom) > 0.5) {
+          setCameraZoom(currentZ);
+        }
       }
     };
 
-    updateCameraDistance();
-
-    const intervalId = setInterval(updateCameraDistance, 100);
+    // Use less frequent updates to improve performance
+    const intervalId = setInterval(updateCameraDistance, 200);
     return () => clearInterval(intervalId);
-  }, [camera]);
+  }, [camera, cameraZoom]);
 
+  // Memoize connected nodes to prevent unnecessary recalculations
   const highlightedNodes = useMemo(() => {
     if (!selectedNode) return new Set<string>();
     return getConnectedNodes(selectedNode, data.links);
@@ -86,50 +95,61 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         rotateSpeed={0.5}
         minDistance={5}
         maxDistance={30}
-        target={[
-          data.nodes.reduce((sum, node) => sum + node.position[0], 0) / data.nodes.length,
-          data.nodes.reduce((sum, node) => sum + node.position[1], 0) / data.nodes.length,
-          0
-        ]}
+        target={centerPosition}
+        // Use a more efficient event handler
         onChange={() => {
-          if (camera) setCameraZoom(camera.position.z);
+          if (camera) {
+            const currentZ = camera.position.z;
+            if (Math.abs(currentZ - cameraZoom) > 0.5) {
+              setCameraZoom(currentZ);
+            }
+          }
         }}
       />
-      {data.links.map((link, index) => {
-        const sourceNode = data.nodes.find(n => n.id === link.source);
-        const targetNode = data.nodes.find(n => n.id === link.target);
-        if (!sourceNode || !targetNode) return null;
-        const isHighlight = selectedNode &&
-          (link.source === selectedNode || link.target === selectedNode);
-        return (
-          <Edge
-            key={`edge-${index}`}
-            start={sourceNode.position}
-            end={targetNode.position}
-            value={link.value}
-            isHighlighted={!!isHighlight}
-            dimmed={shouldDim && !isHighlight}
-          />
-        );
-      })}
-      {data.nodes.map(node => {
-        const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
-        const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
-        return (
-          <Node
-            key={`node-${node.id}`}
-            node={node}
-            isSelected={selectedNode === node.id}
-            onClick={onNodeClick}
-            highlightedNodes={highlightedNodes}
-            showLabel={showLabel}
-            dimmed={dimmed}
-            themeHex={themeHex}
-            selectedNodeId={selectedNode}
-            cameraZoom={cameraZoom}
-          />
-        );
-      })}
+      
+      {/* Memoize edges to prevent unnecessary rerenders */}
+      {useMemo(() => (
+        data.links.map((link, index) => {
+          const sourceNode = data.nodes.find(n => n.id === link.source);
+          const targetNode = data.nodes.find(n => n.id === link.target);
+          if (!sourceNode || !targetNode) return null;
+          const isHighlight = selectedNode &&
+            (link.source === selectedNode || link.target === selectedNode);
+          return (
+            <Edge
+              key={`edge-${index}`}
+              start={sourceNode.position}
+              end={targetNode.position}
+              value={link.value}
+              isHighlighted={!!isHighlight}
+              dimmed={shouldDim && !isHighlight}
+            />
+          );
+        })
+      ), [data.links, data.nodes, selectedNode, shouldDim])}
+      
+      {/* Memoize nodes to prevent unnecessary rerenders */}
+      {useMemo(() => (
+        data.nodes.map(node => {
+          const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
+          const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
+          return (
+            <Node
+              key={`node-${node.id}`}
+              node={node}
+              isSelected={selectedNode === node.id}
+              onClick={onNodeClick}
+              highlightedNodes={highlightedNodes}
+              showLabel={showLabel}
+              dimmed={dimmed}
+              themeHex={themeHex}
+              selectedNodeId={selectedNode}
+              cameraZoom={cameraZoom}
+            />
+          );
+        })
+      ), [data.nodes, selectedNode, highlightedNodes, shouldDim, themeHex, cameraZoom, onNodeClick])}
     </>
   );
 };
+

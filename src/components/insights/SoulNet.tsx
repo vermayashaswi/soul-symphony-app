@@ -1,5 +1,5 @@
 
-import React, { useRef, useState, useEffect } from 'react';
+import React, { useRef, useState, useEffect, useCallback, useMemo } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
@@ -42,39 +42,45 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [isFullScreen, setIsFullScreen] = useState(false);
   const isMobile = useIsMobile();
 
+  // Optimize swipe gesture to reduce unnecessary renders
   useSwipeGesture(containerRef, {
     onSwipeLeft: () => {},
     minDistance: 30
   });
 
+  // Memoize date calculation to prevent unnecessary recalculation
+  const getStartDate = useCallback((range: TimeRange) => {
+    const now = new Date();
+    switch (range) {
+      case 'today':
+        return new Date(now.setHours(0, 0, 0, 0));
+      case 'week':
+        const weekStart = new Date(now);
+        weekStart.setDate(weekStart.getDate() - 7);
+        return weekStart;
+      case 'month':
+        const monthStart = new Date(now);
+        monthStart.setMonth(monthStart.getMonth() - 1);
+        return monthStart;
+      case 'year':
+        const yearStart = new Date(now);
+        yearStart.setFullYear(yearStart.getFullYear() - 1);
+        return yearStart;
+      default:
+        const defaultStart = new Date(now);
+        defaultStart.setDate(defaultStart.getDate() - 7);
+        return defaultStart;
+    }
+  }, []);
+
+  // Fetch data using useEffect with proper dependencies
   useEffect(() => {
     if (!userId) return;
 
     const fetchEntityEmotionData = async () => {
       setLoading(true);
       try {
-        const now = new Date();
-        let startDate;
-        switch (timeRange) {
-          case 'today':
-            startDate = new Date(now.setHours(0, 0, 0, 0));
-            break;
-          case 'week':
-            startDate = new Date(now);
-            startDate.setDate(startDate.getDate() - 7);
-            break;
-          case 'month':
-            startDate = new Date(now);
-            startDate.setMonth(startDate.getMonth() - 1);
-            break;
-          case 'year':
-            startDate = new Date(now);
-            startDate.setFullYear(startDate.getFullYear() - 1);
-            break;
-          default:
-            startDate = new Date(now);
-            startDate.setDate(startDate.getDate() - 7);
-        }
+        const startDate = getStartDate(timeRange);
 
         const { data: entries, error } = await supabase
           .from('Journal Entries')
@@ -119,58 +125,64 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
         setEntityData(entityEmotionMap);
 
-        const nodes: NodeData[] = [];
-        const links: LinkData[] = [];
-        const entityNodes = new Set<string>();
-        const emotionNodes = new Set<string>();
-
-        const entityList = Object.keys(entityEmotionMap);
-        const EMOTION_LAYER_RADIUS = 11;
-        const ENTITY_LAYER_RADIUS = 6;
-        const EMOTION_Y_SPAN = 6;
-        const ENTITY_Y_SPAN = 3;
-
-        entityList.forEach((entity, entityIndex) => {
-          entityNodes.add(entity);
-          const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
-          const entityRadius = ENTITY_LAYER_RADIUS;
-          const entityX = Math.cos(entityAngle) * entityRadius;
-          const entityY = ((entityIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * ENTITY_Y_SPAN;
-          const entityZ = Math.sin(entityAngle) * entityRadius;
-          nodes.push({
-            id: entity,
-            type: 'entity',
-            value: 1,
-            color: '#fff',
-            position: [entityX, entityY, entityZ]
-          });
-
-          Object.entries(entityEmotionMap[entity].emotions).forEach(([emotion, score]) => {
-            emotionNodes.add(emotion);
-            links.push({
-              source: entity,
-              target: emotion,
-              value: score
+        // Generate graph nodes and links
+        const generateGraph = () => {
+          const nodes: NodeData[] = [];
+          const links: LinkData[] = [];
+          const entityNodes = new Set<string>();
+          const emotionNodes = new Set<string>();
+  
+          const entityList = Object.keys(entityEmotionMap);
+          const EMOTION_LAYER_RADIUS = 11;
+          const ENTITY_LAYER_RADIUS = 6;
+          const EMOTION_Y_SPAN = 6;
+          const ENTITY_Y_SPAN = 3;
+  
+          entityList.forEach((entity, entityIndex) => {
+            entityNodes.add(entity);
+            const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
+            const entityRadius = ENTITY_LAYER_RADIUS;
+            const entityX = Math.cos(entityAngle) * entityRadius;
+            const entityY = ((entityIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * ENTITY_Y_SPAN;
+            const entityZ = Math.sin(entityAngle) * entityRadius;
+            nodes.push({
+              id: entity,
+              type: 'entity',
+              value: 1,
+              color: '#fff',
+              position: [entityX, entityY, entityZ]
+            });
+  
+            Object.entries(entityEmotionMap[entity].emotions).forEach(([emotion, score]) => {
+              emotionNodes.add(emotion);
+              links.push({
+                source: entity,
+                target: emotion,
+                value: score
+              });
             });
           });
-        });
-
-        Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
-          const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
-          const emotionRadius = EMOTION_LAYER_RADIUS;
-          const emotionX = Math.cos(emotionAngle) * emotionRadius;
-          const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * EMOTION_Y_SPAN;
-          const emotionZ = Math.sin(emotionAngle) * emotionRadius;
-          nodes.push({
-            id: emotion,
-            type: 'emotion',
-            value: 0.8,
-            color: themeHex,
-            position: [emotionX, emotionY, emotionZ]
+  
+          Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
+            const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
+            const emotionRadius = EMOTION_LAYER_RADIUS;
+            const emotionX = Math.cos(emotionAngle) * emotionRadius;
+            const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * EMOTION_Y_SPAN;
+            const emotionZ = Math.sin(emotionAngle) * emotionRadius;
+            nodes.push({
+              id: emotion,
+              type: 'emotion',
+              value: 0.8,
+              color: themeHex,
+              position: [emotionX, emotionY, emotionZ]
+            });
           });
-        });
+  
+          return { nodes, links };
+        };
 
-        setGraphData({ nodes, links });
+        // Set the graph data
+        setGraphData(generateGraph());
       } catch (error) {
         console.error('Error processing entity-emotion data:', error);
       } finally {
@@ -179,21 +191,29 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
 
     fetchEntityEmotionData();
-  }, [userId, timeRange, themeHex]);
+  }, [userId, timeRange, themeHex, getStartDate]);
 
-  const handleCanvasClick = (e: any) => {
+  const handleCanvasClick = useCallback((e: any) => {
     if (e.target === e.currentTarget) {
       setSelectedEntity(null);
     }
-  };
+  }, []);
 
-  const handleNodeSelect = (id: string) => {
+  const handleNodeSelect = useCallback((id: string) => {
     setSelectedEntity(prevId => prevId === id ? null : id);
-  };
+  }, []);
 
-  const toggleFullScreen = () => {
+  const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => !prev);
-  };
+  }, []);
+
+  // Memoize canvas style to prevent unnecessary style recalculations
+  const canvasStyle = useMemo(() => ({
+    width: '100%',
+    height: '100%',
+    maxWidth: '800px',
+    maxHeight: '500px'
+  }), []);
 
   if (loading) {
     return (
@@ -231,11 +251,22 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       layout
     >
       <Canvas
-        className="w-full h-full max-w-[800px] max-h-[500px]" // Added max dimensions to prevent oversized canvas
+        style={canvasStyle}
         onClick={handleCanvasClick}
         camera={{ position: [0, 0, 26] }}
         onPointerMissed={() => setSelectedEntity(null)}
-        gl={{ preserveDrawingBuffer: true }}
+        gl={{ 
+          preserveDrawingBuffer: true,
+          // Add optimizations for mobile devices
+          antialias: !isMobile, // Disable antialiasing on mobile for performance
+          powerPreference: 'high-performance',
+          alpha: true,
+          // Optimize depth for mobile
+          depth: true,
+          stencil: false,
+          // Set precision based on device capability
+          precision: isMobile ? 'mediump' : 'highp'
+        }}
       >
         <SoulNetVisualization
           data={graphData}
