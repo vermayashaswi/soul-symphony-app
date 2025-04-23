@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
@@ -6,6 +7,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { motion } from 'framer-motion';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
+import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 
 interface NodeData {
   id: string;
@@ -253,14 +255,11 @@ const SoulNetVisualization: React.FC<{
         );
       })}
       {data.nodes.map(node => {
-        let showLabel = false;
-        if (!selectedNode) {
-          showLabel = true;
-        } else if (selectedNode === node.id || highlightedNodes.has(node.id)) {
-          showLabel = true;
-        } else {
-          showLabel = false;
-        }
+        // This is the key fix for label visibility
+        const showLabel = !selectedNode || 
+                         node.id === selectedNode || 
+                         highlightedNodes.has(node.id);
+
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         return (
           <Node
@@ -343,6 +342,14 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [loading, setLoading] = useState(true);
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { theme } = useTheme();
+  const containerRef = useRef<HTMLDivElement>(null);
+
+  // Setup touch gesture handling
+  useSwipeGesture(containerRef, {
+    onSwipeLeft: () => {
+      // Do nothing on swipe, but ensure touch events work
+    }
+  });
 
   useEffect(() => {
     if (!userId) return;
@@ -481,17 +488,16 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     fetchEntityEmotionData();
   }, [userId, timeRange]);
 
-  const handleCanvasClick = () => {
-    setSelectedEntity(null);
+  const handleCanvasClick = (e: any) => {
+    // Check if it's a direct canvas click and not a propagated event
+    if (e.target === e.currentTarget) {
+      setSelectedEntity(null);
+    }
   };
 
   const handleNodeSelect = (id: string) => {
-    const node = graphData.nodes.find(node => node.id === id);
-    if (node && node.type === 'entity') {
-      setSelectedEntity(id === selectedEntity ? null : id);
-    } else if (node && node.type === 'emotion') {
-      setSelectedEntity(id === selectedEntity ? null : id);
-    }
+    console.log("Node selected:", id);
+    setSelectedEntity(prevId => prevId === id ? null : id);
   };
 
   if (loading) {
@@ -518,8 +524,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }
 
   return (
-    <div className="relative w-full h-[600px] rounded-xl overflow-hidden border">
-      <Canvas onClick={handleCanvasClick} camera={{ position: [0, 0, 15] }}>
+    <div 
+      ref={containerRef}
+      className="relative w-full h-[600px] rounded-xl overflow-hidden border touch-action-none"
+    >
+      <Canvas 
+        onClick={handleCanvasClick} 
+        camera={{ position: [0, 0, 15] }}
+        onPointerMissed={() => setSelectedEntity(null)}
+      >
         <SoulNetVisualization 
           data={graphData} 
           selectedNode={selectedEntity}
