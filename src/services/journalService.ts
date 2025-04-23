@@ -303,3 +303,31 @@ export const reprocessJournalEntry = async (entryId: number): Promise<boolean> =
     return false;
   }
 };
+
+/**
+ * Reprocesses all journal entries with NULL entities and entityemotion fields
+ */
+export const reprocessAllNullEntries = async (): Promise<{ updated: number, failed: number, total: number }> => {
+  try {
+    console.log('[JournalService] Triggering reprocessing for all NULL journal entries');
+    
+    const { data, error } = await supabase.functions.invoke('temporary', { 
+      method: 'GET' // Using GET method to trigger the reprocessing function
+    });
+    
+    if (error) {
+      console.error('[JournalService] Error reprocessing entries:', error);
+      throw error;
+    }
+    
+    console.log('[JournalService] Reprocessing complete:', data);
+    return { 
+      updated: data?.updated || 0, 
+      failed: data?.failed || 0,
+      total: data?.total || 0
+    };
+  } catch (error: any) {
+    console.error('[JournalService] Error in reprocessAllNullEntries:', error);
+    throw error;
+  }
+};

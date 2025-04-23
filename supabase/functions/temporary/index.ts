@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -497,8 +498,9 @@ serve(async (req) => {
               )
             );
             
-            // Update the entry in database
-            const { error: updateErr } = await userSupabase
+            // Update the entry in database - FIX: Use service role key for update to ensure RLS doesn't block
+            const serviceSupabase = createClient(supabaseUrl, supabaseServiceKey);
+            const { error: updateErr } = await serviceSupabase
               .from('Journal Entries')
               .update({
                 entities: categories,

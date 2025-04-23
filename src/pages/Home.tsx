@@ -139,26 +139,25 @@ const Home = () => {
     setProcessing(true);
     
     toast.info("Processing started...", {
-      description: "Journal entries are being reprocessed and entityemotion data cleaned.",
+      description: "Journal entries with NULL fields are being reprocessed.",
       duration: 4000,
     });
 
     try {
-      const { data, error } = await supabase.functions.invoke('temporary', { 
-        method: 'POST',
-        body: { action: 'reprocess_all' }
-      });
+      // Update to use the import from journalService
+      const { reprocessAllNullEntries } = await import('@/services/journalService');
+      const result = await reprocessAllNullEntries();
       
       setProcessing(false);
-      if (error) {
-        toast.error("Processing failed", {
-          description: `Error: ${error.message}`,
+      if (result.updated > 0 || result.total > 0) {
+        toast.success("Reprocessing complete!", {
+          description: `Updated: ${result.updated}, Failed: ${result.failed}, Total: ${result.total}`,
           duration: 7000,
         });
       } else {
-        toast.success("Reprocessing complete!", {
-          description: `Updated: ${data?.updated ?? 0}, Failed: ${data?.failed ?? 0}`,
-          duration: 7000,
+        toast.info("No entries needed processing", {
+          description: "All journal entries already have entityemotion data.",
+          duration: 5000,
         });
       }
     } catch (e) {
