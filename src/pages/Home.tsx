@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,10 +9,9 @@ import { useTheme } from '@/hooks/use-theme';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EnergyAnimation from '@/components/EnergyAnimation';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
-import { ArrowRight, LoaderCircle, RefreshCw } from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { Button } from '@/components/ui/button';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -124,43 +124,6 @@ const Home = () => {
       navigate('/app/journal');
     } catch (error) {
       console.error("Navigation error:", error);
-    }
-  };
-
-  console.warn('DEVELOPER WARNING: Reprocess button is visible to all users. This should only be used for debugging!');
-
-  const handleForceReprocess = async () => {
-    setShowConfirm(false);
-    setProcessing(true);
-    
-    toast.info("Processing started...", {
-      description: "Journal entries with NULL fields are being reprocessed.",
-      duration: 4000,
-    });
-
-    try {
-      // Update to use the import from journalService
-      const { reprocessAllNullEntries } = await import('@/services/journalService');
-      const result = await reprocessAllNullEntries();
-      
-      setProcessing(false);
-      if (result.updated > 0 || result.total > 0) {
-        toast.success("Reprocessing complete!", {
-          description: `Updated: ${result.updated}, Failed: ${result.failed}, Total: ${result.total}`,
-          duration: 7000,
-        });
-      } else {
-        toast.info("No entries needed processing", {
-          description: "All journal entries already have entityemotion data.",
-          duration: 5000,
-        });
-      }
-    } catch (e) {
-      setProcessing(false);
-      toast.error("Processing failed", {
-        description: e?.message || 'Unknown error',
-        duration: 7000,
-      });
     }
   };
 
