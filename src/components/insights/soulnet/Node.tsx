@@ -22,7 +22,7 @@ interface NodeProps {
   dimmed: boolean;
   themeHex: string;
   selectedNodeId: string | null;
-  cameraZoom?: number; // new, comes from parent via prop (pass camera.position.z or camera.zoom as appropriate)
+  cameraZoom?: number;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -30,11 +30,10 @@ export const Node: React.FC<NodeProps> = ({
   isSelected,
   onClick,
   highlightedNodes,
-  // showLabel, // UNUSED – unconditional label display
   dimmed,
   themeHex,
   selectedNodeId,
-  cameraZoom, // value provided by parent visualization
+  cameraZoom,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
@@ -68,25 +67,20 @@ export const Node: React.FC<NodeProps> = ({
     }
   });
 
-  // All labels must always be visible at fixed size in any viewport, any selection.
+  // Always show all labels
   const shouldShowLabel = true;
 
-  // Dynamic font size logic based on camera distance (camera.position.z)
-  // Empirically: closer camera => smaller font, farther camera => larger font
-  // We want a minimum, and a scaling relation with zoom/distance.
-  // Perspective camera: larger z = further out, so increase font size as z increases
-  // Clamp min and max for usability
+  // Make font 5x larger by greatly increasing the base and scaling factor.
   let cameraZ = cameraZoom !== undefined 
     ? cameraZoom 
     : (camera && (camera as any).position ? (camera as any).position.z : 26);
   if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
 
-  // More aggressive scaling - base size increased, scaling factor increased
-  let dynamicFontSize = 1.4 + Math.max(0, (cameraZ - 18) * 0.15); // e.g. camera at 26 => ~2.6rem
-  dynamicFontSize = Math.max(dynamicFontSize, 1.3); // min 1.3rem for legibility
-  dynamicFontSize = Math.min(dynamicFontSize, 3.0); // max 3rem
+  // 5x previous base: was ~1.5rem, we'll start at 7.5rem and scale up aggressively.
+  let dynamicFontSize = 7 + Math.max(0, (cameraZ - 18) * 0.8); // e.g. camera at 26 => 13.4rem
+  dynamicFontSize = Math.max(dynamicFontSize, 6.5); // min 6.5rem
+  dynamicFontSize = Math.min(dynamicFontSize, 18);   // max 18rem for sanity
 
-  // Combined handler for all pointer/touch events
   const handleInteraction = (e: any) => {
     e.stopPropagation();
     onClick(node.id);
@@ -124,21 +118,21 @@ export const Node: React.FC<NodeProps> = ({
             minHeight: 'auto',
             pointerEvents: 'none',
             fontSize: `${dynamicFontSize}rem`,
-            fontWeight: 600, // Increased from 500 to 600 for better visibility
+            fontWeight: 700,
             lineHeight: 1.1,
             zIndex: 99999,
             userSelect: 'text',
             whiteSpace: 'nowrap',
             textShadow: theme === 'dark'
-              ? "0 2px 6px #000, 0px 0px 9px #000, 0px 0px 5px #000" // Added extra shadow for dark mode
-              : "0 2px 8px #fff, 0px 0px 7px #fff, 0px 0px 5px #fff" // Added extra shadow for light mode
+              ? "0 2px 6px #000, 0px 0px 9px #000, 0px 0px 5px #000"
+              : "0 2px 8px #fff, 0px 0px 7px #fff, 0px 0px 5px #fff"
           }}
         >
           <div className={`
-            px-2 py-1 rounded-md font-medium whitespace-nowrap
+            px-4 py-2 rounded-lg font-bold whitespace-nowrap
             ${theme === 'dark' ? 'bg-gray-800/90 text-white' : 'bg-white/90 text-gray-800'}
-            ${isHighlighted ? 'scale-110 font-bold' : 'opacity-95'}
-            shadow-lg transition-all duration-200
+            ${isHighlighted ? 'scale-110 font-black' : 'opacity-95'}
+            shadow-xl transition-all duration-200
             select-text
           `}>
             {node.id}
