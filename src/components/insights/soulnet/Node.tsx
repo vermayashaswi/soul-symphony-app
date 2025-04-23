@@ -1,4 +1,3 @@
-
 import React, { useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -82,6 +81,7 @@ export const Node: React.FC<NodeProps> = ({
 
   const handleInteraction = (e: any) => {
     e.stopPropagation();
+    // Immediate selection on any interaction
     onClick(node.id);
   };
 
@@ -141,4 +141,3 @@ export const Node: React.FC<NodeProps> = ({
     </group>
   );
 };
-

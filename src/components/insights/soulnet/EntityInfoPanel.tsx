@@ -19,27 +19,24 @@ export const EntityInfoPanel: React.FC<EntityInfoPanelProps> = ({ selectedEntity
       animate={{ opacity: 1, x: 0 }}
       exit={{ opacity: 0, x: 20 }}
       className={`
-        absolute top-4 right-4 p-3 rounded-lg shadow-lg max-w-[250px] max-h-[40vh] overflow-y-auto
-        ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}
-        sm:right-2 sm:max-w-[160px] sm:top-2 sm:p-1
+        absolute top-2 right-2 p-2.5 rounded-lg shadow-lg
+        ${theme === 'dark' ? 'bg-gray-800/95 text-white' : 'bg-white/95 text-gray-800'}
+        backdrop-blur-sm
+        max-w-[180px] max-h-[35vh]
+        overflow-y-auto
+        border border-border/50
       `}
-      style={{
-        width: '90vw',
-        maxWidth: 320,
-        // Responsive: on small screens use even smaller
-      }}
     >
-      <h3 className="text-lg font-bold mb-2 pb-2 border-b">{selectedEntity}</h3>
-      <h4 className="text-sm font-semibold mt-2 mb-1">Top Emotions</h4>
+      <h3 className="text-base font-semibold mb-1.5 pb-1.5 border-b border-border/30">{selectedEntity}</h3>
       <div className="space-y-1">
         {Object.entries(entityInfo.emotions)
           .sort(([, a], [, b]) => b - a)
           .map(([emotion, score]) => (
-            <div key={emotion} className="flex items-center justify-between">
-              <span className="text-sm">{emotion}</span>
-              <div className="w-20 h-2 bg-gray-200 dark:bg-gray-700 rounded overflow-hidden">
+            <div key={emotion} className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-xs truncate flex-1">{emotion}</span>
+              <div className="w-16 h-1.5 bg-gray-200 dark:bg-gray-700 rounded-full overflow-hidden flex-shrink-0">
                 <div
-                  className="h-full"
+                  className="h-full transition-all"
                   style={{
                     width: `${Math.min(score * 100, 100)}%`,
                     backgroundColor: theme === 'dark' ? '#8b5cf6' : '#8b5cf6',
