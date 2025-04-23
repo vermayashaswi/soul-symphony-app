@@ -199,11 +199,7 @@ export const Node: React.FC<NodeProps> = ({
           style={labelStyle}
           // Add key based on node id to help React stabilize rendering
           key={`label-${node.id}-${isHighlighted ? 'highlighted' : 'normal'}`}
-          // Fix: Return the correct type - a position array instead of boolean
-          calculatePosition={(el, camera, size) => {
-            // Return a default position (no transformation)
-            return [0, 0, 0];
-          }}
+          // Don't provide a custom calculatePosition function, use the default one
         >
           <div className={`
             px-2 py-1 rounded-lg font-bold whitespace-nowrap
