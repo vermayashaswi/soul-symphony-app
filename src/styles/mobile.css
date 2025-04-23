@@ -65,6 +65,8 @@
     transform: translateZ(0);
     will-change: transform;
     padding: 8px 0;
+    margin-top: 0 !important; /* Ensure no unwanted margin */
+    top: 0 !important; /* Force top position */
   }
 
   /* Ensure proper spacing below sticky headers */
@@ -75,6 +77,7 @@
   /* Additional space for content below sticky headers on Insights page */
   .insights-page-content {
     padding-top: 70px !important;
+    margin-top: 0 !important; /* Remove any margin that might create gaps */
   }
   
   /* Increase touch targets for iOS */
@@ -929,5 +932,17 @@
     width: 90vw !important;
     max-width: 90vw !important;
     margin: 0 auto !important;
+  }
+  
+  /* FIX: Ensure time toggle doesn't get hidden beneath other elements */
+  .insights-page-time-toggle {
+    display: flex !important;
+    visibility: visible !important;
+    opacity: 1 !important;
+  }
+  
+  /* Improve shadow for sticky time toggle for better visibility */
+  .insights-page-time-toggle {
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.15) !important;
   }
 }

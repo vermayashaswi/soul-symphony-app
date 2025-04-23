@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -29,18 +30,20 @@ export default function Insights() {
     { value: 'year', label: 'Year' },
   ];
 
+  // Improved scroll handler with better mobile support
   useEffect(() => {
     const handleScroll = () => {
       scrollPositionRef.current = window.scrollY;
       
-      const scrollThreshold = 90;
+      const scrollThreshold = isMobile ? 70 : 90; // Lower threshold for mobile
       setIsSticky(window.scrollY > scrollThreshold);
     };
 
     window.addEventListener('scroll', handleScroll);
-    handleScroll();
+    handleScroll(); // Initialize state based on current scroll position
+    
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);  // No isMobile dependency to ensure consistent behavior
+  }, []); // No dependencies to ensure consistent initialization
 
   const handleEmotionClick = (emotion: string) => {
     setSelectedEmotion(emotion);
@@ -108,6 +111,7 @@ export default function Insights() {
 
   return (
     <div className="min-h-screen pb-20 insights-container">
+      {/* Mobile-optimized sticky header */}
       {isSticky && (
         <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-page-time-toggle">
           <div className="max-w-5xl w-full flex justify-end">
