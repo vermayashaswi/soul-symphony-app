@@ -34,13 +34,16 @@ export default function Insights() {
     const handleScroll = () => {
       scrollPositionRef.current = window.scrollY;
       
-      const scrollThreshold = 90;
+      // Lower threshold for mobile to ensure it sticks earlier
+      const scrollThreshold = isMobile ? 70 : 90;
       setIsSticky(window.scrollY > scrollThreshold);
     };
 
     window.addEventListener('scroll', handleScroll);
+    // Initial check in case page loads with scroll already
+    handleScroll();
     return () => window.removeEventListener('scroll', handleScroll);
-  }, []);
+  }, [isMobile]); // Add isMobile as dependency to recalculate on resize
 
   const handleEmotionClick = (emotion: string) => {
     setSelectedEmotion(emotion);
@@ -111,7 +114,7 @@ export default function Insights() {
       {/* Navbar removed from here */}
       
       {isSticky && (
-        <div className="fixed top-0 left-0 right-0 z-40 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
+        <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
           <div className="max-w-5xl w-full flex justify-end">
             {renderTimeToggle()}
           </div>

@@ -1,4 +1,3 @@
-
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -40,6 +39,22 @@
   .py-8, .py-4 {
     padding-top: 2px !important;
     padding-bottom: 2px !important;
+  }
+  
+  /* FIXED: Sticky elements on mobile - especially for Insights page time toggle */
+  .fixed.top-0.left-0.right-0 {
+    position: fixed !important;
+    width: 100% !important;
+    z-index: 50 !important;
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    transform: translateZ(0); /* Force hardware acceleration */
+    will-change: transform; /* Hint for browser optimization */
+  }
+
+  /* Ensure proper spacing below sticky headers */
+  .fixed.top-0.left-0.right-0 + * {
+    padding-top: 60px; /* Add space for the fixed header */
   }
   
   /* Increase touch targets for iOS */
