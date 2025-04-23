@@ -1,15 +1,16 @@
+
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
-import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 import { SoulNetVisualization } from './soulnet/SoulNetVisualization';
 import { EntityInfoPanel } from './soulnet/EntityInfoPanel';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { useIsMobile } from '@/hooks/use-mobile';
-import AnimatedMindMapButton from './soulnet/AnimatedMindMapButton';
+import { Expand, Minimize } from 'lucide-react';
 
 interface NodeData {
   id: string;
@@ -221,64 +222,56 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     <motion.div
       ref={containerRef}
       className={`
-        relative bg-background transition-all duration-300
+        relative overflow-hidden transition-all duration-300 flex justify-center items-center
         ${isFullScreen 
-          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none' 
-          : 'w-full h-[337px] rounded-xl border'
+          ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-transparent' 
+          : 'w-full h-[337px] rounded-xl border bg-transparent mx-2 md:mx-4 my-4'
         }
       `}
       layout
     >
-      {isMobile && !isFullScreen && (
-        <AnimatedMindMapButton 
-          onClick={toggleFullScreen} 
-          className="absolute left-1/2 -translate-x-1/2 top-[45%] -translate-y-1/2" 
+      <Canvas
+        className="w-full h-full max-w-[800px] max-h-[500px]" // Added max dimensions to prevent oversized canvas
+        onClick={handleCanvasClick}
+        camera={{ position: [0, 0, 26] }}
+        onPointerMissed={() => setSelectedEntity(null)}
+        gl={{ preserveDrawingBuffer: true }}
+      >
+        <SoulNetVisualization
+          data={graphData}
+          selectedNode={selectedEntity}
+          onNodeClick={handleNodeSelect}
+          themeHex={themeHex}
         />
-      )}
+      </Canvas>
       
-      {(!isMobile || isFullScreen) && (
-        <>
-          <Canvas
-            className="w-full h-full"
-            onClick={handleCanvasClick}
-            camera={{ position: [0, 0, 26] }}
-            onPointerMissed={() => setSelectedEntity(null)}
-            gl={{ preserveDrawingBuffer: true }}
-          >
-            <SoulNetVisualization
-              data={graphData}
-              selectedNode={selectedEntity}
-              onNodeClick={handleNodeSelect}
-              themeHex={themeHex}
-            />
-          </Canvas>
+      <button
+        onClick={toggleFullScreen}
+        className="absolute top-4 right-4 z-[10000] p-2 rounded-lg bg-background/80 backdrop-blur-sm shadow-lg"
+        aria-label={isFullScreen ? "Minimize" : "Expand to fullscreen"}
+      >
+        {isFullScreen ? (
+          <Minimize className="w-5 h-5 text-foreground" />
+        ) : (
+          <Expand className="w-5 h-5 text-foreground" />
+        )}
+      </button>
 
-          {selectedEntity && (
-            <EntityInfoPanel
-              selectedEntity={selectedEntity}
-              entityData={entityData}
-            />
-          )}
-          
-          {isMobile && isFullScreen && (
-            <button
-              onClick={toggleFullScreen}
-              className="absolute top-4 right-4 z-[10000] p-2 rounded-lg bg-background/80 backdrop-blur-sm shadow-lg"
-              aria-label="Close fullscreen"
-            >
-              <motion.div
-                initial={{ scale: 0.9 }}
-                animate={{ scale: 1 }}
-                exit={{ scale: 0.9 }}
-              >
-                <AnimatedMindMapButton onClick={toggleFullScreen} />
-              </motion.div>
-            </button>
-          )}
-        </>
+      <div className="absolute bottom-4 left-4 p-3 rounded-lg bg-background/80 backdrop-blur-sm">
+        <p className="text-xs text-muted-foreground">
+          <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
+        </p>
+      </div>
+      
+      {selectedEntity && (
+        <EntityInfoPanel
+          selectedEntity={selectedEntity}
+          entityData={entityData}
+        />
       )}
     </motion.div>
   );
 };
 
 export default SoulNet;
+
