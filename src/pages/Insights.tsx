@@ -305,7 +305,7 @@ export default function Insights() {
               />
             </motion.div>
             
-            {/* SoulNet visualization */}
+            {/* Soul-Net visualization - renamed from SoulMesh */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -313,7 +313,7 @@ export default function Insights() {
               className="mb-8"
             >
               <div className="bg-background p-6 md:p-8 rounded-xl shadow-sm border">
-                <h2 className="text-xl font-semibold mb-4">SoulMesh</h2>
+                <h2 className="text-xl font-semibold mb-4">Soul-Net</h2>
                 <p className="text-muted-foreground mb-4">
                   Explore connections between life aspects and emotions in your journal.
                 </p>

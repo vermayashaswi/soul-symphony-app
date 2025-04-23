@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
@@ -104,6 +105,9 @@ const Node: React.FC<{
     }
   });
 
+  // Always show labels on startup or when highlighted
+  const shouldShowLabel = showLabel || isSelected || highlightedNodes.has(node.id);
+
   return (
     <group position={node.position}>
       <mesh 
@@ -127,7 +131,7 @@ const Node: React.FC<{
           emissiveIntensity={isHighlighted && !dimmed ? 0.5 : 0}
         />
       </mesh>
-      {showLabel && (
+      {shouldShowLabel && (
         <Html
           position={[0, node.type === 'entity' ? 1.2 : 1.4, 0]}
           center
@@ -212,6 +216,14 @@ const SoulNetVisualization: React.FC<{
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
 
+  // Set initial camera position
+  useEffect(() => {
+    if (camera) {
+      camera.position.set(0, 0, 26);
+      camera.lookAt(0, 0, 0);
+    }
+  }, [camera]);
+
   const highlightedNodes = useMemo(() => {
     if (!selectedNode) return new Set<string>();
     return getConnectedNodes(selectedNode, data.links);
@@ -241,7 +253,6 @@ const SoulNetVisualization: React.FC<{
         const dimmedStatus = shouldDim && !isHighlight
           && !(highlightedNodes.has(link.source) && highlightedNodes.has(link.target));
 
-        const visible = !shouldDim || isHighlight;
         return (
           <Edge
             key={`edge-${index}`}
@@ -254,12 +265,12 @@ const SoulNetVisualization: React.FC<{
         );
       })}
       {data.nodes.map(node => {
-        let showLabel = false;
-        if (!selectedNode) showLabel = true;
-        else if (node.id === selectedNode || highlightedNodes.has(node.id)) showLabel = true;
-        else showLabel = false;
-
+        // Always show labels on initial render (when no selection)
+        // OR show label if node is selected or connected to selected node
+        let showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
+        
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
+        
         return (
           <Node
             key={`node-${node.id}`}
@@ -284,6 +295,7 @@ const EntityInfoPanel: React.FC<{
   const { theme } = useTheme();
   if (!selectedEntity || !entityData[selectedEntity]) return null;
   const entityInfo = entityData[selectedEntity];
+  
   return (
     <motion.div
       initial={{ opacity: 0, x: 20 }}
@@ -299,7 +311,7 @@ const EntityInfoPanel: React.FC<{
       <div className="space-y-1">
         {Object.entries(entityInfo.emotions)
           .sort(([, a], [, b]) => b - a)
-          .slice(0, 5)
+          // Show all emotions, not just top 5
           .map(([emotion, score]) => (
             <div key={emotion} className="flex items-center justify-between">
               <span className="text-sm">{emotion}</span>
@@ -308,7 +320,7 @@ const EntityInfoPanel: React.FC<{
                   className="h-full" 
                   style={{ 
                     width: `${Math.min(score * 100, 100)}%`,
-                    backgroundColor: theme
+                    backgroundColor: theme === 'dark' ? '#8b5cf6' : '#8b5cf6'
                   }}
                 />
               </div>
@@ -367,6 +379,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   useSwipeGesture(containerRef, {
     onSwipeLeft: () => {},
+    minDistance: 30
   });
 
   useEffect(() => {
