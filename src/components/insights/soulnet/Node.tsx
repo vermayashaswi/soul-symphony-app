@@ -199,8 +199,8 @@ export const Node: React.FC<NodeProps> = ({
           style={labelStyle}
           // Add key based on node id to help React stabilize rendering
           key={`label-${node.id}-${isHighlighted ? 'highlighted' : 'normal'}`}
-          // Fix: calculatePosition properly typed
-          calculatePosition={() => true}
+          // Fix: Properly type the calculatePosition function to match expected type
+          calculatePosition={(el: any, camera: any, size: any) => true}
         >
           <div className={`
             px-2 py-1 rounded-lg font-bold whitespace-nowrap
