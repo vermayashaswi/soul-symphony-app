@@ -1,14 +1,15 @@
-
 import React, { useRef, useState, useEffect } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
-import { motion } from 'framer-motion';
+import { motion, AnimatePresence } from 'framer-motion';
 import { useSwipeGesture } from '@/hooks/use-swipe-gesture';
 import { SoulNetVisualization } from './soulnet/SoulNetVisualization';
 import { EntityInfoPanel } from './soulnet/EntityInfoPanel';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { Expand, Minimize } from 'lucide-react';
 
 interface NodeData {
   id: string;
@@ -37,6 +38,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
   const themeHex = useUserColorThemeHex();
+  const [isFullScreen, setIsFullScreen] = useState(false);
+  const isMobile = useIsMobile();
 
   useSwipeGesture(containerRef, {
     onSwipeLeft: () => {},
@@ -187,6 +190,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setSelectedEntity(prevId => prevId === id ? null : id);
   };
 
+  const toggleFullScreen = () => {
+    setIsFullScreen(prev => !prev);
+  };
+
   if (loading) {
     return (
       <div className="flex justify-center items-center h-96">
@@ -211,9 +218,14 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }
 
   return (
-    <div
+    <motion.div
       ref={containerRef}
-      className="relative w-full h-[600px] rounded-xl overflow-hidden border touch-action-none"
+      className={`relative rounded-xl overflow-hidden border touch-action-none transition-all duration-300 ${
+        isFullScreen 
+          ? 'fixed inset-0 z-50 m-0 rounded-none border-none'
+          : 'w-full h-[600px]'
+      }`}
+      layout
     >
       <Canvas
         onClick={handleCanvasClick}
@@ -228,18 +240,33 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           themeHex={themeHex}
         />
       </Canvas>
+      
+      {isMobile && (
+        <button
+          onClick={toggleFullScreen}
+          className="absolute top-4 right-16 z-50 p-2 rounded-lg bg-background/80 backdrop-blur-sm shadow-lg"
+        >
+          {isFullScreen ? (
+            <Minimize className="w-5 h-5 text-foreground" />
+          ) : (
+            <Expand className="w-5 h-5 text-foreground" />
+          )}
+        </button>
+      )}
+
       <div className="absolute bottom-4 left-4 p-3 rounded-lg bg-background/80 backdrop-blur-sm">
         <p className="text-xs text-muted-foreground">
           <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
         </p>
       </div>
+      
       {selectedEntity && (
         <EntityInfoPanel
           selectedEntity={selectedEntity}
           entityData={entityData}
         />
       )}
-    </div>
+    </motion.div>
   );
 };
 
