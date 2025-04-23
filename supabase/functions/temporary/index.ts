@@ -14,6 +14,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Only these allowed categories should ever be assigned
 const allowedCategories = [
   "Self & Identity",
   "Body & Health",
@@ -135,17 +136,11 @@ serve(async (req) => {
   }
 
   try {
-    console.log("Starting temporary function to process journal entries");
-    
-    // Handle authentication - extract headers from request
+    console.log("Starting force-reprocess function for ALL journal entries");
     const authHeader = req.headers.get('Authorization');
     const clientInfoHeader = req.headers.get('x-client-info');
-    
-    // Log received headers for debugging
-    console.log("Auth header received:", authHeader ? "Yes" : "No");
-    console.log("Client info header received:", clientInfoHeader ? "Yes" : "No");
 
-    // Create a new Supabase client using the user's auth token
+    // Auth-aware Supabase client
     let userSupabase = supabase;
     if (authHeader) {
       userSupabase = createClient(supabaseUrl, supabaseServiceKey, {
@@ -155,15 +150,13 @@ serve(async (req) => {
           }
         }
       });
-    } else {
-      console.log("Warning: No auth header present, using service role key");
     }
-    
-    // UPDATE: Get all Journal Entries, not just where entityemotion is null
+
+    // Fetch ALL journal entries (not just those with missing entityemotion)
     const { data: entries, error } = await userSupabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text"')
-      .limit(25); // for practical reasons, process max 25 at a time
+      .limit(1000);
 
     if (error) {
       console.error("Database error fetching entries:", error);
@@ -206,13 +199,22 @@ serve(async (req) => {
         console.log(`Processing entry ${entry.id} (text length: ${text.length})`);
         const { categories, entityemotion } = await analyzeText(text, knownEmotions);
         console.log(`Analysis complete for entry ${entry.id}: ${categories.length} categories found`);
+        // Force the entityemotion (and categories) fields to only reference the allowed categories, no "emotions" keys
+        const filteredEntityEmotion = {};
+        for (const category in entityemotion) {
+          if (allowedCategories.includes(category)) {
+            filteredEntityEmotion[category] = entityemotion[category];
+          } else {
+            console.warn(`Skipping disallowed category "${category}" for entry ${entry.id}`);
+          }
+        }
 
         // Update the entry in database
         const { error: updateErr } = await userSupabase
           .from('Journal Entries')
           .update({
-            entities: categories,
-            entityemotion: entityemotion
+            entities: categories.filter((cat) => allowedCategories.includes(cat)),
+            entityemotion: filteredEntityEmotion
           })
           .eq('id', entry.id);
 
@@ -240,7 +242,7 @@ serve(async (req) => {
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (err) {
-    console.error('Global error in edge function:', err);
+    console.error('Global error in force-reprocess function:', err);
     return new Response(
       JSON.stringify({ 
         error: 'Edge function error', 
