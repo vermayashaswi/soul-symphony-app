@@ -1,4 +1,3 @@
-
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Html } from '@react-three/drei';
@@ -51,9 +50,8 @@ const colorMap: Record<string, string> = {
   curiosity: '#2196F3',
 };
 
-const getEmotionColor = (emotion: string): string => {
-  const lowerEmotion = emotion.toLowerCase();
-  return colorMap[lowerEmotion] || '#9C27B0';
+const getEmotionColor = (_emotion: string, themeHex: string): string => {
+  return themeHex || '#9C27B0';
 };
 
 function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
@@ -72,16 +70,19 @@ const Node: React.FC<{
   highlightedNodes: Set<string>;
   showLabel: boolean;
   dimmed: boolean;
-}> = ({ node, isSelected, onClick, highlightedNodes, showLabel, dimmed }) => {
+  themeHex: string;
+}> = ({ node, isSelected, onClick, highlightedNodes, showLabel, dimmed, themeHex }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
   const isHighlighted = isSelected || highlightedNodes.has(node.id);
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = baseScale * (0.8 + node.value * 0.5);
 
-  const displayColor = dimmed
-    ? (theme === 'dark' ? '#8E9196' : '#ccc')
-    : node.color;
+  let displayColor = node.type === 'entity'
+    ? (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : '#fff')
+    : (dimmed
+        ? (theme === 'dark' ? '#8E9196' : '#bbb')
+        : themeHex);
 
   const Geometry = node.type === 'entity' 
     ? <sphereGeometry args={[1, 32, 32]} /> 
@@ -89,7 +90,7 @@ const Node: React.FC<{
 
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
-    if (isHighlighted) {
+    if (isHighlighted && !dimmed) {
       const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.1 + 1;
       meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
@@ -112,6 +113,10 @@ const Node: React.FC<{
           e.stopPropagation();
           onClick(node.id);
         }}
+        onPointerDown={(e) => {
+          e.stopPropagation();
+          onClick(node.id);
+        }}
       >
         {Geometry}
         <meshStandardMaterial 
@@ -119,7 +124,7 @@ const Node: React.FC<{
           transparent
           opacity={isHighlighted ? 1 : 0.7}
           emissive={displayColor}
-          emissiveIntensity={isHighlighted ? 0.5 : 0}
+          emissiveIntensity={isHighlighted && !dimmed ? 0.5 : 0}
         />
       </mesh>
       {showLabel && (
@@ -132,8 +137,8 @@ const Node: React.FC<{
           <div className={`
             px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap
             ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}
-            ${isHighlighted ? 'scale-110 font-bold' : 'opacity-80'}
-            transform transition-all duration-200
+            ${isHighlighted ? 'scale-110 font-bold' : 'opacity-90'}
+            shadow transition-all duration-200
           `}>
             {node.id}
           </div>
@@ -176,7 +181,7 @@ const Edge: React.FC<{
       }
     } else {
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        lineRef.current.material.opacity = dimmed ? 0.08 : (0.15 + value * 0.15);
+        lineRef.current.material.opacity = dimmed ? 0.06 : (0.18 + value * 0.13);
       }
     }
   });
@@ -190,7 +195,7 @@ const Edge: React.FC<{
         new THREE.LineBasicMaterial({
           color: dimmed ? '#BBB' : (isHighlighted ? "#ffffff" : "#aaaaaa"),
           transparent: true,
-          opacity: dimmed ? 0.08 : (isHighlighted ? 0.8 : 0.25),
+          opacity: dimmed ? 0.06 : (isHighlighted ? 0.8 : 0.3),
           linewidth: thickness
         })
       )} ref={lineRef} />
@@ -202,24 +207,14 @@ const SoulNetVisualization: React.FC<{
   data: { nodes: NodeData[]; links: LinkData[] };
   selectedNode: string | null;
   onNodeClick: (id: string) => void;
-}> = ({ data, selectedNode, onNodeClick }) => {
+  themeHex: string;
+}> = ({ data, selectedNode, onNodeClick, themeHex }) => {
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
 
   const highlightedNodes = useMemo(() => {
     if (!selectedNode) return new Set<string>();
     return getConnectedNodes(selectedNode, data.links);
-  }, [selectedNode, data.links]);
-
-  const highlightedLinks = useMemo(() => {
-    if (!selectedNode) return new Set<string>();
-    const connected = new Set<string>();
-    data.links.forEach((link, idx) => {
-      if (link.source === selectedNode || link.target === selectedNode) {
-        connected.add(`${link.source}-${link.target}`);
-      }
-    });
-    return connected;
   }, [selectedNode, data.links]);
 
   const shouldDim = !!selectedNode;
@@ -235,6 +230,7 @@ const SoulNetVisualization: React.FC<{
         rotateSpeed={0.5}
         minDistance={5}
         maxDistance={30}
+        target={[0, 0, 0]}
       />
       {data.links.map((link, index) => {
         const sourceNode = data.nodes.find(n => n.id === link.source);
@@ -242,7 +238,10 @@ const SoulNetVisualization: React.FC<{
         if (!sourceNode || !targetNode) return null;
         const isHighlight = selectedNode &&
           (link.source === selectedNode || link.target === selectedNode);
-        const dimmedStatus = shouldDim && !isHighlight;
+        const dimmedStatus = shouldDim && !isHighlight
+          && !(highlightedNodes.has(link.source) && highlightedNodes.has(link.target));
+
+        const visible = !shouldDim || isHighlight;
         return (
           <Edge
             key={`edge-${index}`}
@@ -250,15 +249,15 @@ const SoulNetVisualization: React.FC<{
             end={targetNode.position}
             value={link.value}
             isHighlighted={!!isHighlight}
-            dimmed={dimmedStatus}
+            dimmed={shouldDim && !isHighlight}
           />
         );
       })}
       {data.nodes.map(node => {
-        // This is the key fix for label visibility
-        const showLabel = !selectedNode || 
-                         node.id === selectedNode || 
-                         highlightedNodes.has(node.id);
+        let showLabel = false;
+        if (!selectedNode) showLabel = true;
+        else if (node.id === selectedNode || highlightedNodes.has(node.id)) showLabel = true;
+        else showLabel = false;
 
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         return (
@@ -270,6 +269,7 @@ const SoulNetVisualization: React.FC<{
             highlightedNodes={highlightedNodes}
             showLabel={showLabel}
             dimmed={dimmed}
+            themeHex={themeHex}
           />
         );
       })}
@@ -308,7 +308,7 @@ const EntityInfoPanel: React.FC<{
                   className="h-full" 
                   style={{ 
                     width: `${Math.min(score * 100, 100)}%`,
-                    backgroundColor: getEmotionColor(emotion)
+                    backgroundColor: theme
                   }}
                 />
               </div>
@@ -336,6 +336,26 @@ const EntityInfoPanel: React.FC<{
   );
 };
 
+function useUserColorThemeHex() {
+  const { colorTheme, customColor } = useTheme();
+  switch (colorTheme) {
+    case 'Default':
+      return '#3b82f6';
+    case 'Calm':
+      return '#8b5cf6';
+    case 'Soothing':
+      return '#FFDEE2';
+    case 'Energy':
+      return '#f59e0b';
+    case 'Focus':
+      return '#10b981';
+    case 'Custom':
+      return customColor || '#3b82f6';
+    default:
+      return '#3b82f6';
+  }
+}
+
 const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [graphData, setGraphData] = useState<{nodes: NodeData[], links: LinkData[]}>({ nodes: [], links: [] });
   const [entityData, setEntityData] = useState<Record<string, {emotions: Record<string, number>, entries?: Array<{id: number, content: string}>}>>({});
@@ -343,12 +363,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const { theme } = useTheme();
   const containerRef = useRef<HTMLDivElement>(null);
+  const themeHex = useUserColorThemeHex();
 
-  // Setup touch gesture handling
   useSwipeGesture(containerRef, {
-    onSwipeLeft: () => {
-      // Do nothing on swipe, but ensure touch events work
-    }
+    onSwipeLeft: () => {},
   });
 
   useEffect(() => {
@@ -436,23 +454,28 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         const entityNodes = new Set<string>();
         const emotionNodes = new Set<string>();
 
-        Object.entries(entityEmotionMap).forEach(([entity, data], entityIndex) => {
-          entityNodes.add(entity);
-          const entityAngle = (entityIndex / Object.keys(entityEmotionMap).length) * Math.PI * 2;
-          const entityRadius = 5;
-          const entityX = Math.cos(entityAngle) * entityRadius;
-          const entityY = (Math.random() - 0.5) * 3;
-          const entityZ = Math.sin(entityAngle) * entityRadius;
+        const entityList = Object.keys(entityEmotionMap);
+        const EMOTION_LAYER_RADIUS = 11;
+        const ENTITY_LAYER_RADIUS = 6;
+        const EMOTION_Y_SPAN = 6;
+        const ENTITY_Y_SPAN = 3;
 
+        entityList.forEach((entity, entityIndex) => {
+          entityNodes.add(entity);
+          const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
+          const entityRadius = ENTITY_LAYER_RADIUS;
+          const entityX = Math.cos(entityAngle) * entityRadius;
+          const entityY = ((entityIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * ENTITY_Y_SPAN;
+          const entityZ = Math.sin(entityAngle) * entityRadius;
           nodes.push({
             id: entity,
             type: 'entity',
             value: 1,
-            color: '#ffffff',
+            color: '#fff',
             position: [entityX, entityY, entityZ]
           });
 
-          Object.entries(data.emotions).forEach(([emotion, score]) => {
+          Object.entries(entityEmotionMap[entity].emotions).forEach(([emotion, score]) => {
             emotionNodes.add(emotion);
             links.push({
               source: entity,
@@ -464,15 +487,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
         Array.from(emotionNodes).forEach((emotion, emotionIndex) => {
           const emotionAngle = (emotionIndex / emotionNodes.size) * Math.PI * 2;
-          const emotionRadius = 10;
+          const emotionRadius = EMOTION_LAYER_RADIUS;
           const emotionX = Math.cos(emotionAngle) * emotionRadius;
-          const emotionY = (Math.random() - 0.5) * 6;
+          const emotionY = ((emotionIndex % 2) === 0 ? -1 : 1) * 0.7 * (Math.random() - 0.5) * EMOTION_Y_SPAN;
           const emotionZ = Math.sin(emotionAngle) * emotionRadius;
           nodes.push({
             id: emotion,
             type: 'emotion',
             value: 0.8,
-            color: getEmotionColor(emotion),
+            color: themeHex,
             position: [emotionX, emotionY, emotionZ]
           });
         });
@@ -486,17 +509,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
 
     fetchEntityEmotionData();
-  }, [userId, timeRange]);
+  }, [userId, timeRange, themeHex]);
 
   const handleCanvasClick = (e: any) => {
-    // Check if it's a direct canvas click and not a propagated event
     if (e.target === e.currentTarget) {
       setSelectedEntity(null);
     }
   };
 
   const handleNodeSelect = (id: string) => {
-    console.log("Node selected:", id);
     setSelectedEntity(prevId => prevId === id ? null : id);
   };
 
@@ -530,18 +551,20 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     >
       <Canvas 
         onClick={handleCanvasClick} 
-        camera={{ position: [0, 0, 15] }}
+        camera={{ position: [0, 0, 26] }}
         onPointerMissed={() => setSelectedEntity(null)}
+        gl={{ preserveDrawingBuffer: true }}
       >
         <SoulNetVisualization 
           data={graphData} 
           selectedNode={selectedEntity}
           onNodeClick={handleNodeSelect}
+          themeHex={themeHex}
         />
       </Canvas>
       <div className="absolute bottom-4 left-4 p-3 rounded-lg bg-background/80 backdrop-blur-sm">
         <p className="text-xs text-muted-foreground">
-          <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Click</b> a node to highlight connections
+          <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
         </p>
       </div>
       {selectedEntity && (
