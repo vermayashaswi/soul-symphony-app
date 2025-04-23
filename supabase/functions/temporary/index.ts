@@ -2,6 +2,7 @@
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { corsHeaders } from "../_shared/utils.ts";
 
 const openAIApiKey = Deno.env.get('OPENAI_API_KEY') || '';
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -9,12 +10,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-const corsHeaders = {
-  'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Only these allowed categories should ever be assigned
+// Only these allowed categories should ever be assigned - STRICTLY ENFORCED
 const allowedCategories = [
   "Self & Identity",
   "Body & Health",
@@ -40,31 +36,56 @@ const allowedCategories = [
   "Celebration & Achievement"
 ];
 
-// Fetch list of emotions from Supabase "emotions" table (fallback: generic emotions)
+// Fetch ALL emotions from Supabase "emotions" table with enhanced error handling
 async function getKnownEmotions() {
   try {
+    console.log('Fetching emotions from the database...');
+    
+    // Fetch all emotions from the table
     const { data, error } = await supabase.from('emotions').select('name');
+    
     if (error) {
       console.error('Error fetching emotions list:', error);
-      return [
-        "joy", "sadness", "anger", "fear", "surprise", "disgust", "trust", "anticipation", "shame", "guilt", "curiosity", "anxiety", "pride", "gratitude", "calm", "boredom", "stress", "love"
-      ];
+      throw new Error(`Failed to fetch emotions: ${error.message}`);
     }
-    return data.map(e => typeof e.name === "string" ? e.name.toLowerCase() : "").filter(Boolean);
+    
+    if (!data || data.length === 0) {
+      console.error('No emotions found in the database!');
+      throw new Error('Emotions table appears to be empty');
+    }
+    
+    // Map the emotion names to lowercase for consistency
+    const emotions = data.map(e => typeof e.name === "string" ? e.name.toLowerCase() : "").filter(Boolean);
+    
+    console.log(`Successfully fetched ${emotions.length} emotions from database`);
+    console.log('Sample of emotions:', emotions.slice(0, 5).join(', ') + '...');
+    
+    return emotions;
   } catch (err) {
     console.error('Exception in getKnownEmotions:', err);
-    return [];
+    throw err; // Re-throw to handle at the caller level
   }
 }
 
 async function analyzeText(text, knownEmotions) {
+  if (!knownEmotions || knownEmotions.length === 0) {
+    throw new Error('No emotions available for analysis');
+  }
+  
+  console.log(`Analyzing text with ${knownEmotions.length} known emotions`);
+  
   const prompt = `
 Analyze the following journal entry and:
-1. From ONLY the following list of Categories, select all that are relevant to this journal entry (list up to 10 max):
+
+1. From STRICTLY ONLY the following list of Categories, select all that are relevant to this journal entry (list up to 10 max):
    Categories: [${allowedCategories.map((c) => `"${c}"`).join(', ')}]
-2. For each selected category, select the top 3 strongest matching emotions from this list: [${knownEmotions.join(', ')}]
+
+2. For each selected category (which must ONLY be from the list above), select the top 3 strongest matching emotions from this EXACT list of emotions: [${knownEmotions.join(', ')}]
    - Provide the strength/score of each detected emotion for the category (between 0 and 1, rounded to 1 decimal).
    - Only include emotions that are clearly relevant for the category.
+   - NEVER include any emotions that are not in the provided list.
+   - NEVER create your own categories outside the given list.
+
 Return JSON (no explanations): 
 {
   "categories": [...],
@@ -73,6 +94,7 @@ Return JSON (no explanations):
     "Category 2": { ... }
   }
 }
+
 Only valid JSON, no explanations.
 
 Journal entry:
@@ -80,6 +102,8 @@ ${text}
 `;
 
   try {
+    console.log('Calling OpenAI API for text analysis...');
+    
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -91,7 +115,7 @@ ${text}
         messages: [
           {
             role: 'system',
-            content: 'Extract relevant categories (from provided list) and core emotions with strength per category for a journal entry. Output ONLY compact JSON as described by the user.'
+            content: 'Extract relevant categories (strictly from provided list) and core emotions (strictly from provided list) with strength per category for a journal entry. Output ONLY compact JSON as described by the user. Never include categories or emotions outside the provided lists.'
           },
           { role: 'user', content: prompt }
         ],
@@ -102,7 +126,7 @@ ${text}
 
     if (!response.ok) {
       console.error(`OpenAI API error: ${response.status}`);
-      return { categories: [], entityemotion: {} };
+      throw new Error(`OpenAI API returned status ${response.status}`);
     }
 
     try {
@@ -116,17 +140,47 @@ ${text}
         parsed = result;
       }
 
+      // Verify only allowed categories are included
+      const sanitizedCategories = Array.isArray(parsed.categories) 
+        ? parsed.categories.filter(category => allowedCategories.includes(category))
+        : [];
+
+      // Verify only known emotions are included for each category
+      const sanitizedEntityEmotion = {};
+      
+      if (typeof parsed.entityemotion === "object" && parsed.entityemotion !== null) {
+        for (const category in parsed.entityemotion) {
+          // Only process allowed categories
+          if (allowedCategories.includes(category)) {
+            sanitizedEntityEmotion[category] = {};
+            
+            // Only include known emotions
+            for (const emotion in parsed.entityemotion[category]) {
+              if (knownEmotions.includes(emotion.toLowerCase())) {
+                sanitizedEntityEmotion[category][emotion] = parsed.entityemotion[category][emotion];
+              } else {
+                console.warn(`Removed invalid emotion "${emotion}" for category "${category}"`);
+              }
+            }
+          } else {
+            console.warn(`Removed invalid category "${category}"`);
+          }
+        }
+      }
+
+      console.log(`Sanitized: ${sanitizedCategories.length} categories, with strict validation`);
+      
       return {
-        categories: Array.isArray(parsed.categories) ? parsed.categories : [],
-        entityemotion: typeof parsed.entityemotion === "object" && parsed.entityemotion !== null ? parsed.entityemotion : {},
+        categories: sanitizedCategories,
+        entityemotion: sanitizedEntityEmotion,
       };
     } catch (err) {
       console.error('Error parsing GPT response:', err);
-      return { categories: [], entityemotion: {} };
+      throw new Error(`Failed to parse OpenAI response: ${err.message}`);
     }
   } catch (err) {
     console.error('Error calling OpenAI API:', err);
-    return { categories: [], entityemotion: {} };
+    throw new Error(`Failed to call OpenAI API: ${err.message}`);
   }
 }
 
@@ -152,7 +206,7 @@ serve(async (req) => {
       });
     }
 
-    // Fetch ALL journal entries (not just those with missing entityemotion)
+    // Fetch ALL journal entries
     const { data: entries, error } = await userSupabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text"')
@@ -182,8 +236,27 @@ serve(async (req) => {
     }
 
     console.log(`Found ${entries.length} entries to process`);
-    const knownEmotions = await getKnownEmotions();
-    console.log(`Using ${knownEmotions.length} known emotions for analysis`);
+    
+    let knownEmotions;
+    try {
+      // Get the complete list of emotions
+      knownEmotions = await getKnownEmotions();
+      console.log(`Using ${knownEmotions.length} known emotions for analysis`);
+      
+      if (knownEmotions.length < 20) {
+        console.error("WARNING: Found fewer emotions than expected. This might indicate a database issue.");
+      }
+    } catch (emotionsErr) {
+      console.error('Error fetching emotions:', emotionsErr);
+      return new Response(
+        JSON.stringify({ 
+          error: 'Failed to fetch emotions', 
+          detail: emotionsErr.message,
+          updated: 0 
+        }), 
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
 
     let updated = 0;
     let failed = 0;
@@ -199,22 +272,13 @@ serve(async (req) => {
         console.log(`Processing entry ${entry.id} (text length: ${text.length})`);
         const { categories, entityemotion } = await analyzeText(text, knownEmotions);
         console.log(`Analysis complete for entry ${entry.id}: ${categories.length} categories found`);
-        // Force the entityemotion (and categories) fields to only reference the allowed categories, no "emotions" keys
-        const filteredEntityEmotion = {};
-        for (const category in entityemotion) {
-          if (allowedCategories.includes(category)) {
-            filteredEntityEmotion[category] = entityemotion[category];
-          } else {
-            console.warn(`Skipping disallowed category "${category}" for entry ${entry.id}`);
-          }
-        }
-
-        // Update the entry in database
+        
+        // Update the entry in database - no need to filter categories again as we've already sanitized them
         const { error: updateErr } = await userSupabase
           .from('Journal Entries')
           .update({
-            entities: categories.filter((cat) => allowedCategories.includes(cat)),
-            entityemotion: filteredEntityEmotion
+            entities: categories,
+            entityemotion: entityemotion
           })
           .eq('id', entry.id);
 
