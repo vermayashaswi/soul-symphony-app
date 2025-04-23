@@ -1,35 +1,52 @@
 
 /**
- * Utility functions for mapping entity (category) names to appropriate OpenMoji unicode, and retrieving SVGs.
- * Uses the openmoji package.
+ * Utility functions for mapping entity (category) names to appropriate emoji characters.
+ * This implementation avoids using the openmoji package which has Node.js dependencies.
  */
-import { openmojis } from "openmoji";
 
 /**
- * Basic mapping of common categories to OpenMoji unicode codes.
- * Add more mappings as you want to support more categories/entities!
+ * Basic mapping of common categories to emoji unicode characters
  */
 const entityToEmoji: Record<string, string> = {
-  family: "1F46A", // 👪
-  work: "1F4BC", // 💼
-  friends: "1F91D", // 🤝
-  travel: "1F30D", // 🌍
-  music: "1F3B5", // 🎵
-  school: "1F393", // 🎓
-  health: "1F489", // 💉
-  sports: "26BD", // ⚽
-  love: "2764", // ❤️
-  pet: "1F436", // 🐶
-  dog: "1F436", // 🐶
-  cat: "1F431", // 🐱
-  money: "1F4B0", // 💰
-  food: "1F37D", // 🍽️
-  art: "1F3A8", // 🎨
+  family: "👪", // family
+  work: "💼", // briefcase
+  friends: "🤝", // handshake
+  travel: "🌍", // globe
+  music: "🎵", // musical note
+  school: "🎓", // graduation cap
+  health: "🩺", // stethoscope
+  sports: "⚽", // soccer ball
+  love: "❤️", // heart
+  pet: "🐾", // paw prints
+  dog: "🐶", // dog
+  cat: "🐱", // cat
+  money: "💰", // money bag
+  food: "🍽️", // plate with cutlery
+  art: "🎨", // artist palette
+  book: "📚", // books
+  movie: "🎬", // clapper board
+  game: "🎮", // video game
+  shopping: "🛍️", // shopping bags
+  technology: "💻", // laptop
+  nature: "🌿", // leaf
+  weather: "☁️", // cloud
+  fitness: "🏋️", // weight lifter
+  cooking: "👨‍🍳", // cook
+  reading: "📖", // book
+  writing: "✍️", // writing hand
+  photography: "📷", // camera
+  dancing: "💃", // dancer
+  singing: "🎤", // microphone
+  playing: "🎯", // direct hit
   // fallback:
-  default: "1F464", // 👤
+  default: "👤", // bust in silhouette
 };
 
-export function getOpenMojiUnicodeForEntity(entity: string) {
+/**
+ * Gets the emoji for a given entity name by checking if any key in our mapping
+ * is contained within the entity string.
+ */
+export function getEmojiForEntity(entity: string): string {
   const normalized = (entity || "").replace(/_/g, " ").toLowerCase();
   for (const key of Object.keys(entityToEmoji)) {
     if (normalized.includes(key)) {
@@ -37,13 +54,4 @@ export function getOpenMojiUnicodeForEntity(entity: string) {
     }
   }
   return entityToEmoji["default"];
-}
-
-/**
- * Returns SVG markup (string) for a given OpenMoji unicode.
- * @param unicode eg "1F4B0" (uppercase, no prefix)
- */
-export function getOpenMojiSvg(unicode: string) {
-  const match = openmojis.find((om) => om.hexcode === unicode);
-  return match ? match.svg : undefined;
 }

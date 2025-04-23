@@ -1,9 +1,10 @@
+
 import React, { useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
 import { Html } from '@react-three/drei';
 import { useTheme } from '@/hooks/use-theme';
-import { getOpenMojiUnicodeForEntity, getOpenMojiSvg } from "./entityEmojiUtils";
+import { getEmojiForEntity } from "./entityEmojiUtils";
 
 interface NodeData {
   id: string;
@@ -40,11 +41,8 @@ export const Node: React.FC<NodeProps> = ({
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = baseScale * (0.8 + node.value * 0.5);
 
-  let emojiSvg: string | undefined = undefined;
-  if (node.type === "entity") {
-    const unicode = getOpenMojiUnicodeForEntity(node.id);
-    emojiSvg = getOpenMojiSvg(unicode);
-  }
+  // Get emoji for entity nodes
+  const emoji = node.type === "entity" ? getEmojiForEntity(node.id) : null;
 
   let displayColor = node.type === 'entity'
     ? (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : '#fff')
@@ -105,7 +103,7 @@ export const Node: React.FC<NodeProps> = ({
           emissive={displayColor}
           emissiveIntensity={isHighlighted && !dimmed ? 0.5 : 0}
         />
-        {emojiSvg && node.type === "entity" && (
+        {emoji && node.type === "entity" && (
           <Html
             position={[0, 0, 1.35]}
             center
@@ -117,12 +115,17 @@ export const Node: React.FC<NodeProps> = ({
               style={{
                 width: 42,
                 height: 42,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                fontSize: "28px",
                 pointerEvents: "none",
                 userSelect: "none",
                 filter: dimmed ? "grayscale(0.7) opacity(0.5)" : "",
               }}
-              dangerouslySetInnerHTML={{ __html: emojiSvg }}
-            />
+            >
+              {emoji}
+            </div>
           </Html>
         )}
       </mesh>
