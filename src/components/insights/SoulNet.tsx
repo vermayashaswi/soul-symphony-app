@@ -1,3 +1,4 @@
+
 import React, { useRef, useState, useEffect, useMemo } from 'react';
 import { Canvas, useFrame, useThree } from '@react-three/fiber';
 import { OrbitControls, Text, Html } from '@react-three/drei';
@@ -141,6 +142,7 @@ const Edge: React.FC<{
   value: number;
   isHighlighted: boolean;
 }> = ({ start, end, value, isHighlighted }) => {
+  const ref = useRef<THREE.Group>(null);
   const lineRef = useRef<THREE.Line>(null);
   
   // Create points for the line
@@ -182,22 +184,24 @@ const Edge: React.FC<{
   const thickness = 1 + value * 4;
   
   return (
-    <line ref={lineRef}>
-      <bufferGeometry>
-        <bufferAttribute
-          attach="attributes-position"
-          count={points.length}
-          array={new Float32Array(points.flatMap(({ x, y, z }) => [x, y, z]))}
-          itemSize={3}
+    <group ref={ref}>
+      <line ref={lineRef as React.RefObject<THREE.Line>}>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={points.length}
+            array={new Float32Array(points.flatMap(({ x, y, z }) => [x, y, z]))}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial 
+          color={isHighlighted ? "#ffffff" : "#aaaaaa"} 
+          transparent 
+          opacity={isHighlighted ? 0.8 : 0.2}
+          linewidth={thickness}
         />
-      </bufferGeometry>
-      <lineBasicMaterial 
-        color={isHighlighted ? "#ffffff" : "#aaaaaa"} 
-        transparent 
-        opacity={isHighlighted ? 0.8 : 0.2}
-        linewidth={thickness}
-      />
-    </line>
+      </line>
+    </group>
   );
 };
 
