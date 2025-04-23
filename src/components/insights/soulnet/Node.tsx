@@ -1,3 +1,4 @@
+
 import React, { useRef } from 'react';
 import * as THREE from 'three';
 import { useFrame, useThree } from '@react-three/fiber';
@@ -69,16 +70,15 @@ export const Node: React.FC<NodeProps> = ({
   // Always show all labels
   const shouldShowLabel = true;
 
-  // Make font 5x larger by greatly increasing the base and scaling factor.
   let cameraZ = cameraZoom !== undefined 
     ? cameraZoom 
     : (camera && (camera as any).position ? (camera as any).position.z : 26);
   if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
 
-  // 5x previous base: was ~1.5rem, we'll start at 7.5rem and scale up aggressively.
-  let dynamicFontSize = 9.45 + Math.max(0, (cameraZ - 18) * 0.8); // Increased from 7 to 9.45 (35% increase)
-  dynamicFontSize = Math.max(dynamicFontSize, 8.8); // Increased min from 6.5 to 8.8 (35% increase)
-  dynamicFontSize = Math.min(dynamicFontSize, 24);   // Increased max from 18 to 24 (33% increase)
+  // Increase base font size by 35%
+  let dynamicFontSize = 12.825 + Math.max(0, (cameraZ - 18) * 0.8); // Increased from 9.45 to 12.825
+  dynamicFontSize = Math.max(dynamicFontSize, 11.88); // Increased min from 8.8 to 11.88
+  dynamicFontSize = Math.min(dynamicFontSize, 32.4);   // Increased max from 24 to 32.4
 
   const handleInteraction = (e: any) => {
     e.stopPropagation();
@@ -116,7 +116,7 @@ export const Node: React.FC<NodeProps> = ({
             minWidth: 'auto',
             minHeight: 'auto',
             pointerEvents: 'none',
-            fontSize: `${dynamicFontSize}rem`,
+            fontSize: `${dynamicFontSize}rem`, // Increased font size by 35%
             fontWeight: 700,
             lineHeight: 1.1,
             zIndex: 99999,
@@ -128,7 +128,7 @@ export const Node: React.FC<NodeProps> = ({
           }}
         >
           <div className={`
-            px-4 py-2 rounded-lg font-bold whitespace-nowrap
+            px-2 py-1 rounded-lg font-bold whitespace-nowrap
             ${theme === 'dark' ? 'bg-gray-800/90 text-white' : 'bg-white/90 text-gray-800'}
             ${isHighlighted ? 'scale-110 font-black' : 'opacity-95'}
             shadow-xl transition-all duration-200
@@ -141,3 +141,4 @@ export const Node: React.FC<NodeProps> = ({
     </group>
   );
 };
+
