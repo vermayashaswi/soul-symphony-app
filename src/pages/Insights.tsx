@@ -1,9 +1,11 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
 import EmotionChart from '@/components/EmotionChart';
 import MoodCalendar from '@/components/insights/MoodCalendar';
+import SoulNet from '@/components/insights/SoulNet';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useInsightsData, TimeRange } from '@/hooks/use-insights-data';
@@ -303,7 +305,21 @@ export default function Insights() {
               />
             </motion.div>
             
-            {/* EntityMindMap removed */}
+            {/* SoulNet visualization */}
+            <motion.div
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, delay: 0.5 }}
+              className="mb-8"
+            >
+              <div className="bg-background p-6 md:p-8 rounded-xl shadow-sm border">
+                <h2 className="text-xl font-semibold mb-4">SoulMesh</h2>
+                <p className="text-muted-foreground mb-4">
+                  Explore connections between life aspects and emotions in your journal.
+                </p>
+                <SoulNet userId={user?.id} timeRange={timeRange} />
+              </div>
+            </motion.div>
           </>
         )}
       </div>
