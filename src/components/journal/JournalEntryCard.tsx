@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -14,6 +13,7 @@ import {
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { Trash, X } from "lucide-react";
 import { JournalEntry as JournalEntryType, Json } from '@/types/journal';
 
 export interface JournalEntry {
@@ -276,6 +276,40 @@ export function JournalEntryCard({
     }
   };
 
+  const handleMakeNull = async () => {
+    try {
+      const response = await fetch(
+        `${process.env.NEXT_PUBLIC_SUPABASE_URL || ""}/functions/v1/temporary",
+        {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+            ...(window?.localStorage?.getItem("sb-access-token")
+              ? { Authorization: `Bearer ${window.localStorage.getItem("sb-access-token")}` }
+              : {}),
+          },
+          body: JSON.stringify({
+            action: "make_null",
+            entryId: entry.id,
+          }),
+        }
+      );
+
+      if (!response.ok) {
+        toast.error("Failed to set fields as null");
+        return;
+      }
+
+      // Refresh the entry
+      toast.success("Emotions and entities cleared for this entry!");
+      if (onDelete) {
+        onDelete(entry.id);
+      }
+    } catch (error) {
+      toast.error("Error: Could not clear fields.");
+    }
+  };
+
   const createdAtFormatted = (() => {
     try {
       return formatShortDate(safeEntry.created_at);
@@ -469,7 +503,6 @@ export function JournalEntryCard({
                 )}
               </div>
             </div>
-
             <div className="flex items-center space-x-2">
               <FloatingDotsToggle 
                 onClick={toggleThemes} 
@@ -481,6 +514,15 @@ export function JournalEntryCard({
                 onEntryUpdated={handleEntryUpdate}
               />
               <DeleteEntryDialog onDelete={handleDelete} />
+              <button
+                onClick={handleMakeNull}
+                className="border border-muted-foreground rounded-md px-2 py-1 ml-2 flex items-center gap-1 text-xs hover:bg-red-50 dark:hover:bg-red-900 transition"
+                title="Set emotions and entities as null"
+                aria-label="Make Null"
+              >
+                <X size={16} className="text-muted-foreground" />
+                Make Null
+              </button>
             </div>
           </div>
 

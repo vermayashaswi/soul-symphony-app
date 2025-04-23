@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -286,6 +285,45 @@ ${text}
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
+  }
+
+  if (req.method === "POST") {
+    // Check for "make_null" action in the body
+    try {
+      const body = await req.json();
+      if (body && body.action === "make_null" && body.entryId) {
+        console.log(`Received make_null request for entryId: ${body.entryId}`);
+
+        const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
+        const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
+        const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+        const { error } = await supabase
+          .from('Journal Entries')
+          .update({
+            entities: null,
+            entityemotion: null
+          })
+          .eq('id', body.entryId);
+
+        if (error) {
+          console.error("Error setting entities/entityemotion to null:", error);
+          return new Response(
+            JSON.stringify({ error: "Failed to set columns as null", detail: error.message }),
+            { headers: { ...corsHeaders, "Content-Type": "application/json" }, status: 500 }
+          );
+        }
+
+        console.log(`Successfully set fields as null for entryId: ${body.entryId}`);
+        return new Response(
+          JSON.stringify({ success: true }),
+          { headers: { ...corsHeaders, "Content-Type": "application/json" } }
+        );
+      }
+    } catch (e) {
+      // Fall through / log error
+      console.error("Error in make_null handler:", e);
+    }
   }
 
   try {
