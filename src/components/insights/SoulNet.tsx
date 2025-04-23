@@ -9,6 +9,7 @@ import { SoulNetVisualization } from './soulnet/SoulNetVisualization';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Expand, Minimize } from 'lucide-react';
+import { toast } from "sonner";
 
 interface NodeData {
   id: string;
@@ -193,8 +194,27 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, []);
 
   const handleNodeSelect = useCallback((id: string) => {
-    setSelectedEntity(prevId => prevId === id ? null : id);
-  }, []);
+    setSelectedEntity(prevId => {
+      const newSelection = prevId === id ? null : id;
+      
+      if (newSelection) {
+        const nodeType = graphData.nodes.find(node => node.id === newSelection)?.type;
+        if (nodeType === 'entity') {
+          const connectedEmotions = graphData.links
+            .filter(link => link.source === newSelection)
+            .length;
+          toast.info(`${id}: ${connectedEmotions} emotional connections`);
+        } else if (nodeType === 'emotion') {
+          const connectedEntities = graphData.links
+            .filter(link => link.target === newSelection)
+            .length;
+          toast.info(`${id}: connected to ${connectedEntities} ${connectedEntities === 1 ? 'entity' : 'entities'}`);
+        }
+      }
+      
+      return newSelection;
+    });
+  }, [graphData]);
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => !prev);
@@ -237,7 +257,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         relative overflow-hidden transition-all duration-300 flex justify-center items-center
         ${isFullScreen 
           ? 'fixed inset-0 z-[9999] m-0 rounded-none border-none bg-transparent' 
-          : 'w-full h-[400px] rounded-xl border bg-transparent mx-2 md:mx-4 my-4'
+          : 'w-full h-[400px] rounded-xl border bg-transparent mx-auto my-4'
         }
       `}
       layout

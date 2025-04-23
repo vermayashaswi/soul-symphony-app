@@ -40,6 +40,7 @@ export const Node: React.FC<NodeProps> = ({
   const { theme } = useTheme();
   const { camera } = useThree();
   const [isTouching, setIsTouching] = useState(false);
+  
   // Use memo for stable colors to avoid unnecessary re-renders
   const isHighlighted = isSelected || highlightedNodes.has(node.id);
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
@@ -60,18 +61,18 @@ export const Node: React.FC<NodeProps> = ({
     [node.type]
   );
 
-  // Animation for highlighted nodes with reduced frequency of updates
+  // Enhanced animation for highlighted nodes
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     
     if (isHighlighted && !dimmed) {
-      // Use slower animation frequency to reduce updates
-      const pulse = Math.sin(clock.getElapsedTime() * 2) * 0.08 + 1;
+      // More pronounced pulse effect for highlighted nodes
+      const pulse = Math.sin(clock.getElapsedTime() * 2.5) * 0.15 + 1.05;
       meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
       
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        // Less frequent emissive changes
-        meshRef.current.material.emissiveIntensity = 0.5 + Math.sin(clock.getElapsedTime() * 3) * 0.15;
+        // Stronger emissive effect for better visibility
+        meshRef.current.material.emissiveIntensity = 0.7 + Math.sin(clock.getElapsedTime() * 3) * 0.2;
       }
     } else if (meshRef.current.scale.x !== scale) {
       // Only update if scale has changed to reduce unnecessary render cycles
@@ -110,25 +111,26 @@ export const Node: React.FC<NodeProps> = ({
     e.stopPropagation();
     setIsTouching(true);
     setTouchStartTime(Date.now());
-    
-    // Immediately select on pointer down for better responsiveness
-    onClick(node.id);
-  }, [node.id, onClick]);
+  }, []);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
+    // Only trigger click if the touch was short (to differentiate from dragging)
+    if (touchStartTime && Date.now() - touchStartTime < 300) {
+      onClick(node.id);
+    }
     setIsTouching(false);
     setTouchStartTime(null);
-  }, []);
+  }, [node.id, onClick, touchStartTime]);
 
-  // This ensures selection persists even with light touches
+  // Ensure node selection works reliably across devices
   useEffect(() => {
     if (isTouching && touchStartTime) {
       const timer = setTimeout(() => {
         if (isTouching) {
-          onClick(node.id); // Ensure selection happens
+          onClick(node.id); // Ensure selection happens for longer presses too
         }
-      }, 100);
+      }, 500); // Long press fallback
       
       return () => clearTimeout(timer);
     }
@@ -136,21 +138,21 @@ export const Node: React.FC<NodeProps> = ({
 
   // Memoize the HTML label style to avoid recreating it on every render
   const labelStyle = useMemo(() => ({
-    transform: 'scale(1) !important',
+    transform: isHighlighted ? 'scale(1.1) !important' : 'scale(1) !important',
     minWidth: 'auto',
     minHeight: 'auto',
     pointerEvents: 'none' as const, // Cast to specific React type
     fontSize: `${dynamicFontSize}rem`,
-    fontWeight: 700, 
+    fontWeight: isHighlighted ? 800 : 700, 
     lineHeight: 1.1,
-    zIndex: 99999,
+    zIndex: isHighlighted ? 100000 : 99999,
     userSelect: 'text' as const, // Cast to specific React type
     whiteSpace: 'nowrap' as const, // Cast to specific React type
     // Use transform for smoother animation, avoid opacity
-    transition: 'transform 0.2s ease-out',
+    transition: 'transform 0.2s ease-out, font-weight 0.2s ease',
     willChange: 'transform', // Hint to browser to optimize animations
     opacity: shouldShowLabel ? 1 : 0,
-  }), [dynamicFontSize, shouldShowLabel]);
+  }), [dynamicFontSize, shouldShowLabel, isHighlighted]);
 
   // Memoize the label container style to avoid recreating it on every render
   const labelContainerStyle = useMemo(() => ({
@@ -159,7 +161,10 @@ export const Node: React.FC<NodeProps> = ({
     backdropFilter: 'blur(8px)',
     WebkitBackdropFilter: 'blur(8px)',
     boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-  }), [node.type, themeHex]);
+    padding: isHighlighted ? '0.3rem 0.7rem' : '0.2rem 0.5rem',
+    borderRadius: '0.5rem',
+    transition: 'padding 0.2s ease',
+  }), [node.type, themeHex, isHighlighted]);
 
   return (
     <group position={node.position}>
@@ -181,7 +186,9 @@ export const Node: React.FC<NodeProps> = ({
           transparent
           opacity={isHighlighted ? 1 : 0.7}
           emissive={displayColor}
-          emissiveIntensity={isHighlighted && !dimmed ? 0.5 : 0}
+          emissiveIntensity={isHighlighted && !dimmed ? 0.7 : 0}
+          roughness={0.5}
+          metalness={0.2}
         />
       </mesh>
       
@@ -199,10 +206,9 @@ export const Node: React.FC<NodeProps> = ({
           style={labelStyle}
           // Add key based on node id to help React stabilize rendering
           key={`label-${node.id}-${isHighlighted ? 'highlighted' : 'normal'}`}
-          // Don't provide a custom calculatePosition function, use the default one
         >
           <div className={`
-            px-2 py-1 rounded-lg font-bold whitespace-nowrap
+            rounded-lg font-bold whitespace-nowrap
             ${isHighlighted ? 'scale-110 font-black' : 'opacity-95'}
             select-text
           `}

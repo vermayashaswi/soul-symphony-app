@@ -9,9 +9,17 @@ interface EdgeProps {
   value: number;
   isHighlighted: boolean;
   dimmed: boolean;
+  maxThickness?: number;
 }
 
-export const Edge: React.FC<EdgeProps> = ({ start, end, value, isHighlighted, dimmed }) => {
+export const Edge: React.FC<EdgeProps> = ({ 
+  start, 
+  end, 
+  value, 
+  isHighlighted, 
+  dimmed,
+  maxThickness = 5
+}) => {
   const ref = useRef<THREE.Group>(null);
   const lineRef = useRef<THREE.LineSegments>(null);
 
@@ -34,7 +42,8 @@ export const Edge: React.FC<EdgeProps> = ({ start, end, value, isHighlighted, di
     if (isHighlighted && !dimmed) {
       const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.3 + 0.7;
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        lineRef.current.material.opacity = 0.5 + value * 0.5 * pulse;
+        // Higher base opacity for highlighted connections
+        lineRef.current.material.opacity = 0.7 + value * 0.3 * pulse;
       }
     } else {
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
@@ -43,7 +52,10 @@ export const Edge: React.FC<EdgeProps> = ({ start, end, value, isHighlighted, di
     }
   });
 
-  const thickness = 1 + value * 4;
+  // Scale thickness based on value (connection strength)
+  // Use a minimum thickness to ensure visibility, then scale up based on value
+  const baseThickness = 1;
+  const thickness = baseThickness + (value * maxThickness);
 
   return (
     <group ref={ref}>

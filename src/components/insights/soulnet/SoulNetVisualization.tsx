@@ -4,7 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { Node } from './Node';
 import { Edge } from './Edge';
-import * as THREE from 'three'; // Add Three.js import for Vector3
+import * as THREE from 'three';
 
 interface NodeData {
   id: string;
@@ -13,11 +13,13 @@ interface NodeData {
   color: string;
   position: [number, number, number];
 }
+
 interface LinkData {
   source: string;
   target: string;
   value: number;
 }
+
 interface SoulNetVisualizationProps {
   data: { nodes: NodeData[]; links: LinkData[] };
   selectedNode: string | null;
@@ -32,6 +34,41 @@ function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
     if (link.target === nodeId) connected.add(link.source);
   });
   return connected;
+}
+
+// Calculate relative connection strength within connected nodes
+function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<string, number> {
+  // Get all links associated with this node
+  const nodeLinks = links.filter(link => link.source === nodeId || link.target === nodeId);
+  
+  // Find min and max values
+  let minValue = Infinity;
+  let maxValue = -Infinity;
+  
+  nodeLinks.forEach(link => {
+    if (link.value < minValue) minValue = link.value;
+    if (link.value > maxValue) maxValue = link.value;
+  });
+
+  // Create normalized strength map
+  const strengthMap = new Map<string, number>();
+  
+  // If all values are the same, use a default value
+  if (maxValue === minValue) {
+    nodeLinks.forEach(link => {
+      const connectedNodeId = link.source === nodeId ? link.target : link.source;
+      strengthMap.set(connectedNodeId, 0.5); // Default mid-value if all same
+    });
+  } else {
+    // Normalize values to 0-1 range
+    nodeLinks.forEach(link => {
+      const connectedNodeId = link.source === nodeId ? link.target : link.source;
+      const normalizedValue = (link.value - minValue) / (maxValue - minValue);
+      strengthMap.set(connectedNodeId, normalizedValue);
+    });
+  }
+  
+  return strengthMap;
 }
 
 export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
@@ -50,7 +87,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / Math.max(nodePositions.length, 1);
     const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / Math.max(nodePositions.length, 1);
     const centerZ = 0;
-    return new THREE.Vector3(centerX, centerY, centerZ); // Fix: Create proper Vector3 object
+    return new THREE.Vector3(centerX, centerY, centerZ);
   }, [data.nodes]);
 
   useEffect(() => {
@@ -62,7 +99,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [camera, data.nodes, centerPosition]);
 
-  // Use a more efficient way to track camera zoom with throttling
+  // Track camera zoom with throttling to improve performance
   useEffect(() => {
     const updateCameraDistance = () => {
       if (camera) {
@@ -73,7 +110,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       }
     };
 
-    // Use less frequent updates to improve performance
     const intervalId = setInterval(updateCameraDistance, 200);
     return () => clearInterval(intervalId);
   }, [camera, cameraZoom]);
@@ -82,6 +118,12 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const highlightedNodes = useMemo(() => {
     if (!selectedNode) return new Set<string>();
     return getConnectedNodes(selectedNode, data.links);
+  }, [selectedNode, data.links]);
+
+  // Calculate relative strength of connections for the selected node
+  const connectionStrengths = useMemo(() => {
+    if (!selectedNode) return new Map<string, number>();
+    return calculateRelativeStrengths(selectedNode, data.links);
   }, [selectedNode, data.links]);
 
   const shouldDim = !!selectedNode;
@@ -98,7 +140,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         minDistance={5}
         maxDistance={30}
         target={centerPosition}
-        // Use a more efficient event handler
         onChange={() => {
           if (camera) {
             const currentZ = camera.position.z;
@@ -115,20 +156,30 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           const sourceNode = data.nodes.find(n => n.id === link.source);
           const targetNode = data.nodes.find(n => n.id === link.target);
           if (!sourceNode || !targetNode) return null;
+          
           const isHighlight = selectedNode &&
             (link.source === selectedNode || link.target === selectedNode);
+            
+          // Get relative strength for this connection if it's highlighted
+          let relativeStrength = link.value;
+          if (isHighlight && selectedNode) {
+            const connectedNodeId = link.source === selectedNode ? link.target : link.source;
+            relativeStrength = connectionStrengths.get(connectedNodeId) || link.value;
+          }
+            
           return (
             <Edge
               key={`edge-${index}`}
               start={sourceNode.position}
               end={targetNode.position}
-              value={link.value}
+              value={relativeStrength}
               isHighlighted={!!isHighlight}
               dimmed={shouldDim && !isHighlight}
+              maxThickness={isHighlight ? 6 : 4}
             />
           );
         })
-      ), [data.links, data.nodes, selectedNode, shouldDim])}
+      ), [data.links, data.nodes, selectedNode, shouldDim, connectionStrengths])}
       
       {/* Memoize nodes to prevent unnecessary rerenders */}
       {useMemo(() => (
