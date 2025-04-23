@@ -1,5 +1,5 @@
 
-import React, { useRef, useEffect, useMemo } from 'react';
+import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { Node } from './Node';
@@ -41,12 +41,31 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 }) => {
   const { camera } = useThree();
   const controlsRef = useRef<any>(null);
+  const [cameraZoom, setCameraZoom] = useState<number>(26);
 
+  // Update camera position and track zoom changes
   useEffect(() => {
     if (camera) {
       camera.position.set(0, 0, 26);
       camera.lookAt(0, 0, 0);
     }
+  }, [camera]);
+
+  // Monitor camera position for zoom changes
+  useEffect(() => {
+    const updateCameraDistance = () => {
+      if (camera) {
+        const z = camera.position.z;
+        setCameraZoom(z);
+      }
+    };
+
+    // Initial update
+    updateCameraDistance();
+
+    // Setup an interval to check camera position frequently
+    const intervalId = setInterval(updateCameraDistance, 100);
+    return () => clearInterval(intervalId);
   }, [camera]);
 
   const highlightedNodes = useMemo(() => {
@@ -68,6 +87,9 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         minDistance={5}
         maxDistance={30}
         target={[0, 0, 0]}
+        onChange={() => {
+          if (camera) setCameraZoom(camera.position.z);
+        }}
       />
       {data.links.map((link, index) => {
         const sourceNode = data.nodes.find(n => n.id === link.source);
@@ -101,6 +123,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             dimmed={dimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
+            cameraZoom={cameraZoom}
           />
         );
       })}

@@ -72,7 +72,7 @@ export const Node: React.FC<NodeProps> = ({
   const shouldShowLabel = true;
 
   // Dynamic font size logic based on camera distance (camera.position.z)
-  // Empirically: closer camera => bigger font, farther camera => even bigger font, but never too small
+  // Empirically: closer camera => smaller font, farther camera => larger font
   // We want a minimum, and a scaling relation with zoom/distance.
   // Perspective camera: larger z = further out, so increase font size as z increases
   // Clamp min and max for usability
@@ -81,9 +81,10 @@ export const Node: React.FC<NodeProps> = ({
     : (camera && (camera as any).position ? (camera as any).position.z : 26);
   if (typeof cameraZ !== 'number' || Number.isNaN(cameraZ)) cameraZ = 26;
 
-  let dynamicFontSize = 1.06 + Math.max(0, (cameraZ - 18) * 0.08); // e.g. camera at 26 => ~1.7rem, 22 => ~1.4rem
-  dynamicFontSize = Math.max(dynamicFontSize, 1); // min 1rem for legibility
-  dynamicFontSize = Math.min(dynamicFontSize, 2.2); // max 2.2rem
+  // More aggressive scaling - base size increased, scaling factor increased
+  let dynamicFontSize = 1.4 + Math.max(0, (cameraZ - 18) * 0.15); // e.g. camera at 26 => ~2.6rem
+  dynamicFontSize = Math.max(dynamicFontSize, 1.3); // min 1.3rem for legibility
+  dynamicFontSize = Math.min(dynamicFontSize, 3.0); // max 3rem
 
   // Combined handler for all pointer/touch events
   const handleInteraction = (e: any) => {
@@ -123,21 +124,21 @@ export const Node: React.FC<NodeProps> = ({
             minHeight: 'auto',
             pointerEvents: 'none',
             fontSize: `${dynamicFontSize}rem`,
-            fontWeight: 500,
+            fontWeight: 600, // Increased from 500 to 600 for better visibility
             lineHeight: 1.1,
             zIndex: 99999,
             userSelect: 'text',
             whiteSpace: 'nowrap',
             textShadow: theme === 'dark'
-              ? "0 2px 6px #000, 0px 0px 9px #000"
-              : "0 2px 8px #fff, 0px 0px 7px #fff"
+              ? "0 2px 6px #000, 0px 0px 9px #000, 0px 0px 5px #000" // Added extra shadow for dark mode
+              : "0 2px 8px #fff, 0px 0px 7px #fff, 0px 0px 5px #fff" // Added extra shadow for light mode
           }}
         >
           <div className={`
             px-2 py-1 rounded-md font-medium whitespace-nowrap
-            ${theme === 'dark' ? 'bg-gray-800 text-white' : 'bg-white text-gray-800'}
-            ${isHighlighted ? 'scale-110 font-bold' : 'opacity-90'}
-            shadow transition-all duration-200
+            ${theme === 'dark' ? 'bg-gray-800/90 text-white' : 'bg-white/90 text-gray-800'}
+            ${isHighlighted ? 'scale-110 font-bold' : 'opacity-95'}
+            shadow-lg transition-all duration-200
             select-text
           `}>
             {node.id}
