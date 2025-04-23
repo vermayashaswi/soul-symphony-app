@@ -23,7 +23,6 @@ const Home = () => {
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
 
-  // New state for reprocessing
   const [processing, setProcessing] = useState(false);
   const [showConfirm, setShowConfirm] = useState(false);
 
@@ -131,11 +130,8 @@ const Home = () => {
     }
   };
 
-  // --- ADMIN ONLY: Reprocess All Entries ---
-  const isAdmin = user?.email === "admin@soulo.app";
-  console.log('Is admin:', isAdmin);
+  console.warn('DEVELOPER WARNING: Reprocess button is visible to all users. This should only be used for debugging!');
 
-  // Actual call to edge function
   const handleForceReprocess = async () => {
     setShowConfirm(false);
     setProcessing(true);
@@ -192,48 +188,44 @@ const Home = () => {
         />
       </div>
 
-      {/* --- ADMIN Button: Only visible to designated admin */}
-      {(isAdmin || process.env.NODE_ENV === 'development') && (
-        <div className="absolute top-6 right-6 z-40 admin-button">
-          <Button
-            variant="destructive"
-            className="shadow px-4 py-2 font-semibold flex items-center gap-2"
-            onClick={() => setShowConfirm(true)}
-            disabled={processing}
-          >
-            {processing ? (
-              <>
-                <LoaderCircle className="w-4 h-4 animate-spin" />
-                Processing...
-              </>
-            ) : (
-              <>
-                <RefreshCw className="w-4 h-4" />
-                Reprocess All Entries
-              </>
-            )}
-          </Button>
-          {/* Confirmation Dialog (simple custom) */}
-          {showConfirm && (
-            <div className="fixed z-50 inset-0 bg-black/40 flex items-center justify-center">
-              <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 relative max-w-xs w-full">
-                <h3 className="font-bold mb-2 text-lg text-destructive">Reprocess All Entries?</h3>
-                <p className="mb-4 text-sm text-muted-foreground">
-                  Are you sure? This will overwrite <b>all entityemotion and entities</b> fields for <b>all</b> journal entries.
-                </p>
-                <div className="flex gap-3">
-                  <Button variant="destructive" onClick={handleForceReprocess} disabled={processing}>
-                    Yes, reprocess
-                  </Button>
-                  <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={processing}>
-                    Cancel
-                  </Button>
-                </div>
+      <div className="absolute top-6 right-6 z-40 admin-button">
+        <Button
+          variant="destructive"
+          className="shadow px-4 py-2 font-semibold flex items-center gap-2"
+          onClick={() => setShowConfirm(true)}
+          disabled={processing}
+        >
+          {processing ? (
+            <>
+              <LoaderCircle className="w-4 h-4 animate-spin" />
+              Processing...
+            </>
+          ) : (
+            <>
+              <RefreshCw className="w-4 h-4" />
+              Reprocess All Entries
+            </>
+          )}
+        </Button>
+        {showConfirm && (
+          <div className="fixed z-50 inset-0 bg-black/40 flex items-center justify-center">
+            <div className="bg-white dark:bg-gray-900 rounded-lg shadow-lg p-6 relative max-w-xs w-full">
+              <h3 className="font-bold mb-2 text-lg text-destructive">Reprocess All Entries?</h3>
+              <p className="mb-4 text-sm text-muted-foreground">
+                Are you sure? This will overwrite <b>all entityemotion and entities</b> fields for <b>all</b> journal entries.
+              </p>
+              <div className="flex gap-3">
+                <Button variant="destructive" onClick={handleForceReprocess} disabled={processing}>
+                  Yes, reprocess
+                </Button>
+                <Button variant="outline" onClick={() => setShowConfirm(false)} disabled={processing}>
+                  Cancel
+                </Button>
               </div>
             </div>
-          )}
-        </div>
-      )}
+          </div>
+        )}
+      </div>
 
       <div className="relative z-20 flex flex-col h-screen">
         <div className="p-4 flex flex-col">
@@ -274,7 +266,6 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Arrow button with glowing effect - always visible for all users */}
       <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
         <motion.div
           className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
