@@ -4,6 +4,7 @@ import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import { Node } from './Node';
 import { Edge } from './Edge';
+import * as THREE from 'three'; // Add Three.js import for Vector3
 
 interface NodeData {
   id: string;
@@ -49,12 +50,13 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / Math.max(nodePositions.length, 1);
     const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / Math.max(nodePositions.length, 1);
     const centerZ = 0;
-    return [centerX, centerY, centerZ];
+    return new THREE.Vector3(centerX, centerY, centerZ); // Fix: Create proper Vector3 object
   }, [data.nodes]);
 
   useEffect(() => {
     if (camera && data.nodes.length > 0) {
-      const [centerX, centerY] = centerPosition;
+      const centerX = centerPosition.x;
+      const centerY = centerPosition.y;
       camera.position.set(centerX, centerY, 26);
       camera.lookAt(centerX, centerY, 0);
     }
@@ -152,4 +154,3 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     </>
   );
 };
-

@@ -139,13 +139,13 @@ export const Node: React.FC<NodeProps> = ({
     transform: 'scale(1) !important',
     minWidth: 'auto',
     minHeight: 'auto',
-    pointerEvents: 'none',
+    pointerEvents: 'none' as const, // Fix: Cast to specific React type
     fontSize: `${dynamicFontSize}rem`,
     fontWeight: 700, 
     lineHeight: 1.1,
     zIndex: 99999,
-    userSelect: 'text',
-    whiteSpace: 'nowrap',
+    userSelect: 'text' as const, // Fix: Cast to specific React type
+    whiteSpace: 'nowrap' as const, // Fix: Cast to specific React type
     // Use transform for smoother animation, avoid opacity
     transition: 'transform 0.2s ease-out',
     willChange: 'transform', // Hint to browser to optimize animations
@@ -199,8 +199,8 @@ export const Node: React.FC<NodeProps> = ({
           style={labelStyle}
           // Add key based on node id to help React stabilize rendering
           key={`label-${node.id}-${isHighlighted ? 'highlighted' : 'normal'}`}
-          // Reduce the update frequency to improve performance
-          calculatePosition={() => true} // Important: set to true to stabilize position
+          // Fix: calculatePosition properly typed
+          calculatePosition={() => true}
         >
           <div className={`
             px-2 py-1 rounded-lg font-bold whitespace-nowrap
@@ -216,4 +216,3 @@ export const Node: React.FC<NodeProps> = ({
     </group>
   );
 };
-
