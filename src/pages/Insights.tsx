@@ -35,7 +35,7 @@ export default function Insights() {
       scrollPositionRef.current = window.scrollY;
       
       // Lower threshold for mobile to ensure it sticks earlier
-      const scrollThreshold = isMobile ? 70 : 90;
+      const scrollThreshold = isMobile ? 50 : 90;
       setIsSticky(window.scrollY > scrollThreshold);
     };
 
@@ -110,11 +110,11 @@ export default function Insights() {
   };
 
   return (
-    <div className="min-h-screen pb-20">
+    <div className="min-h-screen pb-20 insights-container">
       {/* Navbar removed from here */}
       
       {isSticky && (
-        <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center">
+        <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-page-time-toggle">
           <div className="max-w-5xl w-full flex justify-end">
             {renderTimeToggle()}
           </div>
@@ -122,8 +122,9 @@ export default function Insights() {
       )}
       
       <div className={cn(
-        "max-w-5xl mx-auto px-4 pt-4 md:pt-8",
-        isMobile ? "mt-2" : "mt-4"
+        "max-w-5xl mx-auto px-4 pt-4 md:pt-8 insights-page-content",
+        isMobile ? "mt-2" : "mt-4",
+        isSticky && isMobile ? "pt-16" : ""
       )}>
         <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8">
           <div>
@@ -131,7 +132,10 @@ export default function Insights() {
             <p className="text-muted-foreground">Discover patterns in your emotional journey</p>
           </div>
           
-          <div className="mt-4 md:mt-0" ref={timeToggleRef}>
+          <div className={cn(
+            "mt-4 md:mt-0",
+            isSticky ? "opacity-0 h-0 overflow-hidden" : "opacity-100"
+          )} ref={timeToggleRef}>
             {renderTimeToggle()}
           </div>
         </div>

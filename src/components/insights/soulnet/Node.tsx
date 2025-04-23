@@ -106,6 +106,7 @@ export const Node: React.FC<NodeProps> = ({
           center
           distanceFactor={15}
           occlude
+          className="z-40" // Ensure labels appear above other UI elements
         >
           <div className={`
             px-2 py-1 rounded-md text-xs font-medium whitespace-nowrap

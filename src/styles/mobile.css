@@ -52,9 +52,29 @@
     will-change: transform; /* Hint for browser optimization */
   }
 
+  /* Critical Fix: Specifically target the Insights page time toggle component */
+  .fixed.top-0.left-0.right-0, 
+  .sticky.top-0.left-0.right-0,
+  .insights-page-time-toggle {
+    position: fixed !important;
+    width: 100% !important;
+    z-index: 50 !important;
+    background-color: hsl(var(--background)) !important;
+    backdrop-filter: blur(8px);
+    border-bottom: 1px solid rgba(0, 0, 0, 0.1);
+    transform: translateZ(0);
+    will-change: transform;
+    padding: 8px 0;
+  }
+
   /* Ensure proper spacing below sticky headers */
   .fixed.top-0.left-0.right-0 + * {
-    padding-top: 60px; /* Add space for the fixed header */
+    padding-top: 60px !important; /* Add space for the fixed header */
+  }
+  
+  /* Additional space for content below sticky headers on Insights page */
+  .insights-page-content {
+    padding-top: 70px !important;
   }
   
   /* Increase touch targets for iOS */
