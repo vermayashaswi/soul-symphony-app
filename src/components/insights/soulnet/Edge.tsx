@@ -35,7 +35,6 @@ export const Edge: React.FC<EdgeProps> = ({
         midPoint,
         endVec
       );
-      // Increase number of points for smoother curves
       return curve.getPoints(30);
     } catch (error) {
       console.error("Error creating edge points:", error);
@@ -52,11 +51,9 @@ export const Edge: React.FC<EdgeProps> = ({
       
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
         if (isHighlighted) {
-          // Fixed high opacity and brighter color for highlighted state
           lineRef.current.material.opacity = 0.9;
           lineRef.current.material.color.set('#ffffff');
         } else {
-          // Lower opacity for non-highlighted state
           lineRef.current.material.opacity = dimmed ? 0.03 : 0.08;
           lineRef.current.material.color.set(dimmed ? '#444' : "#888");
         }
@@ -68,7 +65,6 @@ export const Edge: React.FC<EdgeProps> = ({
 
   // Scale thickness based on value (connection strength)
   const baseThickness = isHighlighted ? 3 : 1;
-  // When highlighted, scale thickness proportionally to connection strength
   const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2 : maxThickness/3));
 
   return (
