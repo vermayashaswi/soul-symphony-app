@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -156,9 +155,9 @@ const Home = () => {
               variants={dateStripVariants}
               initial="hidden"
               animate="visible"
-              className="flex items-center gap-2 z-30"
+              className="flex flex-col sm:flex-row items-end sm:items-center gap-2 z-30"
             >
-              <div className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}>
+              <div className={`px-3 py-1.5 rounded-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}>
                 <div className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
                   {formattedDate}
                 </div>
@@ -172,25 +171,6 @@ const Home = () => {
       </div>
 
       <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
-        <motion.div
-          className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
-          initial={{ scale: 1, opacity: 0.5 }}
-          animate={{
-            scale: [1, 1.15, 1],
-            opacity: [0.5, 0.8, 0.5]
-          }}
-          transition={{
-            repeat: Infinity,
-            duration: 2,
-            ease: "easeInOut"
-          }}
-          style={{
-            width: "calc(100% + 16px)",
-            height: "calc(100% + 16px)",
-            top: "-8px",
-            left: "-8px"
-          }}
-        />
         <motion.button
           onClick={navigateToJournal}
           className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20"
