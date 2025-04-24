@@ -1,8 +1,7 @@
 
-import React, { useRef, useCallback, useState, useEffect, useMemo } from 'react';
-import * as THREE from 'three';
-import { useFrame, useThree } from '@react-three/fiber';
-import { Html } from '@react-three/drei';
+import React, { useState, useCallback, useEffect } from 'react';
+import { NodeMesh } from './NodeMesh';
+import { NodeLabel } from './NodeLabel';
 import { useTheme } from '@/hooks/use-theme';
 
 interface NodeData {
@@ -40,24 +39,18 @@ export const Node: React.FC<NodeProps> = ({
   isHighlighted = false,
   connectionStrength = 0.5,
 }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
-  const { camera } = useThree();
   const [isTouching, setIsTouching] = useState(false);
+  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
+  const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
-  // Use memo for stable colors to avoid unnecessary re-renders
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
-  
-  // Increased scale differential between highlighted and normal nodes
-  // Apply connection strength to the scale for connected nodes
   const scale = isHighlighted 
     ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
     : baseScale * (0.8 + node.value * 0.5);
 
-  // Memoize colors to avoid recalculations causing flickering
   const displayColor = useMemo(() => {
     if (isHighlighted) {
-      // Brighter colors for highlighted nodes
       return node.type === 'entity' ? '#ffffff' : themeHex;
     }
     return node.type === 'entity'
@@ -65,94 +58,25 @@ export const Node: React.FC<NodeProps> = ({
       : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
   }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
-  const Geometry = useMemo(() => 
-    node.type === 'entity'
-      ? <sphereGeometry args={[1, 32, 32]} />
-      : <boxGeometry args={[1.2, 1.2, 1.2]} />,
-    [node.type]
-  );
-
-  // Enhanced animation for highlighted nodes
-  useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    
-    if (isHighlighted) {
-      // More pronounced pulse effect for highlighted nodes
-      // Use connection strength to determine pulse intensity for connected nodes
-      const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
-      const pulse = Math.sin(clock.getElapsedTime() * 2.5) * pulseIntensity + 1.1;
-      meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
-      
-      if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        // Stronger emissive effect for better visibility
-        const emissiveIntensity = isSelected 
-          ? 1.0 + Math.sin(clock.getElapsedTime() * 3) * 0.3
-          : 0.7 + (connectionStrength * 0.3) + Math.sin(clock.getElapsedTime() * 3) * 0.2;
-        
-        meshRef.current.material.emissiveIntensity = emissiveIntensity;
-      }
-    } else {
-      // Only update if scale has changed to reduce unnecessary render cycles
-      const targetScale = dimmed ? scale * 0.8 : scale; 
-      meshRef.current.scale.set(targetScale, targetScale, targetScale);
-      
-      if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        // Dimmed nodes should have no emissive
-        meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
-      }
-    }
-  });
-
-  // Only show labels for highlighted nodes or when no node is selected
-  const shouldShowLabel = showLabel && (!selectedNodeId || isHighlighted);
-
-  // Calculate appropriate font size based on camera zoom with caching
-  const cameraZ = useMemo(() => {
-    let z = cameraZoom !== undefined 
-      ? cameraZoom 
-      : (camera && (camera as any).position ? (camera as any).position.z : 26);
-    if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
-    return z;
-  }, [camera, cameraZoom]);
-
-  // Stabilize font size calculations to avoid frequent changes
-  const dynamicFontSize = useMemo(() => {
-    const base = 12.825 + Math.max(0, (cameraZ - 18) * 0.8);
-    // Round to fewer decimal places to reduce unnecessary updates
-    const size = Math.round(Math.max(Math.min(base, 32.4), 11.88) * 100) / 100;
-    return size;
-  }, [cameraZ]);
-
-  // Improved touch handling with debouncing
-  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
-  const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
-  
   const handlePointerDown = useCallback((e: any) => {
     e.stopPropagation();
     setIsTouching(true);
     setTouchStartTime(Date.now());
     setTouchStartPosition({x: e.clientX, y: e.clientY});
-    
-    // Log touch event for debugging
     console.log(`Node pointer down: ${node.id}`);
   }, [node.id]);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
-    
-    // Only trigger click if the touch was short (to differentiate from dragging)
     if (touchStartTime && Date.now() - touchStartTime < 300) {
       if (touchStartPosition) {
-        // Check if it was a genuine tap/click, not a drag
         const deltaX = Math.abs(e.clientX - touchStartPosition.x);
         const deltaY = Math.abs(e.clientY - touchStartPosition.y);
         
-        if (deltaX < 10 && deltaY < 10) { // Small threshold to detect real clicks vs drags
-          // Log node click for debugging
+        if (deltaX < 10 && deltaY < 10) {
           console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
           onClick(node.id);
           
-          // Add haptic feedback for mobile devices if available
           if (navigator.vibrate) {
             navigator.vibrate(50);
           }
@@ -166,11 +90,9 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(false);
     setTouchStartTime(null);
     setTouchStartPosition(null);
-  }, [node.id, onClick, touchStartTime, touchStartPosition]);
+  }, [node.id, onClick, touchStartTime, touchStartPosition, isHighlighted]);
 
-  // Ensure node selection works reliably across devices
   useEffect(() => {
-    // Handle case where pointer up event might not be captured
     if (isTouching && touchStartTime) {
       const timer = setTimeout(() => {
         if (isTouching) {
@@ -178,84 +100,38 @@ export const Node: React.FC<NodeProps> = ({
           setTouchStartTime(null);
           setTouchStartPosition(null);
         }
-      }, 1000); // Safety timeout
+      }, 1000);
       
       return () => clearTimeout(timer);
     }
   }, [isTouching, touchStartTime]);
 
-  // Memoize the HTML label style to avoid recreating it on every render
-  const labelStyle = useMemo(() => ({
-    transform: isHighlighted ? 'scale(1.1) !important' : 'scale(1) !important',
-    minWidth: 'auto',
-    minHeight: 'auto',
-    pointerEvents: 'none' as const, // Cast to specific React type
-    fontSize: `${dynamicFontSize}px`,
-    fontWeight: isHighlighted ? 800 : 600, 
-    lineHeight: 1.1,
-    zIndex: isHighlighted ? 100000 : 99999,
-    userSelect: 'text' as const, // Cast to specific React type
-    whiteSpace: 'nowrap' as const, // Cast to specific React type
-    // Use transform for smoother animation, avoid opacity
-    transition: 'transform 0.2s ease-out, font-weight 0.2s ease',
-    willChange: 'transform', // Hint to browser to optimize animations
-    opacity: shouldShowLabel ? 1 : 0,
-    textShadow: isHighlighted 
-      ? '0 0 5px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.8)' 
-      : '0 0 4px rgba(0,0,0,0.7), 0 0 3px rgba(0,0,0,0.7)'
-  }), [dynamicFontSize, shouldShowLabel, isHighlighted]);
-
-  // Removed background styling for labels
-  const labelTextStyle = useMemo(() => ({
-    color: node.type === 'entity' ? '#fff' : themeHex,
-    padding: '0.1rem 0.2rem',
-    fontWeight: isHighlighted ? 'bold' : 'normal',
-  }), [node.type, themeHex, isHighlighted]);
-
   return (
     <group position={node.position}>
-      <mesh
-        ref={meshRef}
-        scale={[scale, scale, scale]}
-        onClick={(e) => {
-          e.stopPropagation();
-          onClick(node.id);
-        }}
+      <NodeMesh
+        type={node.type}
+        scale={scale}
+        displayColor={displayColor}
+        isHighlighted={isHighlighted}
+        dimmed={dimmed}
+        connectionStrength={connectionStrength}
+        isSelected={isSelected}
+        onClick={() => onClick(node.id)}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerOut={() => setIsTouching(false)}
         onPointerLeave={() => setIsTouching(false)}
-      >
-        {Geometry}
-        <meshStandardMaterial
-          color={displayColor}
-          transparent
-          opacity={isHighlighted ? 1 : (dimmed ? 0.5 : 0.8)}
-          emissive={displayColor}
-          emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
-          roughness={0.3}
-          metalness={0.4}
-        />
-      </mesh>
+      />
       
-      {shouldShowLabel && (
-        <Html
-          position={[0, node.type === 'entity' ? 1.2 : 1.4, 0]}
-          center
-          // Increase the distance factor to improve stability
-          distanceFactor={1.2}
-          // Disable occlusion to prevent flickering when nodes overlap
-          occlude={false}
-          // Important for z-order
-          className="z-40"
-          // Use transform3d for hardware acceleration
-          style={labelStyle}
-          // Add key based on node id to help React stabilize rendering
-          key={`label-${node.id}-${isHighlighted ? 'highlighted' : 'normal'}`}
-        >
-          <div style={labelTextStyle}>{node.id}</div>
-        </Html>
-      )}
+      <NodeLabel
+        id={node.id}
+        type={node.type}
+        position={node.position}
+        isHighlighted={isHighlighted}
+        shouldShowLabel={showLabel}
+        cameraZoom={cameraZoom}
+        themeHex={themeHex}
+      />
     </group>
   );
 };
