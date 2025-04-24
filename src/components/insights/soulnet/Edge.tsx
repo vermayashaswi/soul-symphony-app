@@ -1,3 +1,4 @@
+
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
@@ -69,9 +70,9 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // Keep original thickness for non-highlighted lines, reduce only highlighted ones by 3x
-  const baseThickness = isHighlighted ? 1 : 3;
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2/3 : maxThickness));
+  // Reduce non-highlighted lines thickness by 3x
+  const baseThickness = isHighlighted ? 1 : 1; // Adjust non-highlighted base thickness
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2/3 : maxThickness / 3));
   
   // Create material with appropriate properties
   const material = useMemo(() => {
@@ -85,7 +86,6 @@ export const Edge: React.FC<EdgeProps> = ({
 
   return (
     <group ref={ref}>
-      {/* Use the primitive to correctly create a Three.js Line */}
       <primitive 
         object={new THREE.Line(lineGeometry, material)} 
         ref={lineRef}
