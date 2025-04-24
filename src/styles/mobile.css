@@ -1,3 +1,4 @@
+
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -76,12 +77,20 @@
   /* Make SoulNet visualization clickable and fully interactive */
   canvas {
     touch-action: none !important;
+    -webkit-tap-highlight-color: transparent !important; /* Remove tap highlight on iOS */
   }
 
   /* Fix any styling issues with SoulNet info panel on mobile */
   .absolute.top-2.right-2.p-2.rounded-lg.shadow-lg {
     z-index: 10000 !important;
     max-width: 170px !important;
+  }
+  
+  /* iOS-specific styling for emotion bubbles */
+  .emotion-bubble-container {
+    -webkit-tap-highlight-color: transparent !important;
+    will-change: transform !important;
+    transform: translateZ(0) !important;
   }
 }
 
@@ -90,5 +99,31 @@
   /* Ensure SoulNet container has proper padding when not in fullscreen */
   .soulnet-container:not(.fixed) {
     margin: 0 8px !important;
+  }
+  
+  /* iOS Safari optimization for animation performance */
+  html.ios * {
+    -webkit-tap-highlight-color: transparent;
+  }
+  
+  .ios canvas {
+    transform: translateZ(0);
+    will-change: transform;
+    backface-visibility: hidden;
+  }
+}
+
+/* iOS-specific fixes */
+@supports (-webkit-touch-callout: none) {
+  /* iOS-only styles */
+  .emotion-bubble-container {
+    transform: translate3d(0,0,0) !important;
+    -webkit-transform: translate3d(0,0,0) !important;
+  }
+  
+  /* Better rendering for percentage labels in SoulNet */
+  .z-50 > div {
+    transform: translate3d(0,0,0) !important;
+    -webkit-transform: translate3d(0,0,0) !important;
   }
 }

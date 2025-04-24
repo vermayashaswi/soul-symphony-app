@@ -41,6 +41,9 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           fontSize: '12px',
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
+          WebkitBackfaceVisibility: 'hidden', // iOS GPU rendering optimization
+          WebkitTransform: 'translateZ(0)', // iOS GPU rendering optimization
+          WebkitPerspective: '1000', // iOS GPU rendering optimization
         }}
       >
         {displayPercentage}%
