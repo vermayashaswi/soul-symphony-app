@@ -21,10 +21,8 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
 
   const displayPercentage = Math.round(percentage);
   
-  // Position label directly on top of the node based on its type
-  // For entities (circles), position slightly above
-  // For emotions (squares), position right on top
-  const verticalOffset = nodeType === 'entity' ? 0.8 : 0.6;
+  // Position label slightly higher for larger font
+  const verticalOffset = nodeType === 'entity' ? 1.5 : 1.2;
   
   return (
     <Html
@@ -36,21 +34,22 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
       style={{
         pointerEvents: 'none',
         userSelect: 'none',
-        textShadow: '0 0 5px rgba(0,0,0,0.8)',
+        textShadow: '0 0 10px rgba(0,0,0,0.8)',
       }}
     >
       <div
         style={{
           backgroundColor: 'rgba(0,0,0,0.6)',
           color: '#ffffff',
-          padding: '2px 6px',
-          borderRadius: '4px',
-          fontSize: '12px',
+          padding: '10px 20px',
+          borderRadius: '12px',
+          fontSize: '200px',
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          boxShadow: '0 4px 8px rgba(0,0,0,0.5)',
           transform: 'scale(1)',
           transformOrigin: 'center center',
+          lineHeight: '1',
         }}
       >
         {displayPercentage}%
@@ -60,4 +59,3 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
 };
 
 export default ConnectionPercentage;
-
