@@ -24,8 +24,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
-    const base = 12.825 + Math.max(0, (z - 18) * 0.8);
-    return Math.round(Math.max(Math.min(base, 32.4), 11.88) * 100) / 100;
+    
+    // Multiplying base calculation by 10
+    const base = (12.825 + Math.max(0, (z - 18) * 0.8)) * 10;
+    return Math.round(Math.max(Math.min(base, 324), 118.8) * 100) / 100;
   }, [cameraZoom]);
 
   const labelStyle = useMemo(() => ({
