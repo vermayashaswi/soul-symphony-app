@@ -94,6 +94,34 @@
     border: 3px solid white !important;
     padding: 8px 16px !important;
   }
+  
+  /* Fix the sticky header in insights page */
+  .insights-sticky-header {
+    padding: 10px 16px !important;
+  }
+  
+  /* Increase time toggle size in sticky header */
+  .insights-sticky-header .insights-time-toggle {
+    transform: scale(1.15) !important;
+    transform-origin: right center !important;
+    margin-right: 5px !important;
+  }
+  
+  .insights-sticky-header .toggle-group-item {
+    font-size: 13px !important;
+    padding: 6px 12px !important;
+  }
+  
+  /* Ensure the toggle group takes enough width */
+  .insights-time-toggle .bg-secondary {
+    min-width: 240px !important;
+  }
+  
+  /* Make time toggle group stand out more in mobile */
+  .insights-sticky-header .bg-secondary {
+    background-color: hsl(var(--secondary)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+  }
 }
 
 /* Styles for both mobile and desktop */
