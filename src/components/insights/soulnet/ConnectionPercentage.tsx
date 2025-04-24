@@ -45,11 +45,11 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           color: '#ffffff',
           padding: '2px 6px',
           borderRadius: '4px',
-          fontSize: '600px', // Keep the 10x size
+          fontSize: '3000px', // 5x larger than previous 600px
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
           boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-          transform: 'scale(0.05)', // Keep the scale
+          transform: 'scale(0.01)', // Scaled down to maintain visibility
           transformOrigin: 'center center',
         }}
       >
