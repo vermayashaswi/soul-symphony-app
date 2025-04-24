@@ -61,9 +61,7 @@ const Edge: React.FC<EdgeProps> = ({ link, nodes, scale, selectedNode, children 
 
   return (
     <group>
-      <line geometry={curveGeometry}>
-        <lineBasicMaterial color={color} linewidth={lineWidth} />
-      </line>
+      <primitive object={new THREE.Line(curveGeometry, new THREE.LineBasicMaterial({ color, linewidth: lineWidth }))} />
       {children}
     </group>
   );
