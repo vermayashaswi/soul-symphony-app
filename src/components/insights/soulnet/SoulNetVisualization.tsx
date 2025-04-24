@@ -54,20 +54,22 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
   const strengthMap = new Map<string, number>();
   
   // If all values are the same, use a default value
-  if (maxValue === minValue) {
+  if (maxValue === minValue || maxValue - minValue < 0.001) {
     nodeLinks.forEach(link => {
       const connectedNodeId = link.source === nodeId ? link.target : link.source;
-      strengthMap.set(connectedNodeId, 0.5); // Default mid-value if all same
+      strengthMap.set(connectedNodeId, 0.8); // Higher default value for better visibility
     });
   } else {
-    // Normalize values to 0-1 range
+    // Normalize values to 0.3-1.0 range for better visibility
     nodeLinks.forEach(link => {
       const connectedNodeId = link.source === nodeId ? link.target : link.source;
-      const normalizedValue = (link.value - minValue) / (maxValue - minValue);
+      const normalizedValue = 0.3 + (0.7 * (link.value - minValue) / (maxValue - minValue));
       strengthMap.set(connectedNodeId, normalizedValue);
     });
   }
   
+  // Log the calculated strengths for debugging
+  console.log(`Connection strengths for ${nodeId}:`, Object.fromEntries(strengthMap));
   return strengthMap;
 }
 
@@ -94,6 +96,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   useEffect(() => {
     // Force a re-render after selection changes to ensure visuals update
     if (selectedNode) {
+      console.log(`Selected node: ${selectedNode}`);
       // Force multiple updates to ensure the visual changes apply
       setForceUpdate(prev => prev + 1);
       const timer = setTimeout(() => {
@@ -141,6 +144,22 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   }, [selectedNode, data.links]);
 
   const shouldDim = !!selectedNode;
+
+  // Log selection state changes for debugging
+  useEffect(() => {
+    console.log("Selection state updated:", {
+      selectedNode,
+      highlightedNodesCount: highlightedNodes.size,
+      highlightedNodes: Array.from(highlightedNodes),
+      shouldDim
+    });
+  }, [selectedNode, highlightedNodes, shouldDim]);
+
+  // Custom node click handler with debugging
+  const handleNodeClick = (id: string) => {
+    console.log(`Node clicked in visualization: ${id}`);
+    onNodeClick(id);
+  };
 
   return (
     <>
@@ -194,7 +213,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
               value={relativeStrength}
               isHighlighted={!!isHighlight}
               dimmed={shouldDim && !isHighlight}
-              maxThickness={isHighlight ? 8 : 4}
+              maxThickness={isHighlight ? 10 : 4}
             />
           );
         })
@@ -217,7 +236,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
               key={`node-${node.id}-${forceUpdate}`}
               node={node}
               isSelected={selectedNode === node.id}
-              onClick={onNodeClick}
+              onClick={handleNodeClick}
               highlightedNodes={highlightedNodes}
               showLabel={showLabel}
               dimmed={dimmed}
@@ -229,7 +248,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             />
           );
         })
-      ), [data.nodes, selectedNode, highlightedNodes, shouldDim, themeHex, cameraZoom, onNodeClick, forceUpdate, connectionStrengths])}
+      ), [data.nodes, selectedNode, highlightedNodes, shouldDim, themeHex, cameraZoom, handleNodeClick, forceUpdate, connectionStrengths])}
     </>
   );
 };

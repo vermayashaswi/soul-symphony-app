@@ -132,7 +132,10 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(true);
     setTouchStartTime(Date.now());
     setTouchStartPosition({x: e.clientX, y: e.clientY});
-  }, []);
+    
+    // Log touch event for debugging
+    console.log(`Node pointer down: ${node.id}`);
+  }, [node.id]);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
@@ -145,6 +148,8 @@ export const Node: React.FC<NodeProps> = ({
         const deltaY = Math.abs(e.clientY - touchStartPosition.y);
         
         if (deltaX < 10 && deltaY < 10) { // Small threshold to detect real clicks vs drags
+          // Log node click for debugging
+          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
           onClick(node.id);
           
           // Add haptic feedback for mobile devices if available
@@ -153,6 +158,7 @@ export const Node: React.FC<NodeProps> = ({
           }
         }
       } else {
+        console.log(`Node clicked (no start position): ${node.id}`);
         onClick(node.id);
       }
     }
@@ -184,8 +190,8 @@ export const Node: React.FC<NodeProps> = ({
     minWidth: 'auto',
     minHeight: 'auto',
     pointerEvents: 'none' as const, // Cast to specific React type
-    fontSize: `${dynamicFontSize}rem`,
-    fontWeight: isHighlighted ? 800 : 700, 
+    fontSize: `${dynamicFontSize}px`,
+    fontWeight: isHighlighted ? 800 : 600, 
     lineHeight: 1.1,
     zIndex: isHighlighted ? 100000 : 99999,
     userSelect: 'text' as const, // Cast to specific React type
@@ -194,18 +200,16 @@ export const Node: React.FC<NodeProps> = ({
     transition: 'transform 0.2s ease-out, font-weight 0.2s ease',
     willChange: 'transform', // Hint to browser to optimize animations
     opacity: shouldShowLabel ? 1 : 0,
+    textShadow: isHighlighted 
+      ? '0 0 5px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.8)' 
+      : '0 0 4px rgba(0,0,0,0.7), 0 0 3px rgba(0,0,0,0.7)'
   }), [dynamicFontSize, shouldShowLabel, isHighlighted]);
 
-  // Memoize the label container style to avoid recreating it on every render
-  const labelContainerStyle = useMemo(() => ({
+  // Removed background styling for labels
+  const labelTextStyle = useMemo(() => ({
     color: node.type === 'entity' ? '#fff' : themeHex,
-    backgroundColor: node.type === 'entity' ? 'rgba(0, 0, 0, 0.85)' : 'white',
-    backdropFilter: 'blur(8px)',
-    WebkitBackdropFilter: 'blur(8px)',
-    boxShadow: isHighlighted ? '0 2px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.2)',
-    padding: isHighlighted ? '0.4rem 0.8rem' : '0.2rem 0.5rem',
-    borderRadius: '0.5rem',
-    transition: 'all 0.2s ease',
+    padding: '0.1rem 0.2rem',
+    fontWeight: isHighlighted ? 'bold' : 'normal',
   }), [node.type, themeHex, isHighlighted]);
 
   return (
@@ -228,7 +232,7 @@ export const Node: React.FC<NodeProps> = ({
           transparent
           opacity={isHighlighted ? 1 : (dimmed ? 0.5 : 0.8)}
           emissive={displayColor}
-          emissiveIntensity={isHighlighted ? 0.9 : (dimmed ? 0 : 0.1)}
+          emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
           roughness={0.3}
           metalness={0.4}
         />
@@ -249,15 +253,7 @@ export const Node: React.FC<NodeProps> = ({
           // Add key based on node id to help React stabilize rendering
           key={`label-${node.id}-${isHighlighted ? 'highlighted' : 'normal'}`}
         >
-          <div className={`
-            rounded-lg font-bold whitespace-nowrap
-            ${isHighlighted ? 'scale-110 font-black' : 'opacity-95'}
-            select-text
-          `}
-            style={labelContainerStyle}
-          >
-            {node.id}
-          </div>
+          <div style={labelTextStyle}>{node.id}</div>
         </Html>
       )}
     </group>

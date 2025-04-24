@@ -194,13 +194,22 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, []);
 
   const handleNodeSelect = useCallback((id: string) => {
-    setSelectedEntity(prevId => prevId === id ? null : id);
+    // Log node selection events to debug
+    console.log(`Node selected in SoulNet component: ${id}`);
     
-    // Add haptic feedback if available when selecting nodes
-    if (navigator.vibrate) {
-      navigator.vibrate(50);
+    if (selectedEntity === id) {
+      console.log('Deselecting node');
+      setSelectedEntity(null);
+    } else {
+      console.log(`Setting selected entity to: ${id}`);
+      setSelectedEntity(id);
+      
+      // Add haptic feedback if available
+      if (navigator.vibrate) {
+        navigator.vibrate(50);
+      }
     }
-  }, []);
+  }, [selectedEntity]);
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => !prev);
@@ -252,7 +261,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         style={canvasStyle}
         onClick={handleCanvasClick}
         camera={{ position: [0, 0, 26] }}
-        onPointerMissed={() => setSelectedEntity(null)}
+        onPointerMissed={() => {
+          console.log('Canvas click - deselecting node');
+          setSelectedEntity(null);
+        }}
         gl={{ 
           preserveDrawingBuffer: true,
           antialias: !isMobile,

@@ -34,7 +34,8 @@ export const Edge: React.FC<EdgeProps> = ({
       midPoint,
       endVec
     );
-    return curve.getPoints(20);
+    // Increase number of points for smoother curves
+    return curve.getPoints(30);
   }, [start, end]);
 
   useFrame(({ clock }) => {
@@ -46,42 +47,55 @@ export const Edge: React.FC<EdgeProps> = ({
       
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
         // Higher base opacity for highlighted connections - make them visible!
-        lineRef.current.material.opacity = 0.8 + value * 0.2 * pulse;
+        lineRef.current.material.opacity = 0.9 + value * 0.1 * pulse;
         
         // Much brighter color when highlighted
         lineRef.current.material.color.set(value > 0.5 ? "#ffffff" : "#e0e0e0");
         
         // Apply glow effect by updating linewidth dramatically
-        lineRef.current.material.linewidth = isHighlighted ? Math.max(2, thickness * pulse) : thickness;
+        // Note: linewidth only works in WebGLRenderer with special settings, we're using it for reference only
+        lineRef.current.material.linewidth = thickness * pulse;
       }
     } else {
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
         // Much more distinct difference between dimmed and normal states
-        lineRef.current.material.opacity = dimmed ? 0.05 : 0.15;
+        lineRef.current.material.opacity = dimmed ? 0.03 : 0.08;
         
         // Use less vibrant color for non-highlighted connections
-        lineRef.current.material.color.set(dimmed ? '#555' : "#aaaaaa");
+        lineRef.current.material.color.set(dimmed ? '#444' : "#888");
       }
     }
   });
 
   // Scale thickness based on value (connection strength)
-  // Use a minimum thickness to ensure visibility, then scale up based on value
-  // Make highlighted edges MUCH thicker
-  const baseThickness = isHighlighted ? 2 : 1;
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 1.5 : maxThickness/2));
+  // Increase minimum thickness to ensure visibility
+  const baseThickness = isHighlighted ? 3 : 1;
+  // When highlighted, scale thickness proportionally to connection strength
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2 : maxThickness/3));
+
+  // Use dashed lines for non-highlighted connections, solid for highlighted
+  const dashSize = isHighlighted ? 0 : 0.5;
+  const gapSize = isHighlighted ? 0 : 0.2;
 
   return (
     <group ref={ref}>
       <primitive object={new THREE.LineSegments(
         new THREE.BufferGeometry().setFromPoints(points),
-        new THREE.LineBasicMaterial({
-          color: isHighlighted ? "#ffffff" : (dimmed ? '#555' : "#aaaaaa"),
+        new THREE.LineDashedMaterial({
+          color: isHighlighted ? "#ffffff" : (dimmed ? '#444' : "#888"),
           transparent: true,
-          opacity: isHighlighted ? 0.9 : (dimmed ? 0.05 : 0.15),
-          linewidth: thickness
+          opacity: isHighlighted ? 0.9 : (dimmed ? 0.03 : 0.08),
+          linewidth: thickness,
+          scale: 1,
+          dashSize: dashSize,
+          gapSize: gapSize,
         })
-      )} ref={lineRef} />
+      )} ref={lineRef} onUpdate={self => {
+        if (self instanceof THREE.LineSegments) {
+          // Compute line distances for dashed lines
+          (self.geometry as THREE.BufferGeometry).computeLineDistances();
+        }
+      }} />
     </group>
   );
 };
