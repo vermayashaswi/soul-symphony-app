@@ -21,8 +21,8 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
 
   const displayPercentage = Math.round(percentage);
   
-  // Position label slightly higher for larger font
-  const verticalOffset = nodeType === 'entity' ? 1.5 : 1.2;
+  // Position label much higher to avoid overlapping with node labels
+  const verticalOffset = nodeType === 'entity' ? 2.5 : 2.2;
   
   return (
     <Html
@@ -59,3 +59,4 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
 };
 
 export default ConnectionPercentage;
+
