@@ -21,7 +21,8 @@ export const Edge: React.FC<EdgeProps> = ({
   maxThickness = 5
 }) => {
   const ref = useRef<THREE.Group>(null);
-  const lineRef = useRef<THREE.Line>(null);
+  // Change the ref type to match what react-three-fiber expects
+  const lineRef = useRef<THREE.Mesh>(null);
 
   const points = useMemo(() => {
     try {
@@ -45,6 +46,12 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   }, [start, end]);
 
+  // Create line geometry once
+  const lineGeometry = useMemo(() => {
+    const geometry = new THREE.BufferGeometry().setFromPoints(points);
+    return geometry;
+  }, [points]);
+
   useFrame(() => {
     try {
       if (!lineRef.current || !lineRef.current.material) return;
@@ -66,26 +73,24 @@ export const Edge: React.FC<EdgeProps> = ({
   // Scale thickness based on value (connection strength)
   const baseThickness = isHighlighted ? 3 : 1;
   const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2 : maxThickness/3));
+  
+  // Create material with appropriate properties
+  const material = useMemo(() => {
+    return new THREE.LineBasicMaterial({
+      color: isHighlighted ? "#ffffff" : (dimmed ? '#444' : "#888"),
+      transparent: true,
+      opacity: isHighlighted ? 0.9 : (dimmed ? 0.03 : 0.08),
+      linewidth: thickness,
+    });
+  }, [isHighlighted, dimmed, thickness]);
 
   return (
     <group ref={ref}>
-      <line ref={lineRef}>
-        <bufferGeometry attach="geometry">
-          <bufferAttribute
-            attach="attributes-position"
-            count={points.length}
-            array={new Float32Array(points.flatMap(p => [p.x, p.y, p.z]))}
-            itemSize={3}
-          />
-        </bufferGeometry>
-        <lineBasicMaterial 
-          attach="material" 
-          color={isHighlighted ? "#ffffff" : (dimmed ? '#444' : "#888")}
-          transparent={true}
-          opacity={isHighlighted ? 0.9 : (dimmed ? 0.03 : 0.08)}
-          linewidth={thickness}
-        />
-      </line>
+      {/* Use the primitive to correctly create a Three.js Line */}
+      <primitive 
+        object={new THREE.Line(lineGeometry, material)} 
+        ref={lineRef}
+      />
     </group>
   );
 };
