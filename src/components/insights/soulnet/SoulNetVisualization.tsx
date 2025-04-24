@@ -86,12 +86,16 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   
   // Use memoization to prevent recalculation of center position on every render
   const centerPosition = useMemo(() => {
+    if (!data || !data.nodes || data.nodes.length === 0) {
+      return new THREE.Vector3(0, 0, 0);
+    }
+    
     const nodePositions = data.nodes.map(node => node.position);
     const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / Math.max(nodePositions.length, 1);
     const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / Math.max(nodePositions.length, 1);
     const centerZ = 0;
     return new THREE.Vector3(centerX, centerY, centerZ);
-  }, [data.nodes]);
+  }, [data?.nodes]);
 
   useEffect(() => {
     // Force a re-render after selection changes to ensure visuals update
@@ -108,13 +112,13 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   }, [selectedNode]);
 
   useEffect(() => {
-    if (camera && data.nodes.length > 0) {
+    if (camera && data?.nodes?.length > 0) {
       const centerX = centerPosition.x;
       const centerY = centerPosition.y;
       camera.position.set(centerX, centerY, 26);
       camera.lookAt(centerX, centerY, 0);
     }
-  }, [camera, data.nodes, centerPosition]);
+  }, [camera, data?.nodes, centerPosition]);
 
   // Track camera zoom with throttling to improve performance
   useEffect(() => {
@@ -133,33 +137,28 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   // Memoize connected nodes to prevent unnecessary recalculations
   const highlightedNodes = useMemo(() => {
-    if (!selectedNode) return new Set<string>();
+    if (!selectedNode || !data || !data.links) return new Set<string>();
     return getConnectedNodes(selectedNode, data.links);
-  }, [selectedNode, data.links]);
+  }, [selectedNode, data?.links]);
 
   // Calculate relative strength of connections for the selected node
   const connectionStrengths = useMemo(() => {
-    if (!selectedNode) return new Map<string, number>();
+    if (!selectedNode || !data || !data.links) return new Map<string, number>();
     return calculateRelativeStrengths(selectedNode, data.links);
-  }, [selectedNode, data.links]);
+  }, [selectedNode, data?.links]);
 
   const shouldDim = !!selectedNode;
-
-  // Log selection state changes for debugging
-  useEffect(() => {
-    console.log("Selection state updated:", {
-      selectedNode,
-      highlightedNodesCount: highlightedNodes.size,
-      highlightedNodes: Array.from(highlightedNodes),
-      shouldDim
-    });
-  }, [selectedNode, highlightedNodes, shouldDim]);
 
   // Custom node click handler with debugging
   const handleNodeClick = (id: string) => {
     console.log(`Node clicked in visualization: ${id}`);
     onNodeClick(id);
   };
+
+  if (!data || !data.nodes || !data.links) {
+    console.error("SoulNetVisualization: Data is missing or invalid", data);
+    return null;
+  }
 
   return (
     <>
@@ -184,71 +183,67 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       />
       
       {/* Memoize edges to prevent unnecessary rerenders */}
-      {useMemo(() => (
-        data.links.map((link, index) => {
-          const sourceNode = data.nodes.find(n => n.id === link.source);
-          const targetNode = data.nodes.find(n => n.id === link.target);
-          if (!sourceNode || !targetNode) return null;
+      {data.links.map((link, index) => {
+        const sourceNode = data.nodes.find(n => n.id === link.source);
+        const targetNode = data.nodes.find(n => n.id === link.target);
+        if (!sourceNode || !targetNode) return null;
+        
+        const isHighlight = selectedNode &&
+          (link.source === selectedNode || link.target === selectedNode);
           
-          const isHighlight = selectedNode &&
-            (link.source === selectedNode || link.target === selectedNode);
-            
-          // Get relative strength for this connection if it's highlighted
-          let relativeStrength = 0.3; // default lower value
+        // Get relative strength for this connection if it's highlighted
+        let relativeStrength = 0.3; // default lower value
+        
+        if (isHighlight && selectedNode) {
+          const connectedNodeId = link.source === selectedNode ? link.target : link.source;
+          // Use higher base value for highlighted connections
+          relativeStrength = connectionStrengths.get(connectedNodeId) || 0.7;
+        } else {
+          // Use original link value, but scaled down for non-highlighted links
+          relativeStrength = link.value * 0.5;
+        }
           
-          if (isHighlight && selectedNode) {
-            const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-            // Use higher base value for highlighted connections
-            relativeStrength = connectionStrengths.get(connectedNodeId) || 0.7;
-          } else {
-            // Use original link value, but scaled down for non-highlighted links
-            relativeStrength = link.value * 0.5;
-          }
-            
-          return (
-            <Edge
-              key={`edge-${index}-${forceUpdate}`}
-              start={sourceNode.position}
-              end={targetNode.position}
-              value={relativeStrength}
-              isHighlighted={!!isHighlight}
-              dimmed={shouldDim && !isHighlight}
-              maxThickness={isHighlight ? 10 : 4}
-            />
-          );
-        })
-      ), [data.links, data.nodes, selectedNode, shouldDim, connectionStrengths, forceUpdate])}
+        return (
+          <Edge
+            key={`edge-${index}-${forceUpdate}`}
+            start={sourceNode.position}
+            end={targetNode.position}
+            value={relativeStrength}
+            isHighlighted={!!isHighlight}
+            dimmed={shouldDim && !isHighlight}
+            maxThickness={isHighlight ? 10 : 4}
+          />
+        );
+      })}
       
       {/* Memoize nodes to prevent unnecessary rerenders */}
-      {useMemo(() => (
-        data.nodes.map(node => {
-          const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
-          const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
-          const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
+      {data.nodes.map(node => {
+        const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
+        const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
+        const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
+        
+        // Calculate connection strength if this is a connected node
+        const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
+          ? connectionStrengths.get(node.id) || 0.5
+          : 0.5;
           
-          // Calculate connection strength if this is a connected node
-          const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
-            ? connectionStrengths.get(node.id) || 0.5
-            : 0.5;
-            
-          return (
-            <Node
-              key={`node-${node.id}-${forceUpdate}`}
-              node={node}
-              isSelected={selectedNode === node.id}
-              onClick={handleNodeClick}
-              highlightedNodes={highlightedNodes}
-              showLabel={showLabel}
-              dimmed={dimmed}
-              themeHex={themeHex}
-              selectedNodeId={selectedNode}
-              cameraZoom={cameraZoom}
-              isHighlighted={isHighlighted}
-              connectionStrength={connectionStrength}
-            />
-          );
-        })
-      ), [data.nodes, selectedNode, highlightedNodes, shouldDim, themeHex, cameraZoom, handleNodeClick, forceUpdate, connectionStrengths])}
+        return (
+          <Node
+            key={`node-${node.id}-${forceUpdate}`}
+            node={node}
+            isSelected={selectedNode === node.id}
+            onClick={handleNodeClick}
+            highlightedNodes={highlightedNodes}
+            showLabel={showLabel}
+            dimmed={dimmed}
+            themeHex={themeHex}
+            selectedNodeId={selectedNode}
+            cameraZoom={cameraZoom}
+            isHighlighted={isHighlighted}
+            connectionStrength={connectionStrength}
+          />
+        );
+      })}
     </>
   );
 };

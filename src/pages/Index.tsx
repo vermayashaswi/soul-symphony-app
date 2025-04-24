@@ -31,9 +31,10 @@ const Index = () => {
       console.log('Slow network detected, optimizing experience...');
     }
   }, [networkStatus.speed]);
-
-  console.log('Rendering modern marketing homepage on main domain');
   
+  // Add a specific log to track if this component is properly rendering
+  console.log('Rendering Index.tsx component');
+
   return (
     <>
       <NetworkAwareContent
