@@ -21,7 +21,7 @@ export const Edge: React.FC<EdgeProps> = ({
   maxThickness = 5
 }) => {
   const ref = useRef<THREE.Group>(null);
-  const lineRef = useRef<THREE.LineSegments>(null);
+  const lineRef = useRef<THREE.Line>(null);
 
   const points = useMemo(() => {
     try {
@@ -69,18 +69,25 @@ export const Edge: React.FC<EdgeProps> = ({
 
   return (
     <group ref={ref}>
-      <primitive object={new THREE.LineSegments(
-        new THREE.BufferGeometry().setFromPoints(points),
-        new THREE.LineBasicMaterial({
-          color: isHighlighted ? "#ffffff" : (dimmed ? '#444' : "#888"),
-          transparent: true,
-          opacity: isHighlighted ? 0.9 : (dimmed ? 0.03 : 0.08),
-          linewidth: thickness
-        })
-      )} ref={lineRef} />
+      <line ref={lineRef}>
+        <bufferGeometry attach="geometry">
+          <bufferAttribute
+            attach="attributes-position"
+            count={points.length}
+            array={new Float32Array(points.flatMap(p => [p.x, p.y, p.z]))}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <lineBasicMaterial 
+          attach="material" 
+          color={isHighlighted ? "#ffffff" : (dimmed ? '#444' : "#888")}
+          transparent={true}
+          opacity={isHighlighted ? 0.9 : (dimmed ? 0.03 : 0.08)}
+          linewidth={thickness}
+        />
+      </line>
     </group>
   );
 };
 
 export default Edge;
-
