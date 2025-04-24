@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +11,7 @@ import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { LanguageSelector } from '@/components/ui/language-selector';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -146,15 +146,7 @@ const Home = () => {
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full relative">
             <div className="relative">
-              <h1
-                className="text-2xl font-bold text-theme"
-                style={{
-                  fontWeight: 700,
-                  letterSpacing: '0.005em',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale'
-                }}
-              >
+              <h1 className="text-2xl font-bold text-theme">
                 {getJournalName()}
               </h1>
             </div>
@@ -163,19 +155,14 @@ const Home = () => {
               variants={dateStripVariants}
               initial="hidden"
               animate="visible"
-              className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
+              className="flex items-center gap-2"
             >
-              <div
-                className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
-                style={{
-                  fontWeight: 500,
-                  letterSpacing: '0.01em',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale'
-                }}
-              >
-                {formattedDate}
+              <div className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}>
+                <div className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
+                  {formattedDate}
+                </div>
               </div>
+              <LanguageSelector />
             </motion.div>
           </div>
         </div>
