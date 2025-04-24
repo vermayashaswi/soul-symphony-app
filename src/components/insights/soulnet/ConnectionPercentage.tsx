@@ -13,7 +13,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   position,
   percentage,
   isVisible,
-  offsetY = 0.4 // Reduced from 2.2 to 0.4 to bring it closer to the node
+  offsetY = 0.3 // Reduced further from 0.4 to 0.3 to bring it even closer to the node
 }) => {
   if (!isVisible) return null;
 
@@ -34,16 +34,18 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     >
       <div
         style={{
-          backgroundColor: 'rgba(0,0,0,0.5)',
+          backgroundColor: 'rgba(0,0,0,0.7)', // Slightly darker background for better contrast
           color: '#ffffff',
-          padding: '4px 8px', // Increased padding
-          borderRadius: '4px',
-          fontSize: '24px', // Increased from 12px to 24px (2x base size)
+          padding: '6px 12px', // Increased padding for larger text
+          borderRadius: '8px', // Increased border radius for better look with larger size
+          fontSize: '120px', // Increased from 24px to 120px (10x base size of 12px)
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
           WebkitBackfaceVisibility: 'hidden',
           WebkitTransform: 'translateZ(0)',
           WebkitPerspective: '1000',
+          transform: 'scale(0.2)', // Scale down the HTML element while keeping text crisp
+          transformOrigin: 'center center',
         }}
       >
         {displayPercentage}%
@@ -53,4 +55,3 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
 };
 
 export default ConnectionPercentage;
-
