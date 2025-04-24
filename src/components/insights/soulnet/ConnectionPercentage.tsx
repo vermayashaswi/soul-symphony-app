@@ -13,7 +13,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   position,
   percentage,
   isVisible,
-  offsetY = -0.2 // Position it right on top of the node with slight negative offset
+  offsetY = 2.2
 }) => {
   if (!isVisible) return null;
 
@@ -23,30 +23,24 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     <Html
       position={[0, offsetY, 0]}
       center
-      distanceFactor={10} // Reduce the distanceFactor to keep it more stable at various zoom levels
+      distanceFactor={1}
       occlude={false}
       className="z-50"
       style={{
         pointerEvents: 'none',
         userSelect: 'none',
-        textShadow: '0 0 10px rgba(0,0,0,1)', // Stronger text shadow for better visibility
+        textShadow: '0 0 5px rgba(0,0,0,0.8)',
       }}
     >
       <div
         style={{
-          backgroundColor: 'rgba(0,0,0,0.85)', // Darker background for better contrast
+          backgroundColor: 'rgba(0,0,0,0.5)',
           color: '#ffffff',
-          padding: '8px 16px', // Increased padding
-          borderRadius: '12px', // Larger border radius
-          fontSize: '200px', // Much larger font size
+          padding: '2px 4px',
+          borderRadius: '4px',
+          fontSize: '12px',
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
-          WebkitBackfaceVisibility: 'hidden',
-          WebkitTransform: 'translateZ(0)',
-          WebkitPerspective: '1000',
-          transform: 'scale(0.15)', // Scale down to fit, but still much larger than before
-          transformOrigin: 'center center',
-          border: '3px solid white', // Add a white border for better visibility
         }}
       >
         {displayPercentage}%

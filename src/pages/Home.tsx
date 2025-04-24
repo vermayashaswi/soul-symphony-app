@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -130,6 +131,15 @@ const Home = () => {
     <div className="min-h-screen bg-background text-foreground relative">
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
+      </div>
+
+      <div className="hidden">
+        <img
+          src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png"
+          alt="Preload Ruh's avatar"
+          width="1"
+          height="1"
+        />
       </div>
 
       <div className="relative z-20 flex flex-col h-screen">

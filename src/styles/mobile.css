@@ -76,111 +76,12 @@
   /* Make SoulNet visualization clickable and fully interactive */
   canvas {
     touch-action: none !important;
-    -webkit-tap-highlight-color: transparent !important; /* Remove tap highlight on iOS */
   }
 
   /* Fix any styling issues with SoulNet info panel on mobile */
   .absolute.top-2.right-2.p-2.rounded-lg.shadow-lg {
     z-index: 10000 !important;
     max-width: 170px !important;
-  }
-  
-  /* Increase size of percentage bubbles in SoulNet for better visibility */
-  .z-50 > div {
-    transform: scale(0.15) !important;
-    font-size: 200px !important;
-    background-color: rgba(0,0,0,0.85) !important;
-    border: 3px solid white !important;
-    padding: 8px 16px !important;
-  }
-
-  /* Fix the sticky header in insights page */
-  .insights-sticky-header {
-    padding: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    background-color: hsl(var(--background)) !important;
-  }
-  
-  /* Remove border and make toggle fill width */
-  .insights-sticky-header .bg-secondary {
-    border: none !important;
-    width: 100% !important;
-    max-width: 100% !important;
-    background-color: #222 !important;
-    border-radius: 0 !important;
-  }
-  
-  /* Fix time toggle size in sticky header */
-  .insights-sticky-header .insights-time-toggle {
-    transform: none !important;
-    margin: 0 !important;
-    width: 100% !important;
-    max-width: 100% !important;
-  }
-  
-  /* Make the time toggle container take full width */
-  .insights-sticky-header .flex {
-    width: 100% !important;
-    max-width: 100% !important;
-    justify-content: center !important;
-    padding: 0 !important;
-  }
-  
-  /* Ensure the toggle items have proper size */
-  .insights-sticky-header .toggle-group-item {
-    font-size: 14px !important;
-    padding: 8px 16px !important;
-    height: auto !important;
-    min-height: 38px !important;
-    display: flex !important;
-    align-items: center !important;
-    justify-content: center !important;
-    border: none !important;
-  }
-
-  /* Remove the black rectangle from home page */
-  .fixed.inset-0.z-\[9999\] > div:not(.w-12):not(.rounded-full) {
-    display: none !important;
-  }
-
-  /* Ensure the toggle group takes enough width and doesn't shrink */
-  .insights-time-toggle .bg-secondary {
-    width: 100% !important; /* Take full available width */
-    transform: none !important; /* Prevent any transform */
-    border-radius: 0 !important; /* Remove rounded corners */
-  }
-  
-  /* Make sure the entire toggle container doesn't shrink */
-  .insights-sticky-header .insights-time-toggle,
-  .insights-sticky-header .flex {
-    width: 100% !important;
-    transform: none !important; /* Prevent transforms */
-    transition: none !important; /* Disable transitions that might cause size changes */
-  }
-  
-  /* Make time toggle group stand out more in mobile */
-  .insights-sticky-header .bg-secondary {
-    background-color: #222 !important; /* Darker background for better visibility */
-    box-shadow: none !important; /* Remove shadow */
-  }
-  
-  /* Prevent any scaling or animation on the sticky header content */
-  .insights-sticky-header * {
-    transform: none !important;
-    transition: none !important;
-  }
-  
-  /* Fix the sticky header container to stretch full width */
-  .fixed.top-0.left-0.right-0.z-50 {
-    width: 100% !important;
-    max-width: 100% !important;
-    padding: 0 !important;
-  }
-  
-  /* Adjust time toggle text label to align properly */
-  .insights-sticky-header .text-sm.text-muted-foreground {
-    padding-left: 16px !important;
   }
 }
 
@@ -189,45 +90,5 @@
   /* Ensure SoulNet container has proper padding when not in fullscreen */
   .soulnet-container:not(.fixed) {
     margin: 0 8px !important;
-  }
-  
-  /* iOS Safari optimization for animation performance */
-  html.ios * {
-    -webkit-tap-highlight-color: transparent;
-  }
-  
-  .ios canvas {
-    transform: translateZ(0);
-    will-change: transform;
-    backface-visibility: hidden;
-  }
-
-  /* Enhance SoulNet percentage label visibility */
-  .z-50 > div {
-    text-shadow: 0 0 10px rgba(0,0,0,1) !important;
-  }
-}
-
-/* iOS-specific fixes */
-@supports (-webkit-touch-callout: none) {
-  /* iOS-only styles */
-  .emotion-bubble-container {
-    transform: translate3d(0,0,0) !important;
-    -webkit-transform: translate3d(0,0,0) !important;
-  }
-  
-  /* Better rendering for percentage labels in SoulNet */
-  .z-50 > div {
-    transform: translate3d(0,0,0) scale(0.15) !important;
-    -webkit-transform: translate3d(0,0,0) scale(0.15) !important;
-    font-size: 200px !important;
-    background-color: rgba(0,0,0,0.85) !important;
-    border: 3px solid white !important; 
-  }
-
-  /* Enhance line visibility on iOS */
-  .ios canvas line {
-    stroke-width: 2.5px !important;
-    opacity: 1 !important;
   }
 }

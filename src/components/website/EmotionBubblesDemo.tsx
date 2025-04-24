@@ -6,7 +6,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 
 // Demo component that shows floating emotion bubbles with equal sizes but varying color intensities
 const EmotionBubblesDemo = ({ isPhonePreview = false }) => {
-  // Define emotions with their percentages - these are fixed demo values
+  // Define emotions with their percentages
   const emotions = [
     { name: "Joy", percentage: 40 },
     { name: "Calm", percentage: 25 },
@@ -73,13 +73,13 @@ const EmotionBubblesDemo = ({ isPhonePreview = false }) => {
         const maxPercentage = Math.max(...emotions.map(e => e.percentage));
         const opacity = minOpacity + ((1 - minOpacity) * (emotion.percentage / maxPercentage));
         
-        // Adjusted positions for the phone preview - ensure more distinct separation on iOS
+        // Adjusted positions for the phone preview
         const topPosition = isPhonePreview
-          ? `${15 + (index * 12) % 30}px`  // More distinct vertical distribution for iOS
+          ? `${15 + (index * 8) % 30}px`  // More compact vertical distribution
           : `${25 + Math.sin(index * 1.5) * 15}px`;
         
         const leftPosition = isPhonePreview
-          ? `${10 + (index * 20) % 80}%`  // More spread out horizontal distribution for iOS
+          ? `${10 + (index * 18) % 80}%`  // More spread out horizontal distribution
           : `${(index * 16) % 95}%`;
         
         // Faster animation for phone preview
@@ -107,7 +107,6 @@ const EmotionBubblesDemo = ({ isPhonePreview = false }) => {
               WebkitTransform: 'translateZ(0)', // iOS GPU rendering optimization
               WebkitPerspective: '1000', // iOS GPU rendering optimization
               zIndex: isPhonePreview ? 5 : 'auto',
-              transform: 'translate3d(0,0,0)', // Hardware acceleration for iOS
             }}
             animate={{
               y: [0, -5, 0, 5, 0],

@@ -58,11 +58,10 @@ export const Edge: React.FC<EdgeProps> = ({
       
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
         if (isHighlighted) {
-          lineRef.current.material.opacity = 1.0; // Full opacity for highlighted lines
+          lineRef.current.material.opacity = 0.9;
           lineRef.current.material.color.set('#ffffff');
         } else {
-          // Significantly increase base opacity for better visibility on iOS
-          lineRef.current.material.opacity = dimmed ? 0.15 : 0.35; 
+          lineRef.current.material.opacity = dimmed ? 0.03 : 0.08;
           lineRef.current.material.color.set(dimmed ? '#444' : "#888");
         }
       }
@@ -71,16 +70,16 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // Increase non-highlighted lines thickness for better visibility on iOS
-  const baseThickness = isHighlighted ? 2.0 : 1.8; // Increase base thickness for better iOS visibility
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness : maxThickness / 1.8));
+  // Reduce non-highlighted lines thickness by 3x
+  const baseThickness = isHighlighted ? 1 : 1; // Adjust non-highlighted base thickness
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2/3 : maxThickness / 3));
   
   // Create material with appropriate properties
   const material = useMemo(() => {
     return new THREE.LineBasicMaterial({
       color: isHighlighted ? "#ffffff" : (dimmed ? '#444' : "#888"),
       transparent: true,
-      opacity: isHighlighted ? 1.0 : (dimmed ? 0.15 : 0.35), // Increased base opacity for iOS
+      opacity: isHighlighted ? 0.9 : (dimmed ? 0.03 : 0.08),
       linewidth: thickness,
     });
   }, [isHighlighted, dimmed, thickness]);
