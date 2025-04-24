@@ -39,15 +39,25 @@ export const Edge: React.FC<EdgeProps> = ({
 
   useFrame(({ clock }) => {
     if (!lineRef.current || !lineRef.current.material) return;
-    if (isHighlighted && !dimmed) {
-      const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.3 + 0.7;
+    
+    if (isHighlighted) {
+      // More dramatic pulsating effect for highlighted connections
+      const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.4 + 0.6;
+      
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        // Higher base opacity for highlighted connections
-        lineRef.current.material.opacity = 0.7 + value * 0.3 * pulse;
+        // Higher base opacity for highlighted connections - make them more visible
+        lineRef.current.material.opacity = 0.8 + value * 0.2 * pulse;
+        
+        // Update color to be more vibrant when highlighted
+        lineRef.current.material.color.set(value > 0.7 ? "#ffffff" : "#e0e0e0");
       }
     } else {
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        lineRef.current.material.opacity = dimmed ? 0.06 : (0.18 + value * 0.13);
+        // More distinct difference between dimmed and normal states
+        lineRef.current.material.opacity = dimmed ? 0.05 : 0.15;
+        
+        // Use less vibrant color for non-highlighted connections
+        lineRef.current.material.color.set(dimmed ? '#888' : "#aaaaaa");
       }
     }
   });
@@ -55,16 +65,16 @@ export const Edge: React.FC<EdgeProps> = ({
   // Scale thickness based on value (connection strength)
   // Use a minimum thickness to ensure visibility, then scale up based on value
   const baseThickness = 1;
-  const thickness = baseThickness + (value * maxThickness);
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness : maxThickness/2));
 
   return (
     <group ref={ref}>
       <primitive object={new THREE.LineSegments(
         new THREE.BufferGeometry().setFromPoints(points),
         new THREE.LineBasicMaterial({
-          color: dimmed ? '#BBB' : (isHighlighted ? "#ffffff" : "#aaaaaa"),
+          color: isHighlighted ? "#ffffff" : (dimmed ? '#888' : "#aaaaaa"),
           transparent: true,
-          opacity: dimmed ? 0.06 : (isHighlighted ? 0.8 : 0.3),
+          opacity: isHighlighted ? 0.9 : (dimmed ? 0.05 : 0.15),
           linewidth: thickness
         })
       )} ref={lineRef} />

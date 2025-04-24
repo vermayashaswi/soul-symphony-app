@@ -80,6 +80,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(26);
+  const [forceUpdate, setForceUpdate] = useState<number>(0);
   
   // Use memoization to prevent recalculation of center position on every render
   const centerPosition = useMemo(() => {
@@ -89,6 +90,19 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     const centerZ = 0;
     return new THREE.Vector3(centerX, centerY, centerZ);
   }, [data.nodes]);
+
+  useEffect(() => {
+    // Force a re-render after selection changes to ensure visuals update
+    if (selectedNode) {
+      // Force multiple updates to ensure the visual changes apply
+      setForceUpdate(prev => prev + 1);
+      const timer = setTimeout(() => {
+        setForceUpdate(prev => prev + 1);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedNode]);
 
   useEffect(() => {
     if (camera && data.nodes.length > 0) {
@@ -161,25 +175,30 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             (link.source === selectedNode || link.target === selectedNode);
             
           // Get relative strength for this connection if it's highlighted
-          let relativeStrength = link.value;
+          let relativeStrength = 0.3; // default lower value
+          
           if (isHighlight && selectedNode) {
             const connectedNodeId = link.source === selectedNode ? link.target : link.source;
-            relativeStrength = connectionStrengths.get(connectedNodeId) || link.value;
+            // Use higher base value for highlighted connections
+            relativeStrength = connectionStrengths.get(connectedNodeId) || 0.7;
+          } else {
+            // Use original link value, but scaled down for non-highlighted links
+            relativeStrength = link.value * 0.5;
           }
             
           return (
             <Edge
-              key={`edge-${index}`}
+              key={`edge-${index}-${forceUpdate}`}
               start={sourceNode.position}
               end={targetNode.position}
               value={relativeStrength}
               isHighlighted={!!isHighlight}
               dimmed={shouldDim && !isHighlight}
-              maxThickness={isHighlight ? 6 : 4}
+              maxThickness={isHighlight ? 8 : 4}
             />
           );
         })
-      ), [data.links, data.nodes, selectedNode, shouldDim, connectionStrengths])}
+      ), [data.links, data.nodes, selectedNode, shouldDim, connectionStrengths, forceUpdate])}
       
       {/* Memoize nodes to prevent unnecessary rerenders */}
       {useMemo(() => (
@@ -188,7 +207,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
           return (
             <Node
-              key={`node-${node.id}`}
+              key={`node-${node.id}-${forceUpdate}`}
               node={node}
               isSelected={selectedNode === node.id}
               onClick={onNodeClick}
@@ -201,7 +220,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             />
           );
         })
-      ), [data.nodes, selectedNode, highlightedNodes, shouldDim, themeHex, cameraZoom, onNodeClick])}
+      ), [data.nodes, selectedNode, highlightedNodes, shouldDim, themeHex, cameraZoom, onNodeClick, forceUpdate])}
     </>
   );
 };

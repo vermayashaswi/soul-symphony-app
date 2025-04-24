@@ -44,15 +44,21 @@ export const Node: React.FC<NodeProps> = ({
   // Use memo for stable colors to avoid unnecessary re-renders
   const isHighlighted = isSelected || highlightedNodes.has(node.id);
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
-  const scale = baseScale * (0.8 + node.value * 0.5);
+  // Increased scale differential between highlighted and normal nodes
+  const scale = isHighlighted 
+    ? baseScale * (1.2 + node.value * 0.5) 
+    : baseScale * (0.8 + node.value * 0.5);
 
   // Memoize colors to avoid recalculations causing flickering
-  const displayColor = useMemo(() => 
-    node.type === 'entity'
-      ? (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : '#fff')
-      : (dimmed ? (theme === 'dark' ? '#8E9196' : '#bbb') : themeHex),
-    [node.type, dimmed, theme, themeHex]
-  );
+  const displayColor = useMemo(() => {
+    if (isHighlighted) {
+      // Brighter colors for highlighted nodes
+      return node.type === 'entity' ? '#ffffff' : themeHex;
+    }
+    return node.type === 'entity'
+      ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
+      : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
+  }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
   const Geometry = useMemo(() => 
     node.type === 'entity'
@@ -65,21 +71,23 @@ export const Node: React.FC<NodeProps> = ({
   useFrame(({ clock }) => {
     if (!meshRef.current) return;
     
-    if (isHighlighted && !dimmed) {
+    if (isHighlighted) {
       // More pronounced pulse effect for highlighted nodes
-      const pulse = Math.sin(clock.getElapsedTime() * 2.5) * 0.15 + 1.05;
+      const pulse = Math.sin(clock.getElapsedTime() * 2.5) * 0.2 + 1.1;
       meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
       
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
         // Stronger emissive effect for better visibility
-        meshRef.current.material.emissiveIntensity = 0.7 + Math.sin(clock.getElapsedTime() * 3) * 0.2;
+        meshRef.current.material.emissiveIntensity = 0.9 + Math.sin(clock.getElapsedTime() * 3) * 0.3;
       }
-    } else if (meshRef.current.scale.x !== scale) {
+    } else {
       // Only update if scale has changed to reduce unnecessary render cycles
-      meshRef.current.scale.set(scale, scale, scale);
+      const targetScale = dimmed ? scale * 0.8 : scale; 
+      meshRef.current.scale.set(targetScale, targetScale, targetScale);
       
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        meshRef.current.material.emissiveIntensity = 0;
+        // Dimmed nodes should have no emissive
+        meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
       }
     }
   });
@@ -106,35 +114,58 @@ export const Node: React.FC<NodeProps> = ({
 
   // Improved touch handling with debouncing
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
+  const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
   const handlePointerDown = useCallback((e: any) => {
     e.stopPropagation();
     setIsTouching(true);
     setTouchStartTime(Date.now());
+    setTouchStartPosition({x: e.clientX, y: e.clientY});
   }, []);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
+    
     // Only trigger click if the touch was short (to differentiate from dragging)
     if (touchStartTime && Date.now() - touchStartTime < 300) {
-      onClick(node.id);
+      if (touchStartPosition) {
+        // Check if it was a genuine tap/click, not a drag
+        const deltaX = Math.abs(e.clientX - touchStartPosition.x);
+        const deltaY = Math.abs(e.clientY - touchStartPosition.y);
+        
+        if (deltaX < 10 && deltaY < 10) { // Small threshold to detect real clicks vs drags
+          onClick(node.id);
+          
+          // Add haptic feedback for mobile devices if available
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+        }
+      } else {
+        onClick(node.id);
+      }
     }
+    
     setIsTouching(false);
     setTouchStartTime(null);
-  }, [node.id, onClick, touchStartTime]);
+    setTouchStartPosition(null);
+  }, [node.id, onClick, touchStartTime, touchStartPosition]);
 
   // Ensure node selection works reliably across devices
   useEffect(() => {
+    // Handle case where pointer up event might not be captured
     if (isTouching && touchStartTime) {
       const timer = setTimeout(() => {
         if (isTouching) {
-          onClick(node.id); // Ensure selection happens for longer presses too
+          setIsTouching(false);
+          setTouchStartTime(null);
+          setTouchStartPosition(null);
         }
-      }, 500); // Long press fallback
+      }, 1000); // Safety timeout
       
       return () => clearTimeout(timer);
     }
-  }, [isTouching, touchStartTime, node.id, onClick]);
+  }, [isTouching, touchStartTime]);
 
   // Memoize the HTML label style to avoid recreating it on every render
   const labelStyle = useMemo(() => ({
@@ -160,10 +191,10 @@ export const Node: React.FC<NodeProps> = ({
     backgroundColor: node.type === 'entity' ? 'rgba(0, 0, 0, 0.85)' : 'white',
     backdropFilter: 'blur(8px)',
     WebkitBackdropFilter: 'blur(8px)',
-    boxShadow: '0 2px 8px rgba(0, 0, 0, 0.2)',
-    padding: isHighlighted ? '0.3rem 0.7rem' : '0.2rem 0.5rem',
+    boxShadow: isHighlighted ? '0 2px 12px rgba(0, 0, 0, 0.4)' : '0 2px 8px rgba(0, 0, 0, 0.2)',
+    padding: isHighlighted ? '0.4rem 0.8rem' : '0.2rem 0.5rem',
     borderRadius: '0.5rem',
-    transition: 'padding 0.2s ease',
+    transition: 'all 0.2s ease',
   }), [node.type, themeHex, isHighlighted]);
 
   return (
@@ -184,11 +215,11 @@ export const Node: React.FC<NodeProps> = ({
         <meshStandardMaterial
           color={displayColor}
           transparent
-          opacity={isHighlighted ? 1 : 0.7}
+          opacity={isHighlighted ? 1 : (dimmed ? 0.5 : 0.8)}
           emissive={displayColor}
-          emissiveIntensity={isHighlighted && !dimmed ? 0.7 : 0}
-          roughness={0.5}
-          metalness={0.2}
+          emissiveIntensity={isHighlighted ? 0.9 : (dimmed ? 0 : 0.1)}
+          roughness={0.3}
+          metalness={0.4}
         />
       </mesh>
       
