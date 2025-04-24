@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -155,14 +156,16 @@ const Home = () => {
               variants={dateStripVariants}
               initial="hidden"
               animate="visible"
-              className="flex items-center gap-2"
+              className="flex items-center gap-2 z-30"
             >
               <div className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}>
                 <div className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}>
                   {formattedDate}
                 </div>
               </div>
-              <LanguageSelector />
+              <div className="relative z-40">
+                <LanguageSelector />
+              </div>
             </motion.div>
           </div>
         </div>
