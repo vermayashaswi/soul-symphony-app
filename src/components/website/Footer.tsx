@@ -1,14 +1,11 @@
 
 import React from 'react';
 import { Link } from 'react-router-dom';
-import { useTranslation } from 'react-i18next';
 import { Apple, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
 
 const Footer = () => {
-  const { t } = useTranslation();
-
   const openAppStore = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const appStoreUrl = 'https://apps.apple.com/app/soulo';
@@ -48,30 +45,30 @@ const Footer = () => {
             onClick={openAppStore}
           >
             <Apple className="h-5 w-5" />
-            <span>{t('download.appStore')}</span>
+            <span>Download on App Store</span>
           </Button>
           <Button 
             className="gap-2 bg-primary hover:bg-primary/90" 
             onClick={openPlayStore}
           >
             <Play className="h-5 w-5" />
-            <span>{t('download.googlePlay')}</span>
+            <span>Get it on Google Play</span>
           </Button>
         </div>
         
         <p className="text-muted-foreground mb-8">
-          {t('footer.contact')} <a href="mailto:support@soulo.online" className="text-primary hover:underline">support@soulo.online</a>
+          Contact us at <a href="mailto:support@soulo.online" className="text-primary hover:underline">support@soulo.online</a>
         </p>
         
         <div className="flex justify-center gap-8 text-sm text-muted-foreground">
-          <Link to="/privacy-policy" className="hover:text-primary">{t('footer.privacy')}</Link>
-          <Link to="/terms" className="hover:text-primary">{t('footer.terms')}</Link>
-          <Link to="/blog" className="hover:text-primary">{t('navbar.blog')}</Link>
-          <Link to="/faq" className="hover:text-primary">{t('navbar.faq')}</Link>
+          <Link to="/privacy-policy" className="hover:text-primary">Privacy Policy</Link>
+          <Link to="/terms" className="hover:text-primary">Terms of Service</Link>
+          <Link to="/blog" className="hover:text-primary">Blog</Link>
+          <Link to="/faq" className="hover:text-primary">FAQ</Link>
         </div>
         
         <p className="text-xs text-muted-foreground mt-8">
-          &copy; {new Date().getFullYear()} SOULo. {t('footer.rights')}
+          &copy; {new Date().getFullYear()} SOULo. All rights reserved.
         </p>
       </div>
     </footer>
