@@ -82,6 +82,35 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
   return strengthMap;
 }
 
+// Calculate percentage distribution of connection strengths
+function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<string, number> {
+  // Safety check for invalid inputs
+  if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
+  
+  // Get all links associated with this node
+  const nodeLinks = links.filter(link => 
+    link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
+  );
+  
+  // Calculate total value of all connections
+  const totalValue = nodeLinks.reduce((sum, link) => sum + link.value, 0);
+  
+  if (totalValue === 0) return new Map<string, number>();
+  
+  // Create percentage map
+  const percentageMap = new Map<string, number>();
+  
+  nodeLinks.forEach(link => {
+    const connectedNodeId = link.source === nodeId ? link.target : link.source;
+    const percentage = (link.value / totalValue) * 100;
+    percentageMap.set(connectedNodeId, percentage);
+  });
+  
+  // Log the calculated percentages for debugging
+  console.log(`Connection percentages for ${nodeId}:`, Object.fromEntries(percentageMap));
+  return percentageMap;
+}
+
 export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   data,
   selectedNode,
@@ -198,6 +227,12 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return calculateRelativeStrengths(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
+  // Calculate percentage distribution of connections for the selected node
+  const connectionPercentages = useMemo(() => {
+    if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
+    return calculateConnectionPercentages(selectedNode, validData.links);
+  }, [selectedNode, validData?.links]);
+
   const shouldDim = !!selectedNode;
 
   // Custom node click handler with debugging
@@ -296,6 +331,16 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
           ? connectionStrengths.get(node.id) || 0.5
           : 0.5;
+          
+        // Get percentage for this connection if node is highlighted but not selected
+        const connectionPercentage = selectedNode && highlightedNodes.has(node.id)
+          ? connectionPercentages.get(node.id) || 0
+          : 0;
+          
+        // Determine if we should show the percentage
+        const showPercentage = selectedNode !== null && 
+                              highlightedNodes.has(node.id) && 
+                              node.id !== selectedNode;
         
         // Skip rendering this node if position isn't valid
         if (!Array.isArray(node.position)) {
@@ -317,6 +362,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             cameraZoom={cameraZoom}
             isHighlighted={isHighlighted}
             connectionStrength={connectionStrength}
+            connectionPercentage={connectionPercentage}
+            showPercentage={showPercentage}
           />
         );
       })}

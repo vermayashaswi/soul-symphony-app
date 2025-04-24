@@ -2,6 +2,7 @@
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
+import { ConnectionPercentage } from './ConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
 import { cn } from '@/lib/utils';
 
@@ -25,6 +26,8 @@ interface NodeProps {
   cameraZoom?: number;
   isHighlighted?: boolean;
   connectionStrength?: number;
+  connectionPercentage?: number;
+  showPercentage?: boolean;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -39,6 +42,8 @@ export const Node: React.FC<NodeProps> = ({
   cameraZoom,
   isHighlighted = false,
   connectionStrength = 0.5,
+  connectionPercentage = 0,
+  showPercentage = false,
 }) => {
   const { theme } = useTheme();
   const [isTouching, setIsTouching] = useState(false);
@@ -132,6 +137,13 @@ export const Node: React.FC<NodeProps> = ({
         shouldShowLabel={showLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
+      />
+
+      <ConnectionPercentage
+        position={node.position}
+        percentage={connectionPercentage}
+        isVisible={showPercentage && isHighlighted && !isSelected}
+        offsetY={node.type === 'entity' ? 2.2 : 2.4}
       />
     </group>
   );
