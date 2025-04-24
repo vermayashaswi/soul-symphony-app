@@ -13,7 +13,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   position,
   percentage,
   isVisible,
-  offsetY = 0.3 // Reduced further from 0.4 to 0.3 to bring it even closer to the node
+  offsetY = -0.2 // Position it right on top of the node with slight negative offset
 }) => {
   if (!isVisible) return null;
 
@@ -23,29 +23,30 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     <Html
       position={[0, offsetY, 0]}
       center
-      distanceFactor={1}
+      distanceFactor={10} // Reduce the distanceFactor to keep it more stable at various zoom levels
       occlude={false}
       className="z-50"
       style={{
         pointerEvents: 'none',
         userSelect: 'none',
-        textShadow: '0 0 5px rgba(0,0,0,0.8)',
+        textShadow: '0 0 10px rgba(0,0,0,1)', // Stronger text shadow for better visibility
       }}
     >
       <div
         style={{
-          backgroundColor: 'rgba(0,0,0,0.7)', // Slightly darker background for better contrast
+          backgroundColor: 'rgba(0,0,0,0.85)', // Darker background for better contrast
           color: '#ffffff',
-          padding: '6px 12px', // Increased padding for larger text
-          borderRadius: '8px', // Increased border radius for better look with larger size
-          fontSize: '120px', // Increased from 24px to 120px (10x base size of 12px)
+          padding: '8px 16px', // Increased padding
+          borderRadius: '12px', // Larger border radius
+          fontSize: '200px', // Much larger font size
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
           WebkitBackfaceVisibility: 'hidden',
           WebkitTransform: 'translateZ(0)',
           WebkitPerspective: '1000',
-          transform: 'scale(0.2)', // Scale down the HTML element while keeping text crisp
+          transform: 'scale(0.15)', // Scale down to fit, but still much larger than before
           transformOrigin: 'center center',
+          border: '3px solid white', // Add a white border for better visibility
         }}
       >
         {displayPercentage}%

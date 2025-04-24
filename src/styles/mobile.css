@@ -86,11 +86,13 @@
     max-width: 170px !important;
   }
   
-  /* iOS-specific styling for emotion bubbles */
-  .emotion-bubble-container {
-    -webkit-tap-highlight-color: transparent !important;
-    will-change: transform !important;
-    transform: translateZ(0) !important;
+  /* Increase size of percentage bubbles in SoulNet for better visibility */
+  .z-50 > div {
+    transform: scale(0.15) !important;
+    font-size: 200px !important;
+    background-color: rgba(0,0,0,0.85) !important;
+    border: 3px solid white !important;
+    padding: 8px 16px !important;
   }
 }
 
@@ -111,6 +113,11 @@
     will-change: transform;
     backface-visibility: hidden;
   }
+
+  /* Enhance SoulNet percentage label visibility */
+  .z-50 > div {
+    text-shadow: 0 0 10px rgba(0,0,0,1) !important;
+  }
 }
 
 /* iOS-specific fixes */
@@ -123,7 +130,16 @@
   
   /* Better rendering for percentage labels in SoulNet */
   .z-50 > div {
-    transform: translate3d(0,0,0) !important;
-    -webkit-transform: translate3d(0,0,0) !important;
+    transform: translate3d(0,0,0) scale(0.15) !important;
+    -webkit-transform: translate3d(0,0,0) scale(0.15) !important;
+    font-size: 200px !important;
+    background-color: rgba(0,0,0,0.85) !important;
+    border: 3px solid white !important; 
+  }
+
+  /* Enhance line visibility on iOS */
+  .ios canvas line {
+    stroke-width: 2.5px !important;
+    opacity: 1 !important;
   }
 }

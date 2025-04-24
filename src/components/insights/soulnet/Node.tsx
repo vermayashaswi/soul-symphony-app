@@ -64,6 +64,14 @@ export const Node: React.FC<NodeProps> = ({
       : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
   }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
+  // Calculate offset based on node type and scale
+  const percentageOffset = useMemo(() => {
+    // Place the percentage label right on top of the node
+    // Negative values move it lower (more on top of the node)
+    // For entity (cube) vs emotion (sphere)
+    return node.type === 'entity' ? 0 : -0.2;
+  }, [node.type]);
+
   const handlePointerDown = useCallback((e: any) => {
     e.stopPropagation();
     setIsTouching(true);
@@ -143,7 +151,7 @@ export const Node: React.FC<NodeProps> = ({
         position={node.position}
         percentage={connectionPercentage}
         isVisible={showPercentage && isHighlighted && !isSelected}
-        offsetY={node.type === 'entity' ? 2.2 : 2.4}
+        offsetY={percentageOffset}
       />
     </group>
   );
