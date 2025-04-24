@@ -130,6 +130,12 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           />
         </Canvas>
       </FullscreenWrapper>
+      
+      <div className="w-full text-center mt-2 px-4 md:px-8">
+        <p className="text-xs text-muted-foreground">
+          <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
+        </p>
+      </div>
     </div>
   );
 };
