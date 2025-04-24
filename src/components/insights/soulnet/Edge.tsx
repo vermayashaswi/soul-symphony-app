@@ -70,9 +70,9 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // Scale thickness based on value (connection strength)
-  const baseThickness = isHighlighted ? 3 : 1;
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2 : maxThickness/3));
+  // Reduce baseline thickness by 3x
+  const baseThickness = isHighlighted ? 1 : 0.33;
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2/3 : maxThickness/9));
   
   // Create material with appropriate properties
   const material = useMemo(() => {
