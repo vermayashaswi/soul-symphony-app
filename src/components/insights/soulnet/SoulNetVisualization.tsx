@@ -205,6 +205,13 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         data.nodes.map(node => {
           const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
           const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
+          const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
+          
+          // Calculate connection strength if this is a connected node
+          const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
+            ? connectionStrengths.get(node.id) || 0.5
+            : 0.5;
+            
           return (
             <Node
               key={`node-${node.id}-${forceUpdate}`}
@@ -217,10 +224,12 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
               themeHex={themeHex}
               selectedNodeId={selectedNode}
               cameraZoom={cameraZoom}
+              isHighlighted={isHighlighted}
+              connectionStrength={connectionStrength}
             />
           );
         })
-      ), [data.nodes, selectedNode, highlightedNodes, shouldDim, themeHex, cameraZoom, onNodeClick, forceUpdate])}
+      ), [data.nodes, selectedNode, highlightedNodes, shouldDim, themeHex, cameraZoom, onNodeClick, forceUpdate, connectionStrengths])}
     </>
   );
 };

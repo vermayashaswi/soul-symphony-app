@@ -45,34 +45,38 @@ export const Edge: React.FC<EdgeProps> = ({
       const pulse = Math.sin(clock.getElapsedTime() * 3) * 0.4 + 0.6;
       
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        // Higher base opacity for highlighted connections - make them more visible
+        // Higher base opacity for highlighted connections - make them visible!
         lineRef.current.material.opacity = 0.8 + value * 0.2 * pulse;
         
-        // Update color to be more vibrant when highlighted
-        lineRef.current.material.color.set(value > 0.7 ? "#ffffff" : "#e0e0e0");
+        // Much brighter color when highlighted
+        lineRef.current.material.color.set(value > 0.5 ? "#ffffff" : "#e0e0e0");
+        
+        // Apply glow effect by updating linewidth dramatically
+        lineRef.current.material.linewidth = isHighlighted ? Math.max(2, thickness * pulse) : thickness;
       }
     } else {
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        // More distinct difference between dimmed and normal states
+        // Much more distinct difference between dimmed and normal states
         lineRef.current.material.opacity = dimmed ? 0.05 : 0.15;
         
         // Use less vibrant color for non-highlighted connections
-        lineRef.current.material.color.set(dimmed ? '#888' : "#aaaaaa");
+        lineRef.current.material.color.set(dimmed ? '#555' : "#aaaaaa");
       }
     }
   });
 
   // Scale thickness based on value (connection strength)
   // Use a minimum thickness to ensure visibility, then scale up based on value
-  const baseThickness = 1;
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness : maxThickness/2));
+  // Make highlighted edges MUCH thicker
+  const baseThickness = isHighlighted ? 2 : 1;
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 1.5 : maxThickness/2));
 
   return (
     <group ref={ref}>
       <primitive object={new THREE.LineSegments(
         new THREE.BufferGeometry().setFromPoints(points),
         new THREE.LineBasicMaterial({
-          color: isHighlighted ? "#ffffff" : (dimmed ? '#888' : "#aaaaaa"),
+          color: isHighlighted ? "#ffffff" : (dimmed ? '#555' : "#aaaaaa"),
           transparent: true,
           opacity: isHighlighted ? 0.9 : (dimmed ? 0.05 : 0.15),
           linewidth: thickness

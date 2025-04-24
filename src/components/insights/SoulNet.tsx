@@ -10,7 +10,6 @@ import { SoulNetVisualization } from './soulnet/SoulNetVisualization';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Expand, Minimize } from 'lucide-react';
-import { toast } from "sonner";
 
 interface NodeData {
   id: string;
@@ -195,75 +194,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, []);
 
   const handleNodeSelect = useCallback((id: string) => {
-    setSelectedEntity(prevId => {
-      const newSelection = prevId === id ? null : id;
-      
-      if (newSelection) {
-        const nodeType = graphData.nodes.find(node => node.id === newSelection)?.type;
-        
-        if (nodeType === 'entity') {
-          const connections = graphData.links
-            .filter(link => link.source === newSelection);
-          
-          const connectedEmotions = connections.length;
-          
-          // Show more detailed information in the toast
-          const emotionsList = connections
-            .sort((a, b) => b.value - a.value) // Sort by strength
-            .slice(0, 3) // Get top 3
-            .map(link => {
-              const target = graphData.nodes.find(n => n.id === link.target);
-              return target?.id;
-            })
-            .filter(Boolean)
-            .join(", ");
-          
-          const extraEmotions = connectedEmotions > 3 ? ` and ${connectedEmotions - 3} more` : "";
-          
-          toast.info(
-            `${id}: Connected to ${emotionsList}${extraEmotions}`, 
-            {
-              duration: 3000,
-              position: "bottom-center",
-            }
-          );
-        } else if (nodeType === 'emotion') {
-          const connections = graphData.links
-            .filter(link => link.target === newSelection);
-            
-          const connectedEntities = connections.length;
-          
-          // Show more detailed information in the toast
-          const entitiesList = connections
-            .sort((a, b) => b.value - a.value) // Sort by strength
-            .slice(0, 3) // Get top 3
-            .map(link => {
-              const source = graphData.nodes.find(n => n.id === link.source);
-              return source?.id;
-            })
-            .filter(Boolean)
-            .join(", ");
-            
-          const extraEntities = connectedEntities > 3 ? ` and ${connectedEntities - 3} more` : "";
-          
-          toast.info(
-            `${id}: Connected to ${entitiesList}${extraEntities}`,
-            {
-              duration: 3000,
-              position: "bottom-center",
-            }
-          );
-        }
-        
-        // Add haptic feedback if available
-        if (navigator.vibrate) {
-          navigator.vibrate(50);
-        }
-      }
-      
-      return newSelection;
-    });
-  }, [graphData]);
+    setSelectedEntity(prevId => prevId === id ? null : id);
+    
+    // Add haptic feedback if available when selecting nodes
+    if (navigator.vibrate) {
+      navigator.vibrate(50);
+    }
+  }, []);
 
   const toggleFullScreen = useCallback(() => {
     setIsFullScreen(prev => !prev);

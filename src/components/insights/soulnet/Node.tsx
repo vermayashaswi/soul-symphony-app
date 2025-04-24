@@ -23,6 +23,8 @@ interface NodeProps {
   themeHex: string;
   selectedNodeId: string | null;
   cameraZoom?: number;
+  isHighlighted?: boolean;
+  connectionStrength?: number;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -35,6 +37,8 @@ export const Node: React.FC<NodeProps> = ({
   themeHex,
   selectedNodeId,
   cameraZoom,
+  isHighlighted = false,
+  connectionStrength = 0.5,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   const { theme } = useTheme();
@@ -42,11 +46,12 @@ export const Node: React.FC<NodeProps> = ({
   const [isTouching, setIsTouching] = useState(false);
   
   // Use memo for stable colors to avoid unnecessary re-renders
-  const isHighlighted = isSelected || highlightedNodes.has(node.id);
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
+  
   // Increased scale differential between highlighted and normal nodes
+  // Apply connection strength to the scale for connected nodes
   const scale = isHighlighted 
-    ? baseScale * (1.2 + node.value * 0.5) 
+    ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
     : baseScale * (0.8 + node.value * 0.5);
 
   // Memoize colors to avoid recalculations causing flickering
@@ -73,12 +78,18 @@ export const Node: React.FC<NodeProps> = ({
     
     if (isHighlighted) {
       // More pronounced pulse effect for highlighted nodes
-      const pulse = Math.sin(clock.getElapsedTime() * 2.5) * 0.2 + 1.1;
+      // Use connection strength to determine pulse intensity for connected nodes
+      const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
+      const pulse = Math.sin(clock.getElapsedTime() * 2.5) * pulseIntensity + 1.1;
       meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
       
       if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
         // Stronger emissive effect for better visibility
-        meshRef.current.material.emissiveIntensity = 0.9 + Math.sin(clock.getElapsedTime() * 3) * 0.3;
+        const emissiveIntensity = isSelected 
+          ? 1.0 + Math.sin(clock.getElapsedTime() * 3) * 0.3
+          : 0.7 + (connectionStrength * 0.3) + Math.sin(clock.getElapsedTime() * 3) * 0.2;
+        
+        meshRef.current.material.emissiveIntensity = emissiveIntensity;
       }
     } else {
       // Only update if scale has changed to reduce unnecessary render cycles
