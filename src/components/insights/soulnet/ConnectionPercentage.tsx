@@ -14,19 +14,21 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   position,
   percentage,
   isVisible,
-  offsetY = 0, // Default positioning
-  nodeType = 'emotion' // Add node type to adjust positioning
+  offsetY = 0,
+  nodeType = 'emotion'
 }) => {
   if (!isVisible) return null;
 
   const displayPercentage = Math.round(percentage);
   
-  // Adjust vertical offset based on node type
-  const verticalOffset = nodeType === 'entity' ? 0.5 : 0.2;
+  // Position label directly on top of the node based on its type
+  // For entities (circles), position slightly above
+  // For emotions (squares), position right on top
+  const verticalOffset = nodeType === 'entity' ? 0.8 : 0.6;
   
   return (
     <Html
-      position={[0, verticalOffset + offsetY, 0]}
+      position={[0, verticalOffset, 0]}
       center
       distanceFactor={1}
       occlude={false}
@@ -43,11 +45,11 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           color: '#ffffff',
           padding: '2px 6px',
           borderRadius: '4px',
-          fontSize: '600px', // Increased to 10x (previously 60px)
+          fontSize: '600px', // Keep the 10x size
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
           boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
-          transform: 'scale(0.05)', // Further scaled down to maintain proportions
+          transform: 'scale(0.05)', // Keep the scale
           transformOrigin: 'center center',
         }}
       >
