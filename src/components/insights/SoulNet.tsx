@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -10,6 +9,7 @@ import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
 import { SoulNetDescription } from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
+import { cn } from '@/lib/utils';
 
 interface NodeData {
   id: string;
@@ -133,7 +133,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   );
 };
 
-// Helper function to get start date based on time range
 const getStartDate = (range: TimeRange) => {
   const now = new Date();
   switch (range) {
@@ -158,7 +157,6 @@ const getStartDate = (range: TimeRange) => {
   }
 };
 
-// Helper function to process entities and create graph data
 const processEntities = (entries: any[]) => {
   const entityEmotionMap: Record<string, {emotions: Record<string, number>}> = {};
   
@@ -184,7 +182,6 @@ const processEntities = (entries: any[]) => {
   return generateGraph(entityEmotionMap);
 };
 
-// Helper function to generate graph data
 const generateGraph = (entityEmotionMap: Record<string, {emotions: Record<string, number>}>) => {
   const nodes: NodeData[] = [];
   const links: LinkData[] = [];
