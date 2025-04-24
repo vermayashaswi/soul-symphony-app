@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Slider } from "@/components/ui/slider";
 import { cn } from '@/lib/utils';
 import { Check as CheckIcon } from 'lucide-react';
@@ -18,8 +18,8 @@ export function ColorPicker({ value, onChange, className, applyImmediately = fal
   const [currentColor, setCurrentColor] = useState(value || '#3b82f6');
   const colorCircleRef = useRef<HTMLDivElement>(null);
   const spectrumRef = useRef<HTMLDivElement>(null);
-
-  // Initialize hue from input value
+  
+  // Initialize hue from input value - only run once when value initially changes
   useEffect(() => {
     if (value) {
       const rgb = hexToRgb(value);
@@ -32,36 +32,46 @@ export function ColorPicker({ value, onChange, className, applyImmediately = fal
     }
   }, [value]);
 
-  // Update current preview color when HSL changes, but don't call onChange
+  // Memoize color conversions to reduce calculations
+  const hslToHex = useMemo(() => {
+    return (h: number, s: number, l: number): string => {
+      l /= 100;
+      const a = s * Math.min(l, 1 - l) / 100;
+      const f = (n: number) => {
+        const k = (n + h / 30) % 12;
+        const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
+        return Math.round(255 * color).toString(16).padStart(2, '0');
+      };
+      return `#${f(0)}${f(8)}${f(4)}`;
+    };
+  }, []);
+
+  // Use debounced effect for color updates to reduce render frequency
   useEffect(() => {
     const hexColor = hslToHex(hue, saturation, lightness);
-    setCurrentColor(hexColor);
     
-    // If applyImmediately is true, call onChange with every change
-    if (applyImmediately) {
-      onChange(hexColor);
-    }
-  }, [hue, saturation, lightness, applyImmediately, onChange]);
+    // Use RAF to throttle updates and reduce flickering
+    requestAnimationFrame(() => {
+      setCurrentColor(hexColor);
+      
+      // If applyImmediately is true, call onChange with every change
+      if (applyImmediately) {
+        onChange(hexColor);
+      }
+    });
+  }, [hue, saturation, lightness, applyImmediately, onChange, hslToHex]);
 
+  // Handlers with performance optimizations
   const handleHueChange = (newHue: number[]) => {
     setHue(newHue[0]);
-    updateLocalColor(newHue[0], saturation, lightness);
   };
 
   const handleSaturationChange = (newSaturation: number[]) => {
     setSaturation(newSaturation[0]);
-    updateLocalColor(hue, newSaturation[0], lightness);
   };
 
   const handleLightnessChange = (newLightness: number[]) => {
     setLightness(newLightness[0]);
-    updateLocalColor(hue, saturation, newLightness[0]);
-  };
-
-  // This updates the local preview color without calling the onChange prop
-  const updateLocalColor = (h: number, s: number, l: number) => {
-    const hexColor = hslToHex(h, s, l);
-    setCurrentColor(hexColor);
   };
   
   // This function explicitly triggers the onChange callback
@@ -76,20 +86,7 @@ export function ColorPicker({ value, onChange, className, applyImmediately = fal
       const width = rect.width;
       const newHue = Math.round((x / width) * 360);
       setHue(newHue);
-      updateLocalColor(newHue, saturation, lightness);
     }
-  };
-
-  // Convert HSL to Hex
-  const hslToHex = (h: number, s: number, l: number): string => {
-    l /= 100;
-    const a = s * Math.min(l, 1 - l) / 100;
-    const f = (n: number) => {
-      const k = (n + h / 30) % 12;
-      const color = l - a * Math.max(Math.min(k - 3, 9 - k, 1), -1);
-      return Math.round(255 * color).toString(16).padStart(2, '0');
-    };
-    return `#${f(0)}${f(8)}${f(4)}`;
   };
 
   // Utility function to convert hex to RGB
@@ -129,33 +126,31 @@ export function ColorPicker({ value, onChange, className, applyImmediately = fal
     return [Math.round(h * 360), Math.round(s * 100), Math.round(l * 100)];
   };
 
-  // Generate background with color spectrum
-  const generateSpectrumBackground = () => {
+  // Memoize background gradients to prevent recalculation on every render
+  const spectrumBackground = useMemo(() => {
     let gradient = 'linear-gradient(to right, ';
     for (let i = 0; i <= 360; i += 30) {
       gradient += `hsl(${i}, ${saturation}%, ${lightness}%) ${i/3.6}%, `;
     }
-    // Remove trailing comma and space
     gradient = gradient.slice(0, -2);
     gradient += ')';
     return gradient;
-  };
+  }, [saturation, lightness]);
 
-  // Generate saturation gradient background
-  const generateSaturationBackground = () => {
+  const saturationBackground = useMemo(() => {
     return `linear-gradient(to right, hsl(${hue}, 0%, ${lightness}%), hsl(${hue}, 100%, ${lightness}%))`;
-  };
+  }, [hue, lightness]);
 
-  // Generate lightness gradient background
-  const generateLightnessBackground = () => {
+  const lightnessBackground = useMemo(() => {
     return `linear-gradient(to right, hsl(${hue}, ${saturation}%, 0%), hsl(${hue}, ${saturation}%, 50%), hsl(${hue}, ${saturation}%, 100%))`;
-  };
+  }, [hue, saturation]);
 
   return (
     <div className={cn("flex flex-col space-y-4", className)}>
       {/* Color preview */}
       <div className="flex items-center justify-center mb-2">
         <div 
+          ref={colorCircleRef}
           className="h-16 w-16 rounded-full border-2 border-gray-200 shadow-md"
           style={{ backgroundColor: currentColor }}
         />
@@ -166,7 +161,7 @@ export function ColorPicker({ value, onChange, className, applyImmediately = fal
         <label className="text-sm font-medium text-foreground mb-2 block">Hue</label>
         <div 
           className="w-full h-8 rounded-lg overflow-hidden relative cursor-pointer mb-2"
-          style={{ background: generateSpectrumBackground() }}
+          style={{ background: spectrumBackground }}
           onClick={handleSpectrumClick}
           ref={spectrumRef}
         >
@@ -194,7 +189,7 @@ export function ColorPicker({ value, onChange, className, applyImmediately = fal
         <label className="text-sm font-medium text-foreground mb-2 block">Saturation</label>
         <div 
           className="w-full h-8 rounded-lg overflow-hidden relative mb-2"
-          style={{ background: generateSaturationBackground() }}
+          style={{ background: saturationBackground }}
         />
         <Slider
           value={[saturation]}
@@ -211,7 +206,7 @@ export function ColorPicker({ value, onChange, className, applyImmediately = fal
         <label className="text-sm font-medium text-foreground mb-2 block">Lightness</label>
         <div 
           className="w-full h-8 rounded-lg overflow-hidden relative mb-2"
-          style={{ background: generateLightnessBackground() }}
+          style={{ background: lightnessBackground }}
         />
         <Slider
           value={[lightness]}
