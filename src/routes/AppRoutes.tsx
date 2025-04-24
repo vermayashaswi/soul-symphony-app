@@ -20,6 +20,7 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 
 const AppRoutes = () => {
+  console.log('Rendering AppRoutes component');
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
@@ -41,7 +42,11 @@ const AppRoutes = () => {
         <Route path="/app" element={<ProtectedRoute />}>
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
-          <Route path="insights" element={<Insights />} />
+          <Route path="insights" element={
+            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+              <Insights />
+            </React.Suspense>
+          } />
           <Route path="chat" element={<Chat />} />
           <Route path="smart-chat" element={<SmartChat />} />
           <Route path="settings" element={<Settings />} />

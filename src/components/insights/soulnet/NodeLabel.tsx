@@ -67,3 +67,5 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     </Html>
   ) : null;
 };
+
+export default NodeLabel;

@@ -42,27 +42,31 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   );
 
   useFrame(({ clock }) => {
-    if (!meshRef.current) return;
-    
-    if (isHighlighted) {
-      const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
-      const pulse = Math.sin(clock.getElapsedTime() * 2.5) * pulseIntensity + 1.1;
-      meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
+    try {
+      if (!meshRef.current) return;
       
-      if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        const emissiveIntensity = isSelected 
-          ? 1.0 + Math.sin(clock.getElapsedTime() * 3) * 0.3
-          : 0.7 + (connectionStrength * 0.3) + Math.sin(clock.getElapsedTime() * 3) * 0.2;
+      if (isHighlighted) {
+        const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
+        const pulse = Math.sin(clock.getElapsedTime() * 2.5) * pulseIntensity + 1.1;
+        meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
         
-        meshRef.current.material.emissiveIntensity = emissiveIntensity;
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          const emissiveIntensity = isSelected 
+            ? 1.0 + Math.sin(clock.getElapsedTime() * 3) * 0.3
+            : 0.7 + (connectionStrength * 0.3) + Math.sin(clock.getElapsedTime() * 3) * 0.2;
+          
+          meshRef.current.material.emissiveIntensity = emissiveIntensity;
+        }
+      } else {
+        const targetScale = dimmed ? scale * 0.8 : scale;
+        meshRef.current.scale.set(targetScale, targetScale, targetScale);
+        
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+          meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
+        }
       }
-    } else {
-      const targetScale = dimmed ? scale * 0.8 : scale;
-      meshRef.current.scale.set(targetScale, targetScale, targetScale);
-      
-      if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
-        meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
-      }
+    } catch (error) {
+      console.error("Error in NodeMesh useFrame:", error);
     }
   });
 
@@ -92,3 +96,5 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     </mesh>
   );
 };
+
+export default NodeMesh;

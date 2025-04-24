@@ -14,3 +14,5 @@ export const SoulNetDescription: React.FC = () => {
     </div>
   );
 };
+
+export default SoulNetDescription;

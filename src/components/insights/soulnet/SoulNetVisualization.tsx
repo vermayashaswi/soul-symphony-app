@@ -2,8 +2,8 @@
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
-import { Node } from './Node';
-import { Edge } from './Edge';
+import Node from './Node';
+import Edge from './Edge';
 import * as THREE from 'three';
 
 interface NodeData {
@@ -28,8 +28,12 @@ interface SoulNetVisualizationProps {
 }
 
 function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
+  if (!nodeId || !links || !Array.isArray(links)) return new Set<string>();
+  
   const connected = new Set<string>();
   links.forEach(link => {
+    if (!link || typeof link !== 'object') return;
+    
     if (link.source === nodeId) connected.add(link.target);
     if (link.target === nodeId) connected.add(link.source);
   });
@@ -38,8 +42,13 @@ function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
 
 // Calculate relative connection strength within connected nodes
 function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<string, number> {
+  // Safety check for invalid inputs
+  if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
+  
   // Get all links associated with this node
-  const nodeLinks = links.filter(link => link.source === nodeId || link.target === nodeId);
+  const nodeLinks = links.filter(link => 
+    link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
+  );
   
   // Find min and max values
   let minValue = Infinity;
@@ -83,19 +92,55 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(26);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  console.log("Rendering SoulNetVisualization component with data:", 
+    data?.nodes?.length, "nodes and", data?.links?.length, "links");
+  
+  useEffect(() => {
+    console.log("SoulNetVisualization mounted");
+    return () => {
+      console.log("SoulNetVisualization unmounted");
+    };
+  }, []);
+  
+  // Ensure data is valid
+  const validData = useMemo(() => {
+    if (!data || !data.nodes || !Array.isArray(data.nodes) || !data.links || !Array.isArray(data.links)) {
+      console.error("Invalid SoulNetVisualization data:", data);
+      return {
+        nodes: [],
+        links: []
+      };
+    }
+    return data;
+  }, [data]);
   
   // Use memoization to prevent recalculation of center position on every render
   const centerPosition = useMemo(() => {
-    if (!data || !data.nodes || data.nodes.length === 0) {
+    if (!validData.nodes || validData.nodes.length === 0) {
       return new THREE.Vector3(0, 0, 0);
     }
     
-    const nodePositions = data.nodes.map(node => node.position);
-    const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / Math.max(nodePositions.length, 1);
-    const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / Math.max(nodePositions.length, 1);
-    const centerZ = 0;
-    return new THREE.Vector3(centerX, centerY, centerZ);
-  }, [data?.nodes]);
+    try {
+      const validNodes = validData.nodes.filter(node => 
+        node && node.position && Array.isArray(node.position) && node.position.length === 3
+      );
+      
+      if (validNodes.length === 0) {
+        return new THREE.Vector3(0, 0, 0);
+      }
+      
+      const nodePositions = validNodes.map(node => node.position);
+      const centerX = nodePositions.reduce((sum, pos) => sum + pos[0], 0) / Math.max(nodePositions.length, 1);
+      const centerY = nodePositions.reduce((sum, pos) => sum + pos[1], 0) / Math.max(nodePositions.length, 1);
+      const centerZ = 0;
+      return new THREE.Vector3(centerX, centerY, centerZ);
+    } catch (error) {
+      console.error("Error calculating center position:", error);
+      return new THREE.Vector3(0, 0, 0);
+    }
+  }, [validData.nodes]);
 
   useEffect(() => {
     // Force a re-render after selection changes to ensure visuals update
@@ -112,13 +157,19 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   }, [selectedNode]);
 
   useEffect(() => {
-    if (camera && data?.nodes?.length > 0) {
-      const centerX = centerPosition.x;
-      const centerY = centerPosition.y;
-      camera.position.set(centerX, centerY, 26);
-      camera.lookAt(centerX, centerY, 0);
+    if (camera && validData.nodes?.length > 0 && !isInitialized) {
+      console.log("Initializing camera position");
+      try {
+        const centerX = centerPosition.x;
+        const centerY = centerPosition.y;
+        camera.position.set(centerX, centerY, 26);
+        camera.lookAt(centerX, centerY, 0);
+        setIsInitialized(true);
+      } catch (error) {
+        console.error("Error setting camera position:", error);
+      }
     }
-  }, [camera, data?.nodes, centerPosition]);
+  }, [camera, validData.nodes, centerPosition, isInitialized]);
 
   // Track camera zoom with throttling to improve performance
   useEffect(() => {
@@ -137,15 +188,15 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   // Memoize connected nodes to prevent unnecessary recalculations
   const highlightedNodes = useMemo(() => {
-    if (!selectedNode || !data || !data.links) return new Set<string>();
-    return getConnectedNodes(selectedNode, data.links);
-  }, [selectedNode, data?.links]);
+    if (!selectedNode || !validData || !validData.links) return new Set<string>();
+    return getConnectedNodes(selectedNode, validData.links);
+  }, [selectedNode, validData?.links]);
 
   // Calculate relative strength of connections for the selected node
   const connectionStrengths = useMemo(() => {
-    if (!selectedNode || !data || !data.links) return new Map<string, number>();
-    return calculateRelativeStrengths(selectedNode, data.links);
-  }, [selectedNode, data?.links]);
+    if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
+    return calculateRelativeStrengths(selectedNode, validData.links);
+  }, [selectedNode, validData?.links]);
 
   const shouldDim = !!selectedNode;
 
@@ -155,8 +206,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     onNodeClick(id);
   };
 
-  if (!data || !data.nodes || !data.links) {
-    console.error("SoulNetVisualization: Data is missing or invalid", data);
+  if (!validData || !validData.nodes || !validData.links) {
+    console.error("SoulNetVisualization: Data is missing or invalid", validData);
     return null;
   }
 
@@ -182,11 +233,20 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         }}
       />
       
-      {/* Memoize edges to prevent unnecessary rerenders */}
-      {data.links.map((link, index) => {
-        const sourceNode = data.nodes.find(n => n.id === link.source);
-        const targetNode = data.nodes.find(n => n.id === link.target);
-        if (!sourceNode || !targetNode) return null;
+      {/* Display edges */}
+      {validData.links.map((link, index) => {
+        if (!link || typeof link !== 'object') {
+          console.warn(`Invalid link at index ${index}`, link);
+          return null;
+        }
+        
+        const sourceNode = validData.nodes.find(n => n && n.id === link.source);
+        const targetNode = validData.nodes.find(n => n && n.id === link.target);
+        
+        if (!sourceNode || !targetNode) {
+          console.warn(`Missing source or target node for link: ${link.source} -> ${link.target}`);
+          return null;
+        }
         
         const isHighlight = selectedNode &&
           (link.source === selectedNode || link.target === selectedNode);
@@ -202,6 +262,11 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           // Use original link value, but scaled down for non-highlighted links
           relativeStrength = link.value * 0.5;
         }
+        
+        // Skip rendering this edge if positions aren't valid
+        if (!Array.isArray(sourceNode.position) || !Array.isArray(targetNode.position)) {
+          return null;
+        }
           
         return (
           <Edge
@@ -216,8 +281,13 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         );
       })}
       
-      {/* Memoize nodes to prevent unnecessary rerenders */}
-      {data.nodes.map(node => {
+      {/* Display nodes */}
+      {validData.nodes.map(node => {
+        if (!node || typeof node !== 'object' || !node.id) {
+          console.warn("Invalid node:", node);
+          return null;
+        }
+        
         const showLabel = !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
@@ -226,6 +296,12 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
           ? connectionStrengths.get(node.id) || 0.5
           : 0.5;
+        
+        // Skip rendering this node if position isn't valid
+        if (!Array.isArray(node.position)) {
+          console.warn(`Node ${node.id} has invalid position:`, node.position);
+          return null;
+        }
           
         return (
           <Node
@@ -247,3 +323,5 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     </>
   );
 };
+
+export default SoulNetVisualization;

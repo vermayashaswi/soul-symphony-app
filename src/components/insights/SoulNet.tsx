@@ -4,13 +4,14 @@ import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { SoulNetVisualization } from './soulnet/SoulNetVisualization';
+import SoulNetVisualization from './soulnet/SoulNetVisualization';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
-import { SoulNetDescription } from './soulnet/SoulNetDescription';
+import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
+import ErrorBoundary from './ErrorBoundary';
 
 interface NodeData {
   id: string;
@@ -38,14 +39,27 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
+  const [error, setError] = useState<Error | null>(null);
+
+  console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
+
+  useEffect(() => {
+    console.log("SoulNet mounted");
+    return () => {
+      console.log("SoulNet unmounted");
+    };
+  }, []);
 
   useEffect(() => {
     if (!userId) return;
 
     const fetchEntityEmotionData = async () => {
       setLoading(true);
+      setError(null);
       try {
         const startDate = getStartDate(timeRange);
+        console.log(`Fetching data from ${startDate.toISOString()} for user ${userId}`);
+        
         const { data: entries, error } = await supabase
           .from('Journal Entries')
           .select('id, entityemotion, "refined text", "transcription text"')
@@ -53,8 +67,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           .gte('created_at', startDate.toISOString())
           .order('created_at', { ascending: false });
 
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching journal entries:', error);
+          throw error;
+        }
 
+        console.log(`Fetched ${entries?.length || 0} entries`);
+        
         if (!entries || entries.length === 0) {
           setLoading(false);
           setGraphData({ nodes: [], links: [] });
@@ -62,9 +81,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         }
 
         const processedData = processEntities(entries);
+        console.log("Processed graph data:", processedData);
         setGraphData(processedData);
       } catch (error) {
         console.error('Error processing entity-emotion data:', error);
+        setError(error instanceof Error ? error : new Error('Unknown error occurred'));
       } finally {
         setLoading(false);
       }
@@ -90,6 +111,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, []);
 
   if (loading) return <LoadingState />;
+  if (error) return (
+    <div className="bg-background rounded-xl shadow-sm border w-full p-6">
+      <h2 className="text-xl font-semibold text-red-600 mb-4">Error Loading SoulNet</h2>
+      <p className="text-muted-foreground mb-4">{error.message}</p>
+      <button 
+        className="px-4 py-2 bg-primary text-white rounded-md" 
+        onClick={() => window.location.reload()}
+      >
+        Retry
+      </button>
+    </div>
+  );
   if (graphData.nodes.length === 0) return <EmptyState />;
 
   return (
@@ -103,32 +136,49 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         isFullScreen={isFullScreen}
         toggleFullScreen={toggleFullScreen}
       >
-        <Canvas
-          style={{
-            width: '100%',
-            height: '100%',
-            maxWidth: '800px',
-            maxHeight: '500px'
-          }}
-          camera={{ position: [0, 0, 26] }}
-          onPointerMissed={() => setSelectedEntity(null)}
-          gl={{ 
-            preserveDrawingBuffer: true,
-            antialias: !isMobile,
-            powerPreference: 'high-performance',
-            alpha: true,
-            depth: true,
-            stencil: false,
-            precision: isMobile ? 'mediump' : 'highp'
-          }}
-        >
-          <SoulNetVisualization
-            data={graphData}
-            selectedNode={selectedEntity}
-            onNodeClick={handleNodeSelect}
-            themeHex={themeHex}
-          />
-        </Canvas>
+        <ErrorBoundary fallback={
+          <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
+            <div className="text-center">
+              <h3 className="text-lg font-medium">Error in SoulNet Visualization</h3>
+              <p className="text-muted-foreground mt-2">
+                There was a problem rendering the visualization.
+              </p>
+              <button 
+                className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
+                onClick={() => window.location.reload()}
+              >
+                Reload
+              </button>
+            </div>
+          </div>
+        }>
+          <Canvas
+            style={{
+              width: '100%',
+              height: '100%',
+              maxWidth: '800px',
+              maxHeight: '500px'
+            }}
+            camera={{ position: [0, 0, 26] }}
+            onPointerMissed={() => setSelectedEntity(null)}
+            gl={{ 
+              preserveDrawingBuffer: true,
+              antialias: !isMobile,
+              powerPreference: 'high-performance',
+              alpha: true,
+              depth: true,
+              stencil: false,
+              precision: isMobile ? 'mediump' : 'highp'
+            }}
+          >
+            <SoulNetVisualization
+              data={graphData}
+              selectedNode={selectedEntity}
+              onNodeClick={handleNodeSelect}
+              themeHex={themeHex}
+            />
+          </Canvas>
+        </ErrorBoundary>
       </FullscreenWrapper>
       
       <div className="w-full text-center mt-2 px-4 md:px-8">
@@ -165,6 +215,8 @@ const getStartDate = (range: TimeRange) => {
 };
 
 const processEntities = (entries: any[]) => {
+  console.log("Processing entities for", entries.length, "entries");
+  
   const entityEmotionMap: Record<string, {emotions: Record<string, number>}> = {};
   
   entries.forEach(entry => {
@@ -186,6 +238,7 @@ const processEntities = (entries: any[]) => {
     });
   });
 
+  console.log("Entity emotion map:", entityEmotionMap);
   return generateGraph(entityEmotionMap);
 };
 
@@ -201,6 +254,8 @@ const generateGraph = (entityEmotionMap: Record<string, {emotions: Record<string
   const EMOTION_Y_SPAN = 6;
   const ENTITY_Y_SPAN = 3;
 
+  console.log("Generating graph with", entityList.length, "entities");
+  
   entityList.forEach((entity, entityIndex) => {
     entityNodes.add(entity);
     const entityAngle = (entityIndex / entityList.length) * Math.PI * 2;
@@ -243,6 +298,7 @@ const generateGraph = (entityEmotionMap: Record<string, {emotions: Record<string
     });
   });
 
+  console.log("Generated graph with", nodes.length, "nodes and", links.length, "links");
   return { nodes, links };
 };
 

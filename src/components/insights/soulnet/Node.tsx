@@ -3,6 +3,7 @@ import React, { useState, useCallback, useEffect, useMemo } from 'react';
 import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
 import { useTheme } from '@/hooks/use-theme';
+import { cn } from '@/lib/utils';
 
 interface NodeData {
   id: string;
@@ -135,3 +136,5 @@ export const Node: React.FC<NodeProps> = ({
     </group>
   );
 };
+
+export default Node;
