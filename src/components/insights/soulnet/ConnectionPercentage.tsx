@@ -46,7 +46,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           WebkitPerspective: '1000',
           transform: 'scale(0.15)', // Scale down to fit, but still much larger than before
           transformOrigin: 'center center',
-          // Removed the white border completely
+          border: '3px solid white', // Add a white border for better visibility
         }}
       >
         {displayPercentage}%
