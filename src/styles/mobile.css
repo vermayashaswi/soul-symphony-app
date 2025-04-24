@@ -97,13 +97,33 @@
   
   /* Fix the sticky header in insights page */
   .insights-sticky-header {
-    padding: 10px 16px !important;
+    padding: 10px 0 !important; /* Reduced side padding to use full width */
+    width: 100% !important; /* Ensure it takes full width */
+    max-width: 100% !important;
+  }
+  
+  /* Remove the border and make the toggle fill the width */
+  .insights-sticky-header .bg-secondary {
+    border: none !important; /* Remove the border */
+    width: 100% !important;
+    max-width: 100% !important;
+    background-color: #222 !important; /* Darker background for better visibility */
   }
   
   /* Fix time toggle size in sticky header - prevent size reduction */
   .insights-sticky-header .insights-time-toggle {
     transform: none !important; /* Remove transform that was causing the size change */
-    margin-right: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+  
+  /* Make the time toggle container take full width */
+  .insights-sticky-header .flex {
+    width: 100% !important;
+    max-width: 100% !important;
+    justify-content: center !important;
+    padding: 0 !important;
   }
   
   /* Ensure the toggle items have proper size */
@@ -119,32 +139,41 @@
   
   /* Ensure the toggle group takes enough width and doesn't shrink */
   .insights-time-toggle .bg-secondary {
-    min-width: 300px !important; /* Increased minimum width */
-    width: auto !important;
+    width: 100% !important; /* Take full available width */
     transform: none !important; /* Prevent any transform */
+    border-radius: 0 !important; /* Remove rounded corners */
   }
   
   /* Make sure the entire toggle container doesn't shrink */
   .insights-sticky-header .insights-time-toggle,
   .insights-sticky-header .flex {
-    width: auto !important;
-    min-width: 300px !important;
-    max-width: 95vw !important; /* Prevent overflow on very small screens */
+    width: 100% !important;
     transform: none !important; /* Prevent transforms */
     transition: none !important; /* Disable transitions that might cause size changes */
   }
   
   /* Make time toggle group stand out more in mobile */
   .insights-sticky-header .bg-secondary {
-    background-color: hsl(var(--secondary)) !important;
-    border: 1px solid hsl(var(--border)) !important;
-    box-shadow: 0 2px 5px rgba(0,0,0,0.1) !important; /* Add shadow for better visibility */
+    background-color: #222 !important; /* Darker background for better visibility */
+    box-shadow: none !important; /* Remove shadow */
   }
   
   /* Prevent any scaling or animation on the sticky header content */
   .insights-sticky-header * {
     transform: none !important;
     transition: none !important;
+  }
+  
+  /* Fix the sticky header container to stretch full width */
+  .fixed.top-0.left-0.right-0.z-50 {
+    width: 100% !important;
+    max-width: 100% !important;
+    padding: 0 !important;
+  }
+  
+  /* Adjust time toggle text label to align properly */
+  .insights-sticky-header .text-sm.text-muted-foreground {
+    padding-left: 16px !important;
   }
 }
 
