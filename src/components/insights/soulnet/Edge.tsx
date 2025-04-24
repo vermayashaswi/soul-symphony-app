@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
@@ -70,9 +69,9 @@ export const Edge: React.FC<EdgeProps> = ({
     }
   });
 
-  // Reduce baseline thickness by 3x
-  const baseThickness = isHighlighted ? 1 : 0.33;
-  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2/3 : maxThickness/9));
+  // Keep original thickness for non-highlighted lines, reduce only highlighted ones by 3x
+  const baseThickness = isHighlighted ? 1 : 3;
+  const thickness = baseThickness + (value * (isHighlighted ? maxThickness * 2/3 : maxThickness));
   
   // Create material with appropriate properties
   const material = useMemo(() => {
