@@ -92,8 +92,9 @@ export const Edge: React.FC<EdgeProps> = ({
         })
       )} ref={lineRef} onUpdate={self => {
         if (self instanceof THREE.LineSegments) {
-          // Compute line distances for dashed lines
-          (self.geometry as THREE.BufferGeometry).computeLineDistances();
+          // Cast to any to bypass TypeScript's type checking for computeLineDistances
+          // This method exists on BufferGeometry but TypeScript definitions are incomplete
+          (self.geometry as any).computeLineDistances();
         }
       }} />
     </group>
