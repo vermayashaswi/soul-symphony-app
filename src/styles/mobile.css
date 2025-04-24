@@ -1,4 +1,3 @@
-
 /* Mobile-specific styles */
 @media (max-width: 768px) {
   /* Rounded corners for mobile UI elements */
@@ -94,25 +93,27 @@
     border: 3px solid white !important;
     padding: 8px 16px !important;
   }
-  
+
   /* Fix the sticky header in insights page */
   .insights-sticky-header {
-    padding: 10px 0 !important; /* Reduced side padding to use full width */
-    width: 100% !important; /* Ensure it takes full width */
-    max-width: 100% !important;
-  }
-  
-  /* Remove the border and make the toggle fill the width */
-  .insights-sticky-header .bg-secondary {
-    border: none !important; /* Remove the border */
+    padding: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
-    background-color: #222 !important; /* Darker background for better visibility */
+    background-color: hsl(var(--background)) !important;
   }
   
-  /* Fix time toggle size in sticky header - prevent size reduction */
+  /* Remove border and make toggle fill width */
+  .insights-sticky-header .bg-secondary {
+    border: none !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    background-color: #222 !important;
+    border-radius: 0 !important;
+  }
+  
+  /* Fix time toggle size in sticky header */
   .insights-sticky-header .insights-time-toggle {
-    transform: none !important; /* Remove transform that was causing the size change */
+    transform: none !important;
     margin: 0 !important;
     width: 100% !important;
     max-width: 100% !important;
@@ -128,15 +129,21 @@
   
   /* Ensure the toggle items have proper size */
   .insights-sticky-header .toggle-group-item {
-    font-size: 14px !important; /* Increased font size */
-    padding: 8px 16px !important; /* Increased padding */
-    height: auto !important; /* Ensure height is not constrained */
-    min-height: 38px !important; /* Set minimum height */
+    font-size: 14px !important;
+    padding: 8px 16px !important;
+    height: auto !important;
+    min-height: 38px !important;
     display: flex !important;
     align-items: center !important;
     justify-content: center !important;
+    border: none !important;
   }
-  
+
+  /* Remove the black rectangle from home page */
+  .fixed.inset-0.z-\[9999\] > div:not(.w-12):not(.rounded-full) {
+    display: none !important;
+  }
+
   /* Ensure the toggle group takes enough width and doesn't shrink */
   .insights-time-toggle .bg-secondary {
     width: 100% !important; /* Take full available width */
