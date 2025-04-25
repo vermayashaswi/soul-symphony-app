@@ -1,10 +1,8 @@
-
 import React, { useEffect } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import './styles/emoji.css';
-import LanguageDebugPanel from './components/debug/LanguageDebugPanel';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -25,7 +23,6 @@ const App: React.FC = () => {
       <AppRoutes />
       <Toaster />
       <SonnerToaster position="top-right" />
-      <LanguageDebugPanel />
     </>
   );
 };

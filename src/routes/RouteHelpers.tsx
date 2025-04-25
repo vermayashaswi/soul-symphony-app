@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -9,8 +10,7 @@ export const isNativeApp = (): boolean => {
 
 // Remove subdomain check, replace with path-based check
 export const isAppRoute = (pathname: string): boolean => {
-  // Consider root path as an app route
-  return pathname === '/' || pathname.startsWith('/app/') || pathname === '/app';
+  return pathname.startsWith('/app/') || pathname === '/app';
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {

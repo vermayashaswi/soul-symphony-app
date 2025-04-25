@@ -32,13 +32,6 @@ const Home = () => {
     console.log('Home component mounted');
     console.log('Current user:', user?.email);
 
-    if (window.debugEvents) {
-      window.debugEvents.log('mount', 'HomePage', {
-        user: user?.email,
-        timestamp: Date.now()
-      });
-    }
-
     setRefreshKey(prev => prev + 1);
 
     const fetchUserProfile = async () => {
@@ -166,27 +159,24 @@ const Home = () => {
               </h1>
             </div>
 
-            <div className="flex items-center gap-2">
-              <motion.div
-                variants={dateStripVariants}
-                initial="hidden"
-                animate="visible"
-                className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
+            <motion.div
+              variants={dateStripVariants}
+              initial="hidden"
+              animate="visible"
+              className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
+            >
+              <div
+                className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+                style={{
+                  fontWeight: 500,
+                  letterSpacing: '0.01em',
+                  WebkitFontSmoothing: 'antialiased',
+                  MozOsxFontSmoothing: 'grayscale'
+                }}
               >
-                <div
-                  className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
-                  style={{
-                    fontWeight: 500,
-                    letterSpacing: '0.01em',
-                    WebkitFontSmoothing: 'antialiased',
-                    MozOsxFontSmoothing: 'grayscale'
-                  }}
-                >
-                  {formattedDate}
-                </div>
-              </motion.div>
-              {/* Language selector removed from here */}
-            </div>
+                {formattedDate}
+              </div>
+            </motion.div>
           </div>
         </div>
       </div>
