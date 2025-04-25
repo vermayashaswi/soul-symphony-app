@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,8 +12,6 @@ import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import LanguageSelector from '@/components/LanguageSelector';
-import LanguageDebugPanel from '@/components/debug/LanguageDebugPanel';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -135,19 +134,6 @@ const Home = () => {
     }
   };
 
-  const handleLanguageSelectorAreaClick = (event: React.MouseEvent) => {
-    console.log("Language selector container area clicked");
-    
-    if (window.debugEvents) {
-      window.debugEvents.log('containerClick', 'LanguageSelectorContainer', {
-        message: 'Language selector container area clicked',
-        timestamp: Date.now(),
-        target: event.target,
-        currentTarget: event.currentTarget,
-      });
-    }
-  };
-
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       <div className="absolute inset-0 z-0">
@@ -199,14 +185,7 @@ const Home = () => {
                   {formattedDate}
                 </div>
               </motion.div>
-              <div 
-                className="z-30 relative" 
-                id="language-selector-container"
-                onClick={handleLanguageSelectorAreaClick}
-                style={{ minWidth: '40px', minHeight: '40px', pointerEvents: 'auto' }}
-              >
-                <LanguageSelector />
-              </div>
+              {/* Language selector removed from here */}
             </div>
           </div>
         </div>
@@ -266,8 +245,6 @@ const Home = () => {
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
       </div>
-
-      <LanguageDebugPanel />
     </div>
   );
 };

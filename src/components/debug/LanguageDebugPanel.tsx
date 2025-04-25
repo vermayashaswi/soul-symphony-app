@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { Card } from '@/components/ui/card';
-import { Bug } from 'lucide-react';
+import { Bug, Trash, CopyIcon } from 'lucide-react';
 import { toast } from 'sonner';
 
 type DebugEvent = {
@@ -15,13 +15,13 @@ type DebugEvent = {
 };
 
 const LanguageDebugPanel = () => {
-  // Start visible by default
   const [isVisible, setIsVisible] = useState(true);
   const [events, setEvents] = useState<DebugEvent[]>([]);
+  const [filterType, setFilterType] = useState<string | null>(null);
   
   // Create a global debug event handler
   React.useEffect(() => {
-    console.log("Debug panel initialized");
+    console.log("Enhanced debug panel initialized");
     
     // Create global debug event handler if it doesn't exist
     if (!window.debugEvents) {
@@ -32,7 +32,10 @@ const LanguageDebugPanel = () => {
             timestamp: Date.now(),
             type,
             target,
-            details
+            details: {
+              ...details,
+              timestamp: Date.now() // Always include a timestamp
+            }
           };
           
           console.log('Debug event:', newEvent);
@@ -56,15 +59,10 @@ const LanguageDebugPanel = () => {
       }
     }, 500);
     
-    // Add global click handler to track all clicks
+    // Add global click handler with capture to track all clicks before they propagate
     const handleGlobalClick = (e: MouseEvent) => {
       let target = e.target as HTMLElement;
       let targetPath = [];
-      
-      // Check if this is the language selector
-      const isLanguageSelectorClick = target.closest('#language-selector-container') ||
-                                     target.closest('#language-selector-trigger') ||
-                                     target.classList.contains('Globe');
       
       // Build path of elements that were clicked
       while (target && target !== document.body) {
@@ -75,19 +73,26 @@ const LanguageDebugPanel = () => {
         target = target.parentElement as HTMLElement;
       }
       
-      // Log click event with detailed path information
-      window.debugEvents?.log('click', 'document', {
+      // Check if this is related to language selection
+      const isLanguageRelated = targetPath.some(path => 
+        path.includes('language') || 
+        path.includes('Globe') ||
+        path.includes('dropdown')
+      );
+      
+      // Log click event with detailed information
+      window.debugEvents?.log('click', isLanguageRelated ? 'LanguageElement' : 'document', {
         path: targetPath.join(' > '),
-        isLanguageSelectorClick: isLanguageSelectorClick ? true : false,
+        isLanguageRelated,
         bubbles: e.bubbles,
         cancelable: e.cancelable,
         defaultPrevented: e.defaultPrevented,
-        eventPhase: e.eventPhase,
-        timestamp: e.timeStamp
+        eventPhase: e.eventPhase === 1 ? 'capturing' : e.eventPhase === 2 ? 'at target' : 'bubbling',
+        timestamp: Date.now()
       });
     };
     
-    document.addEventListener('click', handleGlobalClick, true);
+    document.addEventListener('click', handleGlobalClick, true); // Use capture phase
     
     return () => {
       document.removeEventListener('click', handleGlobalClick, true);
@@ -104,20 +109,18 @@ const LanguageDebugPanel = () => {
     toast.success("Debug events copied to clipboard");
   };
 
-  // Adding a test event on initial render to verify debug panel functionality
-  useEffect(() => {
-    if (window.debugEvents) {
-      window.debugEvents.log('test', 'DebugPanelTest', {
-        message: 'Debug panel initialized and working',
-        timestamp: Date.now()
-      });
-    }
-  }, []);
+  const filterEvents = (type: string | null) => {
+    setFilterType(type === filterType ? null : type);
+  };
 
-  // Fixed position with higher z-index and bottom/right positioning for visibility
+  // Filter events if a filter is active
+  const filteredEvents = filterType 
+    ? events.filter(event => event.type === filterType)
+    : events;
+
   if (!isVisible) {
     return (
-      <div className="fixed bottom-4 right-4 z-[100]">
+      <div className="fixed bottom-4 right-4 z-[9999]">
         <Button 
           className="bg-red-600 hover:bg-red-700"
           size="sm" 
@@ -131,7 +134,7 @@ const LanguageDebugPanel = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-[100]">
+    <div className="fixed bottom-4 right-4 z-[9999]">
       <Button 
         className="bg-red-600 hover:bg-red-700 mb-2"
         size="sm" 
@@ -146,30 +149,48 @@ const LanguageDebugPanel = () => {
           <h3 className="text-sm font-medium">Language Selector Debug</h3>
           <div className="space-x-1">
             <Button size="sm" variant="outline" onClick={clearEvents} className="h-7 text-xs">
-              Clear
+              <Trash className="h-3 w-3 mr-1" /> Clear
             </Button>
             <Button size="sm" variant="outline" onClick={copyEventsToClipboard} className="h-7 text-xs">
-              Copy
+              <CopyIcon className="h-3 w-3 mr-1" /> Copy
             </Button>
           </div>
         </div>
+        
+        <div className="p-2 border-b flex flex-wrap gap-1">
+          {['click', 'mount', 'languageChange', 'menuItemClick', 'dropdownStateChange'].map(type => (
+            <Button 
+              key={type}
+              size="sm"
+              variant={filterType === type ? "default" : "outline"}
+              onClick={() => filterEvents(type)}
+              className="h-6 text-xs"
+            >
+              {type}
+            </Button>
+          ))}
+        </div>
+        
         <ScrollArea className="h-80 p-2">
-          {events.length === 0 ? (
+          {filteredEvents.length === 0 ? (
             <p className="text-sm text-muted-foreground p-2">
-              Click on the globe icon to see debug events
+              {filterType 
+                ? `No "${filterType}" events recorded`
+                : "Click on the globe icon to see debug events"
+              }
             </p>
           ) : (
             <div className="space-y-2">
-              {events.map(event => (
+              {filteredEvents.map(event => (
                 <div key={event.id} className="text-xs border p-2 rounded-md">
                   <div className="flex justify-between text-muted-foreground mb-1">
-                    <span>{event.type}</span>
+                    <span className="font-semibold">{event.type}</span>
                     <span>{new Date(event.timestamp).toLocaleTimeString()}</span>
                   </div>
                   <div className="font-medium">{event.target}</div>
                   {event.details && (
                     <div className="mt-1 overflow-auto max-h-32">
-                      <pre className="text-xs">{JSON.stringify(event.details, null, 2)}</pre>
+                      <pre className="text-xs whitespace-pre-wrap">{JSON.stringify(event.details, null, 2)}</pre>
                     </div>
                   )}
                 </div>

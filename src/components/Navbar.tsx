@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useTheme } from '@/hooks/use-theme';
+import LanguageSelectorRefactored from './LanguageSelectorRefactored';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -65,6 +66,11 @@ const Navbar = () => {
             </>
           ) : (
             <>
+              {/* Language Selector - Added here */}
+              <div className="z-50">
+                <LanguageSelectorRefactored />
+              </div>
+
               <Button
                 variant="ghost"
                 size="icon"

@@ -7,9 +7,11 @@ import {
   Home, 
   User, 
   MessageSquare, 
-  LineChart 
+  LineChart,
+  Globe
 } from 'lucide-react';
 import SouloLogo from '@/components/SouloLogo';
+import LanguageSelectorRefactored from '@/components/LanguageSelectorRefactored';
 
 const MobileNavbar = () => {
   const navigate = useNavigate();
@@ -34,9 +36,15 @@ const MobileNavbar = () => {
         <Button variant="ghost" size="icon" onClick={() => navigate('/profile')}>
           <User className="h-5 w-5" />
         </Button>
+        
+        <div className="relative z-50">
+          <LanguageSelectorRefactored />
+        </div>
+        
         <Button variant="ghost" size="icon" onClick={() => navigate('/chat')}>
           <MessageSquare className="h-5 w-5" />
         </Button>
+        
         <Button variant="ghost" size="icon" onClick={() => navigate('/insights')}>
           <LineChart className="h-5 w-5" />
         </Button>
