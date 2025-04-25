@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
 import {
@@ -23,39 +23,40 @@ const languages = {
   ar: 'العربية',
   it: 'Italiano',
   ko: '한국어'
-  // Adding more languages as they are fully supported
 };
 
 const LanguageSelector = () => {
   const { i18n } = useTranslation();
+  const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = (newLang: string) => {
     i18n.changeLanguage(newLang);
+    setIsOpen(false);
     toast.success(`Language changed to ${languages[newLang as keyof typeof languages]}`);
   };
 
   return (
-    <DropdownMenu>
+    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
       <DropdownMenuTrigger asChild>
         <Button 
           variant="ghost" 
-          size="icon" 
-          className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90 focus:outline-none"
+          size="icon"
+          className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90 focus:outline-none cursor-pointer"
+          aria-label="Change language"
         >
           <Globe className="h-4 w-4" />
-          <span className="sr-only">Change language</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end"
         sideOffset={4}
-        className="bg-popover/95 backdrop-blur-sm border-muted z-50"
+        className="bg-popover/95 backdrop-blur-sm border-muted z-50 min-w-[150px]"
       >
         {Object.entries(languages).map(([code, name]) => (
           <DropdownMenuItem 
             key={code} 
             onClick={() => handleLanguageChange(code)}
-            className={i18n.language === code ? "bg-accent/70" : ""}
+            className={`cursor-pointer hover:bg-accent focus:bg-accent ${i18n.language === code ? "bg-accent/70" : ""}`}
           >
             {name}
           </DropdownMenuItem>
