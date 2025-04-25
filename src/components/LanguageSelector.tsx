@@ -13,26 +13,8 @@ import { toast } from 'sonner';
 
 const languages = {
   en: 'English',
-  hi: 'हिंदी',
-  es: 'Español',
-  fr: 'Français',
-  de: 'Deutsch',
-  zh: '中文',
-  ja: '日本語',
-  ru: 'Русский',
-  pt: 'Português',
-  ar: 'العربية',
-  it: 'Italiano',
-  ko: '한국어',
-  bn: 'বাংলা',
-  ta: 'தமிழ்',
-  te: 'తెలుగు',
-  mr: 'मराठी',
-  gu: 'ગુજરાતી',
-  kn: 'ಕನ್ನಡ',
-  ml: 'മലയാളം',
-  pa: 'ਪੰਜਾਬੀ',
-  or: 'ଓଡ଼ିଆ'
+  hi: 'हिंदी'
+  // Adding other languages as they are fully translated
 };
 
 const LanguageSelector = () => {
@@ -45,7 +27,7 @@ const LanguageSelector = () => {
 
   return (
     <Select value={i18n.language} onValueChange={handleLanguageChange}>
-      <SelectTrigger className="w-[180px] bg-background/80 backdrop-blur-sm border-muted">
+      <SelectTrigger className="w-[180px] bg-background/80 backdrop-blur-sm border-muted z-50">
         <div className="flex items-center gap-2">
           <Globe className="h-4 w-4" />
           <SelectValue placeholder="Select language" />

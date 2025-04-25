@@ -48,46 +48,30 @@
     "terms": "Terms of Service"
   },
   "mainTagline": "Keep a journal and capture your day without writing down a single word!",
-  "homepage": {
-    "expressReflectGrow": "Express. Reflect. Grow.",
-    "appFeatures": "App Features",
-    "process": {
-      "title": "Process: How It Works",
-      "step1Title": "Record",
-      "step1Description": "Speak your thoughts aloud - no typing needed",
-      "step2Title": "Analyze",
-      "step2Description": "AI processes your entries to identify patterns and insights",
-      "step3Title": "Reflect",
-      "step3Description": "Review personalized insights and track your emotional journey"
-    },
-    "privacy": {
-      "title": "Your Privacy Is Our Priority",
-      "description": "We use state-of-the-art encryption to ensure your journal entries remain completely private and secure.",
-      "featuresList": [
-        "End-to-end encryption",
-        "Local storage options",
-        "No sharing with third parties",
-        "Full control over your data"
-      ]
-    },
-    "testimonials": {
-      "title": "What Our Users Say",
-      "subtitle": "Join thousands of people who are transforming their mental wellness journey."
-    },
-    "cta": {
-      "title": "Ready to start your journey?",
-      "description": "Download SOULo today and transform how you journal.",
-      "buttonText": "Get Started"
-    }
+  "voiceRecorder": {
+    "speakAnyLanguage": "Speak in any language,",
+    "illUnderstandYou": "I'll understand you!"
   },
   "journal": {
     "header": {
       "your": "Your",
-      "journal": "Journal"
+      "journal": "Journal",
+      "noEntries": "No entries yet",
+      "startJournal": "Start your journaling journey"
+    },
+    "actions": {
+      "record": "Record",
+      "edit": "Edit",
+      "delete": "Delete",
+      "save": "Save",
+      "cancel": "Cancel"
     }
   },
-  "voiceRecorder": {
-    "speakAnyLanguage": "Speak in any language,",
-    "illUnderstandYou": "I'll understand you!"
+  "settings": {
+    "title": "Settings",
+    "language": "Language",
+    "theme": "Theme",
+    "privacy": "Privacy",
+    "notifications": "Notifications"
   }
 }
