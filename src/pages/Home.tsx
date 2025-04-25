@@ -12,6 +12,7 @@ import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import LanguageSelector from '@/components/LanguageSelector';
+import LanguageDebugPanel from '@/components/debug/LanguageDebugPanel';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -240,6 +241,8 @@ const Home = () => {
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
       </div>
+
+      <LanguageDebugPanel />
     </div>
   );
 };

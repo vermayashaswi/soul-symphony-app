@@ -8,6 +8,16 @@ export const debugError = (..._: any[]) => {};
 export const debugWarn = (..._: any[]) => {};
 export const debugTrace = (..._: any[]) => {};
 
+declare global {
+  interface Window {
+    debugEvents?: {
+      log: (type: string, target: string, details?: any) => any;
+      clear: () => void;
+      events: () => any[];
+    };
+  }
+}
+
 export const createDebugger = (_: string) => ({
   log: (..._: any[]) => {},
   info: (..._: any[]) => {},
