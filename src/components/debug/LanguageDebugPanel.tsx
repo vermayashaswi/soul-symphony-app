@@ -15,13 +15,15 @@ type DebugEvent = {
 };
 
 const LanguageDebugPanel = () => {
-  const [isVisible, setIsVisible] = useState(true); // Start visible by default
+  // Start visible by default
+  const [isVisible, setIsVisible] = useState(true);
   const [events, setEvents] = useState<DebugEvent[]>([]);
   
   // Create a global debug event handler
   React.useEffect(() => {
     console.log("Debug panel initialized");
     
+    // Create global debug event handler if it doesn't exist
     if (!window.debugEvents) {
       window.debugEvents = {
         log: (type: string, target: string, details?: any) => {
@@ -68,6 +70,7 @@ const LanguageDebugPanel = () => {
         target = target.parentElement as HTMLElement;
       }
       
+      // Log click event with detailed path information
       window.debugEvents?.log('click', 'document', {
         path: targetPath.join(' > '),
         bubbles: e.bubbles,
@@ -95,9 +98,20 @@ const LanguageDebugPanel = () => {
     toast.success("Debug events copied to clipboard");
   };
 
+  // Adding a test event on initial render to verify debug panel functionality
+  useEffect(() => {
+    if (window.debugEvents) {
+      window.debugEvents.log('test', 'DebugPanelTest', {
+        message: 'Debug panel initialized and working',
+        timestamp: Date.now()
+      });
+    }
+  }, []);
+
+  // Fixed position with higher z-index and bottom/right positioning for visibility
   if (!isVisible) {
     return (
-      <div className="fixed bottom-4 right-4 z-50">
+      <div className="fixed bottom-4 right-4 z-[100]">
         <Button 
           className="bg-red-600 hover:bg-red-700"
           size="sm" 
@@ -111,7 +125,7 @@ const LanguageDebugPanel = () => {
   }
 
   return (
-    <div className="fixed bottom-4 right-4 z-50">
+    <div className="fixed bottom-4 right-4 z-[100]">
       <Button 
         className="bg-red-600 hover:bg-red-700 mb-2"
         size="sm" 

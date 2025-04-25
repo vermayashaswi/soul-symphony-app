@@ -135,6 +135,17 @@ const Home = () => {
     }
   };
 
+  const handleLanguageSelectorAreaClick = () => {
+    console.log("Language selector container area clicked");
+    
+    if (window.debugEvents) {
+      window.debugEvents.log('containerClick', 'LanguageSelectorContainer', {
+        message: 'Language selector container area clicked',
+        timestamp: Date.now()
+      });
+    }
+  };
+
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       <div className="absolute inset-0 z-0">
@@ -186,7 +197,12 @@ const Home = () => {
                   {formattedDate}
                 </div>
               </motion.div>
-              <div className="z-30" id="language-selector-container">
+              <div 
+                className="z-30 relative" 
+                id="language-selector-container"
+                onClick={handleLanguageSelectorAreaClick}
+                style={{ minWidth: '40px', minHeight: '40px' }}
+              >
                 <LanguageSelector />
               </div>
             </div>

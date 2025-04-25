@@ -78,6 +78,8 @@ const LanguageSelector = () => {
         timestamp: Date.now()
       });
     }
+    // Toggle dropdown directly on click to force open/close behavior
+    setOpen(!open);
   };
 
   const handleOpenChange = (open: boolean) => {
@@ -97,9 +99,11 @@ const LanguageSelector = () => {
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger 
-        onClick={handleGlobeClick} 
         aria-label="Change language"
         className="cursor-pointer focus:outline-none"
+        onClick={handleGlobeClick}
+        asChild={false}
+        id="language-selector-trigger"
       >
         <Button 
           type="button"
