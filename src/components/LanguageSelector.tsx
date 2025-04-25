@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
 import {
@@ -27,17 +26,15 @@ const languages = {
 
 const LanguageSelector = () => {
   const { i18n } = useTranslation();
-  const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = (newLang: string) => {
     i18n.changeLanguage(newLang);
-    setIsOpen(false);
     toast.success(`Language changed to ${languages[newLang as keyof typeof languages]}`);
   };
 
   return (
-    <DropdownMenu open={isOpen} onOpenChange={setIsOpen}>
-      <DropdownMenuTrigger asChild>
+    <DropdownMenu>
+      <DropdownMenuTrigger>
         <Button 
           variant="ghost" 
           size="icon"
