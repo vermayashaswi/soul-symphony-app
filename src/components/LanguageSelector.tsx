@@ -13,8 +13,17 @@ import { toast } from 'sonner';
 
 const languages = {
   en: 'English',
-  hi: 'हिंदी'
-  // Adding other languages as they are fully translated
+  hi: 'हिंदी',
+  zh: '中文',
+  es: 'Español',
+  fr: 'Français',
+  de: 'Deutsch',
+  ja: '日本語',
+  pt: 'Português',
+  ar: 'العربية',
+  it: 'Italiano',
+  ko: '한국어'
+  // Adding more languages as they are fully supported
 };
 
 const LanguageSelector = () => {
