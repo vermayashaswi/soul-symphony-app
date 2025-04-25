@@ -3,12 +3,12 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
 import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 
 const languages = {
@@ -35,21 +35,31 @@ const LanguageSelector = () => {
   };
 
   return (
-    <Select value={i18n.language} onValueChange={handleLanguageChange}>
-      <SelectTrigger className="w-[180px] bg-background/80 backdrop-blur-sm border-muted z-50">
-        <div className="flex items-center gap-2">
+    <DropdownMenu>
+      <DropdownMenuTrigger asChild>
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90"
+        >
           <Globe className="h-4 w-4" />
-          <SelectValue placeholder="Select language" />
-        </div>
-      </SelectTrigger>
-      <SelectContent>
+        </Button>
+      </DropdownMenuTrigger>
+      <DropdownMenuContent 
+        align="end"
+        className="bg-popover/95 backdrop-blur-sm border-muted"
+      >
         {Object.entries(languages).map(([code, name]) => (
-          <SelectItem key={code} value={code}>
+          <DropdownMenuItem 
+            key={code} 
+            onClick={() => handleLanguageChange(code)}
+            className={i18n.language === code ? "bg-accent/70" : ""}
+          >
             {name}
-          </SelectItem>
+          </DropdownMenuItem>
         ))}
-      </SelectContent>
-    </Select>
+      </DropdownMenuContent>
+    </DropdownMenu>
   );
 };
 
