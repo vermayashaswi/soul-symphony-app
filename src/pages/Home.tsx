@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
@@ -12,6 +11,7 @@ import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import LanguageSelector from '@/components/LanguageSelector';
 
 const Home = () => {
   const { t } = useTranslation();
@@ -159,24 +159,27 @@ const Home = () => {
               </h1>
             </div>
 
-            <motion.div
-              variants={dateStripVariants}
-              initial="hidden"
-              animate="visible"
-              className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
-            >
-              <div
-                className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
-                style={{
-                  fontWeight: 500,
-                  letterSpacing: '0.01em',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale'
-                }}
+            <div className="flex items-center gap-4">
+              <motion.div
+                variants={dateStripVariants}
+                initial="hidden"
+                animate="visible"
+                className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
               >
-                {formattedDate}
-              </div>
-            </motion.div>
+                <div
+                  className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+                  style={{
+                    fontWeight: 500,
+                    letterSpacing: '0.01em',
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale'
+                  }}
+                >
+                  {formattedDate}
+                </div>
+              </motion.div>
+              <LanguageSelector />
+            </div>
           </div>
         </div>
       </div>
