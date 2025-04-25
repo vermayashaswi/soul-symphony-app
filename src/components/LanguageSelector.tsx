@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
@@ -12,7 +11,6 @@ import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
-// Add this type declaration to enable debugging globally
 declare global {
   interface Window {
     debugEvents?: {
@@ -42,7 +40,6 @@ const LanguageSelector = () => {
   const [open, setOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
 
-  // Add debug event for component mounting
   React.useEffect(() => {
     console.log("LanguageSelector mounted with current language:", i18n.language);
     
@@ -53,49 +50,43 @@ const LanguageSelector = () => {
     }
   }, [i18n.language]);
 
-  const handleLanguageChange = (newLang: string) => {
-    // Log debug event
+  const handleLanguageChange = (newLang: string, event?: React.MouseEvent) => {
+    event?.preventDefault();
+    event?.stopPropagation();
+
     if (window.debugEvents) {
       window.debugEvents.log('languageChange', 'LanguageSelector', {
         previousLang: i18n.language,
-        newLang
+        newLang,
+        defaultPrevented: event?.defaultPrevented || true,
+        propagationStopped: true
       });
     }
 
     i18n.changeLanguage(newLang);
     toast.success(`Language changed to ${languages[newLang as keyof typeof languages]}`);
-    setOpen(false); // Close dropdown after selection
-    setDialogOpen(false); // Close dialog after selection
+    setOpen(false);
+    setDialogOpen(false);
   };
 
   const handleGlobeClick = (event: React.MouseEvent) => {
-    // Prevent the default behavior and stop propagation
     event.preventDefault();
     event.stopPropagation();
-    
-    // Log detailed debug event when globe is clicked
-    console.log("Globe button clicked:", event);
     
     if (window.debugEvents) {
       window.debugEvents.log('globeClick', 'LanguageSelectorButton', {
         elementType: 'Button',
         currentLanguage: i18n.language,
-        eventTarget: event.target.toString(),
-        eventCurrentTarget: event.currentTarget.toString(),
-        timestamp: Date.now(),
         defaultPrevented: event.defaultPrevented,
-        propagationStopped: true
+        propagationStopped: true,
+        timestamp: Date.now()
       });
     }
     
-    // Toggle dropdown directly
     setOpen(!open);
   };
 
   const handleOpenChange = (open: boolean) => {
-    // Log debug event when dropdown state changes
-    console.log("Dropdown state changing to:", open);
-    
     if (window.debugEvents) {
       window.debugEvents.log('dropdownStateChange', 'LanguageSelector', {
         isOpen: open,
@@ -106,10 +97,8 @@ const LanguageSelector = () => {
     setOpen(open);
   };
 
-  // For mobile devices, use a dialog instead of dropdown
   const isMobileView = typeof window !== 'undefined' && window.innerWidth < 768;
 
-  // Mobile version uses a Dialog
   if (isMobileView) {
     return (
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
@@ -125,7 +114,9 @@ const LanguageSelector = () => {
               e.stopPropagation();
               if (window.debugEvents) {
                 window.debugEvents.log('mobileGlobeClick', 'MobileLanguageSelector', {
-                  timestamp: Date.now()
+                  timestamp: Date.now(),
+                  defaultPrevented: e.defaultPrevented,
+                  propagationStopped: true
                 });
               }
               setDialogOpen(true);
@@ -146,7 +137,11 @@ const LanguageSelector = () => {
                   key={code}
                   variant={isActive ? "default" : "outline"}
                   className="w-full justify-start"
-                  onClick={() => handleLanguageChange(code)}
+                  onClick={(e) => {
+                    e.preventDefault();
+                    e.stopPropagation();
+                    handleLanguageChange(code, e);
+                  }}
                 >
                   {name}
                 </Button>
@@ -158,13 +153,11 @@ const LanguageSelector = () => {
     );
   }
 
-  // Desktop version uses a DropdownMenu
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger 
         aria-label="Change language"
         className="cursor-pointer focus:outline-none"
-        asChild
         id="language-selector-trigger"
       >
         <Button 
@@ -191,7 +184,6 @@ const LanguageSelector = () => {
               onClick={(e) => {
                 e.preventDefault();
                 e.stopPropagation();
-                // Log debug event
                 if (window.debugEvents) {
                   window.debugEvents.log('menuItemClick', 'LanguageMenuItem', {
                     code,
@@ -201,7 +193,7 @@ const LanguageSelector = () => {
                     defaultPrevented: e.defaultPrevented
                   });
                 }
-                handleLanguageChange(code);
+                handleLanguageChange(code, e);
               }}
               className={`cursor-pointer hover:bg-accent focus:bg-accent ${isActive ? "bg-accent/70" : ""}`}
             >
