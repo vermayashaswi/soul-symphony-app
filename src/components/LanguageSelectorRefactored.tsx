@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
@@ -17,7 +18,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
-import { useIsMobile } from '@/utils/use-is-mobile';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Debug event logger interface for consistent event logging
 interface DebugLogger {
