@@ -10,6 +10,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from "@/components/ui/dialog";
 
 // Add this type declaration to enable debugging globally
 declare global {
@@ -39,6 +40,7 @@ const languages = {
 const LanguageSelector = () => {
   const { i18n } = useTranslation();
   const [open, setOpen] = React.useState(false);
+  const [dialogOpen, setDialogOpen] = React.useState(false);
 
   // Add debug event for component mounting
   React.useEffect(() => {
@@ -63,9 +65,14 @@ const LanguageSelector = () => {
     i18n.changeLanguage(newLang);
     toast.success(`Language changed to ${languages[newLang as keyof typeof languages]}`);
     setOpen(false); // Close dropdown after selection
+    setDialogOpen(false); // Close dialog after selection
   };
 
   const handleGlobeClick = (event: React.MouseEvent) => {
+    // Prevent the default behavior and stop propagation
+    event.preventDefault();
+    event.stopPropagation();
+    
     // Log detailed debug event when globe is clicked
     console.log("Globe button clicked:", event);
     
@@ -75,10 +82,13 @@ const LanguageSelector = () => {
         currentLanguage: i18n.language,
         eventTarget: event.target.toString(),
         eventCurrentTarget: event.currentTarget.toString(),
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        defaultPrevented: event.defaultPrevented,
+        propagationStopped: true
       });
     }
-    // Toggle dropdown directly on click to force open/close behavior
+    
+    // Toggle dropdown directly
     setOpen(!open);
   };
 
@@ -96,13 +106,65 @@ const LanguageSelector = () => {
     setOpen(open);
   };
 
+  // For mobile devices, use a dialog instead of dropdown
+  const isMobileView = typeof window !== 'undefined' && window.innerWidth < 768;
+
+  // Mobile version uses a Dialog
+  if (isMobileView) {
+    return (
+      <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+        <DialogTrigger asChild>
+          <Button 
+            type="button"
+            variant="ghost" 
+            size="icon"
+            className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90 focus:outline-none"
+            data-testid="language-selector-button-mobile"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              if (window.debugEvents) {
+                window.debugEvents.log('mobileGlobeClick', 'MobileLanguageSelector', {
+                  timestamp: Date.now()
+                });
+              }
+              setDialogOpen(true);
+            }}
+          >
+            <Globe className="h-4 w-4" />
+          </Button>
+        </DialogTrigger>
+        <DialogContent className="sm:max-w-[425px]">
+          <DialogHeader>
+            <DialogTitle>Select Language</DialogTitle>
+          </DialogHeader>
+          <div className="grid gap-2 py-4">
+            {Object.entries(languages).map(([code, name]) => {
+              const isActive = i18n.language === code;
+              return (
+                <Button
+                  key={code}
+                  variant={isActive ? "default" : "outline"}
+                  className="w-full justify-start"
+                  onClick={() => handleLanguageChange(code)}
+                >
+                  {name}
+                </Button>
+              );
+            })}
+          </div>
+        </DialogContent>
+      </Dialog>
+    );
+  }
+
+  // Desktop version uses a DropdownMenu
   return (
     <DropdownMenu open={open} onOpenChange={handleOpenChange}>
       <DropdownMenuTrigger 
         aria-label="Change language"
         className="cursor-pointer focus:outline-none"
-        onClick={handleGlobeClick}
-        asChild={false}
+        asChild
         id="language-selector-trigger"
       >
         <Button 
@@ -111,6 +173,7 @@ const LanguageSelector = () => {
           size="icon"
           className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90 focus:outline-none cursor-pointer"
           data-testid="language-selector-button"
+          onClick={handleGlobeClick}
         >
           <Globe className="h-4 w-4" />
         </Button>
@@ -127,13 +190,15 @@ const LanguageSelector = () => {
               key={code} 
               onClick={(e) => {
                 e.preventDefault();
+                e.stopPropagation();
                 // Log debug event
                 if (window.debugEvents) {
                   window.debugEvents.log('menuItemClick', 'LanguageMenuItem', {
                     code,
                     name,
                     isActive,
-                    timestamp: Date.now()
+                    timestamp: Date.now(),
+                    defaultPrevented: e.defaultPrevented
                   });
                 }
                 handleLanguageChange(code);

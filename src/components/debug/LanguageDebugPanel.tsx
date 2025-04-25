@@ -61,6 +61,11 @@ const LanguageDebugPanel = () => {
       let target = e.target as HTMLElement;
       let targetPath = [];
       
+      // Check if this is the language selector
+      const isLanguageSelectorClick = target.closest('#language-selector-container') ||
+                                     target.closest('#language-selector-trigger') ||
+                                     target.classList.contains('Globe');
+      
       // Build path of elements that were clicked
       while (target && target !== document.body) {
         let identifier = target.id ? `#${target.id}` : 
@@ -73,6 +78,7 @@ const LanguageDebugPanel = () => {
       // Log click event with detailed path information
       window.debugEvents?.log('click', 'document', {
         path: targetPath.join(' > '),
+        isLanguageSelectorClick: isLanguageSelectorClick ? true : false,
         bubbles: e.bubbles,
         cancelable: e.cancelable,
         defaultPrevented: e.defaultPrevented,

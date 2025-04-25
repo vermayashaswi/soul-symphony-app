@@ -135,13 +135,15 @@ const Home = () => {
     }
   };
 
-  const handleLanguageSelectorAreaClick = () => {
+  const handleLanguageSelectorAreaClick = (event: React.MouseEvent) => {
     console.log("Language selector container area clicked");
     
     if (window.debugEvents) {
       window.debugEvents.log('containerClick', 'LanguageSelectorContainer', {
         message: 'Language selector container area clicked',
-        timestamp: Date.now()
+        timestamp: Date.now(),
+        target: event.target,
+        currentTarget: event.currentTarget,
       });
     }
   };
@@ -201,7 +203,7 @@ const Home = () => {
                 className="z-30 relative" 
                 id="language-selector-container"
                 onClick={handleLanguageSelectorAreaClick}
-                style={{ minWidth: '40px', minHeight: '40px' }}
+                style={{ minWidth: '40px', minHeight: '40px', pointerEvents: 'auto' }}
               >
                 <LanguageSelector />
               </div>
