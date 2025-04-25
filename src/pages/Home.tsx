@@ -33,6 +33,13 @@ const Home = () => {
     console.log('Home component mounted');
     console.log('Current user:', user?.email);
 
+    if (window.debugEvents) {
+      window.debugEvents.log('mount', 'HomePage', {
+        user: user?.email,
+        timestamp: Date.now()
+      });
+    }
+
     setRefreshKey(prev => prev + 1);
 
     const fetchUserProfile = async () => {
@@ -179,7 +186,7 @@ const Home = () => {
                   {formattedDate}
                 </div>
               </motion.div>
-              <div className="z-30">
+              <div className="z-30" id="language-selector-container">
                 <LanguageSelector />
               </div>
             </div>

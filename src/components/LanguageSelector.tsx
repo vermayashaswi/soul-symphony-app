@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
 import {
@@ -38,9 +38,12 @@ const languages = {
 
 const LanguageSelector = () => {
   const { i18n } = useTranslation();
+  const [open, setOpen] = React.useState(false);
 
   // Add debug event for component mounting
   React.useEffect(() => {
+    console.log("LanguageSelector mounted with current language:", i18n.language);
+    
     if (window.debugEvents) {
       window.debugEvents.log('mount', 'LanguageSelector', {
         currentLanguage: i18n.language
@@ -59,36 +62,51 @@ const LanguageSelector = () => {
 
     i18n.changeLanguage(newLang);
     toast.success(`Language changed to ${languages[newLang as keyof typeof languages]}`);
+    setOpen(false); // Close dropdown after selection
   };
 
-  const handleButtonClick = () => {
-    // Log debug event when button is clicked
+  const handleGlobeClick = (event: React.MouseEvent) => {
+    // Log detailed debug event when globe is clicked
+    console.log("Globe button clicked:", event);
+    
     if (window.debugEvents) {
-      window.debugEvents.log('buttonClick', 'LanguageSelectorButton', {
+      window.debugEvents.log('globeClick', 'LanguageSelectorButton', {
         elementType: 'Button',
-        currentLanguage: i18n.language
+        currentLanguage: i18n.language,
+        eventTarget: event.target.toString(),
+        eventCurrentTarget: event.currentTarget.toString(),
+        timestamp: Date.now()
       });
     }
   };
 
   const handleOpenChange = (open: boolean) => {
     // Log debug event when dropdown state changes
+    console.log("Dropdown state changing to:", open);
+    
     if (window.debugEvents) {
       window.debugEvents.log('dropdownStateChange', 'LanguageSelector', {
         isOpen: open,
-        currentLanguage: i18n.language
+        currentLanguage: i18n.language,
+        timestamp: Date.now()
       });
     }
+    setOpen(open);
   };
 
   return (
-    <DropdownMenu onOpenChange={handleOpenChange}>
-      <DropdownMenuTrigger onClick={handleButtonClick} aria-label="Change language">
+    <DropdownMenu open={open} onOpenChange={handleOpenChange}>
+      <DropdownMenuTrigger 
+        onClick={handleGlobeClick} 
+        aria-label="Change language"
+        className="cursor-pointer focus:outline-none"
+      >
         <Button 
           type="button"
           variant="ghost" 
           size="icon"
           className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90 focus:outline-none cursor-pointer"
+          data-testid="language-selector-button"
         >
           <Globe className="h-4 w-4" />
         </Button>
@@ -103,20 +121,18 @@ const LanguageSelector = () => {
           return (
             <DropdownMenuItem 
               key={code} 
-              onClick={() => handleLanguageChange(code)}
-              onSelect={(event) => {
-                // This prevents the dropdown from closing automatically
-                // so we can handle it manually after the language change
-                event.preventDefault();
-                
+              onClick={(e) => {
+                e.preventDefault();
                 // Log debug event
                 if (window.debugEvents) {
-                  window.debugEvents.log('itemSelect', 'LanguageMenuItem', {
+                  window.debugEvents.log('menuItemClick', 'LanguageMenuItem', {
                     code,
                     name,
-                    isActive
+                    isActive,
+                    timestamp: Date.now()
                   });
                 }
+                handleLanguageChange(code);
               }}
               className={`cursor-pointer hover:bg-accent focus:bg-accent ${isActive ? "bg-accent/70" : ""}`}
             >
