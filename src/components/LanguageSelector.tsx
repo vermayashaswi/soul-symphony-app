@@ -40,14 +40,16 @@ const LanguageSelector = () => {
         <Button 
           variant="ghost" 
           size="icon" 
-          className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90"
+          className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90 focus:outline-none"
         >
           <Globe className="h-4 w-4" />
+          <span className="sr-only">Change language</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end"
-        className="bg-popover/95 backdrop-blur-sm border-muted"
+        sideOffset={4}
+        className="bg-popover/95 backdrop-blur-sm border-muted z-50"
       >
         {Object.entries(languages).map(([code, name]) => (
           <DropdownMenuItem 

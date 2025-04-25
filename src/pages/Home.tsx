@@ -178,7 +178,9 @@ const Home = () => {
                   {formattedDate}
                 </div>
               </motion.div>
-              <LanguageSelector />
+              <div className="z-30">
+                <LanguageSelector />
+              </div>
             </div>
           </div>
         </div>
