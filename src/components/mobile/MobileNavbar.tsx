@@ -37,9 +37,7 @@ const MobileNavbar = () => {
           <User className="h-5 w-5" />
         </Button>
         
-        <div className="relative z-50">
-          <LanguageSelectorRefactored />
-        </div>
+        <LanguageSelectorRefactored />
         
         <Button variant="ghost" size="icon" onClick={() => navigate('/chat')}>
           <MessageSquare className="h-5 w-5" />

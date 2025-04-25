@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { Globe } from 'lucide-react';
@@ -18,6 +17,7 @@ import {
   DialogTitle, 
   DialogTrigger 
 } from "@/components/ui/dialog";
+import { useIsMobile } from '@/utils/use-is-mobile';
 
 // Debug event logger interface for consistent event logging
 interface DebugLogger {
@@ -28,7 +28,8 @@ const LanguageSelectorRefactored: React.FC = () => {
   const { i18n } = useTranslation();
   const [open, setOpen] = React.useState(false);
   const [dialogOpen, setDialogOpen] = React.useState(false);
-  
+  const isMobile = useIsMobile();
+
   // Get window.debugEvents if available
   const debugEvents = React.useMemo<DebugLogger | undefined>(
     () => typeof window !== 'undefined' ? window.debugEvents : undefined,
@@ -67,19 +68,17 @@ const LanguageSelectorRefactored: React.FC = () => {
   };
 
   // For mobile devices, use a dialog instead of dropdown
-  const isMobileView = typeof window !== 'undefined' && window.innerWidth < 768;
-
-  if (isMobileView) {
+  if (isMobile.isMobile) {
     return (
       <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
         <DialogTrigger asChild>
           <Button 
             variant="ghost" 
             size="icon"
-            className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90 focus:outline-none"
+            className="rounded-full bg-background hover:bg-accent focus:outline-none"
             aria-label="Change language"
           >
-            <Globe className="h-4 w-4" />
+            <Globe className="h-5 w-5" />
           </Button>
         </DialogTrigger>
         <DialogContent className="sm:max-w-[425px]">
@@ -114,15 +113,15 @@ const LanguageSelectorRefactored: React.FC = () => {
           variant="ghost" 
           size="icon"
           aria-label="Change language"
-          className="rounded-full bg-background/80 backdrop-blur-sm hover:bg-background/90 focus:outline-none"
+          className="rounded-full bg-background hover:bg-accent focus:outline-none"
         >
-          <Globe className="h-4 w-4" />
+          <Globe className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 
         align="end"
         sideOffset={4}
-        className="bg-popover border-muted z-50 min-w-[150px]"
+        className="bg-popover border-muted"
       >
         {Object.entries(languages).map(([code, name]) => {
           const isActive = i18n.language === code;
