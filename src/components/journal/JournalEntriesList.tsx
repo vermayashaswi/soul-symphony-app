@@ -851,4 +851,24 @@ export function JournalEntriesList({
                       duration: 0.3, 
                       delay: index === 0 && safeLocalEntries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
                     }}
-                    className={
+                    className="relative rounded-lg shadow-md overflow-hidden"
+                  >
+                    <JournalEntryCard 
+                      entry={entry}
+                      onDelete={handleEntryDelete}
+                      isNew={animatedEntryIds.includes(entry.id)}
+                      isProcessing={false}
+                      setEntries={setLocalEntries}
+                    />
+                  </motion.div>
+                </ErrorBoundary>
+              ))
+            )}
+          </div>
+        </AnimatePresence>
+      </div>
+    </ErrorBoundary>
+  );
+}
+
+export default JournalEntriesList;
