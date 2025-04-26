@@ -66,7 +66,6 @@ const JournalEntriesList = ({
   const processingStateChangedRef = useRef(false);
   const dialogOpenRef = useRef(false);
 
-  // Fix for the duplicate setLocalEntries issue - use a callback that uses the state setter
   const setLocalEntries = useCallback((entriesUpdate: React.SetStateAction<JournalEntry[]>) => {
     const newEntries = typeof entriesUpdate === 'function' 
       ? entriesUpdate(localEntries || []) 
@@ -144,8 +143,6 @@ const JournalEntriesList = ({
           console.log(`[JournalEntriesList] Already processed this tempId: ${event.detail.tempId}, skipping`);
           return;
         }
-        
-        setProcessingCardShouldShow(false);
         
         setProcessedProcessingIds(prev => {
           const newSet = new Set(prev);
@@ -385,16 +382,28 @@ const JournalEntriesList = ({
               typeof entry !== 'object' || 
               !entry.id || 
               pendingDeletions.current.has(entry.id) || 
-              deletedEntryIds.has(entry.id) || 
-              (!entry.content && !entry.created_at)) {
+              deletedEntryIds.has(entry.id)) {
             continue;
           }
           
-          entryIdToKeep.set(entry.id, entry);
-          currentEntryIds.add(entry.id);
+          if (entry.content || entry.created_at || entry['transcription text'] || entry['refined text']) {
+            entryIdToKeep.set(entry.id, entry);
+            currentEntryIds.add(entry.id);
+          }
         }
         
         const filteredEntries = Array.from(entryIdToKeep.values());
+        
+        const processingEntriesToShow = processingEntries.filter(id => {
+          const mappedEntryId = getEntryIdForProcessingId(id);
+          return !mappedEntryId || !currentEntryIds.has(mappedEntryId);
+        });
+        
+        if (processingEntriesToShow.length > 0) {
+          console.log('[JournalEntriesList] Found processing entries to show:', processingEntriesToShow);
+          setVisibleProcessingEntries(processingEntriesToShow);
+          setProcessingCardShouldShow(true);
+        }
         
         hasNoValidEntries.current = filteredEntries.length === 0 && entries.length > 0;
         
