@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -19,6 +20,8 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const contentReadyDispatchedRef = useRef(false);
 
   useEffect(() => {
+    mountedRef.current = true;
+    
     if (isProcessing) {
       setShowLoading(true);
       setForceLoading(true);
@@ -49,27 +52,35 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         contentReadyDispatchedRef.current = true;
         
         // Dispatch a single, comprehensive event
-        window.dispatchEvent(new CustomEvent('entryContentReady', { 
-          detail: { 
-            content,
-            timestamp: Date.now(),
-            contentLength: content.length,
-            readyForDisplay: true,
-            forceHideProcessing: true
+        if (mountedRef.current) {
+          try {
+            window.dispatchEvent(new CustomEvent('entryContentReady', { 
+              detail: { 
+                content,
+                timestamp: Date.now(),
+                contentLength: content.length,
+                readyForDisplay: true,
+                forceHideProcessing: true
+              }
+            }));
+          } catch (err) {
+            console.error('Error dispatching entryContentReady event:', err);
           }
-        }));
+        }
       }
     }
     
-    addEvent('EntryContent', 'State update', 'info', {
-      contentLength: content?.length || 0,
-      isProcessing,
-      isExpanded,
-      showLoading,
-      contentEmpty: contentIsLoading,
-      forceLoading,
-      contentReady: contentReadyDispatchedRef.current
-    });
+    if (mountedRef.current) {
+      addEvent('EntryContent', 'State update', 'info', {
+        contentLength: content?.length || 0,
+        isProcessing,
+        isExpanded,
+        showLoading,
+        contentEmpty: contentIsLoading,
+        forceLoading,
+        contentReady: contentReadyDispatchedRef.current
+      });
+    }
     
   }, [content, isProcessing, addEvent, forceLoading]);
   

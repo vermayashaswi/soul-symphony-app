@@ -11,14 +11,18 @@ export function useProcessingVisibility(processingId: string | null, entryIds: S
     
     const checkVisibility = () => {
       if (!processingId) {
-        setShouldShow(false);
+        if (mountedRef.current) {
+          setShouldShow(false);
+        }
         return;
       }
 
       // Check if this processing entry has a corresponding real entry
       const mappedEntryId = getEntryIdForProcessingId(processingId);
       if (mappedEntryId && entryIds.has(mappedEntryId)) {
-        setShouldShow(false);
+        if (mountedRef.current) {
+          setShouldShow(false);
+        }
       }
     };
 
