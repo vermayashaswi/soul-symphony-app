@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Globe } from 'lucide-react';
 import {
@@ -46,31 +45,13 @@ const LanguageSelector = () => {
     { code: 'sw', label: 'Kiswahili' }   // Swahili
   ];
 
-  // Load Google Translate API script manually if needed
   useEffect(() => {
-    // Check if Google Translate script is already loaded
-    const scriptExists = document.querySelector('script[src*="translate_a/element.js"]');
-    
-    if (!scriptExists) {
-      console.log('Loading Google Translate script manually');
-      const script = document.createElement('script');
-      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
-      script.async = true;
-      script.defer = true;
-      
-      script.onerror = () => {
-        console.error('Failed to load Google Translate script');
-        setTranslationState('error');
-        toast.error('Translation service failed to load');
-      };
-      
-      document.body.appendChild(script);
-    }
-    
-    // Define the global callback function
-    window.googleTranslateElementInit = () => {
+    let initAttempts = 0;
+    const maxAttempts = 10;
+    const initInterval = 500;
+
+    const initializeTranslation = () => {
       try {
-        console.log('Google Translate initialization called');
         if (!document.getElementById('google_translate_element')) {
           const div = document.createElement('div');
           div.id = 'google_translate_element';
@@ -79,78 +60,57 @@ const LanguageSelector = () => {
           div.style.left = '-9999px';
           document.body.appendChild(div);
         }
-        
-        new google.translate.TranslateElement({
-          pageLanguage: 'en',
-          includedLanguages: 'ar,bn,de,en,es,fr,gu,hi,id,ja,jw,kn,ko,ml,mr,pa,pt,ru,sw,ta,te,tl,tr,ur,vi,zh',
-          layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
-          autoDisplay: false
-        }, 'google_translate_element');
-      } catch (err) {
-        console.error('Error in googleTranslateElementInit:', err);
+
+        if (typeof window.google === 'undefined' || !window.google.translate) {
+          if (initAttempts < maxAttempts) {
+            initAttempts++;
+            setTimeout(initializeTranslation, initInterval);
+          } else {
+            setTranslationState('error');
+            toast.error('Translation service failed to load');
+          }
+          return;
+        }
+
+        window.googleTranslateElementInit = () => {
+          try {
+            new window.google.translate.TranslateElement({
+              pageLanguage: 'en',
+              includedLanguages: languages.map(lang => lang.code).join(','),
+              layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+              autoDisplay: false
+            }, 'google_translate_element');
+            
+            setTranslationState('ready');
+          } catch (err) {
+            console.error('Error in translation initialization:', err);
+            setTranslationState('error');
+            toast.error('Translation service failed to initialize');
+          }
+        };
+
+        // Force trigger initialization if needed
+        if (window.google && window.google.translate && window.google.translate.TranslateElement) {
+          window.googleTranslateElementInit();
+        }
+
+        setTranslationState('ready');
+      } catch (error) {
+        console.error('Error setting up translation:', error);
         setTranslationState('error');
-        toast.error('Translation service failed to initialize');
+        toast.error('Error setting up translation service');
       }
-    };
-    
-    const checkGoogleTranslateLoaded = () => {
-      return typeof google !== 'undefined' && 
-             google.translate && 
-             document.querySelector('.goog-te-combo');
     };
 
-    // Initialize translation or set up polling if not ready
-    const initializeTranslation = () => {
-      // Check if Google Translate is ready
-      if (checkGoogleTranslateLoaded()) {
-        console.log('Google Translate is ready');
-        forceEnglishLanguage();
-        setTranslationState('ready');
-        return true;
-      }
-      return false;
+    initializeTranslation();
+
+    return () => {
+      initAttempts = maxAttempts; // Stop any pending initialization attempts
     };
-    
-    // Force English as initial language
-    const forceEnglishLanguage = () => {
-      try {
-        const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
-        if (select) {
-          console.log('Setting initial language to English');
-          select.value = 'en';
-          select.dispatchEvent(new Event('change'));
-          setSelectedLanguage('en');
-        }
-      } catch (err) {
-        console.error('Error forcing English language:', err);
-      }
-    };
-    
-    // Try to initialize immediately
-    if (!initializeTranslation()) {
-      // If not ready, poll for availability
-      console.log('Google Translate not ready yet, will poll');
-      const maxAttempts = 20;
-      let attempts = 0;
-      
-      const intervalId = setInterval(() => {
-        attempts++;
-        if (initializeTranslation() || attempts >= maxAttempts) {
-          clearInterval(intervalId);
-          if (attempts >= maxAttempts && translationState !== 'ready') {
-            console.error('Google Translate failed to load after maximum attempts');
-            setTranslationState('error');
-            toast.error('Translation service unavailable. Please refresh the page.');
-          }
-        }
-      }, 500);
-      
-      return () => clearInterval(intervalId);
-    }
   }, []);
 
   const handleLanguageChange = (languageCode: string) => {
-    console.log('Language change requested to:', languageCode);
+    debug('Language change requested:', languageCode);
     
     if (translationState !== 'ready') {
       toast.error('Language selector not ready. Please try again in a moment.');
@@ -160,22 +120,16 @@ const LanguageSelector = () => {
     try {
       const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
       if (select) {
-        // Set the selected language in the Google Translate dropdown
         select.value = languageCode;
         select.dispatchEvent(new Event('change'));
-        
-        // Update our state to reflect the new language
         setSelectedLanguage(languageCode);
         
-        // Provide feedback to the user
         const selectedLang = languages.find(lang => lang.code === languageCode);
         toast.success(`Language changed to ${selectedLang?.label || languageCode}`);
-        
-        console.log('Language successfully changed to:', languageCode);
       } else {
-        console.error('Google Translate widget not found when trying to change language');
-        toast.error('Translation service unavailable. Please refresh the page.');
+        console.error('Google Translate widget not found');
         setTranslationState('error');
+        toast.error('Translation service unavailable. Please refresh the page.');
       }
     } catch (err) {
       console.error('Error changing language:', err);
@@ -198,7 +152,7 @@ const LanguageSelector = () => {
           <Globe className={`h-5 w-5 ${translationState !== 'ready' ? 'opacity-50' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto z-50">
+      <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto">
         {translationState === 'error' && (
           <div className="px-2 py-1.5 text-sm text-red-500">
             Translation service unavailable
