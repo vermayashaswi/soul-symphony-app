@@ -9,10 +9,13 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
+import { createDebugger } from '@/utils/debug/debugUtils';
+
+const debug = createDebugger('languageSelector');
 
 const LanguageSelector = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
-  const [isTranslateReady, setIsTranslateReady] = useState(false);
+  const [translationState, setTranslationState] = useState<'loading' | 'ready' | 'error'>('loading');
 
   const languages = [
     { code: 'en', label: 'English' },
@@ -43,70 +46,113 @@ const LanguageSelector = () => {
     { code: 'sw', label: 'Kiswahili' }   // Swahili
   ];
 
-  // Check if Google Translate is initialized and force English as initial language
+  // Load Google Translate API script manually if needed
   useEffect(() => {
-    // Force set to English on initial load to override any cached language
-    const initialLanguage = 'en';
+    // Check if Google Translate script is already loaded
+    const scriptExists = document.querySelector('script[src*="translate_a/element.js"]');
     
+    if (!scriptExists) {
+      console.log('Loading Google Translate script manually');
+      const script = document.createElement('script');
+      script.src = 'https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit';
+      script.async = true;
+      script.defer = true;
+      
+      script.onerror = () => {
+        console.error('Failed to load Google Translate script');
+        setTranslationState('error');
+        toast.error('Translation service failed to load');
+      };
+      
+      document.body.appendChild(script);
+    }
+    
+    // Define the global callback function
+    window.googleTranslateElementInit = () => {
+      try {
+        console.log('Google Translate initialization called');
+        if (!document.getElementById('google_translate_element')) {
+          const div = document.createElement('div');
+          div.id = 'google_translate_element';
+          div.style.position = 'absolute';
+          div.style.top = '-9999px';
+          div.style.left = '-9999px';
+          document.body.appendChild(div);
+        }
+        
+        new google.translate.TranslateElement({
+          pageLanguage: 'en',
+          includedLanguages: 'ar,bn,de,en,es,fr,gu,hi,id,ja,jw,kn,ko,ml,mr,pa,pt,ru,sw,ta,te,tl,tr,ur,vi,zh',
+          layout: google.translate.TranslateElement.InlineLayout.SIMPLE,
+          autoDisplay: false
+        }, 'google_translate_element');
+      } catch (err) {
+        console.error('Error in googleTranslateElementInit:', err);
+        setTranslationState('error');
+        toast.error('Translation service failed to initialize');
+      }
+    };
+    
+    const checkGoogleTranslateLoaded = () => {
+      return typeof google !== 'undefined' && 
+             google.translate && 
+             document.querySelector('.goog-te-combo');
+    };
+
+    // Initialize translation or set up polling if not ready
     const initializeTranslation = () => {
+      // Check if Google Translate is ready
+      if (checkGoogleTranslateLoaded()) {
+        console.log('Google Translate is ready');
+        forceEnglishLanguage();
+        setTranslationState('ready');
+        return true;
+      }
+      return false;
+    };
+    
+    // Force English as initial language
+    const forceEnglishLanguage = () => {
       try {
         const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
         if (select) {
-          console.log('Google Translate found, initializing...');
-          
-          // First, force English (regardless of the browser/localStorage language)
-          select.value = initialLanguage;
+          console.log('Setting initial language to English');
+          select.value = 'en';
           select.dispatchEvent(new Event('change'));
-          setSelectedLanguage(initialLanguage);
-          
-          // Mark as ready so UI can enable clicks
-          setIsTranslateReady(true);
-          console.log('Google Translate initialized with language:', initialLanguage);
-          
-          // Clear any previous translations that might be applied
-          if (document.body.classList.contains('translated-rtl')) {
-            document.body.classList.remove('translated-rtl');
-          }
-          
-          // Clear Google Translate cookie to ensure fresh start
-          document.cookie = 'googtrans=; expires=Thu, 01 Jan 1970 00:00:00 UTC; path=/;';
-          
-          return true;
+          setSelectedLanguage('en');
         }
-        return false;
       } catch (err) {
-        console.error('Error initializing Google Translate:', err);
-        return false;
+        console.error('Error forcing English language:', err);
       }
     };
     
     // Try to initialize immediately
     if (!initializeTranslation()) {
-      console.log('Google Translate not ready yet, will retry');
-      
-      // If not successful, check every second until it's available (max 10 attempts)
+      // If not ready, poll for availability
+      console.log('Google Translate not ready yet, will poll');
+      const maxAttempts = 20;
       let attempts = 0;
-      const maxAttempts = 10;
       
-      const checkInterval = setInterval(() => {
+      const intervalId = setInterval(() => {
         attempts++;
         if (initializeTranslation() || attempts >= maxAttempts) {
-          clearInterval(checkInterval);
-          if (attempts >= maxAttempts && !isTranslateReady) {
-            console.warn('Failed to initialize Google Translate after maximum attempts');
+          clearInterval(intervalId);
+          if (attempts >= maxAttempts && translationState !== 'ready') {
+            console.error('Google Translate failed to load after maximum attempts');
+            setTranslationState('error');
             toast.error('Translation service unavailable. Please refresh the page.');
           }
         }
-      }, 1000);
+      }, 500);
       
-      return () => clearInterval(checkInterval);
+      return () => clearInterval(intervalId);
     }
   }, []);
 
   const handleLanguageChange = (languageCode: string) => {
     console.log('Language change requested to:', languageCode);
     
-    if (!isTranslateReady) {
+    if (translationState !== 'ready') {
       toast.error('Language selector not ready. Please try again in a moment.');
       return;
     }
@@ -129,6 +175,7 @@ const LanguageSelector = () => {
       } else {
         console.error('Google Translate widget not found when trying to change language');
         toast.error('Translation service unavailable. Please refresh the page.');
+        setTranslationState('error');
       }
     } catch (err) {
       console.error('Error changing language:', err);
@@ -143,12 +190,20 @@ const LanguageSelector = () => {
           variant="ghost" 
           size="icon" 
           aria-label="Select language"
-          title={isTranslateReady ? "Select language" : "Language selector loading..."}
+          title={translationState === 'ready' ? "Select language" : 
+                 translationState === 'loading' ? "Language selector loading..." : 
+                 "Translation service unavailable"}
+          className={translationState === 'error' ? "bg-red-100/10" : ""}
         >
-          <Globe className={`h-5 w-5 ${!isTranslateReady ? 'opacity-50' : ''}`} />
+          <Globe className={`h-5 w-5 ${translationState !== 'ready' ? 'opacity-50' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto">
+      <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto z-50">
+        {translationState === 'error' && (
+          <div className="px-2 py-1.5 text-sm text-red-500">
+            Translation service unavailable
+          </div>
+        )}
         {languages.map((language) => (
           <DropdownMenuItem
             key={language.code}
@@ -157,8 +212,8 @@ const LanguageSelector = () => {
               selectedLanguage === language.code 
                 ? "bg-primary/10 text-primary font-medium"
                 : ""
-            } ${!isTranslateReady ? "opacity-50" : ""}`}
-            disabled={!isTranslateReady}
+            }`}
+            disabled={translationState !== 'ready'}
           >
             {language.label}
           </DropdownMenuItem>
