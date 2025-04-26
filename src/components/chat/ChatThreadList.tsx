@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ChatThread, getUserChatThreads } from '@/services/chat';
 import { Plus, MessageCircle, Loader2 } from 'lucide-react';
@@ -47,7 +46,6 @@ const ChatThreadList: React.FC<ChatThreadListProps> = ({
     
     loadThreads();
     
-    // Subscribe to changes in chat threads
     const handleThreadTitleUpdate = (event: CustomEvent) => {
       if (event.detail?.threadId && event.detail?.title) {
         setThreads(prevThreads => 
@@ -74,7 +72,6 @@ const ChatThreadList: React.FC<ChatThreadListProps> = ({
     try {
       const newThreadId = await onStartNewThread();
       if (newThreadId) {
-        // Reload the thread list
         const updatedThreads = await getUserChatThreads(userId);
         setThreads(updatedThreads);
       }
@@ -90,7 +87,10 @@ const ChatThreadList: React.FC<ChatThreadListProps> = ({
       <div className="p-4 border-b">
         <Button 
           onClick={handleStartNewThread}
-          className={newChatButtonWidth === 'full' ? "w-full" : "w-1/2"}
+          className={cn(
+            newChatButtonWidth === 'full' ? "w-full" : "w-1/2", 
+            "px-4 py-2 flex items-center justify-center gap-2 rounded-md"
+          )}
           disabled={creatingThread}
         >
           {creatingThread ? (
@@ -98,7 +98,7 @@ const ChatThreadList: React.FC<ChatThreadListProps> = ({
           ) : (
             <Plus className="h-4 w-4 mr-2" />
           )}
-          New Conversation
+          New Chat
         </Button>
       </div>
       
