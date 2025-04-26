@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { Globe } from 'lucide-react';
 import {
   DropdownMenu,
@@ -11,11 +11,35 @@ import { Button } from "@/components/ui/button";
 import { toast } from 'sonner';
 
 const LanguageSelector = () => {
+  const [selectedLanguage, setSelectedLanguage] = useState('en');
+
   const languages = [
     { code: 'en', label: 'English' },
-    { code: 'hi', label: 'हिंदी' },
-    { code: 'es', label: 'Español' },
-    { code: 'fr', label: 'Français' }
+    { code: 'zh', label: '中文' },        // Mandarin
+    { code: 'hi', label: 'हिंदी' },       // Hindi
+    { code: 'es', label: 'Español' },     // Spanish
+    { code: 'ar', label: 'العربية' },     // Arabic
+    { code: 'fr', label: 'Français' },    // French
+    { code: 'bn', label: 'বাংলা' },       // Bengali
+    { code: 'pt', label: 'Português' },   // Portuguese
+    { code: 'ru', label: 'Русский' },     // Russian
+    { code: 'ur', label: 'اردو' },        // Urdu
+    { code: 'id', label: 'Indonesia' },   // Indonesian
+    { code: 'de', label: 'Deutsch' },     // German
+    { code: 'ja', label: '日本語' },      // Japanese
+    { code: 'pa', label: 'ਪੰਜਾਬੀ' },      // Punjabi
+    { code: 'te', label: 'తెలుగు' },      // Telugu
+    { code: 'mr', label: 'मराठी' },       // Marathi
+    { code: 'tr', label: 'Türkçe' },     // Turkish
+    { code: 'ta', label: 'தமிழ்' },       // Tamil
+    { code: 'vi', label: 'Tiếng Việt' }, // Vietnamese
+    { code: 'ko', label: '한국어' },      // Korean
+    { code: 'jw', label: 'Basa Jawa' },  // Javanese
+    { code: 'gu', label: 'ગુજરાતી' },     // Gujarati
+    { code: 'kn', label: 'ಕನ್ನಡ' },       // Kannada
+    { code: 'ml', label: 'മലയാളം' },     // Malayalam
+    { code: 'tl', label: 'Filipino' },    // Tagalog
+    { code: 'sw', label: 'Kiswahili' }   // Swahili
   ];
 
   const handleLanguageChange = (languageCode: string) => {
@@ -24,6 +48,7 @@ const LanguageSelector = () => {
       if (select) {
         select.value = languageCode;
         select.dispatchEvent(new Event('change'));
+        setSelectedLanguage(languageCode);
         toast.success(`Language changed to ${languages.find(lang => lang.code === languageCode)?.label || languageCode}`);
       } else {
         console.error('Google Translate widget not found');
@@ -35,6 +60,11 @@ const LanguageSelector = () => {
     }
   };
 
+  // Get current language label
+  const getCurrentLanguageLabel = () => {
+    return languages.find(lang => lang.code === selectedLanguage)?.label || 'English';
+  };
+
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
@@ -42,11 +72,16 @@ const LanguageSelector = () => {
           <Globe className="h-5 w-5" />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto">
         {languages.map((language) => (
           <DropdownMenuItem
             key={language.code}
             onClick={() => handleLanguageChange(language.code)}
+            className={`${
+              selectedLanguage === language.code 
+                ? "bg-primary/10 text-primary font-medium"
+                : ""
+            }`}
           >
             {language.label}
           </DropdownMenuItem>
