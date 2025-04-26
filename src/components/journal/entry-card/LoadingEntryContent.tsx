@@ -49,12 +49,23 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   const stepsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const longProcessingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
+  const isForciblyRemoved = useRef(false);
   
-  // Self cleanup safety - if this component exists for too long (30 seconds), automatically trigger cleanup
+  // Self cleanup safety - if this component exists for too long (15 seconds), automatically trigger cleanup
   useEffect(() => {
+    // Immediately register that this component is mounted
+    window.dispatchEvent(new CustomEvent('loadingContentMounted', {
+      detail: { 
+        timestamp: Date.now(),
+        componentId: componentId.current,
+        source: 'LoadingEntryContent-mount'
+      }
+    }));
+    
     const safetyTimeout = setTimeout(() => {
       if (mountedRef.current) {
         console.log('[LoadingEntryContent] Safety timeout triggered - component existed for too long');
+        isForciblyRemoved.current = true;
         
         // Signal that this component should be removed
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
@@ -62,7 +73,8 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             componentId: componentId.current,
             timestamp: Date.now(),
             forceCleanup: true,
-            reason: 'safety-timeout'
+            reason: 'safety-timeout',
+            source: 'LoadingEntryContent-safetyTimeout'
           }
         }));
         
@@ -72,22 +84,57 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             componentId: componentId.current,
             timestamp: Date.now(), 
             forceClearProcessingCard: true,
-            reason: 'safety-timeout'
+            reason: 'safety-timeout',
+            source: 'LoadingEntryContent-safetyTimeout'
           }
         }));
       }
-    }, 30000); // 30 seconds max lifetime
+    }, 15000); // 15 seconds max lifetime (reduced from 30)
     
     cleanupTimersRef.current.push(safetyTimeout);
     
+    // Add another aggressive cleanup after 20 seconds as a last resort
+    const finalSafetyTimeout = setTimeout(() => {
+      if (mountedRef.current) {
+        isForciblyRemoved.current = true;
+        console.log('[LoadingEntryContent] Final safety timeout triggered');
+        
+        window.dispatchEvent(new CustomEvent('forceRemoveAllProcessingCards', {
+          detail: {
+            timestamp: Date.now(),
+            source: 'LoadingEntryContent-finalSafetyTimeout'
+          }
+        }));
+        
+        // Try to force parent re-render by dispatching a global state change
+        window.dispatchEvent(new CustomEvent('processingStateChanged', {
+          detail: {
+            action: 'forceCleanup',
+            timestamp: Date.now(),
+            source: 'LoadingEntryContent-finalSafetyTimeout'
+          }
+        }));
+        
+        // Force yourself to unmount by setting a special data attribute
+        const element = document.querySelector(`[data-component-id="${componentId.current}"]`);
+        if (element) {
+          element.setAttribute('data-force-remove', 'true');
+          element.setAttribute('style', 'display: none !important; opacity: 0 !important; height: 0 !important; overflow: hidden !important;');
+        }
+      }
+    }, 20000);
+    
+    cleanupTimersRef.current.push(finalSafetyTimeout);
+    
     return () => {
       clearTimeout(safetyTimeout);
+      clearTimeout(finalSafetyTimeout);
     };
   }, []);
   
   useEffect(() => {
     const stepInterval = setInterval(() => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || isForciblyRemoved.current) return;
       
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
       
@@ -97,7 +144,8 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         detail: { 
           step: currentStep.id, 
           text: currentStep.text,
-          componentId: componentId.current
+          componentId: componentId.current,
+          source: 'LoadingEntryContent-stepChanged'
         }
       }));
       
@@ -107,14 +155,15 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     // Set a timeout to show a message if processing is taking too long
     const longProcessingTimeout = setTimeout(() => {
-      if (mountedRef.current) {
+      if (mountedRef.current && !isForciblyRemoved.current) {
         setProcessingTakingTooLong(true);
         
         // Notify that processing is taking a long time
         window.dispatchEvent(new CustomEvent('processingTakingLong', {
           detail: { 
             timestamp: Date.now(),
-            componentId: componentId.current
+            componentId: componentId.current,
+            source: 'LoadingEntryContent-processingTakingLong'
           }
         }));
       }
@@ -122,32 +171,47 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
-    // Notify when loading content is mounted
-    window.dispatchEvent(new CustomEvent('loadingContentMounted', {
-      detail: { 
-        timestamp: Date.now(),
-        componentId: componentId.current
-      }
-    }));
-    
     // Listen for forces removal events targeted at this component
     const handleForceRemoval = (event: CustomEvent) => {
-      if (event.detail?.componentId === componentId.current || !event.detail?.componentId) {
+      if ((event.detail?.componentId === componentId.current) || 
+          !event.detail?.componentId ||
+          event.detail?.forceCleanup === true) {
+        
         console.log('[LoadingEntryContent] Forced removal event received for', componentId.current);
+        isForciblyRemoved.current = true;
         
         // Signal that we're unmounting
         if (mountedRef.current) {
           window.dispatchEvent(new CustomEvent('loadingContentForceRemoved', {
             detail: { 
               timestamp: Date.now(),
-              componentId: componentId.current
+              componentId: componentId.current,
+              source: 'LoadingEntryContent-forceRemoved'
             }
           }));
+          
+          // Try to force parent re-render by dispatching a global state change
+          window.dispatchEvent(new CustomEvent('processingStateChanged', {
+            detail: {
+              action: 'forceCleanup',
+              timestamp: Date.now(),
+              source: 'LoadingEntryContent-forceRemoved'
+            }
+          }));
+          
+          // Force yourself to unmount by setting a special data attribute
+          const element = document.querySelector(`[data-component-id="${componentId.current}"]`);
+          if (element) {
+            element.setAttribute('data-force-remove', 'true');
+            element.setAttribute('style', 'display: none !important; opacity: 0 !important; height: 0 !important; overflow: hidden !important;');
+          }
         }
       }
     };
     
     window.addEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
+    window.addEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
+    window.addEventListener('forceRemoveAllProcessingCards', handleForceRemoval as EventListener);
     
     return () => {
       mountedRef.current = false;
@@ -163,16 +227,23 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
       
       window.removeEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
+      window.removeEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
+      window.removeEventListener('forceRemoveAllProcessingCards', handleForceRemoval as EventListener);
       
       // Notify when loading content is unmounted
       window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {
         detail: { 
           timestamp: Date.now(),
-          componentId: componentId.current
+          componentId: componentId.current,
+          source: 'LoadingEntryContent-unmount'
         }
       }));
     };
   }, [currentStepIndex]);
+  
+  if (isForciblyRemoved.current) {
+    return null;
+  }
   
   const currentStep = processingSteps[currentStepIndex];
   

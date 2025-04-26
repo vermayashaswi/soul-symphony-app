@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useDebugLog } from '@/utils/debug/DebugContext';
@@ -18,6 +18,97 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [forceLoading, setForceLoading] = useState(false);
   const mountedRef = useRef(true);
   const contentReadyDispatchedRef = useRef(false);
+  const contentProcessedTimestamp = useRef(0);
+  
+  // Force cleanup on mount to ensure no stale processing cards
+  useEffect(() => {
+    // On mount, immediately dispatch cleanup events
+    window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+      detail: { 
+        timestamp: Date.now(),
+        forceCleanup: true,
+        source: 'EntryContent-mount'
+      }
+    }));
+    
+    return () => {
+      mountedRef.current = false;
+      
+      // On unmount, dispatch cleanup to ensure no orphaned processing cards
+      window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+        detail: {
+          timestamp: Date.now(),
+          forceClearProcessingCard: true,
+          source: 'EntryContent-unmount'
+        }
+      }));
+    };
+  }, []);
+
+  const dispatchContentReady = useCallback(() => {
+    if (contentReadyDispatchedRef.current) return;
+    
+    contentReadyDispatchedRef.current = true;
+    contentProcessedTimestamp.current = Date.now();
+    
+    // Use a sequence of events with small delays to ensure robustness
+    const events = [
+      // 1. Signal that content is ready
+      { 
+        name: 'entryContentReady', 
+        detail: { 
+          content,
+          timestamp: Date.now(),
+          contentLength: content.length,
+          readyForDisplay: true,
+          source: 'EntryContent-dispatchContentReady'
+        },
+        delay: 0
+      },
+      
+      // 2. Force removal immediately
+      {
+        name: 'forceRemoveProcessingCard',
+        detail: { 
+          content,
+          timestamp: Date.now() + 1,
+          forceCleanup: true,
+          source: 'EntryContent-dispatchContentReady' 
+        },
+        delay: 50
+      },
+      
+      // 3. Signal processing complete
+      {
+        name: 'processingEntryCompleted',
+        detail: {
+          timestamp: Date.now() + 2,
+          forceClearProcessingCard: true,
+          source: 'EntryContent-dispatchContentReady'
+        },
+        delay: 100
+      },
+      
+      // 4. Final cleanup after a short delay
+      {
+        name: 'forceRemoveAllProcessingCards',
+        detail: {
+          timestamp: Date.now() + 3,
+          source: 'EntryContent-dispatchContentReady'
+        },
+        delay: 150
+      }
+    ];
+    
+    // Dispatch events in sequence with slight delays to ensure proper ordering
+    events.forEach(event => {
+      setTimeout(() => {
+        if (mountedRef.current) {
+          window.dispatchEvent(new CustomEvent(event.name, { detail: event.detail }));
+        }
+      }, event.delay);
+    });
+  }, [content]);
 
   useEffect(() => {
     if (isProcessing) {
@@ -46,37 +137,21 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       setShowLoading(false);
       setStableContent(content);
       
-      if (!contentReadyDispatchedRef.current) {
-        contentReadyDispatchedRef.current = true;
-        
-        // Dispatch three events in sequence to ensure card removal
-        // 1. Signal that content is ready
-        window.dispatchEvent(new CustomEvent('entryContentReady', { 
-          detail: { 
-            content,
-            timestamp: Date.now(),
-            contentLength: content.length,
-            readyForDisplay: true
-          }
-        }));
-        
-        // 2. Force removal immediately
+      // If content is ready, dispatch events
+      dispatchContentReady();
+    }
+    
+    // Always dispatch force removal when content changes
+    if (!contentIsLoading && !isProcessing) {
+      setTimeout(() => {
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
           detail: { 
-            content,
             timestamp: Date.now(),
-            forceCleanup: true 
+            forceCleanup: true,
+            source: 'EntryContent-contentChanged' 
           }
         }));
-        
-        // 3. Signal processing complete
-        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-          detail: {
-            timestamp: Date.now(),
-            forceClearProcessingCard: true
-          }
-        }));
-      }
+      }, 50);
     }
     
     addEvent('EntryContent', 'State update', 'info', {
@@ -89,13 +164,26 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       contentReady: contentReadyDispatchedRef.current
     });
     
-  }, [content, isProcessing, addEvent, forceLoading]);
-  
+  }, [content, isProcessing, addEvent, forceLoading, dispatchContentReady]);
+
+  // Force cleanup on a timer
   useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+    const cleanupTimer = setInterval(() => {
+      if (mountedRef.current && !showLoading && !forceLoading && stableContent && 
+          stableContent !== "Processing entry..." && stableContent.trim() !== "") {
+        
+        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+          detail: { 
+            timestamp: Date.now(),
+            forceCleanup: true,
+            source: 'EntryContent-cleanupTimer'
+          }
+        }));
+      }
+    }, 3000);
+    
+    return () => clearInterval(cleanupTimer);
+  }, [showLoading, forceLoading, stableContent]);
 
   return (
     <AnimatePresence mode="wait" initial={false}>

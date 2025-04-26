@@ -4,6 +4,7 @@ import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { triggerThemeExtraction } from '@/utils/audio/theme-extractor';
+import { forceProcessingCardCleanup } from './ProcessingCardCleaner';
 
 interface ExtractThemeButtonProps {
   entryId: number;
@@ -16,29 +17,48 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
 
   // Cleanup all timers on unmount
   useEffect(() => {
+    // Force clean processing cards on mount
+    forceProcessingCardCleanup();
+    
     return () => {
       mountedRef.current = false;
       cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
+      
+      // Force clean processing cards on unmount
+      forceProcessingCardCleanup();
     };
   }, []);
 
   // Clean any processing cards on mount
   useEffect(() => {
     // Clean processing cards related to this entry on mount
+    forceProcessingCardCleanup();
+    
     const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
         detail: { 
           associatedEntryId: entryId, 
           timestamp: Date.now(),
-          forceCleanup: true 
+          forceCleanup: true,
+          source: 'ExtractThemeButton-mount' 
         }
       }));
     }, 100);
     
     cleanupTimersRef.current.push(timer);
     
+    // Set up periodic cleanup
+    const interval = setInterval(() => {
+      if (mountedRef.current) {
+        forceProcessingCardCleanup();
+      }
+    }, 5000);
+    
+    cleanupTimersRef.current.push(interval as unknown as NodeJS.Timeout);
+    
     return () => {
       clearTimeout(timer);
+      clearInterval(interval);
     };
   }, [entryId]);
 
@@ -49,6 +69,9 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
       // Clear any existing timers
       cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
       cleanupTimersRef.current = [];
+      
+      // Force clean any existing processing cards before starting
+      forceProcessingCardCleanup();
       
       // Dispatch an event to notify that theme extraction is starting
       window.dispatchEvent(new CustomEvent('themeExtractionStarted', { 
@@ -64,7 +87,8 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
               detail: { 
                 associatedEntryId: entryId, 
                 timestamp: Date.now() + i,
-                forceCleanup: true 
+                forceCleanup: true,
+                source: 'ExtractThemeButton-extractStart'
               }
             }));
           }
@@ -97,13 +121,19 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
                 detail: { 
                   associatedEntryId: entryId, 
                   timestamp: Date.now() + i,
-                  forceCleanup: true 
+                  forceCleanup: true,
+                  source: 'ExtractThemeButton-success'
                 }
               }));
               
               // Signal completion
               window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-                detail: { entryId, timestamp: Date.now() + i, forceClearProcessingCard: true }
+                detail: { 
+                  entryId, 
+                  timestamp: Date.now() + i, 
+                  forceClearProcessingCard: true,
+                  source: 'ExtractThemeButton-success'
+                }
               }));
             }
           }, 200 + (i * 200));
@@ -136,14 +166,20 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
         const timer = setTimeout(() => {
           if (mountedRef.current) {
             window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-              detail: { entryId, timestamp: Date.now() + i, forceClearProcessingCard: true }
+              detail: { 
+                entryId, 
+                timestamp: Date.now() + i, 
+                forceClearProcessingCard: true,
+                source: 'ExtractThemeButton-finally' 
+              }
             }));
             
             window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
               detail: { 
                 associatedEntryId: entryId, 
                 timestamp: Date.now() + i,
-                forceCleanup: true 
+                forceCleanup: true,
+                source: 'ExtractThemeButton-finally'
               }
             }));
           }
@@ -151,6 +187,15 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
         
         cleanupTimersRef.current.push(timer);
       }
+      
+      // Final aggressive cleanup after a bit longer delay
+      const finalTimer = setTimeout(() => {
+        if (mountedRef.current) {
+          forceProcessingCardCleanup();
+        }
+      }, 2000);
+      
+      cleanupTimersRef.current.push(finalTimer);
     }
   };
 
