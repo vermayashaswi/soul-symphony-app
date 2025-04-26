@@ -260,6 +260,19 @@ serve(async (req) => {
         );
         
         console.log("Journal entry stored with ID:", entryId);
+        
+        // After successful store, verify the entry exists
+        const { data: verifiedEntry, error: verificationError } = await supabase
+          .from('Journal Entries')
+          .select('id')
+          .eq('id', entryId)
+          .single();
+          
+        if (verificationError) {
+          console.warn("Entry verification warning:", verificationError);
+        } else {
+          console.log("Entry verified in database:", verifiedEntry?.id);
+        }
       } catch (dbErr) {
         console.error("Error storing journal entry:", dbErr);
         throw new Error(`Failed to store journal entry: ${dbErr.message}`);

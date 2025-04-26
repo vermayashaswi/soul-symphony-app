@@ -9,7 +9,7 @@ let isEntryBeingProcessed = false;
 let processingLock = false;
 let processingTimeoutId: NodeJS.Timeout | null = null;
 let lastStateChangeTime = 0;
-const DEBOUNCE_THRESHOLD = 500; // ms between state changes
+const DEBOUNCE_THRESHOLD = 200; // Reduced from 500ms to 200ms to be more responsive
 
 // Store processing entries in localStorage to persist across navigations
 export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
@@ -31,14 +31,26 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
     } else if (action === 'remove') {
       entries = entries.filter(id => id !== tempId);
       console.log(`[Audio.ProcessingState] Removed entry ${tempId} from processing list. Now tracking ${entries.length} entries.`);
+      
+      // Add explicit cleanup here to ensure completed entries are properly marked
+      window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+        detail: { tempId, timestamp: now }
+      }));
     }
     
     localStorage.setItem('processingEntries', JSON.stringify(entries));
     
     // Dispatch an event so other components can react to the change
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-      detail: { entries, lastUpdate: now }
+      detail: { entries, lastUpdate: now, forceUpdate: true }
     }));
+    
+    // Send a second event to ensure iOS devices catch it
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { entries, lastUpdate: now + 1, forceUpdate: true }
+      }));
+    }, 50);
     
     return entries;
   } catch (error) {
@@ -85,7 +97,12 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
       
       // Dispatch an event so other components can react to the change
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr }
+        detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr, forceUpdate: true }
+      }));
+      
+      // Add explicit "entry completed" event
+      window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+        detail: { tempId: idStr, timestamp: now }
       }));
       
       console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
@@ -121,7 +138,7 @@ export function resetProcessingState(): void {
   
   // Dispatch a reset event
   window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-    detail: { entries: [], reset: true, lastUpdate: Date.now() }
+    detail: { entries: [], reset: true, lastUpdate: Date.now(), forceUpdate: true }
   }));
 }
 

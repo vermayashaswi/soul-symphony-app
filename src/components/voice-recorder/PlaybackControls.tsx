@@ -37,6 +37,7 @@ export function PlaybackControls({
   const [isClearingToasts, setIsClearingToasts] = useState(false);
   const [sliderValue, setSliderValue] = useState(0);
   const [isTouchActive, setIsTouchActive] = useState(false);
+  const [processingStartTime, setProcessingStartTime] = useState(0);
   const { isMobile } = useIsMobile();
   const { addEvent } = useDebugLog();
   
@@ -54,6 +55,25 @@ export function PlaybackControls({
       });
     }
   }, [playbackProgress, audioDuration, isTouchActive, addEvent]);
+  
+  useEffect(() => {
+    // Track how long processing has been going on
+    if (isProcessing && processingStartTime === 0) {
+      setProcessingStartTime(Date.now());
+    } else if (!isProcessing && processingStartTime !== 0) {
+      setProcessingStartTime(0);
+    }
+    
+    // If processing takes too long (over 45 seconds), we should show a warning or take action
+    if (isProcessing && processingStartTime > 0) {
+      const processingTime = Date.now() - processingStartTime;
+      if (processingTime > 45000) { // 45 seconds
+        addEvent('PlaybackControls', 'Processing taking too long', 'warning', {
+          processingTime
+        });
+      }
+    }
+  }, [isProcessing, processingStartTime, addEvent]);
   
   const formatTime = (seconds: number): string => {
     if (isNaN(seconds) || seconds < 0) return '00:00';
@@ -147,6 +167,18 @@ export function PlaybackControls({
         }
       }));
     }, 200);
+    
+    // Add one more event dispatch specifically for this case
+    setTimeout(() => {
+      addEvent('ProcessingFlow', 'Sending journal refresh event', 'info', { tempId });
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { 
+          tempId,
+          timestamp: Date.now(),
+          forceRefresh: true
+        }
+      }));
+    }, 300);
     
     setTimeout(() => {
       setIsClearingToasts(false);

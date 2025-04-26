@@ -5,7 +5,7 @@
  */
 import { clearAllToasts } from '@/services/notificationService';
 import { supabase } from '@/integrations/supabase/client';
-import { setProcessingLock, setIsEntryBeingProcessed } from './processing-state';
+import { setProcessingLock, setIsEntryBeingProcessed, removeProcessingEntryById } from './processing-state';
 import { blobToBase64 } from './blob-utils';
 import { setEntryIdForProcessingId } from '../audio-processing';
 
@@ -54,11 +54,29 @@ export async function processRecordingInBackground(
     
     if (functionError) {
       console.error('[BackgroundProcessor] Edge function error:', functionError);
+      
+      // Important: Remove processing entry even if it fails
+      removeProcessingEntryById(tempId);
+      
+      // Also explicitly notify UI of failure
+      window.dispatchEvent(new CustomEvent('processingEntryFailed', {
+        detail: { tempId, timestamp: Date.now(), error: functionError.message }
+      }));
+      
       throw new Error(`Edge function error: ${functionError.message}`);
     }
     
     if (!functionData) {
       console.error('[BackgroundProcessor] No data returned from edge function');
+      
+      // Important: Remove processing entry even if it fails
+      removeProcessingEntryById(tempId);
+      
+      // Also explicitly notify UI of failure
+      window.dispatchEvent(new CustomEvent('processingEntryFailed', {
+        detail: { tempId, timestamp: Date.now(), error: 'No data returned from processing' }
+      }));
+      
       throw new Error('No data returned from processing');
     }
     
@@ -78,13 +96,24 @@ export async function processRecordingInBackground(
           isComplete: true 
         }
       }));
+      
+      // Explicitly remove processing entry to update UI
+      removeProcessingEntryById(tempId);
+      
+      // Also trigger another event to refresh journal entries - critical!
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { 
+          timestamp: Date.now(),
+          entryId: functionData.entryId
+        }
+      }));
     }
     
     // Release the processing locks
     setTimeout(() => {
       setProcessingLock(false);
       setIsEntryBeingProcessed(false);
-    }, 500);
+    }, 300);
     
     return { 
       success: true,
@@ -93,10 +122,18 @@ export async function processRecordingInBackground(
   } catch (error: any) {
     console.error('[BackgroundProcessor] Error processing recording:', error);
     
-    // Clean up on error
+    // Clean up on error - CRITICAL
     setProcessingLock(false);
     setIsEntryBeingProcessed(false);
     clearAllToasts();
+    
+    // Important: Remove processing entry even if it fails
+    removeProcessingEntryById(tempId);
+    
+    // Also explicitly notify UI of failure
+    window.dispatchEvent(new CustomEvent('processingEntryFailed', {
+      detail: { tempId, timestamp: Date.now(), error: error.message || 'Unknown error' }
+    }));
     
     return { 
       success: false, 

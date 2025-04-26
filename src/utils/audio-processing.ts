@@ -142,6 +142,19 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
   window.dispatchEvent(new CustomEvent('processingEntryMapped', {
     detail: { tempId, entryId, timestamp: Date.now() }
   }));
+  
+  // IMPORTANT: Explicitly remove the processing entry to update UI
+  removeProcessingEntryById(tempId);
+  
+  // Dispatch a completion event too
+  window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+    detail: { tempId, entryId, timestamp: Date.now() }
+  }));
+  
+  // Also trigger a fetch refresh
+  window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+    detail: { tempId, entryId, timestamp: Date.now() }
+  }));
 }
 
 /**
@@ -176,7 +189,7 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   console.log('[AudioProcessing] Starting processing with blob:', audioBlob?.size, audioBlob?.type);
   
   // Clear all toasts to ensure UI is clean before processing
-  clearAllToasts();
+  await ensureAllToastsCleared();
   
   // Validate the audio blob
   if (!audioBlob) {
@@ -276,6 +289,16 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
         if (result.entryId) {
           setEntryIdForProcessingId(tempId, result.entryId);
           console.log(`[AudioProcessing] Mapped tempId ${tempId} to entryId ${result.entryId}`);
+          
+          // Explicitly trigger a refresh
+          window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+            detail: { 
+              tempId, 
+              entryId: result.entryId, 
+              timestamp: Date.now(), 
+              forceUpdate: true 
+            }
+          }));
         }
       })
       .catch(err => {
@@ -284,6 +307,11 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
         setProcessingLock(false);
         
         updateProcessingEntries(tempId, 'remove');
+        
+        // Dispatch a failure event
+        window.dispatchEvent(new CustomEvent('processingEntryFailed', {
+          detail: { tempId, error: err.message, timestamp: Date.now() }
+        }));
       });
     
     // Return immediately with the temp ID
@@ -455,6 +483,14 @@ export function removeProcessingEntryById(entryId: number | string): void {
             }
           }));
         }, 100);
+        
+        // Dispatch completion event
+        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+          detail: { 
+            tempId: entryId, 
+            timestamp: Date.now() 
+          }
+        }));
       }
     }
   } catch (error) {

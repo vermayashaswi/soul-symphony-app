@@ -20,10 +20,12 @@ const globalEntriesCache: {
   userId?: string;
   lastRefreshKey?: number;
   entryIds: Set<number>;
+  cacheExpiryTime: number;
 } = {
   entries: [],
   lastFetchTime: null,
-  entryIds: new Set()
+  entryIds: new Set(),
+  cacheExpiryTime: 0 // Timestamp when cache should be considered expired
 };
 
 export function useJournalEntries(
@@ -35,7 +37,8 @@ export function useJournalEntries(
     // Enhanced initialization from cache with refreshKey validation
     if (globalEntriesCache.userId === userId && 
         globalEntriesCache.entries.length > 0 &&
-        (!globalEntriesCache.lastRefreshKey || globalEntriesCache.lastRefreshKey === refreshKey)) {
+        (!globalEntriesCache.lastRefreshKey || globalEntriesCache.lastRefreshKey === refreshKey) &&
+        Date.now() < globalEntriesCache.cacheExpiryTime) {
       console.log('[useJournalEntries] Initializing from global cache:', globalEntriesCache.entries.length);
       return globalEntriesCache.entries;
     }
@@ -60,6 +63,7 @@ export function useJournalEntries(
   const lastProcessingEntriesRef = useRef<string[]>([]);
   const previousFetchParamsRef = useRef<{ userId?: string, refreshKey: number }>({ refreshKey });
   const entryIdsSet = useRef<Set<number>>(new Set());
+  const fetchRetryTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -82,18 +86,45 @@ export function useJournalEntries(
       globalEntriesCache.lastRefreshKey = refreshKey;
       globalEntriesCache.lastFetchTime = new Date();
       globalEntriesCache.entryIds = seenIds;
+      globalEntriesCache.cacheExpiryTime = Date.now() + 60000; // Cache valid for 1 minute
       
-      // Set cache validity timer - invalidate after 2 minutes to ensure fresh data eventually
+      // Set cache validity timer - invalidate after 1 minute to ensure fresh data eventually
       if (cacheValidityTimerRef.current) {
         clearTimeout(cacheValidityTimerRef.current);
       }
       
       cacheValidityTimerRef.current = setTimeout(() => {
         console.log('[useJournalEntries] Cache validity expired, will refresh on next fetch');
-        globalEntriesCache.lastRefreshKey = undefined;
-      }, 120000); // 2 minutes cache validity
+        globalEntriesCache.cacheExpiryTime = 0;
+      }, 60000); // 1 minute cache validity
     }
   }, [entries, userId, refreshKey]);
+
+  // Listen for events requesting immediate refresh
+  useEffect(() => {
+    const handleJournalEntriesRefresh = (event: CustomEvent) => {
+      if (!userId || !event.detail) return;
+      
+      console.log(`[useJournalEntries] Detected refresh request, will fetch new data:`, event.detail);
+      
+      // Force cache to expire
+      globalEntriesCache.cacheExpiryTime = 0;
+      
+      // Immediately try to fetch fresh data
+      if (!isFetchingRef.current) {
+        // Short delay to allow the database to settle
+        setTimeout(() => {
+          fetchEntries();
+        }, 300);
+      }
+    };
+    
+    window.addEventListener('journalEntriesNeedRefresh', handleJournalEntriesRefresh as EventListener);
+    
+    return () => {
+      window.removeEventListener('journalEntriesNeedRefresh', handleJournalEntriesRefresh as EventListener);
+    };
+  }, [userId]);
 
   // Listen for processing entry events to trigger proactive fetches
   useEffect(() => {
@@ -101,6 +132,9 @@ export function useJournalEntries(
       if (!event.detail || !event.detail.entryId) return;
       
       console.log(`[useJournalEntries] Detected entry mapping, will fetch new data:`, event.detail.entryId);
+      
+      // Force cache to expire
+      globalEntriesCache.cacheExpiryTime = 0;
       
       // Immediately try to fetch fresh data when an entry is mapped
       if (userId && !isFetchingRef.current) {
@@ -111,10 +145,32 @@ export function useJournalEntries(
       }
     };
     
+    // Also listen for entry completion events
+    const handleProcessingEntryCompleted = (event: CustomEvent) => {
+      if (!event.detail || !event.detail.tempId) return;
+      
+      console.log(`[useJournalEntries] Detected entry completion, will fetch new data:`, event.detail.tempId);
+      
+      // Force cache to expire
+      globalEntriesCache.cacheExpiryTime = 0;
+      
+      // Immediately try to fetch fresh data when an entry is completed
+      if (userId && !isFetchingRef.current) {
+        // Multiple retries for better reliability
+        for (let i = 0; i < 2; i++) {
+          setTimeout(() => {
+            if (!isFetchingRef.current) fetchEntries();
+          }, 500 + (i * 1000));
+        }
+      }
+    };
+    
     window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+    window.addEventListener('processingEntryCompleted', handleProcessingEntryCompleted as EventListener);
     
     return () => {
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+      window.removeEventListener('processingEntryCompleted', handleProcessingEntryCompleted as EventListener);
     };
   }, [userId]);
 
@@ -160,7 +216,7 @@ export function useJournalEntries(
       globalEntriesCache.userId === userId && 
       globalEntriesCache.entries.length > 0 &&
       globalEntriesCache.lastRefreshKey === refreshKey &&
-      Date.now() - (globalEntriesCache.lastFetchTime?.getTime() || 0) < 500;
+      Date.now() < globalEntriesCache.cacheExpiryTime;
     
     if (isDuplicateFetch) {
       console.log('[useJournalEntries] Skipping duplicate fetch with same parameters');
@@ -222,12 +278,22 @@ export function useJournalEntries(
           initialFetchDoneRef.current = true;
           isFetchingRef.current = false;
         }
-      }, 8000); // Increased from 5000ms to 8000ms for longer recordings
+      }, 8000); // 8 seconds for longer recordings
       
       const journalEntries = await fetchJournalEntries(userId, fetchTimeoutRef);
       
       if (journalEntries.length === 0) {
         consecutiveEmptyFetchesRef.current += 1;
+        
+        // If we get multiple empty responses, try once more after a delay
+        if (consecutiveEmptyFetchesRef.current >= 2) {
+          if (fetchRetryTimerRef.current) clearTimeout(fetchRetryTimerRef.current);
+          
+          fetchRetryTimerRef.current = setTimeout(() => {
+            console.log('[useJournalEntries] Retrying fetch after multiple empty responses');
+            fetchEntries();
+          }, 1500);
+        }
       } else {
         consecutiveEmptyFetchesRef.current = 0;
       }
@@ -252,6 +318,7 @@ export function useJournalEntries(
       globalEntriesCache.lastFetchTime = new Date();
       globalEntriesCache.lastRefreshKey = refreshKey;
       globalEntriesCache.entryIds = uniqueIds;
+      globalEntriesCache.cacheExpiryTime = Date.now() + 60000; // Cache valid for 1 minute
       
       // IMPROVED FIX: Don't replace entries with empty array if we already have entries
       // and this fetch returned empty (could be a temporary connectivity issue)
@@ -302,8 +369,11 @@ export function useJournalEntries(
       const newProcessingEntries = event.detail.entries;
       const prevProcessingEntries = lastProcessingEntriesRef.current;
       
+      // Check if force update flag is set
+      const forceUpdate = event.detail.forceUpdate === true;
+      
       // If processing entries have changed and we have new entries, fetch data
-      if (newProcessingEntries.length !== prevProcessingEntries.length) {
+      if (forceUpdate || newProcessingEntries.length !== prevProcessingEntries.length) {
         console.log('[useJournalEntries] Processing entries changed, scheduling fetch');
         
         lastProcessingEntriesRef.current = newProcessingEntries;
@@ -313,6 +383,19 @@ export function useJournalEntries(
           setTimeout(() => {
             fetchEntries();
           }, 1000);
+        }
+        
+        // If we have fewer processing entries (completed), fetch immediately
+        if (newProcessingEntries.length < prevProcessingEntries.length) {
+          // Force cache to expire
+          globalEntriesCache.cacheExpiryTime = 0;
+          
+          // Multiple retries for better reliability
+          for (let i = 0; i < 2; i++) {
+            setTimeout(() => {
+              if (!isFetchingRef.current) fetchEntries();
+            }, 300 + (i * 800));
+          }
         }
       }
     };
@@ -328,7 +411,7 @@ export function useJournalEntries(
     if (userId) {
       const isInitialLoad = !initialFetchDoneRef.current;
       const hasRefreshKeyChanged = refreshKey !== lastRefreshKey;
-      const shouldFetchFresh = isInitialLoad || hasRefreshKeyChanged;
+      const shouldFetchFresh = isInitialLoad || hasRefreshKeyChanged || Date.now() >= globalEntriesCache.cacheExpiryTime;
       
       if (shouldFetchFresh) {
         console.log(`[useJournalEntries] Effect triggered: initial=${isInitialLoad}, refreshKey changed=${hasRefreshKeyChanged}`);
@@ -353,6 +436,9 @@ export function useJournalEntries(
     return () => {
       if (fetchTimeoutRef.current) {
         clearTimeout(fetchTimeoutRef.current);
+      }
+      if (fetchRetryTimerRef.current) {
+        clearTimeout(fetchRetryTimerRef.current);
       }
     };
   }, [userId, refreshKey, fetchEntries, lastRefreshKey]);
