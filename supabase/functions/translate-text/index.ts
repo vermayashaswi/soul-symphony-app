@@ -98,14 +98,14 @@ serve(async (req) => {
     const translatedText = translateData.data.translations[0].translatedText;
     console.log(`Translated text: "${translatedText.substring(0, 50)}..."`);
 
-    // Update the database with the translation - MODIFIED TO REMOVE _hi REFERENCES
+    // Update the database with the translation - UPDATED TO USE NEW SCHEMA WITHOUT _hi REFERENCES
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log('Connecting to Supabase to update entry');
     
-    // Store the translation in the notes or metadata rather than in a language-specific column
+    // Store the translation in the translation_text field and update metadata
     let updateFields = {
       "original_language": detectedLanguage,
       "translation_status": "completed",
