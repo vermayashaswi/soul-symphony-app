@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -98,32 +97,33 @@ serve(async (req) => {
     const translatedText = translateData.data.translations[0].translatedText;
     console.log(`Translated text: "${translatedText.substring(0, 50)}..."`);
 
-    // Update the database with the translation - UPDATED TO USE NEW SCHEMA WITHOUT _hi REFERENCES
+    // Update the database with the translation
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    console.log('Connecting to Supabase to update entry');
-    
-    // Store the translation in the translation_text field and update metadata
-    let updateFields = {
+    console.log(`[translate-text] Updating entry ${entryId} with translation`);
+
+    const updateFields = {
       "original_language": detectedLanguage,
       "translation_status": "completed",
-      "translation_text": translatedText // Store translation in a generic field
+      "translation_text": translatedText
     };
 
-    console.log(`Updating entry ${entryId} with translated text and fields:`, updateFields);
+    console.log('[translate-text] Update fields:', JSON.stringify(updateFields, null, 2));
+
     const { error: updateError } = await supabase
       .from('Journal Entries')
       .update(updateFields)
       .eq('id', entryId);
 
     if (updateError) {
-      console.error(`Database update error: ${updateError.message}`, updateError);
+      console.error(`[translate-text] Database update error:`, updateError);
       throw updateError;
     }
 
-    console.log(`Successfully updated entry ${entryId}`);
+    console.log(`[translate-text] Successfully updated entry ${entryId}`);
+    
     return new Response(
       JSON.stringify({
         translatedText,
@@ -137,7 +137,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error in translate-text function:', error);
+    console.error('[translate-text] Error:', error);
     return new Response(
       JSON.stringify({ 
         error: error.message,

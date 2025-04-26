@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -95,7 +94,7 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
  * Stores a journal entry in the database
  */
 export async function storeJournalEntry(
-  supabase,
+  supabase: SupabaseClient,
   transcribedText: string,
   refinedText: string,
   audioUrl: string | null,
@@ -105,32 +104,46 @@ export async function storeJournalEntry(
   sentimentScore: string,
 ) {
   try {
-    // The function now has proper column names without _hi
+    console.log('[storeJournalEntry] Starting to store journal entry');
+    console.log('[storeJournalEntry] Input validation:', {
+      hasTranscribedText: !!transcribedText,
+      hasRefinedText: !!refinedText,
+      hasAudioUrl: !!audioUrl,
+      hasUserId: !!userId,
+      duration,
+      hasEmotions: !!emotions,
+      hasSentiment: !!sentimentScore
+    });
+
+    const entry = {
+      "transcription text": transcribedText,
+      "refined text": refinedText,
+      audio_url: audioUrl,
+      user_id: userId,
+      duration: duration,
+      emotions: emotions,
+      sentiment: sentimentScore,
+      created_at: new Date().toISOString(),
+      translation_status: refinedText ? 'completed' : 'pending'
+    };
+
+    console.log('[storeJournalEntry] Attempting to insert entry:', JSON.stringify(entry, null, 2));
+
     const { data, error } = await supabase
       .from('Journal Entries')
-      .insert([
-        {
-          "transcription text": transcribedText,
-          "refined text": refinedText,
-          audio_url: audioUrl,
-          user_id: userId,
-          duration: duration,
-          emotions: emotions,
-          sentiment: sentimentScore,
-          created_at: new Date().toISOString()
-        }
-      ])
+      .insert([entry])
       .select()
       .single();
 
     if (error) {
-      console.error('Error storing journal entry:', error);
+      console.error('[storeJournalEntry] Error storing journal entry:', error);
       throw error;
     }
 
+    console.log('[storeJournalEntry] Successfully stored entry with ID:', data.id);
     return data.id;
   } catch (error) {
-    console.error('Error in storeJournalEntry:', error);
+    console.error('[storeJournalEntry] Error in storeJournalEntry:', error);
     throw error;
   }
 }
