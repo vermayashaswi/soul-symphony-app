@@ -30,45 +30,52 @@ const LanguageSelector = () => {
     if (user && languageCode === 'hi') {
       try {
         // Get the latest journal entries that need translation
-        const { data: entriesData, error: fetchError } = await supabase
+        const { data, error: fetchError } = await supabase
           .from('Journal Entries')
-          .select('id, refined text, translation_status')
+          .select('id, "refined text", translation_status')
           .eq('user_id', user.id)
           .eq('translation_status', 'pending')
           .order('created_at', { ascending: false });
 
         if (fetchError) throw fetchError;
         
-        // Type guard to ensure entries is an array
-        const entries = Array.isArray(entriesData) ? entriesData : [];
+        // Make sure data is valid and is an array
+        if (!data || !Array.isArray(data)) {
+          console.log('No entries to translate or invalid data format');
+          return;
+        }
 
-        // Translate each entry
-        for (const entry of entries) {
-          // Type guard to ensure entry has required properties
-          if (entry && typeof entry.id === 'number' && entry['refined text']) {
-            try {
-              const response = await supabase.functions.invoke('translate-text', {
-                body: {
-                  text: entry['refined text'],
-                  entryId: entry.id,
-                  sourceLanguage: 'en',
-                  targetLanguage: 'hi'
-                }
-              });
+        // Filter valid entries
+        const validEntries = data.filter(entry => 
+          entry && 
+          typeof entry.id === 'number' && 
+          entry["refined text"]
+        );
 
-              if (response.error) {
-                console.error('Translation error:', response.error);
-                toast.error('Error translating some entries');
+        // Translate each valid entry
+        for (const entry of validEntries) {
+          try {
+            const response = await supabase.functions.invoke('translate-text', {
+              body: {
+                text: entry["refined text"],
+                entryId: entry.id,
+                sourceLanguage: 'en',
+                targetLanguage: 'hi'
               }
-            } catch (err) {
-              console.error('Translation invoke error:', err);
-              toast.error('Error connecting to translation service');
+            });
+
+            if (response.error) {
+              console.error('Translation error:', response.error);
+              toast.error('Error translating some entries');
             }
+          } catch (err) {
+            console.error('Translation invoke error:', err);
+            toast.error('Error connecting to translation service');
           }
         }
 
-        if (entries.length) {
-          toast.success(`Translating ${entries.length} entries to Hindi`);
+        if (validEntries.length) {
+          toast.success(`Translating ${validEntries.length} entries to Hindi`);
         }
       } catch (error) {
         console.error('Error in translation process:', error);
