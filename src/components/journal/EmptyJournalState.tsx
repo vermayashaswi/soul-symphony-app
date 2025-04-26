@@ -3,12 +3,15 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useTranslation } from 'react-i18next';
 
 interface EmptyJournalStateProps {
   onStartRecording: () => void;
 }
 
 const EmptyJournalState: React.FC<EmptyJournalStateProps> = ({ onStartRecording }) => {
+  const { t } = useTranslation();
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
@@ -20,9 +23,9 @@ const EmptyJournalState: React.FC<EmptyJournalStateProps> = ({ onStartRecording 
         <Mic className="h-8 w-8 text-primary" />
       </div>
       
-      <h3 className="text-xl font-medium mb-2">Welcome to Voice Journaling</h3>
+      <h3 className="text-xl font-medium mb-2">{t('journal.empty.title')}</h3>
       <p className="text-muted-foreground max-w-md mx-auto mb-6">
-        Just speak and we'll do the rest. Your personal AI journaling companion is ready.
+        {t('journal.empty.description')}
       </p>
       
       <Button 
@@ -31,7 +34,7 @@ const EmptyJournalState: React.FC<EmptyJournalStateProps> = ({ onStartRecording 
         className="gap-2 animate-pulse"
       >
         <Mic className="h-5 w-5" />
-        Start Journaling
+        {t('journal.empty.startButton')}
       </Button>
     </motion.div>
   );

@@ -90,13 +90,17 @@ const Home = () => {
 
   const getJournalName = () => {
     if (displayName) {
-      return displayName.endsWith('s') ? `${displayName}' Journal` : `${displayName}'s Journal`;
+      return displayName.endsWith('s') ? 
+        t('journal.possessiveTitle', { name: displayName }) : 
+        t('journal.title', { name: displayName });
     }
     if (user?.email) {
       const name = user.email.split('@')[0];
-      return name.endsWith('s') ? `${name}' Journal` : `${name}'s Journal`;
+      return name.endsWith('s') ? 
+        t('journal.possessiveTitle', { name }) : 
+        t('journal.title', { name });
     }
-    return 'Your Journal';
+    return t('journal.defaultTitle');
   };
 
   const containerVariants = {

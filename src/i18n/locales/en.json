@@ -1,93 +1,24 @@
 
 {
-  "navbar": {
-    "home": "Home",
-    "blog": "Blog",
-    "faq": "FAQ",
-    "download": "Download",
-    "openApp": "Open App",
-    "tryWebApp": "Try Web App",
-    "signIn": "Sign In"
-  },
-  "hero": {
-    "welcome": "Welcome to",
-    "tagline": "Your personal AI companion for emotional wellness and self-reflection using VOICE journaling",
-    "getStarted": "Get Started",
-    "exploreMore": "Discover More"
-  },
-  "features": {
-    "title": "How SOULo Works",
-    "subtitle": "Our innovative approach combines voice journaling with AI technology to provide you with meaningful insights about yourself."
-  },
-  "feature1": {
-    "title": "Voice Journaling",
-    "description": "Record your thoughts with voice and let SOULo transcribe and analyze them automatically."
-  },
-  "feature2": {
-    "title": "AI Analysis",
-    "description": "Gain insights into your patterns and emotions through advanced AI analysis."
-  },
-  "feature3": {
-    "title": "Emotional Tracking",
-    "description": "Visualize your emotional journey over time with interactive charts."
-  },
-  "feature4": {
-    "title": "AI Assistant",
-    "description": "Chat with your journal and get personalized insights from your past entries."
-  },
-  "download": {
-    "title": "Get SOULo Today",
-    "subtitle": "Available on iOS and Android",
-    "appStore": "App Store",
-    "googlePlay": "Google Play"
-  },
-  "footer": {
-    "contact": "You can contact us anytime at",
-    "rights": "All rights reserved.",
-    "privacy": "Privacy Policy",
-    "terms": "Terms of Service"
-  },
-  "mainTagline": "Keep a journal and capture your day without writing down a single word!",
-  "homepage": {
-    "expressReflectGrow": "Express. Reflect. Grow.",
-    "appFeatures": "App Features",
-    "process": {
-      "title": "Process: How It Works",
-      "step1Title": "Record",
-      "step1Description": "Speak your thoughts aloud - no typing needed",
-      "step2Title": "Analyze",
-      "step2Description": "AI processes your entries to identify patterns and insights",
-      "step3Title": "Reflect",
-      "step3Description": "Review personalized insights and track your emotional journey"
-    },
-    "privacy": {
-      "title": "Your Privacy Is Our Priority",
-      "description": "We use state-of-the-art encryption to ensure your journal entries remain completely private and secure.",
-      "featuresList": [
-        "End-to-end encryption",
-        "Local storage options",
-        "No sharing with third parties",
-        "Full control over your data"
-      ]
-    },
-    "testimonials": {
-      "title": "What Our Users Say",
-      "subtitle": "Join thousands of people who are transforming their mental wellness journey."
-    },
-    "cta": {
-      "title": "Ready to start your journey?",
-      "description": "Download SOULo today and transform how you journal.",
-      "buttonText": "Get Started"
-    }
-  },
   "journal": {
-    "header": {
-      "your": "Your",
-      "journal": "Journal"
+    "title": "{{name}}'s Journal",
+    "possessiveTitle": "{{name}}' Journal",
+    "defaultTitle": "Your Journal",
+    "empty": {
+      "title": "Welcome to Voice Journaling",
+      "description": "Just speak and we'll do the rest. Your personal AI journaling companion is ready.",
+      "startButton": "Start Journaling"
     }
   },
-  "voiceRecorder": {
-    "speakAnyLanguage": "Speak in any language,",
-    "illUnderstandYou": "I'll understand you!"
+  "insights": {
+    "soulnet": {
+      "title": "SoulNet Visualization",
+      "description": "Explore the connections between people, places, and emotions in your journal entries. The visualization shows how different entities in your life relate to various emotional states.",
+      "empty": {
+        "title": "No entity-emotion data available",
+        "description": "Continue journaling to see the connections between entities and emotions in your life.",
+        "button": "Go to Journal"
+      }
+    }
   }
 }
