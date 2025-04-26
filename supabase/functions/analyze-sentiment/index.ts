@@ -71,6 +71,7 @@ serve(async (req) => {
     const { text, entryId, processTranslated = false } = requestData;
     
     if (!text) {
+      console.error("No text provided for sentiment analysis");
       throw new Error("No text provided for analysis");
     }
     
@@ -82,6 +83,7 @@ serve(async (req) => {
     const apiKey = Deno.env.get('GOOGLE_API');
     
     if (!apiKey) {
+      console.error("Google API key is not configured");
       throw new Error("Google API key is not configured");
     }
     
@@ -90,6 +92,10 @@ serve(async (req) => {
       console.error('Google NL API key appears invalid (format check failed)');
       throw new Error("Google API key appears to be invalid");
     }
+    
+    // Limit text length to avoid API issues (Google NL has a limit)
+    const maxTextLength = 100000;
+    const processedText = text.length > maxTextLength ? text.substring(0, maxTextLength) : text;
     
     console.log('Analyzing sentiment using Google NL API with UTF-8 encoding...');
     
@@ -102,7 +108,7 @@ serve(async (req) => {
       body: JSON.stringify({
         document: {
           type: 'PLAIN_TEXT',
-          content: text,
+          content: processedText,
         },
         encodingType: 'UTF8'
       }),
@@ -133,31 +139,39 @@ serve(async (req) => {
     const result = await response.json();
     console.log('Raw sentiment result:', result);
     
-    // Better validation of sentiment score
-    if (!result.documentSentiment || typeof result.documentSentiment.score !== 'number') {
-      console.error('Invalid sentiment result:', result);
-      throw new Error('Invalid sentiment score received');
+    // Better validation of sentiment score with default fallback
+    let sentimentScore = 0;
+    let validScore = false;
+    
+    if (result.documentSentiment && typeof result.documentSentiment.score === 'number') {
+      sentimentScore = result.documentSentiment.score;
+      validScore = !isNaN(sentimentScore);
+      console.log('Extracted sentiment score:', sentimentScore, 'Valid:', validScore);
+    } else {
+      console.error('Invalid sentiment result structure:', result);
     }
     
-    // Here's the critical fix: ensure we're getting a valid number for the sentiment score
-    const sentimentScore = result.documentSentiment.score;
-    console.log('Extracted sentiment score:', sentimentScore);
+    if (!validScore) {
+      console.warn('Got invalid sentiment score, using default 0');
+      sentimentScore = 0;
+    }
     
     // Categorize the sentiment according to the specified ranges
     let sentimentCategory;
-    const score = parseFloat(sentimentScore);
     
-    if (isNaN(score)) {
+    if (isNaN(sentimentScore)) {
       console.error('Sentiment score is NaN, defaulting to neutral');
       sentimentCategory = "neutral";
-    } else if (score >= 0.3) {
+      sentimentScore = 0;
+    } else if (sentimentScore >= 0.3) {
       sentimentCategory = "positive";
-    } else if (score >= -0.1) {
+    } else if (sentimentScore >= -0.1) {
       sentimentCategory = "neutral";
     } else {
       sentimentCategory = "negative";
     }
     
+    console.log('Final sentiment score:', sentimentScore);
     console.log('Sentiment category:', sentimentCategory);
     
     // If an entry ID was provided, update the entry directly
@@ -170,7 +184,8 @@ serve(async (req) => {
         console.log(`Updating sentiment directly for entry ID: ${entryId}`);
         
         // Ensure we have a valid numerical string for the sentiment score
-        const finalSentimentScore = isNaN(score) ? "0" : sentimentScore.toString();
+        // If the score is NaN or invalid, use "0"
+        const finalSentimentScore = isNaN(sentimentScore) ? "0" : sentimentScore.toString();
         
         const { error: updateError } = await supabase
           .from('Journal Entries')
@@ -189,9 +204,12 @@ serve(async (req) => {
       }
     }
     
+    // Ensure the return value is a valid string
+    const sentimentScoreString = isNaN(sentimentScore) ? "0" : sentimentScore.toString();
+    
     return new Response(
       JSON.stringify({ 
-        sentiment: sentimentScore.toString(),
+        sentiment: sentimentScoreString,
         category: sentimentCategory,
         success: true,
         processedTranslated: processTranslated

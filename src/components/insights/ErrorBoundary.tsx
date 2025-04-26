@@ -21,24 +21,30 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
-    console.error("Error boundary caught error:", error);
+    console.error("Insights ErrorBoundary caught error:", error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error("Error boundary caught error:", error);
+    console.error("Insights ErrorBoundary componentDidCatch:", error);
     console.error("Error stack:", errorInfo.componentStack);
   }
   
   resetErrorState = () => {
-    console.log('Resetting error state');
+    console.log('Insights ErrorBoundary: Resetting error state');
     this.setState({ hasError: false, error: null });
     
-    if (this.props.onReset) {
-      this.props.onReset();
-    } else {
-      window.location.reload();
-    }
+    // Wait for state to update before calling onReset
+    setTimeout(() => {
+      if (this.props.onReset) {
+        console.log('Insights ErrorBoundary: Calling onReset callback');
+        this.props.onReset();
+      } else {
+        // If no onReset provided, reload the page
+        console.log('Insights ErrorBoundary: No onReset provided, reloading page');
+        window.location.reload();
+      }
+    }, 0);
   };
 
   render(): ReactNode {
@@ -50,7 +56,7 @@ class ErrorBoundary extends Component<Props, State> {
           <details className="bg-white dark:bg-gray-800 p-4 rounded-md my-4">
             <summary className="cursor-pointer font-medium mb-2">Error details</summary>
             <pre className="text-sm overflow-auto p-2 bg-gray-100 dark:bg-gray-900 rounded">
-              {this.state.error?.toString()}
+              {this.state.error?.toString() || 'Unknown error'}
             </pre>
           </details>
           <Button

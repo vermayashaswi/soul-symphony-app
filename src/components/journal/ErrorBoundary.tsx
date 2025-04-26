@@ -21,22 +21,26 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
-    console.error('ErrorBoundary caught an error in getDerivedStateFromError:', error);
+    console.error('Journal ErrorBoundary caught an error:', error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error);
+    console.error('Journal ErrorBoundary componentDidCatch:', error);
     console.error('Component stack:', info.componentStack);
   }
   
   resetErrorState = () => {
-    console.log('Resetting error state');
+    console.log('Journal ErrorBoundary: Resetting error state');
     this.setState({ hasError: false, error: null });
     
-    if (this.props.onReset) {
-      this.props.onReset();
-    }
+    // Wait for state to update before calling onReset
+    setTimeout(() => {
+      if (this.props.onReset) {
+        console.log('Journal ErrorBoundary: Calling onReset callback');
+        this.props.onReset();
+      }
+    }, 0);
   };
 
   render() {
