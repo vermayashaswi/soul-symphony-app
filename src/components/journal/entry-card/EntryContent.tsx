@@ -15,8 +15,9 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
   
-  // Force a minimum loading time of 0.3 seconds for better UX, reduced from 0.5 seconds
+  // Force a minimum loading time of 0.2 seconds for better UX, reduced from 0.3 seconds
   const [forceLoading, setForceLoading] = useState(false);
+  const mountedRef = useRef(true);
 
   useEffect(() => {
     // When processing flag is true, always show loading state and preserve stable content
@@ -26,8 +27,10 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       
       // Set a minimum loading time for better UX, but shorter than before
       const timer = setTimeout(() => {
-        setForceLoading(false);
-      }, 300); // Reduced from 500ms to 300ms for faster response
+        if (mountedRef.current) {
+          setForceLoading(false);
+        }
+      }, 200); // Reduced from 300ms to 200ms for faster response
       
       return () => clearTimeout(timer);
     }
@@ -54,6 +57,15 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           readyForDisplay: true
         }
       }));
+      
+      // Also notify that any associated processing card should be removed
+      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+        detail: { 
+          content,
+          timestamp: Date.now(),
+          forceCleanup: true 
+        }
+      }));
     }
     
     addEvent('EntryContent', 'State update', 'info', {
@@ -66,7 +78,13 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     });
     
   }, [content, isProcessing, addEvent, forceLoading]);
-  // Removed isExpanded from dependencies as it shouldn't affect loader visibility
+  
+  // Cleanup on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   return (
     <AnimatePresence mode="wait" initial={false}>

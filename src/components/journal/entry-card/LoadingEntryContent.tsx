@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
 import { 
@@ -44,42 +44,61 @@ const processingSteps = [
 export function LoadingEntryContent({ error }: { error?: string }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [processingTakingTooLong, setProcessingTakingTooLong] = useState(false);
+  const mountedRef = useRef(true);
+  const componentId = useRef(`loading-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
   
   useEffect(() => {
     const stepInterval = setInterval(() => {
+      if (!mountedRef.current) return;
+      
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
       
       // Notify about the processing step change
       const currentStep = processingSteps[(currentStepIndex + 1) % processingSteps.length];
       window.dispatchEvent(new CustomEvent('processingStepChanged', {
-        detail: { step: currentStep.id, text: currentStep.text }
+        detail: { 
+          step: currentStep.id, 
+          text: currentStep.text,
+          componentId: componentId.current
+        }
       }));
       
     }, 2000); // Each step takes 2 seconds
     
     // Set a timeout to show a message if processing is taking too long
     const longProcessingTimeout = setTimeout(() => {
-      setProcessingTakingTooLong(true);
-      
-      // Notify that processing is taking a long time
-      window.dispatchEvent(new CustomEvent('processingTakingLong', {
-        detail: { timestamp: Date.now() }
-      }));
-      
-    }, 15000); // Reduced from 30 seconds to 15 seconds
+      if (mountedRef.current) {
+        setProcessingTakingTooLong(true);
+        
+        // Notify that processing is taking a long time
+        window.dispatchEvent(new CustomEvent('processingTakingLong', {
+          detail: { 
+            timestamp: Date.now(),
+            componentId: componentId.current
+          }
+        }));
+      }
+    }, 10000); // Reduced from 15 seconds to 10 seconds
     
     // Notify when loading content is mounted
     window.dispatchEvent(new CustomEvent('loadingContentMounted', {
-      detail: { timestamp: Date.now() }
+      detail: { 
+        timestamp: Date.now(),
+        componentId: componentId.current
+      }
     }));
     
     return () => {
+      mountedRef.current = false;
       clearInterval(stepInterval);
       clearTimeout(longProcessingTimeout);
       
       // Notify when loading content is unmounted
       window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {
-        detail: { timestamp: Date.now() }
+        detail: { 
+          timestamp: Date.now(),
+          componentId: componentId.current
+        }
       }));
     };
   }, [currentStepIndex]);
@@ -93,6 +112,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       animate={{ opacity: 1 }}
       exit={{ opacity: 0.7 }}
       transition={{ duration: 0.5 }}
+      data-component-id={componentId.current}
     >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />

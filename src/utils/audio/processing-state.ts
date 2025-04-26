@@ -9,7 +9,12 @@ let isEntryBeingProcessed = false;
 let processingLock = false;
 let processingTimeoutId: NodeJS.Timeout | null = null;
 let lastStateChangeTime = 0;
-const DEBOUNCE_THRESHOLD = 50; // Reduced from 100ms to 50ms to be more responsive
+const DEBOUNCE_THRESHOLD = 30; // Reduced from 50ms to 30ms to be more responsive
+
+// Store mapping between processing IDs and entry IDs to help with cleanup
+const processingToEntryMap = new Map<string, number>();
+// Track components that should be removed
+const componentsToRemove = new Set<string>();
 
 // Store processing entries in localStorage to persist across navigations
 export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
@@ -37,27 +42,30 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
         detail: { tempId, timestamp: now, forceClearProcessingCard: true }
       }));
       
-      // Also send a follow-up event to ensure processing card is removed
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-          detail: { tempId, timestamp: now }
-        }));
-      }, 300);
+      // Also send an immediate follow-up event to ensure processing card is removed
+      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+        detail: { tempId, timestamp: now, forceCleanup: true }
+      }));
+      
+      // Dispatch a third event to force update any UI that depends on this state
+      window.dispatchEvent(new CustomEvent('processingStateChanged', {
+        detail: { tempId, action: 'remove', timestamp: now }
+      }));
     }
     
     localStorage.setItem('processingEntries', JSON.stringify(entries));
     
-    // Dispatch an event so other components can react to the change
+    // Dispatch an event so other components can react to the change immediately
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
       detail: { entries, lastUpdate: now, forceUpdate: true }
     }));
     
-    // Send a second event with shorter delay to ensure iOS devices catch it
+    // Send a second event with shorter delay to ensure all devices catch it
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { entries, lastUpdate: now + 1, forceUpdate: true }
       }));
-    }, 20); // Reduced from 50ms to 20ms
+    }, 10); // Reduced from 20ms to 10ms
     
     return entries;
   } catch (error) {
@@ -100,26 +108,75 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
     const storedEntries = localStorage.getItem('processingEntries');
     let entries: string[] = storedEntries ? JSON.parse(storedEntries) : [];
     
+    // Find both exact matches and any that include the ID as part of a composite ID
     const updatedEntries = entries.filter(tempId => {
       return tempId !== idStr && !tempId.includes(idStr);
     });
+    
+    // Look up any entry ID that might be mapped from a processing ID
+    let mappedEntryId: number | undefined;
+    
+    // If we're removing a processing ID, see if it's mapped to a real entry ID
+    if (typeof entryId === 'string') {
+      // Check our local map first
+      mappedEntryId = processingToEntryMap.get(entryId);
+      
+      // If not found in local map, check localStorage
+      if (!mappedEntryId) {
+        try {
+          const mappingStr = localStorage.getItem('processingToEntryMap');
+          if (mappingStr) {
+            const mappings = JSON.parse(mappingStr);
+            mappedEntryId = mappings[entryId];
+          }
+        } catch (e) {
+          console.error('[Audio.ProcessingState] Error checking mapping storage:', e);
+        }
+      }
+    }
     
     if (updatedEntries.length !== entries.length) {
       localStorage.setItem('processingEntries', JSON.stringify(updatedEntries));
       
       // Fire these events synchronously so they happen immediately
       window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-        detail: { tempId: idStr, timestamp: now, forceClearProcessingCard: true }
+        detail: { 
+          tempId: idStr, 
+          entryId: mappedEntryId, 
+          timestamp: now, 
+          forceClearProcessingCard: true 
+        }
       }));
       
       // Immediately send an event to force removal of processing cards
       window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-        detail: { tempId: idStr, timestamp: now }
+        detail: { 
+          tempId: idStr, 
+          entryId: mappedEntryId,
+          timestamp: now,
+          forceCleanup: true
+        }
+      }));
+      
+      // Also send a general state change event
+      window.dispatchEvent(new CustomEvent('processingStateChanged', {
+        detail: { 
+          tempId: idStr, 
+          entryId: mappedEntryId,
+          action: 'remove', 
+          timestamp: now 
+        }
       }));
       
       // Dispatch an event so other components can react to the change
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr, forceUpdate: true }
+        detail: { 
+          entries: updatedEntries, 
+          lastUpdate: now, 
+          removedId: idStr, 
+          entryId: mappedEntryId,
+          forceUpdate: true 
+        }
       }));
       
       console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
@@ -129,6 +186,9 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
     if (updatedEntries.length === 0) {
       setProcessingLock(false);
       setIsEntryBeingProcessed(false);
+      
+      // Also clean any mapping data
+      clearProcessingMappings();
     }
   } catch (error) {
     console.error('[Audio.ProcessingState] Error removing processing entry from storage:', error);
@@ -136,6 +196,80 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
     setProcessingLock(false);
     setIsEntryBeingProcessed(false);
   }
+};
+
+// Store a mapping between a processing ID and an entry ID
+export const setProcessingToEntryMapping = (processingId: string, entryId: number): void => {
+  try {
+    processingToEntryMap.set(processingId, entryId);
+    
+    // Also store in localStorage for persistence
+    const mappingStr = localStorage.getItem('processingToEntryMap');
+    const mappings = mappingStr ? JSON.parse(mappingStr) : {};
+    mappings[processingId] = entryId;
+    localStorage.setItem('processingToEntryMap', JSON.stringify(mappings));
+    
+    // Dispatch an event to notify components about the mapping
+    window.dispatchEvent(new CustomEvent('processingEntryMapped', {
+      detail: { 
+        tempId: processingId, 
+        entryId: entryId,
+        timestamp: Date.now() 
+      }
+    }));
+    
+    // Also trigger removal of the processing card
+    setTimeout(() => {
+      removeProcessingEntryById(processingId);
+    }, 100);
+  } catch (error) {
+    console.error('[Audio.ProcessingState] Error setting processing to entry mapping:', error);
+  }
+};
+
+// Get an entry ID from a processing ID
+export const getEntryIdFromProcessingId = (processingId: string): number | undefined => {
+  // Check the local map first
+  const mappedId = processingToEntryMap.get(processingId);
+  if (mappedId !== undefined) return mappedId;
+  
+  // Then check localStorage
+  try {
+    const mappingStr = localStorage.getItem('processingToEntryMap');
+    if (!mappingStr) return undefined;
+    
+    const mappings = JSON.parse(mappingStr);
+    return mappings[processingId];
+  } catch (error) {
+    console.error('[Audio.ProcessingState] Error getting entry ID from processing ID:', error);
+    return undefined;
+  }
+};
+
+// Clear all processing to entry mappings
+export const clearProcessingMappings = (): void => {
+  processingToEntryMap.clear();
+  localStorage.removeItem('processingToEntryMap');
+};
+
+// Track a component that should be removed
+export const markComponentForRemoval = (componentId: string): void => {
+  componentsToRemove.add(componentId);
+  
+  // Dispatch an event to notify components
+  window.dispatchEvent(new CustomEvent('componentMarkedForRemoval', {
+    detail: { componentId, timestamp: Date.now() }
+  }));
+};
+
+// Check if a component should be removed
+export const shouldRemoveComponent = (componentId: string): boolean => {
+  return componentsToRemove.has(componentId);
+};
+
+// Clear component removal markers
+export const clearComponentRemovalMarkers = (): void => {
+  componentsToRemove.clear();
 };
 
 // Check if a journal entry is currently being processed
@@ -151,6 +285,12 @@ export function resetProcessingState(): void {
   
   // Clear all processing entries from localStorage
   localStorage.setItem('processingEntries', JSON.stringify([]));
+  
+  // Clear all mappings
+  clearProcessingMappings();
+  
+  // Clear all component removal markers
+  clearComponentRemovalMarkers();
   
   if (processingTimeoutId) {
     clearTimeout(processingTimeoutId);

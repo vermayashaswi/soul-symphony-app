@@ -17,7 +17,6 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
       setIsExtracting(true);
       
       // Dispatch an event to notify that theme extraction is starting
-      // This allows other components to update their UI immediately
       window.dispatchEvent(new CustomEvent('themeExtractionStarted', { 
         detail: { entryId }
       }));
@@ -26,7 +25,8 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
       window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
         detail: { 
           associatedEntryId: entryId, 
-          timestamp: Date.now() 
+          timestamp: Date.now(),
+          forceCleanup: true 
         }
       }));
       
@@ -45,7 +45,16 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
           window.dispatchEvent(new CustomEvent('checkForThemesNow', { 
             detail: { entryId }
           }));
-        }, 300); // Reduced from 500ms to 300ms
+          
+          // Also dispatch another force removal event for redundancy
+          window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+            detail: { 
+              associatedEntryId: entryId, 
+              timestamp: Date.now(),
+              forceCleanup: true 
+            }
+          }));
+        }, 200); // Reduced from 300ms to 200ms for faster response
       } else {
         toast.error('Failed to extract themes');
         
@@ -64,6 +73,13 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
       }));
     } finally {
       setIsExtracting(false);
+      
+      // Always dispatch a final cleanup event regardless of success/failure
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+          detail: { entryId, timestamp: Date.now(), forceClearProcessingCard: true }
+        }));
+      }, 300);
     }
   };
 
