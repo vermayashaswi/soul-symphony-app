@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -123,6 +124,43 @@ serve(async (req) => {
     }
 
     console.log(`[translate-text] Successfully updated entry ${entryId}`);
+    
+    // Now trigger the post-processing functions for this entry
+    try {
+      console.log(`[translate-text] Triggering post-processing for entry ${entryId}`);
+      
+      // Trigger entity extraction
+      const entityPromise = supabase.functions.invoke('batch-extract-entities', {
+        body: {
+          entryIds: [entryId],
+          diagnosticMode: true
+        }
+      });
+      
+      // Trigger sentiment analysis
+      const sentimentPromise = supabase.functions.invoke('analyze-sentiment', {
+        body: { text: translatedText, entryId }
+      });
+      
+      // Trigger themes extraction
+      const themePromise = supabase.functions.invoke('generate-themes', {
+        body: { entryId, fromEdit: false }
+      });
+      
+      // Execute these in the background
+      if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+        EdgeRuntime.waitUntil(Promise.all([entityPromise, sentimentPromise, themePromise]));
+      } else {
+        Promise.all([entityPromise, sentimentPromise, themePromise]).catch(err => {
+          console.error(`[translate-text] Error in post-processing:`, err);
+        });
+      }
+      
+      console.log(`[translate-text] Post-processing successfully triggered`);
+    } catch (postError) {
+      console.error(`[translate-text] Error triggering post-processing:`, postError);
+      // Don't throw this error as it shouldn't affect the response
+    }
     
     return new Response(
       JSON.stringify({

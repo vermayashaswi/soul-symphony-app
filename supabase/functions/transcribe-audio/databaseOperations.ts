@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -85,6 +86,26 @@ export async function extractThemes(supabase: SupabaseClient, text: string, entr
         console.error('Error storing themes in database:', error);
       }
     }
+    
+    // Now trigger the more comprehensive theme generation
+    try {
+      console.log(`Triggering comprehensive theme generation for entry ${entryId}`);
+      
+      const { error: themeError } = await supabase.functions.invoke('generate-themes', {
+        body: { 
+          entryId: entryId,
+          fromEdit: false
+        }
+      });
+      
+      if (themeError) {
+        console.error("[extractThemes] Error invoking generate-themes function:", themeError);
+      } else {
+        console.log("[extractThemes] Successfully triggered theme generation");
+      }
+    } catch (genErr) {
+      console.error("[extractThemes] Error in theme generation trigger:", genErr);
+    }
   } catch (error) {
     console.error('Error extracting themes:', error);
   }
@@ -141,6 +162,48 @@ export async function storeJournalEntry(
     }
 
     console.log('[storeJournalEntry] Successfully stored entry with ID:', data.id);
+    
+    // Trigger entity extraction
+    try {
+      console.log(`[storeJournalEntry] Triggering entity extraction for entry ${data.id}`);
+      
+      const { error: entitiesError } = await supabase.functions.invoke('batch-extract-entities', {
+        body: {
+          processAll: false,
+          diagnosticMode: true,
+          entryIds: [data.id]
+        }
+      });
+      
+      if (entitiesError) {
+        console.error("[storeJournalEntry] Error invoking batch-extract-entities:", entitiesError);
+      } else {
+        console.log("[storeJournalEntry] Successfully triggered entity extraction");
+      }
+    } catch (entityErr) {
+      console.error("[storeJournalEntry] Error triggering entity extraction:", entityErr);
+    }
+    
+    // Trigger comprehensive sentiment analysis
+    try {
+      console.log(`[storeJournalEntry] Triggering sentiment analysis for entry ${data.id}`);
+      
+      const { error: sentimentError } = await supabase.functions.invoke('analyze-sentiment', {
+        body: { 
+          text: refinedText, 
+          entryId: data.id 
+        }
+      });
+      
+      if (sentimentError) {
+        console.error("[storeJournalEntry] Error invoking analyze-sentiment function:", sentimentError);
+      } else {
+        console.log("[storeJournalEntry] Successfully triggered sentiment analysis");
+      }
+    } catch (sentErr) {
+      console.error("[storeJournalEntry] Error triggering sentiment analysis:", sentErr);
+    }
+    
     return data.id;
   } catch (error) {
     console.error('[storeJournalEntry] Error in storeJournalEntry:', error);

@@ -296,16 +296,39 @@ serve(async (req) => {
             }
           })();
           
+          // Trigger generate-themes edge function
+          const generateThemesPromise = (async () => {
+            try {
+              console.log(`Triggering generate-themes for entry ID: ${entryId}`);
+              const { error: themeError } = await supabase.functions.invoke('generate-themes', {
+                body: { 
+                  entryId,
+                  fromEdit: false
+                }
+              });
+              
+              if (themeError) {
+                console.error("Error triggering theme generation:", themeError);
+              } else {
+                console.log("Theme generation triggered successfully");
+              }
+            } catch (err) {
+              console.error("Error in generate-themes trigger:", err);
+            }
+          })();
+          
           // Run background tasks
           if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
             EdgeRuntime.waitUntil(Promise.all([
               themeExtractionPromise,
-              embeddingPromise
+              embeddingPromise,
+              generateThemesPromise
             ]));
           } else {
             Promise.all([
               themeExtractionPromise,
-              embeddingPromise
+              embeddingPromise,
+              generateThemesPromise
             ]).catch(err => {
               console.error("Error in background tasks:", err);
             });
