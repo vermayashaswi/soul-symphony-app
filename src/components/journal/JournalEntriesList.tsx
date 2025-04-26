@@ -16,7 +16,6 @@ import {
   getDeletedEntryIds
 } from '@/utils/audio-processing';
 import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
-import { useProcessingVisibility } from '@/hooks/use-processing-visibility';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -27,14 +26,14 @@ interface JournalEntriesListProps {
   onDeleteEntry?: (entryId: number) => Promise<void> | void;
 }
 
-export function JournalEntriesList({ 
+const JournalEntriesList = ({ 
   entries = [],
   loading = false, 
   processingEntries = [], 
   processedEntryIds = [],
   onStartRecording, 
   onDeleteEntry 
-}: JournalEntriesListProps) {
+}: JournalEntriesListProps) => {
   const [animatedEntryIds, setAnimatedEntryIds] = useState<number[]>([]);
   const [prevEntriesLength, setPrevEntriesLength] = useState(0);
   const [localEntries, setLocalEntriesState] = useState<JournalEntry[]>([]);
@@ -55,6 +54,7 @@ export function JournalEntriesList({
   const [processingCardShouldShow, setProcessingCardShouldShow] = useState<boolean>(false);
   
   const mainProcessingEntryId = visibleProcessingEntries.length > 0 ? visibleProcessingEntries[0] : null;
+  const hasProcessingEntries = mainProcessingEntryId !== null && processingEntries.length > 0;
   
   const componentMounted = useRef(true);
   const pendingDeletions = useRef<Set<number>>(new Set());
@@ -633,7 +633,7 @@ export function JournalEntriesList({
     setIsSearchActive(results.length !== localEntries.length);
   };
   
-  const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !visibleProcessingEntries.length;
+  const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
   
   const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !visibleProcessingEntries.length;
 
@@ -748,15 +748,21 @@ export function JournalEntriesList({
     );
   };
 
-  const entryIdsSet = useRef<Set<number>>(new Set(entries.map(e => e.id)));
-  const shouldShowProcessingCard = useProcessingVisibility(
-    mainProcessingEntryId, 
-    entryIdsSet.current
-  );
+  const shouldShowProcessingCard = 
+    hasProcessingEntries && 
+    processingCardShouldShow &&
+    !processedTransitionalEntries.some(id => id === mainProcessingEntryId) &&
+    (!mainProcessingEntryId || 
+      !getEntryIdForProcessingId(mainProcessingEntryId) || 
+      (!deletedEntryIds.has(getEntryIdForProcessingId(mainProcessingEntryId)!) &&
+       !deletedProcessingTempIds.has(mainProcessingEntryId))) &&
+    !dialogOpenRef.current &&
+    !visibleProcessingEntries.some(tempId => {
+      const mappedId = getEntryIdForProcessingId(tempId);
+      return mappedId && entries.some(entry => entry.id === mappedId);
+    });
 
-  useEffect(() => {
-    entryIdsSet.current = new Set(entries.map(e => e.id));
-  }, [entries]);
+  console.log(`[JournalEntriesList] Final shouldShowProcessingCard: ${shouldShowProcessingCard}, cards: ${visibleProcessingEntries.length}`);
 
   return (
     <ErrorBoundary>
@@ -785,7 +791,7 @@ export function JournalEntriesList({
               </ErrorBoundary>
             ))}
             
-            {shouldShowProcessingCard && mainProcessingEntryId !== null && (
+            {shouldShowProcessingCard && (
               <motion.div 
                 initial={{ opacity: 0, y: -10 }}
                 animate={{ opacity: 1, y: 0 }}
@@ -850,12 +856,15 @@ export function JournalEntriesList({
                       duration: 0.3, 
                       delay: index === 0 && safeLocalEntries.length > prevEntriesLength ? 0 : 0.05 * Math.min(index, 5) 
                     }}
-                    className="relative rounded-lg shadow-md overflow-hidden"
+                    className={animatedEntryIds.includes(entry.id) ? 
+                      "rounded-lg shadow-md relative overflow-hidden ring-2 ring-primary ring-opacity-50" : 
+                      "relative overflow-hidden"
+                    }
                   >
                     <JournalEntryCard 
-                      entry={entry}
-                      onDelete={handleEntryDelete}
-                      isNew={animatedEntryIds.includes(entry.id)}
+                      entry={entry} 
+                      onDelete={handleEntryDelete} 
+                      isNew={animatedEntryIds.includes(entry.id) || recentlyCompletedEntries.includes(entry.id)}
                       isProcessing={false}
                       setEntries={setLocalEntries}
                     />
@@ -865,9 +874,15 @@ export function JournalEntriesList({
             )}
           </div>
         </AnimatePresence>
+        
+        {loading && safeLocalEntries.length > 0 && !hasProcessingEntries && (
+          <div className="flex items-center justify-center h-16 mt-4">
+            <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          </div>
+        )}
       </div>
     </ErrorBoundary>
   );
-}
+};
 
 export default JournalEntriesList;

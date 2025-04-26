@@ -20,8 +20,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const contentReadyDispatchedRef = useRef(false);
 
   useEffect(() => {
-    mountedRef.current = true;
-    
     if (isProcessing) {
       setShowLoading(true);
       setForceLoading(true);
@@ -51,36 +49,45 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       if (!contentReadyDispatchedRef.current) {
         contentReadyDispatchedRef.current = true;
         
-        // Dispatch a single, comprehensive event
-        if (mountedRef.current) {
-          try {
-            window.dispatchEvent(new CustomEvent('entryContentReady', { 
-              detail: { 
-                content,
-                timestamp: Date.now(),
-                contentLength: content.length,
-                readyForDisplay: true,
-                forceHideProcessing: true
-              }
-            }));
-          } catch (err) {
-            console.error('Error dispatching entryContentReady event:', err);
+        // Dispatch three events in sequence to ensure card removal
+        // 1. Signal that content is ready
+        window.dispatchEvent(new CustomEvent('entryContentReady', { 
+          detail: { 
+            content,
+            timestamp: Date.now(),
+            contentLength: content.length,
+            readyForDisplay: true
           }
-        }
+        }));
+        
+        // 2. Force removal immediately
+        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+          detail: { 
+            content,
+            timestamp: Date.now(),
+            forceCleanup: true 
+          }
+        }));
+        
+        // 3. Signal processing complete
+        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+          detail: {
+            timestamp: Date.now(),
+            forceClearProcessingCard: true
+          }
+        }));
       }
     }
     
-    if (mountedRef.current) {
-      addEvent('EntryContent', 'State update', 'info', {
-        contentLength: content?.length || 0,
-        isProcessing,
-        isExpanded,
-        showLoading,
-        contentEmpty: contentIsLoading,
-        forceLoading,
-        contentReady: contentReadyDispatchedRef.current
-      });
-    }
+    addEvent('EntryContent', 'State update', 'info', {
+      contentLength: content?.length || 0,
+      isProcessing,
+      isExpanded,
+      showLoading,
+      contentEmpty: contentIsLoading,
+      forceLoading,
+      contentReady: contentReadyDispatchedRef.current
+    });
     
   }, [content, isProcessing, addEvent, forceLoading]);
   
