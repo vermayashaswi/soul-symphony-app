@@ -106,7 +106,6 @@ const LanguageSelector = () => {
           variant="ghost" 
           size="icon" 
           aria-label="Select language"
-          disabled={!isTranslateReady}
           title={isTranslateReady ? "Select language" : "Language selector loading..."}
         >
           <Globe className={`h-5 w-5 ${!isTranslateReady ? 'opacity-50' : ''}`} />
