@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Globe } from 'lucide-react';
 import {
   DropdownMenu,
@@ -12,6 +12,7 @@ import { toast } from 'sonner';
 
 const LanguageSelector = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const [isTranslateReady, setIsTranslateReady] = useState(false);
 
   const languages = [
     { code: 'en', label: 'English' },
@@ -42,6 +43,25 @@ const LanguageSelector = () => {
     { code: 'sw', label: 'Kiswahili' }   // Swahili
   ];
 
+  // Check if Google Translate is initialized
+  useEffect(() => {
+    const checkGoogleTranslate = () => {
+      const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
+      if (select) {
+        setIsTranslateReady(true);
+        console.log('Google Translate widget found and ready');
+      } else {
+        console.log('Google Translate widget not ready yet, will retry');
+        setTimeout(checkGoogleTranslate, 1000);
+      }
+    };
+    
+    // Start checking for Google Translate after a short delay to allow page to load
+    const timer = setTimeout(checkGoogleTranslate, 1500);
+    
+    return () => clearTimeout(timer);
+  }, []);
+
   const handleLanguageChange = (languageCode: string) => {
     try {
       const select = document.querySelector('.goog-te-combo') as HTMLSelectElement;
@@ -53,6 +73,20 @@ const LanguageSelector = () => {
       } else {
         console.error('Google Translate widget not found');
         toast.error('Language selector not ready. Please try again in a moment.');
+        
+        // Retry initializing Google Translate
+        if (window.googleTranslateElementInit) {
+          window.googleTranslateElementInit();
+          setTimeout(() => {
+            const retrySelect = document.querySelector('.goog-te-combo') as HTMLSelectElement;
+            if (retrySelect) {
+              retrySelect.value = languageCode;
+              retrySelect.dispatchEvent(new Event('change'));
+              setSelectedLanguage(languageCode);
+              toast.success(`Language changed to ${languages.find(lang => lang.code === languageCode)?.label || languageCode}`);
+            }
+          }, 1000);
+        }
       }
     } catch (err) {
       console.error('Error changing language:', err);
@@ -68,8 +102,14 @@ const LanguageSelector = () => {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label="Select language">
-          <Globe className="h-5 w-5" />
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          aria-label="Select language"
+          disabled={!isTranslateReady}
+          title={isTranslateReady ? "Select language" : "Language selector loading..."}
+        >
+          <Globe className={`h-5 w-5 ${!isTranslateReady ? 'opacity-50' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto">
@@ -82,6 +122,7 @@ const LanguageSelector = () => {
                 ? "bg-primary/10 text-primary font-medium"
                 : ""
             }`}
+            disabled={!isTranslateReady}
           >
             {language.label}
           </DropdownMenuItem>
