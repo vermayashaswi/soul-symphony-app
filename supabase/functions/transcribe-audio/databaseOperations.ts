@@ -105,7 +105,7 @@ export async function storeJournalEntry(
   sentimentScore: string,
 ) {
   try {
-    // Removed references to refined text_hi
+    // The function now has proper column names without _hi
     const { data, error } = await supabase
       .from('Journal Entries')
       .insert([

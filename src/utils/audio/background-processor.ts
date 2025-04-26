@@ -38,6 +38,15 @@ export async function processRecordingInBackground(
     const audioBase64 = await blobToBase64(audioBlob);
     console.log('[BackgroundProcessor] Audio converted to base64, size:', audioBase64.length);
     
+    // Make sure we have reasonable data
+    if (audioBase64.length < 50) {
+      removeProcessingEntryById(tempId);
+      return {
+        success: false,
+        error: 'Audio data appears too short or invalid'
+      };
+    }
+    
     // Call Supabase Edge Function to process the audio
     console.log('[BackgroundProcessor] Calling transcribe-audio function');
     
