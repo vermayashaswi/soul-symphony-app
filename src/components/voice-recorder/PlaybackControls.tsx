@@ -1,7 +1,6 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
-import { Loader2, Play, Pause, RotateCcw } from 'lucide-react';
+import { Loader2, Play, RotateCcw, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
@@ -57,17 +56,15 @@ export function PlaybackControls({
   }, [playbackProgress, audioDuration, isTouchActive, addEvent]);
   
   useEffect(() => {
-    // Track how long processing has been going on
     if (isProcessing && processingStartTime === 0) {
       setProcessingStartTime(Date.now());
     } else if (!isProcessing && processingStartTime !== 0) {
       setProcessingStartTime(0);
     }
     
-    // If processing takes too long (over 45 seconds), we should show a warning or take action
     if (isProcessing && processingStartTime > 0) {
       const processingTime = Date.now() - processingStartTime;
-      if (processingTime > 45000) { // 45 seconds
+      if (processingTime > 45000) {
         addEvent('PlaybackControls', 'Processing taking too long', 'warning', {
           processingTime
         });
@@ -128,21 +125,17 @@ export function PlaybackControls({
     const tempId = 'temp-' + Date.now();
     addEvent('ProcessingFlow', 'Dispatching immediate processing event', 'info', { tempId });
     
-    // Create a processing entry state first - CRITICAL for persistence
-    // This must be called BEFORE dispatching the event for proper iOS state management
     updateProcessingEntries(tempId, 'add');
     
-    // Then dispatch the event to update all components
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
       detail: { 
         entries: [tempId], 
         lastUpdate: Date.now(),
         forceUpdate: true,
-        showLoader: true  // Add explicit showLoader flag
+        showLoader: true
       }
     }));
     
-    // Send another event after a short delay to ensure the UI catches it
     setTimeout(() => {
       addEvent('ProcessingFlow', 'Sending followup processing event', 'info', { tempId });
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
@@ -150,12 +143,11 @@ export function PlaybackControls({
           entries: [tempId], 
           lastUpdate: Date.now(),
           forceUpdate: true,
-          showLoader: true  // Add explicit showLoader flag
+          showLoader: true
         }
       }));
     }, 50);
     
-    // And a third time just to be sure - important for iOS
     setTimeout(() => {
       addEvent('ProcessingFlow', 'Sending third processing event', 'info', { tempId });
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
@@ -163,12 +155,11 @@ export function PlaybackControls({
           entries: [tempId], 
           lastUpdate: Date.now(),
           forceUpdate: true,
-          showLoader: true  // Add explicit showLoader flag
+          showLoader: true
         }
       }));
     }, 200);
     
-    // Add one more event dispatch specifically for this case
     setTimeout(() => {
       addEvent('ProcessingFlow', 'Sending journal refresh event', 'info', { tempId });
       window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
@@ -191,20 +182,6 @@ export function PlaybackControls({
     <div className="w-full px-4 py-2">
       <div className="flex flex-col w-full gap-3">
         <div className="flex items-center gap-3 mb-1 w-full">
-          <Button 
-            size="icon" 
-            variant="outline" 
-            className="h-10 w-10 rounded-full bg-white"
-            onClick={onTogglePlayback}
-            disabled={isProcessing}
-          >
-            {isPlaying ? (
-              <Pause className="h-4 w-4" />
-            ) : (
-              <Play className="h-4 w-4 ml-0.5" />
-            )}
-          </Button>
-          
           <div className="relative w-full flex items-center">
             <Slider
               value={[sliderValue]}
@@ -229,19 +206,34 @@ export function PlaybackControls({
           </div>
         </div>
         
-        <div className="flex justify-center gap-3">
+        <div className="flex justify-center items-center gap-4">
           <Button 
-            variant="outline" 
-            className="rounded-full px-4"
+            variant="ghost" 
+            size="icon"
+            className="rounded-full w-10 h-10"
+            onClick={onTogglePlayback}
+            disabled={isProcessing}
+          >
+            {isPlaying ? (
+              <Pause className="h-5 w-5" />
+            ) : (
+              <Play className="h-5 w-5 ml-0.5" />
+            )}
+          </Button>
+          
+          <Button 
+            variant="ghost" 
+            size="icon"
+            className="rounded-full w-10 h-10"
             onClick={onRestart}
             disabled={isProcessing}
           >
-            <RotateCcw className="h-4 w-4 mr-2" /> New Recording
+            <RotateCcw className="h-5 w-5" />
           </Button>
           
           <Button 
             variant="default" 
-            className="rounded-full px-4 bg-green-600 hover:bg-green-700"
+            className="rounded-full px-4 bg-green-600 hover:bg-green-700 ml-2"
             onClick={handleSaveEntry}
             disabled={isProcessing || isClearingToasts || !audioBlob || audioBlob.size < 100}
           >
