@@ -12,6 +12,7 @@ import { Button } from "@/components/ui/button";
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
+import { JournalEntry } from '@/types/journal'; 
 
 const LanguageSelector = () => {
   const { i18n } = useTranslation();
@@ -40,7 +41,8 @@ const LanguageSelector = () => {
 
         // Translate each entry
         for (const entry of entries || []) {
-          if (entry['refined text']) {
+          // Ensure entry has the properties we need before proceeding
+          if (entry && entry.id && entry['refined text']) {
             try {
               const response = await supabase.functions.invoke('translate-text', {
                 body: {
