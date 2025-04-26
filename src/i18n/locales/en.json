@@ -1,5 +1,27 @@
-
 {
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close"
+  },
+  "navigation": {
+    "home": "Home",
+    "journal": "Journal",
+    "insights": "Insights",
+    "settings": "Settings",
+    "chat": "Chat"
+  },
+  "auth": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "welcome": "Welcome back",
+    "googleSignIn": "Sign in with Google"
+  },
   "journal": {
     "title": "{{name}}'s Journal",
     "possessiveTitle": "{{name}}' Journal",
@@ -19,6 +41,45 @@
         "description": "Continue journaling to see the connections between entities and emotions in your life.",
         "button": "Go to Journal"
       }
+    },
+    "moodChart": {
+      "title": "Mood Analysis",
+      "description": "Track your emotional journey over time",
+      "empty": "Start journaling to see your mood patterns"
     }
+  },
+  "chat": {
+    "placeholder": "Type your message...",
+    "send": "Send",
+    "newChat": "New Chat",
+    "empty": {
+      "title": "Start a Conversation",
+      "description": "Ask me anything about your journal insights"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "about": "About"
+  },
+  "footer": {
+    "contact": "Contact us at",
+    "rights": "All rights reserved",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
+  },
+  "navbar": {
+    "home": "Home",
+    "blog": "Blog",
+    "faq": "FAQ",
+    "privacy": "Privacy"
+  },
+  "download": {
+    "appStore": "Download on App Store",
+    "googlePlay": "Get it on Google Play"
   }
 }

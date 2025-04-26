@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, NavLink } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
@@ -6,8 +5,10 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import SouloLogo from '@/components/SouloLogo';
+import { useTranslation } from 'react-i18next';
 
 const Navbar = () => {
+  const { t } = useTranslation();
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const [isScrolled, setIsScrolled] = useState(false);
   const location = useLocation();
@@ -32,10 +33,10 @@ const Navbar = () => {
   }, [location.pathname]);
   
   const navItems = [
-    { name: 'Home', path: '/' },
-    { name: 'Blog', path: '/blog' },
-    { name: 'FAQ', path: '/faq' },
-    { name: 'Privacy', path: '/privacy' },
+    { name: t('navbar.home'), path: '/' },
+    { name: t('navbar.blog'), path: '/blog' },
+    { name: t('navbar.faq'), path: '/faq' },
+    { name: t('navbar.privacy'), path: '/privacy' },
   ];
   
   return (
@@ -69,18 +70,15 @@ const Navbar = () => {
           </nav>
           
           <div className="hidden md:flex items-center space-x-4">
-            <Button 
-              size="sm" 
-              asChild
-            >
-              <Link to="/download">Download</Link>
+            <Button size="sm" asChild>
+              <Link to="/download">{t('download.appStore')}</Link>
             </Button>
           </div>
           
           <button
             className="md:hidden p-2 focus:outline-none"
             onClick={toggleMenu}
-            aria-label={isMenuOpen ? "Close menu" : "Open menu"}
+            aria-label={isMenuOpen ? t('common.close') : t('common.loading')}
           >
             {isMenuOpen ? <X className="h-6 w-6" /> : <Menu className="h-6 w-6" />}
           </button>
@@ -113,7 +111,7 @@ const Navbar = () => {
               ))}
               <div className="flex flex-col space-y-2 pt-2 border-t border-gray-100">
                 <Button asChild>
-                  <Link to="/download">Download</Link>
+                  <Link to="/download">{t('download.appStore')}</Link>
                 </Button>
               </div>
             </div>
