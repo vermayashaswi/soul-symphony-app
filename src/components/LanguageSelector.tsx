@@ -13,8 +13,27 @@ import { createDebugger } from '@/utils/debug/debugUtils';
 
 const debug = createDebugger('languageSelector');
 
-// Explicitly declare google types to ensure TypeScript recognizes them
+// Properly declare Google Translate types
 declare global {
+  namespace google {
+    namespace translate {
+      class TranslateElement {
+        constructor(options: {
+          pageLanguage: string;
+          includedLanguages?: string;
+          layout?: any;
+          autoDisplay?: boolean;
+        }, elementId: string);
+        
+        static InlineLayout: {
+          HORIZONTAL: any;
+          SIMPLE: any;
+          VERTICAL: any;
+        };
+      }
+    }
+  }
+  
   interface Window {
     google: typeof google;
     googleTranslateElementInit: () => void;
