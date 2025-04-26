@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useDebugLog } from '@/utils/debug/DebugContext';
@@ -15,22 +14,19 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
   
-  // Force a minimum loading time of 0.2 seconds for better UX, reduced from 0.3 seconds
   const [forceLoading, setForceLoading] = useState(false);
   const mountedRef = useRef(true);
 
   useEffect(() => {
-    // When processing flag is true, always show loading state and preserve stable content
     if (isProcessing) {
       setShowLoading(true);
       setForceLoading(true);
       
-      // Set a minimum loading time for better UX, but shorter than before
       const timer = setTimeout(() => {
         if (mountedRef.current) {
           setForceLoading(false);
         }
-      }, 200); // Reduced from 300ms to 200ms for faster response
+      }, 200);
       
       return () => clearTimeout(timer);
     }
@@ -43,12 +39,9 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     if (contentIsLoading) {
       setShowLoading(true);
     } else if (!forceLoading) {
-      // Only update stable content and hide loader when not processing
-      // and we have valid content, and not in forced loading state
       setShowLoading(false);
       setStableContent(content);
       
-      // Dispatch an event to notify that content is ready with more details
       window.dispatchEvent(new CustomEvent('entryContentReady', { 
         detail: { 
           content,
@@ -58,7 +51,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         }
       }));
       
-      // Also notify that any associated processing card should be removed
       window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
         detail: { 
           content,
@@ -79,7 +71,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     
   }, [content, isProcessing, addEvent, forceLoading]);
   
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       mountedRef.current = false;
