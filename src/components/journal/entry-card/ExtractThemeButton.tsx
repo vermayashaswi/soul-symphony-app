@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
@@ -11,17 +11,21 @@ interface ExtractThemeButtonProps {
 
 export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
   const [isExtracting, setIsExtracting] = useState(false);
+  const mountedRef = useRef(true);
+  const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
 
-  const handleExtractThemes = async () => {
-    try {
-      setIsExtracting(true);
-      
-      // Dispatch an event to notify that theme extraction is starting
-      window.dispatchEvent(new CustomEvent('themeExtractionStarted', { 
-        detail: { entryId }
-      }));
-      
-      // Immediately force clear any processing cards for this entry
+  // Cleanup all timers on unmount
+  useEffect(() => {
+    return () => {
+      mountedRef.current = false;
+      cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
+    };
+  }, []);
+
+  // Clean any processing cards on mount
+  useEffect(() => {
+    // Clean processing cards related to this entry on mount
+    const timer = setTimeout(() => {
       window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
         detail: { 
           associatedEntryId: entryId, 
@@ -29,6 +33,45 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
           forceCleanup: true 
         }
       }));
+    }, 100);
+    
+    cleanupTimersRef.current.push(timer);
+    
+    return () => {
+      clearTimeout(timer);
+    };
+  }, [entryId]);
+
+  const handleExtractThemes = async () => {
+    try {
+      setIsExtracting(true);
+      
+      // Clear any existing timers
+      cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
+      cleanupTimersRef.current = [];
+      
+      // Dispatch an event to notify that theme extraction is starting
+      window.dispatchEvent(new CustomEvent('themeExtractionStarted', { 
+        detail: { entryId }
+      }));
+      
+      // Immediately force clear any processing cards for this entry
+      for (let i = 0; i < 3; i++) {
+        // Send multiple cleanup events to ensure proper removal
+        const timer = setTimeout(() => {
+          if (mountedRef.current) {
+            window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+              detail: { 
+                associatedEntryId: entryId, 
+                timestamp: Date.now() + i,
+                forceCleanup: true 
+              }
+            }));
+          }
+        }, i * 100); // Staggered timing
+        
+        cleanupTimersRef.current.push(timer);
+      }
       
       const success = await triggerThemeExtraction(entryId);
       
@@ -40,21 +83,33 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
           detail: { entryId }
         }));
         
-        // Force an immediate check for themes
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('checkForThemesNow', { 
-            detail: { entryId }
-          }));
-          
-          // Also dispatch another force removal event for redundancy
-          window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-            detail: { 
-              associatedEntryId: entryId, 
-              timestamp: Date.now(),
-              forceCleanup: true 
+        // Force an immediate check for themes with multiple attempts
+        for (let i = 0; i < 3; i++) {
+          const timer = setTimeout(() => {
+            if (mountedRef.current) {
+              // Check for themes
+              window.dispatchEvent(new CustomEvent('checkForThemesNow', { 
+                detail: { entryId }
+              }));
+              
+              // Also dispatch another force removal event
+              window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+                detail: { 
+                  associatedEntryId: entryId, 
+                  timestamp: Date.now() + i,
+                  forceCleanup: true 
+                }
+              }));
+              
+              // Signal completion
+              window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+                detail: { entryId, timestamp: Date.now() + i, forceClearProcessingCard: true }
+              }));
             }
-          }));
-        }, 200); // Reduced from 300ms to 200ms for faster response
+          }, 200 + (i * 200));
+          
+          cleanupTimersRef.current.push(timer);
+        }
       } else {
         toast.error('Failed to extract themes');
         
@@ -72,14 +127,30 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
         detail: { entryId, error }
       }));
     } finally {
-      setIsExtracting(false);
+      if (mountedRef.current) {
+        setIsExtracting(false);
+      }
       
-      // Always dispatch a final cleanup event regardless of success/failure
-      setTimeout(() => {
-        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-          detail: { entryId, timestamp: Date.now(), forceClearProcessingCard: true }
-        }));
-      }, 300);
+      // Always dispatch final cleanup events regardless of success/failure
+      for (let i = 0; i < 3; i++) {
+        const timer = setTimeout(() => {
+          if (mountedRef.current) {
+            window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+              detail: { entryId, timestamp: Date.now() + i, forceClearProcessingCard: true }
+            }));
+            
+            window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+              detail: { 
+                associatedEntryId: entryId, 
+                timestamp: Date.now() + i,
+                forceCleanup: true 
+              }
+            }));
+          }
+        }, 300 + (i * 200));
+        
+        cleanupTimersRef.current.push(timer);
+      }
     }
   };
 

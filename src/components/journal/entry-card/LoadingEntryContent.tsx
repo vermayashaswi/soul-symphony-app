@@ -46,6 +46,44 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   const [processingTakingTooLong, setProcessingTakingTooLong] = useState(false);
   const mountedRef = useRef(true);
   const componentId = useRef(`loading-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
+  const stepsIntervalRef = useRef<NodeJS.Timeout | null>(null);
+  const longProcessingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
+  
+  // Self cleanup safety - if this component exists for too long (30 seconds), automatically trigger cleanup
+  useEffect(() => {
+    const safetyTimeout = setTimeout(() => {
+      if (mountedRef.current) {
+        console.log('[LoadingEntryContent] Safety timeout triggered - component existed for too long');
+        
+        // Signal that this component should be removed
+        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+          detail: { 
+            componentId: componentId.current,
+            timestamp: Date.now(),
+            forceCleanup: true,
+            reason: 'safety-timeout'
+          }
+        }));
+        
+        // Also dispatch a completion event to ensure any associated processing entries are cleaned up
+        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+          detail: { 
+            componentId: componentId.current,
+            timestamp: Date.now(), 
+            forceClearProcessingCard: true,
+            reason: 'safety-timeout'
+          }
+        }));
+      }
+    }, 30000); // 30 seconds max lifetime
+    
+    cleanupTimersRef.current.push(safetyTimeout);
+    
+    return () => {
+      clearTimeout(safetyTimeout);
+    };
+  }, []);
   
   useEffect(() => {
     const stepInterval = setInterval(() => {
@@ -65,6 +103,8 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       
     }, 2000); // Each step takes 2 seconds
     
+    stepsIntervalRef.current = stepInterval;
+    
     // Set a timeout to show a message if processing is taking too long
     const longProcessingTimeout = setTimeout(() => {
       if (mountedRef.current) {
@@ -78,7 +118,9 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           }
         }));
       }
-    }, 10000); // Reduced from 15 seconds to 10 seconds
+    }, 10000);
+    
+    longProcessingTimeoutRef.current = longProcessingTimeout;
     
     // Notify when loading content is mounted
     window.dispatchEvent(new CustomEvent('loadingContentMounted', {
@@ -88,10 +130,39 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       }
     }));
     
+    // Listen for forces removal events targeted at this component
+    const handleForceRemoval = (event: CustomEvent) => {
+      if (event.detail?.componentId === componentId.current || !event.detail?.componentId) {
+        console.log('[LoadingEntryContent] Forced removal event received for', componentId.current);
+        
+        // Signal that we're unmounting
+        if (mountedRef.current) {
+          window.dispatchEvent(new CustomEvent('loadingContentForceRemoved', {
+            detail: { 
+              timestamp: Date.now(),
+              componentId: componentId.current
+            }
+          }));
+        }
+      }
+    };
+    
+    window.addEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
+    
     return () => {
       mountedRef.current = false;
-      clearInterval(stepInterval);
-      clearTimeout(longProcessingTimeout);
+      
+      if (stepsIntervalRef.current) {
+        clearInterval(stepsIntervalRef.current);
+      }
+      
+      if (longProcessingTimeoutRef.current) {
+        clearTimeout(longProcessingTimeoutRef.current);
+      }
+      
+      cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
+      
+      window.removeEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
       
       // Notify when loading content is unmounted
       window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {

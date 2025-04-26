@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -16,11 +17,13 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   
   const [forceLoading, setForceLoading] = useState(false);
   const mountedRef = useRef(true);
+  const contentReadyDispatchedRef = useRef(false);
 
   useEffect(() => {
     if (isProcessing) {
       setShowLoading(true);
       setForceLoading(true);
+      contentReadyDispatchedRef.current = false;
       
       const timer = setTimeout(() => {
         if (mountedRef.current) {
@@ -38,26 +41,42 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
 
     if (contentIsLoading) {
       setShowLoading(true);
+      contentReadyDispatchedRef.current = false;
     } else if (!forceLoading) {
       setShowLoading(false);
       setStableContent(content);
       
-      window.dispatchEvent(new CustomEvent('entryContentReady', { 
-        detail: { 
-          content,
-          timestamp: Date.now(),
-          contentLength: content.length,
-          readyForDisplay: true
-        }
-      }));
-      
-      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-        detail: { 
-          content,
-          timestamp: Date.now(),
-          forceCleanup: true 
-        }
-      }));
+      if (!contentReadyDispatchedRef.current) {
+        contentReadyDispatchedRef.current = true;
+        
+        // Dispatch three events in sequence to ensure card removal
+        // 1. Signal that content is ready
+        window.dispatchEvent(new CustomEvent('entryContentReady', { 
+          detail: { 
+            content,
+            timestamp: Date.now(),
+            contentLength: content.length,
+            readyForDisplay: true
+          }
+        }));
+        
+        // 2. Force removal immediately
+        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+          detail: { 
+            content,
+            timestamp: Date.now(),
+            forceCleanup: true 
+          }
+        }));
+        
+        // 3. Signal processing complete
+        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+          detail: {
+            timestamp: Date.now(),
+            forceClearProcessingCard: true
+          }
+        }));
+      }
     }
     
     addEvent('EntryContent', 'State update', 'info', {
@@ -66,7 +85,8 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       isExpanded,
       showLoading,
       contentEmpty: contentIsLoading,
-      forceLoading
+      forceLoading,
+      contentReady: contentReadyDispatchedRef.current
     });
     
   }, [content, isProcessing, addEvent, forceLoading]);
