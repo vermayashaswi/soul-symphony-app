@@ -43,39 +43,45 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       setShowLoading(true);
       contentReadyDispatchedRef.current = false;
     } else if (!forceLoading) {
+      // Content is ready, immediately hide loading state
       setShowLoading(false);
       setStableContent(content);
       
       if (!contentReadyDispatchedRef.current) {
         contentReadyDispatchedRef.current = true;
         
-        // Dispatch three events in sequence to ensure card removal
+        // Dispatch events to ensure card cleanup happens immediately
         // 1. Signal that content is ready
         window.dispatchEvent(new CustomEvent('entryContentReady', { 
           detail: { 
             content,
             timestamp: Date.now(),
             contentLength: content.length,
-            readyForDisplay: true
+            readyForDisplay: true,
+            forceRemoveProcessing: true
           }
         }));
         
-        // 2. Force removal immediately
-        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-          detail: { 
-            content,
-            timestamp: Date.now(),
-            forceCleanup: true 
-          }
-        }));
+        // 2. Force removal immediately with 0ms delay
+        setTimeout(() => {
+          window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+            detail: { 
+              content,
+              timestamp: Date.now(),
+              forceCleanup: true,
+              immediate: true
+            }
+          }));
         
-        // 3. Signal processing complete
-        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-          detail: {
-            timestamp: Date.now(),
-            forceClearProcessingCard: true
-          }
-        }));
+          // 3. Signal processing complete
+          window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+            detail: {
+              timestamp: Date.now(),
+              forceClearProcessingCard: true,
+              immediate: true
+            }
+          }));
+        }, 0);
       }
     }
     

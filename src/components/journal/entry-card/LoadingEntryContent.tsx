@@ -49,12 +49,14 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   const stepsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const longProcessingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
+  const unmountingRef = useRef<boolean>(false);
   
-  // Self cleanup safety - if this component exists for too long (30 seconds), automatically trigger cleanup
+  // Self cleanup safety - if this component exists for too long (20 seconds), automatically trigger cleanup
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
-      if (mountedRef.current) {
+      if (mountedRef.current && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Safety timeout triggered - component existed for too long');
+        unmountingRef.current = true;
         
         // Signal that this component should be removed
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
@@ -76,7 +78,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           }
         }));
       }
-    }, 30000); // 30 seconds max lifetime
+    }, 20000); // 20 seconds max lifetime (reduced from 30s)
     
     cleanupTimersRef.current.push(safetyTimeout);
     
@@ -87,7 +89,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   
   useEffect(() => {
     const stepInterval = setInterval(() => {
-      if (!mountedRef.current) return;
+      if (!mountedRef.current || unmountingRef.current) return;
       
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
       
@@ -107,7 +109,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     // Set a timeout to show a message if processing is taking too long
     const longProcessingTimeout = setTimeout(() => {
-      if (mountedRef.current) {
+      if (mountedRef.current && !unmountingRef.current) {
         setProcessingTakingTooLong(true);
         
         // Notify that processing is taking a long time
@@ -132,8 +134,9 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     // Listen for forces removal events targeted at this component
     const handleForceRemoval = (event: CustomEvent) => {
-      if (event.detail?.componentId === componentId.current || !event.detail?.componentId) {
+      if ((event.detail?.componentId === componentId.current || !event.detail?.componentId) && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Forced removal event received for', componentId.current);
+        unmountingRef.current = true;
         
         // Signal that we're unmounting
         if (mountedRef.current) {
@@ -143,11 +146,45 @@ export function LoadingEntryContent({ error }: { error?: string }) {
               componentId: componentId.current
             }
           }));
+          
+          // Force immediate parent card removal
+          const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
+          if (parentCard) {
+            parentCard.classList.add('force-hidden');
+            setTimeout(() => {
+              if (parentCard.parentNode) {
+                parentCard.parentNode.removeChild(parentCard);
+              }
+            }, 50);
+          }
         }
       }
     };
     
     window.addEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
+    window.addEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
+    
+    // Also listen for content ready events which should remove this component
+    const handleContentReady = () => {
+      if (!unmountingRef.current) {
+        unmountingRef.current = true;
+        
+        // Force immediate parent card removal after a short delay
+        setTimeout(() => {
+          const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
+          if (parentCard) {
+            parentCard.classList.add('force-hidden');
+            setTimeout(() => {
+              if (parentCard.parentNode) {
+                parentCard.parentNode.removeChild(parentCard);
+              }
+            }, 50);
+          }
+        }, 100);
+      }
+    };
+    
+    window.addEventListener('entryContentReady', handleContentReady as EventListener);
     
     return () => {
       mountedRef.current = false;
@@ -163,6 +200,8 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
       
       window.removeEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
+      window.removeEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
+      window.removeEventListener('entryContentReady', handleContentReady as EventListener);
       
       // Notify when loading content is unmounted
       window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {
@@ -175,6 +214,27 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   }, [currentStepIndex]);
   
   const currentStep = processingSteps[currentStepIndex];
+  
+  // Add CSS to handle forced hiding
+  useEffect(() => {
+    // Add a style for forced hiding if not already present
+    if (!document.getElementById('force-hidden-style')) {
+      const style = document.createElement('style');
+      style.id = 'force-hidden-style';
+      style.textContent = `.force-hidden { display: none !important; opacity: 0 !important; pointer-events: none !important; }`;
+      document.head.appendChild(style);
+    }
+    
+    return () => {
+      // Cleanup only if no other instances are active
+      if (!document.querySelector('.journal-entry-card:not(.force-hidden)')) {
+        const style = document.getElementById('force-hidden-style');
+        if (style) {
+          document.head.removeChild(style);
+        }
+      }
+    };
+  }, []);
   
   return (
     <motion.div 

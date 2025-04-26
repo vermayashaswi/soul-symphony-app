@@ -1,4 +1,3 @@
-
 /**
  * Audio processing state management
  * Handles processing locks and operational state
@@ -9,8 +8,8 @@ let isEntryBeingProcessed = false;
 let processingLock = false;
 let processingTimeoutId: NodeJS.Timeout | null = null;
 let lastStateChangeTime = 0;
-const DEBOUNCE_THRESHOLD = 30; // Reduced from 50ms to 30ms to be more responsive
-const STALE_ENTRY_THRESHOLD = 5 * 60 * 1000; // 5 minutes - entries older than this are considered stale
+const DEBOUNCE_THRESHOLD = 20; // Reduced from 30ms to 20ms to be more responsive
+const STALE_ENTRY_THRESHOLD = 3 * 60 * 1000; // 3 minutes - entries older than this are considered stale (reduced from 5min)
 
 // Store mapping between processing IDs and entry IDs to help with cleanup
 const processingToEntryMap = new Map<string, number>();
@@ -62,36 +61,52 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
       
       // Add explicit cleanup here to ensure completed entries are properly marked
       window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-        detail: { tempId, timestamp: now, forceClearProcessingCard: true }
+        detail: { tempId, timestamp: now, forceClearProcessingCard: true, immediate: true }
       }));
       
       // Also send an immediate follow-up event to ensure processing card is removed
       window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-        detail: { tempId, timestamp: now, forceCleanup: true }
+        detail: { tempId, timestamp: now, forceCleanup: true, immediate: true }
       }));
       
       // Force remove any loading components showing this entry
       window.dispatchEvent(new CustomEvent('forceRemoveLoadingContent', {
-        detail: { tempId, timestamp: now }
+        detail: { tempId, timestamp: now, immediate: true }
       }));
       
       // Dispatch a third event to force update any UI that depends on this state
       window.dispatchEvent(new CustomEvent('processingStateChanged', {
-        detail: { tempId, action: 'remove', timestamp: now }
+        detail: { tempId, action: 'remove', timestamp: now, immediate: true }
       }));
+      
+      // Additionally, force cleanup any remaining "processing cards" with direct DOM manipulation
+      setTimeout(() => {
+        try {
+          document.querySelectorAll('.journal-entry-card.processing-card').forEach(card => {
+            (card as HTMLElement).style.display = 'none';
+            setTimeout(() => {
+              if (card.parentNode) {
+                card.parentNode.removeChild(card);
+              }
+            }, 50);
+          });
+        } catch (e) {
+          console.error('[Audio.ProcessingState] Error in manual DOM cleanup:', e);
+        }
+      }, 100);
     }
     
     localStorage.setItem('processingEntries', JSON.stringify(entries));
     
     // Dispatch an event so other components can react to the change immediately
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-      detail: { entries, lastUpdate: now, forceUpdate: true }
+      detail: { entries, lastUpdate: now, forceUpdate: true, immediate: true }
     }));
     
     // Send a second event with shorter delay to ensure all devices catch it
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries, lastUpdate: now + 1, forceUpdate: true }
+        detail: { entries, lastUpdate: now + 1, forceUpdate: true, immediate: true }
       }));
     }, 10);
     
@@ -113,7 +128,7 @@ export const getProcessingEntries = (): string[] => {
     const storedEntries = localStorage.getItem('processingEntries');
     let entries = storedEntries ? JSON.parse(storedEntries) : [];
     
-    // Clean up stale entries automatically (older than 5 minutes)
+    // Clean up stale entries automatically (older than 3 minutes - reduced from 5)
     const now = Date.now();
     const validEntries = entries.filter(id => {
       // Skip if it's marked as completed
@@ -141,12 +156,24 @@ export const getProcessingEntries = (): string[] => {
         console.log(`[Audio.ProcessingState] Found stale entry: ${id}, removing automatically`);
         // Fire events to ensure stale processing card is removed
         window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-          detail: { tempId: id, timestamp: now, forceClearProcessingCard: true, wasStale: true }
+          detail: { tempId: id, timestamp: now, forceClearProcessingCard: true, wasStale: true, immediate: true }
         }));
         
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-          detail: { tempId: id, timestamp: now, forceCleanup: true, wasStale: true }
+          detail: { tempId: id, timestamp: now, forceCleanup: true, wasStale: true, immediate: true }
         }));
+        
+        // Direct DOM cleanup attempt for stale cards
+        try {
+          document.querySelectorAll('.journal-entry-card.processing-card').forEach(card => {
+            (card as HTMLElement).style.display = 'none';
+            if (card.parentNode) {
+              card.parentNode.removeChild(card);
+            }
+          });
+        } catch (e) {
+          console.error('[Audio.ProcessingState] Error in stale card DOM cleanup:', e);
+        }
         
         return false; // Remove this stale entry
       }
@@ -161,7 +188,7 @@ export const getProcessingEntries = (): string[] => {
       
       // Notify about the change
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries: validEntries, lastUpdate: now, forceUpdate: true }
+        detail: { entries: validEntries, lastUpdate: now, forceUpdate: true, immediate: true }
       }));
       
       entries = validEntries;
