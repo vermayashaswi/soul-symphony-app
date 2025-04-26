@@ -122,14 +122,9 @@ export type Database = {
           "foreign key": string | null
           id: number
           master_themes: string[] | null
-          master_themes_hi: string[] | null
-          original_language: string | null
           "refined text": string | null
-          "refined text_hi": string | null
           sentiment: string | null
           "transcription text": string | null
-          "transcription text_hi": string | null
-          translation_status: string | null
           user_feedback: string | null
           user_id: string | null
         }
@@ -144,14 +139,9 @@ export type Database = {
           "foreign key"?: string | null
           id?: number
           master_themes?: string[] | null
-          master_themes_hi?: string[] | null
-          original_language?: string | null
           "refined text"?: string | null
-          "refined text_hi"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
-          "transcription text_hi"?: string | null
-          translation_status?: string | null
           user_feedback?: string | null
           user_id?: string | null
         }
@@ -166,14 +156,9 @@ export type Database = {
           "foreign key"?: string | null
           id?: number
           master_themes?: string[] | null
-          master_themes_hi?: string[] | null
-          original_language?: string | null
           "refined text"?: string | null
-          "refined text_hi"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
-          "transcription text_hi"?: string | null
-          translation_status?: string | null
           user_feedback?: string | null
           user_id?: string | null
         }
