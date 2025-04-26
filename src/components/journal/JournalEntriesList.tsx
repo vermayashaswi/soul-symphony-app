@@ -172,6 +172,8 @@ const JournalEntriesList = ({
             return [...prev, event.detail.tempId];
           });
           
+          setProcessingCardShouldShow(false);
+          
           setTimeout(() => {
             if (componentMounted.current) {
               setVisibleProcessingEntries(prev => 
@@ -226,8 +228,21 @@ const JournalEntriesList = ({
     
     window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     
+    const handleProcessingEntryCompleted = (event: CustomEvent) => {
+      if (event.detail && event.detail.tempId) {
+        console.log(`[JournalEntriesList] Processing entry completed: ${event.detail.tempId}`);
+        setProcessingCardShouldShow(false);
+        setVisibleProcessingEntries(prev => 
+          prev.filter(id => id !== event.detail.tempId)
+        );
+      }
+    };
+    
+    window.addEventListener('processingEntryCompleted', handleProcessingEntryCompleted as EventListener);
+    
     return () => {
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+      window.removeEventListener('processingEntryCompleted', handleProcessingEntryCompleted as EventListener);
     };
   }, [entries, processedProcessingIds, deletedEntryIds, deletedProcessingTempIds]);
 
@@ -266,7 +281,6 @@ const JournalEntriesList = ({
           if (!transitionalLoadingEntries.includes(tempId)) {
             setTransitionalLoadingEntries(prev => [...prev, tempId]);
             
-            // Set a cleanup timeout
             setTimeout(() => {
               if (componentMounted.current) {
                 setVisibleProcessingEntries(prev => 
@@ -274,7 +288,7 @@ const JournalEntriesList = ({
                 );
                 setProcessingCardShouldShow(false);
               }
-            }, 3000);
+            }, 1000);
           }
         }
       });
@@ -286,10 +300,10 @@ const JournalEntriesList = ({
       const persistedEntries = getProcessingEntries();
       
       if (persistedEntries.length > 0) {
-        const tenMinutesAgo = Date.now() - 10 * 60 * 1000;
+        const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
         const validEntries = persistedEntries.filter(id => {
           const timestamp = parseInt(id.split('-').pop() || '0');
-          const isRecent = !isNaN(timestamp) && timestamp > tenMinutesAgo;
+          const isRecent = !isNaN(timestamp) && timestamp > fiveMinutesAgo;
           const isNotProcessed = !processedProcessingIds.has(id);
           const isNotDeleted = !deletedProcessingTempIds.has(id);
           const isNotCompleted = !isProcessingEntryCompleted(id);
@@ -300,10 +314,26 @@ const JournalEntriesList = ({
           return isRecent && isNotProcessed && isNotDeleted && isNotCompleted && hasNoExistingEntry;
         });
         
-        setPersistedProcessingEntries(validEntries);
-        const visibleEntries = validEntries.slice(0, 1);
+        const entriesWithMappedIds = entries.map(entry => entry.id);
+        const filteredValidEntries = validEntries.filter(tempId => {
+          const mappedId = getEntryIdForProcessingId(tempId);
+          return !mappedId || !entriesWithMappedIds.includes(mappedId);
+        });
+        
+        console.log(`[JournalEntriesList] Filtered processing entries from ${validEntries.length} to ${filteredValidEntries.length}`);
+        
+        setPersistedProcessingEntries(filteredValidEntries);
+        const visibleEntries = filteredValidEntries.slice(0, 1);
         setVisibleProcessingEntries(visibleEntries);
-        setProcessingCardShouldShow(visibleEntries.length > 0 && !dialogOpenRef.current);
+        
+        const shouldShow = visibleEntries.length > 0 && !dialogOpenRef.current && 
+          !visibleEntries.some(tempId => {
+            const mappedId = getEntryIdForProcessingId(tempId);
+            return mappedId && entriesWithMappedIds.includes(mappedId);
+          });
+        
+        setProcessingCardShouldShow(shouldShow);
+        console.log(`[JournalEntriesList] Processing card should show: ${shouldShow}`);
       } else {
         setPersistedProcessingEntries([]);
         setVisibleProcessingEntries([]);
@@ -313,12 +343,11 @@ const JournalEntriesList = ({
     
     loadPersistedProcessingEntries();
     
-    // Setup cleanup interval
     const cleanupInterval = setInterval(() => {
       if (componentMounted.current) {
         loadPersistedProcessingEntries();
       }
-    }, 5000);
+    }, 2000);
     
     return () => {
       clearInterval(cleanupInterval);
@@ -649,16 +678,13 @@ const JournalEntriesList = ({
   });
   
   const finalDisplayEntries = Array.from(uniqueEntriesMap.values()).filter(entry => {
-    // Skip entries that are still in processing state
     const isProcessing = visibleProcessingEntries.some(tempId => {
       const mappedId = getEntryIdForProcessingId(tempId);
       return mappedId === entry.id;
     });
     
-    // Skip deleted entries
     if (deletedEntryIds.has(entry.id)) return false;
     
-    // Skip entries that have a matching transitional entry
     const hasMatchingTransitional = processedTransitionalEntries.some(tempId => {
       const transitionalEntry = processingToActualEntry.get(tempId);
       return transitionalEntry && transitionalEntry.id === entry.id;
@@ -722,14 +748,21 @@ const JournalEntriesList = ({
     );
   };
 
-  const shouldShowProcessingCard = hasProcessingEntries && 
+  const shouldShowProcessingCard = 
+    hasProcessingEntries && 
     processingCardShouldShow &&
     !processedTransitionalEntries.some(id => id === mainProcessingEntryId) &&
     (!mainProcessingEntryId || 
       !getEntryIdForProcessingId(mainProcessingEntryId) || 
       (!deletedEntryIds.has(getEntryIdForProcessingId(mainProcessingEntryId)!) &&
        !deletedProcessingTempIds.has(mainProcessingEntryId))) &&
-    !dialogOpenRef.current;
+    !dialogOpenRef.current &&
+    !visibleProcessingEntries.some(tempId => {
+      const mappedId = getEntryIdForProcessingId(tempId);
+      return mappedId && entries.some(entry => entry.id === mappedId);
+    });
+
+  console.log(`[JournalEntriesList] Final shouldShowProcessingCard: ${shouldShowProcessingCard}, cards: ${visibleProcessingEntries.length}`);
 
   return (
     <ErrorBoundary>

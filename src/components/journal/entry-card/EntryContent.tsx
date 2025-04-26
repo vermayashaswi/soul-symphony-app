@@ -15,7 +15,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
   
-  // Force a minimum loading time of 2 seconds for better UX
+  // Force a minimum loading time of 1.5 seconds for better UX, reduced from 2 seconds
   const [forceLoading, setForceLoading] = useState(false);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       // Set a minimum loading time for better UX
       const timer = setTimeout(() => {
         setForceLoading(false);
-      }, 2000);
+      }, 1500); // Reduced from 2000ms to 1500ms
       
       return () => clearTimeout(timer);
     }
