@@ -159,24 +159,29 @@ const Home = () => {
               </h1>
             </div>
 
-            <motion.div
-              variants={dateStripVariants}
-              initial="hidden"
-              animate="visible"
-              className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
-            >
-              <div
-                className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
-                style={{
-                  fontWeight: 500,
-                  letterSpacing: '0.01em',
-                  WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale'
-                }}
+            <div className="flex items-center">
+              <motion.div
+                variants={dateStripVariants}
+                initial="hidden"
+                animate="visible"
+                className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
               >
-                {formattedDate}
+                <div
+                  className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+                  style={{
+                    fontWeight: 500,
+                    letterSpacing: '0.01em',
+                    WebkitFontSmoothing: 'antialiased',
+                    MozOsxFontSmoothing: 'grayscale'
+                  }}
+                >
+                  {formattedDate}
+                </div>
+              </motion.div>
+              <div className="ml-2 z-[100]">
+                <LanguageSelector />
               </div>
-            </motion.div>
+            </div>
           </div>
         </div>
       </div>
