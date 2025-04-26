@@ -9,7 +9,7 @@ let isEntryBeingProcessed = false;
 let processingLock = false;
 let processingTimeoutId: NodeJS.Timeout | null = null;
 let lastStateChangeTime = 0;
-const DEBOUNCE_THRESHOLD = 200; // Reduced from 500ms to 200ms to be more responsive
+const DEBOUNCE_THRESHOLD = 100; // Reduced from 200ms to 100ms to be more responsive
 
 // Store processing entries in localStorage to persist across navigations
 export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
@@ -45,12 +45,12 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
       detail: { entries, lastUpdate: now, forceUpdate: true }
     }));
     
-    // Send a second event to ensure iOS devices catch it
+    // Send a second event with shorter delay to ensure iOS devices catch it
     setTimeout(() => {
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { entries, lastUpdate: now + 1, forceUpdate: true }
       }));
-    }, 50);
+    }, 20); // Reduced from 50ms to 20ms
     
     return entries;
   } catch (error) {
@@ -100,14 +100,14 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
     if (updatedEntries.length !== entries.length) {
       localStorage.setItem('processingEntries', JSON.stringify(updatedEntries));
       
+      // Fire these events synchronously so they happen immediately
+      window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+        detail: { tempId: idStr, timestamp: now }
+      }));
+      
       // Dispatch an event so other components can react to the change
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { entries: updatedEntries, lastUpdate: now, removedId: idStr, forceUpdate: true }
-      }));
-      
-      // Add explicit "entry completed" event
-      window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-        detail: { tempId: idStr, timestamp: now }
       }));
       
       console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
@@ -153,6 +153,11 @@ export function resetProcessingState(): void {
   // Dispatch a reset event
   window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
     detail: { entries: [], reset: true, lastUpdate: Date.now(), forceUpdate: true }
+  }));
+  
+  // Also dispatch a completion event for all entries
+  window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+    detail: { tempId: 'all', timestamp: Date.now() }
   }));
 }
 

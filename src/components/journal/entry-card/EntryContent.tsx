@@ -15,7 +15,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
   
-  // Force a minimum loading time of 1 second for better UX, reduced from 1.5 seconds
+  // Force a minimum loading time of 0.5 seconds for better UX, reduced from 1 second
   const [forceLoading, setForceLoading] = useState(false);
 
   useEffect(() => {
@@ -24,10 +24,10 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       setShowLoading(true);
       setForceLoading(true);
       
-      // Set a minimum loading time for better UX
+      // Set a minimum loading time for better UX, but shorter than before
       const timer = setTimeout(() => {
         setForceLoading(false);
-      }, 1000); // Reduced from 1500ms to 1000ms
+      }, 500); // Reduced from 1000ms to 500ms for faster response
       
       return () => clearTimeout(timer);
     }
@@ -44,6 +44,11 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       // and we have valid content, and not in forced loading state
       setShowLoading(false);
       setStableContent(content);
+      
+      // Dispatch an event to notify that content is ready
+      window.dispatchEvent(new CustomEvent('entryContentReady', { 
+        detail: { content }
+      }));
     }
     
     addEvent('EntryContent', 'State update', 'info', {
