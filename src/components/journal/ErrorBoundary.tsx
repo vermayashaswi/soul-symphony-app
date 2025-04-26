@@ -32,10 +32,11 @@ class ErrorBoundary extends Component<Props, State> {
   
   resetErrorState = () => {
     console.log('Resetting error state');
+    this.setState({ hasError: false, error: null });
+    
     if (this.props.onReset) {
       this.props.onReset();
     }
-    this.setState({ hasError: false, error: null });
   };
 
   render() {

@@ -1,9 +1,12 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
+import { AlertCircle, RefreshCw } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  onReset?: () => void;
 }
 
 interface State {
@@ -18,14 +21,25 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI
+    console.error("Error boundary caught error:", error);
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    // You can log the error to an error reporting service
-    console.error("Insights component error:", error, errorInfo);
+    console.error("Error boundary caught error:", error);
+    console.error("Error stack:", errorInfo.componentStack);
   }
+  
+  resetErrorState = () => {
+    console.log('Resetting error state');
+    this.setState({ hasError: false, error: null });
+    
+    if (this.props.onReset) {
+      this.props.onReset();
+    } else {
+      window.location.reload();
+    }
+  };
 
   render(): ReactNode {
     if (this.state.hasError) {
@@ -33,18 +47,19 @@ class ErrorBoundary extends Component<Props, State> {
       return this.props.fallback || (
         <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg max-w-3xl mx-auto my-8">
           <h2 className="text-xl font-semibold text-red-800 dark:text-red-300 mb-2">Something went wrong</h2>
-          <details className="bg-white dark:bg-gray-800 p-4 rounded-md">
+          <details className="bg-white dark:bg-gray-800 p-4 rounded-md my-4">
             <summary className="cursor-pointer font-medium mb-2">Error details</summary>
             <pre className="text-sm overflow-auto p-2 bg-gray-100 dark:bg-gray-900 rounded">
               {this.state.error?.toString()}
             </pre>
           </details>
-          <button
-            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-            onClick={() => window.location.reload()}
+          <Button
+            className="mt-4 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            onClick={this.resetErrorState}
           >
-            Reload page
-          </button>
+            <RefreshCw className="w-4 h-4 mr-2" /> 
+            Retry
+          </Button>
         </div>
       );
     }

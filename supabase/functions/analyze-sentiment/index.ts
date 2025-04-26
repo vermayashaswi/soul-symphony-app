@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -138,14 +139,18 @@ serve(async (req) => {
       throw new Error('Invalid sentiment score received');
     }
     
-    const sentimentScore = result.documentSentiment.score.toString();
+    // Here's the critical fix: ensure we're getting a valid number for the sentiment score
+    const sentimentScore = result.documentSentiment.score;
     console.log('Extracted sentiment score:', sentimentScore);
     
     // Categorize the sentiment according to the specified ranges
     let sentimentCategory;
     const score = parseFloat(sentimentScore);
     
-    if (score >= 0.3) {
+    if (isNaN(score)) {
+      console.error('Sentiment score is NaN, defaulting to neutral');
+      sentimentCategory = "neutral";
+    } else if (score >= 0.3) {
       sentimentCategory = "positive";
     } else if (score >= -0.1) {
       sentimentCategory = "neutral";
@@ -164,9 +169,12 @@ serve(async (req) => {
         
         console.log(`Updating sentiment directly for entry ID: ${entryId}`);
         
+        // Ensure we have a valid numerical string for the sentiment score
+        const finalSentimentScore = isNaN(score) ? "0" : sentimentScore.toString();
+        
         const { error: updateError } = await supabase
           .from('Journal Entries')
-          .update({ sentiment: sentimentScore })
+          .update({ sentiment: finalSentimentScore })
           .eq('id', entryId);
           
         if (updateError) {
@@ -174,7 +182,7 @@ serve(async (req) => {
           throw new Error(`Failed to update sentiment: ${updateError.message}`);
         }
         
-        console.log(`Successfully updated sentiment ${sentimentScore} for entry ID: ${entryId}`);
+        console.log(`Successfully updated sentiment ${finalSentimentScore} for entry ID: ${entryId}`);
       } catch (updateError) {
         console.error('Error updating entry sentiment:', updateError);
         throw updateError;
@@ -183,7 +191,7 @@ serve(async (req) => {
     
     return new Response(
       JSON.stringify({ 
-        sentiment: sentimentScore,
+        sentiment: sentimentScore.toString(),
         category: sentimentCategory,
         success: true,
         processedTranslated: processTranslated
