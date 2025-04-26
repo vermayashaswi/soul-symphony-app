@@ -236,6 +236,7 @@ const JournalEntriesList = ({
       processingToEntryMap.forEach((entryId, tempId) => {
         if (transitionalLoadingEntries.includes(tempId)) return;
         if (processedProcessingIds.has(tempId)) return;
+        if (deletedProcessingTempIds.has(tempId)) return;
         
         const matchedEntry = entries.find(entry => entry.id === entryId);
         
@@ -250,6 +251,12 @@ const JournalEntriesList = ({
             return newSet;
           });
           
+          setProcessedProcessingIds(prev => {
+            const newSet = new Set(prev);
+            newSet.add(tempId);
+            return newSet;
+          });
+          
           setProcessingToActualEntry(prev => {
             const newMap = new Map(prev);
             newMap.set(tempId, matchedEntry);
@@ -258,17 +265,21 @@ const JournalEntriesList = ({
           
           if (!transitionalLoadingEntries.includes(tempId)) {
             setTransitionalLoadingEntries(prev => [...prev, tempId]);
+            
+            // Set a cleanup timeout
+            setTimeout(() => {
+              if (componentMounted.current) {
+                setVisibleProcessingEntries(prev => 
+                  prev.filter(id => id !== tempId)
+                );
+                setProcessingCardShouldShow(false);
+              }
+            }, 3000);
           }
-          
-          setProcessedProcessingIds(prev => {
-            const newSet = new Set(prev);
-            newSet.add(tempId);
-            return newSet;
-          });
         }
       });
     }
-  }, [entries, processingToEntryMap, transitionalLoadingEntries, processedProcessingIds]);
+  }, [entries, processingToEntryMap, transitionalLoadingEntries, processedProcessingIds, deletedProcessingTempIds]);
 
   useEffect(() => {
     const loadPersistedProcessingEntries = () => {
@@ -282,18 +293,17 @@ const JournalEntriesList = ({
           const isNotProcessed = !processedProcessingIds.has(id);
           const isNotDeleted = !deletedProcessingTempIds.has(id);
           const isNotCompleted = !isProcessingEntryCompleted(id);
-          return isRecent && isNotProcessed && isNotDeleted && isNotCompleted;
+          const hasNoExistingEntry = !entries.some(entry => {
+            const mappedId = getEntryIdForProcessingId(id);
+            return entry.id === mappedId;
+          });
+          return isRecent && isNotProcessed && isNotDeleted && isNotCompleted && hasNoExistingEntry;
         });
         
         setPersistedProcessingEntries(validEntries);
-        
-        const visibleEntries = validEntries
-          .filter(id => !deletedProcessingTempIds.has(id))
-          .slice(0, 1);
-          
+        const visibleEntries = validEntries.slice(0, 1);
         setVisibleProcessingEntries(visibleEntries);
-        
-        setProcessingCardShouldShow(visibleEntries.length > 0);
+        setProcessingCardShouldShow(visibleEntries.length > 0 && !dialogOpenRef.current);
       } else {
         setPersistedProcessingEntries([]);
         setVisibleProcessingEntries([]);
@@ -303,73 +313,17 @@ const JournalEntriesList = ({
     
     loadPersistedProcessingEntries();
     
-    const handleProcessingEntriesChanged = (event: CustomEvent) => {
-      processingStateChangedRef.current = true;
-      
-      if (event.detail && Array.isArray(event.detail.entries)) {
-        if (event.detail.removedId) {
-          const removedId = event.detail.removedId;
-          if (typeof removedId === 'number' || !isNaN(Number(removedId))) {
-            const numId = Number(removedId);
-            setDeletedEntryIds(prev => {
-              const newSet = new Set(prev);
-              newSet.add(numId);
-              return newSet;
-            });
-          } else {
-            setDeletedProcessingTempIds(prev => {
-              const newSet = new Set(prev);
-              newSet.add(String(removedId));
-              return newSet;
-            });
-          }
-          
-          setProcessingCardShouldShow(false);
-        }
-        
-        if (event.detail.entries.length > 0) {
-          const newEntries = event.detail.entries.filter(id => 
-            !processedProcessingIds.has(id) && 
-            !deletedProcessingTempIds.has(id) &&
-            !isProcessingEntryCompleted(id)
-          );
-          
-          setPersistedProcessingEntries(newEntries);
-          
-          const entriesToDisplay = newEntries
-            .filter(tempId => 
-              !Array.from(processingToEntryMap.keys()).includes(tempId) &&
-              !deletedProcessingTempIds.has(tempId) &&
-              !isProcessingEntryCompleted(tempId)
-            )
-            .slice(0, 1);
-          
-          setVisibleProcessingEntries(entriesToDisplay);
-          
-          setProcessingCardShouldShow(entriesToDisplay.length > 0 && !dialogOpenRef.current);
-        } else {
-          setPersistedProcessingEntries([]);
-          setVisibleProcessingEntries([]);
-          setProcessingCardShouldShow(false);
-        }
-      }
-    };
-    
-    window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
-    
-    const handleVisibilityChange = () => {
-      if (document.visibilityState === 'visible') {
+    // Setup cleanup interval
+    const cleanupInterval = setInterval(() => {
+      if (componentMounted.current) {
         loadPersistedProcessingEntries();
       }
-    };
-    
-    document.addEventListener('visibilitychange', handleVisibilityChange);
+    }, 5000);
     
     return () => {
-      window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
-      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      clearInterval(cleanupInterval);
     };
-  }, [processingToEntryMap, processedProcessingIds, deletedProcessingTempIds]);
+  }, [entries, processedProcessingIds, deletedProcessingTempIds]);
 
   useEffect(() => {
     try {
@@ -696,14 +650,23 @@ const JournalEntriesList = ({
            !deletedEntryIds.has(actualEntry.id);
   });
   
-  const finalLocalEntries = finalDisplayEntries.filter(entry => {
+  const finalDisplayEntries = Array.from(uniqueEntriesMap.values()).filter(entry => {
+    // Skip entries that are still in processing state
+    const isProcessing = visibleProcessingEntries.some(tempId => {
+      const mappedId = getEntryIdForProcessingId(tempId);
+      return mappedId === entry.id;
+    });
+    
+    // Skip deleted entries
     if (deletedEntryIds.has(entry.id)) return false;
     
+    // Skip entries that have a matching transitional entry
     const hasMatchingTransitional = processedTransitionalEntries.some(tempId => {
       const transitionalEntry = processingToActualEntry.get(tempId);
       return transitionalEntry && transitionalEntry.id === entry.id;
     });
-    return !hasMatchingTransitional;
+    
+    return !isProcessing && !hasMatchingTransitional;
   });
 
   const renderTransitionalEntry = (tempId: string) => {

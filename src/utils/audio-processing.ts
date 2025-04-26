@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -350,7 +349,14 @@ export function isProcessingEntryCompleted(tempId: string): boolean {
   
   // Check if it has a mapped entry ID
   const entryId = getEntryIdForProcessingId(tempId);
-  return entryId !== undefined;
+  if (entryId !== undefined) {
+    // Also mark as completed for future checks
+    completedProcessingEntries.set(tempId, true);
+    completedProcessingEntries.set(baseTempId, true);
+    return true;
+  }
+  
+  return false;
 }
 
 /**
@@ -372,84 +378,31 @@ export function removeProcessingEntryById(entryId: number | string): void {
     deletedProcessingIds.add(baseTempId);
     console.log(`[Audio Processing] Added processing ID ${baseTempId} to deleted processing set`);
     
-    // Also add to session storage deleted set for iOS
-    try {
-      const deletedIds = sessionStorage.getItem('deletedProcessingIds');
-      const idsSet = deletedIds ? new Set(JSON.parse(deletedIds)) : new Set();
-      idsSet.add(baseTempId);
-      sessionStorage.setItem('deletedProcessingIds', JSON.stringify(Array.from(idsSet)));
-    } catch (error) {
-      console.error('[Audio Processing] Error updating session storage deleted IDs:', error);
-    }
+    // Also mark as completed to prevent reappearance
+    completedProcessingEntries.set(baseTempId, true);
   }
   
-  // Then, clean up the map storage
+  // Clean up the map storage
   try {
     const processingToEntryMap = localStorage.getItem('processingToEntryMap');
     if (processingToEntryMap) {
       const map = JSON.parse(processingToEntryMap);
-      const idStr = String(entryId);
-      
-      // Find and remove any entry with this ID
       let hasChanges = false;
+      
       Object.keys(map).forEach(tempId => {
-        // Extract base tempId without timestamp if it has one
         const baseTempId = tempId.includes('-') ? tempId.split('-')[0] : tempId;
         
-        if (String(map[tempId]) === idStr) {
+        if (String(map[tempId]) === String(entryId)) {
           delete map[tempId];
           hasChanges = true;
-          // Also remove from memory map
           processingToEntryIdMap.delete(tempId);
           processingToEntryIdMap.delete(baseTempId);
-          // Mark as completed (technically deleted, but this prevents it from showing again)
           completedProcessingEntries.set(tempId, true);
           completedProcessingEntries.set(baseTempId, true);
-          // And mark as deleted
           deletedProcessingIds.add(baseTempId);
-          
-          // Remove from session storage too
-          sessionStorage.removeItem(`processing_${tempId}`);
-          sessionStorage.removeItem(`processing_${baseTempId}`);
-          
-          console.log(`[Audio Processing] Removed mapping for tempId ${tempId} -> ${idStr}`);
         }
       });
       
-      // If this is a temp ID itself, mark it as deleted
-      if (typeof entryId === 'string') {
-        // Extract base tempId without timestamp if it has one
-        const baseTempId = entryId.includes('-') ? entryId.split('-')[0] : entryId;
-        deletedProcessingIds.add(baseTempId);
-        completedProcessingEntries.set(baseTempId, true);
-        
-        // Add to session storage deleted set for iOS
-        try {
-          const deletedIds = sessionStorage.getItem('deletedProcessingIds');
-          const idsSet = deletedIds ? new Set(JSON.parse(deletedIds)) : new Set();
-          idsSet.add(baseTempId);
-          sessionStorage.setItem('deletedProcessingIds', JSON.stringify(Array.from(idsSet)));
-        } catch (error) {
-          console.error('[Audio Processing] Error updating session storage deleted IDs:', error);
-        }
-        
-        if (map[entryId] || map[baseTempId]) {
-          const mappedEntryId = Number(map[entryId] || map[baseTempId]);
-          if (!isNaN(mappedEntryId)) {
-            deletedEntryIds.add(mappedEntryId);
-            console.log(`[Audio Processing] Added mapped entry ID ${mappedEntryId} to deleted entries set`);
-          }
-          delete map[entryId];
-          delete map[baseTempId];
-          hasChanges = true;
-          
-          // Remove from session storage too
-          sessionStorage.removeItem(`processing_${entryId}`);
-          sessionStorage.removeItem(`processing_${baseTempId}`);
-        }
-      }
-      
-      // Update storage if changes were made
       if (hasChanges) {
         localStorage.setItem('processingToEntryMap', JSON.stringify(map));
         
@@ -459,32 +412,16 @@ export function removeProcessingEntryById(entryId: number | string): void {
           return !deletedProcessingIds.has(baseTempId) && !isEntryDeleted(baseTempId);
         });
         
-        // Update session storage too
-        sessionStorage.setItem('processingEntries', JSON.stringify(currentEntries));
-        
-        // Dispatch an event to notify other components
+        // Dispatch events to notify components
         window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
           detail: { 
             entries: currentEntries,
             lastUpdate: Date.now(),
-            removedId: idStr,
+            removedId: String(entryId),
             forceUpdate: true 
           }
         }));
         
-        // Also dispatch after a small delay - iOS needs this redundancy
-        setTimeout(() => {
-          window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-            detail: { 
-              entries: currentEntries,
-              lastUpdate: Date.now() + 1,
-              removedId: idStr,
-              forceUpdate: true 
-            }
-          }));
-        }, 100);
-        
-        // Dispatch completion event
         window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
           detail: { 
             tempId: entryId, 
@@ -497,7 +434,7 @@ export function removeProcessingEntryById(entryId: number | string): void {
     console.error('[Audio Processing] Error removing entry from processing map:', error);
   }
   
-  // Also, ensure we update the UI by dispatching an additional event
+  // Also dispatch an entryDeleted event
   window.dispatchEvent(new CustomEvent('entryDeleted', {
     detail: { entryId }
   }));
