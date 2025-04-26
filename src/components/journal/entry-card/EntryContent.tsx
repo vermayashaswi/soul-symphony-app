@@ -15,7 +15,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
   
-  // Force a minimum loading time of 1.5 seconds for better UX, reduced from 2 seconds
+  // Force a minimum loading time of 1 second for better UX, reduced from 1.5 seconds
   const [forceLoading, setForceLoading] = useState(false);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       // Set a minimum loading time for better UX
       const timer = setTimeout(() => {
         setForceLoading(false);
-      }, 1500); // Reduced from 2000ms to 1500ms
+      }, 1000); // Reduced from 1500ms to 1000ms
       
       return () => clearTimeout(timer);
     }
@@ -65,9 +65,9 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       ) : isExpanded ? (
         <motion.div
           key="expanded"
-          initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+          initial={{ opacity: 0.7 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+          exit={{ opacity: 0.7 }}
           transition={{ duration: 0.2 }}
         >
           <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
@@ -76,9 +76,9 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
         <motion.p
           key="collapsed" 
           className="text-xs md:text-sm text-foreground line-clamp-3"
-          initial={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+          initial={{ opacity: 0.7 }}
           animate={{ opacity: 1 }}
-          exit={{ opacity: 0.7 }} // Changed from 0 to 0.7 to avoid framer-motion warning
+          exit={{ opacity: 0.7 }}
           transition={{ duration: 0.2 }}
         >
           {stableContent}

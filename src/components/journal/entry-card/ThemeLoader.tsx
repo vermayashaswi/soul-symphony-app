@@ -3,6 +3,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import ThemeBoxes from '../ThemeBoxes';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
+import { triggerThemeExtraction } from '@/utils/audio/theme-extractor';
 
 interface ThemeLoaderProps {
   entryId: number;
@@ -39,11 +40,24 @@ export function ThemeLoader({
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const themeUpdateTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initialFetchRef = useRef<boolean>(false);
 
   // Log when the component is mounted/unmounted
   useEffect(() => {
     console.log(`[ThemeLoader] Mounted for entry ${entryId}`);
     mountedRef.current = true;
+    
+    // Add an immediate fetch when component mounts if we have initialThemes
+    if (initialThemes && initialThemes.length > 0) {
+      setThemes(initialThemes);
+      setStableThemes(initialThemes);
+      setThemesLoaded(true);
+      setHasFoundThemes(true);
+      setIsThemesLoading(false);
+    } else if (entryId && !isProcessing) {
+      // Trigger a theme extraction immediately if we don't have themes
+      fetchThemesImmediately();
+    }
     
     return () => {
       console.log(`[ThemeLoader] Unmounted for entry ${entryId}`);
@@ -65,7 +79,70 @@ export function ThemeLoader({
         themeUpdateTimeoutRef.current = null;
       }
     };
-  }, [entryId]);
+  }, [entryId, initialThemes]);
+
+  // Function to immediately try to fetch themes
+  const fetchThemesImmediately = async () => {
+    if (!entryId || initialFetchRef.current) return;
+    
+    initialFetchRef.current = true;
+    console.log(`[ThemeLoader] Immediate fetch attempt for entry ${entryId}`);
+    
+    try {
+      const { data, error } = await supabase
+        .from('Journal Entries')
+        .select('master_themes, themes')
+        .eq('id', entryId)
+        .maybeSingle();
+        
+      if (error) {
+        console.warn(`[ThemeLoader] Error in immediate fetch: ${error.message}`);
+        // If we fail to fetch, trigger extraction
+        triggerThemeExtraction(entryId)
+          .then(success => console.log(`[ThemeLoader] Theme extraction triggered: ${success}`))
+          .catch(err => console.error('[ThemeLoader] Error triggering theme extraction:', err));
+        return;
+      }
+      
+      if (data && typeof data === 'object') {
+        const entryData = data as JournalEntry;
+        
+        // Safely extract themes with fallbacks
+        const updatedMasterThemes = Array.isArray(entryData.master_themes)
+          ? entryData.master_themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+          : [];
+          
+        const updatedThemes = Array.isArray(entryData.themes)
+          ? entryData.themes.filter(t => t && typeof t === 'string' && t.trim() !== '' && t !== '•') 
+          : [];
+          
+        const updatedCurrentThemes = updatedMasterThemes.length > 0 ? updatedMasterThemes : updatedThemes;
+        
+        if (updatedCurrentThemes.length > 0 && mountedRef.current) {
+          console.log(`[ThemeLoader] Immediate fetch found themes for entry ${entryId}:`, updatedCurrentThemes);
+          setStableThemes(updatedCurrentThemes);
+          setThemes(updatedCurrentThemes);
+          setThemesLoaded(true);
+          setIsThemesLoading(false);
+          setHasFoundThemes(true);
+          
+          // Dispatch an event to notify that we updated themes
+          window.dispatchEvent(new CustomEvent('themesUpdated', { 
+            detail: { entryId, themes: updatedCurrentThemes }
+          }));
+          return;
+        }
+      }
+      
+      // If we get here, we didn't find any themes, so trigger an extraction
+      triggerThemeExtraction(entryId)
+        .then(success => console.log(`[ThemeLoader] Theme extraction triggered: ${success}`))
+        .catch(err => console.error('[ThemeLoader] Error triggering theme extraction:', err));
+      
+    } catch (err) {
+      console.error(`[ThemeLoader] Error in immediate theme fetch: ${err}`);
+    }
+  };
 
   // Safely initialize themes with extensive defensive checks
   useEffect(() => {
@@ -91,6 +168,11 @@ export function ThemeLoader({
             setThemesLoaded(true);
             setIsThemesLoading(false);
             setHasFoundThemes(true);
+            
+            // Dispatch an event to notify that we updated themes
+            window.dispatchEvent(new CustomEvent('themesUpdated', { 
+              detail: { entryId, themes: filteredThemes }
+            }));
           }, 100);
         } else {
           setThemes([]);
@@ -101,8 +183,9 @@ export function ThemeLoader({
           
           // If we're not in a loading state and have no themes, and the entry is not new or processing,
           // we should try to fetch themes immediately
-          if (!shouldBeLoading && entryId) {
+          if (!shouldBeLoading && entryId && !initialFetchRef.current) {
             console.log(`[ThemeLoader] No initial themes, setting up immediate poll for entry ${entryId}`);
+            fetchThemesImmediately();
           }
         }
       }
@@ -183,15 +266,15 @@ export function ThemeLoader({
             setStableThemes(updatedCurrentThemes);
             setHasFoundThemes(true);
             
-            // Add a slight delay before updating the displayed themes to prevent flickering
-            clearTimeout(themeUpdateTimeoutRef.current || undefined);
-            themeUpdateTimeoutRef.current = setTimeout(() => {
-              if (mountedRef.current) {
-                setThemes(updatedCurrentThemes);
-                setIsThemesLoading(false);
-                setThemesLoaded(true);
-              }
-            }, 500);
+            // Set displayed themes immediately to fix the delayed appearance issue
+            setThemes(updatedCurrentThemes);
+            setIsThemesLoading(false);
+            setThemesLoaded(true);
+            
+            // Dispatch an event to notify that we updated themes
+            window.dispatchEvent(new CustomEvent('themesUpdated', { 
+              detail: { entryId, themes: updatedCurrentThemes }
+            }));
             
             // Stop polling since we found the themes
             if (pollIntervalRef.current) {
@@ -204,6 +287,14 @@ export function ThemeLoader({
               clearTimeout(safetyTimeoutRef.current);
               safetyTimeoutRef.current = null;
             }
+          } else if (!isProcessing && mountedRef.current && entryId) {
+            // If we don't have themes yet and we're not processing, try triggering theme extraction
+            console.log(`[ThemeLoader] No themes found yet, triggering extraction for entry ${entryId}`);
+            try {
+              await triggerThemeExtraction(entryId);
+            } catch (err) {
+              console.error('[ThemeLoader] Error triggering theme extraction:', err);
+            }
           }
         }
       } catch (err) {
@@ -215,9 +306,9 @@ export function ThemeLoader({
     pollForThemes();
     
     // Then set up interval polling - less frequent polling to reduce flickering
-    pollIntervalRef.current = setInterval(pollForThemes, 3000);
+    pollIntervalRef.current = setInterval(pollForThemes, 2000); // Poll every 2 seconds
     
-    // Safety timeout: after 30 seconds (increased from 20), stop trying and use fallback
+    // Safety timeout: after 20 seconds, stop trying and use fallback
     safetyTimeoutRef.current = setTimeout(() => {
       if (!mountedRef.current) return;
       
@@ -242,7 +333,7 @@ export function ThemeLoader({
         clearInterval(pollIntervalRef.current);
         pollIntervalRef.current = null;
       }
-    }, 30000);
+    }, 20000);
     
     // Cleanup on component unmount or deps change
     return () => {
