@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -49,31 +48,14 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       if (!contentReadyDispatchedRef.current) {
         contentReadyDispatchedRef.current = true;
         
-        // Dispatch three events in sequence to ensure card removal
-        // 1. Signal that content is ready
+        // Dispatch a single, comprehensive event
         window.dispatchEvent(new CustomEvent('entryContentReady', { 
           detail: { 
             content,
             timestamp: Date.now(),
             contentLength: content.length,
-            readyForDisplay: true
-          }
-        }));
-        
-        // 2. Force removal immediately
-        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-          detail: { 
-            content,
-            timestamp: Date.now(),
-            forceCleanup: true 
-          }
-        }));
-        
-        // 3. Signal processing complete
-        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-          detail: {
-            timestamp: Date.now(),
-            forceClearProcessingCard: true
+            readyForDisplay: true,
+            forceHideProcessing: true
           }
         }));
       }
