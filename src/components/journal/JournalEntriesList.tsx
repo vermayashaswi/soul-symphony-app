@@ -130,7 +130,7 @@ const JournalEntriesList = ({
   }, []);
 
   useEffect(() => {
-    const handleProcessingEntryMapped = (event: CustomEvent) => {
+    const handleProcessingEntryMapped = useCallback((event: CustomEvent) => {
       if (event.detail && event.detail.tempId && event.detail.entryId) {
         console.log(`[JournalEntriesList] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
         
@@ -156,6 +156,12 @@ const JournalEntriesList = ({
           return newSet;
         });
         
+        setVisibleProcessingEntries(prev => 
+          prev.filter(id => id !== event.detail.tempId)
+        );
+        
+        setProcessingCardShouldShow(false);
+        
         const matchedEntry = entries.find(entry => entry.id === event.detail.entryId);
         
         if (matchedEntry) {
@@ -167,69 +173,43 @@ const JournalEntriesList = ({
             return newMap;
           });
           
-          setTransitionalLoadingEntries(prev => {
-            if (prev.includes(event.detail.tempId)) return prev;
-            return [...prev, event.detail.tempId];
-          });
-          
           setTimeout(() => {
             if (componentMounted.current) {
-              setVisibleProcessingEntries(prev => 
+              setTransitionalLoadingEntries(prev => 
                 prev.filter(id => id !== event.detail.tempId)
               );
-              
-              setTimeout(() => {
-                if (componentMounted.current) {
-                  setTransitionalLoadingEntries(prev => 
-                    prev.filter(id => id !== event.detail.tempId)
-                  );
-                }
-              }, 100);
             }
-          }, 100);
-        } else {
-          console.log(`[JournalEntriesList] No matching entry found yet for ${event.detail.entryId}`);
-          
-          setProcessingToEntryMap(prev => {
-            const newMap = new Map(prev);
-            newMap.set(event.detail.tempId, event.detail.entryId);
-            return newMap;
-          });
+          }, 1000);
         }
         
-        const newEntryId = event.detail.entryId;
-        if (newEntryId) {
-          setRecentlyCompletedEntries(prev => {
-            if (prev.includes(newEntryId)) return prev;
-            return [...prev, newEntryId];
-          });
-          
-          setAnimatedEntryIds(prev => {
-            if (prev.includes(newEntryId)) return prev;
-            return [...prev, newEntryId];
-          });
-          
-          setTimeout(() => {
-            if (componentMounted.current) {
-              setAnimatedEntryIds(prev => prev.filter(id => id !== newEntryId));
-              
-              setTimeout(() => {
-                if (componentMounted.current) {
-                  setRecentlyCompletedEntries(prev => prev.filter(id => id !== newEntryId));
-                }
-              }, 5000);
-            }
-          }, 5000);
-        }
+        setProcessingToEntryMap(prev => {
+          const newMap = new Map(prev);
+          newMap.set(event.detail.tempId, event.detail.entryId);
+          return newMap;
+        });
       }
-    };
+    }, [entries, deletedEntryIds, deletedProcessingTempIds, processedProcessingIds]);
     
     window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     
     return () => {
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     };
-  }, [entries, processedProcessingIds, deletedEntryIds, deletedProcessingTempIds]);
+  }, [entries, deletedEntryIds, deletedProcessingTempIds, processedProcessingIds]);
+
+  useEffect(() => {
+    const cleanupInterval = setInterval(() => {
+      setVisibleProcessingEntries(prev => {
+        const now = Date.now();
+        return prev.filter(id => {
+          const timestamp = parseInt(id.split('-').pop() || '0');
+          return now - timestamp < 30000; // Remove entries older than 30 seconds
+        });
+      });
+    }, 5000);
+
+    return () => clearInterval(cleanupInterval);
+  }, []);
 
   useEffect(() => {
     if (entries.length > 0 && processingToEntryMap.size > 0) {

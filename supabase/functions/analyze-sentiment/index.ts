@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.7.1";
@@ -104,7 +103,7 @@ serve(async (req) => {
           type: 'PLAIN_TEXT',
           content: text,
         },
-        encodingType: 'UTF8'  // Added UTF-8 encoding parameter
+        encodingType: 'UTF8'
       }),
     });
 
@@ -117,30 +116,30 @@ serve(async (req) => {
         const errorJson = JSON.parse(error);
         console.error('Detailed API error:', errorJson);
         
-        // Check for common errors
         if (errorJson.error && errorJson.error.status === 'INVALID_ARGUMENT') {
-          console.error('Invalid argument error - check text format');
-          throw new Error(`Google API error: Invalid argument - check text format and encoding`);
+          throw new Error(`Google API error: Invalid argument - check text format`);
         } else if (errorJson.error && errorJson.error.status === 'PERMISSION_DENIED') {
-          console.error('Permission denied - check API key permissions');
-          throw new Error(`Google API error: Permission denied - check API key permissions`);
+          throw new Error(`Google API error: Permission denied - check API key`);
         } else if (errorJson.error && errorJson.error.message) {
           throw new Error(`Google API error: ${errorJson.error.message}`);
         }
-      } catch (e) {
-        if (e.message && e.message.includes("Google API error:")) {
-          throw e; // Re-throw our enhanced error message
-        }
+      } catch (parseError) {
+        console.error('Error parsing API error:', parseError);
+        throw new Error(`Failed to analyze sentiment: ${error}`);
       }
-      
-      throw new Error(`Google API error: ${error}`);
     }
 
     const result = await response.json();
-    const sentimentScore = result.documentSentiment?.score?.toString() || "0";
+    console.log('Raw sentiment result:', result);
     
-    console.log('Sentiment analysis result:', result);
-    console.log('Sentiment score:', sentimentScore);
+    // Better validation of sentiment score
+    if (!result.documentSentiment || typeof result.documentSentiment.score !== 'number') {
+      console.error('Invalid sentiment result:', result);
+      throw new Error('Invalid sentiment score received');
+    }
+    
+    const sentimentScore = result.documentSentiment.score.toString();
+    console.log('Extracted sentiment score:', sentimentScore);
     
     // Categorize the sentiment according to the specified ranges
     let sentimentCategory;
@@ -172,11 +171,13 @@ serve(async (req) => {
           
         if (updateError) {
           console.error('Error updating sentiment in database:', updateError);
-        } else {
-          console.log(`Successfully updated sentiment for entry ID: ${entryId}`);
+          throw new Error(`Failed to update sentiment: ${updateError.message}`);
         }
+        
+        console.log(`Successfully updated sentiment ${sentimentScore} for entry ID: ${entryId}`);
       } catch (updateError) {
         console.error('Error updating entry sentiment:', updateError);
+        throw updateError;
       }
     }
     
@@ -200,7 +201,7 @@ serve(async (req) => {
         success: false 
       }),
       {
-        status: 200, // Using 200 instead of error code to avoid CORS issues
+        status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );
