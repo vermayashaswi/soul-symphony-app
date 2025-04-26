@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Globe } from 'lucide-react';
 import {
@@ -11,6 +12,14 @@ import { toast } from 'sonner';
 import { createDebugger } from '@/utils/debug/debugUtils';
 
 const debug = createDebugger('languageSelector');
+
+// Explicitly declare google types to ensure TypeScript recognizes them
+declare global {
+  interface Window {
+    google: typeof google;
+    googleTranslateElementInit: () => void;
+  }
+}
 
 const LanguageSelector = () => {
   const [selectedLanguage, setSelectedLanguage] = useState('en');
@@ -61,7 +70,9 @@ const LanguageSelector = () => {
           document.body.appendChild(div);
         }
 
-        if (typeof window.google === 'undefined' || !window.google.translate) {
+        // Type guard to check if Google Translate is available
+        if (typeof window.google === 'undefined' || 
+            !window.google.translate) {
           if (initAttempts < maxAttempts) {
             initAttempts++;
             setTimeout(initializeTranslation, initInterval);
@@ -74,14 +85,22 @@ const LanguageSelector = () => {
 
         window.googleTranslateElementInit = () => {
           try {
-            new window.google.translate.TranslateElement({
-              pageLanguage: 'en',
-              includedLanguages: languages.map(lang => lang.code).join(','),
-              layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
-              autoDisplay: false
-            }, 'google_translate_element');
-            
-            setTranslationState('ready');
+            // Check if Google Translate API is available
+            if (window.google && 
+                window.google.translate && 
+                window.google.translate.TranslateElement) {
+              
+              new window.google.translate.TranslateElement({
+                pageLanguage: 'en',
+                includedLanguages: languages.map(lang => lang.code).join(','),
+                layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
+                autoDisplay: false
+              }, 'google_translate_element');
+              
+              setTranslationState('ready');
+            } else {
+              throw new Error('Google Translate API not available');
+            }
           } catch (err) {
             console.error('Error in translation initialization:', err);
             setTranslationState('error');
@@ -90,7 +109,9 @@ const LanguageSelector = () => {
         };
 
         // Force trigger initialization if needed
-        if (window.google && window.google.translate && window.google.translate.TranslateElement) {
+        if (window.google && 
+            window.google.translate && 
+            window.google.translate.TranslateElement) {
           window.googleTranslateElementInit();
         }
 
@@ -110,7 +131,7 @@ const LanguageSelector = () => {
   }, []);
 
   const handleLanguageChange = (languageCode: string) => {
-    debug('Language change requested:', languageCode);
+    debug.info('Language change requested:', languageCode);
     
     if (translationState !== 'ready') {
       toast.error('Language selector not ready. Please try again in a moment.');
