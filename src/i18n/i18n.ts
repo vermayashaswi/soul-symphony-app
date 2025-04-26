@@ -102,15 +102,15 @@ const detectionOptions = {
 
 // Debug function for all i18n operations
 const debugI18n = (message: string, args?: any) => {
-  if (process.env.NODE_ENV === 'development' || localStorage.getItem('debug_i18n') === 'true') {
-    console.log(`[i18n] ${message}`, args);
-  }
+  // Always enable debug for now to troubleshoot the Hindi translation issue
+  console.log(`[i18n] ${message}`, args);
 };
 
 // Apply HTML lang attribute after language detection
 const applyHtmlLang = (detected: string) => {
   const lang = detected || 'en';
   document.documentElement.lang = lang;
+  document.documentElement.setAttribute('data-language', lang); // Additional marker for CSS targeting
   debugI18n(`Applied language to HTML: ${lang}`);
   return lang;
 };
@@ -134,6 +134,43 @@ const addTranslationMarkers = () => {
       console.error('Error adding translation markers:', e);
     }
   }, 500);
+};
+
+// Force reload translations if needed
+const forceReloadTranslations = (lng: string) => {
+  // This is a hack to force reload translations if they're not loading properly
+  const reloadPromise = i18n.reloadResources(lng);
+  debugI18n(`Forced reload of translations for ${lng}`);
+  return reloadPromise;
+};
+
+// Verify translation completeness
+const verifyTranslationCompleteness = (lng: string) => {
+  debugI18n(`Verifying translation completeness for ${lng}`);
+  
+  if (!i18n.store.data[lng]?.translation) {
+    debugI18n(`WARNING: No translations found for ${lng}`, {
+      availableLanguages: Object.keys(i18n.store.data),
+      resourcesState: i18n.store.data
+    });
+    return false;
+  }
+  
+  const targetTranslation = i18n.store.data[lng].translation;
+  const englishTranslation = i18n.store.data.en.translation;
+  
+  const targetKeys = Object.keys(targetTranslation || {}).length;
+  const englishKeys = Object.keys(englishTranslation || {}).length;
+  
+  const completionPercentage = Math.round((targetKeys / englishKeys) * 100);
+  
+  debugI18n(`Translation completeness for ${lng}: ${completionPercentage}% (${targetKeys}/${englishKeys} keys)`, {
+    targetTranslation,
+    englishKeyCount: englishKeys,
+    targetKeyCount: targetKeys
+  });
+  
+  return completionPercentage >= 70; // Consider it complete enough if at least 70% translated
 };
 
 // Initialize i18next
@@ -182,6 +219,12 @@ i18n.on('initialized', (options) => {
   
   // Add translation markers to container elements
   addTranslationMarkers();
+  
+  // Verify the initial language translations are complete
+  verifyTranslationCompleteness(currentLang);
+  
+  // Force load the current language in case it wasn't loaded properly
+  forceReloadTranslations(currentLang);
 });
 
 i18n.on('loaded', (loaded) => {
@@ -199,6 +242,9 @@ i18n.on('loaded', (loaded) => {
   
   // Add translation markers again after resources are loaded
   addTranslationMarkers();
+  
+  // Verify the translations are complete
+  verifyTranslationCompleteness(currentLng);
 });
 
 i18n.on('languageChanged', (lng) => {
@@ -215,6 +261,12 @@ i18n.on('languageChanged', (lng) => {
   
   // Add translation markers to container elements after language change
   addTranslationMarkers();
+  
+  // Force load the translations for the new language in case they weren't loaded properly
+  forceReloadTranslations(lng);
+  
+  // Verify the translations are complete
+  verifyTranslationCompleteness(lng);
   
   // Force update any listeners
   document.dispatchEvent(new CustomEvent('languageChanged', { detail: { language: lng } }));
@@ -256,6 +308,35 @@ i18n.on('missingKey', (lngs, namespace, key, res) => {
   });
   
   return results;
+};
+
+// Add a debug helper
+(window as any).debugLangState = () => {
+  console.group('i18n Language State Debug Info');
+  console.log('Current language:', i18n.language);
+  console.log('Detected languages:', i18n.languages);
+  console.log('HTML lang attribute:', document.documentElement.lang);
+  console.log('localStorage language:', localStorage.getItem('i18nextLng'));
+  console.log('navigator.language:', navigator.language);
+  console.log('Available languages in store:', Object.keys(i18n.store.data));
+  
+  if (i18n.store.data[i18n.language]?.translation) {
+    console.log(`Keys for ${i18n.language}:`, Object.keys(i18n.store.data[i18n.language].translation).length);
+  } else {
+    console.warn(`No translations found for ${i18n.language}`);
+  }
+  
+  console.groupEnd();
+  
+  return {
+    currentLang: i18n.language,
+    htmlLang: document.documentElement.lang,
+    storedLang: localStorage.getItem('i18nextLng'),
+    navLang: navigator.language,
+    availableLangs: Object.keys(i18n.store.data),
+    translationKeys: i18n.store.data[i18n.language]?.translation ? 
+      Object.keys(i18n.store.data[i18n.language].translation).length : 0
+  };
 };
 
 export default i18n;
