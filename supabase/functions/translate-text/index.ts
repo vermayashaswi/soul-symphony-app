@@ -27,6 +27,8 @@ serve(async (req) => {
       throw new Error('Missing required parameters');
     }
 
+    console.log(`Translating text for entry ${entryId}: "${text.substring(0, 50)}..." from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}`);
+
     // First detect the language if sourceLanguage is not provided
     let detectedLanguage = sourceLanguage;
     if (!sourceLanguage) {
@@ -39,11 +41,24 @@ serve(async (req) => {
         }
       );
 
+      if (!detectResponse.ok) {
+        const errorData = await detectResponse.text();
+        console.error(`Language detection failed with status ${detectResponse.status}: ${errorData}`);
+        throw new Error(`Language detection failed: ${detectResponse.statusText}`);
+      }
+
       const detectData = await detectResponse.json();
+      if (!detectData.data || !detectData.data.detections || !detectData.data.detections[0] || !detectData.data.detections[0][0]) {
+        console.error('Invalid detection response format:', JSON.stringify(detectData));
+        throw new Error('Invalid detection response format');
+      }
+      
       detectedLanguage = detectData.data.detections[0][0].language;
+      console.log(`Detected language: ${detectedLanguage}`);
     }
 
     // Then translate the text
+    console.log(`Sending translation request from ${detectedLanguage} to ${targetLanguage}`);
     const translateResponse = await fetch(
       `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`,
       {
@@ -58,8 +73,23 @@ serve(async (req) => {
       }
     );
 
+    if (!translateResponse.ok) {
+      const errorData = await translateResponse.text();
+      console.error(`Translation failed with status ${translateResponse.status}: ${errorData}`);
+      throw new Error(`Translation failed: ${translateResponse.statusText}`);
+    }
+
     const translateData = await translateResponse.json();
+    console.log('Translation API response:', JSON.stringify(translateData));
+    
+    // Check if the response has the expected structure
+    if (!translateData.data || !translateData.data.translations || !translateData.data.translations[0]) {
+      console.error('Invalid translation response format:', JSON.stringify(translateData));
+      throw new Error('Invalid translation response format');
+    }
+    
     const translatedText = translateData.data.translations[0].translatedText;
+    console.log(`Translated text: "${translatedText.substring(0, 50)}..."`);
 
     // Update the database with the translation
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -81,15 +111,18 @@ serve(async (req) => {
       };
     }
 
+    console.log(`Updating entry ${entryId} with translated text`);
     const { error: updateError } = await supabase
       .from('Journal Entries')
       .update(updateFields)
       .eq('id', entryId);
 
     if (updateError) {
+      console.error(`Database update error: ${updateError.message}`, updateError);
       throw updateError;
     }
 
+    console.log(`Successfully updated entry ${entryId}`);
     return new Response(
       JSON.stringify({
         translatedText,
@@ -103,7 +136,7 @@ serve(async (req) => {
     );
 
   } catch (error) {
-    console.error('Error:', error);
+    console.error('Error in translate-text function:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
       {

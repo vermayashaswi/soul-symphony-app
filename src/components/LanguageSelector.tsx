@@ -37,7 +37,11 @@ const LanguageSelector = () => {
           .eq('translation_status', 'pending')
           .order('created_at', { ascending: false });
 
-        if (fetchError) throw fetchError;
+        if (fetchError) {
+          console.error('Error fetching entries:', fetchError);
+          toast.error('Error fetching entries for translation');
+          return;
+        }
         
         // Make sure data is valid and is an array
         if (!data || !Array.isArray(data)) {
@@ -52,9 +56,15 @@ const LanguageSelector = () => {
           entry["refined text"]
         );
 
+        console.log(`Found ${validEntries.length} entries to translate`);
+        
+        let successCount = 0;
+        let errorCount = 0;
+
         // Translate each valid entry
         for (const entry of validEntries) {
           try {
+            console.log(`Translating entry ${entry.id}`);
             const response = await supabase.functions.invoke('translate-text', {
               body: {
                 text: entry["refined text"],
@@ -65,17 +75,29 @@ const LanguageSelector = () => {
             });
 
             if (response.error) {
-              console.error('Translation error:', response.error);
-              toast.error('Error translating some entries');
+              console.error(`Translation error for entry ${entry.id}:`, response.error);
+              errorCount++;
+            } else {
+              console.log(`Successfully translated entry ${entry.id}`);
+              successCount++;
             }
           } catch (err) {
-            console.error('Translation invoke error:', err);
-            toast.error('Error connecting to translation service');
+            console.error(`Translation invoke error for entry ${entry.id}:`, err);
+            errorCount++;
           }
         }
 
-        if (validEntries.length) {
-          toast.success(`Translating ${validEntries.length} entries to Hindi`);
+        // Show appropriate toast message based on results
+        if (successCount > 0) {
+          toast.success(`Successfully translated ${successCount} entries to Hindi`);
+        }
+        
+        if (errorCount > 0) {
+          toast.error(`Error translating ${errorCount} entries`);
+        }
+        
+        if (validEntries.length === 0) {
+          toast.info('No entries found that need translation');
         }
       } catch (error) {
         console.error('Error in translation process:', error);
