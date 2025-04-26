@@ -633,7 +633,7 @@ export function JournalEntriesList({
     setIsSearchActive(results.length !== localEntries.length);
   };
   
-  const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !hasProcessingEntries;
+  const showInitialLoading = loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !visibleProcessingEntries.length;
   
   const isLikelyNewUser = !loading && (!Array.isArray(localEntries) || localEntries.length === 0) && !visibleProcessingEntries.length;
 
@@ -755,7 +755,6 @@ export function JournalEntriesList({
   );
 
   useEffect(() => {
-    // Update entry IDs set when entries change
     entryIdsSet.current = new Set(entries.map(e => e.id));
   }, [entries]);
 
