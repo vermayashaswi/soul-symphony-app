@@ -30,7 +30,7 @@ const LanguageSelector = () => {
     if (user && languageCode === 'hi') {
       try {
         // Get the latest journal entries that need translation
-        const { data: entries, error: fetchError } = await supabase
+        const { data: entriesData, error: fetchError } = await supabase
           .from('Journal Entries')
           .select('id, refined text, translation_status')
           .eq('user_id', user.id)
@@ -38,11 +38,14 @@ const LanguageSelector = () => {
           .order('created_at', { ascending: false });
 
         if (fetchError) throw fetchError;
+        
+        // Type guard to ensure entries is an array
+        const entries = Array.isArray(entriesData) ? entriesData : [];
 
         // Translate each entry
-        for (const entry of entries || []) {
-          // Ensure entry has the properties we need before proceeding
-          if (entry && entry.id && entry['refined text']) {
+        for (const entry of entries) {
+          // Type guard to ensure entry has required properties
+          if (entry && typeof entry.id === 'number' && entry['refined text']) {
             try {
               const response = await supabase.functions.invoke('translate-text', {
                 body: {
@@ -64,7 +67,7 @@ const LanguageSelector = () => {
           }
         }
 
-        if (entries?.length) {
+        if (entries.length) {
           toast.success(`Translating ${entries.length} entries to Hindi`);
         }
       } catch (error) {
