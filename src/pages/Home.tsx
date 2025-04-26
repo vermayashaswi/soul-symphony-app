@@ -1,7 +1,7 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
+import LanguageSelector from '@/components/LanguageSelector';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { format } from 'date-fns';
@@ -234,6 +234,10 @@ const Home = () => {
 
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
+      </div>
+
+      <div className="absolute top-4 right-4 z-50">
+        <LanguageSelector />
       </div>
     </div>
   );
