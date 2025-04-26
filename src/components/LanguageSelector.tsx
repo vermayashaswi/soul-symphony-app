@@ -89,6 +89,9 @@ const LanguageSelector = () => {
           document.body.appendChild(div);
         }
 
+        // Force English as the default language
+        document.documentElement.lang = 'en';
+
         // Type guard to check if Google Translate is available
         if (typeof window.google === 'undefined' || 
             !window.google.translate) {
@@ -110,7 +113,7 @@ const LanguageSelector = () => {
                 window.google.translate.TranslateElement) {
               
               new window.google.translate.TranslateElement({
-                pageLanguage: 'en',
+                pageLanguage: 'en', // Always set English as page language
                 includedLanguages: languages.map(lang => lang.code).join(','),
                 layout: window.google.translate.TranslateElement.InlineLayout.SIMPLE,
                 autoDisplay: false

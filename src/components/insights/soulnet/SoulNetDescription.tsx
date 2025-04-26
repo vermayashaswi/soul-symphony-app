@@ -1,16 +1,15 @@
 
 import React from 'react';
-import { useTranslation } from 'react-i18next';
 
 export const SoulNetDescription: React.FC = () => {
-  const { t } = useTranslation();
   console.log("Rendering SoulNetDescription component");
   
   return (
     <div className="mb-4 p-4 md:mb-6">
-      <h2 className="text-lg font-semibold mb-2">{t('insights.soulnet.title')}</h2>
+      <h2 className="text-lg font-semibold mb-2">SoulNet Visualization</h2>
       <p className="text-muted-foreground text-sm">
-        {t('insights.soulnet.description')}
+        Explore the connections between people, places, and emotions in your journal entries. 
+        The visualization shows how different entities in your life relate to various emotional states.
       </p>
     </div>
   );

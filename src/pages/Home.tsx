@@ -1,5 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import { useTranslation } from 'react-i18next';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
 import { motion } from 'framer-motion';
@@ -14,7 +13,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 
 const Home = () => {
-  const { t } = useTranslation();
   const { user } = useAuth();
   const { colorTheme, theme } = useTheme();
   const [displayName, setDisplayName] = useState<string | null>(null);
@@ -91,16 +89,16 @@ const Home = () => {
   const getJournalName = () => {
     if (displayName) {
       return displayName.endsWith('s') ? 
-        t('journal.possessiveTitle', { name: displayName }) : 
-        t('journal.title', { name: displayName });
+        `${displayName}' Journal` : 
+        `${displayName}'s Journal`;
     }
     if (user?.email) {
       const name = user.email.split('@')[0];
       return name.endsWith('s') ? 
-        t('journal.possessiveTitle', { name }) : 
-        t('journal.title', { name });
+        `${name}' Journal` : 
+        `${name}'s Journal`;
     }
-    return t('journal.defaultTitle');
+    return "Your Journal";
   };
 
   const containerVariants = {
