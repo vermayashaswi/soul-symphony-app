@@ -48,18 +48,41 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   useEffect(() => {
     const stepInterval = setInterval(() => {
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
-    }, 2500); // Slowed down slightly to make steps more visible
+      
+      // Notify about the processing step change
+      const currentStep = processingSteps[(currentStepIndex + 1) % processingSteps.length];
+      window.dispatchEvent(new CustomEvent('processingStepChanged', {
+        detail: { step: currentStep.id, text: currentStep.text }
+      }));
+      
+    }, 2000); // Each step takes 2 seconds
     
     // Set a timeout to show a message if processing is taking too long
     const longProcessingTimeout = setTimeout(() => {
       setProcessingTakingTooLong(true);
-    }, 30000); // 30 seconds
+      
+      // Notify that processing is taking a long time
+      window.dispatchEvent(new CustomEvent('processingTakingLong', {
+        detail: { timestamp: Date.now() }
+      }));
+      
+    }, 15000); // Reduced from 30 seconds to 15 seconds
+    
+    // Notify when loading content is mounted
+    window.dispatchEvent(new CustomEvent('loadingContentMounted', {
+      detail: { timestamp: Date.now() }
+    }));
     
     return () => {
       clearInterval(stepInterval);
       clearTimeout(longProcessingTimeout);
+      
+      // Notify when loading content is unmounted
+      window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {
+        detail: { timestamp: Date.now() }
+      }));
     };
-  }, []);
+  }, [currentStepIndex]);
   
   const currentStep = processingSteps[currentStepIndex];
   

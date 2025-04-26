@@ -9,7 +9,7 @@ let isEntryBeingProcessed = false;
 let processingLock = false;
 let processingTimeoutId: NodeJS.Timeout | null = null;
 let lastStateChangeTime = 0;
-const DEBOUNCE_THRESHOLD = 100; // Reduced from 200ms to 100ms to be more responsive
+const DEBOUNCE_THRESHOLD = 50; // Reduced from 100ms to 50ms to be more responsive
 
 // Store processing entries in localStorage to persist across navigations
 export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove') => {
@@ -34,8 +34,15 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
       
       // Add explicit cleanup here to ensure completed entries are properly marked
       window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-        detail: { tempId, timestamp: now }
+        detail: { tempId, timestamp: now, forceClearProcessingCard: true }
       }));
+      
+      // Also send a follow-up event to ensure processing card is removed
+      setTimeout(() => {
+        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+          detail: { tempId, timestamp: now }
+        }));
+      }, 300);
     }
     
     localStorage.setItem('processingEntries', JSON.stringify(entries));
@@ -102,6 +109,11 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
       
       // Fire these events synchronously so they happen immediately
       window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+        detail: { tempId: idStr, timestamp: now, forceClearProcessingCard: true }
+      }));
+      
+      // Immediately send an event to force removal of processing cards
+      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
         detail: { tempId: idStr, timestamp: now }
       }));
       
@@ -155,9 +167,14 @@ export function resetProcessingState(): void {
     detail: { entries: [], reset: true, lastUpdate: Date.now(), forceUpdate: true }
   }));
   
+  // Forcefully remove all processing cards
+  window.dispatchEvent(new CustomEvent('forceRemoveAllProcessingCards', {
+    detail: { timestamp: Date.now() }
+  }));
+  
   // Also dispatch a completion event for all entries
   window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-    detail: { tempId: 'all', timestamp: Date.now() }
+    detail: { tempId: 'all', timestamp: Date.now(), forceClearProcessingCard: true }
   }));
 }
 

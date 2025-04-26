@@ -22,6 +22,14 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
         detail: { entryId }
       }));
       
+      // Immediately force clear any processing cards for this entry
+      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+        detail: { 
+          associatedEntryId: entryId, 
+          timestamp: Date.now() 
+        }
+      }));
+      
       const success = await triggerThemeExtraction(entryId);
       
       if (success) {
@@ -37,7 +45,7 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
           window.dispatchEvent(new CustomEvent('checkForThemesNow', { 
             detail: { entryId }
           }));
-        }, 500);
+        }, 300); // Reduced from 500ms to 300ms
       } else {
         toast.error('Failed to extract themes');
         

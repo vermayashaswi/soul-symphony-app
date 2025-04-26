@@ -15,7 +15,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
   
-  // Force a minimum loading time of 0.5 seconds for better UX, reduced from 1 second
+  // Force a minimum loading time of 0.3 seconds for better UX, reduced from 0.5 seconds
   const [forceLoading, setForceLoading] = useState(false);
 
   useEffect(() => {
@@ -27,7 +27,7 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       // Set a minimum loading time for better UX, but shorter than before
       const timer = setTimeout(() => {
         setForceLoading(false);
-      }, 500); // Reduced from 1000ms to 500ms for faster response
+      }, 300); // Reduced from 500ms to 300ms for faster response
       
       return () => clearTimeout(timer);
     }
@@ -45,9 +45,14 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       setShowLoading(false);
       setStableContent(content);
       
-      // Dispatch an event to notify that content is ready
+      // Dispatch an event to notify that content is ready with more details
       window.dispatchEvent(new CustomEvent('entryContentReady', { 
-        detail: { content }
+        detail: { 
+          content,
+          timestamp: Date.now(),
+          contentLength: content.length,
+          readyForDisplay: true
+        }
       }));
     }
     
