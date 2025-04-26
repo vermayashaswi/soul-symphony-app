@@ -641,8 +641,6 @@ const JournalEntriesList = ({
     }
   }
   
-  const finalDisplayEntries = Array.from(uniqueEntriesMap.values());
-  
   const processedTransitionalEntries = transitionalLoadingEntries.filter(tempId => {
     const actualEntry = processingToActualEntry.get(tempId);
     return actualEntry && 
