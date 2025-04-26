@@ -236,7 +236,7 @@ const Home = () => {
         <InspirationalQuote />
       </div>
 
-      <div className="absolute top-4 right-4 z-50">
+      <div className="absolute top-4 right-4 z-[100]">
         <LanguageSelector />
       </div>
     </div>
