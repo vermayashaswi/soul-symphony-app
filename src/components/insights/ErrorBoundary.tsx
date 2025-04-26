@@ -1,12 +1,9 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertCircle, RefreshCw } from 'lucide-react';
-import { Button } from '@/components/ui/button';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
-  onReset?: () => void;
 }
 
 interface State {
@@ -21,31 +18,14 @@ class ErrorBoundary extends Component<Props, State> {
   }
 
   static getDerivedStateFromError(error: Error): State {
-    console.error("Insights ErrorBoundary caught error:", error);
+    // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
 
   componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error("Insights ErrorBoundary componentDidCatch:", error);
-    console.error("Error stack:", errorInfo.componentStack);
+    // You can log the error to an error reporting service
+    console.error("Insights component error:", error, errorInfo);
   }
-  
-  resetErrorState = () => {
-    console.log('Insights ErrorBoundary: Resetting error state');
-    this.setState({ hasError: false, error: null });
-    
-    // Wait for state to update before calling onReset
-    setTimeout(() => {
-      if (this.props.onReset) {
-        console.log('Insights ErrorBoundary: Calling onReset callback');
-        this.props.onReset();
-      } else {
-        // If no onReset provided, reload the page
-        console.log('Insights ErrorBoundary: No onReset provided, reloading page');
-        window.location.reload();
-      }
-    }, 0);
-  };
 
   render(): ReactNode {
     if (this.state.hasError) {
@@ -53,19 +33,18 @@ class ErrorBoundary extends Component<Props, State> {
       return this.props.fallback || (
         <div className="p-6 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded-lg max-w-3xl mx-auto my-8">
           <h2 className="text-xl font-semibold text-red-800 dark:text-red-300 mb-2">Something went wrong</h2>
-          <details className="bg-white dark:bg-gray-800 p-4 rounded-md my-4">
+          <details className="bg-white dark:bg-gray-800 p-4 rounded-md">
             <summary className="cursor-pointer font-medium mb-2">Error details</summary>
             <pre className="text-sm overflow-auto p-2 bg-gray-100 dark:bg-gray-900 rounded">
-              {this.state.error?.toString() || 'Unknown error'}
+              {this.state.error?.toString()}
             </pre>
           </details>
-          <Button
-            className="mt-4 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
-            onClick={this.resetErrorState}
+          <button
+            className="mt-4 px-4 py-2 bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+            onClick={() => window.location.reload()}
           >
-            <RefreshCw className="w-4 h-4 mr-2" /> 
-            Retry
-          </Button>
+            Reload page
+          </button>
         </div>
       );
     }

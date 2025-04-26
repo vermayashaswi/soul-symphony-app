@@ -71,7 +71,6 @@ serve(async (req) => {
     const { text, entryId, processTranslated = false } = requestData;
     
     if (!text) {
-      console.error("No text provided for sentiment analysis");
       throw new Error("No text provided for analysis");
     }
     
@@ -83,7 +82,6 @@ serve(async (req) => {
     const apiKey = Deno.env.get('GOOGLE_API');
     
     if (!apiKey) {
-      console.error("Google API key is not configured");
       throw new Error("Google API key is not configured");
     }
     
@@ -92,10 +90,6 @@ serve(async (req) => {
       console.error('Google NL API key appears invalid (format check failed)');
       throw new Error("Google API key appears to be invalid");
     }
-    
-    // Limit text length to avoid API issues (Google NL has a limit)
-    const maxTextLength = 100000;
-    const processedText = text.length > maxTextLength ? text.substring(0, maxTextLength) : text;
     
     console.log('Analyzing sentiment using Google NL API with UTF-8 encoding...');
     
@@ -108,9 +102,9 @@ serve(async (req) => {
       body: JSON.stringify({
         document: {
           type: 'PLAIN_TEXT',
-          content: processedText,
+          content: text,
         },
-        encodingType: 'UTF8'
+        encodingType: 'UTF8'  // Added UTF-8 encoding parameter
       }),
     });
 
@@ -123,55 +117,43 @@ serve(async (req) => {
         const errorJson = JSON.parse(error);
         console.error('Detailed API error:', errorJson);
         
+        // Check for common errors
         if (errorJson.error && errorJson.error.status === 'INVALID_ARGUMENT') {
-          throw new Error(`Google API error: Invalid argument - check text format`);
+          console.error('Invalid argument error - check text format');
+          throw new Error(`Google API error: Invalid argument - check text format and encoding`);
         } else if (errorJson.error && errorJson.error.status === 'PERMISSION_DENIED') {
-          throw new Error(`Google API error: Permission denied - check API key`);
+          console.error('Permission denied - check API key permissions');
+          throw new Error(`Google API error: Permission denied - check API key permissions`);
         } else if (errorJson.error && errorJson.error.message) {
           throw new Error(`Google API error: ${errorJson.error.message}`);
         }
-      } catch (parseError) {
-        console.error('Error parsing API error:', parseError);
-        throw new Error(`Failed to analyze sentiment: ${error}`);
+      } catch (e) {
+        if (e.message && e.message.includes("Google API error:")) {
+          throw e; // Re-throw our enhanced error message
+        }
       }
+      
+      throw new Error(`Google API error: ${error}`);
     }
 
     const result = await response.json();
-    console.log('Raw sentiment result:', result);
+    const sentimentScore = result.documentSentiment?.score?.toString() || "0";
     
-    // Better validation of sentiment score with default fallback
-    let sentimentScore = 0;
-    let validScore = false;
-    
-    if (result.documentSentiment && typeof result.documentSentiment.score === 'number') {
-      sentimentScore = result.documentSentiment.score;
-      validScore = !isNaN(sentimentScore);
-      console.log('Extracted sentiment score:', sentimentScore, 'Valid:', validScore);
-    } else {
-      console.error('Invalid sentiment result structure:', result);
-    }
-    
-    if (!validScore) {
-      console.warn('Got invalid sentiment score, using default 0');
-      sentimentScore = 0;
-    }
+    console.log('Sentiment analysis result:', result);
+    console.log('Sentiment score:', sentimentScore);
     
     // Categorize the sentiment according to the specified ranges
     let sentimentCategory;
+    const score = parseFloat(sentimentScore);
     
-    if (isNaN(sentimentScore)) {
-      console.error('Sentiment score is NaN, defaulting to neutral');
-      sentimentCategory = "neutral";
-      sentimentScore = 0;
-    } else if (sentimentScore >= 0.3) {
+    if (score >= 0.3) {
       sentimentCategory = "positive";
-    } else if (sentimentScore >= -0.1) {
+    } else if (score >= -0.1) {
       sentimentCategory = "neutral";
     } else {
       sentimentCategory = "negative";
     }
     
-    console.log('Final sentiment score:', sentimentScore);
     console.log('Sentiment category:', sentimentCategory);
     
     // If an entry ID was provided, update the entry directly
@@ -183,33 +165,24 @@ serve(async (req) => {
         
         console.log(`Updating sentiment directly for entry ID: ${entryId}`);
         
-        // Ensure we have a valid numerical string for the sentiment score
-        // If the score is NaN or invalid, use "0"
-        const finalSentimentScore = isNaN(sentimentScore) ? "0" : sentimentScore.toString();
-        
         const { error: updateError } = await supabase
           .from('Journal Entries')
-          .update({ sentiment: finalSentimentScore })
+          .update({ sentiment: sentimentScore })
           .eq('id', entryId);
           
         if (updateError) {
           console.error('Error updating sentiment in database:', updateError);
-          throw new Error(`Failed to update sentiment: ${updateError.message}`);
+        } else {
+          console.log(`Successfully updated sentiment for entry ID: ${entryId}`);
         }
-        
-        console.log(`Successfully updated sentiment ${finalSentimentScore} for entry ID: ${entryId}`);
       } catch (updateError) {
         console.error('Error updating entry sentiment:', updateError);
-        throw updateError;
       }
     }
     
-    // Ensure the return value is a valid string
-    const sentimentScoreString = isNaN(sentimentScore) ? "0" : sentimentScore.toString();
-    
     return new Response(
       JSON.stringify({ 
-        sentiment: sentimentScoreString,
+        sentiment: sentimentScore,
         category: sentimentCategory,
         success: true,
         processedTranslated: processTranslated
@@ -227,7 +200,7 @@ serve(async (req) => {
         success: false 
       }),
       {
-        status: 500,
+        status: 200, // Using 200 instead of error code to avoid CORS issues
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       }
     );

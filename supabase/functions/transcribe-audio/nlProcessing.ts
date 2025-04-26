@@ -21,10 +21,6 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
       return { sentiment: "0" };
     }
     
-    // Limit text length to avoid API issues
-    const maxTextLength = 100000;
-    const processedText = text.length > maxTextLength ? text.substring(0, maxTextLength) : text;
-    
     // Make the API call for sentiment analysis
     console.log('Making sentiment analysis request to Google NL API...');
     const sentimentResponse = await fetch(`https://language.googleapis.com/v1/documents:analyzeSentiment?key=${googleNLApiKey}`, {
@@ -35,7 +31,7 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
       body: JSON.stringify({
         document: {
           type: 'PLAIN_TEXT',
-          content: processedText,
+          content: text,
         },
         encodingType: 'UTF8'
       }),
@@ -65,24 +61,10 @@ export async function analyzeWithGoogleNL(text: string, googleNLApiKey: string) 
     
     console.log('Google NL API sentiment analysis complete:', sentimentResult.documentSentiment);
     
-    // Get sentiment score from sentiment analysis response with robust validation
-    let sentimentScore = "0";
+    // Get sentiment score from sentiment analysis response
+    const sentimentScore = sentimentResult.documentSentiment?.score?.toString() || "0";
     
-    if (sentimentResult.documentSentiment && 
-        typeof sentimentResult.documentSentiment.score !== 'undefined') {
-      const score = sentimentResult.documentSentiment.score;
-      
-      // Validate numeric score
-      if (typeof score === 'number' && !isNaN(score)) {
-        sentimentScore = score.toString();
-        console.log(`Extracted valid sentiment score: ${sentimentScore}`);
-      } else {
-        console.error(`Invalid sentiment score detected:`, score);
-        sentimentScore = "0";
-      }
-    } else {
-      console.error('Missing sentiment score in API response');
-    }
+    console.log(`Extracted sentiment score: ${sentimentScore}`);
     
     return { sentiment: sentimentScore };
   } catch (error) {
