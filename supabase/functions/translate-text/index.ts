@@ -98,62 +98,19 @@ serve(async (req) => {
     const translatedText = translateData.data.translations[0].translatedText;
     console.log(`Translated text: "${translatedText.substring(0, 50)}..."`);
 
-    // Update the database with the translation
+    // Update the database with the translation - MODIFIED TO REMOVE _hi REFERENCES
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     console.log('Connecting to Supabase to update entry');
     
-    let updateFields = {};
-    if (detectedLanguage === 'en') {
-      updateFields = {
-        "refined text_hi": translatedText,
-        "original_language": detectedLanguage,
-        "translation_status": "completed"
-      };
-    } else if (detectedLanguage === 'hi') {
-      updateFields = {
-        "refined text": translatedText,
-        "original_language": detectedLanguage,
-        "translation_status": "completed"
-      };
-    } else {
-      // For other languages, translate to both English and Hindi
-      updateFields = {
-        "refined text_hi": translatedText,
-        "original_language": detectedLanguage,
-        "translation_status": "completed"
-      };
-      
-      // Also translate to English if the source is not English
-      if (detectedLanguage !== 'en') {
-        try {
-          const englishTranslateResponse = await fetch(translateUrl, {
-            method: 'POST',
-            headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({
-              q: text,
-              source: detectedLanguage,
-              target: 'en',
-              format: 'text'
-            })
-          });
-          
-          if (englishTranslateResponse.ok) {
-            const englishTranslateData = await englishTranslateResponse.json();
-            if (englishTranslateData.data?.translations?.[0]) {
-              const englishText = englishTranslateData.data.translations[0].translatedText;
-              console.log(`Also translated to English: "${englishText.substring(0, 50)}..."`);
-              (updateFields as any)["refined text"] = englishText;
-            }
-          }
-        } catch (error) {
-          console.error('Error translating to English:', error);
-          // Continue with Hindi translation even if English fails
-        }
-      }
-    }
+    // Store the translation in the notes or metadata rather than in a language-specific column
+    let updateFields = {
+      "original_language": detectedLanguage,
+      "translation_status": "completed",
+      "translation_text": translatedText // Store translation in a generic field
+    };
 
     console.log(`Updating entry ${entryId} with translated text and fields:`, updateFields);
     const { error: updateError } = await supabase

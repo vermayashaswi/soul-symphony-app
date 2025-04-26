@@ -55,6 +55,11 @@ export const updateProcessingEntries = (tempId: string, action: 'add' | 'remove'
     return entries;
   } catch (error) {
     console.error('[Audio.ProcessingState] Error updating processing entries in storage:', error);
+    
+    // Safety cleanup - make sure we don't leave processing locks in place
+    setProcessingLock(false);
+    setIsEntryBeingProcessed(false);
+    
     return [];
   }
 };
@@ -107,8 +112,17 @@ export const removeProcessingEntryById = (entryId: number | string): void => {
       
       console.log(`[Audio.ProcessingState] Removed processing entry with ID ${idStr}`);
     }
+    
+    // Safety cleanup - if we're removing the last processing entry, make sure locks are cleared
+    if (updatedEntries.length === 0) {
+      setProcessingLock(false);
+      setIsEntryBeingProcessed(false);
+    }
   } catch (error) {
     console.error('[Audio.ProcessingState] Error removing processing entry from storage:', error);
+    // Safety cleanup
+    setProcessingLock(false);
+    setIsEntryBeingProcessed(false);
   }
 };
 

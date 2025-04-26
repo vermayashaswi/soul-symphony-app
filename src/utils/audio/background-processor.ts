@@ -24,11 +24,13 @@ export async function processRecordingInBackground(
   try {
     if (!audioBlob) {
       console.error('[BackgroundProcessor] No audio data to process');
+      removeProcessingEntryById(tempId);
       return { success: false, error: 'No audio data to process' };
     }
     
     if (!userId) {
       console.error('[BackgroundProcessor] User ID is required for processing');
+      removeProcessingEntryById(tempId);
       return { success: false, error: 'User ID is required' };
     }
     
@@ -63,6 +65,11 @@ export async function processRecordingInBackground(
         detail: { tempId, timestamp: Date.now(), error: functionError.message }
       }));
       
+      // Release the processing locks before throwing
+      setProcessingLock(false);
+      setIsEntryBeingProcessed(false);
+      clearAllToasts();
+      
       throw new Error(`Edge function error: ${functionError.message}`);
     }
     
@@ -76,6 +83,11 @@ export async function processRecordingInBackground(
       window.dispatchEvent(new CustomEvent('processingEntryFailed', {
         detail: { tempId, timestamp: Date.now(), error: 'No data returned from processing' }
       }));
+      
+      // Release the processing locks
+      setProcessingLock(false);
+      setIsEntryBeingProcessed(false);
+      clearAllToasts();
       
       throw new Error('No data returned from processing');
     }
