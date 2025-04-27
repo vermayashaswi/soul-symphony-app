@@ -21,8 +21,18 @@
   <body>
     <div id="root"></div>
     <div id="google_translate_element" style="position: absolute; top: -9999px; left: -9999px;"></div>
-    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit"></script>
-    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     <script type="module" src="/src/main.tsx"></script>
+    <script type="text/javascript" src="https://translate.google.com/translate_a/element.js?cb=googleTranslateElementInit" async defer></script>
+    <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
+    
+    <script>
+      // Force reload if the app fails to load within 10 seconds
+      setTimeout(function() {
+        if (document.readyState !== 'complete') {
+          console.log('Application failed to load completely. Reloading...');
+          window.location.reload();
+        }
+      }, 10000);
+    </script>
   </body>
 </html>

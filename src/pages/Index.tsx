@@ -10,8 +10,10 @@ import { useOnboarding } from '@/hooks/use-onboarding';
 import Navbar from '@/components/Navbar';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
 import { useNetworkStatus } from '@/utils/network';
+import { toast } from 'sonner';
 
-const HomePageLazy = lazy(() => import('@/pages/website/HomePage'));
+// Import HomePage directly instead of using lazy loading to diagnose the issue
+import HomePage from '@/pages/website/HomePage';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -58,13 +60,8 @@ const Index = () => {
           </div>
         }
       >
-        <Suspense fallback={
-          <div className="flex items-center justify-center min-h-screen">
-            <div className="animate-spin h-10 w-10 border-4 border-primary border-t-transparent rounded-full"></div>
-          </div>
-        }>
-          <HomePageLazy />
-        </Suspense>
+        {/* Render HomePage directly instead of using Suspense and lazy loading */}
+        <HomePage />
       </NetworkAwareContent>
     </>
   );
