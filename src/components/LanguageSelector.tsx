@@ -1,5 +1,4 @@
-
-import React, { useState } from 'react';
+import React from 'react';
 import { Globe } from 'lucide-react';
 import {
   DropdownMenu,
@@ -8,7 +7,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { toast } from 'sonner';
+import { useTranslation } from '@/contexts/TranslationContext';
 import { createDebugger } from '@/utils/debug/debugUtils';
 
 const debug = createDebugger('languageSelector');
@@ -37,19 +36,11 @@ export const languages = [
 ];
 
 const LanguageSelector = () => {
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
+  const { currentLanguage, setLanguage } = useTranslation();
 
   const handleLanguageChange = (languageCode: string) => {
     debug.info('Language change requested:', languageCode);
-    setSelectedLanguage(languageCode);
-    
-    // Dispatch a custom event for components to listen to
-    window.dispatchEvent(new CustomEvent('languageChange', { 
-      detail: { language: languageCode } 
-    }));
-    
-    const selectedLang = languages.find(lang => lang.code === languageCode);
-    toast.success(`Language changed to ${selectedLang?.label || languageCode}`);
+    setLanguage(languageCode);
   };
 
   return (
@@ -70,7 +61,7 @@ const LanguageSelector = () => {
             key={language.code}
             onClick={() => handleLanguageChange(language.code)}
             className={`cursor-pointer ${
-              selectedLanguage === language.code 
+              currentLanguage === language.code 
                 ? "bg-primary/10 text-primary font-medium"
                 : ""
             }`}

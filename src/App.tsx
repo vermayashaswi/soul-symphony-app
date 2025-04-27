@@ -1,7 +1,10 @@
+
 import React, { useEffect } from 'react';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
+import { TranslationProvider } from '@/contexts/TranslationContext';
+import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import './styles/emoji.css';
 
 const App: React.FC = () => {
@@ -19,11 +22,12 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <>
+    <TranslationProvider>
+      <TranslationLoadingOverlay />
       <AppRoutes />
       <Toaster />
       <SonnerToaster position="top-right" />
-    </>
+    </TranslationProvider>
   );
 };
 
