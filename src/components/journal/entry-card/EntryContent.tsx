@@ -2,14 +2,21 @@ import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
 import { useDebugLog } from '@/utils/debug/DebugContext';
+import TranslatedContent from './TranslatedContent';
 
 interface EntryContentProps {
   content: string;
   isExpanded: boolean;
   isProcessing?: boolean;
+  language?: string;
 }
 
-export function EntryContent({ content, isExpanded, isProcessing = false }: EntryContentProps) {
+export function EntryContent({ 
+  content, 
+  isExpanded, 
+  isProcessing = false,
+  language = 'en'
+}: EntryContentProps) {
   const { addEvent } = useDebugLog();
   const [showLoading, setShowLoading] = useState(isProcessing);
   const [stableContent, setStableContent] = useState(content);
@@ -47,7 +54,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
       if (!contentReadyDispatchedRef.current) {
         contentReadyDispatchedRef.current = true;
         
-        // Dispatch content ready event immediately
         window.dispatchEvent(new CustomEvent('entryContentReady', { 
           detail: { 
             content,
@@ -57,7 +63,6 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
           }
         }));
         
-        // Immediately remove processing state
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
           detail: { 
             content,
@@ -99,27 +104,12 @@ export function EntryContent({ content, isExpanded, isProcessing = false }: Entr
     <AnimatePresence mode="wait" initial={false}>
       {(showLoading || forceLoading) ? (
         <LoadingEntryContent key="loading" />
-      ) : isExpanded ? (
-        <motion.div
-          key="expanded"
-          initial={{ opacity: 0.7 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0.7 }}
-          transition={{ duration: 0.2 }}
-        >
-          <p className="text-xs md:text-sm text-foreground">{stableContent}</p>
-        </motion.div>
       ) : (
-        <motion.p
-          key="collapsed" 
-          className="text-xs md:text-sm text-foreground line-clamp-3"
-          initial={{ opacity: 0.7 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0.7 }}
-          transition={{ duration: 0.2 }}
-        >
-          {stableContent}
-        </motion.p>
+        <TranslatedContent 
+          content={stableContent}
+          language={language}
+          isExpanded={isExpanded}
+        />
       )}
     </AnimatePresence>
   );
