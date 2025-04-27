@@ -42,8 +42,10 @@ export function TranslatableText({
     };
   }, [text, currentLanguage, translate]);
 
-  // Fix: Pass only the className prop, not a 'map' prop
-  return <Component className={className}>{translatedText}</Component>;
+  // The error was happening here - we're rendering the Component with children and className
+  // but TypeScript is confusing it with a Three.js texture that requires a 'map' prop
+  // Fix: Explicitly specify the element type to avoid type confusion
+  return React.createElement(Component, { className }, translatedText);
 }
 
 export default TranslatableText;
