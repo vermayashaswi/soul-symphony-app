@@ -42,6 +42,7 @@ export function TranslatableText({
     };
   }, [text, currentLanguage, translate]);
 
+  // Fix: Pass only the className prop, not a 'map' prop
   return <Component className={className}>{translatedText}</Component>;
 }
 

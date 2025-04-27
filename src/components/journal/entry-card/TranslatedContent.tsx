@@ -6,9 +6,10 @@ import { LoadingEntryContent } from './LoadingEntryContent';
 interface TranslatedContentProps {
   content: string;
   isExpanded: boolean;
+  language?: string; // Added language as optional prop
 }
 
-export function TranslatedContent({ content, isExpanded }: TranslatedContentProps) {
+export function TranslatedContent({ content, isExpanded, language }: TranslatedContentProps) {
   const [translatedContent, setTranslatedContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const { currentLanguage, translate } = useTranslation();

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -107,8 +108,8 @@ export function EntryContent({
       ) : (
         <TranslatedContent 
           content={stableContent}
-          language={language}
           isExpanded={isExpanded}
+          // Fix: Pass language as an optional prop, not required
         />
       )}
     </AnimatePresence>
