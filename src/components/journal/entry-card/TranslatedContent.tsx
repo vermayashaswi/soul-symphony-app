@@ -1,27 +1,28 @@
 
 import React, { useState, useEffect } from 'react';
-import { TranslationService } from '@/services/translationService';
+import { useTranslation } from '@/contexts/TranslationContext';
 import { LoadingEntryContent } from './LoadingEntryContent';
 
 interface TranslatedContentProps {
   content: string;
-  language: string;
   isExpanded: boolean;
 }
 
-export function TranslatedContent({ content, language, isExpanded }: TranslatedContentProps) {
+export function TranslatedContent({ content, isExpanded }: TranslatedContentProps) {
   const [translatedContent, setTranslatedContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
+  const { currentLanguage, translate } = useTranslation();
 
   useEffect(() => {
     async function translateContent() {
       setIsLoading(true);
       try {
-        const translated = await TranslationService.translateText({
-          text: content,
-          targetLanguage: language,
-        });
-        setTranslatedContent(translated);
+        if (currentLanguage === 'en') {
+          setTranslatedContent(content);
+        } else {
+          const translated = await translate(content);
+          setTranslatedContent(translated);
+        }
       } catch (error) {
         console.error('Translation error:', error);
         setTranslatedContent(content); // Fallback to original content
@@ -30,13 +31,8 @@ export function TranslatedContent({ content, language, isExpanded }: TranslatedC
       }
     }
 
-    if (language !== 'en') {
-      translateContent();
-    } else {
-      setTranslatedContent(content);
-      setIsLoading(false);
-    }
-  }, [content, language]);
+    translateContent();
+  }, [content, currentLanguage, translate]);
 
   if (isLoading) {
     return <LoadingEntryContent />;

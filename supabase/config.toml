@@ -3,3 +3,6 @@ project_id = "kwnwhgucnzqxndzjayyq"
 
 [functions.translate-text]
 verify_jwt = true
+
+[functions.translate-static-content]
+verify_jwt = true
