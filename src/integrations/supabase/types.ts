@@ -125,7 +125,6 @@ export type Database = {
           "refined text": string | null
           sentiment: string | null
           "transcription text": string | null
-          translation_status: string | null
           user_feedback: string | null
           user_id: string | null
         }
@@ -143,7 +142,6 @@ export type Database = {
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
-          translation_status?: string | null
           user_feedback?: string | null
           user_id?: string | null
         }
@@ -161,7 +159,6 @@ export type Database = {
           "refined text"?: string | null
           sentiment?: string | null
           "transcription text"?: string | null
-          translation_status?: string | null
           user_feedback?: string | null
           user_id?: string | null
         }
