@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { LoadingEntryContent } from './LoadingEntryContent';
@@ -21,8 +20,12 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
         if (currentLanguage === 'en') {
           setTranslatedContent(content);
         } else {
+          // Always keep the original content initially
+          setTranslatedContent(content);
           const translated = await translate(content);
-          setTranslatedContent(translated);
+          if (translated) {
+            setTranslatedContent(translated);
+          }
         }
       } catch (error) {
         console.error('Translation error:', error);
@@ -35,16 +38,18 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
     translateContent();
   }, [content, currentLanguage, translate]);
 
-  if (isLoading) {
-    return <LoadingEntryContent />;
-  }
-
   return (
     <div>
       {isExpanded ? (
-        <p className="text-xs md:text-sm text-foreground">{translatedContent}</p>
+        <div className="relative">
+          <p className="text-xs md:text-sm text-foreground">{translatedContent || content}</p>
+          {isLoading && <div className="absolute top-0 right-0 w-2 h-2 bg-primary/50 rounded-full animate-pulse"></div>}
+        </div>
       ) : (
-        <p className="text-xs md:text-sm text-foreground line-clamp-3">{translatedContent}</p>
+        <div className="relative">
+          <p className="text-xs md:text-sm text-foreground line-clamp-3">{translatedContent || content}</p>
+          {isLoading && <div className="absolute top-0 right-0 w-2 h-2 bg-primary/50 rounded-full animate-pulse"></div>}
+        </div>
       )}
     </div>
   );
