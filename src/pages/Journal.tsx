@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -434,7 +435,8 @@ const Journal = () => {
     if (value === 'entries' && !safeToSwitchTab) {
       console.log('[Journal] User attempting to switch to entries while processing');
       
-      toast.info('Processing in progress...', { 
+      const translatedMessage = await translate('Processing in progress...');
+      toast.info(translatedMessage, { 
         duration: 2000,
         closeButton: false
       });
@@ -446,9 +448,12 @@ const Journal = () => {
       if (value === 'entries' && !safeToSwitchTab) {
         console.log('[Journal] User attempting to switch to entries while processing');
         
-        toast.info('Processing in progress...', { 
-          duration: 2000,
-          closeButton: false
+        // Using a non-async approach here since we're in a setTimeout callback
+        translate('Processing in progress...').then(translatedMessage => {
+          toast.info(translatedMessage, { 
+            duration: 2000,
+            closeButton: false
+          });
         });
       }
       
