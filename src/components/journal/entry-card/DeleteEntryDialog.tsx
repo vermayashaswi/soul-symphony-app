@@ -40,8 +40,12 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
       console.log("[DeleteEntryDialog] Delete operation completed successfully");
       setOpen(false);
       
-      // Show success toast - moved to Journal.tsx for better UX timing
-      // toast.success("Entry deleted successfully");
+      // Show success toast
+      toast.success("Entry deleted successfully", {
+        duration: 3000,
+        closeButton: false
+      });
+      
     } catch (error) {
       console.error("[DeleteEntryDialog] Error deleting entry:", error);
       
