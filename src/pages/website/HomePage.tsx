@@ -1,11 +1,25 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 const HomePage = () => {
+  const { currentLanguage } = useTranslation();
+
+  // Ensure language changes are propagated globally
+  useEffect(() => {
+    // Dispatch a global event when language changes on the homepage
+    // This will help other pages (like Journal) to react
+    window.dispatchEvent(new CustomEvent('homepageLanguageChanged', { 
+      detail: { language: currentLanguage } 
+    }));
+    
+    console.log(`HomePage: Language changed to ${currentLanguage}, dispatching global event`);
+  }, [currentLanguage]);
+
   const openAppStore = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const appStoreUrl = 'https://apps.apple.com/app/soulo';

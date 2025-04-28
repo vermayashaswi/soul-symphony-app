@@ -4,6 +4,8 @@ import { RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { toast } from 'sonner';
 import { triggerThemeExtraction } from '@/utils/audio/theme-extractor';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface ExtractThemeButtonProps {
   entryId: number;
@@ -13,6 +15,14 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
   const [isExtracting, setIsExtracting] = useState(false);
   const mountedRef = useRef(true);
   const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
+  const { currentLanguage } = useTranslation();
+  const [key, setKey] = useState(Date.now());
+
+  // Force re-render when language changes
+  useEffect(() => {
+    setKey(Date.now());
+    console.log(`ExtractThemeButton: Language changed to ${currentLanguage}, forcing re-render`);
+  }, [currentLanguage]);
 
   // Cleanup all timers on unmount
   useEffect(() => {
@@ -161,9 +171,13 @@ export function ExtractThemeButton({ entryId }: ExtractThemeButtonProps) {
       onClick={handleExtractThemes}
       disabled={isExtracting}
       className="mt-2 w-full bg-background hover:bg-slate-100 dark:hover:bg-slate-800 border border-slate-200 dark:border-slate-700"
+      key={`theme-button-${key}`}
     >
       <RefreshCw className={`h-4 w-4 mr-2 ${isExtracting ? 'animate-spin' : ''}`} />
-      {isExtracting ? 'Extracting...' : 'Refresh Themes'}
+      {isExtracting ? 
+        <TranslatableText text="Extracting..." /> : 
+        <TranslatableText text="Refresh Themes" />
+      }
     </Button>
   );
 }

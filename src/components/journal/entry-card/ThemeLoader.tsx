@@ -3,6 +3,8 @@ import ThemeBoxes from '../ThemeBoxes';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { triggerThemeExtraction } from '@/utils/audio/theme-extractor';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface ThemeLoaderProps {
   entryId: number;
@@ -38,6 +40,8 @@ export function ThemeLoader({
   const pollIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const initialFetchRef = useRef<boolean>(false);
+  const { currentLanguage } = useTranslation();
+  const [key, setKey] = useState(Date.now());
 
   useEffect(() => {
     console.log(`[ThemeLoader] Mounted for entry ${entryId}`);
@@ -64,6 +68,11 @@ export function ThemeLoader({
       if (safetyTimeoutRef.current) clearTimeout(safetyTimeoutRef.current);
     };
   }, [entryId, initialThemes]);
+
+  useEffect(() => {
+    setKey(Date.now());
+    console.log(`ThemeLoader: Language changed to ${currentLanguage}, forcing re-render`);
+  }, [currentLanguage]);
 
   const fetchThemesImmediately = async () => {
     if (!entryId || initialFetchRef.current) return;
@@ -335,15 +344,15 @@ export function ThemeLoader({
 
   if (hasError && themes.length === 0) {
     return (
-      <div className="mt-3 md:mt-4">
-        <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
+      <div className="mt-3 md:mt-4" key={`theme-loader-error-${key}`}>
+        <h4 className="text-xs md:text-sm font-semibold text-foreground"><TranslatableText text="Themes" /></h4>
         <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 rounded border border-red-200 dark:border-red-800">
-          <p className="text-xs text-red-700 dark:text-red-300">Unable to load themes</p>
+          <p className="text-xs text-red-700 dark:text-red-300"><TranslatableText text="Unable to load themes" /></p>
           <button 
             onClick={handleRetry}
             className="text-xs mt-1 text-blue-600 underline"
           >
-            Try again
+            <TranslatableText text="Try again" />
           </button>
         </div>
       </div>
@@ -353,8 +362,8 @@ export function ThemeLoader({
   const shouldShowLoadingState = isThemesLoading && (!hasFoundThemes || stableThemes.length === 0);
 
   return (
-    <div className="mt-3 md:mt-4">
-      <h4 className="text-xs md:text-sm font-semibold text-foreground">Themes</h4>
+    <div className="mt-3 md:mt-4" key={`theme-loader-${key}`}>
+      <h4 className="text-xs md:text-sm font-semibold text-foreground"><TranslatableText text="Themes" /></h4>
       {shouldShowLoadingState ? (
         <div className="space-y-2 mt-2">
           <div className="flex space-x-2">

@@ -13,6 +13,8 @@ import {
 } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface DeleteEntryDialogProps {
   entryId?: number;
@@ -25,6 +27,14 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
   const isMobile = useIsMobile();
   const componentMounted = useRef(true);
   const deleteAttempted = useRef(false);
+  const { currentLanguage } = useTranslation();
+  const [key, setKey] = useState(Date.now());
+
+  // Force re-render when language changes
+  useEffect(() => {
+    setKey(Date.now());
+    console.log(`DeleteEntryDialog: Language changed to ${currentLanguage}, forcing re-render`);
+  }, [currentLanguage]);
 
   useEffect(() => {
     return () => {
@@ -76,17 +86,16 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
           <Trash2 className="h-4 w-4" />
         </Button>
       </DialogTrigger>
-      <DialogContent className="w-[90%] max-w-md mx-auto">
+      <DialogContent className="w-[90%] max-w-md mx-auto" key={`delete-dialog-${key}`}>
         <DialogHeader>
-          <DialogTitle>Are you absolutely sure?</DialogTitle>
+          <DialogTitle><TranslatableText text="Are you absolutely sure?" /></DialogTitle>
           <DialogDescription>
-            This action cannot be undone. This will permanently delete your journal entry from our
-            servers.
+            <TranslatableText text="This action cannot be undone. This will permanently delete your journal entry from our servers." />
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex flex-row justify-end space-x-2 mt-4">
           <Button type="button" variant="secondary" onClick={() => handleDialogChange(false)} disabled={isDeleting}>
-            Cancel
+            <TranslatableText text="Cancel" />
           </Button>
           <Button 
             type="submit" 
@@ -94,7 +103,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
             onClick={handleDelete}
             disabled={isDeleting}
           >
-            {isDeleting ? 'Deleting...' : 'Delete'}
+            {isDeleting ? <TranslatableText text="Deleting..." /> : <TranslatableText text="Delete" />}
           </Button>
         </DialogFooter>
       </DialogContent>

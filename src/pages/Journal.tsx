@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -750,7 +751,6 @@ const Journal = () => {
     setLastAction(`Recorder: ${info.status}`);
   };
 
-  // Add an event listener for journal entry updates
   useEffect(() => {
     const handleJournalEntryUpdated = (event: CustomEvent) => {
       if (event.detail && event.detail.entryId) {
@@ -776,7 +776,7 @@ const Journal = () => {
           <div className="min-h-screen flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-              <p className="text-muted-foreground">Setting up your profile...</p>
+              <p className="text-muted-foreground"><TranslatableText text="Setting up your profile..." /></p>
             </div>
           </div>
         ) : entriesError && !loading ? (
@@ -786,7 +786,7 @@ const Journal = () => {
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                   <p className="text-red-800 dark:text-red-200">
-                    Error loading your journal entries: {entriesError}
+                    <TranslatableText text="Error loading your journal entries: " /> {entriesError}
                   </p>
                 </div>
                 <Button 
@@ -798,7 +798,7 @@ const Journal = () => {
                   }}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" /> 
-                  Retry Loading
+                  <TranslatableText text="Retry Loading" />
                 </Button>
               </div>
             </div>
@@ -811,7 +811,7 @@ const Journal = () => {
                   <div className="flex items-start gap-2">
                     <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <p className="text-amber-800 dark:text-amber-200">
-                      We're having trouble setting up your profile. Your entries may not be saved correctly.
+                      <TranslatableText text="We're having trouble setting up your profile. Your entries may not be saved correctly." />
                     </p>
                   </div>
                   <Button 
@@ -820,7 +820,7 @@ const Journal = () => {
                     onClick={handleRetryProfileCreation}
                   >
                     <RefreshCw className="w-4 h-4 mr-2" /> 
-                    Retry Profile Setup
+                    <TranslatableText text="Retry Profile Setup" />
                   </Button>
                 </div>
               </div>
@@ -832,7 +832,7 @@ const Journal = () => {
                   <div className="flex items-start gap-2">
                     <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                     <p className="text-red-800 dark:text-red-200">
-                      Error processing your recording: {processingError}
+                      <TranslatableText text="Error processing your recording: " />{processingError}
                     </p>
                   </div>
                   <Button 
@@ -844,7 +844,7 @@ const Journal = () => {
                     }}
                   >
                     <RefreshCw className="w-4 h-4 mr-2" /> 
-                    Try Again
+                    <TranslatableText text="Try Again" />
                   </Button>
                 </div>
               </div>
@@ -857,8 +857,8 @@ const Journal = () => {
               className="mt-6"
             >
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="record">Record Entry</TabsTrigger>
-                <TabsTrigger value="entries">Past Entries</TabsTrigger>
+                <TabsTrigger value="record"><TranslatableText text="Record Entry" /></TabsTrigger>
+                <TabsTrigger value="entries"><TranslatableText text="Past Entries" /></TabsTrigger>
               </TabsList>
               
               <TabsContent value="record" className="mt-0">
