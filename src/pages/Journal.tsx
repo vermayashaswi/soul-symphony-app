@@ -873,34 +873,3 @@ const Journal = () => {
             >
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="record"><TranslatableText text="Record Entry" /></TabsTrigger>
-                <TabsTrigger value="entries"><TranslatableText text="Past Entries" /></TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="record" className="pt-2">
-                <VoiceRecorder
-                  onRecordingComplete={handleRecordingComplete}
-                  updateDebugInfo={updateDebugInfo}
-                />
-              </TabsContent>
-              
-              <TabsContent value="entries" className="pt-2">
-                <div ref={entriesListRef}>
-                  <JournalEntriesList
-                    entries={entries}
-                    loading={loading}
-                    processingEntries={processingEntries}
-                    processedEntryIds={processedEntryIds}
-                    onStartRecording={handleStartRecording}
-                    onDeleteEntry={handleDeleteEntry}
-                  />
-                </div>
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
-      </div>
-    </ErrorBoundary>
-  );
-};
-
-export default Journal;

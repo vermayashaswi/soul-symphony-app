@@ -2,7 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { JournalEntry } from '@/types/journal';
+import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 
@@ -129,14 +129,12 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
         }
       }
       
-      // Modified to check for themes property existence first
       if (entry.themes && Array.isArray(entry.themes)) {
         return entry.themes.some(theme => 
           theme.toLowerCase().includes(query)
         );
       }
       
-      // Modified to check for master_themes property existence first
       if (entry.master_themes && Array.isArray(entry.master_themes)) {
         return entry.master_themes.some(theme => 
           theme.toLowerCase().includes(query)
