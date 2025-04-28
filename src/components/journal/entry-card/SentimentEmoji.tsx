@@ -41,10 +41,10 @@ export function SentimentEmoji({ sentiment, isProcessing = false }: SentimentEmo
       } else if (typeof sentiment === 'number') {
         return sentiment;
       } else if (sentiment && typeof sentiment === 'object') {
-        if ('sentiment' in sentiment && typeof sentiment.sentiment === 'string') {
-          return parseFloat(sentiment.sentiment);
-        } else if ('score' in sentiment && typeof sentiment.score === 'number') {
+        if ('score' in sentiment && typeof sentiment.score === 'number') {
           return sentiment.score;
+        } else if ('sentiment' in sentiment && typeof sentiment.sentiment === 'string') {
+          return parseFloat(sentiment.sentiment);
         }
       }
       return 0;

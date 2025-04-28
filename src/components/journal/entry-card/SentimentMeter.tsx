@@ -28,7 +28,7 @@ export function SentimentMeter({ sentiment, isProcessing = false }: SentimentMet
       } else if (typeof sentiment === 'number') {
         return sentiment;
       } else if (sentiment && typeof sentiment === 'object') {
-        if ('score' in sentiment) {
+        if ('score' in sentiment && typeof sentiment.score === 'number') {
           return sentiment.score;
         } else if ('sentiment' in sentiment && typeof sentiment.sentiment === 'string') {
           return parseFloat(sentiment.sentiment);
