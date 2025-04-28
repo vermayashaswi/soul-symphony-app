@@ -24,6 +24,35 @@ export function EntryContent({
   const [forceLoading, setForceLoading] = useState(false);
   const mountedRef = useRef(true);
   const contentReadyDispatchedRef = useRef(false);
+  const safetyTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Add safety timeout to exit loading state if it gets stuck
+  useEffect(() => {
+    // Always set up a safety timeout to ensure loading state doesn't get stuck
+    if (showLoading || forceLoading) {
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
+      
+      safetyTimeoutRef.current = setTimeout(() => {
+        if (mountedRef.current) {
+          console.log('[EntryContent] Safety timeout triggered - forcing content display');
+          setShowLoading(false);
+          setForceLoading(false);
+          
+          if (content) {
+            setStableContent(content);
+          }
+        }
+      }, 5000); // 5 seconds safety timeout
+    }
+    
+    return () => {
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
+    };
+  }, [showLoading, forceLoading, content]);
 
   useEffect(() => {
     if (isProcessing) {
@@ -40,16 +69,13 @@ export function EntryContent({
       return () => clearTimeout(timer);
     }
 
-    // Only show loading if we absolutely have no content to display
-    const contentIsLoading = !content || 
-                          content === "Processing entry..." || 
-                          content.trim() === "" ||
-                          content === "Loading...";
-
-    if (contentIsLoading) {
-      setShowLoading(true);
-      contentReadyDispatchedRef.current = false;
-    } else if (!forceLoading) {
+    // Modified: Be less strict about showing loading - prioritize showing content
+    // Only show loading if we absolutely have no content at all to display
+    const contentIsEmpty = !content || content.trim() === "";
+    const isProcessingPlaceholder = content === "Processing entry..." || content === "Loading...";
+    
+    // If we have real content, show it even if it's technically still processing
+    if (!contentIsEmpty && !isProcessingPlaceholder) {
       setShowLoading(false);
       setStableContent(content);
       
@@ -82,6 +108,9 @@ export function EntryContent({
           }
         }));
       }
+    } else if ((contentIsEmpty || isProcessingPlaceholder) && !forceLoading) {
+      setShowLoading(true);
+      contentReadyDispatchedRef.current = false;
     }
     
     addEvent('EntryContent', 'State update', 'info', {
@@ -89,7 +118,7 @@ export function EntryContent({
       isProcessing,
       isExpanded,
       showLoading,
-      contentEmpty: contentIsLoading,
+      contentEmpty: contentIsEmpty || isProcessingPlaceholder,
       forceLoading,
       contentReady: contentReadyDispatchedRef.current
     });
@@ -99,6 +128,9 @@ export function EntryContent({
   useEffect(() => {
     return () => {
       mountedRef.current = false;
+      if (safetyTimeoutRef.current) {
+        clearTimeout(safetyTimeoutRef.current);
+      }
     };
   }, []);
 

@@ -44,6 +44,7 @@ const processingSteps = [
 export function LoadingEntryContent({ error }: { error?: string }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [processingTakingTooLong, setProcessingTakingTooLong] = useState(false);
+  const [forceRenderContent, setForceRenderContent] = useState(false);
   const mountedRef = useRef(true);
   const componentId = useRef(`loading-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
   const stepsIntervalRef = useRef<NodeJS.Timeout | null>(null);
@@ -56,6 +57,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       if (mountedRef.current && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Safety timeout triggered - component existed for too long');
         unmountingRef.current = true;
+        setForceRenderContent(true);
         
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
           detail: { 
@@ -74,8 +76,17 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             reason: 'safety-timeout'
           }
         }));
+        
+        window.dispatchEvent(new CustomEvent('entryContentReady', { 
+          detail: { 
+            timestamp: Date.now(),
+            readyForDisplay: true,
+            forceRemoveProcessing: true,
+            componentId: componentId.current
+          }
+        }));
       }
-    }, 20000);
+    }, 10000);
     
     cleanupTimersRef.current.push(safetyTimeout);
     
@@ -113,8 +124,27 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             componentId: componentId.current
           }
         }));
+        
+        const fallbackTimeout = setTimeout(() => {
+          if (mountedRef.current && !unmountingRef.current) {
+            console.log('[LoadingEntryContent] Processing taking too long, forcing content display');
+            setForceRenderContent(true);
+            
+            window.dispatchEvent(new CustomEvent('entryContentReady', { 
+              detail: { 
+                timestamp: Date.now(),
+                readyForDisplay: true,
+                forceRemoveProcessing: true,
+                componentId: componentId.current,
+                reason: 'timeout-fallback'
+              }
+            }));
+          }
+        }, 5000);
+        
+        cleanupTimersRef.current.push(fallbackTimeout);
       }
-    }, 10000);
+    }, 8000);
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
@@ -200,6 +230,31 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     };
   }, [currentStepIndex]);
   
+  useEffect(() => {
+    if (forceRenderContent && mountedRef.current) {
+      unmountingRef.current = true;
+      
+      window.dispatchEvent(new CustomEvent('entryContentReady', { 
+        detail: { 
+          timestamp: Date.now(),
+          readyForDisplay: true,
+          forceRemoveProcessing: true,
+          componentId: componentId.current,
+          reason: 'manual-force'
+        }
+      }));
+      
+      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+        detail: { 
+          componentId: componentId.current,
+          timestamp: Date.now(),
+          forceCleanup: true,
+          reason: 'manual-force'
+        }
+      }));
+    }
+  }, [forceRenderContent]);
+  
   const currentStep = processingSteps[currentStepIndex];
   
   useEffect(() => {
@@ -219,6 +274,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       }
     };
   }, []);
+  
+  if (unmountingRef.current || forceRenderContent) {
+    return null;
+  }
   
   return (
     <motion.div 

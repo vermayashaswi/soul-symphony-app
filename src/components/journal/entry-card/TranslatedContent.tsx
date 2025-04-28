@@ -1,10 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 
 interface TranslatedContentProps {
   content: string;
   isExpanded: boolean;
-  language?: string; // Added language as optional prop
+  language?: string;
 }
 
 export function TranslatedContent({ content, isExpanded, language }: TranslatedContentProps) {
@@ -14,13 +15,13 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
 
   useEffect(() => {
     async function translateContent() {
-      // Always start with the original content
-      if (content) {
+      // Immediately set content to ensure something is always displayed
+      if (content && content.trim() !== '') {
         setTranslatedContent(content);
       }
       
       // Don't proceed with translation if no content or already in English
-      if (!content || currentLanguage === 'en') {
+      if (!content || content.trim() === '' || currentLanguage === 'en') {
         setIsLoading(false);
         return;
       }
@@ -51,9 +52,9 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
   return (
     <div className={`transition-opacity duration-300 ${isLoading ? "relative" : ""}`}>
       {isExpanded ? (
-        <p className="text-xs md:text-sm text-foreground">{translatedContent || content}</p>
+        <p className="text-xs md:text-sm text-foreground">{translatedContent || content || ''}</p>
       ) : (
-        <p className="text-xs md:text-sm text-foreground line-clamp-3">{translatedContent || content}</p>
+        <p className="text-xs md:text-sm text-foreground line-clamp-3">{translatedContent || content || ''}</p>
       )}
       
       {isLoading && (
