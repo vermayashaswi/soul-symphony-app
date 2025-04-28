@@ -1,7 +1,4 @@
 
-// I'm creating a safe version of this file that doesn't currently exist in the provided code
-// This will help create better integration between the DeleteEntryDialog and Journal components
-
 import React, { useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import { EntryContent } from './entry-card/EntryContent';

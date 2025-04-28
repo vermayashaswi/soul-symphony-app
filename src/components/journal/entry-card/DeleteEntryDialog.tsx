@@ -16,7 +16,7 @@ import { Trash, Loader2 } from "lucide-react";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface DeleteEntryDialogProps {
-  onDelete: () => Promise<void>; // Changed to Promise<void> to properly handle async
+  onDelete: () => Promise<void>; 
   isProcessing?: boolean;
 }
 

@@ -14,7 +14,7 @@ interface JournalEntriesListProps {
   processingEntries: string[];
   processedEntryIds: number[];
   onStartRecording: () => void;
-  onDeleteEntry: (entryId: number) => Promise<void>; // Change to Promise<void>
+  onDeleteEntry: (entryId: number) => Promise<void>;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
@@ -47,11 +47,11 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
                 ...entry,
                 content: (entry as any).content || entry["refined text"] || entry["transcription text"] || "",
                 // Make sure id is definitely defined and not optional
-                id: entry.id!
+                id: entry.id
               }}
               processing={processingEntries.some(tempId => tempId.includes(String(entry.id)))}
-              processed={processedEntryIds.includes(entry.id!)}
-              onDelete={() => onDeleteEntry(entry.id!)}
+              processed={processedEntryIds.includes(entry.id)}
+              onDelete={() => onDeleteEntry(entry.id)}
             />
           ))}
         </div>
