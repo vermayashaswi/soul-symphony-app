@@ -1,11 +1,11 @@
-
 import React from 'react';
-import { Apple, Play, Shield } from 'lucide-react';
+import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import SouloLogo from '@/components/SouloLogo';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { PhoneVoiceAnimation } from '@/components/website/PhoneVoiceAnimation';
 
 interface HeroSectionProps {
   openAppStore: () => void;
