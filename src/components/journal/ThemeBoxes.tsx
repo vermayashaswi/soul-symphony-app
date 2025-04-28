@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -25,11 +24,9 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
   const [loadingIntervalId, setLoadingIntervalId] = useState<NodeJS.Timeout | null>(null);
   const [maxLoadingTime, setMaxLoadingTime] = useState(false);
   
-  // Update local loading state when prop changes
   useEffect(() => {
     setIsLocalLoading(isLoading);
     
-    // Clean up any existing timers to prevent memory leaks
     if (loadingIntervalId) {
       clearInterval(loadingIntervalId);
       setLoadingIntervalId(null);
@@ -41,7 +38,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
     }
     
     if (isLoading) {
-      // Reset and start loading animation
       setLoadingProgress(0);
       setMaxLoadingTime(false);
       
@@ -54,7 +50,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
       
       setLoadingIntervalId(interval);
       
-      // Safety timeout - force loading to complete after 20 seconds
       const timeout = setTimeout(() => {
         setMaxLoadingTime(true);
         setIsLocalLoading(false);
@@ -73,12 +68,10 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
         clearTimeout(timeout);
       };
     } else {
-      // Complete loading animation
       setLoadingProgress(100);
     }
   }, [isLoading]);
   
-  // Cleanup on unmount
   useEffect(() => {
     return () => {
       if (loadingIntervalId) {
@@ -90,7 +83,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
     };
   }, []);
   
-  // If themes changes from empty to non-empty, ensure loading is false
   useEffect(() => {
     if (themes && themes.length > 0) {
       setIsLocalLoading(false);
@@ -108,7 +100,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
     }
   }, [themes]);
   
-  // Enhanced vibrant color classes for theme boxes
   const colorClasses = [
     'bg-gradient-to-br from-blue-100 to-blue-200 text-blue-800 border border-blue-200',
     'bg-gradient-to-br from-indigo-100 to-indigo-200 text-indigo-800 border border-indigo-200',
@@ -120,7 +111,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
     'bg-gradient-to-br from-cyan-100 to-cyan-200 text-cyan-800 border border-cyan-200',
   ];
 
-  // Animation variants for funky entrance effects
   const containerVariants = {
     hidden: { opacity: 0 },
     visible: {
@@ -147,11 +137,9 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
     }
   };
 
-  // Filter out any empty themes
   const filteredThemes = themes ? themes.filter(theme => theme && theme.trim() !== '' && theme !== '•') : [];
   const hasThemes = filteredThemes.length > 0;
 
-  // Handle case where loading has gone on too long but we have themes to show
   if (maxLoadingTime && hasThemes) {
     return (
       <motion.div 
@@ -217,7 +205,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
   }
 
   if (isLocalLoading || !hasThemes) {
-    // Display placeholder theme boxes with smooth floating animation
     return (
       <div className={cn("flex flex-wrap gap-3 justify-center items-center h-full w-full relative", className)}>
         {[1, 2, 3].map((_, i) => (
@@ -264,7 +251,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
       animate="visible"
     >
       {filteredThemes.map((theme, index) => {
-        // Generate a random offset for the animation but ensure it's consistent
         const seed = (index + 1) * 0.2;
         
         return (
@@ -281,7 +267,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
               transition: { duration: 0.2 }
             }}
             animate={isDisturbed ? {
-              // Smooth floating animation without flickering for disturbed state
               y: [(seed * -10), (seed * 10), (seed * -10)],
               x: [(seed * -5), (seed * 5), (seed * -5)],
               rotate: [(seed * -3), (seed * 3), (seed * -3)],
@@ -303,7 +288,6 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
                 }
               }
             } : {
-              // Subtle hover animation for normal state
               y: [0, -3 * seed, 0],
               transition: { 
                 y: {

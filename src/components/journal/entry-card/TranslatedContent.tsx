@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { LoadingEntryContent } from './LoadingEntryContent';
 
 interface TranslatedContentProps {
   content: string;
@@ -16,8 +15,9 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
 
   useEffect(() => {
     async function translateContent() {
-      // Only show loading if we have no content to display
-      if (!translatedContent) {
+      // Don't show loading if we have content to display already
+      // This prevents the issue where entries show as processing cards
+      if (!translatedContent && !content) {
         setIsLoading(true);
       }
       
@@ -25,6 +25,7 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
         if (currentLanguage === 'en') {
           setTranslatedContent(content);
         } else {
+          // Always maintain the current content while translating
           const translated = await translate(content);
           setTranslatedContent(translated);
         }
