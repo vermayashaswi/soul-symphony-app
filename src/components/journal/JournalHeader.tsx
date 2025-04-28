@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import SouloLogo from '@/components/SouloLogo';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const JournalHeader = () => {
   const isMobile = useIsMobile();
@@ -24,7 +25,7 @@ const JournalHeader = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            Your <SouloLogo className="inline-flex" useColorTheme={true} /> Journal
+            <TranslatableText text="Your" /> <SouloLogo className="inline-flex" useColorTheme={true} /> <TranslatableText text="Journal" />
           </motion.h1>
         </div>
       </div>
