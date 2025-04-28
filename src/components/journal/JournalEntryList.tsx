@@ -3,7 +3,6 @@ import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ErrorBoundary from './ErrorBoundary';
 import { JournalEntryCard, JournalEntry } from './JournalEntryCard';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface JournalEntryListProps {
   entries: JournalEntry[];

@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface EmotionBubblesProps {
   isPhonePreview?: boolean;
@@ -57,7 +56,7 @@ const EmotionBubblesDemo: React.FC<EmotionBubblesProps> = ({ isPhonePreview = fa
             }}
           >
             <span className={`${textSize} font-medium`}>
-              <TranslatableText text={emotion.name} />
+              {emotion.name}
             </span>
           </motion.div>
         );
