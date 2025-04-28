@@ -23,17 +23,13 @@ export interface JournalEntry {
   created_at: string;
   audio_url?: string;
   sentiment?: string | null;
-  themes?: string[] | null;
+  themes?: string[];
   master_themes?: string[];
   entities?: Array<{
     type: string;
     name: string;
     text?: string;
   }>;
-  foreignKey?: string;
-  predictedLanguages?: {
-    [key: string]: number;
-  } | null;
   Edit_Status?: number | null;
   user_feedback?: string | null;
 }

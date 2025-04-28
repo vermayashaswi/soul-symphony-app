@@ -6,6 +6,7 @@ import VoiceRecorder from '@/components/VoiceRecorder';
 import JournalEntriesList from '@/components/journal/JournalEntriesList';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { JournalEntry } from '@/types/journal';
+import { transformDatabaseToUIEntry } from '@/types/journal-entries';
 
 interface JournalTabsProps {
   activeTab: string;
@@ -34,19 +35,8 @@ export function JournalTabs({
   onDeleteEntry,
   entriesListRef
 }: JournalTabsProps) {
-  // Transform JournalEntry objects from types/journal to match the format expected by JournalEntryCard
-  const transformedEntries = entries.map(entry => ({
-    id: entry.id || 0,
-    content: entry["refined text"] || entry["transcription text"] || "",
-    created_at: entry.created_at || new Date().toISOString(),
-    audio_url: entry.audio_url || undefined,
-    sentiment: entry.sentiment || null,
-    themes: entry.master_themes || [],
-    master_themes: entry.master_themes || [],
-    entities: entry.entities || [],
-    Edit_Status: entry.Edit_Status || null,
-    user_feedback: entry.user_feedback || null
-  }));
+  // Transform database entries to UI entries format
+  const transformedEntries = entries.map(transformDatabaseToUIEntry);
 
   return (
     <Tabs 
