@@ -11,11 +11,13 @@ import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
-import { TranslatableText } from '@/components/TranslatableText';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 const Home = () => {
   const { user } = useAuth();
   const { colorTheme, theme } = useTheme();
+  const { translate } = useTranslation();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const today = new Date();
@@ -178,7 +180,7 @@ const Home = () => {
                     MozOsxFontSmoothing: 'grayscale'
                   }}
                 >
-                  {formattedDate}
+                  <TranslatableText text={formattedDate} />
                 </div>
               </motion.div>
               <div className="ml-2 z-[100]">

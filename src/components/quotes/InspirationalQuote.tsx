@@ -1,9 +1,11 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { Quote } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export const InspirationalQuote: React.FC = () => {
   const [quote, setQuote] = useState<string>('');
@@ -132,11 +134,11 @@ export const InspirationalQuote: React.FC = () => {
               <Quote className="h-6 w-6 text-theme opacity-100" />
             </div>
             <p className="text-foreground text-center text-lg font-medium italic mb-1">
-              "{quote}"
+              <TranslatableText text={`"${quote}"`} />
             </p>
             {author && (
               <p className="text-theme text-center font-bold text-sm">
-                — {author}
+                <TranslatableText text={`— ${author}`} />
               </p>
             )}
           </motion.div>
