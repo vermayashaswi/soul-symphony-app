@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -20,9 +21,23 @@ const Home = () => {
   const { translate } = useTranslation();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
+  const [journalLabel, setJournalLabel] = useState("Journal");
+  const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Pre-translate common labels to avoid async issues
+    const loadTranslations = async () => {
+      if (translate) {
+        setJournalLabel(await translate("Journal"));
+        setYourJournalLabel(await translate("Your Journal"));
+      }
+    };
+    
+    loadTranslations();
+  }, [translate]);
 
   useEffect(() => {
     const preloadImage = new Image();
@@ -92,16 +107,16 @@ const Home = () => {
   const getJournalName = () => {
     if (displayName) {
       return displayName.endsWith('s') ? 
-        `${displayName}' ${translate("Journal")}` : 
-        `${displayName}'s ${translate("Journal")}`;
+        `${displayName}' ${journalLabel}` : 
+        `${displayName}'s ${journalLabel}`;
     }
     if (user?.email) {
       const name = user.email.split('@')[0];
       return name.endsWith('s') ? 
-        `${name}' ${translate("Journal")}` : 
-        `${name}'s ${translate("Journal")}`;
+        `${name}' ${journalLabel}` : 
+        `${name}'s ${journalLabel}`;
     }
-    return translate("Your Journal");
+    return yourJournalLabel;
   };
 
   const containerVariants = {
