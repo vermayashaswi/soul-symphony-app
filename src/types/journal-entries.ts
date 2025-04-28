@@ -19,15 +19,21 @@ export interface UIJournalEntry {
 }
 
 export const transformDatabaseToUIEntry = (entry: DatabaseJournalEntry): UIJournalEntry => {
+  let content = entry["refined text"] || entry["transcription text"];
+  
+  if (!content || content.trim() === "") {
+    content = "No content available";
+  }
+
   return {
     id: entry.id || 0,
-    content: entry["refined text"] || entry["transcription text"] || "",
+    content: content,
     created_at: entry.created_at || new Date().toISOString(),
     audio_url: entry.audio_url,
     sentiment: entry.sentiment,
-    themes: entry.master_themes,
-    master_themes: entry.master_themes,
-    entities: entry.entities,
+    themes: entry.master_themes || [],
+    master_themes: entry.master_themes || [],
+    entities: entry.entities || [],
     Edit_Status: entry.Edit_Status,
     user_feedback: entry.user_feedback
   };

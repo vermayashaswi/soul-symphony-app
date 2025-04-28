@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -40,12 +39,10 @@ export function EntryContent({
       return () => clearTimeout(timer);
     }
 
-    const contentIsLoading = !content || 
-                          content === "Processing entry..." || 
-                          content.trim() === "" ||
-                          content === "Loading...";
+    const contentIsLoading = content === "Processing entry..." || 
+                           content === "Loading...";
 
-    if (contentIsLoading) {
+    if (contentIsLoading || isProcessing) {
       setShowLoading(true);
       contentReadyDispatchedRef.current = false;
     } else if (!forceLoading) {
@@ -109,7 +106,7 @@ export function EntryContent({
         <TranslatedContent 
           content={stableContent}
           isExpanded={isExpanded}
-          // Fix: Pass language as an optional prop, not required
+          language={language}
         />
       )}
     </AnimatePresence>
