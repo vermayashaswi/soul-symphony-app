@@ -12,6 +12,7 @@ import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -750,7 +751,6 @@ const Journal = () => {
     setLastAction(`Recorder: ${info.status}`);
   };
 
-  // Add an event listener for journal entry updates
   useEffect(() => {
     const handleJournalEntryUpdated = (event: CustomEvent) => {
       if (event.detail && event.detail.entryId) {
@@ -857,8 +857,8 @@ const Journal = () => {
               className="mt-6"
             >
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="record">Record Entry</TabsTrigger>
-                <TabsTrigger value="entries">Past Entries</TabsTrigger>
+                <TabsTrigger value="record"><TranslatableText text="Record Entry" /></TabsTrigger>
+                <TabsTrigger value="entries"><TranslatableText text="Past Entries" /></TabsTrigger>
               </TabsList>
               
               <TabsContent value="record" className="mt-0">

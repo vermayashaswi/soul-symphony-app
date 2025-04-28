@@ -7,6 +7,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import ErrorBoundary from './ErrorBoundary';
 import JournalSearch from './JournalSearch';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 import { 
   getProcessingEntries, 
   getEntryIdForProcessingId, 
@@ -769,10 +770,10 @@ const JournalEntriesList = ({
       <div className="space-y-4 pb-20">
         <div className="space-y-4 mb-6">
           <div className="flex items-center justify-between">
-            <h2 className="text-xl font-semibold">Your Journal Entries</h2>
+            <h2 className="text-xl font-semibold"><TranslatableText text="Your Journal Entries" /></h2>
             <Button onClick={onStartRecording} size="sm" className="gap-1">
               <Plus className="h-4 w-4" />
-              New Entry
+              <TranslatableText text="New Entry" />
             </Button>
           </div>
         </div>
