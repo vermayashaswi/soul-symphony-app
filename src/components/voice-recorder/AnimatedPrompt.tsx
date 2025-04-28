@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface AnimatedPromptProps {
   show: boolean;
@@ -43,8 +42,8 @@ export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
               repeatType: "reverse"
             }}
           >
-            <span><TranslatableText text="Speak in any language," /></span>
-            <span><TranslatableText text="I'll understand you!" /></span>
+            <span>Speak in any language,</span>
+            <span>I'll understand you!</span>
           </motion.div>
         </motion.div>
       )}

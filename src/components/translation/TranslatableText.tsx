@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
@@ -19,51 +20,63 @@ export function TranslatableText({
   const { translate, currentLanguage } = useTranslation();
   const location = useLocation();
   
+  // Determine if we're on a website route (marketing site)
   const isOnWebsite = isWebsiteRoute(location.pathname);
 
   useEffect(() => {
     let isMounted = true;
 
     const translateText = async () => {
-      if (!text?.trim() || isOnWebsite || currentLanguage === 'en') {
-        if (isMounted) setTranslatedText(text || '');
+      if (!text?.trim()) {
+        if (isMounted) setTranslatedText('');
         return;
       }
-      
-      setIsLoading(true);
-      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
 
-      try {
-        const result = await translate(text);
-        if (isMounted && result && result.trim() !== '') {
-          setTranslatedText(result);
-          console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
-        } else {
-          console.log(`TranslatableText: Translation empty, keeping original text`);
+      // Skip translations for the marketing website pages
+      if (isOnWebsite) {
+        if (isMounted) setTranslatedText(text);
+        return;
+      }
+
+      // Fallback to dynamic translation service if not in English
+      if (currentLanguage !== 'en') {
+        setIsLoading(true);
+        console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
+
+        try {
+          const result = await translate(text);
+          if (isMounted) {
+            setTranslatedText(result);
+            console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
+          }
+        } catch (error) {
+          console.error('Translation error:', error);
+          if (isMounted) {
+            setTranslatedText(text); // Fallback to original
+            console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
+          }
+        } finally {
+          if (isMounted) setIsLoading(false);
         }
-      } catch (error) {
-        console.error('Translation error:', error);
-      } finally {
-        if (isMounted) setIsLoading(false);
+      } else {
+        if (isMounted) setTranslatedText(text);
       }
     };
 
-    if (text !== translatedText && currentLanguage !== 'en') {
-      translateText();
-    } else if (text && text !== translatedText) {
-      setTranslatedText(text);
-    }
+    translateText();
 
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, translate, isOnWebsite, translatedText]);
+  }, [text, currentLanguage, translate, isOnWebsite]);
   
+  // Listen to the language change event to force re-render
   useEffect(() => {
     const handleLanguageChange = (event: CustomEvent) => {
       console.log(`TranslatableText: Language change event detected: ${event.detail.language}`);
-      
-      if (currentLanguage !== 'en' && text && text.trim() !== '') {
+      // This will re-trigger the translation effect
+      if (currentLanguage !== 'en') {
+        setTranslatedText(''); // Clear to show loading state
         setIsLoading(true);
       }
     };
@@ -73,14 +86,15 @@ export function TranslatableText({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [currentLanguage, text]);
+  }, []);
 
+  // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(
     Component, 
     { 
       className: `${className} ${isLoading ? 'opacity-70' : ''}`.trim()
     }, 
-    translatedText || text || ""
+    translatedText
   );
 }
 
