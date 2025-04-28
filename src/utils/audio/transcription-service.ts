@@ -41,32 +41,44 @@ export async function sendAudioForTranscription(
       userId = undefined;
     }
 
+    // Generate a request ID for tracking
+    const requestId = Math.random().toString(36).substring(2, 15);
+    console.log(`[TranscriptionService] Generated request ID: ${requestId}`);
+
     // Calculate estimated recording time based on audio data size
     const estimatedDuration = Math.floor(base64Audio.length / 10000);
     console.log(`[TranscriptionService] Estimated recording duration: ~${estimatedDuration}s`);
 
     // Invoke the edge function
+    console.log(`[TranscriptionService] Invoking edge function with request ID: ${requestId}`);
+    const startTime = Date.now();
+    
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64Audio,
         userId,
         directTranscription,
         highQuality: processSentiment,
-        recordingTime: estimatedDuration * 1000 // Convert to milliseconds
+        recordingTime: estimatedDuration * 1000, // Convert to milliseconds
+        requestId // Include the request ID
       },
     });
 
+    const endTime = Date.now();
+    console.log(`[TranscriptionService] Edge function response received in ${endTime - startTime}ms for request ${requestId}`);
+
     if (error) {
-      console.error('[TranscriptionService] Edge function error:', error);
+      console.error(`[TranscriptionService] Edge function error for request ${requestId}:`, error);
       throw new Error(`Edge function error: ${error.message}`);
     }
 
     if (!data) {
-      console.error('[TranscriptionService] No data returned from edge function');
+      console.error(`[TranscriptionService] No data returned from edge function for request ${requestId}`);
       throw new Error('No data returned from transcription service');
     }
 
-    console.log('[TranscriptionService] Transcription completed successfully');
+    console.log(`[TranscriptionService] Transcription completed successfully for request ${requestId}`);
+    console.log(`[TranscriptionService] Response data:`, data);
     
     return {
       success: true,
@@ -91,5 +103,39 @@ export async function audioToBase64(blob: Blob): Promise<string> {
   } catch (error) {
     console.error('[TranscriptionService] Error converting audio to base64:', error);
     throw new Error('Failed to convert audio to base64');
+  }
+}
+
+/**
+ * Verifies if a journal entry was properly processed
+ * @param entryId - ID of the journal entry to verify
+ */
+export async function verifyJournalEntryProcessed(entryId: number): Promise<boolean> {
+  try {
+    console.log(`[TranscriptionService] Verifying journal entry ${entryId} was processed`);
+    
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", emotions')
+      .eq('id', entryId)
+      .single();
+    
+    if (error) {
+      console.error(`[TranscriptionService] Error verifying entry ${entryId}:`, error);
+      return false;
+    }
+    
+    if (!data) {
+      console.log(`[TranscriptionService] Entry ${entryId} not found`);
+      return false;
+    }
+    
+    const isProcessed = !!data["refined text"] || !!data.emotions;
+    console.log(`[TranscriptionService] Entry ${entryId} processed status: ${isProcessed}`);
+    
+    return isProcessed;
+  } catch (error) {
+    console.error(`[TranscriptionService] Exception verifying entry ${entryId}:`, error);
+    return false;
   }
 }

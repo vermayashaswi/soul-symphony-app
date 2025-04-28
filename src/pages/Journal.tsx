@@ -615,13 +615,14 @@ const Journal = () => {
     }
   };
 
-  const handleDeleteEntry = useCallback(async (entryId: number) => {
+  const handleDeleteEntry = useCallback(async (entryId: number): Promise<void> => {
     if (!user?.id) return;
     
     try {
       console.log(`[Journal] Deleting entry ${entryId}`);
       setLastAction(`Deleting Entry ${entryId}`);
       
+      // Clear any existing toasts to avoid UI clutter
       clearAllToasts();
       
       // Find and mark any processing entries related to this one as deleted
@@ -658,7 +659,7 @@ const Journal = () => {
       // Clean up processing entries
       removeProcessingEntryById(entryId);
       
-      // Update UI states
+      // Update UI states first to ensure responsiveness
       const updatedProcessingEntries = processingEntries.filter(
         tempId => !tempIdsToDelete.includes(tempId) && getEntryIdForProcessingId(tempId) !== entryId
       );
@@ -679,21 +680,33 @@ const Journal = () => {
       });
       
       // Delete from the database
+      console.log(`[Journal] Sending database delete request for entry ${entryId}`);
+      const deleteStartTime = Date.now();
+      
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
         .eq('id', entryId);
+      
+      const deleteEndTime = Date.now();
+      console.log(`[Journal] Database delete completed in ${deleteEndTime - deleteStartTime}ms`);
         
       if (error) {
+        console.error(`[Journal] Database error deleting entry ${entryId}:`, error);
         throw error;
       }
       
-      // Refresh entries
+      // Update local state to remove the deleted entry
+      previousEntriesRef.current = previousEntriesRef.current.filter(id => id !== entryId);
+      
+      // Refresh entries after a short delay to ensure the database has time to update
       setTimeout(() => {
-        setRefreshKey(Date.now());
+        console.log(`[Journal] Refreshing entries after deletion of ${entryId}`);
+        setRefreshKey(prev => prev + 1);
         fetchEntries();
       }, 100);
       
+      console.log(`[Journal] Entry ${entryId} deleted successfully`);
       toast.success('Entry deleted successfully');
       
     } catch (error) {
@@ -701,12 +714,14 @@ const Journal = () => {
       setLastAction(`Delete Entry Error (${entryId})`);
       toast.error('Failed to delete entry');
       
+      // Attempt to recover by refreshing the entries list
       setTimeout(() => {
-        setRefreshKey(Date.now());
+        console.log(`[Journal] Attempting recovery refresh after deletion error`);
+        setRefreshKey(prev => prev + 1);
         fetchEntries();
       }, 500);
     }
-  }, [user?.id, processingEntries, toastIds, fetchEntries, setRefreshKey, setProcessingEntries, setToastIds, setNotifiedEntryIds]);
+  }, [user?.id, processingEntries, toastIds, fetchEntries]);
 
   const resetError = useCallback(() => {
     setHasRenderError(false);
@@ -858,36 +873,3 @@ const Journal = () => {
             >
               <TabsList className="grid w-full grid-cols-2 mb-6">
                 <TabsTrigger value="record"><TranslatableText text="Record Entry" /></TabsTrigger>
-                <TabsTrigger value="entries"><TranslatableText text="Past Entries" /></TabsTrigger>
-              </TabsList>
-              
-              <TabsContent value="record" className="mt-0">
-                <div className="mb-4">
-                  <VoiceRecorder 
-                    onRecordingComplete={handleRecordingComplete}
-                    updateDebugInfo={updateDebugInfo}
-                  />
-                </div>
-              </TabsContent>
-              
-              <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
-                <ErrorBoundary>
-                  <JournalEntriesList
-                    entries={entries}
-                    loading={loading}
-                    processingEntries={processingEntries}
-                    processedEntryIds={processedEntryIds}
-                    onStartRecording={handleStartRecording}
-                    onDeleteEntry={handleDeleteEntry}
-                  />
-                </ErrorBoundary>
-              </TabsContent>
-            </Tabs>
-          </>
-        )}
-      </div>
-    </ErrorBoundary>
-  );
-};
-
-export default Journal;

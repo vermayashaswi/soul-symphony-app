@@ -16,7 +16,7 @@ import { Trash, Loader2 } from "lucide-react";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface DeleteEntryDialogProps {
-  onDelete: () => void;
+  onDelete: () => Promise<void>; // Changed to Promise<void> to properly handle async
   isProcessing?: boolean;
 }
 
@@ -25,11 +25,14 @@ export function DeleteEntryDialog({ onDelete, isProcessing = false }: DeleteEntr
   const [isDeleting, setIsDeleting] = useState(false);
   
   const handleDelete = async () => {
+    if (isDeleting) return; // Prevent multiple simultaneous delete attempts
+    
     setIsDeleting(true);
     try {
       await onDelete();
+      console.log('[DeleteEntryDialog] Entry deleted successfully');
     } catch (error) {
-      console.error('Error deleting entry:', error);
+      console.error('[DeleteEntryDialog] Error deleting entry:', error);
     } finally {
       setIsDeleting(false);
       setOpen(false);
@@ -39,7 +42,14 @@ export function DeleteEntryDialog({ onDelete, isProcessing = false }: DeleteEntr
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <button className="hover:text-red-500 text-gray-500" disabled={isProcessing}>
+        <button 
+          className="hover:text-red-500 text-gray-500" 
+          disabled={isProcessing}
+          onClick={(e) => {
+            // Prevent propagation to avoid triggering card click events
+            e.stopPropagation();
+          }}
+        >
           {isProcessing ? (
             <Loader2 size={16} className="animate-spin" />
           ) : (
@@ -61,7 +71,10 @@ export function DeleteEntryDialog({ onDelete, isProcessing = false }: DeleteEntr
             <TranslatableText text="Cancel" />
           </AlertDialogCancel>
           <AlertDialogAction 
-            onClick={handleDelete} 
+            onClick={(e) => {
+              e.preventDefault(); // Prevent default to handle deletion manually
+              handleDelete();
+            }} 
             className="bg-red-500 hover:bg-red-600"
             disabled={isDeleting}
           >

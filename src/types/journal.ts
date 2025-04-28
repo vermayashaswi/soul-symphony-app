@@ -2,7 +2,7 @@
 import { Json } from '@/integrations/supabase/types';
 
 export interface JournalEntry {
-  id: number;
+  id: number; // Making this required (not optional)
   user_id?: string;
   created_at: string;
   "transcription text"?: string;
