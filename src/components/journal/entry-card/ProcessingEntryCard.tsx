@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { CheckCircle2 } from 'lucide-react';
 import { JournalEntryCard, JournalEntry } from '../JournalEntryCard';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ProcessingEntryCardProps {
   tempId: string;
@@ -25,9 +26,11 @@ export const ProcessingEntryCard: React.FC<ProcessingEntryCardProps> = ({
       <div className="mb-4 bg-muted/40 border rounded-lg p-4 shadow-sm">
         <div className="flex flex-col space-y-3">
           <div className="flex items-center justify-between">
-            <h3 className="font-medium">Processing New Entry</h3>
+            <h3 className="font-medium">
+              <TranslatableText text="Processing New Entry" />
+            </h3>
             <div className="bg-primary/10 text-primary text-xs rounded-full px-2 py-0.5">
-              In Progress
+              <TranslatableText text="In Progress" />
             </div>
           </div>
           

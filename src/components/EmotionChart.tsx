@@ -19,6 +19,7 @@ import { Sparkles, CircleDot } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 type EmotionData = {
   day: string;
@@ -342,7 +343,9 @@ export function EmotionChart({
     if (lineData.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">No data available for this timeframe</p>
+          <p className="text-muted-foreground">
+            <TranslatableText text="No data available for this timeframe" />
+          </p>
         </div>
       );
     }
@@ -354,7 +357,9 @@ export function EmotionChart({
     if (allEmotions.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">No emotional data found</p>
+          <p className="text-muted-foreground">
+            <TranslatableText text="No emotional data found" />
+          </p>
         </div>
       );
     }
@@ -436,7 +441,7 @@ export function EmotionChart({
                     isSelected ? "font-bold" : "text-muted-foreground"
                   )}
                 >
-                  {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+                  <TranslatableText text={emotion.charAt(0).toUpperCase() + emotion.slice(1)} />
                 </span>
               </div>
             );
@@ -444,7 +449,9 @@ export function EmotionChart({
         </div>
         
         <div className="flex justify-center flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
-          <span>* Click on a legend item to focus on that emotion</span>
+          <span>
+            <TranslatableText text="* Click on a legend item to focus on that emotion" />
+          </span>
         </div>
       </div>
     );
@@ -457,7 +464,9 @@ export function EmotionChart({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Top Emotions</h3>
+        <h3 className="text-xl font-semibold">
+          <TranslatableText text="Top Emotions" />
+        </h3>
         <div className="flex gap-2">
           {chartTypes.map((type) => (
             <button
@@ -470,7 +479,7 @@ export function EmotionChart({
                   : "bg-secondary text-muted-foreground hover:text-foreground"
               )}
             >
-              {type.label}
+              <TranslatableText text={type.label} />
             </button>
           ))}
         </div>
@@ -481,12 +490,14 @@ export function EmotionChart({
         {chartType === 'bubble' && (
           <div className="w-full">
             <div className="absolute top-2 right-2 text-xs text-muted-foreground z-10">
-              * Darker colors represent higher scores of emotion
+              <TranslatableText text="* Darker colors represent higher scores of emotion" />
             </div>
             
             {topRightPercentage && (
               <div className="absolute top-2 right-32 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
-                {topRightPercentage.emotion}: {topRightPercentage.percentage}%
+                <TranslatableText 
+                  text={`${topRightPercentage.emotion}: ${topRightPercentage.percentage}%`} 
+                />
               </div>
             )}
             
@@ -499,7 +510,7 @@ export function EmotionChart({
                 />
               ) : (
                 <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No emotions data available for this timeframe
+                  <TranslatableText text="No emotions data available for this timeframe" />
                 </div>
               )}
             </div>
