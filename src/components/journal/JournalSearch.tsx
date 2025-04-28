@@ -4,8 +4,6 @@ import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface JournalSearchProps {
   entries: JournalEntry[];
@@ -13,7 +11,7 @@ interface JournalSearchProps {
   onSearchResults: (filteredEntries: JournalEntry[]) => void;
 }
 
-const originalSearchPrompts = [
+const searchPrompts = [
   "emotions",
   "memories",
   "places",
@@ -36,35 +34,10 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const mobile = useIsMobile();
-  const { translate, currentLanguage } = useTranslation();
-  const [translatedPrompts, setTranslatedPrompts] = useState(originalSearchPrompts);
-
-  useEffect(() => {
-    const translatePrompts = async () => {
-      if (currentLanguage === 'en') {
-        setTranslatedPrompts(originalSearchPrompts);
-        return;
-      }
-      
-      const promises = originalSearchPrompts.map(prompt => translate(prompt));
-      try {
-        const translated = await Promise.all(promises);
-        setTranslatedPrompts(translated);
-      } catch (error) {
-        console.error('Error translating search prompts:', error);
-      }
-    };
-    
-    translatePrompts();
-    
-    setTypingPlaceholder("");
-    setTypingIndex(0);
-    setIsTyping(true);
-  }, [currentLanguage, translate]);
 
   useEffect(() => {
     if (isTyping) {
-      const currentWord = translatedPrompts[placeholderIndex];
+      const currentWord = searchPrompts[placeholderIndex];
       
       if (typingIndex < currentWord.length) {
         const typingTimeout = setTimeout(() => {
@@ -83,21 +56,21 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     } else {
       if (typingIndex > 0) {
         const erasingTimeout = setTimeout(() => {
-          setTypingPlaceholder(translatedPrompts[placeholderIndex].substring(0, typingIndex - 1));
+          setTypingPlaceholder(searchPrompts[placeholderIndex].substring(0, typingIndex - 1));
           setTypingIndex(typingIndex - 1);
         }, 60);
         
         return () => clearTimeout(erasingTimeout);
       } else {
         const nextWordTimeout = setTimeout(() => {
-          setPlaceholderIndex((prevIndex) => (prevIndex + 1) % translatedPrompts.length);
+          setPlaceholderIndex((prevIndex) => (prevIndex + 1) % searchPrompts.length);
           setIsTyping(true);
         }, 300);
         
         return () => clearTimeout(nextWordTimeout);
       }
     }
-  }, [isTyping, typingIndex, placeholderIndex, translatedPrompts]);
+  }, [isTyping, typingIndex, placeholderIndex]);
 
   useEffect(() => {
     const handleBackButton = (event: PopStateEvent) => {
@@ -129,7 +102,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     }
 
     const filtered = entries.filter(entry => {
-      const content = (entry.content || '').toLowerCase();
+      const content = (entry.content || entry["refined text"] || entry["transcription text"] || '').toLowerCase();
       const query = searchQuery.toLowerCase();
       
       if (content.includes(query)) return true;
@@ -153,12 +126,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
         } catch (e) {
           console.error("Error parsing entities:", e);
         }
-      }
-      
-      if (entry.themes && Array.isArray(entry.themes)) {
-        return entry.themes.some(theme => 
-          theme.toLowerCase().includes(query)
-        );
       }
       
       if (entry.master_themes && Array.isArray(entry.master_themes)) {
@@ -191,21 +158,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     setIsFocused(false);
   };
 
-  const getTranslatedPlaceholder = async () => {
-    try {
-      const searchFor = await translate("Search for");
-      return `${searchFor} ${typingPlaceholder}${isTyping ? '|' : ''}`;
-    } catch (error) {
-      return `Search for ${typingPlaceholder}${isTyping ? '|' : ''}`;
-    }
-  };
-
-  const [placeholder, setPlaceholder] = useState(`Search for ${typingPlaceholder}${isTyping ? '|' : ''}`);
-  
-  useEffect(() => {
-    getTranslatedPlaceholder().then(setPlaceholder);
-  }, [typingPlaceholder, isTyping, currentLanguage]);
-
   return (
     <Card 
       className={`w-full transition-all duration-300 bg-transparent border-none shadow-none ${isFocused 
@@ -219,7 +171,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
             <Input
               ref={inputRef}
               type="text"
-              placeholder={placeholder}
+              placeholder={`Search for ${typingPlaceholder}${isTyping ? '|' : ''}`}
               value={searchQuery}
               onChange={handleSearchChange}
               onFocus={handleFocus}
@@ -230,9 +182,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
 
           <div className="flex flex-wrap items-center justify-end gap-1 py-0.5"> 
             <div className="text-xs text-muted-foreground">
-              <TranslatableText 
-                text={`${filteredEntries.length} total ${filteredEntries.length === 1 ? 'entry' : 'entries'}`} 
-              />
+              {filteredEntries.length} total {filteredEntries.length === 1 ? 'entry' : 'entries'}
             </div>
           </div>
         </div>

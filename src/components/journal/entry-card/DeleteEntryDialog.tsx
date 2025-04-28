@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
@@ -95,7 +96,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
             onClick={handleDelete}
             disabled={isDeleting}
           >
-            <TranslatableText text={isDeleting ? 'Deleting...' : 'Delete'} />
+            {isDeleting ? <TranslatableText text="Deleting..." /> : <TranslatableText text="Delete" />}
           </Button>
         </DialogFooter>
       </DialogContent>

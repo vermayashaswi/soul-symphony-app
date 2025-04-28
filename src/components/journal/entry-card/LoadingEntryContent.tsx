@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -12,6 +11,7 @@ import {
   HeartHandshake,
   AlertTriangle
 } from 'lucide-react';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const processingSteps = [
   { 
@@ -51,14 +51,12 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
   const unmountingRef = useRef<boolean>(false);
   
-  // Self cleanup safety - if this component exists for too long (20 seconds), automatically trigger cleanup
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
       if (mountedRef.current && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Safety timeout triggered - component existed for too long');
         unmountingRef.current = true;
         
-        // Signal that this component should be removed
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
           detail: { 
             componentId: componentId.current,
@@ -68,7 +66,6 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           }
         }));
         
-        // Also dispatch a completion event to ensure any associated processing entries are cleaned up
         window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
           detail: { 
             componentId: componentId.current,
@@ -78,7 +75,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           }
         }));
       }
-    }, 20000); // 20 seconds max lifetime (reduced from 30s)
+    }, 20000);
     
     cleanupTimersRef.current.push(safetyTimeout);
     
@@ -93,7 +90,6 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
       
-      // Notify about the processing step change
       const currentStep = processingSteps[(currentStepIndex + 1) % processingSteps.length];
       window.dispatchEvent(new CustomEvent('processingStepChanged', {
         detail: { 
@@ -103,16 +99,14 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         }
       }));
       
-    }, 2000); // Each step takes 2 seconds
+    }, 2000);
     
     stepsIntervalRef.current = stepInterval;
     
-    // Set a timeout to show a message if processing is taking too long
     const longProcessingTimeout = setTimeout(() => {
       if (mountedRef.current && !unmountingRef.current) {
         setProcessingTakingTooLong(true);
         
-        // Notify that processing is taking a long time
         window.dispatchEvent(new CustomEvent('processingTakingLong', {
           detail: { 
             timestamp: Date.now(),
@@ -124,7 +118,6 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
-    // Notify when loading content is mounted
     window.dispatchEvent(new CustomEvent('loadingContentMounted', {
       detail: { 
         timestamp: Date.now(),
@@ -132,13 +125,11 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       }
     }));
     
-    // Listen for forces removal events targeted at this component
     const handleForceRemoval = (event: CustomEvent) => {
       if ((event.detail?.componentId === componentId.current || !event.detail?.componentId) && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Forced removal event received for', componentId.current);
         unmountingRef.current = true;
         
-        // Signal that we're unmounting
         if (mountedRef.current) {
           window.dispatchEvent(new CustomEvent('loadingContentForceRemoved', {
             detail: { 
@@ -147,7 +138,6 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             }
           }));
           
-          // Force immediate parent card removal
           const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
           if (parentCard) {
             parentCard.classList.add('force-hidden');
@@ -164,12 +154,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     window.addEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
     window.addEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
     
-    // Also listen for content ready events which should remove this component
     const handleContentReady = () => {
       if (!unmountingRef.current) {
         unmountingRef.current = true;
         
-        // Force immediate parent card removal after a short delay
         setTimeout(() => {
           const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
           if (parentCard) {
@@ -203,7 +191,6 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       window.removeEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
       window.removeEventListener('entryContentReady', handleContentReady as EventListener);
       
-      // Notify when loading content is unmounted
       window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {
         detail: { 
           timestamp: Date.now(),
@@ -215,9 +202,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   
   const currentStep = processingSteps[currentStepIndex];
   
-  // Add CSS to handle forced hiding
   useEffect(() => {
-    // Add a style for forced hiding if not already present
     if (!document.getElementById('force-hidden-style')) {
       const style = document.createElement('style');
       style.id = 'force-hidden-style';
@@ -226,7 +211,6 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     }
     
     return () => {
-      // Cleanup only if no other instances are active
       if (!document.querySelector('.journal-entry-card:not(.force-hidden)')) {
         const style = document.getElementById('force-hidden-style');
         if (style) {
@@ -259,8 +243,12 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         {error ? (
           <div className="flex flex-col items-center">
             <AlertTriangle className="h-8 w-8 text-red-500 mb-2" />
-            <p className="text-red-500 font-medium text-sm text-center">{error}</p>
-            <p className="text-muted-foreground text-xs text-center mt-2">Try refreshing the page or recording again</p>
+            <p className="text-red-500 font-medium text-sm text-center">
+              <TranslatableText text={error} />
+            </p>
+            <p className="text-muted-foreground text-xs text-center mt-2">
+              <TranslatableText text="Try refreshing the page or recording again" />
+            </p>
           </div>
         ) : (
           <>
@@ -301,7 +289,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                 transition={{ duration: 0.3 }}
                 className="text-sm text-center text-primary font-medium"
               >
-                {currentStep.text}
+                <TranslatableText text={currentStep.text} />
               </motion.div>
             </AnimatePresence>
             
@@ -311,7 +299,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                 animate={{ opacity: 1 }}
                 className="text-xs text-muted-foreground text-center mt-2"
               >
-                This is taking longer than usual. Please wait a moment...
+                <TranslatableText text="This is taking longer than usual. Please wait a moment..." />
               </motion.p>
             )}
           </>
