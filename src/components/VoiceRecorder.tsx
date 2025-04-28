@@ -292,6 +292,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           });
           
           console.log('[VoiceRecorder] Base64 test conversion successful, length:', base64Test.length);
+          console.log('[VoiceRecorder] Directly calling onRecordingComplete with blob');
           
           await onRecordingComplete(normalizedBlob);
           

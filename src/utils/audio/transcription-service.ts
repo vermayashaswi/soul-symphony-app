@@ -29,159 +29,67 @@ export async function sendAudioForTranscription(
 
     console.log(`[TranscriptionService] Sending audio for ${directTranscription ? 'direct' : 'full'} transcription processing`);
     console.log(`[TranscriptionService] Audio data size: ${base64Audio.length} characters`);
-    console.log('[TranscriptionService] Using transcription model: gpt-4o-transcribe');
-    console.log(`[TranscriptionService] Process sentiment with UTF-8 encoding: ${processSentiment ? 'YES' : 'NO'}`);
-    
-    // Add more diagnostic info about the audio data being sent
-    console.log('[TranscriptionService] Audio data sample (first 100 chars):', base64Audio.substring(0, 100));
-    
-    // Make sure the base64 doesn't contain any URL encoding or header parts
-    // It should be a clean base64 string without "data:audio/webm;base64," prefix
-    let cleanBase64 = base64Audio;
-    if (cleanBase64.includes(',')) {
-      cleanBase64 = cleanBase64.split(',')[1];
+    console.log('[TranscriptionService] User ID provided:', userId ? 'Yes' : 'No');
+
+    // Check if base64Audio is valid
+    if (typeof base64Audio !== 'string' || base64Audio.length < 50) {
+      throw new Error('Invalid audio data format');
     }
-    
-    // Validate base64 string - ensure it's properly formed
-    if (!cleanBase64 || cleanBase64.length < 50) {
-      throw new Error('Invalid audio data: Base64 string is too short');
+
+    // Guard against empty or invalid user ID which could cause server-side errors
+    if (userId === '') {
+      userId = undefined;
     }
-    
-    try {
-      // Verify this is a valid base64 string by trying to decode a small part
-      atob(cleanBase64.substring(0, 100));
-    } catch (e) {
-      console.error('[TranscriptionService] Invalid base64 encoding:', e);
-      throw new Error('Invalid audio data: Not properly base64 encoded');
-    }
-    
-    // Better estimation of recording time
-    const estimatedDuration = Math.max(
-      (cleanBase64.length > 1000) ? Math.floor(cleanBase64.length / 700) : 1,
-      directTranscription ? 5 : 3 // Minimum length assumptions
-    );
-    
-    // Call the Supabase edge function with the properly formatted body
-    console.log('[TranscriptionService] Invoking transcribe-audio edge function');
-    const response = await supabase.functions.invoke('transcribe-audio', {
+
+    // Calculate estimated recording time based on audio data size
+    const estimatedDuration = Math.floor(base64Audio.length / 10000);
+    console.log(`[TranscriptionService] Estimated recording duration: ~${estimatedDuration}s`);
+
+    // Invoke the edge function
+    const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
-        audio: cleanBase64,
-        userId: userId || null,
-        directTranscription: directTranscription,
-        highQuality: true, // Set to true for full model
-        recordingTime: estimatedDuration,
-        modelName: 'gpt-4o-transcribe', // Use the full model
-        format: 'wav', // Tell the server we're sending WAV format
-        processSentiment: processSentiment, // Flag to process sentiment with UTF-8 encoding
-        audioConfig: {
-          sampleRate: 44100,
-          channels: 1,
-          bitDepth: 16
-        },
-        autoDetectLanguage: true  // Added explicit flag for auto language detection
-      }
+        audio: base64Audio,
+        userId,
+        directTranscription,
+        highQuality: processSentiment,
+        recordingTime: estimatedDuration * 1000 // Convert to milliseconds
+      },
     });
 
-    // Handle response errors
-    if (response.error) {
-      console.error('[TranscriptionService] Edge function error:', response.error);
-      return {
-        success: false,
-        error: response.error?.message || 'Failed to process audio'
-      };
+    if (error) {
+      console.error('[TranscriptionService] Edge function error:', error);
+      throw new Error(`Edge function error: ${error.message}`);
     }
 
-    // Check if the response has a success field
-    if (response.data?.success === false) {
-      console.error('[TranscriptionService] Processing error:', response.data.error || response.data.message);
-      return {
-        success: false,
-        error: response.data.error || response.data.message || 'Unknown error in audio processing'
-      };
-    }
-
-    // Validate that we have data back
-    if (!response.data) {
+    if (!data) {
       console.error('[TranscriptionService] No data returned from edge function');
-      return {
-        success: false,
-        error: 'No data returned from server'
-      };
+      throw new Error('No data returned from transcription service');
     }
 
-    // Add more detailed logging about what was returned
-    console.log('[TranscriptionService] Transcription successful:', {
-      directMode: directTranscription,
-      transcriptionLength: response.data?.transcription?.length || 0,
-      refinedTextLength: response.data?.refinedText?.length || 0,
-      hasEntryId: !!response.data?.entryId,
-      entryId: response.data?.entryId || 'none',
-      audioUrl: response.data?.audioUrl ? 'exists' : 'none',
-      sentimentProcessed: processSentiment,
-      model: 'gpt-4o-transcribe',
-      detectedLanguages: response.data?.detectedLanguages || 'none',
-      responseData: JSON.stringify(response.data).substring(0, 200) + '...' // Log a sample of the response
-    });
-
+    console.log('[TranscriptionService] Transcription completed successfully');
+    
     return {
       success: true,
-      data: response.data
+      data
     };
   } catch (error: any) {
-    console.error('[TranscriptionService] Error in sendAudioForTranscription:', error);
+    console.error('[TranscriptionService] Error in transcription process:', error);
     return {
       success: false,
-      error: error.message || 'Unknown error occurred'
+      error: error.message || 'Unknown transcription error'
     };
   }
 }
 
 /**
- * Convert an audio blob to base64 and send for transcription
- * @param audioBlob - The audio blob to transcribe
- * @param userId - User ID for association with the transcription
- * @param directTranscription - If true, just returns the transcription without processing
- * @param processSentiment - If true, ensure sentiment analysis is performed with UTF-8 encoding
+ * Helper function to convert a Blob to base64
+ * @param blob - Audio blob to convert
  */
-export async function transcribeAudioBlob(
-  audioBlob: Blob,
-  userId: string | undefined,
-  directTranscription: boolean = false,
-  processSentiment: boolean = true
-): Promise<TranscriptionResult> {
+export async function audioToBase64(blob: Blob): Promise<string> {
   try {
-    console.log('[TranscriptionService] Converting audio blob to base64...');
-    console.log('[TranscriptionService] Audio blob details:', {
-      size: audioBlob.size,
-      type: audioBlob.type,
-      hasDuration: 'duration' in audioBlob,
-      duration: (audioBlob as any).duration || 'unknown'
-    });
-    
-    // Basic validation of the audio blob
-    if (!audioBlob || audioBlob.size < 100) {
-      throw new Error('Audio blob is empty or too small to be valid');
-    }
-    
-    // Verify audio MIME type
-    const validTypes = ['audio/wav', 'audio/webm', 'audio/mp3', 'audio/mp4', 'audio/mpeg', 'audio/ogg'];
-    if (!validTypes.includes(audioBlob.type) && audioBlob.type !== '') {
-      console.warn('[TranscriptionService] Unusual audio type:', audioBlob.type);
-      // Continue anyway but log the warning
-    }
-    
-    // Convert blob to base64
-    const base64Audio = await blobToBase64(audioBlob);
-    
-    console.log(`[TranscriptionService] Base64 conversion successful, length: ${base64Audio.length}`);
-    
-    // Send for transcription
-    return await sendAudioForTranscription(base64Audio, userId, directTranscription, processSentiment);
-  } catch (error: any) {
-    console.error('[TranscriptionService] Error in transcribeAudioBlob:', error);
-    return {
-      success: false,
-      error: error.message || 'Failed to prepare audio for transcription'
-    };
+    return await blobToBase64(blob);
+  } catch (error) {
+    console.error('[TranscriptionService] Error converting audio to base64:', error);
+    throw new Error('Failed to convert audio to base64');
   }
 }

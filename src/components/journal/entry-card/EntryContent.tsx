@@ -1,118 +1,35 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 import { LoadingEntryContent } from './LoadingEntryContent';
-import { AnimatePresence, motion } from 'framer-motion';
-import { useDebugLog } from '@/utils/debug/DebugContext';
-import TranslatedContent from './TranslatedContent';
 
 interface EntryContentProps {
   content: string;
   isExpanded: boolean;
-  isProcessing?: boolean;
-  language?: string;
+  isProcessing: boolean;
 }
 
-export function EntryContent({ 
-  content, 
-  isExpanded, 
-  isProcessing = false,
-  language = 'en'
-}: EntryContentProps) {
-  const { addEvent } = useDebugLog();
-  const [showLoading, setShowLoading] = useState(isProcessing);
-  const [stableContent, setStableContent] = useState(content);
-  const [forceLoading, setForceLoading] = useState(false);
-  const mountedRef = useRef(true);
-  const contentReadyDispatchedRef = useRef(false);
-
-  useEffect(() => {
-    if (isProcessing) {
-      setShowLoading(true);
-      setForceLoading(true);
-      contentReadyDispatchedRef.current = false;
-      
-      const timer = setTimeout(() => {
-        if (mountedRef.current) {
-          setForceLoading(false);
-        }
-      }, 200);
-      
-      return () => clearTimeout(timer);
-    }
-
-    const contentIsLoading = !content || 
-                          content === "Processing entry..." || 
-                          content.trim() === "" ||
-                          content === "Loading...";
-
-    if (contentIsLoading) {
-      setShowLoading(true);
-      contentReadyDispatchedRef.current = false;
-    } else if (!forceLoading) {
-      setShowLoading(false);
-      setStableContent(content);
-      
-      if (!contentReadyDispatchedRef.current) {
-        contentReadyDispatchedRef.current = true;
-        
-        window.dispatchEvent(new CustomEvent('entryContentReady', { 
-          detail: { 
-            content,
-            timestamp: Date.now(),
-            readyForDisplay: true,
-            forceRemoveProcessing: true
-          }
-        }));
-        
-        window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-          detail: { 
-            content,
-            timestamp: Date.now(),
-            forceCleanup: true,
-            immediate: true
-          }
-        }));
-        
-        window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-          detail: {
-            timestamp: Date.now(),
-            forceClearProcessingCard: true,
-            immediate: true
-          }
-        }));
-      }
-    }
-    
-    addEvent('EntryContent', 'State update', 'info', {
-      contentLength: content?.length || 0,
-      isProcessing,
-      isExpanded,
-      showLoading,
-      contentEmpty: contentIsLoading,
-      forceLoading,
-      contentReady: contentReadyDispatchedRef.current
-    });
-    
-  }, [content, isProcessing, addEvent, forceLoading]);
-  
-  useEffect(() => {
-    return () => {
-      mountedRef.current = false;
-    };
-  }, []);
+export function EntryContent({ content, isExpanded, isProcessing }: EntryContentProps) {
+  if (isProcessing) {
+    return <LoadingEntryContent />;
+  }
 
   return (
-    <AnimatePresence mode="wait" initial={false}>
-      {(showLoading || forceLoading) ? (
-        <LoadingEntryContent key="loading" />
+    <div>
+      {isExpanded ? (
+        <TranslatableText 
+          text={content} 
+          as="p" 
+          className="text-xs md:text-sm text-foreground" 
+        />
       ) : (
-        <TranslatedContent 
-          content={stableContent}
-          isExpanded={isExpanded}
-          // Fix: Pass language as an optional prop, not required
+        <TranslatableText 
+          text={content} 
+          as="p" 
+          className="text-xs md:text-sm text-foreground line-clamp-3" 
         />
       )}
-    </AnimatePresence>
+    </div>
   );
 }
 

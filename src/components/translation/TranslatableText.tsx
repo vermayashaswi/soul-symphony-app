@@ -27,6 +27,9 @@ export function TranslatableText({
     let isMounted = true;
 
     const translateText = async () => {
+      // Always start with the original text first
+      if (isMounted) setTranslatedText(text);
+      
       if (!text?.trim()) {
         if (isMounted) setTranslatedText('');
         return;
@@ -38,7 +41,7 @@ export function TranslatableText({
         return;
       }
 
-      // Fallback to dynamic translation service if not in English
+      // Only initiate translation if not in English
       if (currentLanguage !== 'en') {
         setIsLoading(true);
         console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
@@ -46,8 +49,8 @@ export function TranslatableText({
         try {
           const result = await translate(text);
           if (isMounted) {
-            setTranslatedText(result);
-            console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
+            setTranslatedText(result || text); // Fallback to original text if result is empty
+            console.log(`TranslatableText: Successfully translated to "${result?.substring(0, 30) || 'empty'}..."`);
           }
         } catch (error) {
           console.error('Translation error:', error);
@@ -58,8 +61,6 @@ export function TranslatableText({
         } finally {
           if (isMounted) setIsLoading(false);
         }
-      } else {
-        if (isMounted) setTranslatedText(text);
       }
     };
 
@@ -74,9 +75,11 @@ export function TranslatableText({
   useEffect(() => {
     const handleLanguageChange = (event: CustomEvent) => {
       console.log(`TranslatableText: Language change event detected: ${event.detail.language}`);
+      // Always set the original text first to ensure content is always visible
+      setTranslatedText(text);
+      
       // This will re-trigger the translation effect
       if (currentLanguage !== 'en') {
-        setTranslatedText(''); // Clear to show loading state
         setIsLoading(true);
       }
     };
@@ -86,7 +89,7 @@ export function TranslatableText({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, []);
+  }, [text]);
 
   // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(
@@ -94,7 +97,7 @@ export function TranslatableText({
     { 
       className: `${className} ${isLoading ? 'opacity-70' : ''}`.trim()
     }, 
-    translatedText
+    translatedText || text  // Ensure we always show something, even if translation fails
   );
 }
 
