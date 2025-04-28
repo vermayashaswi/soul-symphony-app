@@ -9,6 +9,7 @@ import { format, isValid, endOfDay, startOfDay, isAfter, isBefore, isEqual, isSa
 import { JournalEntry } from './JournalEntryCard';
 import { Badge } from '@/components/ui/badge';
 import { DayPickerSingleProps } from 'react-day-picker';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface DateRangeFilterProps {
   entries: JournalEntry[];
@@ -181,7 +182,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
               onClick={() => setIsCalendarOpen(true)}
             >
               <CalendarRange className="h-4 w-4" />
-              <span>Filter by date</span>
+              <span><TranslatableText text="Filter by date" /></span>
             </Button>
           </PopoverTrigger>
           <PopoverContent className="w-auto p-0" align="start">
@@ -205,7 +206,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
                           ? `From ${format(startDate, 'MMM d')}`
                           : endDate 
                             ? `Until ${format(endDate, 'MMM d')}`
-                            : 'Select dates'
+                            : <TranslatableText text="Select dates" />
                       }
                     </div>
                     <Button
@@ -214,7 +215,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
                       className="h-7 text-xs"
                       onClick={clearFilters}
                     >
-                      Reset
+                      <TranslatableText text="Reset" />
                     </Button>
                   </div>
                 </div>
@@ -229,7 +230,7 @@ export function DateRangeFilter({ entries, onFilterChange, onFilterActive }: Dat
           variant="outline" 
           className="ml-2 gap-1 px-2 py-1 bg-primary/10 text-primary text-xs"
         >
-          {totalFiltered} of {totalEntries} entries
+          <TranslatableText text={`${totalFiltered} of ${totalEntries} entries`} />
         </Badge>
       )}
     </div>

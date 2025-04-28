@@ -7,6 +7,14 @@ interface CacheEntry {
   language: string;
 }
 
+interface TranslationEntry {
+  originalText: string;
+  translatedText: string;
+  language: string;
+  timestamp: number;
+  version: number;
+}
+
 class TranslationCache {
   private cache: Record<string, Record<string, CacheEntry>> = {};
   private readonly TTL: number = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
@@ -57,6 +65,24 @@ class TranslationCache {
       console.error('Error retrieving from translation cache:', error);
       return null;
     }
+  }
+  
+  // New methods to support the translationService interface
+  public async getTranslation(text: string, language: string): Promise<TranslationEntry | null> {
+    const cachedValue = this.get(text, language);
+    if (cachedValue === null) return null;
+    
+    return {
+      originalText: text,
+      translatedText: cachedValue,
+      language,
+      timestamp: Date.now(),
+      version: 1
+    };
+  }
+  
+  public async setTranslation(entry: TranslationEntry): Promise<void> {
+    this.set(entry.originalText, entry.translatedText, entry.language);
   }
   
   private cleanExpired(): void {

@@ -31,6 +31,7 @@ const JournalEntriesList: React.FC<JournalEntriesList> = ({
   const [selectedEntry, setSelectedEntry] = useState<any>(null);
   const { currentLanguage } = useTranslation();
   const [key, setKey] = useState(Date.now());
+  const [isFilterActive, setIsFilterActive] = useState(false);
   
   // Force re-render when language changes
   useEffect(() => {
@@ -48,6 +49,10 @@ const JournalEntriesList: React.FC<JournalEntriesList> = ({
   
   const handleSelectEntry = (entry: any) => {
     setSelectedEntry(entry);
+  };
+  
+  const handleFilterActive = (active: boolean) => {
+    setIsFilterActive(active);
   };
   
   if (loading) {
@@ -92,7 +97,8 @@ const JournalEntriesList: React.FC<JournalEntriesList> = ({
       
       <DateRangeFilter 
         entries={entries} 
-        onFilterChange={handleSearchResults} 
+        onFilterChange={handleSearchResults}
+        onFilterActive={handleFilterActive}
       />
       
       <div className="mt-6 space-y-6">
@@ -101,7 +107,6 @@ const JournalEntriesList: React.FC<JournalEntriesList> = ({
             key={entry.id}
             entry={entry}
             isProcessing={processingEntries.some(id => id === entry.processing_id)}
-            isProcessed={processedEntryIds.includes(entry.id)}
             onDelete={() => onDeleteEntry(entry.id)}
           />
         ))}
