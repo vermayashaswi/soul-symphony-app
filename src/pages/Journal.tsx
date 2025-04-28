@@ -428,7 +428,7 @@ const Journal = () => {
     setProcessingError(null);
   };
 
-  const handleTabChange = (value: string) => {
+  const handleTabChange = async (value: string) => {
     console.log(`[Journal] Tab change requested to: ${value}. Current safeToSwitchTab: ${safeToSwitchTab}`);
     
     if (value === 'entries' && !safeToSwitchTab) {
