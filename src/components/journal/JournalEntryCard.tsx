@@ -13,29 +13,11 @@ import {
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
-import { Trash, X } from "lucide-react";
-import { JournalEntry as JournalEntryType, Json } from '@/types/journal';
-import { Button } from '@/components/ui/button';
+import { JournalEntry as JournalEntryType } from '@/types/journal';
 
-export interface JournalEntry {
-  id: number;
+export interface JournalEntry extends JournalEntryType {
   content: string;
   created_at: string;
-  audio_url?: string;
-  sentiment?: string | null;
-  themes?: string[] | null;
-  master_themes?: string[];
-  entities?: Array<{
-    type: string;
-    name: string;
-    text?: string;
-  }>;
-  foreignKey?: string;
-  predictedLanguages?: {
-    [key: string]: number;
-  } | null;
-  Edit_Status?: number | null;
-  user_feedback?: string | null;
 }
 
 interface JournalEntryCardProps {
