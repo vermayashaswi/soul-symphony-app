@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
@@ -20,9 +21,7 @@ const JournalEntriesList = ({ entries, loading, processingEntries, processedEntr
   if (loading) {
     return (
       <div className="space-y-6">
-        <JournalEntryLoadingSkeleton />
-        <JournalEntryLoadingSkeleton />
-        <JournalEntryLoadingSkeleton />
+        <JournalEntryLoadingSkeleton count={3} />
       </div>
     );
   }
@@ -36,7 +35,7 @@ const JournalEntriesList = ({ entries, loading, processingEntries, processedEntr
   return (
     <div className="space-y-6">
       {processingEntries.map((id) => (
-        <JournalEntryLoadingSkeleton key={id} message={t('journal.entry.processing')} />
+        <JournalEntryLoadingSkeleton key={id} />
       ))}
       {entries.map((entry) => (
         <JournalEntryCard
