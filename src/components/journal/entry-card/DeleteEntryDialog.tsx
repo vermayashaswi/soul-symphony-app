@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -28,9 +27,11 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
     try {
       setIsProcessing(true);
       await onDelete();
+      // Only close the dialog if deletion was successful
       setOpen(false);
     } catch (error) {
       console.error("Error deleting entry:", error);
+      // Keep dialog open if there was an error
     } finally {
       setIsProcessing(false);
     }

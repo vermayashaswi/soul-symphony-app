@@ -38,7 +38,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   };
 
   return (
-    <div>
+    <div className="journal-entries-list">
       <JournalEntriesHeader onStartRecording={onStartRecording} />
 
       {isLoading ? (
