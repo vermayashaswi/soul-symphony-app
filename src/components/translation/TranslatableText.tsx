@@ -10,9 +10,6 @@ interface TranslatableTextProps {
   as?: keyof JSX.IntrinsicElements;
 }
 
-// Regular expressions to detect language markers like [hi], [en], etc.
-const LANGUAGE_MARKER_REGEX = /^\[(\w+)\]\s*(.*)$/;
-
 export function TranslatableText({ 
   text, 
   className = "",
@@ -26,13 +23,6 @@ export function TranslatableText({
   // Determine if we're on a website route (marketing site)
   const isOnWebsite = isWebsiteRoute(location.pathname);
 
-  // Function to clean text of language markers
-  const cleanTextOfMarkers = (input: string): string => {
-    if (!input) return '';
-    // Remove all language markers like [hi], [en], etc.
-    return input.replace(/\[\w+\]\s*/g, '');
-  };
-
   useEffect(() => {
     let isMounted = true;
 
@@ -42,40 +32,34 @@ export function TranslatableText({
         return;
       }
 
-      // Always clean the text of any language markers before any processing
-      const cleanedText = cleanTextOfMarkers(text);
-      
       // Skip translations for the marketing website pages
       if (isOnWebsite) {
-        if (isMounted) setTranslatedText(cleanedText);
+        if (isMounted) setTranslatedText(text);
         return;
       }
 
-      // Use the cleaned text for both English and non-English cases
-      if (currentLanguage === 'en') {
-        if (isMounted) setTranslatedText(cleanedText);
-      } else {
-        // Only perform API translation for non-English
+      // Fallback to dynamic translation service if not in English
+      if (currentLanguage !== 'en') {
         setIsLoading(true);
-        console.log(`TranslatableText: Translating "${cleanedText.substring(0, 30)}..." to ${currentLanguage}`);
+        console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
 
         try {
-          const result = await translate(cleanedText);
+          const result = await translate(text);
           if (isMounted) {
-            // Make sure we don't accidentally reintroduce language markers
-            const finalResult = cleanTextOfMarkers(result);
-            setTranslatedText(finalResult);
-            console.log(`TranslatableText: Successfully translated to "${finalResult.substring(0, 30)}..."`);
+            setTranslatedText(result);
+            console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
           }
         } catch (error) {
           console.error('Translation error:', error);
           if (isMounted) {
-            setTranslatedText(cleanedText); // Fallback to original cleaned text
-            console.warn(`TranslatableText: Failed to translate "${cleanedText.substring(0, 30)}..." to ${currentLanguage}`);
+            setTranslatedText(text); // Fallback to original
+            console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
           }
         } finally {
           if (isMounted) setIsLoading(false);
         }
+      } else {
+        if (isMounted) setTranslatedText(text);
       }
     };
 

@@ -1,163 +1,197 @@
 
-// This file is mentioned but not provided in the allowed files list
-// Let's create a basic static translation service with synchronous capability
-
+import { supabase } from '@/integrations/supabase/client';
 import { translationCache } from './translationCache';
+import { toast } from 'sonner';
+
+type TranslationResult = {
+  original: string;
+  translated: string;
+};
 
 class StaticTranslationService {
-  private language: string = 'en';
-  private isBusy: boolean = false;
+  private static readonly BATCH_SIZE = 20;
+  private currentLanguage = 'en';
+  private translationsInProgress = new Map<string, Promise<string>>();
   
-  // Common date-related terms for quick translation
-  private static dateTerms: Record<string, Record<string, string>> = {
-    'es': {
-      'January': 'Enero',
-      'February': 'Febrero', 
-      'March': 'Marzo',
-      'April': 'Abril',
-      'May': 'Mayo',
-      'June': 'Junio',
-      'July': 'Julio',
-      'August': 'Agosto',
-      'September': 'Septiembre',
-      'October': 'Octubre',
-      'November': 'Noviembre',
-      'December': 'Diciembre',
-      'Monday': 'Lunes',
-      'Tuesday': 'Martes',
-      'Wednesday': 'Miércoles',
-      'Thursday': 'Jueves',
-      'Friday': 'Viernes',
-      'Saturday': 'Sábado',
-      'Sunday': 'Domingo',
-      'at': 'a las'
-    },
-    'fr': {
-      'January': 'Janvier',
-      'February': 'Février',
-      'March': 'Mars',
-      'April': 'Avril',
-      'May': 'Mai',
-      'June': 'Juin',
-      'July': 'Juillet',
-      'August': 'Août',
-      'September': 'Septembre',
-      'October': 'Octobre',
-      'November': 'Novembre',
-      'December': 'Décembre',
-      'Monday': 'Lundi',
-      'Tuesday': 'Mardi',
-      'Wednesday': 'Mercredi',
-      'Thursday': 'Jeudi',
-      'Friday': 'Vendredi',
-      'Saturday': 'Samedi',
-      'Sunday': 'Dimanche',
-      'at': 'à'
-    },
-    'de': {
-      'January': 'Januar',
-      'February': 'Februar',
-      'March': 'März',
-      'April': 'April',
-      'May': 'Mai',
-      'June': 'Juni',
-      'July': 'Juli',
-      'August': 'August',
-      'September': 'September',
-      'October': 'Oktober',
-      'November': 'November',
-      'December': 'Dezember',
-      'Monday': 'Montag',
-      'Tuesday': 'Dienstag',
-      'Wednesday': 'Mittwoch',
-      'Thursday': 'Donnerstag',
-      'Friday': 'Freitag',
-      'Saturday': 'Samstag',
-      'Sunday': 'Sonntag',
-      'at': 'um'
-    }
-    // Add more languages as needed
-  };
-
-  constructor() {
-    // Initialize with the default language
-    this.language = 'en';
+  setLanguage(lang: string) {
+    console.log(`StaticTranslationService: Setting language to ${lang}`);
+    this.currentLanguage = lang;
   }
-
-  public setLanguage(lang: string): void {
-    this.language = lang;
+  
+  getLanguage(): string {
+    return this.currentLanguage;
   }
-
-  public getLanguage(): string {
-    return this.language;
-  }
-
-  // Asynchronous translation method (existing from your implementation)
-  public async translateText(text: string, targetLang?: string): Promise<string> {
-    if (!text || text.trim() === '') return '';
-    
-    const lang = targetLang || this.language;
-    if (lang === 'en') return text;
-    
-    // Check cache first
-    const cachedTranslation = translationCache.get(text, lang);
-    if (cachedTranslation) {
-      return cachedTranslation;
-    }
-    
-    if (this.isBusy) {
-      // If already translating, return original to avoid overwhelming the API
+  
+  async translateText(text: string, targetLanguage: string = this.currentLanguage): Promise<string> {
+    // If target language is English or text is empty, return the original text
+    if (targetLanguage === 'en' || !text?.trim()) {
       return text;
     }
     
+    console.log(`StaticTranslationService: Translating to ${targetLanguage}`);
+    
+    // Check if there's already a translation in progress for this text
+    const inProgressKey = `${text}_${targetLanguage}`;
+    if (this.translationsInProgress.has(inProgressKey)) {
+      return this.translationsInProgress.get(inProgressKey) as Promise<string>;
+    }
+    
+    // Check cache first
     try {
-      this.isBusy = true;
+      const cached = await translationCache.getTranslation(text, targetLanguage);
+      if (cached) {
+        console.log('Using cached translation');
+        return cached.translatedText;
+      }
+    } catch (error) {
+      console.error('Cache error:', error);
+      // Continue with API call if cache fails
+    }
+    
+    // For testing when Supabase edge function is not available
+    // Just return a simple mock translation
+    if (!text) return '';
+    
+    // Fall back to simple mock translation if needed
+    try {
+      // Create a new translation promise
+      const translationPromise = this.fetchTranslation(text, targetLanguage);
+      this.translationsInProgress.set(inProgressKey, translationPromise);
       
-      // In a real implementation, this would call an API
-      // For now, we'll simulate a translation by returning the text with a language marker
-      const translatedText = `[${lang}] ${text}`;
+      const result = await translationPromise;
+      // Remove from in-progress map once done
+      this.translationsInProgress.delete(inProgressKey);
+      return result;
+    } catch (error) {
+      console.error('Translation failed:', error);
+      this.translationsInProgress.delete(inProgressKey);
       
-      // Cache the result
-      translationCache.set(text, translatedText, lang);
+      // Mock translation for testing/fallback
+      if (targetLanguage === 'es') {
+        return `ES: ${text}`;
+      } else if (targetLanguage === 'fr') {
+        return `FR: ${text}`;
+      } else if (targetLanguage === 'de') {
+        return `DE: ${text}`;
+      } else if (targetLanguage === 'zh') {
+        return `ZH: ${text}`;
+      }
       
+      return text; // Default fallback to original text
+    }
+  }
+  
+  private async fetchTranslation(text: string, targetLanguage: string): Promise<string> {
+    try {
+      // Call the edge function for translation
+      const { data, error } = await supabase.functions.invoke('translate-static-content', {
+        body: {
+          texts: [text],
+          targetLanguage,
+        },
+      });
+
+      if (error) {
+        console.error('Translation error:', error);
+        return text; // Fallback to original text
+      }
+
+      if (!data || !data.translations || !data.translations[0]) {
+        console.error('Invalid translation response format');
+        return text;
+      }
+
+      const translatedText = data.translations[0].translated;
+
+      // Cache the successful translation
+      try {
+        await translationCache.setTranslation({
+          originalText: text,
+          translatedText,
+          language: targetLanguage,
+          timestamp: Date.now(),
+          version: 1,
+        });
+      } catch (cacheError) {
+        console.error('Cache write error:', cacheError);
+      }
+
       return translatedText;
     } catch (error) {
-      console.error('Translation error:', error);
-      return text;
-    } finally {
-      this.isBusy = false;
+      console.error('Translation service error:', error);
+      return text; // Fallback to original text
     }
   }
-
-  // New synchronous method specifically for date translations
-  public translateTextSync(text: string, targetLang?: string): string {
-    if (!text || text.trim() === '') return '';
-    
-    const lang = targetLang || this.language;
-    if (lang === 'en') return text;
-    
-    // Check cache first
-    const cachedTranslation = translationCache.get(text, lang);
-    if (cachedTranslation) {
-      return cachedTranslation;
+  
+  async batchTranslate(texts: string[], targetLanguage: string = this.currentLanguage): Promise<Map<string, string>> {
+    if (targetLanguage === 'en' || texts.length === 0) {
+      // No translation needed for English or empty list
+      return new Map(texts.map(text => [text, text]));
     }
     
-    // For dates, we can do simple term replacements
-    let result = text;
-    const dateTerms = StaticTranslationService.dateTerms[lang];
+    const results = new Map<string, string>();
+    const needsTranslation: string[] = [];
     
-    if (dateTerms) {
-      // Replace each term in the text
-      Object.entries(dateTerms).forEach(([engTerm, translation]) => {
-        const regex = new RegExp(`\\b${engTerm}\\b`, 'g');
-        result = result.replace(regex, translation);
+    // Check cache first for all texts
+    for (const text of texts) {
+      try {
+        const cached = await translationCache.getTranslation(text, targetLanguage);
+        if (cached) {
+          results.set(text, cached.translatedText);
+        } else {
+          needsTranslation.push(text);
+        }
+      } catch (error) {
+        needsTranslation.push(text);
+      }
+    }
+    
+    if (needsTranslation.length === 0) {
+      return results;
+    }
+    
+    // Process in batches
+    try {
+      const { data, error } = await supabase.functions.invoke('translate-static-content', {
+        body: {
+          texts: needsTranslation,
+          targetLanguage,
+          sourceLanguage: 'en',
+        },
       });
+
+      if (error) {
+        console.error('Batch translation error:', error);
+        // Fallback to original text for untranslated items
+        needsTranslation.forEach(text => results.set(text, text));
+        return results;
+      }
+      
+      // Process and cache all translations
+      const translations: TranslationResult[] = data.translations;
+      for (const item of translations) {
+        results.set(item.original, item.translated);
+        
+        // Cache each translation
+        try {
+          await translationCache.setTranslation({
+            originalText: item.original,
+            translatedText: item.translated,
+            language: targetLanguage,
+            timestamp: Date.now(),
+            version: 1,
+          });
+        } catch (cacheError) {
+          console.error('Cache write error:', cacheError);
+        }
+      }
+    } catch (error) {
+      console.error('Batch translation service error:', error);
+      // Fallback to original text for untranslated items
+      needsTranslation.forEach(text => results.set(text, text));
     }
     
-    // Cache this result too
-    translationCache.set(text, result, lang);
-    
-    return result;
+    return results;
   }
 }
 

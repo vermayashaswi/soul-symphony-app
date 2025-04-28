@@ -5,14 +5,25 @@ import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface JournalSearchProps {
   entries: JournalEntry[];
   onSelectEntry: (entry: JournalEntry) => void;
   onSearchResults: (filteredEntries: JournalEntry[]) => void;
 }
+
+const searchPrompts = [
+  "emotions",
+  "memories",
+  "places",
+  "people",
+  "thoughts",
+  "events",
+  "feelings",
+  "themes",
+  "issues",
+  "entities"
+];
 
 const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, onSearchResults }) => {
   const [searchQuery, setSearchQuery] = useState('');
@@ -24,35 +35,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [isFocused, setIsFocused] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const mobile = useIsMobile();
-  const { currentLanguage } = useTranslation();
-  const [searchPromptsTranslated, setSearchPromptsTranslated] = useState<string[]>([]);
-  const [key, setKey] = useState(Date.now());
-  
-  // Define the search prompts with translations
-  const searchPrompts = [
-    "emotions",
-    "memories",
-    "places",
-    "people",
-    "thoughts",
-    "events",
-    "feelings",
-    "themes",
-    "issues",
-    "entities"
-  ];
-
-  // Force re-render when language changes
-  useEffect(() => {
-    setKey(Date.now());
-    console.log(`JournalSearch: Language changed to ${currentLanguage}, forcing re-render`);
-    
-    // Reset typing animation
-    setTypingIndex(0);
-    setIsTyping(true);
-    setPlaceholderIndex(0);
-    setTypingPlaceholder('');
-  }, [currentLanguage]);
 
   useEffect(() => {
     if (isTyping) {
@@ -188,7 +170,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
       className={`w-full transition-all duration-300 bg-transparent border-none shadow-none ${isFocused 
         ? 'fixed top-0 left-0 right-0 z-50 rounded-none' 
         : 'sticky top-0 z-10'}`}
-      key={`search-card-${key}`}
     >
       <CardContent className="p-1 py-1">
         <div className="flex flex-col space-y-0.5">
@@ -197,8 +178,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
             <Input
               ref={inputRef}
               type="text"
-              placeholder={`${currentLanguage !== 'en' ? 
-                <TranslatableText text="Search for" /> : 'Search for'} ${typingPlaceholder}${isTyping ? '|' : ''}`}
+              placeholder={`Search for ${typingPlaceholder}${isTyping ? '|' : ''}`}
               value={searchQuery}
               onChange={handleSearchChange}
               onFocus={handleFocus}
@@ -209,9 +189,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
 
           <div className="flex flex-wrap items-center justify-end gap-1 py-0.5"> 
             <div className="text-xs text-muted-foreground">
-              {filteredEntries.length} <TranslatableText text="total" /> {filteredEntries.length === 1 ? 
-                <TranslatableText text="entry" /> : 
-                <TranslatableText text="entries" />}
+              {filteredEntries.length} total {filteredEntries.length === 1 ? 'entry' : 'entries'}
             </div>
           </div>
         </div>

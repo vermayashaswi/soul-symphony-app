@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
@@ -5,12 +6,6 @@ import { Quote } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-
-// Function to clean text of language markers
-const cleanTextOfMarkers = (input: string): string => {
-  if (!input) return '';
-  return input.replace(/\[\w+\]\s*/g, '');
-};
 
 export const InspirationalQuote: React.FC = () => {
   const [quote, setQuote] = useState<string>('');
@@ -51,14 +46,8 @@ export const InspirationalQuote: React.FC = () => {
       
       if (data && data.quotes && Array.isArray(data.quotes)) {
         console.log('Successfully parsed quotes:', data.quotes);
-        // Shuffle the quotes for more randomness and clean language markers
-        const shuffledQuotes = [...data.quotes]
-          .sort(() => Math.random() - 0.5)
-          .map(q => ({
-            quote: cleanTextOfMarkers(q.quote || ''),
-            author: cleanTextOfMarkers(q.author || 'Unknown')
-          }));
-        
+        // Shuffle the quotes for more randomness
+        const shuffledQuotes = [...data.quotes].sort(() => Math.random() - 0.5);
         setQuotes(shuffledQuotes);
         if (shuffledQuotes.length > 0) {
           setQuote(shuffledQuotes[0].quote);

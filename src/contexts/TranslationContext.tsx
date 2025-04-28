@@ -28,12 +28,6 @@ interface TranslationContextType {
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
 
-// Helper function to clean text of language markers
-const cleanTextOfMarkers = (text: string): string => {
-  if (!text) return '';
-  return text.replace(/\[\w+\]\s*/g, '');
-};
-
 export function TranslationProvider({ children }: { children: React.ReactNode }) {
   const [isTranslating, setIsTranslating] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
@@ -41,23 +35,16 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
 
   // Function to translate text using our service
   const translate = async (text: string): Promise<string> => {
-    if (currentLanguage === 'en' || !text) return cleanTextOfMarkers(text);
+    if (currentLanguage === 'en' || !text) return text;
     
     try {
-      // Clean the text of any language markers before translation
-      const cleanedText = cleanTextOfMarkers(text);
-      
-      console.log(`Translating text: "${cleanedText.substring(0, 30)}..." to ${currentLanguage}`);
-      const translated = await staticTranslationService.translateText(cleanedText, currentLanguage);
-      
-      // Clean the result again in case translation somehow added markers
-      const cleanedTranslated = cleanTextOfMarkers(translated);
-      console.log(`Translation result: "${cleanedTranslated.substring(0, 30)}..."`);
-      
-      return cleanedTranslated;
+      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage}`);
+      const translated = await staticTranslationService.translateText(text, currentLanguage);
+      console.log(`Translation result: "${translated.substring(0, 30)}..."`);
+      return translated;
     } catch (error) {
       console.error('Translation error in context:', error);
-      return cleanTextOfMarkers(text); // Fallback to original cleaned text
+      return text; // Fallback to original
     }
   };
 

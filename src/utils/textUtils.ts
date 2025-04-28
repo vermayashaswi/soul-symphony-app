@@ -2,9 +2,6 @@
 /**
  * Text utility functions for formatting and manipulating text
  */
-import { format } from 'date-fns';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { staticTranslationService } from '@/services/staticTranslationService';
 
 /**
  * Truncates text to a specified length and adds ellipsis if needed
@@ -29,37 +26,18 @@ export const capitalizeFirstLetter = (text: string): string => {
 
 /**
  * Formats a timestamp string to a user-friendly date string
- * Now supports multiple languages
  */
-export const formatTimestamp = (timestamp: string, language: string = 'en'): string => {
+export const formatTimestamp = (timestamp: string): string => {
   if (!timestamp) return '';
   
-  try {
-    const date = new Date(timestamp);
-    
-    // Format date based on language using date-fns
-    const formattedDate = format(date, 'PPpp', {
-      // You can add locale-specific options if needed
-    });
-    
-    // For languages other than English, use translation service
-    if (language !== 'en') {
-      // This could be replaced with an async function, but for simplicity 
-      // we'll use a synchronous approach here
-      try {
-        const translated = staticTranslationService.translateTextSync(formattedDate, language);
-        return translated || formattedDate;
-      } catch (error) {
-        console.error('Error translating date:', error);
-        return formattedDate;
-      }
-    }
-    
-    return formattedDate;
-  } catch (error) {
-    console.error('Error formatting timestamp:', error);
-    return timestamp;
-  }
+  const date = new Date(timestamp);
+  return date.toLocaleDateString(undefined, { 
+    year: 'numeric', 
+    month: 'short', 
+    day: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit'
+  });
 };
 
 /**
@@ -74,12 +52,4 @@ export const extractSummary = (text: string, wordCount: number = 20): string => 
   }
   
   return words.slice(0, wordCount).join(' ') + '...';
-};
-
-/**
- * Hook to get a translated date from timestamp
- */
-export const useFormattedDate = (timestamp: string): string => {
-  const { currentLanguage } = useTranslation();
-  return formatTimestamp(timestamp, currentLanguage);
 };

@@ -1,12 +1,7 @@
-// Translation cache service to improve performance
 
-interface CacheEntry {
-  value: string;
-  timestamp: number;
-  language: string;
-}
+import { openDB, IDBPDatabase } from 'idb';
 
-interface TranslationEntry {
+interface TranslationRecord {
   originalText: string;
   translatedText: string;
   language: string;
@@ -14,176 +9,94 @@ interface TranslationEntry {
   version: number;
 }
 
+interface LanguageMetadata {
+  lastUpdated: number;
+  version: number;
+  available: boolean;
+  completionPercentage: number;
+}
+
 class TranslationCache {
-  private cache: Record<string, Record<string, CacheEntry>> = {};
-  private readonly TTL: number = 24 * 60 * 60 * 1000; // 24 hours in milliseconds
-  
-  constructor() {
-    this.loadFromStorage();
+  private db: IDBPDatabase | null = null;
+  private readonly DB_NAME = 'translations_db';
+  private readonly DB_VERSION = 1;
+  private initPromise: Promise<IDBPDatabase> | null = null;
+
+  async initialize() {
+    if (this.initPromise) return this.initPromise;
     
-    // Schedule periodic cleanup
-    setInterval(() => this.cleanExpired(), 60 * 60 * 1000); // Clean every hour
-  }
-  
-  public set(key: string, value: string, language: string): void {
-    // Remove any language markers from the key and value before storing
-    const cleanKey = this.removeLanguageMarkers(key);
-    const cleanValue = this.removeLanguageMarkers(value);
+    console.log('Initializing translation cache database');
     
-    // Create language section if it doesn't exist
-    if (!this.cache[language]) {
-      this.cache[language] = {};
-    }
+    this.initPromise = openDB(this.DB_NAME, this.DB_VERSION, {
+      upgrade(db) {
+        console.log('Upgrading translation cache database');
+        if (!db.objectStoreNames.contains('translations')) {
+          db.createObjectStore('translations');
+        }
+        if (!db.objectStoreNames.contains('languageMetadata')) {
+          db.createObjectStore('languageMetadata');
+        }
+      },
+    });
     
-    // Store the translation with timestamp
-    this.cache[language][cleanKey] = {
-      value: cleanValue,
-      timestamp: Date.now(),
-      language
-    };
-    
-    // Save to storage (debounced)
-    this.debouncedSave();
-  }
-  
-  public get(key: string, language: string): string | null {
     try {
-      // Remove any language markers from the key before retrieving
-      const cleanKey = this.removeLanguageMarkers(key);
-      
-      // Check if we have this language and key
-      if (!this.cache[language] || !this.cache[language][cleanKey]) {
-        return null;
-      }
-      
-      const entry = this.cache[language][cleanKey];
-      
-      // Check if the entry has expired
-      if (Date.now() - entry.timestamp > this.TTL) {
-        // Remove expired entry
-        delete this.cache[language][cleanKey];
-        return null;
-      }
-      
-      // Return valid entry
-      return entry.value;
+      this.db = await this.initPromise;
+      console.log('Translation cache database initialized successfully');
+      return this.db;
     } catch (error) {
-      console.error('Error retrieving from translation cache:', error);
+      console.error('Failed to initialize translation cache:', error);
+      this.initPromise = null;
+      throw error;
+    }
+  }
+
+  async getTranslation(originalText: string, language: string): Promise<TranslationRecord | null> {
+    try {
+      if (!this.db) await this.initialize();
+      const key = `${originalText}_${language}`;
+      return this.db!.get('translations', key);
+    } catch (error) {
+      console.error('Error getting translation from cache:', error);
       return null;
     }
   }
-  
-  // Method to remove language markers like [hi] from strings
-  private removeLanguageMarkers(text: string): string {
-    if (!text) return '';
-    // Remove ALL language markers like [hi], [en], etc. from anywhere in the text
-    return text.replace(/\[\w+\]\s*/g, '');
-  }
-  
-  // Methods to support the translationService interface
-  public async getTranslation(text: string, language: string): Promise<TranslationEntry | null> {
-    // Clean the input text of any language markers
-    const cleanText = this.removeLanguageMarkers(text);
-    
-    const cachedValue = this.get(cleanText, language);
-    if (cachedValue === null) return null;
-    
-    return {
-      originalText: cleanText,
-      translatedText: cachedValue,
-      language,
-      timestamp: Date.now(),
-      version: 1
-    };
-  }
-  
-  public async setTranslation(entry: TranslationEntry): Promise<void> {
-    // Clean both the original text and translated text of any language markers
-    const cleanText = this.removeLanguageMarkers(entry.originalText);
-    const cleanTranslation = this.removeLanguageMarkers(entry.translatedText);
-    
-    this.set(cleanText, cleanTranslation, entry.language);
-  }
-  
-  private cleanExpired(): void {
-    const now = Date.now();
-    let changed = false;
-    
-    // Check all languages
-    Object.keys(this.cache).forEach(lang => {
-      // Check all keys in this language
-      Object.keys(this.cache[lang]).forEach(key => {
-        const entry = this.cache[lang][key];
-        if (now - entry.timestamp > this.TTL) {
-          delete this.cache[lang][key];
-          changed = true;
-        }
-      });
-      
-      // Remove empty language sections
-      if (Object.keys(this.cache[lang]).length === 0) {
-        delete this.cache[lang];
-      }
-    });
-    
-    // Save if we made changes
-    if (changed) {
-      this.saveToStorage();
-    }
-  }
-  
-  private saveToStorage(): void {
+
+  async setTranslation(record: TranslationRecord): Promise<void> {
     try {
-      // Store a simplified version of the cache (no timestamp needed)
-      const simplified: Record<string, Record<string, string>> = {};
-      
-      Object.keys(this.cache).forEach(lang => {
-        simplified[lang] = {};
-        Object.keys(this.cache[lang]).forEach(key => {
-          simplified[lang][key] = this.cache[lang][key].value;
-        });
-      });
-      
-      localStorage.setItem('translationCache', JSON.stringify(simplified));
+      if (!this.db) await this.initialize();
+      const key = `${record.originalText}_${record.language}`;
+      await this.db!.put('translations', record, key);
     } catch (error) {
-      console.error('Error saving translation cache to storage:', error);
+      console.error('Error setting translation in cache:', error);
     }
   }
-  
-  private loadFromStorage(): void {
+
+  async clearCache(): Promise<void> {
     try {
-      const stored = localStorage.getItem('translationCache');
-      if (!stored) return;
-      
-      const simplified = JSON.parse(stored) as Record<string, Record<string, string>>;
-      
-      // Convert simplified format back to full format with timestamps
-      Object.keys(simplified).forEach(lang => {
-        this.cache[lang] = {};
-        Object.keys(simplified[lang]).forEach(key => {
-          this.cache[lang][key] = {
-            value: this.removeLanguageMarkers(simplified[lang][key]), // Clean values when loading
-            timestamp: Date.now(), // Reset timestamp on load
-            language: lang
-          };
-        });
-      });
+      if (!this.db) await this.initialize();
+      await this.db!.clear('translations');
     } catch (error) {
-      console.error('Error loading translation cache from storage:', error);
+      console.error('Error clearing translation cache:', error);
     }
   }
-  
-  // Create a debounced save function to avoid excessive writes
-  private saveTimeout: NodeJS.Timeout | null = null;
-  private debouncedSave(): void {
-    if (this.saveTimeout) {
-      clearTimeout(this.saveTimeout);
+
+  async getLanguageMetadata(language: string): Promise<LanguageMetadata | null> {
+    try {
+      if (!this.db) await this.initialize();
+      return this.db!.get('languageMetadata', language);
+    } catch (error) {
+      console.error('Error getting language metadata from cache:', error);
+      return null;
     }
-    
-    this.saveTimeout = setTimeout(() => {
-      this.saveToStorage();
-      this.saveTimeout = null;
-    }, 1000);
+  }
+
+  async setLanguageMetadata(language: string, metadata: LanguageMetadata): Promise<void> {
+    try {
+      if (!this.db) await this.initialize();
+      await this.db!.put('languageMetadata', metadata, language);
+    } catch (error) {
+      console.error('Error setting language metadata in cache:', error);
+    }
   }
 }
 

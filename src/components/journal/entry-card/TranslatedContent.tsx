@@ -9,12 +9,6 @@ interface TranslatedContentProps {
   language?: string; // Added language as optional prop
 }
 
-// Helper function to clean text of language markers
-const cleanTextOfMarkers = (input: string): string => {
-  if (!input) return '';
-  return input.replace(/\[\w+\]\s*/g, '');
-};
-
 export function TranslatedContent({ content, isExpanded, language }: TranslatedContentProps) {
   const [translatedContent, setTranslatedContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
@@ -24,20 +18,15 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
     async function translateContent() {
       setIsLoading(true);
       try {
-        // Always clean the content of language markers first
-        const cleanContent = cleanTextOfMarkers(content);
-        
         if (currentLanguage === 'en') {
-          setTranslatedContent(cleanContent);
+          setTranslatedContent(content);
         } else {
-          const translated = await translate(cleanContent);
-          // Clean again just to be sure no markers were introduced
-          setTranslatedContent(cleanTextOfMarkers(translated));
+          const translated = await translate(content);
+          setTranslatedContent(translated);
         }
       } catch (error) {
         console.error('Translation error:', error);
-        // Fallback to original content but still clean it
-        setTranslatedContent(cleanTextOfMarkers(content));
+        setTranslatedContent(content); // Fallback to original content
       } finally {
         setIsLoading(false);
       }
