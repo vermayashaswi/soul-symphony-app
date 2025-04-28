@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -15,32 +14,44 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
 
   useEffect(() => {
     async function translateContent() {
-      // Don't show loading if we have content to display already
-      // This prevents the issue where entries show as processing cards
-      if (!translatedContent && !content) {
+      // Don't translate if no content or if we're in English
+      if (!content || currentLanguage === 'en') {
+        setTranslatedContent(content);
+        return;
+      }
+      
+      // Only show loading state if we don't have anything to display yet
+      if (!translatedContent) {
         setIsLoading(true);
       }
       
       try {
-        if (currentLanguage === 'en') {
-          setTranslatedContent(content);
-        } else {
-          // Always maintain the current content while translating
-          const translated = await translate(content);
+        // CRITICAL: Always maintain the current content while translating
+        // Never set to empty string during translation
+        const translated = await translate(content);
+        
+        // Only update if we get valid content back
+        if (translated && translated.trim() !== '') {
           setTranslatedContent(translated);
         }
       } catch (error) {
         console.error('Translation error:', error);
-        setTranslatedContent(content); // Fallback to original content
+        // Fallback to original content on error
+        if (!translatedContent) {
+          setTranslatedContent(content);
+        }
       } finally {
         setIsLoading(false);
       }
     }
 
-    if (content) {
+    // Keep current content during translation
+    if (content && content !== translatedContent) {
       translateContent();
+    } else if (!translatedContent && content) {
+      setTranslatedContent(content);
     }
-  }, [content, currentLanguage, translate]);
+  }, [content, currentLanguage, translate, translatedContent]);
 
   // Don't show the loading component in place of actual content
   // Just render content with a subtle loading indicator if needed

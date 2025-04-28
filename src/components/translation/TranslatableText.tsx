@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
@@ -38,32 +37,35 @@ export function TranslatableText({
         return;
       }
 
-      // Fallback to dynamic translation service if not in English
-      if (currentLanguage !== 'en') {
-        setIsLoading(true);
-        console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
-
-        try {
-          const result = await translate(text);
-          if (isMounted) {
-            setTranslatedText(result);
-            console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
-          }
-        } catch (error) {
-          console.error('Translation error:', error);
-          if (isMounted) {
-            setTranslatedText(text); // Fallback to original
-            console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
-          }
-        } finally {
-          if (isMounted) setIsLoading(false);
-        }
-      } else {
+      // Don't translate if we're in English
+      if (currentLanguage === 'en') {
         if (isMounted) setTranslatedText(text);
+        return;
+      }
+      
+      // CRITICAL: Always keep the current text while translating
+      // Never set to empty string during translation process
+      setIsLoading(true);
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
+
+      try {
+        const result = await translate(text);
+        if (isMounted && result && result.trim() !== '') {
+          setTranslatedText(result);
+          console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
+        }
+      } catch (error) {
+        console.error('Translation error:', error);
+        // Don't reset the text on error
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     };
 
-    translateText();
+    // Keep the current text if it exists, otherwise translate
+    if (text !== translatedText) {
+      translateText();
+    }
 
     return () => {
       isMounted = false;
@@ -74,10 +76,11 @@ export function TranslatableText({
   useEffect(() => {
     const handleLanguageChange = (event: CustomEvent) => {
       console.log(`TranslatableText: Language change event detected: ${event.detail.language}`);
-      // This will re-trigger the translation effect
-      if (currentLanguage !== 'en') {
-        setTranslatedText(''); // Clear to show loading state
+      
+      // Only trigger retranslation if not in English and there's actual text
+      if (currentLanguage !== 'en' && text && text.trim() !== '') {
         setIsLoading(true);
+        // CRITICAL: Don't clear the text while loading
       }
     };
     
@@ -86,7 +89,7 @@ export function TranslatableText({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, []);
+  }, [currentLanguage, text]);
 
   // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(
@@ -94,7 +97,8 @@ export function TranslatableText({
     { 
       className: `${className} ${isLoading ? 'opacity-70' : ''}`.trim()
     }, 
-    translatedText
+    // Always show some content - never empty string during translation
+    translatedText || text
   );
 }
 

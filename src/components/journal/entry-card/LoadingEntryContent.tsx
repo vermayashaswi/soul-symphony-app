@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -228,6 +229,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       exit={{ opacity: 0.7 }}
       transition={{ duration: 0.5 }}
       data-component-id={componentId.current}
+      data-is-loading-component="true"
     >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />
@@ -244,7 +246,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           <div className="flex flex-col items-center">
             <AlertTriangle className="h-8 w-8 text-red-500 mb-2" />
             <p className="text-red-500 font-medium text-sm text-center">
-              <TranslatableText text={error} />
+              <TranslatableText text={error || "An error occurred"} />
             </p>
             <p className="text-muted-foreground text-xs text-center mt-2">
               <TranslatableText text="Try refreshing the page or recording again" />
