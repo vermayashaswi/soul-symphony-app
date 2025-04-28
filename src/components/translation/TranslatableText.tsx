@@ -69,6 +69,24 @@ export function TranslatableText({
       isMounted = false;
     };
   }, [text, currentLanguage, translate, isOnWebsite]);
+  
+  // Listen to the language change event to force re-render
+  useEffect(() => {
+    const handleLanguageChange = (event: CustomEvent) => {
+      console.log(`TranslatableText: Language change event detected: ${event.detail.language}`);
+      // This will re-trigger the translation effect
+      if (currentLanguage !== 'en') {
+        setTranslatedText(''); // Clear to show loading state
+        setIsLoading(true);
+      }
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+    };
+  }, []);
 
   // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(

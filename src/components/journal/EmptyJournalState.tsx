@@ -1,21 +1,33 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Mic } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface EmptyJournalStateProps {
   onStartRecording: () => void;
 }
 
 const EmptyJournalState: React.FC<EmptyJournalStateProps> = ({ onStartRecording }) => {
+  // Track language changes to force re-render
+  const { currentLanguage } = useTranslation();
+  const [key, setKey] = useState(Date.now());
+  
+  // Force re-render when language changes
+  useEffect(() => {
+    setKey(Date.now());
+    console.log(`EmptyJournalState: Language changed to ${currentLanguage}, forcing re-render`);
+  }, [currentLanguage]);
+  
   return (
     <motion.div
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.4 }}
       className="text-center py-8"
+      key={`empty-journal-${key}`}
     >
       <div className="h-16 w-16 bg-primary/10 rounded-full flex items-center justify-center mb-4 mx-auto">
         <Mic className="h-8 w-8 text-primary" />
