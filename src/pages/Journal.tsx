@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useProfileManagement } from '@/hooks/use-profile-management';
@@ -12,6 +13,10 @@ import JournalHeader from '@/components/journal/JournalHeader';
 import { ProfileManager } from '@/components/journal/profile/ProfileManager';
 import { ErrorDisplay } from '@/components/journal/errors/ErrorDisplay';
 import { JournalTabs } from '@/components/journal/tabs/JournalTabs';
+
+const logInfo = (message: string, source: string) => {
+  console.log(`[${source}] ${message}`);
+};
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
@@ -33,10 +38,18 @@ const Journal = () => {
   const [audioStatus, setAudioStatus] = useState<string>('No Recording');
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [entriesReady, setEntriesReady] = useState(false);
+  
+  // Create refs outside of the hook
+  const previousEntriesRef = useRef<number[]>([]);
   const entriesListRef = useRef<HTMLDivElement>(null);
+  const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const processingToEntryMapRef = useRef<Map<string, number>>(new Map());
+  const profileCheckedOnceRef = useRef(false);
+  
   const [deletedProcessingIds, setDeletedProcessingIds] = useState<Set<string>>(new Set());
-
+  const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
+  
   const { 
     isProfileChecked,
     isCheckingProfile,
@@ -276,31 +289,6 @@ const Journal = () => {
   }, [toastIds, profileCheckTimeoutId]);
 
   useEffect(() => {
-    if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
-      const timeoutId = setTimeout(() => {
-        console.log('[Journal] Profile check taking too long, proceeding anyway');
-        logInfo('Profile check taking too long, proceeding anyway', 'Journal');
-        setIsCheckingProfile(false);
-        setIsProfileChecked(true);
-        profileCheckedOnceRef.current = true;
-      }, 5000);
-      
-      setProfileCheckTimeoutId(timeoutId);
-      
-      return () => {
-        clearTimeout(timeoutId);
-        setProfileCheckTimeoutId(null);
-      };
-    }
-  }, [user?.id, isCheckingProfile]);
-
-  useEffect(() => {
-    if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
-      checkUserProfile(user.id);
-    }
-  }, [user?.id, isProfileChecked, isCheckingProfile]);
-
-  useEffect(() => {
     if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
@@ -324,95 +312,6 @@ const Journal = () => {
       }
     }
   }, [activeTab, processingEntries]);
-
-  const checkUserProfile = async (userId: string) => {
-    try {
-      setIsCheckingProfile(true);
-      setShowRetryButton(false);
-      setLastAction('Checking Profile');
-      
-      console.log('[Journal] Checking user profile for ID:', userId);
-      
-      const profileCreated = await ensureProfileExists();
-      profileCheckedOnceRef.current = true;
-      
-      console.log('[Journal] Profile check result:', profileCreated);
-      
-      if (!profileCreated) {
-        if (profileCreationAttempts < maxProfileAttempts) {
-          setProfileCreationAttempts(prev => prev + 1);
-          
-          const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
-          
-          if (autoRetryTimeoutRef.current) {
-            clearTimeout(autoRetryTimeoutRef.current);
-          }
-          
-          autoRetryTimeoutRef.current = setTimeout(() => {
-            setLastAction(`Auto Retry Profile ${profileCreationAttempts + 1}`);
-            
-            if (profileCreationAttempts >= maxProfileAttempts - 1) {
-              setShowRetryButton(true);
-            }
-            
-            checkUserProfile(userId);
-          }, retryDelay);
-        } else {
-          setShowRetryButton(true);
-          setLastAction('Profile Check Failed');
-        }
-      } else {
-        setLastAction('Profile Check Success');
-        setProfileCreationAttempts(0);
-      }
-      
-      setIsProfileChecked(true);
-    } catch (error: any) {
-      console.error('[Journal] Error checking/creating user profile:', error);
-      
-      const now = Date.now();
-      if (now - lastProfileErrorTime > 60000) {
-        setLastProfileErrorTime(now);
-      }
-      
-      if (profileCreationAttempts < maxProfileAttempts) {
-        setProfileCreationAttempts(prev => prev + 1);
-        
-        const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
-        
-        if (autoRetryTimeoutRef.current) {
-          clearTimeout(autoRetryTimeoutRef.current);
-        }
-        
-        autoRetryTimeoutRef.current = setTimeout(() => {
-          setLastAction(`Auto Retry Profile After Error ${profileCreationAttempts + 1}`);
-          
-          if (profileCreationAttempts >= maxProfileAttempts - 1) {
-            setShowRetryButton(true);
-          }
-          
-          checkUserProfile(userId);
-        }, retryDelay);
-      } else {
-        setShowRetryButton(true);
-        setLastAction('Profile Check Error');
-      }
-      
-      setIsProfileChecked(true);
-    } finally {
-      setIsCheckingProfile(false);
-    }
-  };
-
-  const handleRetryProfileCreation = () => {
-    if (!user?.id) return;
-    
-    setProfileCreationAttempts(0);
-    profileCheckedOnceRef.current = false;
-    setIsProfileChecked(false);
-    setLastAction('Retry Profile Creation');
-    checkUserProfile(user.id);
-  };
 
   const handleStartRecording = () => {
     console.log('Starting new recording');
