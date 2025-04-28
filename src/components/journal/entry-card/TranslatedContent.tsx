@@ -13,6 +13,11 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
   const { currentLanguage, translate } = useTranslation();
 
   useEffect(() => {
+    // Always update the state with current content first to ensure we're always showing something
+    if (content && content !== translatedContent) {
+      setTranslatedContent(content);
+    }
+    
     async function translateContent() {
       // Don't translate if no content or if we're in English
       if (!content || currentLanguage === 'en') {
@@ -20,38 +25,32 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
         return;
       }
       
-      // Only show loading state if we don't have anything to display yet
-      if (!translatedContent) {
-        setIsLoading(true);
-      }
+      // Indicate loading but don't change content yet
+      setIsLoading(true);
       
       try {
-        // CRITICAL: Always maintain the current content while translating
-        // Never set to empty string during translation
         const translated = await translate(content);
         
         // Only update if we get valid content back
         if (translated && translated.trim() !== '') {
           setTranslatedContent(translated);
+        } else {
+          // If translation returns empty, keep showing original content
+          console.log('Translation returned empty, keeping original content');
         }
       } catch (error) {
         console.error('Translation error:', error);
-        // Fallback to original content on error
-        if (!translatedContent) {
-          setTranslatedContent(content);
-        }
+        // No need to fallback since we already set content initially
       } finally {
         setIsLoading(false);
       }
     }
 
-    // Keep current content during translation
-    if (content && content !== translatedContent) {
+    // Only attempt translation if we have content and language isn't English
+    if (content && currentLanguage !== 'en') {
       translateContent();
-    } else if (!translatedContent && content) {
-      setTranslatedContent(content);
     }
-  }, [content, currentLanguage, translate, translatedContent]);
+  }, [content, currentLanguage, translate]);
 
   // Don't show the loading component in place of actual content
   // Just render content with a subtle loading indicator if needed

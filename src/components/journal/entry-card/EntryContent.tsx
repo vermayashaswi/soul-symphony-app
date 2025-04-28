@@ -10,11 +10,13 @@ interface EntryContentProps {
 }
 
 export function EntryContent({ content, isExpanded, isProcessing = false }: EntryContentProps) {
-  // Only show loading if explicitly processing and content is empty/loading
-  const showLoading = isProcessing && (!content || 
-    content === "Processing entry..." || 
-    content === "Loading..." ||
-    content.trim() === "");
+  // More strict condition for showing loading state:
+  // Only show loading if explicitly in processing mode AND content is truly empty or contains placeholder text
+  const isEmptyContent = !content || content.trim() === "";
+  const isPlaceholderContent = content === "Processing entry..." || content === "Loading...";
+  
+  // Only show loading when both processing flag is true AND we don't have real content
+  const showLoading = isProcessing && (isEmptyContent || isPlaceholderContent);
   
   if (showLoading) {
     return <LoadingEntryContent />;
