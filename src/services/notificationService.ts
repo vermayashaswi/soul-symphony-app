@@ -1,109 +1,389 @@
 
-import { toast } from 'sonner';
-import { useTranslation } from '@/contexts/TranslationContext';
+import { toast } from "sonner";
 
-// Types for notification settings
-export type NotificationFrequency = 'once' | 'twice' | 'thrice';
-export type NotificationTime = 'morning' | 'afternoon' | 'evening' | 'night';
+// Duration constants
+const STANDARD_DURATION = 1000; // 1 second for regular toasts (updated from 5 seconds)
+const ACTIVE_JOB_DURATION = 8000; // 8 seconds for active jobs (unchanged)
+const ERROR_DURATION = 6000; // 6 seconds for errors (unchanged)
 
-let activeToasts: string[] = [];
+// Check if we're in a browser environment
+const isBrowser = (): boolean => {
+  return typeof window !== 'undefined';
+};
 
-export const clearAllToasts = () => {
-  activeToasts.forEach(id => {
-    if (id) toast.dismiss(id);
+// Store active toast IDs to prevent duplicates and ensure cleanup
+const activeToasts = new Set<string | number>();
+const toastTimeouts = new Map<string | number, NodeJS.Timeout>();
+
+// Clear all toast timeouts when needed
+const clearToastTimeouts = () => {
+  toastTimeouts.forEach(timeout => {
+    clearTimeout(timeout);
   });
-  activeToasts = [];
+  toastTimeouts.clear();
 };
 
-// Function to ensure all toasts are cleared
-export const ensureAllToastsCleared = async (): Promise<void> => {
-  clearAllToasts();
-  // Wait a brief moment to ensure UI is updated
-  return new Promise(resolve => setTimeout(resolve, 100));
-};
-
-export const dismissToast = (id: string) => {
-  toast.dismiss(id);
-  activeToasts = activeToasts.filter(toastId => toastId !== id);
-};
-
-export const addToast = (id: string) => {
-  activeToasts.push(id);
-};
-
-export const getActiveToasts = () => {
-  return activeToasts;
-};
-
-export const translateAndShowToast = async (
+// Enhanced toast functions for different types of notifications
+export const showToast = (
   message: string, 
-  type: 'success' | 'error' | 'info' | 'loading' = 'info',
-  options: any = {}
+  type: "default" | "success" | "error" | "info" | "warning" = "default",
+  isActiveJob = false
 ) => {
-  try {
-    const { translate } = useTranslation();
-    const translatedMessage = await translate(message);
+  // Deduplicate identical messages that might be in flight
+  const messageKey = `${type}-${message}`;
+  if (activeToasts.has(messageKey)) {
+    console.log(`[NotificationService] Skipping duplicate toast: ${messageKey}`);
+    return;
+  }
+  
+  const duration = isActiveJob ? ACTIVE_JOB_DURATION : 
+                  (type === "error" ? ERROR_DURATION : STANDARD_DURATION);
+  
+  console.log(`[NotificationService] Showing toast: ${message} (${type})`);
+  
+  let toastId;
+  switch (type) {
+    case "success":
+      toastId = toast.success(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+      break;
+    case "error":
+      toastId = toast.error(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+      break;
+    case "info":
+      toastId = toast.info(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+      break;
+    case "warning":
+      toastId = toast.warning(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+      break;
+    default:
+      toastId = toast(message, { 
+        duration, 
+        id: messageKey,
+        onDismiss: () => {
+          activeToasts.delete(messageKey);
+          if (toastTimeouts.has(messageKey)) {
+            clearTimeout(toastTimeouts.get(messageKey)!);
+            toastTimeouts.delete(messageKey);
+          }
+        }
+      });
+  }
+  
+  activeToasts.add(messageKey);
+  
+  // Ensure toasts are cleared after their duration
+  if (duration !== null) {
+    const timeoutId = setTimeout(() => {
+      clearToast(toastId);
+      activeToasts.delete(messageKey);
+      toastTimeouts.delete(messageKey);
+    }, duration + 500); // Add a buffer to ensure toast removal
     
-    let toastId;
-    
-    switch (type) {
-      case 'success':
-        toastId = toast.success(translatedMessage, options);
-        break;
-      case 'error':
-        toastId = toast.error(translatedMessage, options);
-        break;
-      case 'loading':
-        toastId = toast.loading(translatedMessage, options);
-        break;
-      default:
-        toastId = toast(translatedMessage, options);
-    }
-    
-    if (toastId) {
-      addToast(toastId);
-    }
-    
-    return toastId;
-  } catch (error) {
-    console.error('Error showing translated toast:', error);
-    return toast(message, options); // Fallback to original message
+    toastTimeouts.set(messageKey, timeoutId);
+  }
+  
+  return toastId;
+};
+
+// Clear a specific toast
+export const clearToast = (toastId: string | number) => {
+  if (toastId) {
+    console.log(`[NotificationService] Clearing toast: ${toastId}`);
+    toast.dismiss(toastId);
   }
 };
 
-// Notification setup functions for Settings.tsx
-export const setupJournalReminder = async (
-  enabled: boolean, 
-  frequency: NotificationFrequency = 'once',
-  times: NotificationTime[] = ['evening']
-): Promise<boolean> => {
-  try {
-    // Save notification preferences in localStorage
-    if (typeof window !== 'undefined') {
-      localStorage.setItem('notification_enabled', String(enabled));
-      localStorage.setItem('notification_frequency', frequency);
-      localStorage.setItem('notification_times', JSON.stringify(times));
+// Enhanced aggressive toast clearing function
+export const clearAllToasts = (): Promise<boolean> => {
+  console.log('[NotificationService] Clearing all toasts');
+  
+  return new Promise((resolve) => {
+    // First use the standard dismiss method
+    toast.dismiss();
+    
+    // Clear all timeouts
+    clearToastTimeouts();
+    
+    // Then clear our tracking set
+    activeToasts.clear();
+    
+    // As a safety measure for any persistent toasts with the loading state,
+    // get all toast elements and remove them manually if needed
+    if (isBrowser()) {
+      try {
+        // Try to find any toast container elements that might be persisting
+        const toastContainers = document.querySelectorAll('[data-sonner-toast]');
+        console.log(`[NotificationService] Found ${toastContainers.length} persistent toast containers`);
+        
+        if (toastContainers.length > 0) {
+          toastContainers.forEach(container => {
+            // Manual removal since we've disabled close buttons
+            if (container.parentNode) {
+              container.parentNode?.removeChild(container);
+            }
+          });
+        }
+        
+        // Also try to clear any toast containers
+        const sonnerRoots = document.querySelectorAll('[data-sonner-toaster]');
+        console.log(`[NotificationService] Found ${sonnerRoots.length} sonner root containers`);
+        
+        if (sonnerRoots.length > 0) {
+          sonnerRoots.forEach(root => {
+            // Don't remove the container, but clear its children
+            while (root.firstChild) {
+              root.removeChild(root.firstChild);
+            }
+          });
+        }
+      } catch (e) {
+        console.error('[NotificationService] Error trying to clean up persistent toasts:', e);
+      }
     }
     
-    // This is a placeholder implementation
-    // In a real app, you would integrate with Capacitor notifications
-    console.log(`Setting up notifications: enabled=${enabled}, frequency=${frequency}, times=${times.join(',')}`);
-    return true;
+    // Give it a small delay to ensure DOM updates are complete
+    setTimeout(() => {
+      // Additional safety check after DOM update
+      if (isBrowser()) {
+        const remainingToasts = document.querySelectorAll('[data-sonner-toast]');
+        if (remainingToasts.length > 0) {
+          console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after cleanup`);
+          try {
+            remainingToasts.forEach(toast => {
+              if (toast.parentNode) {
+                toast.parentNode.removeChild(toast);
+              }
+            });
+          } catch (e) {
+            console.error('[NotificationService] Error in final toast cleanup:', e);
+          }
+        }
+      }
+      
+      // Call toast.dismiss() one more time as a final measure
+      toast.dismiss();
+      resolve(true);
+    }, 50);
+  });
+};
+
+// Function to ensure toasts are completely cleared through multiple attempts
+export const ensureAllToastsCleared = async (): Promise<boolean> => {
+  console.log('[NotificationService] Ensuring all toasts are completely cleared');
+  
+  // First attempt
+  await clearAllToasts();
+  
+  // Wait a bit and check if any toasts remain
+  await new Promise(resolve => setTimeout(resolve, 50));
+  
+  if (isBrowser()) {
+    const remainingToasts = document.querySelectorAll('[data-sonner-toast]');
+    if (remainingToasts.length > 0) {
+      console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after first cleanup`);
+      
+      // Second attempt with more aggressive DOM manipulation
+      toast.dismiss();
+      await new Promise(resolve => setTimeout(resolve, 50));
+      
+      try {
+        document.querySelectorAll('[data-sonner-toast]').forEach(toast => {
+          if (toast.parentNode) {
+            toast.parentNode.removeChild(toast);
+          }
+        });
+      } catch (e) {
+        console.error('[NotificationService] Error in second toast cleanup:', e);
+      }
+    }
+  }
+  
+  // Final attempt to ensure cleanup is complete
+  await clearAllToasts();
+  return true;
+};
+
+// Function to request notification permissions (web only for now)
+export const requestNotificationPermission = async (): Promise<boolean> => {
+  try {
+    // For web browsers
+    if (isBrowser() && 'Notification' in window) {
+      const permission = await Notification.requestPermission();
+      return permission === 'granted';
+    }
+    
+    return false;
   } catch (error) {
-    console.error('Error setting up notifications:', error);
+    console.error('[NotificationService] Error requesting notification permission:', error);
     return false;
   }
 };
 
-// Initialize Capacitor notifications
-export const initializeCapacitorNotifications = async (): Promise<void> => {
+// Schedule a notification (for reminders) - web only for now
+export const scheduleNotification = async (
+  title: string, 
+  body: string, 
+  hours: number = 24
+): Promise<boolean> => {
   try {
-    // This is a placeholder for Capacitor notification initialization
-    // In a real app, you would initialize the Capacitor Notifications plugin
-    console.log('Initializing Capacitor notifications');
-    return Promise.resolve();
+    // For web testing - immediate notification if hours is 0, otherwise mock scheduling
+    if (isBrowser() && 'Notification' in window && Notification.permission === 'granted') {
+      if (hours === 0) {
+        // Immediate notification
+        new Notification(title, { body });
+        console.log(`[NotificationService] Sent immediate notification: "${title}"`);
+      } else {
+        // This is just a mock for web - on real mobile we would use actual scheduling
+        console.log(`[NotificationService] Scheduled notification: "${title}" for ${hours} hours from now`);
+      }
+      
+      return true;
+    }
+    return false;
   } catch (error) {
-    console.error('Error initializing Capacitor notifications:', error);
-    return Promise.reject(error);
+    console.error('[NotificationService] Error scheduling notification:', error);
+    return false;
   }
+};
+
+// New type definitions for notification frequency and time
+export type NotificationFrequency = 'once' | 'twice' | 'thrice';
+export type NotificationTime = 'morning' | 'afternoon' | 'evening' | 'night';
+
+// Get notification times based on selected time preferences
+const getNotificationTimeHours = (timePreferences: NotificationTime[]): number[] => {
+  const times: Record<NotificationTime, number> = {
+    'morning': 8,     // 8:00 AM
+    'afternoon': 14,  // 2:00 PM
+    'evening': 19,    // 7:00 PM
+    'night': 22       // 10:00 PM
+  };
+  
+  return timePreferences.map(time => times[time]);
+};
+
+// Get notification days based on frequency
+const getNotificationDays = (frequency: NotificationFrequency): number => {
+  switch (frequency) {
+    case 'once': return 1;  // Once a day
+    case 'twice': return 2; // Twice a day
+    case 'thrice': return 3; // Three times a day
+    default: return 1;
+  }
+};
+
+// Set up journal reminder with frequency and time preferences
+export const setupJournalReminder = async (
+  enabled: boolean,
+  frequency: NotificationFrequency = 'once',
+  timePreferences: NotificationTime[] = ['evening']
+): Promise<void> => {
+  if (!enabled) return;
+  
+  try {
+    const hasPermission = await requestNotificationPermission();
+    
+    if (hasPermission) {
+      const timeHours = getNotificationTimeHours(timePreferences);
+      const notificationDays = getNotificationDays(frequency);
+      
+      // Limit the notifications per day based on frequency
+      const scheduledTimes = timeHours.slice(0, notificationDays);
+      
+      console.log(`[NotificationService] Setting up ${notificationDays} notifications per day at times:`, scheduledTimes);
+      
+      // Schedule notifications for each selected time
+      for (const hour of scheduledTimes) {
+        // Calculate hours until next notification time
+        const now = new Date();
+        const notificationTime = new Date();
+        notificationTime.setHours(hour, 0, 0, 0);
+        
+        // If notification time has passed today, schedule for tomorrow
+        if (now > notificationTime) {
+          notificationTime.setDate(notificationTime.getDate() + 1);
+        }
+        
+        // Calculate hours difference
+        const hoursDiff = Math.round((notificationTime.getTime() - now.getTime()) / (1000 * 60 * 60));
+        
+        await scheduleNotification(
+          "Journal Reminder",
+          "It's time to check in with yourself. Take a moment to record your thoughts.",
+          hoursDiff
+        );
+        
+        console.log(`[NotificationService] Journal reminder scheduled for ${hour}:00`);
+      }
+      
+      // Save notification preferences to localStorage for persistence
+      if (isBrowser()) {
+        localStorage.setItem('notification_enabled', 'true');
+        localStorage.setItem('notification_frequency', frequency);
+        localStorage.setItem('notification_times', JSON.stringify(timePreferences));
+      }
+      
+    } else {
+      showToast("Could not enable notifications. Please check your browser settings.", "error");
+    }
+  } catch (error) {
+    console.error("[NotificationService] Error setting up journal reminder:", error);
+    showToast("Failed to set up notification", "error");
+  }
+};
+
+// Initialize Capacitor notifications if available
+export const initializeCapacitorNotifications = async (): Promise<void> => {
+  // This is a stub function for the Settings page
+  // In a real implementation, this would initialize Capacitor notifications
+  // But since we're focused on web right now, it's just a placeholder
+  console.log("[NotificationService] Capacitor notifications initialization stub called");
+};
+
+// Clean up function to be called when components unmount
+export const cleanupNotifications = () => {
+  console.log('[NotificationService] Cleaning up notifications');
+  clearAllToasts();
+  clearToastTimeouts();
+  activeToasts.clear();
 };

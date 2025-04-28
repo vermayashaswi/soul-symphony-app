@@ -40,10 +40,12 @@ export function EntryContent({
       return () => clearTimeout(timer);
     }
 
-    const contentIsLoading = content === "Processing entry..." || 
-                         content === "Loading...";
+    const contentIsLoading = !content || 
+                          content === "Processing entry..." || 
+                          content.trim() === "" ||
+                          content === "Loading...";
 
-    if (contentIsLoading || isProcessing) {
+    if (contentIsLoading) {
       setShowLoading(true);
       contentReadyDispatchedRef.current = false;
     } else if (!forceLoading) {
@@ -53,7 +55,6 @@ export function EntryContent({
       if (!contentReadyDispatchedRef.current) {
         contentReadyDispatchedRef.current = true;
         
-        // Dispatch events when content is ready
         window.dispatchEvent(new CustomEvent('entryContentReady', { 
           detail: { 
             content,
@@ -108,7 +109,7 @@ export function EntryContent({
         <TranslatedContent 
           content={stableContent}
           isExpanded={isExpanded}
-          language={language}
+          // Fix: Pass language as an optional prop, not required
         />
       )}
     </AnimatePresence>

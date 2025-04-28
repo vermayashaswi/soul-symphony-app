@@ -6,7 +6,7 @@ import { LoadingEntryContent } from './LoadingEntryContent';
 interface TranslatedContentProps {
   content: string;
   isExpanded: boolean;
-  language?: string;
+  language?: string; // Added language as optional prop
 }
 
 export function TranslatedContent({ content, isExpanded, language }: TranslatedContentProps) {
@@ -18,8 +18,7 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
     async function translateContent() {
       setIsLoading(true);
       try {
-        // Only translate if we have actual content and aren't in English
-        if (currentLanguage === 'en' || content === 'No content available') {
+        if (currentLanguage === 'en') {
           setTranslatedContent(content);
         } else {
           const translated = await translate(content);

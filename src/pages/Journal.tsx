@@ -1,18 +1,17 @@
-
-import React, { useState, useRef, useCallback, useEffect } from 'react';
+import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { useProfileManagement } from '@/hooks/use-profile-management';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
+import JournalEntriesList from '@/components/journal/JournalEntriesList';
+import VoiceRecorder from '@/components/VoiceRecorder';
+import JournalHeader from '@/components/journal/JournalHeader';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTranslation } from '@/contexts/TranslationContext';
 import { toast } from 'sonner';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
-import JournalHeader from '@/components/journal/JournalHeader';
-import { ProfileManager } from '@/components/journal/profile/ProfileManager';
-import { ErrorDisplay } from '@/components/journal/errors/ErrorDisplay';
-import { JournalTabs } from '@/components/journal/tabs/JournalTabs';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -20,52 +19,44 @@ const logInfo = (message: string, source: string) => {
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
-  const { translate } = useTranslation();
   const [refreshKey, setRefreshKey] = useState(0);
+  const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
   const [processedEntryIds, setProcessedEntryIds] = useState<number[]>([]);
+  const [isCheckingProfile, setIsCheckingProfile] = useState(false);
   const [activeTab, setActiveTab] = useState('record');
+  const [profileCheckRetryCount, setProfileCheckRetryCount] = useState(0);
+  const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
+  const [showRetryButton, setShowRetryButton] = useState(false);
   const [toastIds, setToastIds] = useState<{ [key: string]: string }>({});
   const [notifiedEntryIds, setNotifiedEntryIds] = useState<Set<number>>(new Set());
+  const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
   const [entryHasBeenProcessed, setEntryHasBeenProcessed] = useState(false);
   const [isRecordingComplete, setIsRecordingComplete] = useState(false);
   const [isSavingRecording, setIsSavingRecording] = useState(false);
   const [processingError, setProcessingError] = useState<string | null>(null);
   const [hasRenderError, setHasRenderError] = useState(false);
   const [safeToSwitchTab, setSafeToSwitchTab] = useState(true);
+  const [profileCreationAttempts, setProfileCreationAttempts] = useState(0);
   const [tabChangeInProgress, setTabChangeInProgress] = useState(false);
+  const [maxProfileAttempts, setMaxProfileAttempts] = useState(3);
+  const previousEntriesRef = useRef<number[]>([]);
+  const profileCheckedOnceRef = useRef(false);
+  const entriesListRef = useRef<HTMLDivElement>(null);
   const [lastAction, setLastAction] = useState<string>('Page Loaded');
   const [audioStatus, setAudioStatus] = useState<string>('No Recording');
   const [recordingDuration, setRecordingDuration] = useState<number>(0);
   const [entriesReady, setEntriesReady] = useState(false);
-  
-  // Create refs outside of the hook
-  const previousEntriesRef = useRef<number[]>([]);
-  const entriesListRef = useRef<HTMLDivElement>(null);
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const processingToEntryMapRef = useRef<Map<string, number>>(new Map());
-  const profileCheckedOnceRef = useRef(false);
-  
   const [deletedProcessingIds, setDeletedProcessingIds] = useState<Set<string>>(new Set());
-  const [profileCheckTimeoutId, setProfileCheckTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  const [lastProfileErrorTime, setLastProfileErrorTime] = useState(0);
-  
-  const { 
-    isProfileChecked,
-    isCheckingProfile,
-    showRetryButton,
-    checkUserProfile,
-    handleRetryProfileCreation
-  } = useProfileManagement({
-    userId: user?.id,
-    ensureProfileExists
-  });
 
   const { 
     entries, 
     loading, 
     fetchEntries, 
-    error: entriesError,
+    error: entriesError, 
+    profileExists 
   } = useJournalEntries(
     user?.id,
     refreshKey,
@@ -289,6 +280,31 @@ const Journal = () => {
   }, [toastIds, profileCheckTimeoutId]);
 
   useEffect(() => {
+    if (user?.id && isCheckingProfile && !profileCheckedOnceRef.current) {
+      const timeoutId = setTimeout(() => {
+        console.log('[Journal] Profile check taking too long, proceeding anyway');
+        logInfo('Profile check taking too long, proceeding anyway', 'Journal');
+        setIsCheckingProfile(false);
+        setIsProfileChecked(true);
+        profileCheckedOnceRef.current = true;
+      }, 5000);
+      
+      setProfileCheckTimeoutId(timeoutId);
+      
+      return () => {
+        clearTimeout(timeoutId);
+        setProfileCheckTimeoutId(null);
+      };
+    }
+  }, [user?.id, isCheckingProfile]);
+
+  useEffect(() => {
+    if (user?.id && !isProfileChecked && !isCheckingProfile && !profileCheckedOnceRef.current) {
+      checkUserProfile(user.id);
+    }
+  }, [user?.id, isProfileChecked, isCheckingProfile]);
+
+  useEffect(() => {
     if (processingEntries.length > 0 || isSavingRecording) {
       const interval = setInterval(() => {
         console.log('[Journal] Polling for updates while processing entries');
@@ -313,6 +329,95 @@ const Journal = () => {
     }
   }, [activeTab, processingEntries]);
 
+  const checkUserProfile = async (userId: string) => {
+    try {
+      setIsCheckingProfile(true);
+      setShowRetryButton(false);
+      setLastAction('Checking Profile');
+      
+      console.log('[Journal] Checking user profile for ID:', userId);
+      
+      const profileCreated = await ensureProfileExists();
+      profileCheckedOnceRef.current = true;
+      
+      console.log('[Journal] Profile check result:', profileCreated);
+      
+      if (!profileCreated) {
+        if (profileCreationAttempts < maxProfileAttempts) {
+          setProfileCreationAttempts(prev => prev + 1);
+          
+          const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
+          
+          if (autoRetryTimeoutRef.current) {
+            clearTimeout(autoRetryTimeoutRef.current);
+          }
+          
+          autoRetryTimeoutRef.current = setTimeout(() => {
+            setLastAction(`Auto Retry Profile ${profileCreationAttempts + 1}`);
+            
+            if (profileCreationAttempts >= maxProfileAttempts - 1) {
+              setShowRetryButton(true);
+            }
+            
+            checkUserProfile(userId);
+          }, retryDelay);
+        } else {
+          setShowRetryButton(true);
+          setLastAction('Profile Check Failed');
+        }
+      } else {
+        setLastAction('Profile Check Success');
+        setProfileCreationAttempts(0);
+      }
+      
+      setIsProfileChecked(true);
+    } catch (error: any) {
+      console.error('[Journal] Error checking/creating user profile:', error);
+      
+      const now = Date.now();
+      if (now - lastProfileErrorTime > 60000) {
+        setLastProfileErrorTime(now);
+      }
+      
+      if (profileCreationAttempts < maxProfileAttempts) {
+        setProfileCreationAttempts(prev => prev + 1);
+        
+        const retryDelay = 1000 * Math.pow(1.5, profileCreationAttempts);
+        
+        if (autoRetryTimeoutRef.current) {
+          clearTimeout(autoRetryTimeoutRef.current);
+        }
+        
+        autoRetryTimeoutRef.current = setTimeout(() => {
+          setLastAction(`Auto Retry Profile After Error ${profileCreationAttempts + 1}`);
+          
+          if (profileCreationAttempts >= maxProfileAttempts - 1) {
+            setShowRetryButton(true);
+          }
+          
+          checkUserProfile(userId);
+        }, retryDelay);
+      } else {
+        setShowRetryButton(true);
+        setLastAction('Profile Check Error');
+      }
+      
+      setIsProfileChecked(true);
+    } finally {
+      setIsCheckingProfile(false);
+    }
+  };
+
+  const handleRetryProfileCreation = () => {
+    if (!user?.id) return;
+    
+    setProfileCreationAttempts(0);
+    profileCheckedOnceRef.current = false;
+    setIsProfileChecked(false);
+    setLastAction('Retry Profile Creation');
+    checkUserProfile(user.id);
+  };
+
   const handleStartRecording = () => {
     console.log('Starting new recording');
     setActiveTab('record');
@@ -320,14 +425,13 @@ const Journal = () => {
     setProcessingError(null);
   };
 
-  const handleTabChange = async (value: string) => {
+  const handleTabChange = (value: string) => {
     console.log(`[Journal] Tab change requested to: ${value}. Current safeToSwitchTab: ${safeToSwitchTab}`);
     
     if (value === 'entries' && !safeToSwitchTab) {
       console.log('[Journal] User attempting to switch to entries while processing');
       
-      const translatedMessage = await translate('Processing in progress...');
-      toast.info(translatedMessage, { 
+      toast.info('Processing in progress...', { 
         duration: 2000,
         closeButton: false
       });
@@ -339,12 +443,9 @@ const Journal = () => {
       if (value === 'entries' && !safeToSwitchTab) {
         console.log('[Journal] User attempting to switch to entries while processing');
         
-        // Using a non-async approach here since we're in a setTimeout callback
-        translate('Processing in progress...').then(translatedMessage => {
-          toast.info(translatedMessage, { 
-            duration: 2000,
-            closeButton: false
-          });
+        toast.info('Processing in progress...', { 
+          duration: 2000,
+          closeButton: false
         });
       }
       
@@ -388,10 +489,8 @@ const Journal = () => {
       setTimeout(() => {
         setActiveTab('entries');
       }, 50);
-
-      const translatedProcessingMessage = await translate('Processing your journal entry with AI...');
       
-      const toastId = toast.loading(translatedProcessingMessage, {
+      const toastId = toast.loading('Processing your journal entry with AI...', {
         duration: 15000,
         closeButton: false,
         onAutoClose: () => {
@@ -406,7 +505,7 @@ const Journal = () => {
           }
         }
       });
-
+      
       console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes');
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
@@ -447,14 +546,10 @@ const Journal = () => {
               if (toastIds[tempId]) {
                 toast.dismiss(toastIds[tempId]);
                 
-                // Using a Promise to handle the async operation inside setTimeout
-                (async () => {
-                  const translatedSuccessMessage = await translate('Journal entry processed');
-                  toast.success(translatedSuccessMessage, { 
-                    duration: 3000,
-                    closeButton: false
-                  });
-                })();
+                toast.success('Journal entry processed', { 
+                  duration: 3000,
+                  closeButton: false
+                });
                 
                 setToastIds(prev => {
                   const newToastIds = { ...prev };
@@ -480,11 +575,20 @@ const Journal = () => {
         
         toast.dismiss(toastId);
         
-        const translatedErrorMessage = await translate(`Failed to process recording: ${error || 'Unknown error'}`);
-        toast.error(translatedErrorMessage, { 
+        await new Promise(resolve => setTimeout(resolve, 150));
+        
+        toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
           duration: 3000,
           closeButton: false
         });
+        
+        setIsRecordingComplete(false);
+        setIsSavingRecording(false);
+        setSafeToSwitchTab(true);
+        
+        setTimeout(() => {
+          setActiveTab('record');
+        }, 100);
       }
     } catch (error: any) {
       console.error('Error processing recording:', error);
@@ -495,8 +599,7 @@ const Journal = () => {
       
       await new Promise(resolve => setTimeout(resolve, 150));
       
-      const translatedErrorMessage = await translate('Error processing your recording');
-      toast.error(translatedErrorMessage, { 
+      toast.error('Error processing your recording', { 
         duration: 3000,
         closeButton: false
       });
@@ -616,6 +719,17 @@ const Journal = () => {
     }, 100);
   }, [fetchEntries]);
 
+  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && 
+                             !entriesError && 
+                             !processingError && 
+                             processingEntries.length > 0;
+
+  if (hasRenderError) {
+    console.error('[Journal] Recovering from render error');
+    setHasRenderError(false);
+    setLastAction('Recovering from Render Error');
+  }
+
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
     
@@ -636,6 +750,7 @@ const Journal = () => {
     setLastAction(`Recorder: ${info.status}`);
   };
 
+  // Add an event listener for journal entry updates
   useEffect(() => {
     const handleJournalEntryUpdated = (event: CustomEvent) => {
       if (event.detail && event.detail.entryId) {
@@ -657,43 +772,122 @@ const Journal = () => {
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
         
-        <ProfileManager 
-          isCheckingProfile={isCheckingProfile}
-          showRetryButton={showRetryButton}
-          onRetryProfileCreation={handleRetryProfileCreation}
-        />
-        
-        <ErrorDisplay 
-          entriesError={entriesError}
-          processingError={processingError}
-          onRetryLoading={() => {
-            setRefreshKey(prev => prev + 1);
-            fetchEntries();
-          }}
-          onTryAgainProcessing={() => {
-            setProcessingError(null);
-            setActiveTab('record');
-          }}
-        />
-        
-        {!isCheckingProfile && !entriesError && (
-          <JournalTabs
-            activeTab={activeTab}
-            onTabChange={handleTabChange}
-            onRecordingComplete={handleRecordingComplete}
-            updateDebugInfo={updateDebugInfo}
-            entries={entries}
-            loading={loading}
-            processingEntries={processingEntries}
-            processedEntryIds={processedEntryIds}
-            onStartRecording={handleStartRecording}
-            onDeleteEntry={handleDeleteEntry}
-            entriesListRef={entriesListRef}
-          />
+        {isCheckingProfile ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+              <p className="text-muted-foreground">Setting up your profile...</p>
+            </div>
+          </div>
+        ) : entriesError && !loading ? (
+          <>
+            <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <p className="text-red-800 dark:text-red-200">
+                    Error loading your journal entries: {entriesError}
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                  onClick={() => {
+                    setRefreshKey(prev => prev + 1);
+                    fetchEntries();
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" /> 
+                  Retry Loading
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {showRetryButton && (
+              <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-amber-800 dark:text-amber-200">
+                      We're having trouble setting up your profile. Your entries may not be saved correctly.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                    onClick={handleRetryProfileCreation}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> 
+                    Retry Profile Setup
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            {processingError && (
+              <div className="mb-6 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-red-800 dark:text-red-200">
+                      Error processing your recording: {processingError}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                    onClick={() => {
+                      setProcessingError(null);
+                      setActiveTab('record');
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> 
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            <Tabs 
+              defaultValue={activeTab} 
+              value={activeTab} 
+              onValueChange={handleTabChange} 
+              className="mt-6"
+            >
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="record">Record Entry</TabsTrigger>
+                <TabsTrigger value="entries">Past Entries</TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="record" className="mt-0">
+                <div className="mb-4">
+                  <VoiceRecorder 
+                    onRecordingComplete={handleRecordingComplete}
+                    updateDebugInfo={updateDebugInfo}
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
+                <ErrorBoundary>
+                  <JournalEntriesList
+                    entries={entries}
+                    loading={loading}
+                    processingEntries={processingEntries}
+                    processedEntryIds={processedEntryIds}
+                    onStartRecording={handleStartRecording}
+                    onDeleteEntry={handleDeleteEntry}
+                  />
+                </ErrorBoundary>
+              </TabsContent>
+            </Tabs>
+          </>
         )}
       </div>
     </ErrorBoundary>
   );
 };
 
-export default Journal;
+export default Journal
