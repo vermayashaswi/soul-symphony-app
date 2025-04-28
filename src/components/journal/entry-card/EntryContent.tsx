@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { AnimatePresence, motion } from 'framer-motion';
@@ -40,7 +41,7 @@ export function EntryContent({
     }
 
     const contentIsLoading = content === "Processing entry..." || 
-                           content === "Loading...";
+                         content === "Loading...";
 
     if (contentIsLoading || isProcessing) {
       setShowLoading(true);
@@ -52,6 +53,7 @@ export function EntryContent({
       if (!contentReadyDispatchedRef.current) {
         contentReadyDispatchedRef.current = true;
         
+        // Dispatch events when content is ready
         window.dispatchEvent(new CustomEvent('entryContentReady', { 
           detail: { 
             content,

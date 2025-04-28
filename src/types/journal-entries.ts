@@ -19,9 +19,13 @@ export interface UIJournalEntry {
 }
 
 export const transformDatabaseToUIEntry = (entry: DatabaseJournalEntry): UIJournalEntry => {
+  // First try to get refined text, then transcription text
   let content = entry["refined text"] || entry["transcription text"];
   
-  if (!content || content.trim() === "") {
+  // Only set to "No content available" if both fields are truly empty
+  if ((typeof content !== 'string' || content.trim() === "") && 
+      !entry["refined text"] && 
+      !entry["transcription text"]) {
     content = "No content available";
   }
 
