@@ -1,7 +1,7 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ThemeData {
   theme: string;
@@ -47,7 +47,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     setUniqueThemes(sortedThemes);
   }, [themesData]);
 
-  // Empty return when no themes instead of showing "No themes found" text
   if (!themesData.length) {
     return null;
   }
@@ -82,7 +81,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               MozOsxFontSmoothing: 'grayscale'
             }}
           >
-            7-day themes
+            <TranslatableText text="7-day themes" />
           </span>
         </motion.div>
       </div>
@@ -135,7 +134,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                   MozOsxFontSmoothing: 'grayscale',
                 }}
               >
-                {themeItem.theme}
+                <TranslatableText text={themeItem.theme} />
               </span>
             </motion.div>
           );

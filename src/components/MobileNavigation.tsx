@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -6,6 +5,7 @@ import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react
 import { cn } from '@/lib/utils';
 import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -18,32 +18,26 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
   useEffect(() => {
-    // Detect keyboard visibility with multiple signals
     const handleVisualViewportResize = () => {
       if (window.visualViewport) {
-        // More aggressive detection threshold
         const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
         setIsKeyboardVisible(isKeyboard);
       }
     };
     
-    // Initial check
     handleVisualViewportResize();
     
-    // Set up listeners for viewport changes
     if (window.visualViewport) {
       window.visualViewport.addEventListener('resize', handleVisualViewportResize);
       window.addEventListener('resize', handleVisualViewportResize);
     }
     
-    // Set up listeners for keyboard events
     const handleKeyboardOpen = () => setIsKeyboardVisible(true);
     const handleKeyboardClose = () => setIsKeyboardVisible(false);
     
     window.addEventListener('keyboardOpen', handleKeyboardOpen);
     window.addEventListener('keyboardClose', handleKeyboardClose);
     
-    // Clean up listeners
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
@@ -56,8 +50,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
-    // Always show mobile navigation for app routes in mobile or native app
-    // Hide when keyboard is visible
     const shouldShowNav = (isMobile || isNativeApp()) && 
                           !isKeyboardVisible; 
     
@@ -76,10 +68,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  // Skip specific routes where nav doesn't make sense
   const hiddenRoutes = ['/app/auth', '/app/onboarding'];
   
-  // Also hide on the main /app route if onboarding is not complete
   if (!onboardingComplete && location.pathname === '/app') {
     return null;
   }
@@ -88,7 +78,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  // Define navigation items with app path prefix
   const navItems = [
     { path: '/app/home', icon: Home, label: 'Home' },
     { path: '/app/journal', icon: BookOpen, label: 'Journal' },
@@ -97,7 +86,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     { path: '/app/settings', icon: Settings, label: 'Settings' },
   ];
 
-  // Active status just needs to check current path
   const getActiveStatus = (path: string) => {
     return location.pathname.startsWith(path);
   };
@@ -106,7 +94,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     <motion.div 
       className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted p-2"
       style={{
-        zIndex: 50, // Keep navbar below the input
+        zIndex: 50,
         paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))'
       }}
       initial={{ y: 100 }}
@@ -138,7 +126,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                   />
                 )}
               </div>
-              <span className="text-xs mt-1">{item.label}</span>
+              <span className="text-xs mt-1">
+                <TranslatableText text={item.label} />
+              </span>
             </Link>
           );
         })}
