@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTranslation as useI18nTranslation } from 'react-i18next';
+import { useLocation } from 'react-router-dom';
+import { isWebsiteRoute } from '@/routes/RouteHelpers';
 
 interface TranslatableTextProps {
   text: string;
@@ -18,6 +20,10 @@ export function TranslatableText({
   const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage } = useTranslation();
   const { t } = useI18nTranslation();
+  const location = useLocation();
+  
+  // Determine if we're on a website route (marketing site)
+  const isOnWebsite = isWebsiteRoute(location.pathname);
 
   useEffect(() => {
     let isMounted = true;
@@ -25,6 +31,12 @@ export function TranslatableText({
     const translateText = async () => {
       if (!text?.trim()) {
         if (isMounted) setTranslatedText('');
+        return;
+      }
+
+      // Skip translations for the marketing website pages
+      if (isOnWebsite) {
+        if (isMounted) setTranslatedText(text);
         return;
       }
 
@@ -76,7 +88,7 @@ export function TranslatableText({
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, translate, t]);
+  }, [text, currentLanguage, translate, t, isOnWebsite]);
 
   // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(

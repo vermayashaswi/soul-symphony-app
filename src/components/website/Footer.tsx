@@ -4,7 +4,6 @@ import { Link } from 'react-router-dom';
 import { Apple, Play } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const Footer = () => {
   const openAppStore = () => {
@@ -46,40 +45,39 @@ const Footer = () => {
             onClick={openAppStore}
           >
             <Apple className="h-5 w-5" />
-            <TranslatableText text="download.appStore" />
+            Download on App Store
           </Button>
           <Button 
             className="gap-2 bg-primary hover:bg-primary/90" 
             onClick={openPlayStore}
           >
             <Play className="h-5 w-5" />
-            <TranslatableText text="download.googlePlay" />
+            Get it on Google Play
           </Button>
         </div>
         
         <p className="text-muted-foreground mb-8">
-          <TranslatableText text="footer.contact" />{" "}
+          Contact us at{" "}
           <a href="mailto:support@soulo.online" className="text-primary hover:underline">support@soulo.online</a>
         </p>
         
         <div className="flex justify-center gap-8 text-sm text-muted-foreground">
           <Link to="/privacy-policy" className="hover:text-primary">
-            <TranslatableText text="footer.privacy" />
+            Privacy Policy
           </Link>
           <Link to="/terms" className="hover:text-primary">
-            <TranslatableText text="footer.terms" />
+            Terms of Service
           </Link>
           <Link to="/blog" className="hover:text-primary">
-            <TranslatableText text="navbar.blog" />
+            Blog
           </Link>
           <Link to="/faq" className="hover:text-primary">
-            <TranslatableText text="navbar.faq" />
+            FAQ
           </Link>
         </div>
         
         <p className="text-xs text-muted-foreground mt-8">
-          &copy; {new Date().getFullYear()} SOULo.{" "}
-          <TranslatableText text="footer.rights" />
+          &copy; {new Date().getFullYear()} SOULo. All rights reserved.
         </p>
       </div>
     </footer>
