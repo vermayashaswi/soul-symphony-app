@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { TranslatableText } from '@/components/TranslatableText';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ThemeBoxesProps {
   themes: string[];

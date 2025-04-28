@@ -16,7 +16,7 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Trash, X } from "lucide-react";
 import { JournalEntry as JournalEntryType, Json } from '@/types/journal';
 import { Button } from '@/components/ui/button';
-import { TranslatableText } from '@/components/ui/translatable-text';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export interface JournalEntry {
   id: number;
