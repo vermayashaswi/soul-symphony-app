@@ -40,6 +40,7 @@ export function EntryContent({
       return () => clearTimeout(timer);
     }
 
+    // Only show loading if we absolutely have no content to display
     const contentIsLoading = !content || 
                           content === "Processing entry..." || 
                           content.trim() === "" ||
@@ -109,7 +110,7 @@ export function EntryContent({
         <TranslatedContent 
           content={stableContent}
           isExpanded={isExpanded}
-          // Fix: Pass language as an optional prop, not required
+          language={language}
         />
       )}
     </AnimatePresence>

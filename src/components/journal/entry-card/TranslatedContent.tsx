@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 
@@ -15,23 +14,29 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
 
   useEffect(() => {
     async function translateContent() {
-      // Don't show loading if we have content to display already
-      // This prevents the issue where entries show as processing cards
-      if (!translatedContent && !content) {
-        setIsLoading(true);
+      // Always start with the original content
+      if (content) {
+        setTranslatedContent(content);
       }
       
+      // Don't proceed with translation if no content or already in English
+      if (!content || currentLanguage === 'en') {
+        setIsLoading(false);
+        return;
+      }
+      
+      // Now attempt translation while keeping original content visible
+      setIsLoading(true);
+      
       try {
-        if (currentLanguage === 'en') {
-          setTranslatedContent(content);
-        } else {
-          // Always maintain the current content while translating
-          const translated = await translate(content);
+        const translated = await translate(content);
+        // Only update if we got a valid translation result
+        if (translated && translated.trim() !== '') {
           setTranslatedContent(translated);
         }
       } catch (error) {
         console.error('Translation error:', error);
-        setTranslatedContent(content); // Fallback to original content
+        // Keep the original content on error - no need to update state
       } finally {
         setIsLoading(false);
       }
@@ -42,14 +47,19 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
     }
   }, [content, currentLanguage, translate]);
 
-  // Don't show the loading component in place of actual content
-  // Just render content with a subtle loading indicator if needed
+  // Always render content (original or translated) with a subtle loading indicator if needed
   return (
-    <div className={isLoading ? "opacity-80" : ""}>
+    <div className={`transition-opacity duration-300 ${isLoading ? "relative" : ""}`}>
       {isExpanded ? (
         <p className="text-xs md:text-sm text-foreground">{translatedContent || content}</p>
       ) : (
         <p className="text-xs md:text-sm text-foreground line-clamp-3">{translatedContent || content}</p>
+      )}
+      
+      {isLoading && (
+        <div className="absolute top-0 right-0">
+          <div className="h-2 w-2 bg-primary/50 rounded-full animate-pulse"></div>
+        </div>
       )}
     </div>
   );
