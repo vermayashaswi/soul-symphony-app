@@ -108,6 +108,27 @@ const JournalEntriesList: React.FC<JournalEntriesList> = ({
             entry={entry}
             isProcessing={processingEntries.some(id => id === entry.processing_id)}
             onDelete={() => onDeleteEntry(entry.id)}
+            setEntries={setEntries => {
+              // Since we don't have direct access to the parent's setEntries function,
+              // we'll update our local filteredEntries state as a workaround
+              const updatedEntries = entries.map(e => {
+                if (e.id === entry.id) {
+                  return { ...e, ...setEntries(e) };
+                }
+                return e;
+              });
+              
+              // Update filtered entries based on the updated entries
+              const updatedFilteredEntries = filteredEntries.map(e => {
+                if (e.id === entry.id) {
+                  const updatedEntry = updatedEntries.find(ue => ue.id === entry.id);
+                  return updatedEntry || e;
+                }
+                return e;
+              });
+              
+              setFilteredEntries(updatedFilteredEntries);
+            }}
           />
         ))}
         
