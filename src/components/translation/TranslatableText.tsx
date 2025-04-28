@@ -10,6 +10,9 @@ interface TranslatableTextProps {
   as?: keyof JSX.IntrinsicElements;
 }
 
+// Regular expressions to detect language markers like [hi], [en], etc.
+const LANGUAGE_MARKER_REGEX = /^\[(\w+)\]\s*(.*)$/;
+
 export function TranslatableText({ 
   text, 
   className = "",
@@ -23,6 +26,12 @@ export function TranslatableText({
   // Determine if we're on a website route (marketing site)
   const isOnWebsite = isWebsiteRoute(location.pathname);
 
+  // Function to clean text of language markers
+  const cleanTextOfMarkers = (input: string): string => {
+    if (!input) return '';
+    return input.replace(/\[\w+\]\s*/g, '');
+  };
+
   useEffect(() => {
     let isMounted = true;
 
@@ -32,19 +41,22 @@ export function TranslatableText({
         return;
       }
 
+      // Clean the text of any language markers before translation
+      const cleanedText = cleanTextOfMarkers(text);
+      
       // Skip translations for the marketing website pages
       if (isOnWebsite) {
-        if (isMounted) setTranslatedText(text);
+        if (isMounted) setTranslatedText(cleanedText);
         return;
       }
 
       // Fallback to dynamic translation service if not in English
       if (currentLanguage !== 'en') {
         setIsLoading(true);
-        console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
+        console.log(`TranslatableText: Translating "${cleanedText.substring(0, 30)}..." to ${currentLanguage}`);
 
         try {
-          const result = await translate(text);
+          const result = await translate(cleanedText);
           if (isMounted) {
             setTranslatedText(result);
             console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
@@ -52,14 +64,14 @@ export function TranslatableText({
         } catch (error) {
           console.error('Translation error:', error);
           if (isMounted) {
-            setTranslatedText(text); // Fallback to original
-            console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
+            setTranslatedText(cleanedText); // Fallback to original cleaned text
+            console.warn(`TranslatableText: Failed to translate "${cleanedText.substring(0, 30)}..." to ${currentLanguage}`);
           }
         } finally {
           if (isMounted) setIsLoading(false);
         }
       } else {
-        if (isMounted) setTranslatedText(text);
+        if (isMounted) setTranslatedText(cleanedText);
       }
     };
 

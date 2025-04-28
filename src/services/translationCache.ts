@@ -27,13 +27,16 @@ class TranslationCache {
   }
   
   public set(key: string, value: string, language: string): void {
+    // Remove any language markers from the key before storing
+    const cleanKey = this.removeLanguageMarkers(key);
+    
     // Create language section if it doesn't exist
     if (!this.cache[language]) {
       this.cache[language] = {};
     }
     
     // Store the translation with timestamp
-    this.cache[language][key] = {
+    this.cache[language][cleanKey] = {
       value,
       timestamp: Date.now(),
       language
@@ -45,17 +48,20 @@ class TranslationCache {
   
   public get(key: string, language: string): string | null {
     try {
+      // Remove any language markers from the key before retrieving
+      const cleanKey = this.removeLanguageMarkers(key);
+      
       // Check if we have this language and key
-      if (!this.cache[language] || !this.cache[language][key]) {
+      if (!this.cache[language] || !this.cache[language][cleanKey]) {
         return null;
       }
       
-      const entry = this.cache[language][key];
+      const entry = this.cache[language][cleanKey];
       
       // Check if the entry has expired
       if (Date.now() - entry.timestamp > this.TTL) {
         // Remove expired entry
-        delete this.cache[language][key];
+        delete this.cache[language][cleanKey];
         return null;
       }
       
@@ -67,13 +73,22 @@ class TranslationCache {
     }
   }
   
-  // New methods to support the translationService interface
+  // Method to remove language markers like [hi] from strings
+  private removeLanguageMarkers(text: string): string {
+    // Remove language markers like [hi], [en], etc.
+    return text.replace(/\[\w+\]\s*/g, '');
+  }
+  
+  // Methods to support the translationService interface
   public async getTranslation(text: string, language: string): Promise<TranslationEntry | null> {
-    const cachedValue = this.get(text, language);
+    // Clean the input text of any language markers
+    const cleanText = this.removeLanguageMarkers(text);
+    
+    const cachedValue = this.get(cleanText, language);
     if (cachedValue === null) return null;
     
     return {
-      originalText: text,
+      originalText: cleanText,
       translatedText: cachedValue,
       language,
       timestamp: Date.now(),
@@ -82,7 +97,9 @@ class TranslationCache {
   }
   
   public async setTranslation(entry: TranslationEntry): Promise<void> {
-    this.set(entry.originalText, entry.translatedText, entry.language);
+    // Clean the original text of any language markers
+    const cleanText = this.removeLanguageMarkers(entry.originalText);
+    this.set(cleanText, entry.translatedText, entry.language);
   }
   
   private cleanExpired(): void {
