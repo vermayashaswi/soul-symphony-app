@@ -1,4 +1,3 @@
-
 // Translation cache service to improve performance
 
 interface CacheEntry {
@@ -27,8 +26,9 @@ class TranslationCache {
   }
   
   public set(key: string, value: string, language: string): void {
-    // Remove any language markers from the key before storing
+    // Remove any language markers from the key and value before storing
     const cleanKey = this.removeLanguageMarkers(key);
+    const cleanValue = this.removeLanguageMarkers(value);
     
     // Create language section if it doesn't exist
     if (!this.cache[language]) {
@@ -37,7 +37,7 @@ class TranslationCache {
     
     // Store the translation with timestamp
     this.cache[language][cleanKey] = {
-      value,
+      value: cleanValue,
       timestamp: Date.now(),
       language
     };
@@ -75,7 +75,8 @@ class TranslationCache {
   
   // Method to remove language markers like [hi] from strings
   private removeLanguageMarkers(text: string): string {
-    // Remove language markers like [hi], [en], etc.
+    if (!text) return '';
+    // Remove ALL language markers like [hi], [en], etc. from anywhere in the text
     return text.replace(/\[\w+\]\s*/g, '');
   }
   
@@ -97,9 +98,11 @@ class TranslationCache {
   }
   
   public async setTranslation(entry: TranslationEntry): Promise<void> {
-    // Clean the original text of any language markers
+    // Clean both the original text and translated text of any language markers
     const cleanText = this.removeLanguageMarkers(entry.originalText);
-    this.set(cleanText, entry.translatedText, entry.language);
+    const cleanTranslation = this.removeLanguageMarkers(entry.translatedText);
+    
+    this.set(cleanText, cleanTranslation, entry.language);
   }
   
   private cleanExpired(): void {
@@ -159,7 +162,7 @@ class TranslationCache {
         this.cache[lang] = {};
         Object.keys(simplified[lang]).forEach(key => {
           this.cache[lang][key] = {
-            value: simplified[lang][key],
+            value: this.removeLanguageMarkers(simplified[lang][key]), // Clean values when loading
             timestamp: Date.now(), // Reset timestamp on load
             language: lang
           };

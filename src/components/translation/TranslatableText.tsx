@@ -29,6 +29,7 @@ export function TranslatableText({
   // Function to clean text of language markers
   const cleanTextOfMarkers = (input: string): string => {
     if (!input) return '';
+    // Remove all language markers like [hi], [en], etc.
     return input.replace(/\[\w+\]\s*/g, '');
   };
 
@@ -41,7 +42,7 @@ export function TranslatableText({
         return;
       }
 
-      // Clean the text of any language markers before translation
+      // Always clean the text of any language markers before any processing
       const cleanedText = cleanTextOfMarkers(text);
       
       // Skip translations for the marketing website pages
@@ -50,16 +51,21 @@ export function TranslatableText({
         return;
       }
 
-      // Fallback to dynamic translation service if not in English
-      if (currentLanguage !== 'en') {
+      // Use the cleaned text for both English and non-English cases
+      if (currentLanguage === 'en') {
+        if (isMounted) setTranslatedText(cleanedText);
+      } else {
+        // Only perform API translation for non-English
         setIsLoading(true);
         console.log(`TranslatableText: Translating "${cleanedText.substring(0, 30)}..." to ${currentLanguage}`);
 
         try {
           const result = await translate(cleanedText);
           if (isMounted) {
-            setTranslatedText(result);
-            console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
+            // Make sure we don't accidentally reintroduce language markers
+            const finalResult = cleanTextOfMarkers(result);
+            setTranslatedText(finalResult);
+            console.log(`TranslatableText: Successfully translated to "${finalResult.substring(0, 30)}..."`);
           }
         } catch (error) {
           console.error('Translation error:', error);
@@ -70,8 +76,6 @@ export function TranslatableText({
         } finally {
           if (isMounted) setIsLoading(false);
         }
-      } else {
-        if (isMounted) setTranslatedText(cleanedText);
       }
     };
 

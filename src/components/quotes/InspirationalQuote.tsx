@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
@@ -52,11 +51,11 @@ export const InspirationalQuote: React.FC = () => {
       
       if (data && data.quotes && Array.isArray(data.quotes)) {
         console.log('Successfully parsed quotes:', data.quotes);
-        // Shuffle the quotes for more randomness
+        // Shuffle the quotes for more randomness and clean language markers
         const shuffledQuotes = [...data.quotes]
           .sort(() => Math.random() - 0.5)
           .map(q => ({
-            quote: cleanTextOfMarkers(q.quote),
+            quote: cleanTextOfMarkers(q.quote || ''),
             author: cleanTextOfMarkers(q.author || 'Unknown')
           }));
         

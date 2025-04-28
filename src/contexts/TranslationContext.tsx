@@ -49,8 +49,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       
       console.log(`Translating text: "${cleanedText.substring(0, 30)}..." to ${currentLanguage}`);
       const translated = await staticTranslationService.translateText(cleanedText, currentLanguage);
-      console.log(`Translation result: "${translated.substring(0, 30)}..."`);
-      return translated;
+      
+      // Clean the result again in case translation somehow added markers
+      const cleanedTranslated = cleanTextOfMarkers(translated);
+      console.log(`Translation result: "${cleanedTranslated.substring(0, 30)}..."`);
+      
+      return cleanedTranslated;
     } catch (error) {
       console.error('Translation error in context:', error);
       return cleanTextOfMarkers(text); // Fallback to original cleaned text
