@@ -2,9 +2,9 @@
 import { Json } from '@/integrations/supabase/types';
 
 export interface JournalEntry {
-  id?: number;
+  id: number;
   user_id?: string;
-  created_at?: string;
+  created_at: string;
   "transcription text"?: string;
   "refined text"?: string;
   audio_url?: string;
@@ -20,6 +20,7 @@ export interface JournalEntry {
   master_themes?: string[];
   user_feedback?: string | null;
   Edit_Status?: number | null;
+  content?: string; // Adding content as an optional property
 }
 
 export interface JournalEntryFormData extends JournalEntry {
