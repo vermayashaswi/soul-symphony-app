@@ -9,7 +9,6 @@ import {
 } from '@/components/ui/dropdown-menu';
 import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export function LanguageSelector() {
   const { currentLanguage, setLanguage, isTranslating } = useTranslation();
@@ -29,16 +28,12 @@ export function LanguageSelector() {
           size="sm" 
           className="flex items-center gap-2"
           disabled={isTranslating}
-          title="Change language"
         >
           <Globe className={`h-4 w-4 ${isTranslating ? "animate-pulse" : ""}`} />
           <span>{currentLanguageLabel}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="bg-background border border-border">
-        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-          <TranslatableText text="Select Language" />
-        </div>
         {languages.map((language) => (
           <DropdownMenuItem
             key={language.code}
@@ -51,11 +46,6 @@ export function LanguageSelector() {
             {language.label}
           </DropdownMenuItem>
         ))}
-        {isTranslating && (
-          <div className="px-2 py-1.5 text-xs italic text-muted-foreground">
-            <TranslatableText text="Changing language..." />
-          </div>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );

@@ -10,7 +10,6 @@ import {
 import { Button } from "@/components/ui/button";
 import { useTranslation } from '@/contexts/TranslationContext';
 import { createDebugger } from '@/utils/debug/debugUtils';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const debug = createDebugger('languageSelector');
 
@@ -39,9 +38,6 @@ const LanguageSelector = () => {
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto bg-background border border-border">
-        <div className="px-2 py-1.5 text-xs font-medium text-muted-foreground">
-          <TranslatableText text="Select Language" />
-        </div>
         {languages.map((language) => (
           <DropdownMenuItem
             key={language.code}
@@ -56,11 +52,6 @@ const LanguageSelector = () => {
             {language.label}
           </DropdownMenuItem>
         ))}
-        {isTranslating && (
-          <div className="px-2 py-1.5 text-xs italic text-muted-foreground">
-            <TranslatableText text="Changing language..." />
-          </div>
-        )}
       </DropdownMenuContent>
     </DropdownMenu>
   );
