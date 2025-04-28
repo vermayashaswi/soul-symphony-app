@@ -1,66 +1,50 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { LoadingEntryContent } from './LoadingEntryContent';
 
 interface TranslatedContentProps {
   content: string;
   isExpanded: boolean;
-  language?: string;
+  language?: string; // Added language as optional prop
 }
 
 export function TranslatedContent({ content, isExpanded, language }: TranslatedContentProps) {
-  const [translatedContent, setTranslatedContent] = useState<string>(content || '');
-  const [isLoading, setIsLoading] = useState(false);
+  const [translatedContent, setTranslatedContent] = useState<string>('');
+  const [isLoading, setIsLoading] = useState(true);
   const { currentLanguage, translate } = useTranslation();
 
   useEffect(() => {
     async function translateContent() {
-      // Immediately set content to ensure something is always displayed
-      if (content && content.trim() !== '') {
-        setTranslatedContent(content);
-      }
-      
-      // Don't proceed with translation if no content or already in English
-      if (!content || content.trim() === '' || currentLanguage === 'en') {
-        setIsLoading(false);
-        return;
-      }
-      
-      // Now attempt translation while keeping original content visible
       setIsLoading(true);
-      
       try {
-        const translated = await translate(content);
-        // Only update if we got a valid translation result
-        if (translated && translated.trim() !== '') {
+        if (currentLanguage === 'en') {
+          setTranslatedContent(content);
+        } else {
+          const translated = await translate(content);
           setTranslatedContent(translated);
         }
       } catch (error) {
         console.error('Translation error:', error);
-        // Keep the original content on error - no need to update state
+        setTranslatedContent(content); // Fallback to original content
       } finally {
         setIsLoading(false);
       }
     }
 
-    if (content) {
-      translateContent();
-    }
+    translateContent();
   }, [content, currentLanguage, translate]);
 
-  // Always render content (original or translated) with a subtle loading indicator if needed
+  if (isLoading) {
+    return <LoadingEntryContent />;
+  }
+
   return (
-    <div className={`transition-opacity duration-300 ${isLoading ? "relative" : ""}`}>
+    <div>
       {isExpanded ? (
-        <p className="text-xs md:text-sm text-foreground">{translatedContent || content || ''}</p>
+        <p className="text-xs md:text-sm text-foreground">{translatedContent}</p>
       ) : (
-        <p className="text-xs md:text-sm text-foreground line-clamp-3">{translatedContent || content || ''}</p>
-      )}
-      
-      {isLoading && (
-        <div className="absolute top-0 right-0">
-          <div className="h-2 w-2 bg-primary/50 rounded-full animate-pulse"></div>
-        </div>
+        <p className="text-xs md:text-sm text-foreground line-clamp-3">{translatedContent}</p>
       )}
     </div>
   );
