@@ -14,6 +14,10 @@ export function EntryContent({ content, isExpanded, isProcessing }: EntryContent
     return <LoadingEntryContent />;
   }
 
+  if (!content || content.trim() === '') {
+    return <p className="text-xs md:text-sm text-muted-foreground italic">No content available</p>;
+  }
+
   return (
     <div>
       {isExpanded ? (

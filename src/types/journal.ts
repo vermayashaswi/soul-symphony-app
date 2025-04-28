@@ -11,6 +11,7 @@ export interface JournalEntry {
   duration?: number;
   emotions?: Json;
   sentiment?: string;
+  translation_status?: string;
   entities?: Array<{
     type: string;
     name: string;
