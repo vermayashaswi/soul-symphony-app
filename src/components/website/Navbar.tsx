@@ -73,7 +73,7 @@ const Navbar = () => {
             <LanguageSelector />
             <Button size="sm" asChild>
               <Link to="/download">
-                <TranslatableText text="Download" />
+                <TranslatableText text="Download App" />
               </Link>
             </Button>
           </div>
@@ -118,7 +118,7 @@ const Navbar = () => {
               <div className="flex flex-col space-y-2 pt-2 border-t border-gray-100">
                 <Button asChild>
                   <Link to="/download">
-                    <TranslatableText text="Download" />
+                    <TranslatableText text="Download App" />
                   </Link>
                 </Button>
               </div>
