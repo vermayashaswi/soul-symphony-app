@@ -81,5 +81,21 @@
   "download": {
     "appStore": "Download on App Store",
     "googlePlay": "Get it on Google Play"
+  },
+  "homepage": {
+    "hero": {
+      "title": "Express. Reflect. Grow.",
+      "subtitle": "Journaling should be as simple as talking. Use voice and leave the rest to us.",
+      "appStore": "App Store",
+      "googlePlay": "Google Play",
+      "privacyFocused": "Privacy-Focused",
+      "freeTrial": "14-Day Free Trial"
+    },
+    "phoneAnimation": {
+      "recording": "Recording your journal...",
+      "processing": "Processing your entry...",
+      "insights": "Your Journal Insights",
+      "viewAnalysis": "View full analysis"
+    }
   }
 }
