@@ -20,11 +20,13 @@ const globalEntriesCache: {
   lastRefreshKey?: number;
   entryIds: Set<number>;
   cacheExpiryTime: number;
+  lastDeletedEntryId?: number | null;
 } = {
   entries: [],
   lastFetchTime: null,
   entryIds: new Set(),
-  cacheExpiryTime: 0 // Timestamp when cache should be considered expired
+  cacheExpiryTime: 0, // Timestamp when cache should be considered expired
+  lastDeletedEntryId: null // Track the last deleted entry for better cache invalidation
 };
 
 export function useJournalEntries(
@@ -63,6 +65,7 @@ export function useJournalEntries(
   const previousFetchParamsRef = useRef<{ userId?: string, refreshKey: number }>({ refreshKey });
   const entryIdsSet = useRef<Set<number>>(new Set());
   const fetchRetryTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const deletedEntryIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -78,6 +81,12 @@ export function useJournalEntries(
           seenIds.add(entry.id);
           uniqueEntries.push(entry);
         }
+      }
+      
+      // Check if we need to remember a deleted entry ID
+      if (deletedEntryIdRef.current) {
+        globalEntriesCache.lastDeletedEntryId = deletedEntryIdRef.current;
+        deletedEntryIdRef.current = null;
       }
       
       globalEntriesCache.entries = uniqueEntries;
@@ -105,6 +114,12 @@ export function useJournalEntries(
       if (!userId || !event.detail) return;
       
       console.log(`[useJournalEntries] Detected refresh request, will fetch new data:`, event.detail);
+      
+      // Track deleted entry ID if this is a delete action
+      if (event.detail.action === 'delete' && event.detail.entryId) {
+        console.log(`[useJournalEntries] Tracking deleted entry ID: ${event.detail.entryId}`);
+        deletedEntryIdRef.current = event.detail.entryId;
+      }
       
       // Force cache to expire
       globalEntriesCache.cacheExpiryTime = 0;
@@ -207,6 +222,16 @@ export function useJournalEntries(
                 'cached entries:', globalEntriesCache.entries.length,
                 'refreshKey:', refreshKey);
     
+    // Check if there was a recently deleted entry ID
+    const hasRecentDeletion = globalEntriesCache.lastDeletedEntryId !== null || 
+                             deletedEntryIdRef.current !== null;
+    
+    // Cache invalidation logic - always invalidate cache if there was a deletion
+    if (hasRecentDeletion) {
+      console.log('[useJournalEntries] Cache invalidated due to deletion');
+      globalEntriesCache.cacheExpiryTime = 0;
+    }
+    
     // Check if this is a duplicate fetch with the same parameters
     const isDuplicateFetch = 
       isFetchingRef.current && 
@@ -215,7 +240,8 @@ export function useJournalEntries(
       globalEntriesCache.userId === userId && 
       globalEntriesCache.entries.length > 0 &&
       globalEntriesCache.lastRefreshKey === refreshKey &&
-      Date.now() < globalEntriesCache.cacheExpiryTime;
+      Date.now() < globalEntriesCache.cacheExpiryTime &&
+      !hasRecentDeletion;
     
     if (isDuplicateFetch) {
       console.log('[useJournalEntries] Skipping duplicate fetch with same parameters');
@@ -226,7 +252,9 @@ export function useJournalEntries(
     previousFetchParamsRef.current = { userId, refreshKey };
     
     // CRITICAL IMPROVEMENT: Immediately show cached data while fetching fresh data
-    if (globalEntriesCache.userId === userId && globalEntriesCache.entries.length > 0) {
+    if (globalEntriesCache.userId === userId && 
+        globalEntriesCache.entries.length > 0 &&
+        !hasRecentDeletion) {
       console.log('[useJournalEntries] Using cached entries while fetching fresh data');
       setEntries(globalEntriesCache.entries);
       
@@ -259,7 +287,9 @@ export function useJournalEntries(
       isFetchingRef.current = true;
       
       // Only show loading if we have no cached data
-      if (globalEntriesCache.entries.length === 0 || globalEntriesCache.userId !== userId) {
+      if (globalEntriesCache.entries.length === 0 || 
+          globalEntriesCache.userId !== userId || 
+          hasRecentDeletion) {
         setLoading(true);
       }
       
@@ -295,6 +325,44 @@ export function useJournalEntries(
         }
       } else {
         consecutiveEmptyFetchesRef.current = 0;
+      }
+      
+      // Special handling for post-deletion refreshes to ensure freshness
+      if (deletedEntryIdRef.current) {
+        const deletedId = deletedEntryIdRef.current;
+        console.log(`[useJournalEntries] Post-deletion check for ID: ${deletedId}`);
+        
+        // Check if the deleted entry is still in the fetched results
+        const stillExists = journalEntries.some(entry => entry.id === deletedId);
+        
+        if (stillExists) {
+          console.log(`[useJournalEntries] Deleted entry ${deletedId} still found in results, will filter it out`);
+          // Filter out the entry that should be deleted
+          const filteredEntries = journalEntries.filter(entry => entry.id !== deletedId);
+          
+          // Update global cache
+          globalEntriesCache.lastDeletedEntryId = deletedId;
+          
+          // Set the filtered entries
+          setEntries(filteredEntries);
+          setLastFetchTime(new Date());
+          setFetchCount(prev => prev + 1);
+          
+          // Clear the ref to avoid re-filtering on next fetch
+          deletedEntryIdRef.current = null;
+          
+          // Schedule one more fetch after a delay to ensure database consistency
+          setTimeout(() => {
+            console.log(`[useJournalEntries] Scheduling follow-up fetch after deletion`);
+            fetchEntries();
+          }, 2000);
+          
+          return;
+        } else {
+          console.log(`[useJournalEntries] Confirmed entry ${deletedId} is no longer in results`);
+          deletedEntryIdRef.current = null;
+          globalEntriesCache.lastDeletedEntryId = null;
+        }
       }
       
       // Deduplicate entries
@@ -410,10 +478,15 @@ export function useJournalEntries(
     if (userId) {
       const isInitialLoad = !initialFetchDoneRef.current;
       const hasRefreshKeyChanged = refreshKey !== lastRefreshKey;
-      const shouldFetchFresh = isInitialLoad || hasRefreshKeyChanged || Date.now() >= globalEntriesCache.cacheExpiryTime;
+      const forceCacheRefresh = globalEntriesCache.lastDeletedEntryId !== null || 
+                               deletedEntryIdRef.current !== null;
+      const shouldFetchFresh = isInitialLoad || 
+                              hasRefreshKeyChanged || 
+                              Date.now() >= globalEntriesCache.cacheExpiryTime ||
+                              forceCacheRefresh;
       
       if (shouldFetchFresh) {
-        console.log(`[useJournalEntries] Effect triggered: initial=${isInitialLoad}, refreshKey changed=${hasRefreshKeyChanged}`);
+        console.log(`[useJournalEntries] Effect triggered: initial=${isInitialLoad}, refreshKey changed=${hasRefreshKeyChanged}, forceCacheRefresh=${forceCacheRefresh}`);
         fetchEntries();
         setLastRefreshKey(refreshKey);
       } else {

@@ -31,14 +31,22 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   const handleDeleteEntry = (entryId: number) => {
     try {
       console.log(`[JournalEntriesList] Handling delete for entry: ${entryId}`);
+      
+      if (!entryId) {
+        console.error("[JournalEntriesList] Invalid entry ID for deletion");
+        return;
+      }
+      
+      // Call the parent component's delete handler
       onDeleteEntry(entryId);
     } catch (error) {
       console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
+      throw error; // Re-throw to let DeleteEntryDialog handle the error display
     }
   };
 
   return (
-    <div className="journal-entries-list">
+    <div className="journal-entries-list" id="journal-entries-container">
       <JournalEntriesHeader onStartRecording={onStartRecording} />
 
       {isLoading ? (
@@ -48,7 +56,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           </p>
         </div>
       ) : hasEntries ? (
-        <div className="grid gap-4">
+        <div className="grid gap-4" data-entries-count={entries.length}>
           {entries.map((entry) => (
             <JournalEntryCard
               key={entry.id}

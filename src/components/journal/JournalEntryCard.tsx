@@ -76,8 +76,6 @@ export function JournalEntryCard({
   const [isExpanded, setIsExpanded] = useState(isNew);
   const [showThemes, setShowThemes] = useState(false);
   const [highlightNew, setHighlightNew] = useState(isNew);
-  const [deletionCompleted, setDeletionCompleted] = useState(false);
-  const [deletionInProgress, setDeletionInProgress] = useState(false);
   const [hasError, setHasError] = useState(false);
   const [contentLoaded, setContentLoaded] = useState(false);
   const [thumbsUp, setThumbsUp] = useState(false);
@@ -187,49 +185,6 @@ export function JournalEntryCard({
   const toggleThemes = () => {
     console.log(`[JournalEntryCard] Toggling themes visibility for entry ${safeEntry.id}, current state:`, showThemes);
     setShowThemes(!showThemes);
-  };
-
-  const handleDelete = async () => {
-    if (!safeEntry.id || deletionCompleted || deletionInProgress) {
-      console.log(`[JournalEntryCard] Skipping deletion for entry ${safeEntry.id} - already completed or in progress`);
-      return;
-    }
-    
-    try {
-      console.log(`[JournalEntryCard] Starting deletion of entry ${safeEntry.id}`);
-      
-      setDeletionInProgress(true);
-      
-      const { error } = await supabase
-        .from('Journal Entries')
-        .delete()
-        .eq('id', safeEntry.id);
-        
-      if (error) {
-        throw error;
-      }
-      
-      console.log(`[JournalEntryCard] Successfully deleted entry ${safeEntry.id} from database`);
-      
-      setDeletionCompleted(true);
-      
-      if (onDelete && mountedRef.current) {
-        console.log(`[JournalEntryCard] Calling onDelete for entry ${safeEntry.id}`);
-        onDelete(safeEntry.id);
-      }
-      
-      toast.success('Journal entry deleted');
-    } catch (error) {
-      console.error('[JournalEntryCard] Error deleting journal entry:', error);
-      
-      if (mountedRef.current) {
-        setDeletionInProgress(false);
-        setDeletionCompleted(false);
-        setHasError(true);
-      }
-      
-      toast.error('Failed to delete entry');
-    }
   };
 
   const handleUserFeedback = async (feedback: number) => {
@@ -484,14 +439,19 @@ export function JournalEntryCard({
                 onDelete={async () => {
                   return new Promise<void>(async (resolve, reject) => {
                     try {
-                      await handleDelete();
-                      resolve();
+                      if (onDelete && safeEntry.id) {
+                        // Call the parent's onDelete handler
+                        onDelete(safeEntry.id);
+                        resolve();
+                      } else {
+                        reject(new Error("Delete handler not available"));
+                      }
                     } catch (error) {
+                      console.error("[JournalEntryCard] Error during deletion:", error);
                       reject(error);
                     }
                   });
                 }} 
-                isDeleting={deletionInProgress}
               />
             </div>
           </div>

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -14,6 +13,7 @@ import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { JournalEntry } from '@/types/journal';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -52,6 +52,10 @@ const Journal = () => {
   const autoRetryTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const processingToEntryMapRef = useRef<Map<string, number>>(new Map());
   const [deletedProcessingIds, setDeletedProcessingIds] = useState<Set<string>>(new Set());
+  const [isDeletingEntry, setIsDeletingEntry] = useState(false);
+  const [deletingEntryId, setDeletingEntryId] = useState<number | null>(null);
+  const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
+  const [hasLocalChanges, setHasLocalChanges] = useState(false);
 
   const { 
     entries, 
@@ -617,11 +621,13 @@ const Journal = () => {
   };
 
   const handleDeleteEntry = useCallback(async (entryId: number) => {
-    if (!user?.id) return;
+    if (!user?.id || isDeletingEntry) return;
     
     try {
       console.log(`[Journal] Deleting entry ${entryId}`);
       setLastAction(`Deleting Entry ${entryId}`);
+      setDeletingEntryId(entryId);
+      setIsDeletingEntry(true);
       
       clearAllToasts();
       
@@ -679,6 +685,14 @@ const Journal = () => {
         return updated;
       });
       
+      // IMPORTANT: Update local entries state immediately before the database operation
+      setLocalEntries(prevEntries => {
+        const filteredEntries = prevEntries.filter(entry => entry.id !== entryId);
+        console.log(`[Journal] Locally filtered entries: ${filteredEntries.length} (removed entry ${entryId})`);
+        setHasLocalChanges(true);
+        return filteredEntries;
+      });
+      
       // Delete from the database
       const { error } = await supabase
         .from('Journal Entries')
@@ -686,28 +700,46 @@ const Journal = () => {
         .eq('id', entryId);
         
       if (error) {
-        throw error;
+        console.error('[Journal] Database error while deleting entry:', error);
+        throw new Error(`Database error: ${error.message}`);
       }
       
-      // Refresh entries
+      console.log(`[Journal] Entry ${entryId} successfully deleted from database`);
+      
+      // Force cache invalidation and refresh for entry list after successful deletion
       setTimeout(() => {
+        // Dispatch an event to notify that journal entries need to be refreshed
+        window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+          detail: { 
+            action: 'delete',
+            entryId: entryId,
+            timestamp: Date.now()
+          }
+        }));
+        
         setRefreshKey(prev => prev + 1);
         fetchEntries();
-      }, 100);
-      
-      toast.success('Entry deleted successfully');
+      }, 300);
       
     } catch (error) {
       console.error('[Journal] Error deleting entry:', error);
       setLastAction(`Delete Entry Error (${entryId})`);
       toast.error('Failed to delete entry');
       
-      setTimeout(() => {
-        setRefreshKey(prev => prev + 1);
-        fetchEntries();
-      }, 500);
+      // Revert local changes if deletion failed
+      if (hasLocalChanges) {
+        setLocalEntries(entries);
+        setHasLocalChanges(false);
+      }
+      
+      // Re-throw to let DeleteEntryDialog handle it
+      throw error;
+    } finally {
+      setIsDeletingEntry(false);
+      setDeletingEntryId(null);
     }
-  }, [user?.id, processingEntries, toastIds, fetchEntries, setRefreshKey, setProcessingEntries, setToastIds, setNotifiedEntryIds]);
+  }, [user?.id, processingEntries, toastIds, fetchEntries, setRefreshKey, setProcessingEntries, 
+      setToastIds, setNotifiedEntryIds, isDeletingEntry, hasLocalChanges, entries]);
 
   const resetError = useCallback(() => {
     setHasRenderError(false);
@@ -767,6 +799,8 @@ const Journal = () => {
       window.removeEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
     };
   }, [fetchEntries]);
+
+  const displayEntries = hasLocalChanges ? localEntries : entries;
 
   return (
     <ErrorBoundary onReset={resetError}>
@@ -874,8 +908,8 @@ const Journal = () => {
               <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
                 <ErrorBoundary>
                   <JournalEntriesList
-                    entries={entries}
-                    loading={loading}
+                    entries={displayEntries}
+                    loading={loading && !hasLocalChanges}
                     processingEntries={processingEntries}
                     processedEntryIds={processedEntryIds}
                     onStartRecording={handleStartRecording}
