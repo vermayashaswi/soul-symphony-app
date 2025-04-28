@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -6,6 +7,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PhoneVoiceAnimation } from '@/components/website/PhoneVoiceAnimation';
+import LanguageSelector from '@/components/translation/LanguageSelector';
 
 interface HeroSectionProps {
   openAppStore: () => void;
@@ -33,10 +35,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
-              <TranslatableText text="Express. Reflect. Grow." />
+              <TranslatableText text="homepage.hero.title" />
             </h1>
             <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-2xl mx-auto lg:mx-0">
-              <TranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
+              <TranslatableText text="homepage.hero.subtitle" />
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -46,7 +48,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
                 onClick={openAppStore}
               >
                 <Apple className="h-5 w-5" />
-                <TranslatableText text="App Store" />
+                <TranslatableText text="homepage.hero.appStore" />
               </Button>
               <Button 
                 size="lg" 
@@ -54,19 +56,23 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
                 onClick={openPlayStore}
               >
                 <Play className="h-5 w-5" />
-                <TranslatableText text="Google Play" />
+                <TranslatableText text="homepage.hero.googlePlay" />
               </Button>
             </div>
             
             <div className="flex items-center justify-center lg:justify-start gap-8 text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <Shield className="h-4 w-4 text-primary" />
-                <TranslatableText text="Privacy-Focused" />
+                <TranslatableText text="homepage.hero.privacyFocused" />
               </div>
               <div className="flex items-center gap-1">
                 <Check className="h-4 w-4 text-primary" />
-                <TranslatableText text="14-Day Free Trial" />
+                <TranslatableText text="homepage.hero.freeTrial" />
               </div>
+            </div>
+            
+            <div className="mt-8 flex justify-center lg:justify-start">
+              <LanguageSelector />
             </div>
           </motion.div>
           

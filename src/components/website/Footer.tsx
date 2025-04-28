@@ -46,40 +46,40 @@ const Footer = () => {
             onClick={openAppStore}
           >
             <Apple className="h-5 w-5" />
-            <TranslatableText text="Download on App Store" />
+            <TranslatableText text="download.appStore" />
           </Button>
           <Button 
             className="gap-2 bg-primary hover:bg-primary/90" 
             onClick={openPlayStore}
           >
             <Play className="h-5 w-5" />
-            <TranslatableText text="Get it on Google Play" />
+            <TranslatableText text="download.googlePlay" />
           </Button>
         </div>
         
         <p className="text-muted-foreground mb-8">
-          <TranslatableText text="Contact us:" />{" "}
+          <TranslatableText text="footer.contact" />{" "}
           <a href="mailto:support@soulo.online" className="text-primary hover:underline">support@soulo.online</a>
         </p>
         
         <div className="flex justify-center gap-8 text-sm text-muted-foreground">
           <Link to="/privacy-policy" className="hover:text-primary">
-            <TranslatableText text="Privacy Policy" />
+            <TranslatableText text="footer.privacy" />
           </Link>
           <Link to="/terms" className="hover:text-primary">
-            <TranslatableText text="Terms" />
+            <TranslatableText text="footer.terms" />
           </Link>
           <Link to="/blog" className="hover:text-primary">
-            <TranslatableText text="Blog" />
+            <TranslatableText text="navbar.blog" />
           </Link>
           <Link to="/faq" className="hover:text-primary">
-            <TranslatableText text="FAQ" />
+            <TranslatableText text="navbar.faq" />
           </Link>
         </div>
         
         <p className="text-xs text-muted-foreground mt-8">
           &copy; {new Date().getFullYear()} SOULo.{" "}
-          <TranslatableText text="All rights reserved" />
+          <TranslatableText text="footer.rights" />
         </p>
       </div>
     </footer>

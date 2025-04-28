@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useTranslation as useI18nTranslation } from 'react-i18next';
 
 interface TranslatableTextProps {
   text: string;
@@ -16,34 +17,57 @@ export function TranslatableText({
   const [translatedText, setTranslatedText] = useState(text);
   const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage } = useTranslation();
+  const { t } = useI18nTranslation();
 
   useEffect(() => {
     let isMounted = true;
 
     const translateText = async () => {
-      // Don't translate English or empty text
-      if (currentLanguage === 'en' || !text?.trim()) {
-        if (isMounted) setTranslatedText(text);
+      if (!text?.trim()) {
+        if (isMounted) setTranslatedText('');
         return;
       }
 
-      setIsLoading(true);
-      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
+      // Check if this is a translation key (contains dots or is in the form of a key)
+      const isTranslationKey = text.includes('.') || !text.includes(' ');
+      
+      if (isTranslationKey) {
+        try {
+          // Try to use i18next first
+          const i18nResult = t(text);
+          
+          // If it returns the key itself, then it's not found in i18n
+          if (i18nResult !== text) {
+            if (isMounted) setTranslatedText(i18nResult);
+            return;
+          }
+        } catch (error) {
+          console.warn(`TranslatableText: i18n key not found: "${text}"`);
+        }
+      }
 
-      try {
-        const result = await translate(text);
-        if (isMounted) {
-          setTranslatedText(result);
-          console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
+      // Fallback to dynamic translation service if not in English
+      if (currentLanguage !== 'en') {
+        setIsLoading(true);
+        console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
+
+        try {
+          const result = await translate(text);
+          if (isMounted) {
+            setTranslatedText(result);
+            console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
+          }
+        } catch (error) {
+          console.error('Translation error:', error);
+          if (isMounted) {
+            setTranslatedText(text); // Fallback to original
+            console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
+          }
+        } finally {
+          if (isMounted) setIsLoading(false);
         }
-      } catch (error) {
-        console.error('Translation error:', error);
-        if (isMounted) {
-          setTranslatedText(text); // Fallback to original
-          console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
-        }
-      } finally {
-        if (isMounted) setIsLoading(false);
+      } else {
+        if (isMounted) setTranslatedText(text);
       }
     };
 
@@ -52,7 +76,7 @@ export function TranslatableText({
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, translate]);
+  }, [text, currentLanguage, translate, t]);
 
   // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Brain, Mic, MessageSquare, LineChart, ArrowRight, TrendingUp } from 'lucide-react';
@@ -49,7 +50,7 @@ export const PhoneVoiceAnimation = () => {
                 className="flex-1 flex flex-col items-center justify-center"
               >
                 <div className="text-white text-center mb-6">
-                  <TranslatableText text="Recording your journal..." className="text-sm mb-2" />
+                  <TranslatableText text="homepage.phoneAnimation.recording" className="text-sm mb-2" />
                 </div>
                 <div className="w-full h-24 flex items-center justify-center gap-1 mb-8">
                   {waveform.map((height, index) => (
@@ -91,7 +92,7 @@ export const PhoneVoiceAnimation = () => {
                 className="flex-1 flex flex-col items-center justify-center"
               >
                 <div className="text-white text-center mb-8">
-                  <TranslatableText text="Processing your entry..." className="text-sm mb-2" />
+                  <TranslatableText text="homepage.phoneAnimation.processing" className="text-sm mb-2" />
                 </div>
                 <motion.div 
                   className="w-20 h-20 rounded-full bg-purple-600/30 flex items-center justify-center"
@@ -149,7 +150,7 @@ export const PhoneVoiceAnimation = () => {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col"
               >
-                <h3 className="text-white text-center mb-3 text-sm"><TranslatableText text="Your Journal Insights" /></h3>
+                <h3 className="text-white text-center mb-3 text-sm"><TranslatableText text="homepage.phoneAnimation.insights" /></h3>
                 
                 {/* Enhanced Insights with Visualizations */}
                 <div className="space-y-3">
@@ -211,7 +212,7 @@ export const PhoneVoiceAnimation = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.8 }}
                 >
-                  <TranslatableText text="View full analysis" className="text-primary text-xs" />
+                  <TranslatableText text="homepage.phoneAnimation.viewAnalysis" className="text-primary text-xs" />
                   <ArrowRight className="h-4 w-4 text-primary" />
                 </motion.div>
               </motion.div>

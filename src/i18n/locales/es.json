@@ -1,3 +1,4 @@
+
 {
   "navbar": {
     "home": "Inicio",
@@ -6,7 +7,8 @@
     "download": "Descargar",
     "openApp": "Abrir App",
     "tryWebApp": "Probar Web App",
-    "signIn": "Iniciar Sesión"
+    "signIn": "Iniciar Sesión",
+    "privacy": "Privacidad"
   },
   "hero": {
     "welcome": "Bienvenido a",
@@ -62,5 +64,28 @@
       "insights": "Tus Ideas del Diario",
       "viewAnalysis": "Ver análisis completo"
     }
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "retry": "Reintentar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "close": "Cerrar"
+  },
+  "navigation": {
+    "home": "Inicio",
+    "journal": "Diario",
+    "insights": "Perspectivas",
+    "settings": "Configuración",
+    "chat": "Chat"
+  },
+  "auth": {
+    "signIn": "Iniciar Sesión",
+    "signOut": "Cerrar Sesión",
+    "welcome": "Bienvenido de nuevo",
+    "googleSignIn": "Iniciar sesión con Google"
   }
 }
