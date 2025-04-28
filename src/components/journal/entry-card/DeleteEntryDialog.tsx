@@ -12,49 +12,26 @@ import {
   AlertDialogTitle, 
   AlertDialogTrigger 
 } from '@/components/ui/alert-dialog';
-import { Trash, Loader2 } from "lucide-react";
+import { Trash } from "lucide-react";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface DeleteEntryDialogProps {
-  onDelete: () => Promise<void>; // Changed to Promise<void> to properly handle async
-  isProcessing?: boolean;
+  onDelete: () => void;
 }
 
-export function DeleteEntryDialog({ onDelete, isProcessing = false }: DeleteEntryDialogProps) {
+export function DeleteEntryDialog({ onDelete }: DeleteEntryDialogProps) {
   const [open, setOpen] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   
-  const handleDelete = async () => {
-    if (isDeleting) return; // Prevent multiple simultaneous delete attempts
-    
-    setIsDeleting(true);
-    try {
-      await onDelete();
-      console.log('[DeleteEntryDialog] Entry deleted successfully');
-    } catch (error) {
-      console.error('[DeleteEntryDialog] Error deleting entry:', error);
-    } finally {
-      setIsDeleting(false);
-      setOpen(false);
-    }
+  const handleDelete = () => {
+    onDelete();
+    setOpen(false);
   };
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <button 
-          className="hover:text-red-500 text-gray-500" 
-          disabled={isProcessing}
-          onClick={(e) => {
-            // Prevent propagation to avoid triggering card click events
-            e.stopPropagation();
-          }}
-        >
-          {isProcessing ? (
-            <Loader2 size={16} className="animate-spin" />
-          ) : (
-            <Trash size={16} />
-          )}
+        <button className="hover:text-red-500 text-gray-500">
+          <Trash size={16} />
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -70,22 +47,8 @@ export function DeleteEntryDialog({ onDelete, isProcessing = false }: DeleteEntr
           <AlertDialogCancel>
             <TranslatableText text="Cancel" />
           </AlertDialogCancel>
-          <AlertDialogAction 
-            onClick={(e) => {
-              e.preventDefault(); // Prevent default to handle deletion manually
-              handleDelete();
-            }} 
-            className="bg-red-500 hover:bg-red-600"
-            disabled={isDeleting}
-          >
-            {isDeleting ? (
-              <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                <TranslatableText text="Deleting..." />
-              </>
-            ) : (
-              <TranslatableText text="Delete" />
-            )}
+          <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
+            <TranslatableText text="Delete" />
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>

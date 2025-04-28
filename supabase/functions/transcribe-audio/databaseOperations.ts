@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -144,7 +143,6 @@ export async function storeJournalEntry(
       duration: duration,
       emotions: emotions,
       sentiment: sentimentScore,
-      translation_status: refinedText ? 'completed' : 'pending',
       created_at: new Date().toISOString()
     };
 
