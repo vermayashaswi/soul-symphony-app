@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation, NavLink } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
@@ -118,7 +117,9 @@ const Navbar = () => {
               ))}
               <div className="flex flex-col space-y-2 pt-2 border-t border-gray-100">
                 <Button asChild>
-                  <Link to="/download"><TranslatableText text="Download" /></Link>
+                  <Link to="/download">
+                    <TranslatableText text="Download" />
+                  </Link>
                 </Button>
               </div>
             </div>

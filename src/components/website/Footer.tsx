@@ -46,14 +46,14 @@ const Footer = () => {
             onClick={openAppStore}
           >
             <Apple className="h-5 w-5" />
-            <TranslatableText text="App Store" />
+            <TranslatableText text="Download on App Store" />
           </Button>
           <Button 
             className="gap-2 bg-primary hover:bg-primary/90" 
             onClick={openPlayStore}
           >
             <Play className="h-5 w-5" />
-            <TranslatableText text="Google Play" />
+            <TranslatableText text="Get it on Google Play" />
           </Button>
         </div>
         

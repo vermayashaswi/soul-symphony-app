@@ -14,24 +14,36 @@ export function TranslatableText({
   as: Component = 'span' 
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState(text);
+  const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage } = useTranslation();
 
   useEffect(() => {
     let isMounted = true;
 
     const translateText = async () => {
-      if (currentLanguage === 'en') {
-        // No need to translate English
+      // Don't translate English or empty text
+      if (currentLanguage === 'en' || !text?.trim()) {
         if (isMounted) setTranslatedText(text);
         return;
       }
 
+      setIsLoading(true);
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
+
       try {
         const result = await translate(text);
-        if (isMounted) setTranslatedText(result);
+        if (isMounted) {
+          setTranslatedText(result);
+          console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
+        }
       } catch (error) {
         console.error('Translation error:', error);
-        if (isMounted) setTranslatedText(text); // Fallback to original
+        if (isMounted) {
+          setTranslatedText(text); // Fallback to original
+          console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
+        }
+      } finally {
+        if (isMounted) setIsLoading(false);
       }
     };
 
@@ -43,7 +55,13 @@ export function TranslatableText({
   }, [text, currentLanguage, translate]);
 
   // Using React.createElement to avoid type confusion with Three.js components
-  return React.createElement(Component, { className }, translatedText);
+  return React.createElement(
+    Component, 
+    { 
+      className: `${className} ${isLoading ? 'opacity-70' : ''}`.trim()
+    }, 
+    translatedText
+  );
 }
 
 export default TranslatableText;
