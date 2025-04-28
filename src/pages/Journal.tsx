@@ -59,6 +59,7 @@ const Journal = () => {
   const [pendingDeletionIds, setPendingDeletionIds] = useState<Set<number>>(new Set());
   const lastSuccessfulEntriesRef = useRef<JournalEntry[]>([]);
   const forceUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [tempEntries, setTempEntries] = useState<Array<{id: string; tempId: string}>>([]);
 
   const { 
     entries, 
@@ -114,6 +115,8 @@ const Journal = () => {
         }
         
         processingToEntryMapRef.current.set(event.detail.tempId, event.detail.entryId);
+        
+        setTempEntries(prev => prev.filter(temp => temp.tempId !== event.detail.tempId));
         
         if (processingEntries.includes(event.detail.tempId)) {
           setProcessedEntryIds(prev => [...prev, event.detail.entryId]);
@@ -537,6 +540,9 @@ const Journal = () => {
       
       if (success && tempId) {
         console.log('[Journal] Processing started with tempId:', tempId);
+        
+        setTempEntries(prev => [...prev, {id: `temp-${Date.now()}`, tempId}]);
+        
         setProcessingEntries(prev => [...prev, tempId]);
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
@@ -568,6 +574,8 @@ const Journal = () => {
             if (prev.includes(tempId)) {
               console.log('[Journal] Maximum processing time reached for tempId:', tempId);
               setLastAction(`Max Processing Time Reached (${tempId})`);
+              
+              setTempEntries(prev => prev.filter(temp => temp.tempId !== tempId));
               
               if (toastIds[tempId]) {
                 toast.dismiss(toastIds[tempId]);
@@ -957,6 +965,7 @@ const Journal = () => {
                     processedEntryIds={processedEntryIds}
                     onStartRecording={handleStartRecording}
                     onDeleteEntry={handleDeleteEntry}
+                    tempEntries={tempEntries}
                   />
                 </ErrorBoundary>
               </TabsContent>

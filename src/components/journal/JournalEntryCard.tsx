@@ -1,518 +1,158 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Card } from '@/components/ui/card';
-import { formatShortDate } from '@/utils/format-time';
-import { motion } from 'framer-motion';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { 
-  FloatingDotsToggle, 
-  ThemeLoader, 
-  DeleteEntryDialog,
-  EntryContent
-} from './entry-card';
-import { EditEntryButton } from './entry-card/EditEntryButton';
-import ErrorBoundary from './ErrorBoundary';
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
-import { JournalEntry as JournalEntryType } from '@/types/journal';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
-export interface JournalEntry {
-  id: number;
-  content: string;
-  created_at: string;
-  audio_url?: string;
-  sentiment?: string | null;
-  themes?: string[] | null;
-  master_themes?: string[];
-  entities?: Array<{
-    type: string;
-    name: string;
-    text?: string;
-  }>;
-  foreignKey?: string;
-  predictedLanguages?: {
-    [key: string]: number;
-  } | null;
-  Edit_Status?: number | null;
-  user_feedback?: string | null;
-  "transcription text"?: string;
-  "refined text"?: string;
-  translation_text?: string;
-  original_language?: string;
-}
+import React, { useState, useRef, useEffect } from 'react';
+import { JournalEntry } from '@/types/journal';
+import { Card } from '@/components/ui/card';
+import { formatDistanceToNow } from 'date-fns';
+import { MoreHorizontal, MessageSquare } from 'lucide-react';
+import SentimentEmoji from './entry-card/SentimentEmoji';
+import SentimentMeter from './entry-card/SentimentMeter';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import ThemeBoxes from './ThemeBoxes';
+import { EntryContent } from './entry-card/EntryContent';
+import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
+import { FloatingDotsToggle } from './entry-card/FloatingDotsToggle';
+import { DeleteEntryDialog } from './entry-card/DeleteEntryDialog';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import TranslatedContent from './entry-card/TranslatedContent';
+import { EditEntryButton } from './entry-card/EditEntryButton';
+import { ExtractThemeButton } from './entry-card/ExtractThemeButton';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
-  onDelete?: (entryId: number) => void;
-  isNew?: boolean;
-  isProcessing?: boolean;
   processing?: boolean;
   processed?: boolean;
-  setEntries?: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
+  onDelete: (id: number) => void;
+  tempId?: string;
 }
 
-export function JournalEntryCard({ 
+const JournalEntryCard: React.FC<JournalEntryCardProps> = ({ 
   entry, 
-  onDelete, 
-  isNew = false, 
-  isProcessing = false,
-  processing = false,
+  processing = false, 
   processed = false,
-  setEntries
-}: JournalEntryCardProps) {
-  const safeEntry = {
-    id: entry?.id || 0,
-    content: entry?.content || "Processing entry...",
-    created_at: entry?.created_at || new Date().toISOString(),
-    sentiment: entry?.sentiment || null,
-    master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
-    themes: Array.isArray(entry?.themes) ? entry.themes : [],
-    Edit_Status: entry?.Edit_Status || null,
-    user_feedback: entry?.user_feedback || null,
-    translation_text: entry?.translation_text,
-    original_language: entry?.original_language
-  };
-
-  const [isExpanded, setIsExpanded] = useState(isNew);
-  const [showThemes, setShowThemes] = useState(false);
-  const [highlightNew, setHighlightNew] = useState(isNew);
+  onDelete,
+  tempId
+}) => {
+  const [isDeleting, setIsDeleting] = useState(false);
+  const [showSentiment, setShowSentiment] = useState(true);
   const [hasError, setHasError] = useState(false);
-  const [contentLoaded, setContentLoaded] = useState(false);
-  const [thumbsUp, setThumbsUp] = useState(false);
-  const [thumbsDown, setThumbsDown] = useState(false);
-  const mountedRef = useRef<boolean>(true);
+  const [loadingError, setLoadingError] = useState<string | null>(null);
+  const cardRef = useRef<HTMLDivElement>(null);
+  const processingRef = useRef(processing);
   
-  const extractThemes = (): string[] => {
-    try {
-      const masterThemes = Array.isArray(safeEntry.master_themes) ? safeEntry.master_themes : [];
-      const entryThemes = Array.isArray(safeEntry.themes) ? safeEntry.themes : [];
-      
-      const filteredMasterThemes = masterThemes.filter(theme => 
-        theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
-      );
-      const filteredEntryThemes = entryThemes.filter(theme => 
-        theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
-      );
-      
-      if (filteredMasterThemes.length > 0) {
-        return filteredMasterThemes;
-      } else if (filteredEntryThemes.length > 0) {
-        return filteredEntryThemes;
-      }
-      
-      return [];
-    } catch (error) {
-      console.error("[JournalEntryCard] Error extracting themes:", error);
-      return [];
-    }
-  };
+  // NEW: Add data-temp-id attribute if tempId is provided
+  const attributes: any = tempId ? { 'data-temp-id': tempId } : {};
   
-  const getSentimentBorderClass = (): string => {
-    if (!safeEntry.sentiment || isProcessing) {
-      return '';
-    }
-
-    let score = 0;
-    try {
-      if (typeof safeEntry.sentiment === 'string') {
-        score = parseFloat(safeEntry.sentiment);
-      } else if (typeof safeEntry.sentiment === 'object' && safeEntry.sentiment !== null) {
-        score = (safeEntry.sentiment as any).score || 0;
-      }
-    } catch (error) {
-      console.error("[JournalEntryCard] Error parsing sentiment score:", error);
-      return '';
-    }
-
-    if (score > 0.2) {
-      return 'border-green-500 border-2';
-    } else if (score >= -0.1 && score <= 0.2) {
-      return 'border-[#FEF7CD] border-2';
-    } else {
-      return 'border-[#ea384c] border-2';
-    }
-  };
-  
-  useEffect(() => {
-    const hasValidContent = safeEntry.content && 
-                         safeEntry.content !== "Processing entry..." && 
-                         safeEntry.content !== "Loading..." &&
-                         safeEntry.content.trim() !== "";
-    
-    console.log(`[JournalEntryCard] Entry ${safeEntry.id} content status:`, {
-      hasValidContent,
-      contentLength: safeEntry.content?.length || 0,
-      isProcessing
-    });
-    
-    setContentLoaded(hasValidContent);
-    
-    if (isNew && hasValidContent && !isExpanded) {
-      setIsExpanded(true);
-    }
-  }, [safeEntry.content, isNew, isExpanded, isProcessing]);
-  
-  useEffect(() => {
-    console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);
-    mountedRef.current = true;
-    
-    return () => {
-      console.log(`[JournalEntryCard] Unmounted entry ${safeEntry.id}`);
-      mountedRef.current = false;
-    };
-  }, [safeEntry.id]);
-
-  useEffect(() => {
-    if (isNew) {
-      setIsExpanded(true);
-      setHighlightNew(true);
-      
-      const timer = setTimeout(() => {
-        if (mountedRef.current) {
-          setHighlightNew(false);
-        }
-      }, 5000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isNew]);
-
-  const toggleExpanded = () => {
-    console.log(`[JournalEntryCard] Toggling expansion for entry ${safeEntry.id}, current state:`, isExpanded);
-    setIsExpanded(!isExpanded);
-  };
-
-  const toggleThemes = () => {
-    console.log(`[JournalEntryCard] Toggling themes visibility for entry ${safeEntry.id}, current state:`, showThemes);
-    setShowThemes(!showThemes);
-  };
-
-  const handleUserFeedback = async (feedback: number) => {
-    try {
-      // Toggle thumbs state
-      if (feedback === 1) {
-        if (!thumbsUp) {
-          setThumbsUp(true);
-          setThumbsDown(false);
-          toast.success('Glad you liked the translation');
-        } else {
-          setThumbsUp(false);
-          // No toast when deselecting
-        }
-      } else {
-        if (!thumbsDown) {
-          setThumbsDown(true);
-          setThumbsUp(false);
-          toast.error("We'll try and improve on the translation");
-        } else {
-          setThumbsDown(false);
-          // No toast when deselecting
-        }
-      }
-      
-      const { error } = await supabase
-        .from('Journal Entries')
-        .update({ user_feedback: feedback.toString() })
-        .eq('id', safeEntry.id);
-    
-      if (error) {
-        console.error('Error saving user feedback:', error);
-        toast.error('Failed to save feedback');
-      }
-    } catch (error) {
-      console.error('Unexpected error saving feedback:', error);
-      toast.error('An unexpected error occurred');
-    }
-  };
-
-  const handleRefresh = () => {
-    if (onDelete) {
-      console.log(`[JournalEntryCard] Refreshing entry ${safeEntry.id}`);
-      onDelete(safeEntry.id);
-    }
-  };
-
-  const createdAtFormatted = (() => {
-    try {
-      return formatShortDate(safeEntry.created_at);
-    } catch (error) {
-      console.error('[JournalEntryCard] Error formatting date:', error);
-      return 'Recently';
-    }
-  })();
-  
-  const initialThemes = extractThemes();
-  
-  const isContentProcessing = isProcessing && (!contentLoaded || !safeEntry.content || 
-                                              safeEntry.content === "Processing entry..." ||
-                                              safeEntry.content === "Loading...");
-  
-  const isThemesProcessing = isProcessing && !contentLoaded && 
-                           (!safeEntry.themes || safeEntry.themes.length === 0) && 
-                           (!safeEntry.master_themes || safeEntry.master_themes.length === 0);
-
-  const handleEntryUpdate = (newContent: string) => {
-    console.log(`[JournalEntryCard] Updating entry ${entry.id} with new content: "${newContent.substring(0, 30)}..."`);
-    
-    setEntries(prevEntries => {
-      return prevEntries.map(e => {
-        if (e.id === entry.id) {
-          return {
-            ...e,
-            content: newContent,
-            Edit_Status: 1,
-            sentiment: null,
-            emotions: null,
-            master_themes: [],
-            entities: []
-          };
-        }
-        return e;
-      });
-    });
-    
-    setTimeout(() => {
-      console.log('[JournalEntryCard] Triggering re-fetch for updated analysis data');
-      
-      window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
-        detail: { entryId: entry.id }
-      }));
-      
-      const checkForUpdatedThemes = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('Journal Entries')
-            .select('master_themes, emotions, sentiment, entities')
-            .eq('id', entry.id)
-            .single();
-            
-          if (error) {
-            console.error('[JournalEntryCard] Error fetching updated entry data:', error);
-            return false;
-          }
-          
-          if (data) {
-            if ((data.master_themes && data.master_themes.length > 0) || 
-                (data.emotions && Object.keys(data.emotions).length > 0)) {
-              
-              console.log('[JournalEntryCard] Found updated data for entry:', data);
-              
-              setEntries(prevEntries => {
-                return prevEntries.map(e => {
-                  if (e.id === entry.id) {
-                    let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
-                    
-                    if (data.entities) {
-                      try {
-                        if (Array.isArray(data.entities)) {
-                          parsedEntities = data.entities.map((entity: any) => ({
-                            type: entity.type || 'other',
-                            name: entity.name || '',
-                            text: entity.text
-                          }));
-                        }
-                        else if (typeof data.entities === 'string') {
-                          const parsed = JSON.parse(data.entities);
-                          if (Array.isArray(parsed)) {
-                            parsedEntities = parsed.map((entity: any) => ({
-                              type: entity.type || 'other',
-                              name: entity.name || '',
-                              text: entity.text
-                            }));
-                          }
-                        }
-                        else if (data.entities && typeof data.entities === 'object') {
-                          // Handle case where data.entities is already a JSON object
-                          const entities = Array.isArray(data.entities) ? data.entities : [data.entities];
-                          parsedEntities = entities.map((entity: any) => ({
-                            type: entity.type || 'other',
-                            name: entity.name || '',
-                            text: entity.text
-                          }));
-                        }
-                      } catch (err) {
-                        console.error('[JournalEntryCard] Error parsing entities:', err);
-                        parsedEntities = [];
-                      }
-                    }
-                    
-                    return {
-                      ...e,
-                      master_themes: data.master_themes || [],
-                      themes: data.master_themes || [],
-                      sentiment: data.sentiment,
-                      emotions: data.emotions,
-                      entities: parsedEntities
-                    };
-                  }
-                  return e;
-                });
-              });
-              
-              return true;
-            }
-          }
-          
-          return false;
-        } catch (err) {
-          console.error('[JournalEntryCard] Error in checkForUpdatedThemes:', err);
-          return false;
-        }
-      };
-      
-      let pollingAttempts = 0;
-      const maxPollingAttempts = 10;
-      
-      const pollingInterval = setInterval(async () => {
-        pollingAttempts++;
-        
-        const updated = await checkForUpdatedThemes();
-        
-        if (updated || pollingAttempts >= maxPollingAttempts) {
-          clearInterval(pollingInterval);
-          
-          if (pollingAttempts >= maxPollingAttempts && !updated) {
-            console.warn('[JournalEntryCard] Stopped polling for updated data after max attempts');
-          }
-        }
-      }, 3000);
-    }, 3000);
-  };
-
-  if (hasError) {
-    return (
-      <Card className="bg-background shadow-md border-red-300">
-        <div className="p-4">
-          <h3 className="text-red-600">Error displaying entry</h3>
-          <p className="text-sm mt-2">There was a problem showing this entry.</p>
-          <button 
-            className="text-sm mt-2 text-blue-600 underline" 
-            onClick={() => setHasError(false)}
-          >
-            Try again
-          </button>
-        </div>
-      </Card>
-    );
+  // Add data-processing attributes for debugging
+  if (processing) {
+    attributes['data-processing'] = "true";
   }
+  
+  // Mark processed entries
+  if (processed) {
+    attributes['data-processed'] = "true";
+  }
+  
+  // Track when processing state changes
+  useEffect(() => {
+    if (processingRef.current && !processing) {
+      // Processing finished, animate or update UI if needed
+      console.log(`[JournalEntryCard] Entry ${entry.id} finished processing`);
+    }
+    processingRef.current = processing;
+  }, [processing, entry.id]);
+
+  // Format date display
+  const dateDisplay = entry.created_at ? formatDistanceToNow(new Date(entry.created_at), { addSuffix: true }) : '';
+  
+  const handleDeleteClick = async () => {
+    if (isDeleting || entry.id < 0) return; // Prevent deletion during processing
+    
+    try {
+      setIsDeleting(true);
+      await onDelete(entry.id);
+    } catch (error) {
+      console.error(`[JournalEntryCard] Error deleting entry ${entry.id}:`, error);
+      setHasError(true);
+    } finally {
+      setIsDeleting(false);
+    }
+  };
 
   return (
-    <ErrorBoundary>
-      <motion.div
-        initial={isNew ? { borderColor: 'rgba(var(--color-primary), 0.7)' } : {}}
-        animate={highlightNew 
-          ? { 
-              borderColor: ['rgba(var(--color-primary), 0.7)', 'rgba(var(--color-primary), 0)'],
-              boxShadow: ['0 0 15px rgba(var(--color-primary), 0.3)', '0 0 0px rgba(var(--color-primary), 0)']
-            } 
-          : {}}
-        transition={{ duration: 3 }}
-        className="journal-entry-card" 
-        data-entry-id={safeEntry.id}
-        data-processing={isProcessing ? "true" : "false"}
-        data-expanded={isExpanded ? "true" : "false"}
-        data-show-themes={showThemes ? "true" : "false"}
-      >
-        <Card className={`bg-background shadow-md ${highlightNew ? 'border-primary' : ''} ${getSentimentBorderClass()}`}>
-          <div className="flex justify-between items-center p-3 md:p-4">
-            <div className="flex items-center space-x-3">
-              <div className="flex flex-col">
-                <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
-                  {createdAtFormatted}
-                </h3>
-                {entry.Edit_Status === 1 && (
-                  <span className="text-xs text-muted-foreground">(edited)</span>
-                )}
+    <Card 
+      className={`p-4 journal-entry-card relative ${processing ? 'border-primary/50 shadow-md' : ''} ${processed ? 'border-green-500/50' : ''}`}
+      ref={cardRef}
+      {...attributes}
+    >
+      <div className="flex justify-between items-start mb-2">
+        <div>
+          <h3 className="font-medium">{dateDisplay}</h3>
+          
+          <div className="flex items-center text-muted-foreground text-sm mt-1">
+            {entry.duration && !processing && (
+              <div className="flex items-center mr-3" title="Recording duration">
+                <MessageSquare className="w-3 h-3 mr-1" />
+                <span>{Math.round(Number(entry.duration))}s</span>
               </div>
-            </div>
-            <div className="flex items-center space-x-2">
-              <FloatingDotsToggle 
-                onClick={toggleThemes} 
-                isExpanded={showThemes}
-              />
-              <EditEntryButton 
-                entryId={safeEntry.id}
-                content={safeEntry.content}
-                onEntryUpdated={handleEntryUpdate}
-              />
-              <DeleteEntryDialog 
-                onDelete={async () => {
-                  return new Promise<void>(async (resolve, reject) => {
-                    try {
-                      if (onDelete && safeEntry.id) {
-                        // Call the parent's onDelete handler
-                        onDelete(safeEntry.id);
-                        resolve();
-                      } else {
-                        reject(new Error("Delete handler not available"));
-                      }
-                    } catch (error) {
-                      console.error("[JournalEntryCard] Error during deletion:", error);
-                      reject(error);
-                    }
-                  });
-                }} 
-              />
-            </div>
-          </div>
-
-          <div className="p-3 md:p-4">
-            <ErrorBoundary>
-              <EntryContent 
-                content={safeEntry.content} 
-                isExpanded={isExpanded} 
-                isProcessing={isContentProcessing}
-                entryId={safeEntry.id}
-                translationText={safeEntry.translation_text}
-              />
-            </ErrorBoundary>
+            )}
             
-            <div className="mt-3 mb-2 flex items-center">
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleUserFeedback(1)}
-                  className={`hover:bg-green-100 p-1 rounded-full ${thumbsUp ? 'text-green-600 bg-green-100' : 'text-green-500'}`}
-                  aria-label="Thumbs up for translation"
-                >
-                  <ThumbsUp size={16} />
-                </button>
-                <button
-                  onClick={() => handleUserFeedback(0)}
-                  className={`hover:bg-red-100 p-1 rounded-full ${thumbsDown ? 'text-red-600 bg-red-100' : 'text-red-500'}`}
-                  aria-label="Thumbs down for translation"
-                >
-                  <ThumbsDown size={16} />
-                </button>
-              </div>
-            </div>
-            
-            {showThemes && (
-              <div className="mt-2">
-                <ErrorBoundary>
-                  <ThemeLoader 
-                    entryId={safeEntry.id}
-                    initialThemes={initialThemes}
-                    content={safeEntry.content}
-                    isProcessing={isThemesProcessing}
-                    isNew={isNew}
-                  />
-                </ErrorBoundary>
+            {!processing && entry.sentiment && showSentiment && (
+              <div className="flex items-center gap-1">
+                <SentimentEmoji sentiment={entry.sentiment} />
               </div>
             )}
           </div>
-
-          <div className="flex justify-end p-2">
-            <button
-              onClick={toggleExpanded}
-              className="text-sm text-muted-foreground hover:text-foreground"
-            >
-              {isExpanded ? '' : <TranslatableText text="Show more" />}
-            </button>
-          </div>
-        </Card>
-      </motion.div>
-    </ErrorBoundary>
+        </div>
+        
+        <div className="flex gap-2">
+          {!processing && (
+            <>
+              <FloatingDotsToggle>
+                <DropdownMenu>
+                  <DropdownMenuTrigger asChild>
+                    <button className="text-muted-foreground hover:text-foreground">
+                      <MoreHorizontal size={18} />
+                    </button>
+                  </DropdownMenuTrigger>
+                  <DropdownMenuContent align="end">
+                    <ExtractThemeButton entryId={entry.id} />
+                    <EditEntryButton entryId={entry.id} />
+                    <DropdownMenuItem className="cursor-pointer text-red-500" asChild>
+                      <DeleteEntryDialog onDelete={() => handleDeleteClick()} isDeleting={isDeleting} />
+                    </DropdownMenuItem>
+                  </DropdownMenuContent>
+                </DropdownMenu>
+              </FloatingDotsToggle>
+            </>
+          )}
+        </div>
+      </div>
+      
+      {processing ? (
+        <LoadingEntryContent error={loadingError} />
+      ) : (
+        <>
+          {entry.original_language && entry.original_language !== 'en' ? (
+            <TranslatedContent entry={entry} />
+          ) : (
+            <EntryContent entry={entry} />
+          )}
+          
+          {showSentiment && entry.sentiment && (
+            <div className="mt-2">
+              <SentimentMeter sentiment={parseFloat(entry.sentiment)} />
+            </div>
+          )}
+          
+          {entry.master_themes && entry.master_themes.length > 0 && (
+            <div className="mt-3">
+              <ThemeBoxes themes={entry.master_themes} />
+            </div>
+          )}
+        </>
+      )}
+    </Card>
   );
-}
+};
 
 export default JournalEntryCard;

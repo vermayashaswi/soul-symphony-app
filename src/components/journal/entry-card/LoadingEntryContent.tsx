@@ -51,6 +51,8 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
   const unmountingRef = useRef<boolean>(false);
   
+  console.log("[LoadingEntryContent] Rendering with component ID:", componentId.current);
+  
   // Self cleanup safety - if this component exists for too long (20 seconds), automatically trigger cleanup
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
@@ -244,6 +246,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       exit={{ opacity: 0.7 }}
       transition={{ duration: 0.5 }}
       data-component-id={componentId.current}
+      data-loading-content="true"
     >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />
