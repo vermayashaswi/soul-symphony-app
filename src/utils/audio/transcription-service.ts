@@ -1,11 +1,14 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from '@/utils/audio/blob-utils';
+import { toast } from 'sonner';
 
 interface TranscriptionResult {
   success: boolean;
   data?: any;
   error?: string;
+  statusCode?: number;
+  requestId?: string;
 }
 
 /**
@@ -45,6 +48,10 @@ export async function sendAudioForTranscription(
     const estimatedDuration = Math.floor(base64Audio.length / 10000);
     console.log(`[TranscriptionService] Estimated recording duration: ~${estimatedDuration}s`);
 
+    // Generate a request ID for tracking
+    const requestId = `req_${Date.now().toString(36)}_${Math.random().toString(36).substring(2, 9)}`;
+    console.log(`[TranscriptionService] Request ID: ${requestId}`);
+
     // Invoke the edge function
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
@@ -52,31 +59,59 @@ export async function sendAudioForTranscription(
         userId,
         directTranscription,
         highQuality: processSentiment,
-        recordingTime: estimatedDuration * 1000 // Convert to milliseconds
+        recordingTime: estimatedDuration * 1000, // Convert to milliseconds
+        requestId
       },
     });
 
     if (error) {
-      console.error('[TranscriptionService] Edge function error:', error);
-      throw new Error(`Edge function error: ${error.message}`);
+      console.error(`[TranscriptionService] Edge function error (${requestId}):`, error);
+      // Try to get more detailed error information
+      const errorDetails = typeof error === 'object' ? JSON.stringify(error) : error.toString();
+      throw new Error(`Edge function error: ${error.message || errorDetails}`);
     }
 
     if (!data) {
-      console.error('[TranscriptionService] No data returned from edge function');
+      console.error(`[TranscriptionService] No data returned from edge function (${requestId})`);
       throw new Error('No data returned from transcription service');
     }
 
-    console.log('[TranscriptionService] Transcription completed successfully');
+    console.log(`[TranscriptionService] Transcription completed successfully (${requestId})`);
+    console.log('[TranscriptionService] Response data:', data);
+    
+    // Additional response validation
+    if (data.entryId) {
+      console.log(`[TranscriptionService] Entry ID received: ${data.entryId}`);
+      
+      // Dispatch completion event to notify listeners
+      const event = new CustomEvent('transcriptionComplete', {
+        detail: { 
+          entryId: data.entryId,
+          requestId,
+          timestamp: Date.now()
+        }
+      });
+      window.dispatchEvent(event);
+    }
     
     return {
       success: true,
-      data
+      data,
+      requestId
     };
   } catch (error: any) {
     console.error('[TranscriptionService] Error in transcription process:', error);
+    
+    // Show error toast to the user
+    toast.error('Error processing audio', {
+      description: error.message || 'Please try again',
+      duration: 4000
+    });
+    
     return {
       success: false,
-      error: error.message || 'Unknown transcription error'
+      error: error.message || 'Unknown transcription error',
+      statusCode: error.status || 500
     };
   }
 }
@@ -91,5 +126,37 @@ export async function audioToBase64(blob: Blob): Promise<string> {
   } catch (error) {
     console.error('[TranscriptionService] Error converting audio to base64:', error);
     throw new Error('Failed to convert audio to base64');
+  }
+}
+
+/**
+ * Verifies that an entry was correctly processed
+ * @param entryId - The entry ID to verify
+ */
+export async function verifyEntryProcessed(entryId: number): Promise<boolean> {
+  try {
+    console.log(`[TranscriptionService] Verifying entry ${entryId} processing`);
+    
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, "refined text", translation_status')
+      .eq('id', entryId)
+      .single();
+    
+    if (error) {
+      console.error(`[TranscriptionService] Error verifying entry ${entryId}:`, error);
+      return false;
+    }
+    
+    if (!data || !data["refined text"]) {
+      console.log(`[TranscriptionService] Entry ${entryId} exists but not fully processed`);
+      return false;
+    }
+    
+    console.log(`[TranscriptionService] Entry ${entryId} verified with status: ${data.translation_status}`);
+    return true;
+  } catch (error) {
+    console.error(`[TranscriptionService] Error in verifyEntryProcessed:`, error);
+    return false;
   }
 }
