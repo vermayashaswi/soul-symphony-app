@@ -39,6 +39,9 @@ export interface JournalEntry {
   user_feedback?: string | null;
   "transcription text"?: string;
   "refined text"?: string;
+  translation_text?: string;
+  translation_status?: string;
+  original_language?: string;
 }
 
 interface JournalEntryCardProps {
@@ -68,7 +71,10 @@ export function JournalEntryCard({
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
     themes: Array.isArray(entry?.themes) ? entry.themes : [],
     Edit_Status: entry?.Edit_Status || null,
-    user_feedback: entry?.user_feedback || null
+    user_feedback: entry?.user_feedback || null,
+    translation_text: entry?.translation_text,
+    translation_status: entry?.translation_status,
+    original_language: entry?.original_language
   };
 
   const [isExpanded, setIsExpanded] = useState(isNew);
@@ -497,6 +503,9 @@ export function JournalEntryCard({
                 content={safeEntry.content} 
                 isExpanded={isExpanded} 
                 isProcessing={isContentProcessing}
+                entryId={safeEntry.id}
+                translationText={safeEntry.translation_text}
+                translationStatus={safeEntry.translation_status}
               />
             </ErrorBoundary>
             

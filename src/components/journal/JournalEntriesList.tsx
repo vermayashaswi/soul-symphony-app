@@ -46,9 +46,6 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
               entry={{
                 ...entry,
                 content: (entry as any).content || entry["refined text"] || entry["transcription text"] || "",
-                translation_text: entry.translation_text,
-                translation_status: entry.translation_status,
-                original_language: entry.original_language,
                 // Make sure id is definitely defined and not optional
                 id: entry.id!
               }}
