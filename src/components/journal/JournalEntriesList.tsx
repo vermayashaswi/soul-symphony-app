@@ -51,7 +51,6 @@ const JournalEntriesList = ({ entries, loading, processingEntries, processedEntr
             Edit_Status: entry.Edit_Status,
             user_feedback: entry.user_feedback
           }}
-          isProcessed={processedEntryIds.includes(entry.id || 0)}
           onDelete={() => entry.id && onDeleteEntry(entry.id)}
           setEntries={() => {}} // Passing empty function as it's required but not used in this context
         />
