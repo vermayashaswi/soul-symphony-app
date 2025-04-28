@@ -13,7 +13,6 @@ interface EntryContentProps {
   isProcessing: boolean;
   entryId?: number;
   translationText?: string;
-  translationStatus?: string;
 }
 
 export function EntryContent({ 
@@ -21,8 +20,7 @@ export function EntryContent({
   isExpanded, 
   isProcessing,
   entryId,
-  translationText,
-  translationStatus
+  translationText
 }: EntryContentProps) {
   const [isTranslating, setIsTranslating] = useState(false);
   const [showTranslation, setShowTranslation] = useState(false);
@@ -73,7 +71,7 @@ export function EntryContent({
   }
   
   const displayContent = showTranslation && translationText ? translationText : content;
-  const hasTranslation = translationText && translationStatus === 'completed';
+  const hasTranslation = translationText ? true : false;
 
   return (
     <div>

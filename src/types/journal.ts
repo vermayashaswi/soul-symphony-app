@@ -23,7 +23,6 @@ export interface JournalEntry {
   content?: string; // Content field for easier access
   original_language?: string; // Original language of the entry
   translation_text?: string; // Translated text when available
-  translation_status?: string; // Status of translation process
 }
 
 export interface JournalEntryFormData extends JournalEntry {

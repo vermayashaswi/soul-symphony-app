@@ -40,7 +40,6 @@ export interface JournalEntry {
   "transcription text"?: string;
   "refined text"?: string;
   translation_text?: string;
-  translation_status?: string;
   original_language?: string;
 }
 
@@ -73,7 +72,6 @@ export function JournalEntryCard({
     Edit_Status: entry?.Edit_Status || null,
     user_feedback: entry?.user_feedback || null,
     translation_text: entry?.translation_text,
-    translation_status: entry?.translation_status,
     original_language: entry?.original_language
   };
 
@@ -505,7 +503,6 @@ export function JournalEntryCard({
                 isProcessing={isContentProcessing}
                 entryId={safeEntry.id}
                 translationText={safeEntry.translation_text}
-                translationStatus={safeEntry.translation_status}
               />
             </ErrorBoundary>
             
