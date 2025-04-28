@@ -753,7 +753,6 @@ const Journal = () => {
     setLastAction(`Recorder: ${info.status}`);
   };
 
-  // Add an event listener for journal entry updates
   useEffect(() => {
     const handleJournalEntryUpdated = (event: CustomEvent) => {
       if (event.detail && event.detail.entryId) {
@@ -883,4 +882,18 @@ const Journal = () => {
                     entries={entries}
                     loading={loading}
                     processingEntries={processingEntries}
-                    processed
+                    processedEntryIds={processedEntryIds}
+                    onStartRecording={handleStartRecording}
+                    onDeleteEntry={handleDeleteEntry}
+                  />
+                </ErrorBoundary>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default Journal;
