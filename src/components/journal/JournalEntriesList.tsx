@@ -40,9 +40,20 @@ const JournalEntriesList = ({ entries, loading, processingEntries, processedEntr
       {entries.map((entry) => (
         <JournalEntryCard
           key={entry.id}
-          entry={entry}
+          entry={{
+            id: entry.id || 0,
+            content: entry["refined text"] || entry["transcription text"] || "",
+            created_at: entry.created_at || new Date().toISOString(),
+            sentiment: entry.sentiment,
+            themes: entry.entities?.map(e => e.type === 'THEME' ? e.name : '').filter(Boolean) || [],
+            master_themes: entry.master_themes || [],
+            entities: entry.entities || [],
+            Edit_Status: entry.Edit_Status,
+            user_feedback: entry.user_feedback
+          }}
           isProcessed={processedEntryIds.includes(entry.id || 0)}
           onDelete={() => entry.id && onDeleteEntry(entry.id)}
+          setEntries={() => {}} // Passing empty function as it's required but not used in this context
         />
       ))}
     </div>
