@@ -12,6 +12,8 @@ import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -19,6 +21,7 @@ const logInfo = (message: string, source: string) => {
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
+  const { translate } = useTranslation();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
@@ -489,8 +492,10 @@ const Journal = () => {
       setTimeout(() => {
         setActiveTab('entries');
       }, 50);
+
+      const translatedProcessingMessage = await translate('Processing your journal entry with AI...');
       
-      const toastId = toast.loading('Processing your journal entry with AI...', {
+      const toastId = toast.loading(translatedProcessingMessage, {
         duration: 15000,
         closeButton: false,
         onAutoClose: () => {
@@ -505,7 +510,7 @@ const Journal = () => {
           }
         }
       });
-      
+
       console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes');
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
@@ -546,7 +551,8 @@ const Journal = () => {
               if (toastIds[tempId]) {
                 toast.dismiss(toastIds[tempId]);
                 
-                toast.success('Journal entry processed', { 
+                const translatedSuccessMessage = await translate('Journal entry processed');
+                toast.success(translatedSuccessMessage, { 
                   duration: 3000,
                   closeButton: false
                 });
@@ -575,20 +581,11 @@ const Journal = () => {
         
         toast.dismiss(toastId);
         
-        await new Promise(resolve => setTimeout(resolve, 150));
-        
-        toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
+        const translatedErrorMessage = await translate(`Failed to process recording: ${error || 'Unknown error'}`);
+        toast.error(translatedErrorMessage, { 
           duration: 3000,
           closeButton: false
         });
-        
-        setIsRecordingComplete(false);
-        setIsSavingRecording(false);
-        setSafeToSwitchTab(true);
-        
-        setTimeout(() => {
-          setActiveTab('record');
-        }, 100);
       }
     } catch (error: any) {
       console.error('Error processing recording:', error);
@@ -599,7 +596,8 @@ const Journal = () => {
       
       await new Promise(resolve => setTimeout(resolve, 150));
       
-      toast.error('Error processing your recording', { 
+      const translatedErrorMessage = await translate('Error processing your recording');
+      toast.error(translatedErrorMessage, { 
         duration: 3000,
         closeButton: false
       });
@@ -750,7 +748,6 @@ const Journal = () => {
     setLastAction(`Recorder: ${info.status}`);
   };
 
-  // Add an event listener for journal entry updates
   useEffect(() => {
     const handleJournalEntryUpdated = (event: CustomEvent) => {
       if (event.detail && event.detail.entryId) {
@@ -776,7 +773,9 @@ const Journal = () => {
           <div className="min-h-screen flex items-center justify-center">
             <div className="flex flex-col items-center gap-3">
               <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
-              <p className="text-muted-foreground">Setting up your profile...</p>
+              <p className="text-muted-foreground">
+                <TranslatableText text="Setting up your profile..." />
+              </p>
             </div>
           </div>
         ) : entriesError && !loading ? (
@@ -786,7 +785,7 @@ const Journal = () => {
                 <div className="flex items-start gap-2">
                   <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                   <p className="text-red-800 dark:text-red-200">
-                    Error loading your journal entries: {entriesError}
+                    <TranslatableText text={`Error loading your journal entries: ${entriesError}`} />
                   </p>
                 </div>
                 <Button 
@@ -798,7 +797,7 @@ const Journal = () => {
                   }}
                 >
                   <RefreshCw className="w-4 h-4 mr-2" /> 
-                  Retry Loading
+                  <TranslatableText text="Retry Loading" />
                 </Button>
               </div>
             </div>
@@ -811,7 +810,7 @@ const Journal = () => {
                   <div className="flex items-start gap-2">
                     <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
                     <p className="text-amber-800 dark:text-amber-200">
-                      We're having trouble setting up your profile. Your entries may not be saved correctly.
+                      <TranslatableText text="We're having trouble setting up your profile. Your entries may not be saved correctly." />
                     </p>
                   </div>
                   <Button 
@@ -820,7 +819,7 @@ const Journal = () => {
                     onClick={handleRetryProfileCreation}
                   >
                     <RefreshCw className="w-4 h-4 mr-2" /> 
-                    Retry Profile Setup
+                    <TranslatableText text="Retry Profile Setup" />
                   </Button>
                 </div>
               </div>
@@ -832,7 +831,7 @@ const Journal = () => {
                   <div className="flex items-start gap-2">
                     <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
                     <p className="text-red-800 dark:text-red-200">
-                      Error processing your recording: {processingError}
+                      <TranslatableText text={`Error processing your recording: ${processingError}`} />
                     </p>
                   </div>
                   <Button 
@@ -844,7 +843,7 @@ const Journal = () => {
                     }}
                   >
                     <RefreshCw className="w-4 h-4 mr-2" /> 
-                    Try Again
+                    <TranslatableText text="Try Again" />
                   </Button>
                 </div>
               </div>
@@ -857,8 +856,12 @@ const Journal = () => {
               className="mt-6"
             >
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="record">Record Entry</TabsTrigger>
-                <TabsTrigger value="entries">Past Entries</TabsTrigger>
+                <TabsTrigger value="record">
+                  <TranslatableText text="Record Entry" />
+                </TabsTrigger>
+                <TabsTrigger value="entries">
+                  <TranslatableText text="Past Entries" />
+                </TabsTrigger>
               </TabsList>
               
               <TabsContent value="record" className="mt-0">
@@ -890,4 +893,4 @@ const Journal = () => {
   );
 };
 
-export default Journal
+export default Journal;
