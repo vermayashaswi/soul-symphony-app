@@ -36,12 +36,22 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   // Function to translate text using our service
   const translate = async (text: string): Promise<string> => {
     if (currentLanguage === 'en' || !text) return text;
-    return staticTranslationService.translateText(text, currentLanguage);
+    
+    try {
+      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage}`);
+      const translated = await staticTranslationService.translateText(text, currentLanguage);
+      console.log(`Translation result: "${translated.substring(0, 30)}..."`);
+      return translated;
+    } catch (error) {
+      console.error('Translation error in context:', error);
+      return text; // Fallback to original
+    }
   };
 
   const setLanguage = async (lang: string) => {
     if (lang === currentLanguage) return;
     
+    console.log(`Changing language from ${currentLanguage} to ${lang}`);
     setIsTranslating(true);
     setTranslationProgress(0);
     
@@ -52,8 +62,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       // Update the service language
       staticTranslationService.setLanguage(lang);
       
-      // For simplicity, we'll just set the progress to 100% right away
-      // In a real implementation, you'd want to translate common UI elements here
+      // Set new language
       setCurrentLanguage(lang);
       
       // Dispatch language change event for components to react
@@ -67,7 +76,11 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       const selectedLang = languages.find(l => l.code === lang);
       toast.success(`Language changed to ${selectedLang?.label || lang}`);
       
-      setTranslationProgress(100);
+      // Force a component re-render by updating progress
+      setTranslationProgress(50);
+      setTimeout(() => {
+        setTranslationProgress(100);
+      }, 300);
     } catch (error) {
       console.error('Language change error:', error);
       toast.error('Failed to change language');
@@ -80,6 +93,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     const storedLang = localStorage.getItem('preferredLanguage');
     if (storedLang) {
+      console.log(`Initializing with stored language preference: ${storedLang}`);
       setLanguage(storedLang);
     }
   }, []);

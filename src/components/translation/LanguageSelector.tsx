@@ -11,24 +11,37 @@ import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
 
 export function LanguageSelector() {
-  const { currentLanguage, setLanguage } = useTranslation();
+  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
 
   const currentLanguageLabel = languages.find(lang => lang.code === currentLanguage)?.label || 'Language';
+  
+  const handleLanguageChange = (code: string) => {
+    console.log(`LanguageSelector: Language selected: ${code}`);
+    setLanguage(code);
+  };
 
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" className="flex items-center gap-2">
-          <Globe className="h-4 w-4" />
+        <Button 
+          variant="ghost" 
+          size="sm" 
+          className="flex items-center gap-2"
+          disabled={isTranslating}
+        >
+          <Globe className={`h-4 w-4 ${isTranslating ? "animate-pulse" : ""}`} />
           <span>{currentLanguageLabel}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end">
+      <DropdownMenuContent align="end" className="bg-background border border-border">
         {languages.map((language) => (
           <DropdownMenuItem
             key={language.code}
-            onClick={() => setLanguage(language.code)}
-            className={currentLanguage === language.code ? "bg-secondary" : ""}
+            onClick={() => handleLanguageChange(language.code)}
+            className={`cursor-pointer ${
+              currentLanguage === language.code ? "bg-secondary" : ""
+            }`}
+            disabled={isTranslating}
           >
             {language.label}
           </DropdownMenuItem>

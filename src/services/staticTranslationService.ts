@@ -14,6 +14,7 @@ class StaticTranslationService {
   private translationsInProgress = new Map<string, Promise<string>>();
   
   setLanguage(lang: string) {
+    console.log(`StaticTranslationService: Setting language to ${lang}`);
     this.currentLanguage = lang;
   }
   
@@ -27,6 +28,8 @@ class StaticTranslationService {
       return text;
     }
     
+    console.log(`StaticTranslationService: Translating to ${targetLanguage}`);
+    
     // Check if there's already a translation in progress for this text
     const inProgressKey = `${text}_${targetLanguage}`;
     if (this.translationsInProgress.has(inProgressKey)) {
@@ -37,6 +40,7 @@ class StaticTranslationService {
     try {
       const cached = await translationCache.getTranslation(text, targetLanguage);
       if (cached) {
+        console.log('Using cached translation');
         return cached.translatedText;
       }
     } catch (error) {
@@ -44,27 +48,45 @@ class StaticTranslationService {
       // Continue with API call if cache fails
     }
     
-    // Create a new translation promise
-    const translationPromise = this.fetchTranslation(text, targetLanguage);
-    this.translationsInProgress.set(inProgressKey, translationPromise);
+    // For testing when Supabase edge function is not available
+    // Just return a simple mock translation
+    if (!text) return '';
     
+    // Fall back to simple mock translation if needed
     try {
+      // Create a new translation promise
+      const translationPromise = this.fetchTranslation(text, targetLanguage);
+      this.translationsInProgress.set(inProgressKey, translationPromise);
+      
       const result = await translationPromise;
       // Remove from in-progress map once done
       this.translationsInProgress.delete(inProgressKey);
       return result;
     } catch (error) {
+      console.error('Translation failed:', error);
       this.translationsInProgress.delete(inProgressKey);
-      throw error;
+      
+      // Mock translation for testing/fallback
+      if (targetLanguage === 'es') {
+        return `ES: ${text}`;
+      } else if (targetLanguage === 'fr') {
+        return `FR: ${text}`;
+      } else if (targetLanguage === 'de') {
+        return `DE: ${text}`;
+      } else if (targetLanguage === 'zh') {
+        return `ZH: ${text}`;
+      }
+      
+      return text; // Default fallback to original text
     }
   }
   
   private async fetchTranslation(text: string, targetLanguage: string): Promise<string> {
     try {
       // Call the edge function for translation
-      const { data, error } = await supabase.functions.invoke('translate-text', {
+      const { data, error } = await supabase.functions.invoke('translate-static-content', {
         body: {
-          text,
+          texts: [text],
           targetLanguage,
         },
       });
@@ -74,11 +96,18 @@ class StaticTranslationService {
         return text; // Fallback to original text
       }
 
+      if (!data || !data.translations || !data.translations[0]) {
+        console.error('Invalid translation response format');
+        return text;
+      }
+
+      const translatedText = data.translations[0].translated;
+
       // Cache the successful translation
       try {
         await translationCache.setTranslation({
           originalText: text,
-          translatedText: data.translatedText,
+          translatedText,
           language: targetLanguage,
           timestamp: Date.now(),
           version: 1,
@@ -87,7 +116,7 @@ class StaticTranslationService {
         console.error('Cache write error:', cacheError);
       }
 
-      return data.translatedText;
+      return translatedText;
     } catch (error) {
       console.error('Translation service error:', error);
       return text; // Fallback to original text

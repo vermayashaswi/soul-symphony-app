@@ -42,9 +42,7 @@ export function TranslatableText({
     };
   }, [text, currentLanguage, translate]);
 
-  // The error was happening here - we're rendering the Component with children and className
-  // but TypeScript is confusing it with a Three.js texture that requires a 'map' prop
-  // Fix: Explicitly specify the element type to avoid type confusion
+  // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(Component, { className }, translatedText);
 }
 

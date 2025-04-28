@@ -13,28 +13,8 @@ import { createDebugger } from '@/utils/debug/debugUtils';
 
 const debug = createDebugger('languageSelector');
 
-export const languages = [
-  { code: 'en', label: 'English' },
-  { code: 'zh', label: '中文' },
-  { code: 'hi', label: 'हिंदी' },
-  { code: 'es', label: 'Español' },
-  { code: 'ar', label: 'العربية' },
-  { code: 'fr', label: 'Français' },
-  { code: 'bn', label: 'বাংলা' },
-  { code: 'pt', label: 'Português' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'ur', label: 'اردو' },
-  { code: 'id', label: 'Indonesia' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'ja', label: '日本語' },
-  { code: 'pa', label: 'ਪੰਜਾਬੀ' },
-  { code: 'te', label: 'తెలుగు' },
-  { code: 'mr', label: 'मराठी' },
-  { code: 'tr', label: 'Türkçe' },
-  { code: 'ta', label: 'தமிழ்' },
-  { code: 'vi', label: 'Tiếng Việt' },
-  { code: 'ko', label: '한국어' },
-];
+// We'll reuse the languages from the context
+import { languages } from '@/contexts/TranslationContext';
 
 const LanguageSelector = () => {
   const { currentLanguage, setLanguage, isTranslating } = useTranslation();
@@ -57,7 +37,7 @@ const LanguageSelector = () => {
           <Globe className={`h-5 w-5 ${isTranslating ? 'animate-pulse' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto">
+      <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto bg-background border border-border">
         {languages.map((language) => (
           <DropdownMenuItem
             key={language.code}

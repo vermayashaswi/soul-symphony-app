@@ -1,18 +1,12 @@
 
-import React, { useEffect, lazy, Suspense } from 'react';
-import { motion } from 'framer-motion';
+import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { cn } from '@/lib/utils';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import Navbar from '@/components/Navbar';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
 import { useNetworkStatus } from '@/utils/network';
-import { toast } from 'sonner';
-
-// Import HomePage directly instead of using lazy loading to diagnose the issue
 import HomePage from '@/pages/website/HomePage';
 
 const Index = () => {
@@ -60,7 +54,6 @@ const Index = () => {
           </div>
         }
       >
-        {/* Render HomePage directly instead of using Suspense and lazy loading */}
         <HomePage />
       </NetworkAwareContent>
     </>
