@@ -230,17 +230,17 @@ export function ThemeLoader({
       if (!text || typeof text !== 'string') return [];
       
       const words = text.split(/\s+/);
-      const uniqueWords = new Set<string>();
+      const longWords = words
+        .filter(word => word && typeof word === 'string' && word.length > 5)
+        .slice(0, 3)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase());
       
-      words.forEach(word => {
-        if (word.length > 5 && !word.match(/^\d+$/)) {
-          uniqueWords.add(word.replace(/[^\w\s]|_/g, '').toLowerCase());
-        }
-      });
-      
-      return Array.from(uniqueWords).slice(0, 3);
-    } catch (err) {
-      console.error(`[ThemeLoader] Error generating fallback themes: ${err}`);
+      if (longWords.length > 0) {
+        return [...new Set(longWords)];
+      }
+      return [];
+    } catch (error) {
+      console.error('[ThemeLoader] Error generating fallback themes:', error);
       return [];
     }
   };
@@ -369,8 +369,8 @@ export function ThemeLoader({
       ) : (
         <ThemeBoxes 
           themes={hasFoundThemes ? stableThemes : themes} 
-          className="mb-1"
-          size="sm"
+          isDisturbed={themesLoaded} 
+          isLoading={false} 
         />
       )}
     </div>

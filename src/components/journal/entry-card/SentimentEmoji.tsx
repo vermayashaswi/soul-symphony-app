@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import twemoji from 'twemoji';
 
 interface SentimentEmojiProps {
-  sentiment?: string | number | {
+  sentiment?: string | {
     sentiment: string;
     score: number;
   };
@@ -38,13 +38,11 @@ export function SentimentEmoji({ sentiment, isProcessing = false }: SentimentEmo
     try {
       if (typeof sentiment === 'string') {
         return parseFloat(sentiment);
-      } else if (typeof sentiment === 'number') {
-        return sentiment;
       } else if (sentiment && typeof sentiment === 'object') {
-        if ('score' in sentiment && typeof sentiment.score === 'number') {
-          return sentiment.score;
-        } else if ('sentiment' in sentiment && typeof sentiment.sentiment === 'string') {
+        if ('sentiment' in sentiment && typeof sentiment.sentiment === 'string') {
           return parseFloat(sentiment.sentiment);
+        } else if ('score' in sentiment && typeof sentiment.score === 'number') {
+          return sentiment.score;
         }
       }
       return 0;

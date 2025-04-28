@@ -7,11 +7,10 @@ export interface JournalEntry {
   created_at?: string;
   "transcription text"?: string;
   "refined text"?: string;
-  content?: string;
   audio_url?: string;
   duration?: number;
   emotions?: Json;
-  sentiment?: string | number | { sentiment: string; score: number };
+  sentiment?: string;
   entities?: Array<{
     type: string;
     name: string;
@@ -19,7 +18,6 @@ export interface JournalEntry {
   }>;
   "foreign key"?: string;
   master_themes?: string[];
-  themes?: string[];
   user_feedback?: string | null;
   Edit_Status?: number | null;
 }

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Trash2 } from 'lucide-react';
@@ -12,7 +13,6 @@ import {
 } from '@/components/ui/dialog';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { toast } from 'sonner';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface DeleteEntryDialogProps {
   entryId?: number;
@@ -78,16 +78,15 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
       </DialogTrigger>
       <DialogContent className="w-[90%] max-w-md mx-auto">
         <DialogHeader>
-          <DialogTitle>
-            <TranslatableText text="Are you absolutely sure?" />
-          </DialogTitle>
+          <DialogTitle>Are you absolutely sure?</DialogTitle>
           <DialogDescription>
-            <TranslatableText text="This action cannot be undone. This will permanently delete your journal entry from our servers." />
+            This action cannot be undone. This will permanently delete your journal entry from our
+            servers.
           </DialogDescription>
         </DialogHeader>
         <DialogFooter className="flex flex-row justify-end space-x-2 mt-4">
           <Button type="button" variant="secondary" onClick={() => handleDialogChange(false)} disabled={isDeleting}>
-            <TranslatableText text="Cancel" />
+            Cancel
           </Button>
           <Button 
             type="submit" 
@@ -95,7 +94,7 @@ export function DeleteEntryDialog({ entryId, onDelete }: DeleteEntryDialogProps)
             onClick={handleDelete}
             disabled={isDeleting}
           >
-            <TranslatableText text={isDeleting ? 'Deleting...' : 'Delete'} />
+            {isDeleting ? 'Deleting...' : 'Delete'}
           </Button>
         </DialogFooter>
       </DialogContent>
