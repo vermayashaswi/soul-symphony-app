@@ -129,12 +129,14 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
         }
       }
       
+      // Modified to check for themes property existence first
       if (entry.themes && Array.isArray(entry.themes)) {
         return entry.themes.some(theme => 
           theme.toLowerCase().includes(query)
         );
       }
       
+      // Modified to check for master_themes property existence first
       if (entry.master_themes && Array.isArray(entry.master_themes)) {
         return entry.master_themes.some(theme => 
           theme.toLowerCase().includes(query)

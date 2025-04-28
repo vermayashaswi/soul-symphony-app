@@ -22,6 +22,7 @@ export interface JournalEntry {
   user_feedback?: string | null;
   Edit_Status?: number | null;
   content?: string; // Adding content as an optional property
+  themes?: string[]; // Add the missing themes property
 }
 
 export interface JournalEntryFormData extends JournalEntry {
