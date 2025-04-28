@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -556,11 +555,14 @@ const Journal = () => {
               if (toastIds[tempId]) {
                 toast.dismiss(toastIds[tempId]);
                 
-                const translatedSuccessMessage = await translate('Journal entry processed');
-                toast.success(translatedSuccessMessage, { 
-                  duration: 3000,
-                  closeButton: false
-                });
+                // Using a Promise to handle the async operation inside setTimeout
+                (async () => {
+                  const translatedSuccessMessage = await translate('Journal entry processed');
+                  toast.success(translatedSuccessMessage, { 
+                    duration: 3000,
+                    closeButton: false
+                  });
+                })();
                 
                 setToastIds(prev => {
                   const newToastIds = { ...prev };
