@@ -3,6 +3,7 @@ import ThemeBoxes from '../ThemeBoxes';
 import { supabase } from '@/integrations/supabase/client';
 import { Skeleton } from '@/components/ui/skeleton';
 import { triggerThemeExtraction } from '@/utils/audio/theme-extractor';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ThemeLoaderProps {
   entryId: number;

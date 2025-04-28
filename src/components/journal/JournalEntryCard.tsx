@@ -16,6 +16,7 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { Trash, X } from "lucide-react";
 import { JournalEntry as JournalEntryType, Json } from '@/types/journal';
 import { Button } from '@/components/ui/button';
+import { TranslatableText } from '@/components/ui/translatable-text';
 
 export interface JournalEntry {
   id: number;
@@ -538,7 +539,7 @@ export function JournalEntryCard({
               onClick={toggleExpanded}
               className="text-sm text-muted-foreground hover:text-foreground"
             >
-              {isExpanded ? '' : 'Show more'}
+              {isExpanded ? '' : <TranslatableText text="Show more" />}
             </button>
           </div>
         </Card>
