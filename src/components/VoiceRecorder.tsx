@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -16,7 +15,6 @@ import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
 import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
-import { sendAudioForTranscription } from '@/utils/audio/transcription-service';
 
 interface VoiceRecorderProps {
   onRecordingComplete?: (audioBlob: Blob, tempId?: string) => void;
@@ -34,7 +32,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   const [audioPrepared, setAudioPrepared] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
   const [toastsCleared, setToastsCleared] = useState(false);
-  const [processingRequestId, setProcessingRequestId] = useState<string | null>(null);
   
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
@@ -139,45 +136,23 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       hasPlayedOnce,
       audioPrepared,
       waitingForClear,
-      toastsCleared,
-      processingRequestId
+      toastsCleared
     });
     
     if (updateDebugInfo) {
       updateDebugInfo({
-        status: isProcessing 
-          ? 'Processing' 
-          : (isRecording 
-             ? 'Recording' 
-             : (audioBlob ? 'Recorded' : 'No Recording')),
+        status: isRecording 
+          ? 'Recording' 
+          : (audioBlob ? 'Recorded' : 'No Recording'),
         duration: audioDuration || (recordingTime / 1000)
       });
     }
   }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, 
-       audioPrepared, waitingForClear, toastsCleared, updateDebugInfo, processingRequestId]);
+       audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
   useEffect(() => {
-    // Listen for transcription completed events
-    const handleTranscriptionComplete = (event: CustomEvent) => {
-      console.log('[VoiceRecorder] Transcription complete event received:', event.detail);
-      
-      if (event.detail && event.detail.requestId && event.detail.requestId === processingRequestId) {
-        console.log('[VoiceRecorder] Request ID matched, processing complete');
-        saveCompleteRef.current = true;
-        savingInProgressRef.current = false;
-        setIsProcessing(false);
-        
-        // Show success toast
-        toast.success('Journal entry processed successfully', {
-          duration: 3000,
-        });
-      }
-    };
-    
-    window.addEventListener('transcriptionComplete', handleTranscriptionComplete as EventListener);
-    
     return () => {
-      window.removeEventListener('transcriptionComplete', handleTranscriptionComplete as EventListener);
+      console.log('[VoiceRecorder] Component unmounting, resetting state');
       
       if (isProcessing && !saveCompleteRef.current) {
         console.warn('[VoiceRecorder] Component unmounted during processing - potential source of UI errors');
@@ -185,7 +160,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       
       clearAllToasts();
     };
-  }, [isProcessing, processingRequestId]);
+  }, [isProcessing]);
   
   const handleSaveEntry = async () => {
     if (!audioBlob) {
@@ -311,48 +286,27 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
-          const base64Audio = await blobToBase64(normalizedBlob).catch(err => {
-            console.error('[VoiceRecorder] Base64 conversion failed:', err);
+          const base64Test = await blobToBase64(normalizedBlob).catch(err => {
+            console.error('[VoiceRecorder] Base64 conversion test failed:', err);
             throw new Error('Error preparing audio for processing');
           });
           
-          console.log('[VoiceRecorder] Base64 conversion successful, length:', base64Audio.length);
+          console.log('[VoiceRecorder] Base64 test conversion successful, length:', base64Test.length);
+          console.log('[VoiceRecorder] Directly calling onRecordingComplete with blob');
           
-          // Direct approach: Call transcription service first to see if it succeeds
-          const result = await sendAudioForTranscription(base64Audio, user?.id);
+          await onRecordingComplete(normalizedBlob);
           
-          if (result.success) {
-            console.log('[VoiceRecorder] Transcription API call successful:', result);
-            setProcessingRequestId(result.requestId || null);
-            
-            // Call the callback with the blob
-            onRecordingComplete(normalizedBlob);
-            
-            // Show toast for processing
-            toast.loading('Processing your journal entry...', {
-              duration: 10000,
-            });
-            
-            // Set a safety timeout to reset loading state if events don't fire
-            setTimeout(() => {
-              if (savingInProgressRef.current && !saveCompleteRef.current) {
-                console.log('[VoiceRecorder] Safety timeout - resetting state');
-                savingInProgressRef.current = false;
-                saveCompleteRef.current = true;
-                setIsProcessing(false);
-              }
-            }, 15000);
-            
-          } else {
-            throw new Error(result.error || 'Transcription failed');
-          }
+          saveCompleteRef.current = true;
+          savingInProgressRef.current = false;
+          
+          console.log('[VoiceRecorder] Recording callback completed successfully');
         } catch (error: any) {
           console.error('[VoiceRecorder] Error in recording callback:', error);
           setRecordingError(error?.message || "An unexpected error occurred");
           
           setTimeout(() => {
             toast.error("Error saving recording", {
-              description: error?.message || "Please try again",
+              id: 'error-toast',
               duration: 3000
             });
           }, 300);
@@ -368,7 +322,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       
       setTimeout(() => {
         toast.error("Error saving recording", {
-          description: error?.message || "Please try again",
+          id: 'error-toast',
           duration: 3000
         });
       }, 300);
@@ -390,7 +344,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     setHasSaved(false);
     setHasPlayedOnce(false);
     setAudioPrepared(false);
-    setProcessingRequestId(null);
     saveCompleteRef.current = false;
     savingInProgressRef.current = false;
     domClearAttemptedRef.current = false;
@@ -438,7 +391,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               onPermissionRequest={() => {
                 console.log('[VoiceRecorder] Requesting permissions');
                 requestPermissions().then(granted => {
-                  console.log('[VoiceRecorder] Permissions granted:', granted);
                 });
               }}
               audioLevel={audioLevel}
