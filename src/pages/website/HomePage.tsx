@@ -3,6 +3,7 @@ import React from 'react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const HomePage = () => {
   const openAppStore = () => {

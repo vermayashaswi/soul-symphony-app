@@ -23,6 +23,7 @@ import {
   PopoverTrigger,
 } from '@/components/ui/popover';
 import { useTheme } from '@/hooks/use-theme';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -57,10 +58,10 @@ const Navbar = () => {
           {!user ? (
             <>
               <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-                Home
+                <TranslatableText text="Home" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/auth')}>
-                Sign In
+                <TranslatableText text="Sign In" />
               </Button>
             </>
           ) : (
@@ -94,7 +95,7 @@ const Navbar = () => {
                       onClick={() => navigate('/')}
                     >
                       <Home className="mr-2 h-4 w-4" />
-                      <span>Home</span>
+                      <TranslatableText text="Home" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -103,7 +104,7 @@ const Navbar = () => {
                       onClick={() => navigate('/settings')}
                     >
                       <Settings className="mr-2 h-4 w-4" />
-                      <span>Settings</span>
+                      <TranslatableText text="Settings" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -112,7 +113,7 @@ const Navbar = () => {
                       onClick={() => navigate('/help')}
                     >
                       <HelpCircle className="mr-2 h-4 w-4" />
-                      <span>Help</span>
+                      <TranslatableText text="Help" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -121,7 +122,7 @@ const Navbar = () => {
                       onClick={handleLogout}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
-                      <span>Logout</span>
+                      <TranslatableText text="Logout" />
                     </Button>
                   </div>
                 </PopoverContent>

@@ -11,6 +11,7 @@ import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
+import { TranslatableText } from '@/components/TranslatableText';
 
 const Home = () => {
   const { user } = useAuth();
@@ -89,16 +90,16 @@ const Home = () => {
   const getJournalName = () => {
     if (displayName) {
       return displayName.endsWith('s') ? 
-        `${displayName}' Journal` : 
-        `${displayName}'s Journal`;
+        `${displayName}' ${translate("Journal")}` : 
+        `${displayName}'s ${translate("Journal")}`;
     }
     if (user?.email) {
       const name = user.email.split('@')[0];
       return name.endsWith('s') ? 
-        `${name}' Journal` : 
-        `${name}'s Journal`;
+        `${name}' ${translate("Journal")}` : 
+        `${name}'s ${translate("Journal")}`;
     }
-    return "Your Journal";
+    return translate("Your Journal");
   };
 
   const containerVariants = {
@@ -157,7 +158,7 @@ const Home = () => {
                   MozOsxFontSmoothing: 'grayscale'
                 }}
               >
-                {getJournalName()}
+                <TranslatableText text={getJournalName()} />
               </h1>
             </div>
 
