@@ -165,9 +165,9 @@ const Home = () => {
       <div className="relative z-20 flex flex-col h-screen">
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full relative">
-            <div className="relative">
+            <div className="relative max-w-[65%]">
               <h1
-                className="text-2xl font-bold text-theme"
+                className="text-2xl font-bold text-theme truncate"
                 style={{
                   fontWeight: 700,
                   letterSpacing: '0.005em',
