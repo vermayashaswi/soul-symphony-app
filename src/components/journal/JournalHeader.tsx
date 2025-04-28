@@ -4,12 +4,14 @@ import { motion } from 'framer-motion';
 import SouloLogo from '@/components/SouloLogo';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTranslation } from 'react-i18next';
 
 const JournalHeader = () => {
   const isMobile = useIsMobile();
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldAdjustForMobile = isMobile || mobileDemo;
+  const { t } = useTranslation();
   
   return (
     <div className={cn(
@@ -24,7 +26,7 @@ const JournalHeader = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ duration: 0.5 }}
           >
-            Your <SouloLogo className="inline-flex" useColorTheme={true} /> Journal
+            {t('journal.header.your')} <SouloLogo className="inline-flex" useColorTheme={true} /> {t('journal.header.journal')}
           </motion.h1>
         </div>
       </div>

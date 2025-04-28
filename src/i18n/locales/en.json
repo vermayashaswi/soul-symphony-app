@@ -1,4 +1,3 @@
-
 {
   "common": {
     "loading": "Loading...",
@@ -24,13 +23,20 @@
     "googleSignIn": "Sign in with Google"
   },
   "journal": {
+    "header": {
+      "your": "Your",
+      "journal": "Journal"
+    },
     "title": "{{name}}'s Journal",
     "possessiveTitle": "{{name}}' Journal",
     "defaultTitle": "Your Journal",
     "empty": {
-      "title": "Welcome to Voice Journaling",
-      "description": "Just speak and we'll do the rest. Your personal AI journaling companion is ready.",
-      "startButton": "Start Journaling"
+      "title": "Start Your Journal Journey",
+      "description": "Record your thoughts and feelings by voice. Your entries will be transcribed and analyzed automatically.",
+      "startButton": "Start Recording"
+    },
+    "entry": {
+      "processing": "Processing your journal entry..."
     }
   },
   "insights": {
