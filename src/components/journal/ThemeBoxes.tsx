@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ThemeBoxesProps {
   themes: string[];
@@ -207,7 +208,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
                 }
               }}
             >
-              {theme}
+              <TranslatableText text={theme} />
             </motion.div>
           );
         })}
@@ -249,7 +250,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
           </motion.div>
         ))}
         <div className="absolute text-sm text-muted-foreground">
-          {isLocalLoading ? "Generating themes..." : "Extracting themes..."}
+          {isLocalLoading ? <TranslatableText text="Generating themes..." /> : <TranslatableText text="Extracting themes..." />}
         </div>
       </div>
     );
@@ -313,7 +314,7 @@ const ThemeBoxes: React.FC<ThemeBoxesProps> = ({
               }
             }}
           >
-            {theme}
+            <TranslatableText text={theme} />
           </motion.div>
         );
       })}
