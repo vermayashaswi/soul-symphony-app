@@ -56,6 +56,9 @@ const Journal = () => {
   const [deletingEntryId, setDeletingEntryId] = useState<number | null>(null);
   const [localEntries, setLocalEntries] = useState<JournalEntry[]>([]);
   const [hasLocalChanges, setHasLocalChanges] = useState(false);
+  const [pendingDeletionIds, setPendingDeletionIds] = useState<Set<number>>(new Set());
+  const lastSuccessfulEntriesRef = useRef<JournalEntry[]>([]);
+  const forceUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   const { 
     entries, 
@@ -70,6 +73,22 @@ const Journal = () => {
   );
 
   useEffect(() => {
+    if (entries && entries.length > 0 && !hasLocalChanges) {
+      setLocalEntries(entries);
+      lastSuccessfulEntriesRef.current = entries;
+    } else if (entries && entries.length > 0) {
+      const deletedIds = new Set([...pendingDeletionIds]);
+      
+      const mergedEntries = entries.filter(entry => !deletedIds.has(entry.id));
+      
+      if (mergedEntries.length > 0) {
+        setLocalEntries(mergedEntries);
+        lastSuccessfulEntriesRef.current = mergedEntries;
+      }
+    }
+  }, [entries, hasLocalChanges, pendingDeletionIds]);
+
+  useEffect(() => {
     const handleError = (event: ErrorEvent) => {
       console.error('[Journal] Caught render error:', event);
       setHasRenderError(true);
@@ -80,7 +99,6 @@ const Journal = () => {
     const handleProcessingEntriesChanged = (event: CustomEvent) => {
       if (event.detail && Array.isArray(event.detail.entries)) {
         console.log(`[Journal] Processing entries changed: ${event.detail.entries.length} entries`);
-        // Filter out entries that were deleted
         const filteredEntries = event.detail.entries.filter(id => !deletedProcessingIds.has(id));
         setProcessingEntries(filteredEntries);
       }
@@ -90,7 +108,6 @@ const Journal = () => {
       if (event.detail && event.detail.tempId && event.detail.entryId) {
         console.log(`[Journal] Processing entry mapped: ${event.detail.tempId} -> ${event.detail.entryId}`);
         
-        // Check if this entry was already deleted
         if (deletedProcessingIds.has(event.detail.tempId)) {
           console.log(`[Journal] Skipping mapped entry as its tempId was deleted: ${event.detail.tempId}`);
           return;
@@ -150,6 +167,9 @@ const Journal = () => {
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
       if (autoRetryTimeoutRef.current) {
         clearTimeout(autoRetryTimeoutRef.current);
+      }
+      if (forceUpdateTimerRef.current) {
+        clearTimeout(forceUpdateTimerRef.current);
       }
       
       clearAllToasts();
@@ -631,7 +651,6 @@ const Journal = () => {
       
       clearAllToasts();
       
-      // Find and mark any processing entries related to this one as deleted
       const tempIdsToDelete: string[] = [];
       
       processingEntries.forEach(tempId => {
@@ -645,14 +664,12 @@ const Journal = () => {
         }
       });
       
-      // Also check the map for any other tempIds that might map to this entryId
       processingToEntryMapRef.current.forEach((mappedId, tempId) => {
         if (mappedId === entryId && !tempIdsToDelete.includes(tempId)) {
           tempIdsToDelete.push(tempId);
         }
       });
       
-      // Mark these as deleted to prevent them from reappearing
       if (tempIdsToDelete.length > 0) {
         console.log(`[Journal] Marking processing entries as deleted:`, tempIdsToDelete);
         setDeletedProcessingIds(prev => {
@@ -662,10 +679,8 @@ const Journal = () => {
         });
       }
       
-      // Clean up processing entries
       removeProcessingEntryById(entryId);
       
-      // Update UI states
       const updatedProcessingEntries = processingEntries.filter(
         tempId => !tempIdsToDelete.includes(tempId) && getEntryIdForProcessingId(tempId) !== entryId
       );
@@ -685,15 +700,20 @@ const Journal = () => {
         return updated;
       });
       
-      // IMPORTANT: Update local entries state immediately before the database operation
       setLocalEntries(prevEntries => {
         const filteredEntries = prevEntries.filter(entry => entry.id !== entryId);
         console.log(`[Journal] Locally filtered entries: ${filteredEntries.length} (removed entry ${entryId})`);
-        setHasLocalChanges(true);
         return filteredEntries;
       });
       
-      // Delete from the database
+      setPendingDeletionIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(entryId);
+        return newSet;
+      });
+      
+      setHasLocalChanges(true);
+      
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
@@ -706,40 +726,60 @@ const Journal = () => {
       
       console.log(`[Journal] Entry ${entryId} successfully deleted from database`);
       
-      // Force cache invalidation and refresh for entry list after successful deletion
-      setTimeout(() => {
-        // Dispatch an event to notify that journal entries need to be refreshed
-        window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
-          detail: { 
-            action: 'delete',
-            entryId: entryId,
-            timestamp: Date.now()
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { 
+          action: 'delete',
+          entryId: entryId,
+          timestamp: Date.now()
+        }
+      }));
+      
+      const refreshIntervals = [300, 1000, 2500];
+      refreshIntervals.forEach((interval, index) => {
+        setTimeout(() => {
+          if (index === refreshIntervals.length - 1) {
+            setPendingDeletionIds(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(entryId);
+              return newSet;
+            });
+            setHasLocalChanges(false);
           }
-        }));
-        
-        setRefreshKey(prev => prev + 1);
-        fetchEntries();
-      }, 300);
+          
+          setRefreshKey(prev => prev + 1);
+          if (index === 0) {
+            fetchEntries();
+          }
+        }, interval);
+      });
+      
+      toast.success('Entry successfully deleted', {
+        duration: 3000,
+        id: 'delete-success-toast',
+        closeButton: false
+      });
       
     } catch (error) {
       console.error('[Journal] Error deleting entry:', error);
       setLastAction(`Delete Entry Error (${entryId})`);
       toast.error('Failed to delete entry');
       
-      // Revert local changes if deletion failed
       if (hasLocalChanges) {
         setLocalEntries(entries);
+        setPendingDeletionIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(entryId);
+          return newSet;
+        });
         setHasLocalChanges(false);
       }
       
-      // Re-throw to let DeleteEntryDialog handle it
       throw error;
     } finally {
       setIsDeletingEntry(false);
       setDeletingEntryId(null);
     }
-  }, [user?.id, processingEntries, toastIds, fetchEntries, setRefreshKey, setProcessingEntries, 
-      setToastIds, setNotifiedEntryIds, isDeletingEntry, hasLocalChanges, entries]);
+  }, [user?.id, processingEntries, toastIds, fetchEntries, entries, hasLocalChanges, isDeletingEntry]);
 
   const resetError = useCallback(() => {
     setHasRenderError(false);
@@ -752,17 +792,6 @@ const Journal = () => {
       fetchEntries();
     }, 100);
   }, [fetchEntries]);
-
-  const showLoadingFeedback = (isRecordingComplete || isSavingRecording) && 
-                             !entriesError && 
-                             !processingError && 
-                             processingEntries.length > 0;
-
-  if (hasRenderError) {
-    console.error('[Journal] Recovering from render error');
-    setHasRenderError(false);
-    setLastAction('Recovering from Render Error');
-  }
 
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
@@ -800,7 +829,21 @@ const Journal = () => {
     };
   }, [fetchEntries]);
 
-  const displayEntries = hasLocalChanges ? localEntries : entries;
+  const displayEntries = hasLocalChanges ? localEntries : 
+                        (entries && entries.length > 0) ? entries : 
+                        (lastSuccessfulEntriesRef.current.length > 0) ? lastSuccessfulEntriesRef.current : [];
+
+  const isReallyEmpty = displayEntries.length === 0 && 
+                        lastSuccessfulEntriesRef.current.length === 0 && 
+                        !loading;
+
+  const showLoading = loading && displayEntries.length === 0 && !hasLocalChanges;
+
+  if (hasRenderError) {
+    console.error('[Journal] Recovering from render error');
+    setHasRenderError(false);
+    setLastAction('Recovering from Render Error');
+  }
 
   return (
     <ErrorBoundary onReset={resetError}>
@@ -909,7 +952,7 @@ const Journal = () => {
                 <ErrorBoundary>
                   <JournalEntriesList
                     entries={displayEntries}
-                    loading={loading && !hasLocalChanges}
+                    loading={showLoading}
                     processingEntries={processingEntries}
                     processedEntryIds={processedEntryIds}
                     onStartRecording={handleStartRecording}

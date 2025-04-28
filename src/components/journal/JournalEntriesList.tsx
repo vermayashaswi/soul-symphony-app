@@ -25,7 +25,10 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   onStartRecording,
   onDeleteEntry,
 }) => {
+  // IMPROVED: More reliable check for entries with fallbacks
   const hasEntries = entries && entries.length > 0;
+  
+  // IMPROVED: Only show loading on initial load, not during refreshes
   const isLoading = loading && !hasEntries;
   
   const handleDeleteEntry = (entryId: number) => {
@@ -44,6 +47,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       throw error; // Re-throw to let DeleteEntryDialog handle the error display
     }
   };
+
+  // NEW: Debug logging for rendered state
+  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}`);
 
   return (
     <div className="journal-entries-list" id="journal-entries-container">
