@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -882,4 +883,13 @@ const Journal = () => {
                     onDeleteEntry={handleDeleteEntry}
                   />
                 </ErrorBoundary>
-              </
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default Journal;
