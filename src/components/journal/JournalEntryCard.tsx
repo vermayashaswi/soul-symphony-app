@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, memo } from 'react';
 import { Card } from "@/components/ui/card";
 import DeleteEntryDialog from './entry-card/DeleteEntryDialog';
@@ -7,27 +8,25 @@ import ExtractThemeButton from './entry-card/ExtractThemeButton';
 import FloatingDotsToggle from './entry-card/FloatingDotsToggle';
 import ThemeLoader from './entry-card/ThemeLoader';
 import ThemeBoxes from './ThemeBoxes';
-import { formatDate } from '@/utils/textUtils'; // We'll create this function
-
-export interface JournalEntry {
-  id: number;
-  content: string;
-  created_at: string;
-  themes?: string[];
-  sentiment?: number;
-  entities?: any;
-  audio_url?: string;
-  master_themes?: string[];
-}
+import { JournalEntry } from '@/types/journal';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
   onDelete: (entryId: number) => Promise<void>;
   isProcessing?: boolean;
   wasProcessed?: boolean;
+  isNew?: boolean;
+  setEntries?: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
 }
 
-const JournalEntryCard: React.FC<JournalEntryCardProps> = memo(({ entry, onDelete, isProcessing = false, wasProcessed = false }) => {
+const JournalEntryCard: React.FC<JournalEntryCardProps> = memo(({ 
+  entry, 
+  onDelete, 
+  isProcessing = false, 
+  wasProcessed = false,
+  isNew = false,
+  setEntries
+}) => {
   const [isExpanded, setIsExpanded] = useState(false);
   const [showThemes, setShowThemes] = useState(false);
   const [isLoadingThemes, setIsLoadingThemes] = useState(false);
@@ -62,14 +61,14 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = memo(({ entry, onDelet
         <div className="flex flex-col items-end gap-1.5">
           <div className="flex items-center justify-end space-x-2">
             <SentimentMeter sentiment={entry.sentiment} />
-            <FloatingDotsToggle isExpanded={isExpanded} toggleExpanded={toggleExpanded} />
+            <FloatingDotsToggle isExpanded={isExpanded} onToggle={toggleExpanded} />
             <DeleteEntryDialog entryId={entry.id} onDelete={() => onDelete(entry.id)} />
           </div>
         </div>
       </div>
 
       <div className="px-4 py-2">
-        {isLoadingThemes && <ThemeLoader />}
+        {isLoadingThemes && <ThemeLoader entryId={entry.id} initialThemes={themes || []} content={entry.content || ""} />}
         {showThemes && (
           <>
             {themes && themes.length > 0 && (
@@ -89,7 +88,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = memo(({ entry, onDelet
       <div className="px-4 pb-4">
         <ExtractThemeButton
           entryId={entry.id}
-          onClick={toggleThemes}
+          onExtract={toggleThemes}
           showThemes={showThemes}
           themes={themes}
           masterThemes={masterThemes}
