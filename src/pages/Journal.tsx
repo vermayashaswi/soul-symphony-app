@@ -753,7 +753,6 @@ const Journal = () => {
     setLastAction(`Recorder: ${info.status}`);
   };
 
-  // Add an event listener for journal entry updates
   useEffect(() => {
     const handleJournalEntryUpdated = (event: CustomEvent) => {
       if (event.detail && event.detail.entryId) {
@@ -771,7 +770,7 @@ const Journal = () => {
   }, [fetchEntries]);
 
   return (
-    <ErrorBoundary onReset={resetError}>
+    <React.Fragment>
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
         
@@ -783,29 +782,27 @@ const Journal = () => {
             </div>
           </div>
         ) : entriesError && !loading ? (
-          <>
-            <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
-              <div className="flex flex-col gap-3">
-                <div className="flex items-start gap-2">
-                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-                  <p className="text-red-800 dark:text-red-200">
-                    Error loading your journal entries: {entriesError}
-                  </p>
-                </div>
-                <Button 
-                  variant="outline" 
-                  className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
-                  onClick={() => {
-                    setRefreshKey(prev => prev + 1);
-                    fetchEntries();
-                  }}
-                >
-                  <RefreshCw className="w-4 h-4 mr-2" /> 
-                  Retry Loading
-                </Button>
+          <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+            <div className="flex flex-col gap-3">
+              <div className="flex items-start gap-2">
+                <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                <p className="text-red-800 dark:text-red-200">
+                  Error loading your journal entries: {entriesError}
+                </p>
               </div>
+              <Button 
+                variant="outline" 
+                className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                onClick={() => {
+                  setRefreshKey(prev => prev + 1);
+                  fetchEntries();
+                }}
+              >
+                <RefreshCw className="w-4 h-4 mr-2" /> 
+                Retry Loading
+              </Button>
             </div>
-          </>
+          </div>
         ) : (
           <>
             {showRetryButton && (
@@ -883,4 +880,18 @@ const Journal = () => {
                     entries={entries}
                     loading={loading}
                     processingEntries={processingEntries}
-                    processed
+                    processedEntryIds={processedEntryIds}
+                    onStartRecording={handleStartRecording}
+                    onDeleteEntry={handleDeleteEntry}
+                  />
+                </ErrorBoundary>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
+      </div>
+    </React.Fragment>
+  );
+};
+
+export default Journal;
