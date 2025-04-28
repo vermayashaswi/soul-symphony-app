@@ -4,7 +4,7 @@ import { Skeleton } from '@/components/ui/skeleton';
 import { Progress } from '@/components/ui/progress';
 
 interface SentimentMeterProps {
-  sentiment?: string | {
+  sentiment?: string | number | {
     sentiment: string;
     score: number;
   };
@@ -25,8 +25,14 @@ export function SentimentMeter({ sentiment, isProcessing = false }: SentimentMet
     try {
       if (typeof sentiment === 'string') {
         return parseFloat(sentiment);
-      } else if (sentiment) {
-        return sentiment.score;
+      } else if (typeof sentiment === 'number') {
+        return sentiment;
+      } else if (sentiment && typeof sentiment === 'object') {
+        if ('score' in sentiment) {
+          return sentiment.score;
+        } else if ('sentiment' in sentiment && typeof sentiment.sentiment === 'string') {
+          return parseFloat(sentiment.sentiment);
+        }
       }
       return 0;
     } catch (error) {
