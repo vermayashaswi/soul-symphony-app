@@ -27,6 +27,15 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
 }) => {
   const hasEntries = entries && entries.length > 0;
   const isLoading = loading && !hasEntries;
+  
+  const handleDeleteEntry = (entryId: number) => {
+    try {
+      console.log(`[JournalEntriesList] Handling delete for entry: ${entryId}`);
+      onDeleteEntry(entryId);
+    } catch (error) {
+      console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
+    }
+  };
 
   return (
     <div>
@@ -51,7 +60,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
               }}
               processing={processingEntries.some(tempId => tempId.includes(String(entry.id)))}
               processed={processedEntryIds.includes(entry.id!)}
-              onDelete={onDeleteEntry}
+              onDelete={handleDeleteEntry}
             />
           ))}
         </div>

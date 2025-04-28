@@ -690,7 +690,7 @@ const Journal = () => {
       
       // Refresh entries
       setTimeout(() => {
-        setRefreshKey(Date.now());
+        setRefreshKey(prev => prev + 1);
         fetchEntries();
       }, 100);
       
@@ -702,7 +702,7 @@ const Journal = () => {
       toast.error('Failed to delete entry');
       
       setTimeout(() => {
-        setRefreshKey(Date.now());
+        setRefreshKey(prev => prev + 1);
         fetchEntries();
       }, 500);
     }
@@ -883,11 +883,3 @@ const Journal = () => {
                 </ErrorBoundary>
               </TabsContent>
             </Tabs>
-          </>
-        )}
-      </div>
-    </ErrorBoundary>
-  );
-};
-
-export default Journal;

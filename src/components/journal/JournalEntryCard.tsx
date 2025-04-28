@@ -13,9 +13,7 @@ import {
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
-import { Trash, X } from "lucide-react";
-import { JournalEntry as JournalEntryType, Json } from '@/types/journal';
-import { Button } from '@/components/ui/button';
+import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export interface JournalEntry {
@@ -231,15 +229,6 @@ export function JournalEntryCard({
       }
       
       toast.error('Failed to delete entry');
-      
-      if (onDelete && mountedRef.current) {
-        console.log(`[JournalEntryCard] Calling onDelete after error for entry ${safeEntry.id}`);
-        setTimeout(() => {
-          if (mountedRef.current) {
-            onDelete(safeEntry.id);
-          }
-        }, 100);
-      }
     }
   };
 
@@ -491,7 +480,19 @@ export function JournalEntryCard({
                 content={safeEntry.content}
                 onEntryUpdated={handleEntryUpdate}
               />
-              <DeleteEntryDialog onDelete={handleDelete} />
+              <DeleteEntryDialog 
+                onDelete={async () => {
+                  return new Promise<void>(async (resolve, reject) => {
+                    try {
+                      await handleDelete();
+                      resolve();
+                    } catch (error) {
+                      reject(error);
+                    }
+                  });
+                }} 
+                isDeleting={deletionInProgress}
+              />
             </div>
           </div>
 

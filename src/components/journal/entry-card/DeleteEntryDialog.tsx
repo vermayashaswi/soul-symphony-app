@@ -12,26 +12,42 @@ import {
   AlertDialogTitle, 
   AlertDialogTrigger 
 } from '@/components/ui/alert-dialog';
-import { Trash } from "lucide-react";
+import { Trash, Loader2 } from "lucide-react";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface DeleteEntryDialogProps {
-  onDelete: () => void;
+  onDelete: () => Promise<void>;
+  isDeleting?: boolean;
 }
 
-export function DeleteEntryDialog({ onDelete }: DeleteEntryDialogProps) {
+export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryDialogProps) {
   const [open, setOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
   
-  const handleDelete = () => {
-    onDelete();
-    setOpen(false);
+  const handleDelete = async () => {
+    try {
+      setIsProcessing(true);
+      await onDelete();
+      setOpen(false);
+    } catch (error) {
+      console.error("Error deleting entry:", error);
+    } finally {
+      setIsProcessing(false);
+    }
   };
 
   return (
     <AlertDialog open={open} onOpenChange={setOpen}>
       <AlertDialogTrigger asChild>
-        <button className="hover:text-red-500 text-gray-500">
-          <Trash size={16} />
+        <button 
+          className="hover:text-red-500 text-gray-500" 
+          disabled={isDeleting}
+        >
+          {isDeleting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Trash size={16} />
+          )}
         </button>
       </AlertDialogTrigger>
       <AlertDialogContent>
@@ -44,11 +60,22 @@ export function DeleteEntryDialog({ onDelete }: DeleteEntryDialogProps) {
           </AlertDialogDescription>
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel>
+          <AlertDialogCancel disabled={isProcessing}>
             <TranslatableText text="Cancel" />
           </AlertDialogCancel>
-          <AlertDialogAction onClick={handleDelete} className="bg-red-500 hover:bg-red-600">
-            <TranslatableText text="Delete" />
+          <AlertDialogAction 
+            onClick={handleDelete} 
+            className="bg-red-500 hover:bg-red-600" 
+            disabled={isProcessing}
+          >
+            {isProcessing ? (
+              <>
+                <Loader2 size={16} className="mr-2 animate-spin" />
+                <TranslatableText text="Deleting..." />
+              </>
+            ) : (
+              <TranslatableText text="Delete" />
+            )}
           </AlertDialogAction>
         </AlertDialogFooter>
       </AlertDialogContent>
