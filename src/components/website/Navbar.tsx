@@ -5,6 +5,7 @@ import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { LanguageSelector } from '@/components/translation/LanguageSelector';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -23,19 +24,20 @@ const Navbar = () => {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-6">
           <Link to="/" className="text-gray-600 hover:text-primary text-sm">
-            Home
+            <TranslatableText text="Home" />
           </Link>
           <Link to="/blog" className="text-gray-600 hover:text-primary text-sm">
-            Blog
+            <TranslatableText text="Blog" />
           </Link>
           <Link to="/faq" className="text-gray-600 hover:text-primary text-sm">
-            FAQ
+            <TranslatableText text="FAQ" />
           </Link>
           <Button size="sm" asChild>
             <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
-              Download on App Store
+              <TranslatableText text="Download on App Store" />
             </a>
           </Button>
+          <LanguageSelector />
         </div>
 
         {/* Mobile Navigation Toggle */}
@@ -51,19 +53,20 @@ const Navbar = () => {
         <div className="md:hidden bg-white border-t border-gray-100 py-4">
           <div className="container mx-auto flex flex-col space-y-4 px-4">
             <Link to="/" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              Home
+              <TranslatableText text="Home" />
             </Link>
             <Link to="/blog" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              Blog
+              <TranslatableText text="Blog" />
             </Link>
             <Link to="/faq" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              FAQ
+              <TranslatableText text="FAQ" />
             </Link>
             <Button size="sm" className="w-full" asChild>
               <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
-                Download on App Store
+                <TranslatableText text="Download on App Store" />
               </a>
             </Button>
+            <LanguageSelector />
           </div>
         </div>
       )}

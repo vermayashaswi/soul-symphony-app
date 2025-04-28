@@ -6,6 +6,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PhoneVoiceAnimation } from '@/components/website/PhoneVoiceAnimation';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface HeroSectionProps {
   openAppStore: () => void;
@@ -33,10 +34,10 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             className="w-full lg:w-1/2 text-center lg:text-left"
           >
             <h1 className="text-4xl md:text-5xl lg:text-6xl font-bold mb-6 text-primary">
-              Express. Reflect. Grow.
+              <TranslatableText text="Express. Reflect. Grow." />
             </h1>
             <p className="text-xl md:text-2xl text-gray-700 mb-8 max-w-2xl mx-auto lg:mx-0">
-              Journaling should be as simple as talking. Use voice and leave the rest to us.
+              <TranslatableText text="Journaling should be as simple as talking. Use voice and leave the rest to us." />
             </p>
             
             <div className="flex flex-col sm:flex-row gap-4 justify-center lg:justify-start mb-8">
@@ -46,7 +47,7 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
                 onClick={openAppStore}
               >
                 <Apple className="h-5 w-5" />
-                App Store
+                <TranslatableText text="App Store" />
               </Button>
               <Button 
                 size="lg" 
@@ -54,18 +55,18 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
                 onClick={openPlayStore}
               >
                 <Play className="h-5 w-5" />
-                Google Play
+                <TranslatableText text="Google Play" />
               </Button>
             </div>
             
             <div className="flex items-center justify-center lg:justify-start gap-8 text-sm text-gray-500">
               <div className="flex items-center gap-1">
                 <Shield className="h-4 w-4 text-primary" />
-                Privacy-Focused
+                <TranslatableText text="Privacy-Focused" />
               </div>
               <div className="flex items-center gap-1">
                 <Check className="h-4 w-4 text-primary" />
-                14-Day Free Trial
+                <TranslatableText text="14-Day Free Trial" />
               </div>
             </div>
           </motion.div>

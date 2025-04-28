@@ -1,7 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useTranslation as useI18nTranslation } from 'react-i18next';
 import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
 
@@ -19,7 +18,6 @@ export function TranslatableText({
   const [translatedText, setTranslatedText] = useState(text);
   const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage } = useTranslation();
-  const { t } = useI18nTranslation();
   const location = useLocation();
   
   // Determine if we're on a website route (marketing site)
@@ -38,24 +36,6 @@ export function TranslatableText({
       if (isOnWebsite) {
         if (isMounted) setTranslatedText(text);
         return;
-      }
-
-      // Check if this is a translation key (contains dots or is in the form of a key)
-      const isTranslationKey = text.includes('.') || !text.includes(' ');
-      
-      if (isTranslationKey) {
-        try {
-          // Try to use i18next first
-          const i18nResult = t(text);
-          
-          // If it returns the key itself, then it's not found in i18n
-          if (i18nResult !== text) {
-            if (isMounted) setTranslatedText(i18nResult);
-            return;
-          }
-        } catch (error) {
-          console.warn(`TranslatableText: i18n key not found: "${text}"`);
-        }
       }
 
       // Fallback to dynamic translation service if not in English
@@ -88,7 +68,7 @@ export function TranslatableText({
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, translate, t, isOnWebsite]);
+  }, [text, currentLanguage, translate, isOnWebsite]);
 
   // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(
