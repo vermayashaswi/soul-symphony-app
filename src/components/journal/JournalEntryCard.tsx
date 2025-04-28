@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -15,9 +16,9 @@ import ErrorBoundary from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 
+// Extended JournalEntry type that includes content property
 export interface JournalEntry extends JournalEntryType {
-  content: string;
-  created_at: string;
+  content?: string;  // Make content optional to match existing usage pattern
 }
 
 interface JournalEntryCardProps {
@@ -37,11 +38,11 @@ export function JournalEntryCard({
 }: JournalEntryCardProps) {
   const safeEntry = {
     id: entry?.id || 0,
-    content: entry?.content || "Processing entry...",
+    content: entry?.content || entry?.["refined text"] || entry?.["transcription text"] || "Processing entry...",
     created_at: entry?.created_at || new Date().toISOString(),
     sentiment: entry?.sentiment || null,
     master_themes: Array.isArray(entry?.master_themes) ? entry.master_themes : [],
-    themes: Array.isArray(entry?.themes) ? entry.themes : [],
+    themes: entry?.master_themes || [], // Use master_themes as themes for backward compatibility
     Edit_Status: entry?.Edit_Status || null,
     user_feedback: entry?.user_feedback || null
   };

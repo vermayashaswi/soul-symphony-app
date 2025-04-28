@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -103,7 +102,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     }
 
     const filtered = entries.filter(entry => {
-      const content = (entry.content || '').toLowerCase();
+      const content = (entry.content || entry["refined text"] || entry["transcription text"] || '').toLowerCase();
       const query = searchQuery.toLowerCase();
       
       if (content.includes(query)) return true;
@@ -127,12 +126,6 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
         } catch (e) {
           console.error("Error parsing entities:", e);
         }
-      }
-      
-      if (entry.themes && Array.isArray(entry.themes)) {
-        return entry.themes.some(theme => 
-          theme.toLowerCase().includes(query)
-        );
       }
       
       if (entry.master_themes && Array.isArray(entry.master_themes)) {

@@ -2,8 +2,7 @@
 import React from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import ErrorBoundary from './ErrorBoundary';
-import { JournalEntry } from '@/types/journal';
-import { JournalEntryCard } from './JournalEntryCard';
+import { JournalEntryCard, JournalEntry } from './JournalEntryCard';
 
 interface JournalEntryListProps {
   entries: JournalEntry[];

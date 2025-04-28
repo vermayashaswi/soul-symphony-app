@@ -3,8 +3,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { CheckCircle2 } from 'lucide-react';
-import { JournalEntryCard } from '../JournalEntryCard';
-import { JournalEntry } from '@/types/journal';
+import { JournalEntryCard, JournalEntry } from '../JournalEntryCard';
 
 interface ProcessingEntryCardProps {
   tempId: string;
@@ -44,6 +43,12 @@ export const ProcessingEntryCard: React.FC<ProcessingEntryCardProps> = ({
     return null;
   }
   
+  // Ensure the entry has a content property derived from other fields if needed
+  const entryWithContent: JournalEntry = {
+    ...actualEntry,
+    content: actualEntry.content || actualEntry["refined text"] || actualEntry["transcription text"] || "Processing entry..."
+  };
+  
   return (
     <motion.div
       key={`transitional-${tempId}`}
@@ -55,7 +60,7 @@ export const ProcessingEntryCard: React.FC<ProcessingEntryCardProps> = ({
       className="relative rounded-lg shadow-md overflow-hidden ring-2 ring-primary ring-opacity-50"
     >
       <JournalEntryCard 
-        entry={actualEntry}
+        entry={entryWithContent}
         onDelete={onDelete}
         isNew={true}
         isProcessing={false}

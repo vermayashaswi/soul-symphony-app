@@ -1,7 +1,6 @@
 
 import React, { useEffect, useState, useRef } from 'react';
 import { JournalEntry } from '@/types/journal';
-import { Button } from '@/components/ui/button';
 import { Plus, Mic, Loader2 } from 'lucide-react';
 import EmptyJournalState from './EmptyJournalState';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -64,7 +63,14 @@ const JournalEntriesList = ({
     fullyProcessedEntries,
     processingCardShouldShow,
     setProcessingCardShouldShow,
-    setVisibleProcessingEntries
+    setVisibleProcessingEntries,
+    setProcessingToActualEntry,
+    setTransitionalLoadingEntries,
+    setRecentlyCompletedEntries,
+    setProcessedProcessingIds,
+    setDeletedEntryIds,
+    setDeletedProcessingTempIds,
+    setFullyProcessedEntries
   } = useProcessingEntries({
     entries,
     processingEntries
@@ -104,8 +110,14 @@ const JournalEntriesList = ({
             continue;
           }
           
-          if (entry.content || entry.created_at || entry['transcription text'] || entry['refined text']) {
-            entryIdToKeep.set(entry.id, entry);
+          // Check for valid content in the entry - could be in different fields based on API
+          if (entry["refined text"] || entry.created_at || entry["transcription text"]) {
+            // Create an entry with a content property derived from available fields
+            const entryWithContent = {
+              ...entry,
+              content: entry["refined text"] || entry["transcription text"] || ""
+            };
+            entryIdToKeep.set(entry.id, entryWithContent);
             currentEntryIds.add(entry.id);
           }
         }
