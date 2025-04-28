@@ -20,7 +20,10 @@ export interface JournalEntry {
   master_themes?: string[];
   user_feedback?: string | null;
   Edit_Status?: number | null;
-  content?: string; // Adding content as an optional property
+  content?: string; // Content field for easier access
+  original_language?: string; // Original language of the entry
+  translation_text?: string; // Translated text when available
+  translation_status?: string; // Status of translation process
 }
 
 export interface JournalEntryFormData extends JournalEntry {

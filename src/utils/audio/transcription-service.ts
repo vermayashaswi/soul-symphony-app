@@ -45,7 +45,19 @@ export async function sendAudioForTranscription(
     const estimatedDuration = Math.floor(base64Audio.length / 10000);
     console.log(`[TranscriptionService] Estimated recording duration: ~${estimatedDuration}s`);
 
+    // Log the request parameters for debugging
+    console.log('[TranscriptionService] Request parameters:', {
+      userId: userId ? '(provided)' : '(not provided)',
+      directTranscription,
+      highQuality: processSentiment,
+      audioSize: base64Audio.length,
+      estimatedDuration: estimatedDuration * 1000
+    });
+
     // Invoke the edge function
+    console.log('[TranscriptionService] Calling transcribe-audio edge function...');
+    const startTime = Date.now();
+    
     const { data, error } = await supabase.functions.invoke('transcribe-audio', {
       body: {
         audio: base64Audio,
@@ -55,6 +67,9 @@ export async function sendAudioForTranscription(
         recordingTime: estimatedDuration * 1000 // Convert to milliseconds
       },
     });
+    
+    const elapsed = Date.now() - startTime;
+    console.log(`[TranscriptionService] Edge function responded in ${elapsed}ms`);
 
     if (error) {
       console.error('[TranscriptionService] Edge function error:', error);
@@ -66,6 +81,7 @@ export async function sendAudioForTranscription(
       throw new Error('No data returned from transcription service');
     }
 
+    console.log('[TranscriptionService] Transcription response:', data);
     console.log('[TranscriptionService] Transcription completed successfully');
     
     return {
@@ -87,7 +103,15 @@ export async function sendAudioForTranscription(
  */
 export async function audioToBase64(blob: Blob): Promise<string> {
   try {
-    return await blobToBase64(blob);
+    console.log(`[TranscriptionService] Converting audio blob to base64, size: ${blob.size} bytes`);
+    const startTime = Date.now();
+    
+    const base64 = await blobToBase64(blob);
+    
+    const elapsed = Date.now() - startTime;
+    console.log(`[TranscriptionService] Conversion completed in ${elapsed}ms, result size: ${base64.length} characters`);
+    
+    return base64;
   } catch (error) {
     console.error('[TranscriptionService] Error converting audio to base64:', error);
     throw new Error('Failed to convert audio to base64');
