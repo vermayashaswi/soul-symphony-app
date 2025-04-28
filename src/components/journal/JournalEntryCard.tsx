@@ -36,6 +36,8 @@ export interface JournalEntry {
   } | null;
   Edit_Status?: number | null;
   user_feedback?: string | null;
+  "transcription text"?: string;
+  "refined text"?: string;
 }
 
 interface JournalEntryCardProps {
@@ -43,7 +45,9 @@ interface JournalEntryCardProps {
   onDelete?: (entryId: number) => void;
   isNew?: boolean;
   isProcessing?: boolean;
-  setEntries: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
+  processing?: boolean;
+  processed?: boolean;
+  setEntries?: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
 }
 
 export function JournalEntryCard({ 
@@ -51,6 +55,8 @@ export function JournalEntryCard({
   onDelete, 
   isNew = false, 
   isProcessing = false,
+  processing = false,
+  processed = false,
   setEntries
 }: JournalEntryCardProps) {
   const safeEntry = {

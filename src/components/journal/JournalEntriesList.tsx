@@ -1,11 +1,12 @@
+
 import React from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
-import { EmptyState } from '@/components/ui/empty-state';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Plus } from 'lucide-react';
 import JournalEntriesHeader from './JournalEntriesHeader';
+import EmptyJournalState from './EmptyJournalState';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -42,7 +43,10 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           {entries.map((entry) => (
             <JournalEntryCard
               key={entry.id}
-              entry={entry}
+              entry={{
+                ...entry,
+                content: entry.content || entry["refined text"] || entry["transcription text"] || "",
+              }}
               processing={processingEntries.some(tempId => tempId.includes(String(entry.id)))}
               processed={processedEntryIds.includes(entry.id)}
               onDelete={onDeleteEntry}
@@ -50,12 +54,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           ))}
         </div>
       ) : (
-        <EmptyState
-          title={<TranslatableText text="No journal entries yet" />}
-          description={<TranslatableText text="Start recording your thoughts and experiences" />}
-          buttonText={<TranslatableText text="Record new entry" />}
-          onAction={onStartRecording}
-        />
+        <EmptyJournalState onStartRecording={onStartRecording} />
       )}
     </div>
   );
