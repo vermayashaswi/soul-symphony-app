@@ -53,3 +53,19 @@ export const extractSummary = (text: string, wordCount: number = 20): string => 
   
   return words.slice(0, wordCount).join(' ') + '...';
 };
+
+/**
+ * Returns true if the text is likely to overflow when limited to the specified number of lines
+ * @param text Text content to check
+ * @param lineHeight Approximate line height in characters
+ * @param maxLines Maximum number of lines before overflow
+ */
+export const textWillOverflow = (text: string, lineHeight = 60, maxLines = 3): boolean => {
+  if (!text) return false;
+  
+  // Rough estimation - average character count per line
+  const totalChars = text.length;
+  const estimatedLines = Math.ceil(totalChars / lineHeight);
+  
+  return estimatedLines > maxLines;
+};

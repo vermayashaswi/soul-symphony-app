@@ -17,6 +17,7 @@ import { ThumbsUp, ThumbsDown, ArrowDown, ArrowUp } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
+import { textWillOverflow } from '@/utils/textUtils';
 
 export interface JournalEntry {
   id: number;
@@ -84,7 +85,16 @@ export function JournalEntryCard({
   const [contentLoaded, setContentLoaded] = useState(false);
   const [thumbsUp, setThumbsUp] = useState(false);
   const [thumbsDown, setThumbsDown] = useState(false);
+  const [hasOverflow, setHasOverflow] = useState(false);
   const mountedRef = useRef<boolean>(true);
+  
+  // Initial check for content overflow
+  useEffect(() => {
+    if (safeEntry.content) {
+      const overflow = textWillOverflow(safeEntry.content);
+      setHasOverflow(overflow);
+    }
+  }, [safeEntry.content]);
   
   const extractThemes = (): string[] => {
     try {
@@ -384,6 +394,10 @@ export function JournalEntryCard({
     }, 3000);
   };
 
+  const handleContentOverflow = (overflow: boolean) => {
+    setHasOverflow(overflow);
+  };
+
   if (hasError) {
     return (
       <Card className="bg-background shadow-md border-red-300">
@@ -502,6 +516,7 @@ export function JournalEntryCard({
                   content={safeEntry.content} 
                   isExpanded={isExpanded} 
                   isProcessing={isContentProcessing}
+                  onOverflowChange={handleContentOverflow}
                 />
               )}
             </ErrorBoundary>
@@ -521,17 +536,20 @@ export function JournalEntryCard({
             )}
           </div>
 
-          <div className="flex justify-end p-2">
-            <Button
-              onClick={toggleExpanded}
-              className="rounded-full h-8 w-8 p-0"
-              size="icon"
-              variant="ghost"
-              aria-label={isExpanded ? "Show less" : "Show more"}
-            >
-              {isExpanded ? <ArrowUp size={18} /> : <ArrowDown size={18} />}
-            </Button>
-          </div>
+          {/* Only show the expand/collapse button if there is content overflow or themes are shown */}
+          {(hasOverflow || showThemes || isExpanded) && (
+            <div className="flex justify-end p-2">
+              <Button
+                onClick={toggleExpanded}
+                className="rounded-full h-8 w-8 p-0"
+                size="icon"
+                variant="ghost"
+                aria-label={isExpanded ? "Show less" : "Show more"}
+              >
+                {isExpanded ? <ArrowUp size={18} /> : <ArrowDown size={18} />}
+              </Button>
+            </div>
+          )}
         </Card>
       </motion.div>
     </ErrorBoundary>
