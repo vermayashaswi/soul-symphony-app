@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { TranslatedContent } from '../entry-card/TranslatedContent';
@@ -53,14 +54,17 @@ export function EntryContent({
         // Otherwise fetch it from Supabase
         const { data, error } = await supabase
           .from('Journal Entries')
-          .select('original_language')
+          .select('*')  // Select all columns to ensure we get what's available
           .eq('id', entryId)
           .single();
           
-        if (!error && data && data.original_language) {
-          setDetectedLanguage(data.original_language);
-          // Cache the result
-          localStorage.setItem(`entry_lang_${entryId}`, data.original_language);
+        if (!error && data) {
+          // Check if translation_text or original_language fields exist
+          if (data.original_language) {
+            setDetectedLanguage(data.original_language);
+            // Cache the result
+            localStorage.setItem(`entry_lang_${entryId}`, data.original_language);
+          }
         }
       } catch (error) {
         console.error('Error fetching entry language:', error);

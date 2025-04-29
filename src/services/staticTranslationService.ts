@@ -22,6 +22,7 @@ class StaticTranslationService {
    * Translate text to the current target language
    * @param text The text to translate
    * @param sourceLanguage Optional source language of the text
+   * @param entryId Optional entry ID for caching purposes
    * @returns The translated text
    */
   async translateText(text: string, sourceLanguage?: string, entryId?: number): Promise<string> {

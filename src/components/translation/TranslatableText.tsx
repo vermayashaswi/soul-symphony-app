@@ -25,65 +25,66 @@ export function TranslatableText({
   // Determine if we're on a website route (marketing site)
   const isOnWebsite = isWebsiteRoute(location.pathname);
 
+  // Function to translate text
+  const translateText = async () => {
+    // Always start with the original text first
+    setTranslatedText(text);
+    
+    if (!text?.trim()) {
+      setTranslatedText('');
+      return;
+    }
+
+    // Skip translations for the marketing website pages
+    if (isOnWebsite) {
+      setTranslatedText(text);
+      return;
+    }
+
+    // Only initiate translation if not in English
+    if (currentLanguage !== 'en') {
+      setIsLoading(true);
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'}`);
+
+      try {
+        const result = await translate(text, sourceLanguage);
+        setTranslatedText(result || text); // Fallback to original text if result is empty
+        console.log(`TranslatableText: Successfully translated to "${result?.substring(0, 30) || 'empty'}..."`);
+      } catch (error) {
+        console.error('Translation error:', error);
+        setTranslatedText(text); // Fallback to original
+        console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
+      } finally {
+        setIsLoading(false);
+      }
+    }
+  };
+
+  // Effect to handle translation when text or language changes
   useEffect(() => {
     let isMounted = true;
 
-    const translateText = async () => {
-      // Always start with the original text first
-      if (isMounted) setTranslatedText(text);
-      
-      if (!text?.trim()) {
-        if (isMounted) setTranslatedText('');
-        return;
-      }
-
-      // Skip translations for the marketing website pages
-      if (isOnWebsite) {
-        if (isMounted) setTranslatedText(text);
-        return;
-      }
-
-      // Only initiate translation if not in English
-      if (currentLanguage !== 'en') {
-        setIsLoading(true);
-        console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'}`);
-
-        try {
-          const result = await translate(text, sourceLanguage);
-          if (isMounted) {
-            setTranslatedText(result || text); // Fallback to original text if result is empty
-            console.log(`TranslatableText: Successfully translated to "${result?.substring(0, 30) || 'empty'}..."`);
-          }
-        } catch (error) {
-          console.error('Translation error:', error);
-          if (isMounted) {
-            setTranslatedText(text); // Fallback to original
-            console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
-          }
-        } finally {
-          if (isMounted) setIsLoading(false);
-        }
+    const handleTranslation = async () => {
+      if (isMounted) {
+        await translateText();
       }
     };
 
-    translateText();
+    handleTranslation();
 
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, translate, isOnWebsite, sourceLanguage]);
+  }, [text, currentLanguage, sourceLanguage]);
   
-  // Listen to the language change event to force re-render
+  // Listen to language change events to force re-translate
   useEffect(() => {
-    const handleLanguageChange = (event: CustomEvent) => {
-      console.log(`TranslatableText: Language change event detected: ${event.detail.language}`);
-      // Always set the original text first to ensure content is always visible
+    const handleLanguageChange = () => {
+      // First set to original text to ensure visibility during translation
       setTranslatedText(text);
       
-      // This will re-trigger the translation effect
-      if (currentLanguage !== 'en') {
-        setIsLoading(true);
-      }
+      // Then retranslate
+      translateText();
     };
     
     window.addEventListener('languageChange', handleLanguageChange as EventListener);

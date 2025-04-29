@@ -30,7 +30,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
 
         const { data, error } = await supabase
           .from('Journal Entries')
-          .select('master_themes, original_language')
+          .select('*')  // Select all columns to ensure we get what's available
           .eq('id', entryId)
           .single();
 
@@ -41,7 +41,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         }
 
         if (data) {
-          // Check if original_language exists in the response
+          // Check if there's a language field in the data
           if (data.original_language) {
             setEntryLanguage(data.original_language);
           }

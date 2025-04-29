@@ -13,31 +13,49 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
   const [isLoading, setIsLoading] = useState(true);
   const { currentLanguage, translate } = useTranslation();
 
-  useEffect(() => {
-    async function translateContent() {
-      setIsLoading(true);
-      try {
-        if (currentLanguage === 'en') {
-          setTranslatedContent(content);
-        } else {
-          // Always keep the original content initially
-          setTranslatedContent(content);
-          // Pass the detected language to the translation service if available
-          const translated = await translate(content, language);
-          if (translated) {
-            setTranslatedContent(translated);
-          }
+  // Function to handle translation
+  const handleTranslation = async () => {
+    setIsLoading(true);
+    try {
+      if (currentLanguage === 'en') {
+        setTranslatedContent(content);
+      } else {
+        // Always keep the original content initially
+        setTranslatedContent(content);
+        // Pass the detected language to the translation service if available
+        const translated = await translate(content, language);
+        if (translated) {
+          setTranslatedContent(translated);
         }
-      } catch (error) {
-        console.error('Translation error:', error);
-        setTranslatedContent(content); // Fallback to original content
-      } finally {
-        setIsLoading(false);
       }
+    } catch (error) {
+      console.error('Translation error:', error);
+      setTranslatedContent(content); // Fallback to original content
+    } finally {
+      setIsLoading(false);
     }
+  };
 
-    translateContent();
-  }, [content, currentLanguage, translate, language]);
+  // Effect to translate content when it changes or language changes
+  useEffect(() => {
+    handleTranslation();
+  }, [content, currentLanguage, language]);
+
+  // Listen for language change events
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      // First set to original content
+      setTranslatedContent(content);
+      // Then retranslate
+      handleTranslation();
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+    };
+  }, [content, language]);
 
   return (
     <div>
