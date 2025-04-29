@@ -198,7 +198,7 @@ const Home = () => {
               </h1>
             </div>
 
-            <div className="flex items-center">
+            <div className="flex items-center z-50">
               <motion.div
                 variants={dateStripVariants}
                 initial="hidden"
@@ -217,7 +217,7 @@ const Home = () => {
                   {translatedDate || formattedDate}
                 </div>
               </motion.div>
-              <div className="ml-2 z-[100]">
+              <div className="ml-2 z-50 pointer-events-auto">
                 <LanguageSelector />
               </div>
             </div>
