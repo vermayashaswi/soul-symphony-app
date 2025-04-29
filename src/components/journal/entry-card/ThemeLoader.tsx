@@ -41,10 +41,12 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         }
 
         if (data) {
+          // Check if original_language exists in the response
           if (data.original_language) {
             setEntryLanguage(data.original_language);
           }
           
+          // Check if master_themes exists in the response
           if (Array.isArray(data.master_themes)) {
             const filteredThemes = data.master_themes.filter(theme => 
               theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'

@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { useTranslation, languages } from '@/contexts/TranslationContext';
+import { useTranslation } from '@/contexts/TranslationContext';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -12,6 +12,20 @@ import { Globe } from 'lucide-react';
 
 export function LanguageSelector() {
   const { currentLanguage, setLanguage, isTranslating } = useTranslation();
+
+  // Use locally defined languages to avoid circular imports
+  const languages = [
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
+    { code: 'fr', label: 'Français' },
+    { code: 'de', label: 'Deutsch' },
+    { code: 'hi', label: 'हिन्दी' },
+    { code: 'zh', label: '中文' },
+    { code: 'ja', label: '日本語' },
+    { code: 'ru', label: 'Русский' },
+    { code: 'ar', label: 'العربية' },
+    { code: 'pt', label: 'Português' },
+  ];
 
   const currentLanguageLabel = languages.find(lang => lang.code === currentLanguage)?.label || 'Language';
   

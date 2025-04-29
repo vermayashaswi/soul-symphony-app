@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { TranslatedContent } from '../entry-card/TranslatedContent';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EntryContentProps {
   content: string;
@@ -50,9 +51,6 @@ export function EntryContent({
         }
         
         // Otherwise fetch it from Supabase
-        const { createClient } = await import('@/integrations/supabase/client');
-        const supabase = createClient();
-        
         const { data, error } = await supabase
           .from('Journal Entries')
           .select('original_language')
