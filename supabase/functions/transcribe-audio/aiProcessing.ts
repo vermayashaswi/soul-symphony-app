@@ -1,109 +1,236 @@
+// Import necessary Deno modules
+import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/base64.ts";
+
+/**
+ * Transcribe audio using OpenAI's Whisper API
+ * @param audioBlob - The audio blob to transcribe
+ * @param fileType - The audio file type (webm, mp4, wav, etc.)
+ * @param apiKey - The OpenAI API key
+ * @param language - The language code or 'auto' for auto-detection
+ * @returns Transcribed text and detected languages
+ */
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob,
-  fileExtension: string,
+  fileType: string,
   apiKey: string,
   language: string = 'auto'
-): Promise<{ text: string, detectedLanguages: string[] }> {
+): Promise<{ text: string; detectedLanguages: string[] }> {
   try {
-    console.log('[Transcription] Preparing audio for OpenAI:', {
+    // Determine the appropriate filename extension based on audio type
+    const fileExtension = fileType === 'webm' ? 'webm' : 
+                         fileType === 'mp4' ? 'm4a' :
+                         fileType === 'wav' ? 'wav' : 'ogg';
+    
+    // Prepare the audio file with an appropriate name for the OpenAI API
+    const filename = `audio.${fileExtension}`;
+    console.log("[Transcription] Using filename:", filename);
+    
+    // Convert the blob to an ArrayBuffer
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBytes = new Uint8Array(arrayBuffer);
+    
+    console.log("[Transcription] Preparing audio for OpenAI:", {
       blobSize: audioBlob.size,
       blobType: audioBlob.type,
       fileExtension
     });
     
-    if (!apiKey) {
-      throw new Error('Missing OpenAI API key');
-    }
-    
-    if (!audioBlob || audioBlob.size === 0) {
-      throw new Error('Empty or invalid audio data');
-    }
-    
-    if (audioBlob.size < 100) {
-      throw new Error('Audio file is too small to be valid');
-    }
-    
-    const contentType = audioBlob.type || 'audio/wav';
-    if (!contentType.includes('audio/')) {
-      console.warn('[Transcription] Audio blob has non-audio content type:', contentType);
-    }
-    
-    const filename = `audio.${fileExtension || 'wav'}`;
-    console.log(`[Transcription] Using filename: ${filename}`);
-    
+    // Create form data to send to the OpenAI API
     const formData = new FormData();
-    formData.append('file', audioBlob, filename);
-    formData.append('model', 'gpt-4o-transcribe');
+    formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
+    formData.append("model", "gpt-4o-transcribe-mini"); // Use the mini model for transcription
     
-    formData.append('response_format', 'json');
-    formData.append('prompt', 'The following is a journal entry or conversation that may contain personal thoughts, feelings, or experiences.');
+    // Only add language parameter if it's not 'auto'
+    if (language !== 'auto') {
+      formData.append("language", language);
+    }
     
-    console.log('[Transcription] Sending request to OpenAI with:', {
+    console.log("[Transcription] Sending request to OpenAI with:", {
       fileSize: audioBlob.size,
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: 'gpt-4o-transcribe',
-      autoLanguageDetection: true
+      model: "gpt-4o-transcribe-mini",
+      autoLanguageDetection: language === 'auto'
     });
     
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 60000);
+    // Call the OpenAI API for transcription
+    const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
+      method: "POST",
+      headers: {
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: formData
+    });
     
-    try {
-      const response = await fetch('https://api.openai.com/v1/audio/transcriptions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`
-        },
-        body: formData,
-        signal: controller.signal
-      });
-      
-      clearTimeout(timeoutId);
-      
-      if (!response.ok) {
-        const errorText = await response.text();
-        console.error('[Transcription] API error:', errorText);
-        throw new Error(`Transcription API error: ${response.status} - ${errorText}`);
-      }
-      
-      const result = await response.json();
-      
-      if (!result.text) {
-        console.error('[Transcription] No text in response:', result);
-        throw new Error('No transcription text returned from API');
-      }
-      
-      console.log('[Transcription] Success:', {
-        textLength: result.text.length,
-        sampleText: result.text.substring(0, 100) + '...',
-        model: 'gpt-4o-transcribe',
-        detectedLanguage: result.language || 'unknown',
-      });
-      
-      const detectedLanguages = result.language ? [result.language] : ['auto'];
-      
-      return {
-        text: result.text,
-        detectedLanguages
-      };
-    } catch (fetchError) {
-      clearTimeout(timeoutId);
-      if (fetchError.name === 'AbortError') {
-        throw new Error('Transcription request timed out after 60 seconds');
-      }
-      throw fetchError;
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[Transcription] OpenAI API error:", errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
+    
+    // Parse the response
+    const result = await response.json();
+    
+    // Get the transcribed text from the result
+    const transcribedText = result.text || "";
+    
+    // Get detected languages (defaults to "unknown" if not provided)
+    const detectedLanguages = result.language ? [result.language] : ["auto"];
+    
+    console.log("[Transcription] Success:", {
+      textLength: transcribedText.length,
+      sampleText: transcribedText.substring(0, 50) + "...",
+      model: "gpt-4o-transcribe-mini",
+      detectedLanguage: detectedLanguages[0]
+    });
+    
+    return {
+      text: transcribedText,
+      detectedLanguages
+    };
   } catch (error) {
-    console.error('[Transcription] Error in transcribeAudioWithWhisper:', error);
+    console.error("[Transcription] Error:", error);
     throw error;
   }
 }
 
+/**
+ * Translates and refines text using GPT-4 
+ * Handles translation to English if needed and improves transcription quality
+ */
+export async function translateAndRefineText(
+  text: string, 
+  apiKey: string,
+  detectedLanguages: string[]
+): Promise<{ refinedText: string; }> {
+  try {
+    console.log("[AI] Starting text refinement:", text.substring(0, 50) + "...");
+    console.log("[AI] Detected languages:", detectedLanguages);
+    
+    // Prepare the system message based on detected language
+    const isNonEnglish = detectedLanguages[0] !== 'en' && detectedLanguages[0] !== 'auto';
+    
+    // Call the OpenAI API with the appropriate system message
+    const systemMessage = isNonEnglish 
+      ? "You are a multilingual expert that translates and refines text from any language to English. Translate the following text into clear, natural English while preserving all meaning and emotion."
+      : "You are an expert at refining transcribed text. Clean up the input text into clear, well-structured sentences. Fix grammar issues, remove filler words, and make it sound more natural, but preserve ALL the original meaning and information.";
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o", // Using main model for high-quality translation/refinement
+        messages: [
+          {
+            role: "system",
+            content: systemMessage
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        max_tokens: 1000
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[AI] OpenAI API error:", errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
+    }
+    
+    const result = await response.json();
+    const refinedText = result.choices?.[0]?.message?.content || text;
+    
+    console.log("[AI] Text refined successfully, new length:", refinedText.length);
+    console.log("[AI] Original text sample:", text.substring(0, 50));
+    console.log("[AI] Refined text sample:", refinedText.substring(0, 50));
+    
+    return { refinedText };
+  } catch (error) {
+    console.error("[AI] Text refinement error:", error);
+    return { refinedText: text }; // Return original text on error
+  }
+}
+
+/**
+ * Analyze emotions in text using OpenAI's GPT-4
+ */
+export async function analyzeEmotions(
+  text: string,
+  emotionsData: Array<{ name: string; description: string }>,
+  apiKey: string
+): Promise<Record<string, number>> {
+  try {
+    console.log("[AI] Analyzing emotions in text:", text.substring(0, 50) + "....");
+    
+    // Create a prompt with available emotions
+    const emotionOptions = emotionsData
+      .map(e => `${e.name}: ${e.description}`)
+      .join("\n");
+    
+    const systemPrompt = `
+      You are an expert at detecting emotions in text. Analyze the following text and assign scores to the emotions below:
+      ${emotionOptions}
+      
+      Only return emotions that are clearly present in the text. 
+      Use a scale of 0.0 to 1.0, where 0.0 means not present and 1.0 means strongly present.
+      Return your response as a JSON object with emotion names as keys and scores as values.
+      Return ONLY a valid JSON object without any additional text.
+    `;
+    
+    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: "gpt-4o",
+        messages: [
+          {
+            role: "system",
+            content: systemPrompt
+          },
+          {
+            role: "user",
+            content: text
+          }
+        ],
+        response_format: { type: "json_object" }
+      })
+    });
+    
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error("[AI] Emotion analysis API error:", errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
+    }
+    
+    const result = await response.json();
+    const emotionsResult = JSON.parse(result.choices[0].message.content);
+    
+    console.log("[AI] Emotions analyzed successfully:", emotionsResult);
+    
+    return emotionsResult;
+  } catch (error) {
+    console.error("[AI] Emotion analysis error:", error);
+    // Return a small set of default emotions on error
+    return { Neutral: 0.5 };
+  }
+}
+
+/**
+ * Generate embedding for text using OpenAI's embedding API
+ */
 export async function generateEmbedding(text: string, apiKey: string): Promise<number[]> {
   try {
-    console.log("[AI] Generating embedding for text:", text.substring(0, 100) + "...");
+    console.log("[AI] Generating embedding for text:", text.substring(0, 50) + "....");
     
     const response = await fetch("https://api.openai.com/v1/embeddings", {
       method: "POST",
@@ -113,183 +240,24 @@ export async function generateEmbedding(text: string, apiKey: string): Promise<n
       },
       body: JSON.stringify({
         model: "text-embedding-3-small",
-        input: text.substring(0, 8000)
+        input: text
       })
     });
     
     if (!response.ok) {
       const errorText = await response.text();
       console.error("[AI] Embedding API error:", errorText);
-      throw new Error(`Embedding API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
     
     const result = await response.json();
+    const embedding = result.data[0].embedding;
+    
     console.log("[AI] Embedding generated successfully");
     
-    return result.data[0].embedding;
+    return embedding;
   } catch (error) {
-    console.error("[AI] Error in generateEmbedding:", error);
+    console.error("[AI] Embedding error:", error);
     throw error;
-  }
-}
-
-export async function analyzeEmotions(text: string, emotionsData: any[], apiKey: string): Promise<Record<string, number>> {
-  try {
-    console.log("[AI] Analyzing emotions in text:", text.substring(0, 100) + "...");
-    
-    const emotionsList = emotionsData.map(e => `- ${e.name}: ${e.description}`).join('\n');
-    
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are an emotion analysis assistant. You will analyze text and identify emotions expressed in it.
-            Analyze the text and select up to 3 of the most prominent emotions from this list:
-            ${emotionsList}
-            
-            For each emotion you identify, provide an intensity score from 0.1 to 1.0 (with 1.0 being the strongest).
-            Format your response as JSON without explanations, like this example:
-            {"Joy": 0.8, "Gratitude": 0.6, "Curiosity": 0.4}`
-          },
-          {
-            role: "user",
-            content: text
-          }
-        ],
-        temperature: 0.2,
-        response_format: { type: "json_object" }
-      })
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[AI] Emotions API error:", errorText);
-      throw new Error(`Emotions API error: ${response.status} - ${errorText}`);
-    }
-    
-    const result = await response.json();
-    const emotions = JSON.parse(result.choices[0].message.content);
-    
-    console.log("[AI] Emotions analyzed successfully:", emotions);
-    
-    return emotions;
-  } catch (error) {
-    console.error("[AI] Error in analyzeEmotions:", error);
-    return {};
-  }
-}
-
-export async function translateAndRefineText(text: string, apiKey: string, detectedLanguages: string[] = ['en']): Promise<{ refinedText: string }> {
-  try {
-    console.log("[AI] Starting text refinement:", text.substring(0, 100) + "...");
-    console.log("[AI] Detected languages:", detectedLanguages);
-    
-    const languageList = detectedLanguages.join(', ');
-    
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: 'POST',
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: `You are a multilingual translator and language refinement expert for a voice journaling app called SOuLO. Users speak in multiple languages and your job is to translate everything clearly into English.
-
-Detected languages in this transcription: ${languageList}
-
-Instructions:
-1. Translate the entire input into fluent, emotionally accurate English.
-2. Fix spelling, grammar, and clarity issues while preserving the original meaning.
-3. Do NOT summarize or remove content — preserve all details.
-4. ALWAYS improve the structure or word choice — even if the input is already in English.
-5. NEVER return the original input text — ensure the output is a refined version in English.`
-          },
-          {
-            role: "user",
-            content: text
-          }
-        ],
-        temperature: 0.3
-      })
-    });
-    
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error("[AI] Refinement API error:", errorText);
-      console.log("[AI] Making second attempt with simpler prompt");
-      return await makeSecondAttempt(text, apiKey);
-    }
-    
-    const result = await response.json();
-    const refinedText = result.choices[0].message.content;
-    
-    if (refinedText === text) {
-      console.log("[AI] Refined text identical to original, making second attempt");
-      return await makeSecondAttempt(text, apiKey);
-    }
-    
-    console.log("[AI] Text refined successfully, new length:", refinedText.length);
-    console.log("[AI] Original text sample:", text.substring(0, 50));
-    console.log("[AI] Refined text sample:", refinedText.substring(0, 50));
-    
-    return { refinedText };
-  } catch (error) {
-    console.error("[AI] Error in translateAndRefineText:", error);
-    return await makeSecondAttempt(text, apiKey);
-  }
-}
-
-async function makeSecondAttempt(text: string, apiKey: string): Promise<{ refinedText: string }> {
-  try {
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: 'POST',
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [
-          {
-            role: "system",
-            content: "You are a text editor. You MUST make at least minor improvements to the text - never return it exactly as provided. Fix spelling, grammar, and improve clarity while preserving the original meaning."
-          },
-          {
-            role: "user",
-            content: text
-          }
-        ],
-        temperature: 0.2
-      })
-    });
-    
-    if (!response.ok) {
-      console.error("[AI] Second refinement attempt failed");
-      return { refinedText: text.trim() + (text.trim().endsWith('.') ? '' : '.') };
-    }
-    
-    const result = await response.json();
-    const refinedText = result.choices[0].message.content;
-    
-    if (refinedText === text) {
-      return { refinedText: text.trim() + (text.trim().endsWith('.') ? '' : '.') };
-    }
-    
-    console.log("[AI] Second attempt refinement complete");
-    return { refinedText };
-  } catch (error) {
-    console.error("[AI] Error in second refinement attempt:", error);
-    return { refinedText: text.trim() + (text.trim().endsWith('.') ? '' : '.') };
   }
 }

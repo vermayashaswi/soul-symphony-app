@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { corsHeaders, handleCorsRequest, createErrorResponse, createSuccessResponse } from "../_shared/utils.ts";
@@ -100,7 +101,7 @@ serve(async (req) => {
     console.log("Direct transcription mode:", directTranscription ? "YES" : "NO");
     console.log("High quality mode:", highQuality ? "YES" : "NO");
     console.log("Audio data length:", audio.length);
-    console.log("Using model: gpt-4o-transcribe");
+    console.log("Using model: gpt-4o-transcribe-mini");
     
     // Process audio data in a try-catch block to handle any processing errors
     let binaryAudio;
@@ -161,16 +162,16 @@ serve(async (req) => {
     });
     
     try {
-      // Transcribe audio with the new model that provides language detection
+      // Transcribe audio with the new mini model that provides language detection
       console.log("Sending audio to OpenAI API for transcription");
-      console.log("Using model: gpt-4o-transcribe");
+      console.log("Using model: gpt-4o-transcribe-mini");
       
-      // Important: Use 'en' as default language instead of 'auto'
+      // Important: Use 'auto' for language detection
       const { text: transcribedText, detectedLanguages } = await transcribeAudioWithWhisper(
         blob, 
         detectedFileType, 
         openAIApiKey, 
-        'en'  // Use 'en' as a fallback instead of 'auto'
+        'auto'  // Use 'auto' for automatic language detection
       );
       
       console.log("Transcription successful:", transcribedText ? "yes" : "no");

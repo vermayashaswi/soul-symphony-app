@@ -52,6 +52,7 @@ export function EntryContent({
     return <LoadingEntryContent />;
   }
 
+  // Handle multi-language content display with proper overflow handling
   return (
     <div ref={contentRef}>
       {isExpanded ? (
