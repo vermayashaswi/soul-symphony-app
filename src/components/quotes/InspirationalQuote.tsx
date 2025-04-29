@@ -12,15 +12,12 @@ import { staticTranslationService } from '@/services/staticTranslationService';
 interface QuoteItem {
   quote: string;
   author: string;
-  translatedQuote?: string;
-  translatedAuthor?: string;
 }
 
 export const InspirationalQuote: React.FC = () => {
   const [quote, setQuote] = useState<string>('');
   const [author, setAuthor] = useState<string>('');
   const [quotes, setQuotes] = useState<QuoteItem[]>([]);
-  const [translatedQuotes, setTranslatedQuotes] = useState<QuoteItem[]>([]);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState<number>(0);
   const [isReady, setIsReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -29,7 +26,7 @@ export const InspirationalQuote: React.FC = () => {
     threshold: 0.1,
   });
   const { colorTheme } = useTheme();
-  const { currentLanguage, translate } = useTranslation();
+  const { currentLanguage } = useTranslation();
   const rotationIntervalRef = useRef<number | null>(null);
   const isTranslatingRef = useRef<boolean>(false);
   const languageRef = useRef<string>(currentLanguage);
@@ -42,43 +39,6 @@ export const InspirationalQuote: React.FC = () => {
     
     console.log("InspirationalQuote component mounted, default quote set");
   }, []);
-
-  // Function to translate all quotes at once
-  const translateAllQuotes = async (quotesToTranslate: QuoteItem[]) => {
-    if (currentLanguage === 'en' || quotesToTranslate.length === 0) {
-      return quotesToTranslate;
-    }
-    
-    isTranslatingRef.current = true;
-    console.log(`Translating ${quotesToTranslate.length} quotes to ${currentLanguage}`);
-    
-    try {
-      // Extract all texts that need translation
-      const textsToTranslate: string[] = [];
-      quotesToTranslate.forEach(q => {
-        textsToTranslate.push(q.quote);
-        if (q.author) textsToTranslate.push(q.author);
-      });
-      
-      // Pre-translate all texts at once
-      const translationsMap = await staticTranslationService.preTranslate(textsToTranslate, "en");
-      
-      // Apply translations to quotes
-      const translated = quotesToTranslate.map(q => ({
-        ...q,
-        translatedQuote: translationsMap.get(q.quote) || q.quote,
-        translatedAuthor: q.author ? (translationsMap.get(q.author) || q.author) : undefined
-      }));
-      
-      console.log(`Successfully translated ${translated.length} quotes`);
-      return translated;
-    } catch (error) {
-      console.error('Failed to translate quotes:', error);
-      return quotesToTranslate;
-    } finally {
-      isTranslatingRef.current = false;
-    }
-  };
 
   const fetchQuotes = async () => {
     try {
@@ -101,14 +61,10 @@ export const InspirationalQuote: React.FC = () => {
         const shuffledQuotes = [...data.quotes].sort(() => Math.random() - 0.5);
         setQuotes(shuffledQuotes);
         
-        // Translate all quotes at once
-        const translatedQuotes = await translateAllQuotes(shuffledQuotes);
-        setTranslatedQuotes(translatedQuotes);
-        
-        if (translatedQuotes.length > 0) {
-          const firstQuote = translatedQuotes[0];
-          setQuote(currentLanguage === 'en' ? firstQuote.quote : (firstQuote.translatedQuote || firstQuote.quote));
-          setAuthor(currentLanguage === 'en' ? (firstQuote.author || 'Unknown') : (firstQuote.translatedAuthor || firstQuote.author || 'Unknown'));
+        if (shuffledQuotes.length > 0) {
+          const firstQuote = shuffledQuotes[0];
+          setQuote(firstQuote.quote);
+          setAuthor(firstQuote.author || 'Unknown');
           setIsReady(true);
         }
       } else if (data && data.error) {
@@ -133,19 +89,18 @@ export const InspirationalQuote: React.FC = () => {
     }
     
     // Only setup rotation if we have quotes
-    if ((currentLanguage === 'en' ? quotes : translatedQuotes).length > 0) {
+    if (quotes.length > 0) {
       rotationIntervalRef.current = window.setInterval(() => {
         // Skip rotation if currently translating
         if (isTranslatingRef.current) return;
         
         setCurrentQuoteIndex((prevIndex) => {
-          const quotesList = currentLanguage === 'en' ? quotes : translatedQuotes;
-          const newIndex = (prevIndex + 1) % quotesList.length;
+          const newIndex = (prevIndex + 1) % quotes.length;
           
-          const nextQuote = quotesList[newIndex];
+          const nextQuote = quotes[newIndex];
           if (nextQuote) {
-            setQuote(currentLanguage === 'en' ? nextQuote.quote : (nextQuote.translatedQuote || nextQuote.quote));
-            setAuthor(currentLanguage === 'en' ? (nextQuote.author || 'Unknown') : (nextQuote.translatedAuthor || nextQuote.author || 'Unknown'));
+            setQuote(nextQuote.quote);
+            setAuthor(nextQuote.author || 'Unknown');
           }
           
           return newIndex;
@@ -190,63 +145,20 @@ export const InspirationalQuote: React.FC = () => {
     };
   }, [inView]);
 
-  // Handle language change - this is critical for translation persistence
+  // Handle language change
   useEffect(() => {
-    if (languageRef.current === currentLanguage) return;
-    
-    languageRef.current = currentLanguage;
-    
-    const handleLanguageChange = async () => {
-      if (quotes.length === 0) return;
-      
-      console.log(`Language changed to ${currentLanguage}, translating quotes`);
-      
-      // If switching to English, no translation needed
-      if (currentLanguage === 'en') {
-        if (quotes.length > 0 && currentQuoteIndex < quotes.length) {
-          const currentItem = quotes[currentQuoteIndex];
-          setQuote(currentItem.quote);
-          setAuthor(currentItem.author || 'Unknown');
-        }
-      } else {
-        // Force re-translate all quotes when language changes
-        const newTranslatedQuotes = await translateAllQuotes(quotes);
-        setTranslatedQuotes(newTranslatedQuotes);
-        
-        // Update current quote with translation
-        if (newTranslatedQuotes.length > 0 && currentQuoteIndex < newTranslatedQuotes.length) {
-          const currentItem = newTranslatedQuotes[currentQuoteIndex];
-          setQuote(currentItem.translatedQuote || currentItem.quote);
-          setAuthor(currentItem.translatedAuthor || currentItem.author || 'Unknown');
-        }
-      }
-      
-      // Reset and restart the rotation interval
-      setupQuoteRotation();
-    };
-    
-    handleLanguageChange();
-  }, [currentLanguage, quotes, currentQuoteIndex]);
+    if (languageRef.current !== currentLanguage) {
+      console.log(`Language changed to ${currentLanguage}, need to update quotes`);
+      languageRef.current = currentLanguage;
+    }
+  }, [currentLanguage]);
 
   // Listen for language change events
   useEffect(() => {
     const handleLanguageChangeEvent = () => {
-      // This will be triggered by the event, ensure we're using the latest language
+      // Force refresh
       if (languageRef.current !== currentLanguage) {
         languageRef.current = currentLanguage;
-        
-        // Force refresh the current quote's translation
-        const quotesList = currentLanguage === 'en' ? quotes : translatedQuotes;
-        if (quotesList.length > 0 && currentQuoteIndex < quotesList.length) {
-          const currentItem = quotesList[currentQuoteIndex];
-          if (currentLanguage === 'en') {
-            setQuote(currentItem.quote);
-            setAuthor(currentItem.author || 'Unknown');
-          } else {
-            setQuote(currentItem.translatedQuote || currentItem.quote);
-            setAuthor(currentItem.translatedAuthor || currentItem.author || 'Unknown');
-          }
-        }
       }
     };
     
@@ -255,11 +167,11 @@ export const InspirationalQuote: React.FC = () => {
     return () => {
       window.removeEventListener('languageChange', handleLanguageChangeEvent as EventListener);
     };
-  }, [currentLanguage, quotes, translatedQuotes, currentQuoteIndex]);
+  }, [currentLanguage]);
 
   // Setup quote rotation when quotes are loaded
   useEffect(() => {
-    if ((currentLanguage === 'en' ? quotes : translatedQuotes).length > 0) {
+    if (quotes.length > 0) {
       setupQuoteRotation();
     }
     
@@ -269,7 +181,7 @@ export const InspirationalQuote: React.FC = () => {
         rotationIntervalRef.current = null;
       }
     };
-  }, [quotes, translatedQuotes, currentLanguage]);
+  }, [quotes]);
 
   if (!isReady && !error) {
     return null;
@@ -294,11 +206,11 @@ export const InspirationalQuote: React.FC = () => {
               <Quote className="h-6 w-6 text-theme opacity-100" />
             </div>
             <p className="text-foreground text-center text-lg font-medium italic mb-1">
-              {`"${quote}"`}
+              <TranslatableText text={`"${quote}"`} />
             </p>
             {author && (
               <p className="text-theme text-center font-bold text-sm">
-                {`— ${author}`}
+                <TranslatableText text={`— ${author}`} />
               </p>
             )}
           </motion.div>
