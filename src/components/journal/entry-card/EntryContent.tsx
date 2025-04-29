@@ -18,7 +18,7 @@ export function EntryContent({
   isProcessing,
   onOverflowChange
 }: EntryContentProps) {
-  const contentRef = useRef<HTMLDivElement | null>(null);
+  const contentRef = useRef<HTMLParagraphElement | null>(null);
   const [hasOverflow, setHasOverflow] = useState(false);
   
   // Check for content overflow on initial render and on content changes
@@ -34,27 +34,23 @@ export function EntryContent({
     // For more accurate measurement, check after render if we have DOM access
     if (contentRef.current && !isExpanded) {
       const element = contentRef.current;
-      // Look for the paragraph element inside our container
-      const paragraphElement = element.querySelector('p');
-      if (paragraphElement) {
-        const hasActualOverflow = paragraphElement.scrollHeight > paragraphElement.clientHeight;
-        
-        if (hasActualOverflow !== hasOverflow) {
-          setHasOverflow(hasActualOverflow);
-          if (onOverflowChange) {
-            onOverflowChange(hasActualOverflow);
-          }
+      const hasActualOverflow = element.scrollHeight > element.clientHeight;
+      
+      if (hasActualOverflow !== hasOverflow) {
+        setHasOverflow(hasActualOverflow);
+        if (onOverflowChange) {
+          onOverflowChange(hasActualOverflow);
         }
       }
     }
-  }, [content, isExpanded, onOverflowChange, hasOverflow]);
+  }, [content, isExpanded, onOverflowChange]);
 
   if (isProcessing) {
     return <LoadingEntryContent />;
   }
 
   return (
-    <div ref={contentRef}>
+    <div>
       {isExpanded ? (
         <TranslatableText 
           text={content} 
