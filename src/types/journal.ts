@@ -21,7 +21,7 @@ export interface JournalEntry {
   themes?: string[];
   user_feedback?: string | null;
   Edit_Status?: number | null;
-  content?: string; // Content field for easier access
+  content: string; // Changed from optional to required
   original_language?: string; // Original language of the entry
   translation_text?: string; // Translated text when available
   tempId?: string; // Temporary ID for tracking processing entries

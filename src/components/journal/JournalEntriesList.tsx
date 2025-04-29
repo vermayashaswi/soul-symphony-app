@@ -68,12 +68,10 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
               key={entry.id}
               entry={{
                 ...entry,
-                content: (entry as any).content || entry["refined text"] || entry["transcription text"] || "",
-                // Make sure id is definitely defined and not optional
-                id: entry.id!
+                content: entry.content || entry["refined text"] || entry["transcription text"] || ""
               }}
               processing={processingEntries.some(tempId => tempId === entry.tempId) || entry.content === "Processing entry..."}
-              processed={processedEntryIds.includes(entry.id!)}
+              processed={processedEntryIds.includes(entry.id)}
               onDelete={handleDeleteEntry}
             />
           ))}

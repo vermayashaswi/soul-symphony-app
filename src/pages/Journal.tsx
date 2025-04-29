@@ -849,21 +849,26 @@ const Journal = () => {
     };
   }, [fetchEntries]);
 
+  // Update the handleSearchResults function to ensure type compatibility
   const handleSearchResults = (filtered: JournalEntry[]) => {
     setFilteredEntries(filtered);
   };
 
+  // Update the entries handling to ensure types are compatible
   const displayEntries = hasLocalChanges ? localEntries : 
                         (entries && entries.length > 0) ? entries : 
                         (lastSuccessfulEntriesRef.current.length > 0) ? lastSuccessfulEntriesRef.current : [];
 
-  const entriesToDisplay = filteredEntries.length > 0 && displayEntries.length > 0 ? filteredEntries : displayEntries;
-
-  const isReallyEmpty = displayEntries.length === 0 && 
-                        lastSuccessfulEntriesRef.current.length === 0 && 
-                        !loading;
-
-  const showLoading = loading && displayEntries.length === 0 && !hasLocalChanges;
+  // Convert entries to ensure they have the required content field
+  const entriesToDisplay = (filteredEntries.length > 0 && displayEntries.length > 0) ? 
+    filteredEntries.map(entry => ({
+      ...entry,
+      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+    })) : 
+    displayEntries.map(entry => ({
+      ...entry,
+      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+    }));
 
   if (hasRenderError) {
     console.error('[Journal] Recovering from render error');
