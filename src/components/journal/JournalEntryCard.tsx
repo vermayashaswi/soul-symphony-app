@@ -501,30 +501,9 @@ export function JournalEntryCard({
                   content={safeEntry.content} 
                   isExpanded={isExpanded} 
                   isProcessing={isContentProcessing}
-                  entryId={safeEntry.id}
-                  translationText={safeEntry.translation_text}
                 />
               )}
             </ErrorBoundary>
-            
-            <div className="mt-3 mb-2 flex items-center">
-              <div className="flex space-x-2">
-                <button
-                  onClick={() => handleUserFeedback(1)}
-                  className={`hover:bg-green-100 p-1 rounded-full ${thumbsUp ? 'text-green-600 bg-green-100' : 'text-green-500'}`}
-                  aria-label="Thumbs up for translation"
-                >
-                  <ThumbsUp size={16} />
-                </button>
-                <button
-                  onClick={() => handleUserFeedback(0)}
-                  className={`hover:bg-red-100 p-1 rounded-full ${thumbsDown ? 'text-red-600 bg-red-100' : 'text-red-500'}`}
-                  aria-label="Thumbs down for translation"
-                >
-                  <ThumbsDown size={16} />
-                </button>
-              </div>
-            </div>
             
             {showThemes && (
               <div className="mt-2">
