@@ -13,9 +13,10 @@ import {
 } from './entry-card';
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
-import { ThumbsUp, ThumbsDown } from 'lucide-react';
+import { ThumbsUp, ThumbsDown, ArrowDown, ArrowUp } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { Button } from '@/components/ui/button';
 
 export interface JournalEntry {
   id: number;
@@ -521,12 +522,15 @@ export function JournalEntryCard({
           </div>
 
           <div className="flex justify-end p-2">
-            <button
+            <Button
               onClick={toggleExpanded}
-              className="text-sm text-muted-foreground hover:text-foreground"
+              className="rounded-full h-8 w-8 p-0"
+              size="icon"
+              variant="ghost"
+              aria-label={isExpanded ? "Show less" : "Show more"}
             >
-              {isExpanded ? '' : <TranslatableText text="Show more" />}
-            </button>
+              {isExpanded ? <ArrowUp size={18} /> : <ArrowDown size={18} />}
+            </Button>
           </div>
         </Card>
       </motion.div>

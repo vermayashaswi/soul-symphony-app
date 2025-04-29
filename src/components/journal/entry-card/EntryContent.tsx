@@ -8,7 +8,6 @@ interface EntryContentProps {
   isExpanded: boolean;
   isProcessing: boolean;
   entryId?: number;
-  translationText?: string;
 }
 
 export function EntryContent({ 
