@@ -56,12 +56,14 @@ export function EntryContent({
           text={content} 
           as="p" 
           className="text-xs md:text-sm text-foreground" 
+          ref={contentRef}
         />
       ) : (
         <TranslatableText 
           text={content} 
           as="p" 
           className="text-xs md:text-sm text-foreground line-clamp-3" 
+          ref={contentRef}
         />
       )}
     </div>
