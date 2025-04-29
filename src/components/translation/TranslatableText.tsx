@@ -8,12 +8,14 @@ interface TranslatableTextProps {
   text: string;
   className?: string;
   as?: keyof JSX.IntrinsicElements;
+  sourceLanguage?: string; // Add optional source language prop
 }
 
 export function TranslatableText({ 
   text, 
   className = "",
-  as: Component = 'span' 
+  as: Component = 'span',
+  sourceLanguage  // New prop for source language
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState(text);
   const [isLoading, setIsLoading] = useState(false);
@@ -47,7 +49,7 @@ export function TranslatableText({
         console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
 
         try {
-          const result = await translate(text);
+          const result = await translate(text, sourceLanguage);
           if (isMounted) {
             setTranslatedText(result || text); // Fallback to original text if result is empty
             console.log(`TranslatableText: Successfully translated to "${result?.substring(0, 30) || 'empty'}..."`);
@@ -69,7 +71,7 @@ export function TranslatableText({
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, translate, isOnWebsite]);
+  }, [text, currentLanguage, translate, isOnWebsite, sourceLanguage]);
   
   // Listen to the language change event to force re-render
   useEffect(() => {
@@ -89,7 +91,7 @@ export function TranslatableText({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [text]);
+  }, [text, currentLanguage]);
 
   // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(
