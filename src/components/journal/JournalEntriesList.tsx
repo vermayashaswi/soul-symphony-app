@@ -37,17 +37,18 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       
       if (!entryId) {
         console.error("[JournalEntriesList] Invalid entry ID for deletion");
-        return;
+        return Promise.reject(new Error("Invalid entry ID"));
       }
       
-      // Call the parent component's delete handler
-      onDeleteEntry(entryId);
+      // Call the parent component's delete handler and return the Promise
+      return Promise.resolve(onDeleteEntry(entryId))
+        .then(() => {
+          console.log(`[JournalEntriesList] Delete handler completed for entry: ${entryId}`);
+        });
       
-      // Important: The UI update will happen when the entries prop changes 
-      // from the parent after successful deletion on the backend
-      console.log(`[JournalEntriesList] Delete handler called for entry: ${entryId}`);
     } catch (error) {
       console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
+      return Promise.reject(error);
     }
   };
 

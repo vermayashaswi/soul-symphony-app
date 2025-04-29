@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -457,6 +456,21 @@ export function JournalEntryCard({
     );
   }
 
+  const handleDelete = async () => {
+    try {
+      if (onDelete && safeEntry.id) {
+        console.log(`[JournalEntryCard] Deleting entry ${safeEntry.id}`);
+        // Call the parent's onDelete handler and ensure we return the promise
+        return await onDelete(safeEntry.id);
+      } else {
+        throw new Error("Delete handler not available or invalid entry ID");
+      }
+    } catch (error) {
+      console.error("[JournalEntryCard] Error during deletion:", error);
+      throw error; // Propagate the error to be handled by the dialog
+    }
+  };
+
   return (
     <ErrorBoundary>
       <motion.div
@@ -503,7 +517,7 @@ export function JournalEntryCard({
                     try {
                       if (onDelete && safeEntry.id) {
                         // Call the parent's onDelete handler
-                        onDelete(safeEntry.id);
+                        await onDelete(safeEntry.id);
                         resolve();
                       } else {
                         reject(new Error("Delete handler not available"));
