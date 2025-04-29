@@ -7,7 +7,6 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Plus } from 'lucide-react';
 import JournalEntriesHeader from './JournalEntriesHeader';
 import EmptyJournalState from './EmptyJournalState';
-import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -16,7 +15,6 @@ interface JournalEntriesListProps {
   processedEntryIds: number[];
   onStartRecording: () => void;
   onDeleteEntry: (entryId: number) => void;
-  tempEntries?: Array<{id: string; tempId: string}>;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
@@ -26,7 +24,6 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   processedEntryIds,
   onStartRecording,
   onDeleteEntry,
-  tempEntries = [],
 }) => {
   // IMPROVED: More reliable check for entries with fallbacks
   const hasEntries = entries && entries.length > 0;
@@ -51,11 +48,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     }
   };
 
-  // Check for active processing entries to show loaders
-  const hasProcessingEntries = processingEntries.length > 0;
-  
-  // NEW: Debug logging for better visibility
-  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}, processingEntries=${processingEntries.length}, tempEntries=${tempEntries?.length || 0}`);
+  // NEW: Debug logging for rendered state
+  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}`);
 
   return (
     <div className="journal-entries-list" id="journal-entries-container">
@@ -67,26 +61,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             <TranslatableText text="Loading journal entries..." />
           </p>
         </div>
-      ) : hasEntries || hasProcessingEntries ? (
-        <div className="grid gap-4" data-entries-count={entries.length + processingEntries.length}>
-          {/* Show placeholder entries for processing entries */}
-          {processingEntries.map((tempId) => (
-            <JournalEntryCard
-              key={`processing-${tempId}`}
-              entry={{
-                id: -1, // Use placeholder ID
-                created_at: new Date().toISOString(),
-                content: "",
-                // Add required fields for the entry type
-              }}
-              processing={true}
-              tempId={tempId}
-              processed={false}
-              onDelete={() => {}}
-            />
-          ))}
-          
-          {/* Display actual entries */}
+      ) : hasEntries ? (
+        <div className="grid gap-4" data-entries-count={entries.length}>
           {entries.map((entry) => (
             <JournalEntryCard
               key={entry.id}

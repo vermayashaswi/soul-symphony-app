@@ -10,7 +10,7 @@ export interface JournalEntry {
   audio_url?: string;
   duration?: number;
   emotions?: Json;
-  sentiment?: string | { sentiment: string; score: number }; // Updated to support both formats
+  sentiment?: string;
   entities?: Array<{
     type: string;
     name: string;
@@ -18,7 +18,6 @@ export interface JournalEntry {
   }>;
   "foreign key"?: string;
   master_themes?: string[];
-  themes?: string[]; // Added missing themes property
   user_feedback?: string | null;
   Edit_Status?: number | null;
   content?: string; // Content field for easier access

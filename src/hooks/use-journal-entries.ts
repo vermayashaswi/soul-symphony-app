@@ -1,6 +1,5 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { JournalEntry } from '@/types/journal';
+import { JournalEntry } from '@/components/journal/JournalEntryCard';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
 
 type UseJournalEntriesReturn = {

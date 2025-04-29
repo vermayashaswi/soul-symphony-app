@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -7,10 +6,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
 import { Loader2 } from 'lucide-react';
 import { reprocessJournalEntry } from '@/services/journalService';
 
-export interface EditEntryButtonProps {
+interface EditEntryButtonProps {
   entryId: number;
   content: string;
   onEntryUpdated: (newContent: string, isProcessing?: boolean) => void;
