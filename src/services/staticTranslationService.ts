@@ -21,10 +21,10 @@ class StaticTranslationService {
         ? `${sourceLanguage}:${targetLanguage}:${text}` 
         : `${targetLanguage}:${text}`;
       
-      const cachedTranslation = await translationCache.get(cacheKey);
+      const cachedTranslation = await translationCache.getTranslation(cacheKey, targetLanguage);
       if (cachedTranslation) {
         console.log(`[Translation] Cache hit for ${text.substring(0, 20)}...`);
-        return cachedTranslation;
+        return cachedTranslation.translatedText;
       }
 
       console.log(`[Translation] Translating "${text.substring(0, 20)}..." to ${targetLanguage}`);
@@ -36,7 +36,13 @@ class StaticTranslationService {
       const translatedText = await this.mockTranslate(text, targetLanguage, sourceLanguage);
       
       // Cache the result
-      await translationCache.set(cacheKey, translatedText);
+      await translationCache.setTranslation({
+        originalText: cacheKey,
+        translatedText: translatedText,
+        language: targetLanguage,
+        timestamp: Date.now(),
+        version: 1
+      });
       
       return translatedText;
     } catch (error) {
