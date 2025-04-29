@@ -7,6 +7,7 @@ interface TranslationRequest {
   text: string;
   sourceLanguage?: string;
   targetLanguage: string;
+  entryId?: number;
 }
 
 interface BatchTranslationRequest {
@@ -32,6 +33,7 @@ export class TranslationService {
           text: request.text,
           sourceLanguage: request.sourceLanguage,
           targetLanguage: request.targetLanguage,
+          entryId: request.entryId || null
         },
       });
 
