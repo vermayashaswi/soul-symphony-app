@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -49,7 +49,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   };
 
   // NEW: Debug logging for rendered state
-  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}`);
+  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}, processingEntries=${processingEntries.length}`);
 
   return (
     <div className="journal-entries-list" id="journal-entries-container">
@@ -65,14 +65,15 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         <div className="grid gap-4" data-entries-count={entries.length}>
           {entries.map((entry) => (
             <JournalEntryCard
-              key={entry.id}
+              key={entry.id || entry.tempId || Math.random()}
               entry={{
                 ...entry,
                 content: entry.content || entry["refined text"] || entry["transcription text"] || ""
               }}
-              processing={processingEntries.some(tempId => tempId === entry.tempId) || entry.content === "Processing entry..."}
+              processing={processingEntries.includes(entry.tempId) || entry.content === "Processing entry..."}
               processed={processedEntryIds.includes(entry.id)}
               onDelete={handleDeleteEntry}
+              setEntries={null} // Pass null since we don't want to modify entries directly here
             />
           ))}
         </div>

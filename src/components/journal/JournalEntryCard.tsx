@@ -157,7 +157,8 @@ export function JournalEntryCard({
       hasValidContent,
       contentLength: safeEntry.content?.length || 0,
       isProcessing,
-      processing
+      processing,
+      tempId: safeEntry.tempId
     });
     
     setContentLoaded(hasValidContent);
@@ -168,14 +169,14 @@ export function JournalEntryCard({
   }, [safeEntry.content, isNew, isExpanded, isProcessing, processing]);
   
   useEffect(() => {
-    console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);
+    console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id} with tempId ${safeEntry.tempId}`);
     mountedRef.current = true;
     
     return () => {
-      console.log(`[JournalEntryCard] Unmounted entry ${safeEntry.id}`);
+      console.log(`[JournalEntryCard] Unmounted entry ${safeEntry.id} with tempId ${safeEntry.tempId}`);
       mountedRef.current = false;
     };
-  }, [safeEntry.id]);
+  }, [safeEntry.id, safeEntry.tempId]);
 
   useEffect(() => {
     if (isNew) {
@@ -258,9 +259,10 @@ export function JournalEntryCard({
   
   const initialThemes = extractThemes();
   
-  const isContentProcessing = processing || isProcessing || (!contentLoaded || !safeEntry.content || 
-                                              safeEntry.content === "Processing entry..." ||
-                                              safeEntry.content === "Loading...");
+  // Determine if this is a processing entry
+  const isContentProcessing = processing || isProcessing || 
+                            safeEntry.content === "Processing entry..." ||
+                            safeEntry.content === "Loading...";
   
   const isThemesProcessing = isProcessing && !contentLoaded && 
                            (!safeEntry.themes || safeEntry.themes.length === 0) && 
@@ -269,129 +271,133 @@ export function JournalEntryCard({
   const handleEntryUpdate = (newContent: string) => {
     console.log(`[JournalEntryCard] Updating entry ${entry.id} with new content: "${newContent.substring(0, 30)}..."`);
     
-    setEntries(prevEntries => {
-      return prevEntries.map(e => {
-        if (e.id === entry.id) {
-          return {
-            ...e,
-            content: newContent,
-            Edit_Status: 1,
-            sentiment: null,
-            emotions: null,
-            master_themes: [],
-            entities: []
-          };
-        }
-        return e;
-      });
-    });
-    
-    setTimeout(() => {
-      console.log('[JournalEntryCard] Triggering re-fetch for updated analysis data');
-      
-      window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
-        detail: { entryId: entry.id }
-      }));
-      
-      const checkForUpdatedThemes = async () => {
-        try {
-          const { data, error } = await supabase
-            .from('Journal Entries')
-            .select('master_themes, emotions, sentiment, entities')
-            .eq('id', entry.id)
-            .single();
-            
-          if (error) {
-            console.error('[JournalEntryCard] Error fetching updated entry data:', error);
-            return false;
+    if (setEntries) {
+      setEntries(prevEntries => {
+        return prevEntries.map(e => {
+          if (e.id === entry.id) {
+            return {
+              ...e,
+              content: newContent,
+              Edit_Status: 1,
+              sentiment: null,
+              emotions: null,
+              master_themes: [],
+              entities: []
+            };
           }
-          
-          if (data) {
-            if ((data.master_themes && data.master_themes.length > 0) || 
-                (data.emotions && Object.keys(data.emotions).length > 0)) {
+          return e;
+        });
+      });
+      
+      setTimeout(() => {
+        console.log('[JournalEntryCard] Triggering re-fetch for updated analysis data');
+        
+        window.dispatchEvent(new CustomEvent('journalEntryUpdated', {
+          detail: { entryId: entry.id }
+        }));
+        
+        const checkForUpdatedThemes = async () => {
+          try {
+            const { data, error } = await supabase
+              .from('Journal Entries')
+              .select('master_themes, emotions, sentiment, entities')
+              .eq('id', entry.id)
+              .single();
               
-              console.log('[JournalEntryCard] Found updated data for entry:', data);
-              
-              setEntries(prevEntries => {
-                return prevEntries.map(e => {
-                  if (e.id === entry.id) {
-                    let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
-                    
-                    if (data.entities) {
-                      try {
-                        if (Array.isArray(data.entities)) {
-                          parsedEntities = data.entities.map((entity: any) => ({
-                            type: entity.type || 'other',
-                            name: entity.name || '',
-                            text: entity.text
-                          }));
-                        }
-                        else if (typeof data.entities === 'string') {
-                          const parsed = JSON.parse(data.entities);
-                          if (Array.isArray(parsed)) {
-                            parsedEntities = parsed.map((entity: any) => ({
-                              type: entity.type || 'other',
-                              name: entity.name || '',
-                              text: entity.text
-                            }));
+            if (error) {
+              console.error('[JournalEntryCard] Error fetching updated entry data:', error);
+              return false;
+            }
+            
+            if (data) {
+              if ((data.master_themes && data.master_themes.length > 0) || 
+                  (data.emotions && Object.keys(data.emotions).length > 0)) {
+                
+                console.log('[JournalEntryCard] Found updated data for entry:', data);
+                
+                if (setEntries) {
+                  setEntries(prevEntries => {
+                    return prevEntries.map(e => {
+                      if (e.id === entry.id) {
+                        let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
+                        
+                        if (data.entities) {
+                          try {
+                            if (Array.isArray(data.entities)) {
+                              parsedEntities = data.entities.map((entity: any) => ({
+                                type: entity.type || 'other',
+                                name: entity.name || '',
+                                text: entity.text
+                              }));
+                            }
+                            else if (typeof data.entities === 'string') {
+                              const parsed = JSON.parse(data.entities);
+                              if (Array.isArray(parsed)) {
+                                parsedEntities = parsed.map((entity: any) => ({
+                                  type: entity.type || 'other',
+                                  name: entity.name || '',
+                                  text: entity.text
+                                }));
+                              }
+                            }
+                            else if (data.entities && typeof data.entities === 'object') {
+                              // Handle case where data.entities is already a JSON object
+                              const entities = Array.isArray(data.entities) ? data.entities : [data.entities];
+                              parsedEntities = entities.map((entity: any) => ({
+                                type: entity.type || 'other',
+                                name: entity.name || '',
+                                text: entity.text
+                              }));
+                            }
+                          } catch (err) {
+                            console.error('[JournalEntryCard] Error parsing entities:', err);
+                            parsedEntities = [];
                           }
                         }
-                        else if (data.entities && typeof data.entities === 'object') {
-                          // Handle case where data.entities is already a JSON object
-                          const entities = Array.isArray(data.entities) ? data.entities : [data.entities];
-                          parsedEntities = entities.map((entity: any) => ({
-                            type: entity.type || 'other',
-                            name: entity.name || '',
-                            text: entity.text
-                          }));
-                        }
-                      } catch (err) {
-                        console.error('[JournalEntryCard] Error parsing entities:', err);
-                        parsedEntities = [];
+                        
+                        return {
+                          ...e,
+                          master_themes: data.master_themes || [],
+                          themes: data.master_themes || [],
+                          sentiment: data.sentiment,
+                          emotions: data.emotions,
+                          entities: parsedEntities
+                        };
                       }
-                    }
-                    
-                    return {
-                      ...e,
-                      master_themes: data.master_themes || [],
-                      themes: data.master_themes || [],
-                      sentiment: data.sentiment,
-                      emotions: data.emotions,
-                      entities: parsedEntities
-                    };
-                  }
-                  return e;
-                });
-              });
-              
-              return true;
+                      return e;
+                    });
+                  });
+                }
+                
+                return true;
+              }
+            }
+            
+            return false;
+          } catch (err) {
+            console.error('[JournalEntryCard] Error in checkForUpdatedThemes:', err);
+            return false;
+          }
+        };
+        
+        let pollingAttempts = 0;
+        const maxPollingAttempts = 10;
+        
+        const pollingInterval = setInterval(async () => {
+          pollingAttempts++;
+          
+          const updated = await checkForUpdatedThemes();
+          
+          if (updated || pollingAttempts >= maxPollingAttempts) {
+            clearInterval(pollingInterval);
+            
+            if (pollingAttempts >= maxPollingAttempts && !updated) {
+              console.warn('[JournalEntryCard] Stopped polling for updated data after max attempts');
             }
           }
-          
-          return false;
-        } catch (err) {
-          console.error('[JournalEntryCard] Error in checkForUpdatedThemes:', err);
-          return false;
-        }
-      };
-      
-      let pollingAttempts = 0;
-      const maxPollingAttempts = 10;
-      
-      const pollingInterval = setInterval(async () => {
-        pollingAttempts++;
-        
-        const updated = await checkForUpdatedThemes();
-        
-        if (updated || pollingAttempts >= maxPollingAttempts) {
-          clearInterval(pollingInterval);
-          
-          if (pollingAttempts >= maxPollingAttempts && !updated) {
-            console.warn('[JournalEntryCard] Stopped polling for updated data after max attempts');
-          }
-        }
+        }, 3000);
       }, 3000);
-    }, 3000);
+    }
   };
 
   const handleContentOverflow = (overflow: boolean) => {
@@ -415,8 +421,10 @@ export function JournalEntryCard({
     );
   }
 
-  // If this is a processing entry, render the LoadingEntryContent directly
-  if (isContentProcessing && entry.content === "Processing entry...") {
+  // If this is a processing entry, render a simplified card
+  if (isContentProcessing && (safeEntry.content === "Processing entry..." || processing)) {
+    console.log(`[JournalEntryCard] Rendering processing card for ${safeEntry.tempId || 'unknown'}`);
+    
     return (
       <ErrorBoundary>
         <motion.div
@@ -425,6 +433,7 @@ export function JournalEntryCard({
           transition={{ duration: 0.3 }}
           className="journal-entry-card" 
           data-entry-id={safeEntry.id}
+          data-temp-id={safeEntry.tempId}
           data-processing="true"
         >
           <Card className="bg-background shadow-md">
@@ -460,6 +469,7 @@ export function JournalEntryCard({
         transition={{ duration: 3 }}
         className="journal-entry-card" 
         data-entry-id={safeEntry.id}
+        data-temp-id={safeEntry.tempId}
         data-processing={isProcessing ? "true" : "false"}
         data-expanded={isExpanded ? "true" : "false"}
         data-show-themes={showThemes ? "true" : "false"}
@@ -509,16 +519,12 @@ export function JournalEntryCard({
 
           <div className="p-3 md:p-4">
             <ErrorBoundary>
-              {isContentProcessing ? (
-                <LoadingEntryContent />
-              ) : (
-                <EntryContent 
-                  content={safeEntry.content} 
-                  isExpanded={isExpanded} 
-                  isProcessing={isContentProcessing}
-                  onOverflowChange={handleContentOverflow}
-                />
-              )}
+              <EntryContent 
+                content={safeEntry.content} 
+                isExpanded={isExpanded} 
+                isProcessing={isContentProcessing}
+                onOverflowChange={handleContentOverflow}
+              />
             </ErrorBoundary>
             
             {showThemes && (
