@@ -121,6 +121,11 @@ export function useJournalEntries(
         deletedEntryIdRef.current = event.detail.entryId;
       }
       
+      // For delete operations, filter out the deleted entry instantly for a smoother experience
+      if (event.detail.action === 'delete' && event.detail.entryId) {
+        setEntries(prevEntries => prevEntries.filter(entry => entry.id !== event.detail.entryId));
+      }
+      
       // Force cache to expire
       globalEntriesCache.cacheExpiryTime = 0;
       
@@ -138,7 +143,7 @@ export function useJournalEntries(
     return () => {
       window.removeEventListener('journalEntriesNeedRefresh', handleJournalEntriesRefresh as EventListener);
     };
-  }, [userId]);
+  }, [userId, fetchEntries]);
 
   // Listen for processing entry events to trigger proactive fetches
   useEffect(() => {

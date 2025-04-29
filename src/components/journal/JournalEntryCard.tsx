@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -523,6 +524,7 @@ export function JournalEntryCard({
                 content={safeEntry.content} 
                 isExpanded={isExpanded} 
                 isProcessing={isContentProcessing}
+                entryId={safeEntry.id}
                 onOverflowChange={handleContentOverflow}
               />
             </ErrorBoundary>

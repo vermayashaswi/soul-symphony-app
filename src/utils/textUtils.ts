@@ -63,9 +63,38 @@ export const extractSummary = (text: string, wordCount: number = 20): string => 
 export const textWillOverflow = (text: string, lineHeight = 60, maxLines = 3): boolean => {
   if (!text) return false;
   
-  // Rough estimation - average character count per line
-  const totalChars = text.length;
-  const estimatedLines = Math.ceil(totalChars / lineHeight);
+  // Check for line breaks which force new lines
+  const lineBreaks = (text.match(/\n/g) || []).length;
+  if (lineBreaks >= maxLines) return true;
   
-  return estimatedLines > maxLines;
+  // Adjust for the possibility of words wrapping
+  const totalChars = text.length;
+  const avgWordLength = 6; // Estimated average word length in English
+  
+  // This approach estimates how many characters can fit in the specified line height
+  // and then adjusts based on word-wrapping behavior
+  const estimatedLines = Math.ceil(totalChars / (lineHeight - Math.min(avgWordLength - 1, lineHeight * 0.2)));
+  
+  return estimatedLines > maxLines || lineBreaks > 0 && estimatedLines + lineBreaks > maxLines;
+};
+
+/**
+ * Checks if a journal entry is still being processed
+ */
+export const isEntryProcessing = (entry: any): boolean => {
+  if (!entry) return false;
+  
+  // Check for explicit processing flags
+  if (entry.processing === true) return true;
+  
+  // Check for processing content indicators
+  if (entry.content === "Processing entry..." || entry.content === "Loading...") return true;
+  
+  // Check for temp ID but no permanent ID
+  if (entry.tempId && !entry.id) return true;
+  
+  // Check for missing essential data that should be present if processing is complete
+  if (!entry.content && !entry["refined text"] && !entry["transcription text"]) return true;
+  
+  return false;
 };

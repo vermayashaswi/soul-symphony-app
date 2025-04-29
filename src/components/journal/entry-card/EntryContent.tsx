@@ -16,6 +16,7 @@ export function EntryContent({
   content, 
   isExpanded, 
   isProcessing,
+  entryId,
   onOverflowChange
 }: EntryContentProps) {
   const contentRef = useRef<HTMLDivElement | null>(null);
@@ -45,7 +46,7 @@ export function EntryContent({
         }
       }
     }
-  }, [content, isExpanded, onOverflowChange, hasOverflow]);
+  }, [content, isExpanded, onOverflowChange, hasOverflow, entryId]);
 
   if (isProcessing) {
     return <LoadingEntryContent />;

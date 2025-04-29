@@ -46,6 +46,11 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
         closeButton: false
       });
       
+      // Dispatch an event to notify other components of the deletion
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { action: 'delete' }
+      }));
+      
     } catch (error) {
       console.error("[DeleteEntryDialog] Error deleting entry:", error);
       

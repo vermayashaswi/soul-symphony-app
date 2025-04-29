@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -42,9 +42,12 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       
       // Call the parent component's delete handler
       onDeleteEntry(entryId);
+      
+      // Important: The UI update will happen when the entries prop changes 
+      // from the parent after successful deletion on the backend
+      console.log(`[JournalEntriesList] Delete handler called for entry: ${entryId}`);
     } catch (error) {
       console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
-      throw error; // Re-throw to let DeleteEntryDialog handle the error display
     }
   };
 
