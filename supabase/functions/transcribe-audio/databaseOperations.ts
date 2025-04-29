@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -143,7 +144,8 @@ export async function storeJournalEntry(
       duration: duration,
       emotions: emotions,
       sentiment: sentimentScore,
-      created_at: new Date().toISOString()
+      created_at: new Date().toISOString(),
+      translation_status: "completed" // Always set translation_status to completed
     };
 
     console.log('[storeJournalEntry] Attempting to insert entry:', JSON.stringify(entry, null, 2));

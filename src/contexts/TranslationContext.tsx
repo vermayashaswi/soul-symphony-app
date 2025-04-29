@@ -33,7 +33,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
 
-  // Function to translate text using our service
+  // Function to translate text using our service - now respects translation_status
   const translate = async (text: string, sourceLanguage?: string): Promise<string> => {
     if (currentLanguage === 'en' || !text) return text;
     
