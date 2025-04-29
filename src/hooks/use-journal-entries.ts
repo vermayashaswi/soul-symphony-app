@@ -1,5 +1,6 @@
+
 import { useState, useEffect, useCallback, useRef } from 'react';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
 
 type UseJournalEntriesReturn = {
@@ -108,91 +109,7 @@ export function useJournalEntries(
     }
   }, [entries, userId, refreshKey]);
 
-  // Listen for events requesting immediate refresh
-  useEffect(() => {
-    const handleJournalEntriesRefresh = (event: CustomEvent) => {
-      if (!userId || !event.detail) return;
-      
-      console.log(`[useJournalEntries] Detected refresh request, will fetch new data:`, event.detail);
-      
-      // Track deleted entry ID if this is a delete action
-      if (event.detail.action === 'delete' && event.detail.entryId) {
-        console.log(`[useJournalEntries] Tracking deleted entry ID: ${event.detail.entryId}`);
-        deletedEntryIdRef.current = event.detail.entryId;
-      }
-      
-      // For delete operations, filter out the deleted entry instantly for a smoother experience
-      if (event.detail.action === 'delete' && event.detail.entryId) {
-        setEntries(prevEntries => prevEntries.filter(entry => entry.id !== event.detail.entryId));
-      }
-      
-      // Force cache to expire
-      globalEntriesCache.cacheExpiryTime = 0;
-      
-      // Immediately try to fetch fresh data
-      if (!isFetchingRef.current) {
-        // Short delay to allow the database to settle
-        setTimeout(() => {
-          fetchEntries();
-        }, 300);
-      }
-    };
-    
-    window.addEventListener('journalEntriesNeedRefresh', handleJournalEntriesRefresh as EventListener);
-    
-    return () => {
-      window.removeEventListener('journalEntriesNeedRefresh', handleJournalEntriesRefresh as EventListener);
-    };
-  }, [userId, fetchEntries]);
-
-  // Listen for processing entry events to trigger proactive fetches
-  useEffect(() => {
-    const handleProcessingEntryMapped = (event: CustomEvent) => {
-      if (!event.detail || !event.detail.entryId) return;
-      
-      console.log(`[useJournalEntries] Detected entry mapping, will fetch new data:`, event.detail.entryId);
-      
-      // Force cache to expire
-      globalEntriesCache.cacheExpiryTime = 0;
-      
-      // Immediately try to fetch fresh data when an entry is mapped
-      if (userId && !isFetchingRef.current) {
-        // Short delay to allow the database to settle
-        setTimeout(() => {
-          fetchEntries();
-        }, 300);
-      }
-    };
-    
-    // Also listen for entry completion events
-    const handleProcessingEntryCompleted = (event: CustomEvent) => {
-      if (!event.detail || !event.detail.tempId) return;
-      
-      console.log(`[useJournalEntries] Detected entry completion, will fetch new data:`, event.detail.tempId);
-      
-      // Force cache to expire
-      globalEntriesCache.cacheExpiryTime = 0;
-      
-      // Immediately try to fetch fresh data when an entry is completed
-      if (userId && !isFetchingRef.current) {
-        // Multiple retries for better reliability
-        for (let i = 0; i < 2; i++) {
-          setTimeout(() => {
-            if (!isFetchingRef.current) fetchEntries();
-          }, 500 + (i * 1000));
-        }
-      }
-    };
-    
-    window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
-    window.addEventListener('processingEntryCompleted', handleProcessingEntryCompleted as EventListener);
-    
-    return () => {
-      window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
-      window.removeEventListener('processingEntryCompleted', handleProcessingEntryCompleted as EventListener);
-    };
-  }, [userId]);
-
+  // IMPORTANT: Fix for the TypeScript error - Declare verifyUserProfile before fetchEntries
   const verifyUserProfile = useCallback(async (userId: string) => {
     try {
       console.log('[useJournalEntries] Verifying user profile:', userId);
@@ -213,6 +130,7 @@ export function useJournalEntries(
     }
   }, []);
 
+  // IMPORTANT: Fix - Declare fetchEntries after verifyUserProfile
   const fetchEntries = useCallback(async () => {
     if (!userId) {
       console.log('[useJournalEntries] No user ID provided for fetching entries');
@@ -478,6 +396,91 @@ export function useJournalEntries(
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
     };
   }, [fetchEntries]);
+
+  // Listen for events requesting immediate refresh
+  useEffect(() => {
+    const handleJournalEntriesRefresh = (event: CustomEvent) => {
+      if (!userId || !event.detail) return;
+      
+      console.log(`[useJournalEntries] Detected refresh request, will fetch new data:`, event.detail);
+      
+      // Track deleted entry ID if this is a delete action
+      if (event.detail.action === 'delete' && event.detail.entryId) {
+        console.log(`[useJournalEntries] Tracking deleted entry ID: ${event.detail.entryId}`);
+        deletedEntryIdRef.current = event.detail.entryId;
+      }
+      
+      // For delete operations, filter out the deleted entry instantly for a smoother experience
+      if (event.detail.action === 'delete' && event.detail.entryId) {
+        setEntries(prevEntries => prevEntries.filter(entry => entry.id !== event.detail.entryId));
+      }
+      
+      // Force cache to expire
+      globalEntriesCache.cacheExpiryTime = 0;
+      
+      // Immediately try to fetch fresh data
+      if (!isFetchingRef.current) {
+        // Short delay to allow the database to settle
+        setTimeout(() => {
+          fetchEntries();
+        }, 300);
+      }
+    };
+    
+    window.addEventListener('journalEntriesNeedRefresh', handleJournalEntriesRefresh as EventListener);
+    
+    return () => {
+      window.removeEventListener('journalEntriesNeedRefresh', handleJournalEntriesRefresh as EventListener);
+    };
+  }, [userId, fetchEntries]);
+
+  // Listen for processing entry events to trigger proactive fetches
+  useEffect(() => {
+    const handleProcessingEntryMapped = (event: CustomEvent) => {
+      if (!event.detail || !event.detail.entryId) return;
+      
+      console.log(`[useJournalEntries] Detected entry mapping, will fetch new data:`, event.detail.entryId);
+      
+      // Force cache to expire
+      globalEntriesCache.cacheExpiryTime = 0;
+      
+      // Immediately try to fetch fresh data when an entry is mapped
+      if (userId && !isFetchingRef.current) {
+        // Short delay to allow the database to settle
+        setTimeout(() => {
+          fetchEntries();
+        }, 300);
+      }
+    };
+    
+    // Also listen for entry completion events
+    const handleProcessingEntryCompleted = (event: CustomEvent) => {
+      if (!event.detail || !event.detail.tempId) return;
+      
+      console.log(`[useJournalEntries] Detected entry completion, will fetch new data:`, event.detail.tempId);
+      
+      // Force cache to expire
+      globalEntriesCache.cacheExpiryTime = 0;
+      
+      // Immediately try to fetch fresh data when an entry is completed
+      if (userId && !isFetchingRef.current) {
+        // Multiple retries for better reliability
+        for (let i = 0; i < 2; i++) {
+          setTimeout(() => {
+            if (!isFetchingRef.current) fetchEntries();
+          }, 500 + (i * 1000));
+        }
+      }
+    };
+    
+    window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+    window.addEventListener('processingEntryCompleted', handleProcessingEntryCompleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
+      window.removeEventListener('processingEntryCompleted', handleProcessingEntryCompleted as EventListener);
+    };
+  }, [userId, fetchEntries]);
 
   useEffect(() => {
     if (userId) {
