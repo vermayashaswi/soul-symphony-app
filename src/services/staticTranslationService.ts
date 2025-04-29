@@ -21,6 +21,7 @@ class StaticTranslationService {
   /**
    * Translate text to the current target language
    * @param text The text to translate
+   * @param targetLanguage Optional override for the target language
    * @param sourceLanguage Optional source language of the text
    * @param entryId Optional entry ID for context
    * @returns The translated text
