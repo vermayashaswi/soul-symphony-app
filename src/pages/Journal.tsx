@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -858,6 +859,13 @@ const Journal = () => {
   const displayEntries = hasLocalChanges ? localEntries : 
                         (entries && entries.length > 0) ? entries : 
                         (lastSuccessfulEntriesRef.current.length > 0) ? lastSuccessfulEntriesRef.current : [];
+  
+  // Define the missing showLoading variable
+  const isReallyEmpty = displayEntries.length === 0 && 
+                        lastSuccessfulEntriesRef.current.length === 0 && 
+                        !loading;
+                        
+  const showLoading = loading && displayEntries.length === 0 && !hasLocalChanges;
 
   // Convert entries to ensure they have the required content field
   const entriesToDisplay = (filteredEntries.length > 0 && displayEntries.length > 0) ? 
