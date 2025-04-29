@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { LoadingEntryContent } from './LoadingEntryContent';
@@ -24,7 +25,8 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
         // Always keep the original content initially
         setTranslatedContent(content);
         // Pass the detected language and entryId to the translation service
-        const translated = await translate(content, language, entryId);
+        // Use "en" as default source language when none is provided
+        const translated = await translate(content, language || "en", entryId);
         if (translated) {
           setTranslatedContent(translated);
         }

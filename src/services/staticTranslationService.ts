@@ -26,17 +26,20 @@ class StaticTranslationService {
    * @returns The translated text
    */
   async translateText(text: string, sourceLanguage?: string, entryId?: number): Promise<string> {
+    // Use "en" as the default source language
+    const effectiveSourceLang = sourceLanguage || "en";
+    
     // Skip translation if target language is English or same as source
     if (this.targetLanguage === 'en' || 
-        (sourceLanguage && this.targetLanguage === sourceLanguage)) {
+        this.targetLanguage === effectiveSourceLang) {
       return text;
     }
     
     try {
-      console.log(`Translating text: "${text.substring(0, 30)}..." to ${this.targetLanguage} from ${sourceLanguage || 'unknown'} for entry: ${entryId || 'unknown'}`);
+      console.log(`Translating text: "${text.substring(0, 30)}..." to ${this.targetLanguage} from ${effectiveSourceLang} for entry: ${entryId || 'unknown'}`);
       const result = await TranslationService.translateText({
         text,
-        sourceLanguage,
+        sourceLanguage: effectiveSourceLang,
         targetLanguage: this.targetLanguage,
         entryId
       });

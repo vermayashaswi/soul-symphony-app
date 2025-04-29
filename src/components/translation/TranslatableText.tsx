@@ -46,10 +46,11 @@ export function TranslatableText({
     // Only initiate translation if not in English
     if (currentLanguage !== 'en') {
       setIsLoading(true);
-      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'} for entry: ${entryId || 'unknown'}`);
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'en'} for entry: ${entryId || 'unknown'}`);
 
       try {
-        const result = await translate(text, sourceLanguage, entryId);
+        // Use "en" as default source language when none is provided
+        const result = await translate(text, sourceLanguage || "en", entryId);
         setTranslatedText(result || text); // Fallback to original text if result is empty
         console.log(`TranslatableText: Successfully translated to "${result?.substring(0, 30) || 'empty'}..."`);
       } catch (error) {
