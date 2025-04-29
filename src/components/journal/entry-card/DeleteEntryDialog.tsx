@@ -1,4 +1,3 @@
-
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -34,11 +33,10 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
       setIsProcessing(true);
       console.log("[DeleteEntryDialog] Starting delete operation");
       
+      // Wait for the deletion to complete before proceeding
       await onDelete();
       
-      // Only close the dialog if deletion was successful
       console.log("[DeleteEntryDialog] Delete operation completed successfully");
-      setOpen(false);
       
       // Show success toast
       toast.success("Entry deleted successfully", {
@@ -50,6 +48,12 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
       window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
         detail: { action: 'delete' }
       }));
+
+      // Only close the dialog after everything is complete
+      setTimeout(() => {
+        setIsProcessing(false);
+        setOpen(false);
+      }, 100);
       
     } catch (error) {
       console.error("[DeleteEntryDialog] Error deleting entry:", error);
@@ -58,10 +62,9 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
       const errorMessage = error instanceof Error ? error.message : "Failed to delete entry";
       setError(errorMessage);
       toast.error(`Error: ${errorMessage}`);
+      setIsProcessing(false);
       
       // Keep dialog open if there was an error
-    } finally {
-      setIsProcessing(false);
     }
   };
 
