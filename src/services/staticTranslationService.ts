@@ -5,6 +5,7 @@ class StaticTranslationService {
   private targetLanguage: string = 'en';
   private translationCache = new Map<string, {text: string, timestamp: number}>();
   private cacheLifetime = 1000 * 60 * 30; // 30 minutes
+  private translationPromises = new Map<string, Promise<string>>();
 
   /**
    * Set the target language for translations
@@ -14,6 +15,7 @@ class StaticTranslationService {
       console.log(`StaticTranslationService: Changing language from ${this.targetLanguage} to ${lang}`);
       // Clear cache when language changes
       this.translationCache.clear();
+      this.translationPromises.clear();
     }
     this.targetLanguage = lang;
   }
@@ -36,7 +38,7 @@ class StaticTranslationService {
     // Use "en" as the default source language
     const effectiveSourceLang = sourceLanguage || "en";
     
-    // Skip translation if target language is English or same as source
+    // Skip translation if target language is English or same as source or text is empty
     if (this.targetLanguage === 'en' || 
         this.targetLanguage === effectiveSourceLang || 
         !text || 
@@ -54,28 +56,89 @@ class StaticTranslationService {
       return cachedItem.text;
     }
     
+    // Check if we're already translating this text
+    if (this.translationPromises.has(cacheKey)) {
+      console.log(`Reusing in-progress translation for: "${text.substring(0, 30)}..."`);
+      try {
+        return await this.translationPromises.get(cacheKey)!;
+      } catch (error) {
+        console.error('Error in reused translation promise:', error);
+        // Continue to new translation attempt if the shared promise failed
+      }
+    }
+    
+    // Create a new translation promise
+    const translationPromise = this.performTranslation(text, effectiveSourceLang, entryId, cacheKey);
+    this.translationPromises.set(cacheKey, translationPromise);
+    
     try {
-      console.log(`Translating text: "${text.substring(0, 30)}..." to ${this.targetLanguage} from ${effectiveSourceLang}${entryId ? ` for entry: ${entryId}` : ''}`);
-      const result = await TranslationService.translateText({
-        text,
-        sourceLanguage: effectiveSourceLang,
-        targetLanguage: this.targetLanguage,
-        entryId
-      });
+      const result = await translationPromise;
+      return result;
+    } finally {
+      // Remove the promise when done (whether successful or failed)
+      this.translationPromises.delete(cacheKey);
+    }
+  }
+  
+  /**
+   * Perform the actual translation and cache the result
+   */
+  private async performTranslation(
+    text: string, 
+    sourceLanguage: string, 
+    entryId?: number,
+    cacheKey?: string
+  ): Promise<string> {
+    const effectiveCacheKey = cacheKey || `${this.targetLanguage}:${text}`;
+    
+    try {
+      console.log(`Translating text: "${text.substring(0, 30)}..." to ${this.targetLanguage} from ${sourceLanguage}${entryId ? ` for entry: ${entryId}` : ''}`);
       
-      // Cache the result
+      // Add retries for reliability
+      let retries = 0;
+      const maxRetries = 2;
+      let result = '';
+      
+      while (retries <= maxRetries) {
+        try {
+          result = await TranslationService.translateText({
+            text,
+            sourceLanguage,
+            targetLanguage: this.targetLanguage,
+            entryId
+          });
+          
+          if (result) break; // Success, exit retry loop
+          
+          retries++;
+          if (retries <= maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 500 * retries)); // Backoff
+          }
+        } catch (retryError) {
+          console.warn(`Translation retry ${retries}/${maxRetries} failed:`, retryError);
+          retries++;
+          if (retries <= maxRetries) {
+            await new Promise(resolve => setTimeout(resolve, 500 * retries)); // Backoff
+          } else {
+            throw retryError; // Rethrow the last error after all retries fail
+          }
+        }
+      }
+      
+      // Cache the result if we got one
       if (result) {
-        this.translationCache.set(cacheKey, {
+        this.translationCache.set(effectiveCacheKey, {
           text: result,
           timestamp: Date.now()
         });
+        return result;
+      } else {
+        throw new Error('Empty translation result after retries');
       }
-      
-      return result;
     } catch (error) {
       console.error('Static translation error:', error);
       // Store original text in cache to prevent repeated failed attempts
-      this.translationCache.set(cacheKey, {
+      this.translationCache.set(effectiveCacheKey, {
         text,
         timestamp: Date.now() - (this.cacheLifetime / 2) // Cache for half the lifetime
       });
@@ -89,6 +152,7 @@ class StaticTranslationService {
   clearCache(): void {
     console.log('Clearing translation cache');
     this.translationCache.clear();
+    this.translationPromises.clear();
   }
 
   /**
@@ -103,12 +167,69 @@ class StaticTranslationService {
     console.log(`Pre-translating ${texts.length} items to ${this.targetLanguage}`);
     
     try {
-      const translationsMap = await TranslationService.batchTranslate({
-        texts,
-        targetLanguage: this.targetLanguage
-      });
+      // First check cache for all texts
+      const result = new Map<string, string>();
+      const uncachedTexts: string[] = [];
       
-      return translationsMap;
+      for (const text of texts) {
+        const cacheKey = `${this.targetLanguage}:${text}`;
+        const cachedItem = this.translationCache.get(cacheKey);
+        
+        if (cachedItem && (Date.now() - cachedItem.timestamp) < this.cacheLifetime) {
+          result.set(text, cachedItem.text);
+        } else {
+          uncachedTexts.push(text);
+        }
+      }
+      
+      // If we have uncached texts, get them translated
+      if (uncachedTexts.length > 0) {
+        // Add retry logic for batch translations
+        let retries = 0;
+        const maxRetries = 2;
+        let batchTranslations: Map<string, string> | null = null;
+        
+        while (retries <= maxRetries && !batchTranslations) {
+          try {
+            batchTranslations = await TranslationService.batchTranslate({
+              texts: uncachedTexts,
+              targetLanguage: this.targetLanguage
+            });
+            
+            // Cache the translations
+            if (batchTranslations) {
+              for (const [original, translated] of batchTranslations.entries()) {
+                const cacheKey = `${this.targetLanguage}:${original}`;
+                this.translationCache.set(cacheKey, {
+                  text: translated,
+                  timestamp: Date.now()
+                });
+                result.set(original, translated);
+              }
+            }
+          } catch (error) {
+            console.error(`Batch translation retry ${retries}/${maxRetries} failed:`, error);
+            retries++;
+            
+            if (retries <= maxRetries) {
+              await new Promise(resolve => setTimeout(resolve, 500 * retries)); // Backoff
+            } else {
+              // If all retries fail, use original texts
+              for (const text of uncachedTexts) {
+                result.set(text, text);
+                // Cache the original to prevent repeated failures
+                const cacheKey = `${this.targetLanguage}:${text}`;
+                this.translationCache.set(cacheKey, {
+                  text,
+                  timestamp: Date.now() - (this.cacheLifetime / 2) // Cache for half the lifetime
+                });
+              }
+            }
+          }
+        }
+      }
+      
+      return result;
     } catch (error) {
       console.error('Error pre-translating texts:', error);
       return new Map(texts.map(text => [text, text]));

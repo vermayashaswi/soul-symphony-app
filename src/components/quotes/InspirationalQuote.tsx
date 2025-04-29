@@ -32,6 +32,7 @@ export const InspirationalQuote: React.FC = () => {
   const { currentLanguage, translate } = useTranslation();
   const rotationIntervalRef = useRef<number | null>(null);
   const isTranslatingRef = useRef<boolean>(false);
+  const languageRef = useRef<string>(currentLanguage);
 
   useEffect(() => {
     // Set a default quote immediately for visibility testing
@@ -142,8 +143,10 @@ export const InspirationalQuote: React.FC = () => {
           const newIndex = (prevIndex + 1) % quotesList.length;
           
           const nextQuote = quotesList[newIndex];
-          setQuote(currentLanguage === 'en' ? nextQuote.quote : (nextQuote.translatedQuote || nextQuote.quote));
-          setAuthor(currentLanguage === 'en' ? (nextQuote.author || 'Unknown') : (nextQuote.translatedAuthor || nextQuote.author || 'Unknown'));
+          if (nextQuote) {
+            setQuote(currentLanguage === 'en' ? nextQuote.quote : (nextQuote.translatedQuote || nextQuote.quote));
+            setAuthor(currentLanguage === 'en' ? (nextQuote.author || 'Unknown') : (nextQuote.translatedAuthor || nextQuote.author || 'Unknown'));
+          }
           
           return newIndex;
         });
@@ -187,8 +190,12 @@ export const InspirationalQuote: React.FC = () => {
     };
   }, [inView]);
 
-  // Handle language change
+  // Handle language change - this is critical for translation persistence
   useEffect(() => {
+    if (languageRef.current === currentLanguage) return;
+    
+    languageRef.current = currentLanguage;
+    
     const handleLanguageChange = async () => {
       if (quotes.length === 0) return;
       
@@ -197,15 +204,16 @@ export const InspirationalQuote: React.FC = () => {
       // If switching to English, no translation needed
       if (currentLanguage === 'en') {
         if (quotes.length > 0 && currentQuoteIndex < quotes.length) {
-          setQuote(quotes[currentQuoteIndex].quote);
-          setAuthor(quotes[currentQuoteIndex].author || 'Unknown');
+          const currentItem = quotes[currentQuoteIndex];
+          setQuote(currentItem.quote);
+          setAuthor(currentItem.author || 'Unknown');
         }
       } else {
-        // Re-translate all quotes if needed
+        // Force re-translate all quotes when language changes
         const newTranslatedQuotes = await translateAllQuotes(quotes);
         setTranslatedQuotes(newTranslatedQuotes);
         
-        // Update current quote
+        // Update current quote with translation
         if (newTranslatedQuotes.length > 0 && currentQuoteIndex < newTranslatedQuotes.length) {
           const currentItem = newTranslatedQuotes[currentQuoteIndex];
           setQuote(currentItem.translatedQuote || currentItem.quote);
@@ -218,17 +226,40 @@ export const InspirationalQuote: React.FC = () => {
     };
     
     handleLanguageChange();
+  }, [currentLanguage, quotes, currentQuoteIndex]);
+
+  // Listen for language change events
+  useEffect(() => {
+    const handleLanguageChangeEvent = () => {
+      // This will be triggered by the event, ensure we're using the latest language
+      if (languageRef.current !== currentLanguage) {
+        languageRef.current = currentLanguage;
+        
+        // Force refresh the current quote's translation
+        const quotesList = currentLanguage === 'en' ? quotes : translatedQuotes;
+        if (quotesList.length > 0 && currentQuoteIndex < quotesList.length) {
+          const currentItem = quotesList[currentQuoteIndex];
+          if (currentLanguage === 'en') {
+            setQuote(currentItem.quote);
+            setAuthor(currentItem.author || 'Unknown');
+          } else {
+            setQuote(currentItem.translatedQuote || currentItem.quote);
+            setAuthor(currentItem.translatedAuthor || currentItem.author || 'Unknown');
+          }
+        }
+      }
+    };
     
-    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    window.addEventListener('languageChange', handleLanguageChangeEvent as EventListener);
     
     return () => {
-      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+      window.removeEventListener('languageChange', handleLanguageChangeEvent as EventListener);
     };
-  }, [currentLanguage, quotes]);
+  }, [currentLanguage, quotes, translatedQuotes, currentQuoteIndex]);
 
   // Setup quote rotation when quotes are loaded
   useEffect(() => {
-    if (quotes.length > 0) {
+    if ((currentLanguage === 'en' ? quotes : translatedQuotes).length > 0) {
       setupQuoteRotation();
     }
     
@@ -238,7 +269,7 @@ export const InspirationalQuote: React.FC = () => {
         rotationIntervalRef.current = null;
       }
     };
-  }, [quotes, translatedQuotes]);
+  }, [quotes, translatedQuotes, currentLanguage]);
 
   if (!isReady && !error) {
     return null;
