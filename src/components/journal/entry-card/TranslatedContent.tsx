@@ -22,7 +22,8 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
         } else {
           // Always keep the original content initially
           setTranslatedContent(content);
-          const translated = await translate(content);
+          // Pass the detected language to the translation service if available
+          const translated = await translate(content, language);
           if (translated) {
             setTranslatedContent(translated);
           }
@@ -36,7 +37,7 @@ export function TranslatedContent({ content, isExpanded, language }: TranslatedC
     }
 
     translateContent();
-  }, [content, currentLanguage, translate]);
+  }, [content, currentLanguage, translate, language]);
 
   return (
     <div>

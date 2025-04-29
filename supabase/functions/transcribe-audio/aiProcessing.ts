@@ -1,4 +1,3 @@
-
 // Import necessary Deno modules
 import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/base64.ts";
 
@@ -76,8 +75,8 @@ export async function transcribeAudioWithWhisper(
     // Get the transcribed text from the result
     const transcribedText = result.text || "";
     
-    // Get detected languages (defaults to "unknown" if not provided)
-    const detectedLanguages = result.language ? [result.language] : ["auto"];
+    // Get detected languages from the API response, not defaulting to any specific language
+    const detectedLanguages = result.language ? [result.language] : ["unknown"];
     
     console.log("[Transcription] Success:", {
       textLength: transcribedText.length,
@@ -109,13 +108,16 @@ export async function translateAndRefineText(
     console.log("[AI] Starting text refinement:", text.substring(0, 50) + "...");
     console.log("[AI] Detected languages:", detectedLanguages);
     
-    // Prepare the system message based on detected language
-    const isNonEnglish = detectedLanguages[0] !== 'en' && detectedLanguages[0] !== 'auto';
+    // Check if the detected language indicates non-English content
+    // We never default to 'en' here - we only use what the transcription model detected
+    const isNonEnglish = detectedLanguages[0] !== 'en';
+    const detectedLanguagesInfo = detectedLanguages.join(', ');
     
     // Call the OpenAI API with the appropriate system message
+    // Include detected language information in both prompts
     const systemMessage = isNonEnglish 
-      ? "You are a multilingual expert that translates and refines text from any language to English. Translate the following text into clear, natural English while preserving all meaning and emotion."
-      : "You are an expert at refining transcribed text. Clean up the input text into clear, well-structured sentences. Fix grammar issues, remove filler words, and make it sound more natural, but preserve ALL the original meaning and information.";
+      ? `You are a multilingual expert that translates and refines text from any language to English. The text was detected to be in language(s): ${detectedLanguagesInfo}. Please use this language information when translating. Translate the following text into clear, natural English while preserving all meaning and emotion.`
+      : `You are an expert at refining transcribed text. The text was detected to be in language(s): ${detectedLanguagesInfo}. Clean up the input text into clear, well-structured sentences. Fix grammar issues, remove filler words, and make it sound more natural, but preserve ALL the original meaning and information.`;
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -151,6 +153,7 @@ export async function translateAndRefineText(
     console.log("[AI] Text refined successfully, new length:", refinedText.length);
     console.log("[AI] Original text sample:", text.substring(0, 50));
     console.log("[AI] Refined text sample:", refinedText.substring(0, 50));
+    console.log("[AI] Used detected language(s):", detectedLanguagesInfo);
     
     return { refinedText };
   } catch (error) {
