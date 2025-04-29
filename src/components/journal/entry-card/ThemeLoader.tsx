@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ThemeBoxes } from '../ThemeBoxes';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,6 +10,15 @@ interface ThemeLoaderProps {
   content: string;
   isProcessing?: boolean;
   isNew?: boolean;
+}
+
+// Define interface for the entry data from database
+interface EntryData {
+  id: number;
+  original_language?: string;
+  master_themes?: string[];
+  // Other fields that might be returned
+  [key: string]: any;
 }
 
 export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing = false, isNew = false }: ThemeLoaderProps) {
@@ -41,14 +49,17 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         }
 
         if (data) {
+          // Cast to our interface to safely access properties
+          const entryData = data as EntryData;
+          
           // Check if there's a language field in the data
-          if (data.original_language) {
-            setEntryLanguage(data.original_language);
+          if (entryData.original_language) {
+            setEntryLanguage(entryData.original_language);
           }
           
           // Check if master_themes exists in the response
-          if (Array.isArray(data.master_themes)) {
-            const filteredThemes = data.master_themes.filter(theme => 
+          if (Array.isArray(entryData.master_themes)) {
+            const filteredThemes = entryData.master_themes.filter(theme => 
               theme && typeof theme === 'string' && theme.trim() !== '' && theme !== '•'
             );
             setThemes(filteredThemes);

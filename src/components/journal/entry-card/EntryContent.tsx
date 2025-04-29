@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { TranslatedContent } from '../entry-card/TranslatedContent';
@@ -10,6 +9,15 @@ interface EntryContentProps {
   isProcessing?: boolean;
   entryId: number;
   onOverflowChange?: (hasOverflow: boolean) => void;
+}
+
+// Define interface for the entry data from database
+interface EntryData {
+  id: number;
+  original_language?: string;
+  translation_text?: string;
+  // Other fields that might be returned
+  [key: string]: any;
 }
 
 export function EntryContent({ 
@@ -59,11 +67,12 @@ export function EntryContent({
           .single();
           
         if (!error && data) {
-          // Check if translation_text or original_language fields exist
-          if (data.original_language) {
-            setDetectedLanguage(data.original_language);
+          // Check if original_language field exists
+          const entryData = data as EntryData;
+          if (entryData.original_language) {
+            setDetectedLanguage(entryData.original_language);
             // Cache the result
-            localStorage.setItem(`entry_lang_${entryId}`, data.original_language);
+            localStorage.setItem(`entry_lang_${entryId}`, entryData.original_language);
           }
         }
       } catch (error) {
