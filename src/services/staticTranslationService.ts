@@ -24,18 +24,20 @@ class StaticTranslationService {
    * @param sourceLanguage Optional source language of the text
    * @returns The translated text
    */
-  async translateText(text: string, targetLanguage?: string, sourceLanguage?: string): Promise<string> {
+  async translateText(text: string, sourceLanguage?: string, entryId?: number): Promise<string> {
     // Skip translation if target language is English or same as source
-    if ((targetLanguage || this.targetLanguage) === 'en' || 
-        (sourceLanguage && (targetLanguage || this.targetLanguage) === sourceLanguage)) {
+    if (this.targetLanguage === 'en' || 
+        (sourceLanguage && this.targetLanguage === sourceLanguage)) {
       return text;
     }
     
     try {
+      console.log(`Translating text: "${text.substring(0, 30)}..." to ${this.targetLanguage} from ${sourceLanguage || 'unknown'} for entry: ${entryId || 'unknown'}`);
       const result = await TranslationService.translateText({
         text,
         sourceLanguage,
-        targetLanguage: targetLanguage || this.targetLanguage
+        targetLanguage: this.targetLanguage,
+        entryId
       });
       
       return result;

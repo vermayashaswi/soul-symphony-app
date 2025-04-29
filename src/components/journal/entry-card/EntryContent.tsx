@@ -1,73 +1,88 @@
-
-import React, { useEffect, useRef, useState } from 'react';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import React, { useEffect, useState } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
-import { textWillOverflow } from '@/utils/textUtils';
+import { TranslatedContent } from '../entry-card/TranslatedContent';
 
 interface EntryContentProps {
   content: string;
   isExpanded: boolean;
-  isProcessing: boolean;
-  entryId?: number;
+  isProcessing?: boolean;
+  entryId: number;
   onOverflowChange?: (hasOverflow: boolean) => void;
 }
 
 export function EntryContent({ 
   content, 
   isExpanded, 
-  isProcessing,
+  isProcessing = false,
   entryId,
   onOverflowChange
 }: EntryContentProps) {
-  const contentRef = useRef<HTMLDivElement | null>(null);
-  const [hasOverflow, setHasOverflow] = useState(false);
-  
-  // Check for content overflow on initial render and on content changes
-  useEffect(() => {
-    // Use our utility for initial check
-    const overflowEstimate = textWillOverflow(content);
-    setHasOverflow(overflowEstimate);
-    
-    if (onOverflowChange) {
-      onOverflowChange(overflowEstimate);
-    }
-    
-    // For more accurate measurement, check after render if we have DOM access
-    if (contentRef.current && !isExpanded) {
-      const element = contentRef.current.querySelector('p');
-      if (element) {
-        const hasActualOverflow = element.scrollHeight > element.clientHeight;
-        
-        if (hasActualOverflow !== hasOverflow) {
-          setHasOverflow(hasActualOverflow);
-          if (onOverflowChange) {
-            onOverflowChange(hasActualOverflow);
-          }
-        }
-      }
-    }
-  }, [content, isExpanded, onOverflowChange, hasOverflow, entryId]);
+  const [isLoading, setIsLoading] = useState(isProcessing);
+  const [detectedLanguage, setDetectedLanguage] = useState<string | undefined>(undefined);
+  const contentRef = React.useRef<HTMLDivElement>(null);
 
-  if (isProcessing) {
+  // Function to check if content will overflow container
+  useEffect(() => {
+    const checkOverflow = () => {
+      if (!contentRef.current) return;
+      
+      const hasOverflow = contentRef.current.scrollHeight > contentRef.current.clientHeight;
+      onOverflowChange?.(hasOverflow);
+    };
+
+    // Wait for any potential content changes to finish before checking
+    const timer = setTimeout(checkOverflow, 100);
+    
+    return () => clearTimeout(timer);
+  }, [content, isExpanded, onOverflowChange]);
+
+  // Check for language information from the entry
+  useEffect(() => {
+    const fetchEntryLanguageInfo = async () => {
+      if (!entryId) return;
+      
+      try {
+        // Check if we have the entry in local storage cache
+        const cachedLang = localStorage.getItem(`entry_lang_${entryId}`);
+        if (cachedLang) {
+          setDetectedLanguage(cachedLang);
+          return;
+        }
+        
+        // Otherwise fetch it from Supabase
+        const { createClient } = await import('@/integrations/supabase/client');
+        const supabase = createClient();
+        
+        const { data, error } = await supabase
+          .from('Journal Entries')
+          .select('original_language')
+          .eq('id', entryId)
+          .single();
+          
+        if (!error && data && data.original_language) {
+          setDetectedLanguage(data.original_language);
+          // Cache the result
+          localStorage.setItem(`entry_lang_${entryId}`, data.original_language);
+        }
+      } catch (error) {
+        console.error('Error fetching entry language:', error);
+      }
+    };
+    
+    fetchEntryLanguageInfo();
+  }, [entryId]);
+
+  if (isLoading || isProcessing) {
     return <LoadingEntryContent />;
   }
 
-  // Handle multi-language content display with proper overflow handling
   return (
     <div ref={contentRef}>
-      {isExpanded ? (
-        <TranslatableText 
-          text={content} 
-          as="p" 
-          className="text-xs md:text-sm text-foreground" 
-        />
-      ) : (
-        <TranslatableText 
-          text={content} 
-          as="p" 
-          className="text-xs md:text-sm text-foreground line-clamp-3" 
-        />
-      )}
+      <TranslatedContent 
+        content={content} 
+        isExpanded={isExpanded} 
+        language={detectedLanguage} 
+      />
     </div>
   );
 }
