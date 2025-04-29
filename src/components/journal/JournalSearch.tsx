@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
@@ -129,14 +128,15 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
         }
       }
       
-      if (entry.themes && Array.isArray(entry.themes)) {
-        return entry.themes.some(theme => 
+      // Check master_themes first (preferred) and fall back to themes if needed
+      if (entry.master_themes && Array.isArray(entry.master_themes)) {
+        return entry.master_themes.some(theme => 
           theme.toLowerCase().includes(query)
         );
       }
       
-      if (entry.master_themes && Array.isArray(entry.master_themes)) {
-        return entry.master_themes.some(theme => 
+      if (entry.themes && Array.isArray(entry.themes)) {
+        return entry.themes.some(theme => 
           theme.toLowerCase().includes(query)
         );
       }

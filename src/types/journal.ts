@@ -18,6 +18,7 @@ export interface JournalEntry {
   }>;
   "foreign key"?: string;
   master_themes?: string[];
+  themes?: string[]; // Added missing themes property
   user_feedback?: string | null;
   Edit_Status?: number | null;
   content?: string; // Content field for easier access
