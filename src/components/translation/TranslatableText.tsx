@@ -9,15 +9,13 @@ interface TranslatableTextProps {
   className?: string;
   as?: keyof JSX.IntrinsicElements;
   sourceLanguage?: string;  // Added sourceLanguage prop
-  entryId?: number;  // Add entryId prop
 }
 
 export function TranslatableText({ 
   text, 
   className = "",
   as: Component = 'span',
-  sourceLanguage,
-  entryId
+  sourceLanguage
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState(text);
   const [isLoading, setIsLoading] = useState(false);
@@ -48,10 +46,10 @@ export function TranslatableText({
       // Only initiate translation if not in English
       if (currentLanguage !== 'en') {
         setIsLoading(true);
-        console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'}, entryId: ${entryId || 'N/A'}`);
+        console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'}`);
 
         try {
-          const result = await translate(text, sourceLanguage, entryId);
+          const result = await translate(text, sourceLanguage);
           if (isMounted) {
             setTranslatedText(result || text); // Fallback to original text if result is empty
             console.log(`TranslatableText: Successfully translated to "${result?.substring(0, 30) || 'empty'}..."`);
@@ -73,7 +71,7 @@ export function TranslatableText({
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, translate, isOnWebsite, sourceLanguage, entryId]);
+  }, [text, currentLanguage, translate, isOnWebsite, sourceLanguage]);
   
   // Listen to the language change event to force re-render
   useEffect(() => {
