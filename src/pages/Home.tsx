@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -23,6 +22,7 @@ const Home = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [journalLabel, setJournalLabel] = useState("Journal");
   const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
+  const [translatedDate, setTranslatedDate] = useState<string>("");
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
@@ -31,13 +31,31 @@ const Home = () => {
     // Pre-translate common labels to avoid async issues
     const loadTranslations = async () => {
       if (translate) {
-        setJournalLabel(await translate("Journal"));
-        setYourJournalLabel(await translate("Your Journal"));
+        setJournalLabel(await translate("Journal", "en"));
+        setYourJournalLabel(await translate("Your Journal", "en"));
+        setTranslatedDate(await translate(formattedDate, "en"));
       }
     };
     
     loadTranslations();
-  }, [translate]);
+  }, [translate, formattedDate]);
+
+  // Listen for language changes and update translations
+  useEffect(() => {
+    const handleLanguageChange = async () => {
+      if (translate) {
+        setJournalLabel(await translate("Journal", "en"));
+        setYourJournalLabel(await translate("Your Journal", "en"));
+        setTranslatedDate(await translate(formattedDate, "en"));
+      }
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+    };
+  }, [translate, formattedDate]);
 
   useEffect(() => {
     const preloadImage = new Image();
@@ -195,7 +213,7 @@ const Home = () => {
                     MozOsxFontSmoothing: 'grayscale'
                   }}
                 >
-                  <TranslatableText text={formattedDate} />
+                  {translatedDate || formattedDate}
                 </div>
               </motion.div>
               <div className="ml-2 z-[100]">

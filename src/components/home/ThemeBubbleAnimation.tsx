@@ -1,6 +1,8 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ThemeData {
   theme: string;
@@ -111,7 +113,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
           letterSpacing: '0.01em',
         }}
       >
-        {themeData.theme}
+        <TranslatableText text={themeData.theme} sourceLanguage="en" />
       </span>
     </motion.div>
   );

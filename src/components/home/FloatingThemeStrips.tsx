@@ -3,6 +3,7 @@ import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface ThemeData {
   theme: string;
@@ -20,7 +21,35 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 }) => {
   const [uniqueThemes, setUniqueThemes] = useState<ThemeData[]>([]);
   const { theme } = useTheme();
+  const { translate } = useTranslation();
+  const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
+  
+  // Translate the label
+  useEffect(() => {
+    const translateLabel = async () => {
+      if (translate) {
+        const result = await translate("7-day themes", "en");
+        setTranslatedLabel(result);
+      }
+    };
+    
+    translateLabel();
+    
+    // Listen for language changes
+    const handleLanguageChange = async () => {
+      if (translate) {
+        const result = await translate("7-day themes", "en");
+        setTranslatedLabel(result);
+      }
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+    };
+  }, [translate]);
   
   useEffect(() => {
     if (themesData.length === 0) return;
@@ -82,7 +111,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               MozOsxFontSmoothing: 'grayscale'
             }}
           >
-            <TranslatableText text="7-day themes" />
+            {translatedLabel}
           </span>
         </motion.div>
       </div>
@@ -135,7 +164,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                   MozOsxFontSmoothing: 'grayscale',
                 }}
               >
-                <TranslatableText text={themeItem.theme} />
+                <TranslatableText text={themeItem.theme} sourceLanguage="en" />
               </span>
             </motion.div>
           );
