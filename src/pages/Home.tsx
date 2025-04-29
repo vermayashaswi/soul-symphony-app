@@ -168,10 +168,12 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
+      {/* Background Animation */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
       </div>
 
+      {/* Preload Image */}
       <div className="hidden">
         <img
           src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png"
@@ -217,7 +219,7 @@ const Home = () => {
                   {translatedDate || formattedDate}
                 </div>
               </motion.div>
-              <div className="ml-2 z-50 pointer-events-auto">
+              <div className="ml-2 relative z-[1000] pointer-events-auto">
                 <LanguageSelector />
               </div>
             </div>
@@ -225,7 +227,8 @@ const Home = () => {
         </div>
       </div>
 
-      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
+      {/* Central arrow button */}
+      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-auto">
         <motion.div
           className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
           initial={{ scale: 1, opacity: 0.5 }}
@@ -258,7 +261,8 @@ const Home = () => {
         </motion.button>
       </div>
 
-      <div className="flex-1 px-0 absolute inset-0 z-30">
+      {/* Journal Summary */}
+      <div className="flex-1 px-0 absolute inset-0 z-30 pointer-events-none">
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -276,11 +280,10 @@ const Home = () => {
         </motion.div>
       </div>
 
+      {/* Inspirational Quote */}
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
       </div>
-
-      {/* Removed duplicate LanguageSelector here */}
     </div>
   );
 };
