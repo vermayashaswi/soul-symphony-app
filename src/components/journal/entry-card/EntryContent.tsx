@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { TranslatedContent } from '../entry-card/TranslatedContent';
@@ -93,6 +94,7 @@ export function EntryContent({
         content={content} 
         isExpanded={isExpanded} 
         language={detectedLanguage} 
+        entryId={entryId} 
       />
     </div>
   );

@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { ThemeBoxes } from '../ThemeBoxes';
 import { supabase } from '@/integrations/supabase/client';
@@ -83,6 +84,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         <TranslatableText 
           text="Themes" 
           sourceLanguage={entryLanguage}
+          entryId={entryId}
         />
       </h3>
       
@@ -103,6 +105,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
           <TranslatableText 
             text="No themes detected" 
             sourceLanguage={entryLanguage}
+            entryId={entryId}
           />
         </p>
       )}

@@ -8,14 +8,16 @@ interface TranslatableTextProps {
   text: string;
   className?: string;
   as?: keyof JSX.IntrinsicElements;
-  sourceLanguage?: string;  // Added sourceLanguage prop
+  sourceLanguage?: string;  // The detected language of the content
+  entryId?: number;  // Added entryId parameter
 }
 
 export function TranslatableText({ 
   text, 
   className = "",
   as: Component = 'span',
-  sourceLanguage
+  sourceLanguage,
+  entryId
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState(text);
   const [isLoading, setIsLoading] = useState(false);
@@ -44,10 +46,10 @@ export function TranslatableText({
     // Only initiate translation if not in English
     if (currentLanguage !== 'en') {
       setIsLoading(true);
-      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'}`);
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'} for entry: ${entryId || 'unknown'}`);
 
       try {
-        const result = await translate(text, sourceLanguage);
+        const result = await translate(text, sourceLanguage, entryId);
         setTranslatedText(result || text); // Fallback to original text if result is empty
         console.log(`TranslatableText: Successfully translated to "${result?.substring(0, 30) || 'empty'}..."`);
       } catch (error) {
@@ -75,7 +77,7 @@ export function TranslatableText({
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, sourceLanguage]);
+  }, [text, currentLanguage, sourceLanguage, entryId]);
   
   // Listen to language change events to force re-translate
   useEffect(() => {
@@ -92,7 +94,7 @@ export function TranslatableText({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [text]);
+  }, [text, sourceLanguage, entryId]);
 
   // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(

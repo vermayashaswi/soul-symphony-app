@@ -26,6 +26,7 @@ export function ThemeBoxes({ themes = [], entryId, sourceLanguage }: ThemeBoxesP
           <TranslatableText 
             text={theme} 
             sourceLanguage={sourceLanguage}
+            entryId={entryId}
           />
         </Badge>
       ))}
