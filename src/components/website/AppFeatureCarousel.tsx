@@ -1,47 +1,34 @@
 
 import React, { useState } from 'react';
 import { motion } from 'framer-motion';
-import { ChevronLeft, ChevronRight, Mic, Brain, LineChart, MessageSquare, Smartphone } from 'lucide-react';
+import { ChevronLeft, ChevronRight, Mic, Brain, LineChart, MessageSquare } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
-import { 
-  Carousel,
-  CarouselContent,
-  CarouselItem,
-  CarouselPrevious,
-  CarouselNext,
-  CarouselDots
-} from '@/components/ui/carousel';
-import OptimizedImage from '@/components/ui/optimized-image';
 
 const features = [
   {
     title: "Voice Journaling",
     description: "Record your thoughts with voice and let SOuLO transcribe and analyze them automatically.",
     icon: Mic,
-    image: "/lovable-uploads/69a98431-43ec-41e5-93f1-7ddaf28e2884.png", // App screenshot for voice journaling
-    mobileBg: "/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png" // Phone frame
+    image: "https://images.unsplash.com/photo-1589254065878-42c9da997008?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Person speaking into microphone
   },
   {
     title: "AI Analysis",
     description: "Gain insights into your patterns and emotions through advanced AI analysis.",
     icon: Brain,
-    image: "/lovable-uploads/624f7365-8259-44e3-9c0f-baa65d0b9776.png", // App screenshot for AI analysis
-    mobileBg: "/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png" // Phone frame
+    image: "public/lovable-uploads/624f7365-8259-44e3-9c0f-baa65d0b9776.png", // New AI visualization image with shorter height
   },
   {
     title: "Emotional Tracking",
     description: "Visualize your emotional journey over time with interactive charts.",
     icon: LineChart,
-    image: "/lovable-uploads/2ca17c6f-5994-4559-a86c-7dcac6672b6c.png", // App screenshot for emotion tracking
-    mobileBg: "/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png" // Phone frame
+    image: "https://images.unsplash.com/photo-1551288049-bebda4e38f71?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // Colorful emotion/mood charts
   },
   {
     title: "AI Assistant",
     description: "Chat with your journal and get personalized insights from your past entries.",
     icon: MessageSquare,
-    image: "/lovable-uploads/1c377509-f91d-4c41-9289-dc867a89a90e.png", // App screenshot for AI chat
-    mobileBg: "/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png" // Phone frame
+    image: "https://images.unsplash.com/photo-1577563908411-5077b6dc7624?ixlib=rb-1.2.1&auto=format&fit=crop&w=1350&q=80", // AI chat interface with personal insights
   }
 ];
 
@@ -88,25 +75,17 @@ const AppFeatureCarousel = () => {
                   animate={{ opacity: 1, x: 0 }}
                   exit={{ opacity: 0, x: -100 }}
                   transition={{ duration: 0.5 }}
-                  className="w-full md:w-1/2 p-4 relative"
+                  className="w-full md:w-1/2 p-4"
                 >
-                  <div className="relative mx-auto w-full max-w-[280px]">
-                    {/* Phone frame */}
-                    <img 
-                      src={features[activeFeature].mobileBg} 
-                      alt="Phone frame" 
-                      className="w-full h-auto"
-                    />
-                    
-                    {/* App screenshot positioned inside phone frame */}
-                    <div className="absolute top-[6%] left-[5%] right-[5%] bottom-[10%] overflow-hidden">
+                  <Card className="overflow-hidden border-theme/10 shadow-lg bg-white">
+                    <CardContent className="p-0">
                       <img 
                         src={features[activeFeature].image} 
                         alt={features[activeFeature].title} 
-                        className="w-full h-full object-cover rounded-2xl"
+                        className="w-full h-auto"
                       />
-                    </div>
-                  </div>
+                    </CardContent>
+                  </Card>
                 </motion.div>
                 
                 <motion.div 

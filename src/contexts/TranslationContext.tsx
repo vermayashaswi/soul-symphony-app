@@ -23,7 +23,7 @@ interface TranslationContextType {
   currentLanguage: string;
   setLanguage: (lang: string) => Promise<void>;
   translationProgress: number;
-  translate: (text: string, sourceLanguage?: string) => Promise<string>;
+  translate: (text: string) => Promise<string>;
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -33,13 +33,13 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
 
-  // Function to translate text using our service - now respects translation_status
-  const translate = async (text: string, sourceLanguage?: string): Promise<string> => {
+  // Function to translate text using our service
+  const translate = async (text: string): Promise<string> => {
     if (currentLanguage === 'en' || !text) return text;
     
     try {
-      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage} from source language: ${sourceLanguage || 'auto'}`);
-      const translated = await staticTranslationService.translateText(text, currentLanguage, sourceLanguage);
+      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage}`);
+      const translated = await staticTranslationService.translateText(text, currentLanguage);
       console.log(`Translation result: "${translated.substring(0, 30)}..."`);
       return translated;
     } catch (error) {

@@ -3,8 +3,6 @@ import React from 'react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
-import AppFeatureCarousel from '@/components/website/AppFeatureCarousel';
-import PrivacySection from '@/components/website/sections/PrivacySection';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const HomePage = () => {
@@ -43,8 +41,6 @@ const HomePage = () => {
         openAppStore={openAppStore}
         openPlayStore={openPlayStore}
       />
-      <AppFeatureCarousel />
-      <PrivacySection />
       <Footer />
     </div>
   );
