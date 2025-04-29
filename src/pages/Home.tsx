@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -279,9 +280,7 @@ const Home = () => {
         <InspirationalQuote />
       </div>
 
-      <div className="absolute top-4 right-4 z-[100]">
-        <LanguageSelector />
-      </div>
+      {/* Removed duplicate LanguageSelector here */}
     </div>
   );
 };
