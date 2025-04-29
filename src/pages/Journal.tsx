@@ -14,6 +14,7 @@ import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
+import JournalSearch from '@/components/journal/JournalSearch';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -59,6 +60,7 @@ const Journal = () => {
   const [pendingDeletionIds, setPendingDeletionIds] = useState<Set<number>>(new Set());
   const lastSuccessfulEntriesRef = useRef<JournalEntry[]>([]);
   const forceUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
 
   const { 
     entries, 
@@ -120,6 +122,9 @@ const Journal = () => {
           
           console.log('[Journal] Fetching new data immediately after entry mapped');
           fetchEntries();
+          
+          // Remove the temporary entry if it exists
+          setLocalEntries(prev => prev.filter(entry => !(entry.tempId === event.detail.tempId)));
           
           setTimeout(() => {
             setProcessingEntries(prev => prev.filter(id => id !== event.detail.tempId));
@@ -541,6 +546,18 @@ const Journal = () => {
         setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
         
+        // Create a temporary processing entry to be displayed while the real one is being processed
+        const tempEntry: JournalEntry = {
+          id: Date.now(), // Temporary ID that won't conflict with real entries
+          created_at: new Date().toISOString(),
+          content: "Processing entry...",
+          tempId: tempId // To track which processing entry this corresponds to
+        };
+        
+        // Add the temporary entry to localEntries
+        setLocalEntries(prev => [tempEntry, ...prev]);
+        setHasLocalChanges(true);
+        
         fetchEntries();
         setRefreshKey(prev => prev + 1);
         
@@ -583,6 +600,9 @@ const Journal = () => {
                   return newToastIds;
                 });
               }
+              
+              // Remove the temporary entry from localEntries if it's still there
+              setLocalEntries(prev => prev.filter(entry => !(entry.tempId === tempId)));
               
               fetchEntries();
               setRefreshKey(prev => prev + 1);
@@ -829,9 +849,15 @@ const Journal = () => {
     };
   }, [fetchEntries]);
 
+  const handleSearchResults = (filtered: JournalEntry[]) => {
+    setFilteredEntries(filtered);
+  };
+
   const displayEntries = hasLocalChanges ? localEntries : 
                         (entries && entries.length > 0) ? entries : 
                         (lastSuccessfulEntriesRef.current.length > 0) ? lastSuccessfulEntriesRef.current : [];
+
+  const entriesToDisplay = filteredEntries.length > 0 && displayEntries.length > 0 ? filteredEntries : displayEntries;
 
   const isReallyEmpty = displayEntries.length === 0 && 
                         lastSuccessfulEntriesRef.current.length === 0 && 
@@ -950,8 +976,13 @@ const Journal = () => {
               
               <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
                 <ErrorBoundary>
-                  <JournalEntriesList
+                  <JournalSearch
                     entries={displayEntries}
+                    onSelectEntry={() => {}}
+                    onSearchResults={handleSearchResults}
+                  />
+                  <JournalEntriesList
+                    entries={entriesToDisplay}
                     loading={showLoading}
                     processingEntries={processingEntries}
                     processedEntryIds={processedEntryIds}

@@ -8,7 +8,8 @@ import {
   FloatingDotsToggle, 
   ThemeLoader, 
   DeleteEntryDialog,
-  EntryContent
+  EntryContent,
+  LoadingEntryContent
 } from './entry-card';
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
@@ -39,6 +40,7 @@ export interface JournalEntry {
   "refined text"?: string;
   translation_text?: string;
   original_language?: string;
+  tempId?: string;
 }
 
 interface JournalEntryCardProps {
@@ -70,7 +72,8 @@ export function JournalEntryCard({
     Edit_Status: entry?.Edit_Status || null,
     user_feedback: entry?.user_feedback || null,
     translation_text: entry?.translation_text,
-    original_language: entry?.original_language
+    original_language: entry?.original_language,
+    tempId: entry?.tempId
   };
 
   const [isExpanded, setIsExpanded] = useState(isNew);
@@ -142,7 +145,8 @@ export function JournalEntryCard({
     console.log(`[JournalEntryCard] Entry ${safeEntry.id} content status:`, {
       hasValidContent,
       contentLength: safeEntry.content?.length || 0,
-      isProcessing
+      isProcessing,
+      processing
     });
     
     setContentLoaded(hasValidContent);
@@ -150,7 +154,7 @@ export function JournalEntryCard({
     if (isNew && hasValidContent && !isExpanded) {
       setIsExpanded(true);
     }
-  }, [safeEntry.content, isNew, isExpanded, isProcessing]);
+  }, [safeEntry.content, isNew, isExpanded, isProcessing, processing]);
   
   useEffect(() => {
     console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id}`);
@@ -243,7 +247,7 @@ export function JournalEntryCard({
   
   const initialThemes = extractThemes();
   
-  const isContentProcessing = isProcessing && (!contentLoaded || !safeEntry.content || 
+  const isContentProcessing = processing || isProcessing || (!contentLoaded || !safeEntry.content || 
                                               safeEntry.content === "Processing entry..." ||
                                               safeEntry.content === "Loading...");
   
@@ -396,6 +400,38 @@ export function JournalEntryCard({
     );
   }
 
+  // If this is a processing entry, render the LoadingEntryContent directly
+  if (isContentProcessing && entry.content === "Processing entry...") {
+    return (
+      <ErrorBoundary>
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.3 }}
+          className="journal-entry-card" 
+          data-entry-id={safeEntry.id}
+          data-processing="true"
+        >
+          <Card className="bg-background shadow-md">
+            <div className="flex justify-between items-center p-3 md:p-4">
+              <div className="flex items-center space-x-3">
+                <div className="flex flex-col">
+                  <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
+                    {formatShortDate(safeEntry.created_at)}
+                  </h3>
+                </div>
+              </div>
+            </div>
+
+            <div className="p-3 md:p-4">
+              <LoadingEntryContent />
+            </div>
+          </Card>
+        </motion.div>
+      </ErrorBoundary>
+    );
+  }
+
   return (
     <ErrorBoundary>
       <motion.div
@@ -458,13 +494,17 @@ export function JournalEntryCard({
 
           <div className="p-3 md:p-4">
             <ErrorBoundary>
-              <EntryContent 
-                content={safeEntry.content} 
-                isExpanded={isExpanded} 
-                isProcessing={isContentProcessing}
-                entryId={safeEntry.id}
-                translationText={safeEntry.translation_text}
-              />
+              {isContentProcessing ? (
+                <LoadingEntryContent />
+              ) : (
+                <EntryContent 
+                  content={safeEntry.content} 
+                  isExpanded={isExpanded} 
+                  isProcessing={isContentProcessing}
+                  entryId={safeEntry.id}
+                  translationText={safeEntry.translation_text}
+                />
+              )}
             </ErrorBoundary>
             
             <div className="mt-3 mb-2 flex items-center">

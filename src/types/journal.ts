@@ -18,11 +18,13 @@ export interface JournalEntry {
   }>;
   "foreign key"?: string;
   master_themes?: string[];
+  themes?: string[];
   user_feedback?: string | null;
   Edit_Status?: number | null;
   content?: string; // Content field for easier access
   original_language?: string; // Original language of the entry
   translation_text?: string; // Translated text when available
+  tempId?: string; // Temporary ID for tracking processing entries
 }
 
 export interface JournalEntryFormData extends JournalEntry {

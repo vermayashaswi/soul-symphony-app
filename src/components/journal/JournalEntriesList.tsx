@@ -72,7 +72,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
                 // Make sure id is definitely defined and not optional
                 id: entry.id!
               }}
-              processing={processingEntries.some(tempId => tempId.includes(String(entry.id)))}
+              processing={processingEntries.some(tempId => tempId === entry.tempId) || entry.content === "Processing entry..."}
               processed={processedEntryIds.includes(entry.id!)}
               onDelete={handleDeleteEntry}
             />
