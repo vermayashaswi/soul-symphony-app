@@ -1,9 +1,7 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
-import { GripVertical } from 'lucide-react';
 
-interface FloatingDotsToggleProps {
+export interface FloatingDotsToggleProps {
   onClick: () => void;
   isExpanded: boolean;
 }

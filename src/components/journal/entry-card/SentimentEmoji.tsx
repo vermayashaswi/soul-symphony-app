@@ -1,67 +1,43 @@
 
-import React, { useEffect, useRef } from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import twemoji from 'twemoji';
+import React from 'react';
 
 interface SentimentEmojiProps {
-  sentiment?: string | {
-    sentiment: string;
-    score: number;
-  };
-  isProcessing?: boolean;
+  sentiment: string | { sentiment: string; score: number };
 }
 
-export function SentimentEmoji({ sentiment, isProcessing = false }: SentimentEmojiProps) {
-  const emojiRef = useRef<HTMLSpanElement>(null);
+const SentimentEmoji: React.FC<SentimentEmojiProps> = ({ sentiment }) => {
+  // Parse sentiment value
+  let sentimentValue: number;
   
-  useEffect(() => {
-    if (emojiRef.current) {
-      twemoji.parse(emojiRef.current, {
-        folder: 'svg',
-        ext: '.svg',
-        className: 'emoji-svg',
-        size: '72x72'
-      });
-    }
-  }, [sentiment]);
-  
-  if (isProcessing) {
-    return <Skeleton className="h-8 w-8 rounded-full" />;
-  }
-
-  // If sentiment is missing or invalid, show a neutral face
-  if (!sentiment) {
-    return <span ref={emojiRef} role="img" aria-label="pending sentiment" className="text-2xl text-muted-foreground">⌛</span>;
-  }
-
-  const getSentimentScore = (): number => {
-    try {
-      if (typeof sentiment === 'string') {
-        return parseFloat(sentiment);
-      } else if (sentiment && typeof sentiment === 'object') {
-        if ('sentiment' in sentiment && typeof sentiment.sentiment === 'string') {
-          return parseFloat(sentiment.sentiment);
-        } else if ('score' in sentiment && typeof sentiment.score === 'number') {
-          return sentiment.score;
-        }
-      }
-      return 0;
-    } catch (error) {
-      console.error("[SentimentEmoji] Error parsing sentiment score:", error);
-      console.log("[SentimentEmoji] Sentiment value that caused the error:", sentiment);
-      return 0;
-    }
-  };
-
-  const score = getSentimentScore();
-  
-  if (score >= 0.3) {
-    return <span ref={emojiRef} role="img" aria-label="positive sentiment" className="text-2xl" style={{ color: '#4ade80' }}>😊</span>;
-  } else if (score >= -0.1) {
-    return <span ref={emojiRef} role="img" aria-label="neutral sentiment" className="text-2xl" style={{ color: '#facc15' }}>😐</span>;
+  if (typeof sentiment === 'string') {
+    sentimentValue = parseFloat(sentiment);
+    if (isNaN(sentimentValue)) sentimentValue = 0;
   } else {
-    return <span ref={emojiRef} role="img" aria-label="negative sentiment" className="text-2xl" style={{ color: '#ef4444' }}>😔</span>;
+    sentimentValue = sentiment.score;
   }
-}
+  
+  // Choose emoji based on sentiment value
+  let emoji = '😐'; // neutral default
+  
+  if (sentimentValue <= -0.7) {
+    emoji = '😡'; // very negative
+  } else if (sentimentValue <= -0.4) {
+    emoji = '😔'; // quite negative
+  } else if (sentimentValue <= -0.1) {
+    emoji = '🙁'; // slightly negative
+  } else if (sentimentValue >= 0.7) {
+    emoji = '😄'; // very positive
+  } else if (sentimentValue >= 0.4) {
+    emoji = '🙂'; // quite positive
+  } else if (sentimentValue >= 0.1) {
+    emoji = '😊'; // slightly positive
+  }
+
+  return (
+    <span role="img" aria-label="sentiment" className="select-none">
+      {emoji}
+    </span>
+  );
+};
 
 export default SentimentEmoji;

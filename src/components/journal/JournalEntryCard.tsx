@@ -36,6 +36,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   const [showSentiment, setShowSentiment] = useState(true);
   const [hasError, setHasError] = useState(false);
   const [loadingError, setLoadingError] = useState<string | null>(null);
+  const [isDotsExpanded, setIsDotsExpanded] = useState(false); // State for dots toggle
   const cardRef = useRef<HTMLDivElement>(null);
   const processingRef = useRef(processing);
   
@@ -64,19 +65,36 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   // Format date display
   const dateDisplay = entry.created_at ? formatDistanceToNow(new Date(entry.created_at), { addSuffix: true }) : '';
   
-  const handleDeleteClick = async () => {
+  const handleDeleteEntry = async () => {
     if (isDeleting || entry.id < 0) return; // Prevent deletion during processing
     
     try {
       setIsDeleting(true);
+      console.log(`[JournalEntryCard] Handling delete for entry: ${entry.id}`);
+      
+      if (!entry.id) {
+        console.error("[JournalEntryCard] Invalid entry ID for deletion");
+        return;
+      }
+      
+      // Call the parent component's delete handler
       await onDelete(entry.id);
     } catch (error) {
-      console.error(`[JournalEntryCard] Error deleting entry ${entry.id}:`, error);
+      console.error(`[JournalEntryCard] Error when deleting entry ${entry.id}:`, error);
       setHasError(true);
+      throw error; // Re-throw to let DeleteEntryDialog handle the error display
     } finally {
       setIsDeleting(false);
     }
   };
+
+  // Handle toggle click for the dots animation
+  const handleDotsToggle = () => {
+    setIsDotsExpanded(prev => !prev);
+  };
+
+  // Extract content for passing to child components
+  const entryContent = entry.content || entry["refined text"] || entry["transcription text"] || "";
 
   return (
     <Card 
@@ -107,22 +125,31 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
         <div className="flex gap-2">
           {!processing && (
             <>
-              <FloatingDotsToggle>
-                <DropdownMenu>
-                  <DropdownMenuTrigger asChild>
-                    <button className="text-muted-foreground hover:text-foreground">
-                      <MoreHorizontal size={18} />
-                    </button>
-                  </DropdownMenuTrigger>
-                  <DropdownMenuContent align="end">
-                    <ExtractThemeButton entryId={entry.id} />
-                    <EditEntryButton entryId={entry.id} />
-                    <DropdownMenuItem className="cursor-pointer text-red-500" asChild>
-                      <DeleteEntryDialog onDelete={() => handleDeleteClick()} isDeleting={isDeleting} />
-                    </DropdownMenuItem>
-                  </DropdownMenuContent>
-                </DropdownMenu>
-              </FloatingDotsToggle>
+              <FloatingDotsToggle 
+                onClick={handleDotsToggle} 
+                isExpanded={isDotsExpanded}
+              />
+              <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                  <button className="text-muted-foreground hover:text-foreground">
+                    <MoreHorizontal size={18} />
+                  </button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end">
+                  <ExtractThemeButton entryId={entry.id} />
+                  <EditEntryButton 
+                    entryId={entry.id} 
+                    content={entryContent} 
+                    onEntryUpdated={(newContent, isProcessing) => {
+                      // This callback will be called when the entry is updated
+                      console.log(`Entry ${entry.id} updated with new content`);
+                    }}
+                  />
+                  <DropdownMenuItem className="cursor-pointer text-red-500" asChild>
+                    <DeleteEntryDialog onDelete={handleDeleteEntry} isDeleting={isDeleting} />
+                  </DropdownMenuItem>
+                </DropdownMenuContent>
+              </DropdownMenu>
             </>
           )}
         </div>
@@ -133,14 +160,21 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       ) : (
         <>
           {entry.original_language && entry.original_language !== 'en' ? (
-            <TranslatedContent entry={entry} />
+            <TranslatedContent 
+              originalContent={entryContent} 
+              translatedContent={entry.translation_text || ""} 
+              language={entry.original_language} 
+            />
           ) : (
-            <EntryContent entry={entry} />
+            <EntryContent 
+              content={entryContent} 
+              entryId={entry.id}
+            />
           )}
           
           {showSentiment && entry.sentiment && (
             <div className="mt-2">
-              <SentimentMeter sentiment={parseFloat(entry.sentiment)} />
+              <SentimentMeter sentiment={typeof entry.sentiment === 'string' ? entry.sentiment : entry.sentiment.toString()} />
             </div>
           )}
           

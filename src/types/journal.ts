@@ -10,7 +10,7 @@ export interface JournalEntry {
   audio_url?: string;
   duration?: number;
   emotions?: Json;
-  sentiment?: string;
+  sentiment?: string | { sentiment: string; score: number }; // Updated to support both formats
   entities?: Array<{
     type: string;
     name: string;

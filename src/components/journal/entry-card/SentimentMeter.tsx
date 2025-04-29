@@ -1,58 +1,49 @@
 
 import React from 'react';
-import { Skeleton } from '@/components/ui/skeleton';
-import { Progress } from '@/components/ui/progress';
 
 interface SentimentMeterProps {
-  sentiment?: string | {
-    sentiment: string;
-    score: number;
-  };
-  isProcessing?: boolean;
+  sentiment: string | { sentiment: string; score: number };
 }
 
-export function SentimentMeter({ sentiment, isProcessing = false }: SentimentMeterProps) {
-  if (isProcessing) {
-    return <Skeleton className="h-2 w-24" />;
-  }
-
-  // If sentiment is missing or invalid, show a neutral meter
-  if (!sentiment) {
-    return <div className="h-2 w-24 bg-neutral-300 rounded-full"></div>;
-  }
-
-  const getSentimentScore = (): number => {
-    try {
-      if (typeof sentiment === 'string') {
-        return parseFloat(sentiment);
-      } else if (sentiment) {
-        return sentiment.score;
-      }
-      return 0;
-    } catch (error) {
-      console.error("[SentimentMeter] Error parsing sentiment score:", error);
-      return 0;
-    }
-  };
-
-  const score = getSentimentScore();
-  // Convert score from -1 to 1 range to 0 to 100 for the progress component
-  const normalizedScore = ((score + 1) / 2) * 100;
+const SentimentMeter: React.FC<SentimentMeterProps> = ({ sentiment }) => {
+  // Handle different sentiment formats
+  let sentimentScore: number;
   
-  // Create a gradient from red to green
-  const gradientStyle = {
-    background: 'linear-gradient(to right, #ea384c, #F2FCE2)'
-  };
-
+  if (typeof sentiment === 'string') {
+    // Parse the sentiment string to a number between -1 and 1
+    sentimentScore = parseFloat(sentiment);
+    // If parsing fails or value is out of range, use a default neutral value
+    if (isNaN(sentimentScore) || sentimentScore < -1 || sentimentScore > 1) {
+      sentimentScore = 0;
+    }
+  } else {
+    // Use the score from the sentiment object
+    sentimentScore = sentiment.score;
+  }
+  
+  // Map from [-1, 1] range to [0, 100] for the meter
+  const meterValue = ((sentimentScore + 1) / 2) * 100;
+  
+  // Determine color based on sentiment score
+  let barColor = '';
+  if (sentimentScore < -0.3) {
+    barColor = 'bg-red-500';
+  } else if (sentimentScore > 0.3) {
+    barColor = 'bg-green-500';
+  } else {
+    barColor = 'bg-amber-500';
+  }
+  
   return (
-    <div className="w-24 h-3 relative">
-      <div className="absolute inset-0 rounded-full" style={gradientStyle}></div>
-      <div 
-        className="absolute w-3 h-3 bg-white border border-gray-300 rounded-full transform -translate-y-1/4"
-        style={{ left: `calc(${normalizedScore}% - 4px)` }}
-      ></div>
+    <div className="w-full">
+      <div className="w-full h-1.5 bg-gray-100 dark:bg-gray-700 rounded-full">
+        <div 
+          className={`h-1.5 rounded-full ${barColor} transition-all duration-500`}
+          style={{ width: `${meterValue}%` }}
+        />
+      </div>
     </div>
   );
-}
+};
 
 export default SentimentMeter;
