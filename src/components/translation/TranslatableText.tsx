@@ -82,6 +82,7 @@ export function TranslatableText({
   // Listen to language change events to force re-translate
   useEffect(() => {
     const handleLanguageChange = () => {
+      console.log('TranslatableText: Language change event detected');
       // First set to original text to ensure visibility during translation
       setTranslatedText(text);
       
@@ -96,7 +97,6 @@ export function TranslatableText({
     };
   }, [text, sourceLanguage, entryId]);
 
-  // Using React.createElement to avoid type confusion with Three.js components
   return React.createElement(
     Component, 
     { 

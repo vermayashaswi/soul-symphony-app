@@ -80,11 +80,11 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       setTranslationProgress(50);
       setTimeout(() => {
         setTranslationProgress(100);
+        setIsTranslating(false);
       }, 300);
     } catch (error) {
       console.error('Language change error:', error);
       toast.error('Failed to change language');
-    } finally {
       setIsTranslating(false);
     }
   };

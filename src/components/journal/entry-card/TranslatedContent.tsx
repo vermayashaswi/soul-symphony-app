@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { LoadingEntryContent } from './LoadingEntryContent';
@@ -11,19 +12,22 @@ interface TranslatedContentProps {
 
 export function TranslatedContent({ content, isExpanded, language, entryId }: TranslatedContentProps) {
   const [translatedContent, setTranslatedContent] = useState<string>('');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isLoading, setIsLoading] = useState(false);
   const { currentLanguage, translate } = useTranslation();
 
   // Function to handle translation
   const handleTranslation = async () => {
+    if (!content) return;
+    
     setIsLoading(true);
     try {
       if (currentLanguage === 'en') {
         setTranslatedContent(content);
       } else {
-        // Always keep the original content initially
+        // Always set original content first to ensure something is displayed
         setTranslatedContent(content);
-        // Pass the detected language and entryId to the translation service
+        
+        // Then translate
         const translated = await translate(content, language, entryId);
         if (translated) {
           setTranslatedContent(translated);
@@ -45,7 +49,8 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
   // Listen for language change events
   useEffect(() => {
     const handleLanguageChange = () => {
-      // First set to original content to ensure visibility
+      console.log('TranslatedContent: Language change event detected');
+      // First reset to original content to ensure visibility
       setTranslatedContent(content);
       // Then retranslate
       handleTranslation();
