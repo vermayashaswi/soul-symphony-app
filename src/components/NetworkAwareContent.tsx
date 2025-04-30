@@ -32,8 +32,8 @@ export function NetworkAwareContent({
       setHasReconnected(true);
       
       toast({
-        title: <TranslatableText text="Back online" />,
-        description: <TranslatableText text="Your connection has been restored." />,
+        title: "Back online",
+        description: "Your connection has been restored.",
         duration: 3000,
       });
     }
@@ -43,8 +43,8 @@ export function NetworkAwareContent({
       setShouldRender(false);
       
       toast({
-        title: <TranslatableText text="You're offline" />,
-        description: <TranslatableText text="Some content may not be available." />,
+        title: "You're offline",
+        description: "Some content may not be available.",
         variant: "destructive",
         duration: 5000,
       });
@@ -53,8 +53,8 @@ export function NetworkAwareContent({
     // Handle slow connection
     if (networkStatus.online && networkStatus.speed === 'slow' && !hasReconnected) {
       toast({
-        title: <TranslatableText text="Slow connection detected" />,
-        description: <TranslatableText text="Loading optimized content for your connection speed." />,
+        title: "Slow connection detected",
+        description: "Loading optimized content for your connection speed.",
         duration: 3000,
       });
     }
