@@ -1,6 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface SentimentChartDemoProps {
   isPhonePreview?: boolean;
@@ -43,7 +44,7 @@ const SentimentChartDemo: React.FC<SentimentChartDemoProps> = ({ isPhonePreview 
                 }}
               />
               <span className={`${textSize} text-foreground/70 mt-1`}>
-                {point.day}
+                <TranslatableText text={point.day} />
               </span>
             </div>
           );
