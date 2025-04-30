@@ -42,5 +42,21 @@
     "entry": "entry",
     "entries": "entries",
     "searchFor": "Search for"
+  },
+  "insights": {
+    "moodTrends": "Mood Trends",
+    "sentimentChanges": "Your sentiment changes over time",
+    "positive": "Positive",
+    "neutral": "Neutral",
+    "negative": "Negative",
+    "noData": "No data available for this timeframe",
+    "soulNet": {
+      "title": "SoulNet Visualization",
+      "description": "Explore connections between entities and emotions in your journal",
+      "loading": "Loading visualization...",
+      "noConnections": "No connections found",
+      "addMore": "Add more journal entries to visualize connections between entities and emotions in your journaling.",
+      "dragInfo": "<b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections"
+    }
   }
 }
