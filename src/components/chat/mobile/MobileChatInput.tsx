@@ -158,7 +158,7 @@ export default function MobileChatInput({
       }`}
       style={{
         position: 'fixed',
-        bottom: isKeyboardVisible ? 0 : '69px',
+        bottom: isKeyboardVisible ? 0 : '3.6rem', // Adjusted from 69px to 3.6rem (to match the new navbar height)
         left: 0,
         right: 0,
         paddingBottom: isKeyboardVisible ? '5px' : 'env(safe-area-inset-bottom, 8px)',

@@ -76,11 +76,12 @@ const Chat = () => {
       .mobile-chat-input-container {
         padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 5px);
         z-index: 9999;
+        bottom: 3.6rem !important; /* Adjusted to match the new navbar height */
       }
       
       /* Add extra padding to chat area to prevent content from being hidden */
       .chat-messages-container {
-        padding-bottom: 90px;
+        padding-bottom: 100px;
       }
       
       /* Ensure keyboard doesn't obscure input */

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -92,10 +93,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   return (
     <motion.div 
-      className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted p-2"
+      className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted"
       style={{
         zIndex: 50,
-        paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))'
+        paddingTop: '0.40rem', // Reduced padding (10% less)
+        paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))', // Reduced padding (10% less)
+        height: 'calc(3.6rem + env(safe-area-inset-bottom))' // Reduced height by 10% from 4rem to 3.6rem
       }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
@@ -110,14 +113,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
               key={item.path}
               to={item.path}
               className={cn(
-                "flex flex-col items-center p-2 transition-colors",
+                "flex flex-col items-center py-1 transition-colors", // Reduced padding
                 isActive 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-primary"
               )}
             >
               <div className="relative">
-                <item.icon size={24} />
+                <item.icon size={22} /> {/* Slightly smaller icon */}
                 {isActive && (
                   <motion.div
                     layoutId="mobileNavIndicator"
@@ -126,7 +129,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                   />
                 )}
               </div>
-              <span className="text-xs mt-1">
+              <span className="text-xs mt-0.5"> {/* Reduced margin */}
                 <TranslatableText text={item.label} />
               </span>
             </Link>
