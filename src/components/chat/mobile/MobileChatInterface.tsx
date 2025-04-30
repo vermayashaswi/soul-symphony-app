@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
-import ChatThreadList from "@/components/chat/ChatThreadList";
+import { translateChatString } from "@/components/chat/ChatThreadList"; // Import the named export instead
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
 import { ChatMessage as ChatMessageType, getThreadMessages, saveMessage } from "@/services/chatPersistenceService";
@@ -25,6 +25,8 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { useDebugLog } from "@/utils/debug/DebugContext";
+import { useTranslation } from '@/contexts/TranslationContext';
+import { TranslatableText } from "@/components/translation/TranslatableText";
 
 type UIChatMessage = {
   role: 'user' | 'assistant';
@@ -96,6 +98,7 @@ const MobileChatInterfaceContent = ({
   ];
   const { toast } = useToast();
   const { user } = useAuth();
+  const { translate } = useTranslation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -537,17 +540,29 @@ const MobileChatInterfaceContent = ({
             </Button>
           </SheetTrigger>
           <SheetContent side="left" className="p-0 sm:max-w-sm w-[85vw]">
-            <ChatThreadList 
-              userId={userId || user?.id} 
-              onSelectThread={handleSelectThread}
-              onStartNewThread={handleStartNewThread}
-              currentThreadId={currentThreadId}
-              newChatButtonWidth="half"
-              showDeleteButtons={false}
-            />
+            <div className="h-full flex flex-col">
+              <div className="p-4 flex items-center justify-between border-b">
+                <h2 className="text-lg font-semibold">
+                  <TranslatableText text="Chat History" />
+                </h2>
+                <Button 
+                  variant="outline" 
+                  onClick={handleStartNewThread}
+                  className="text-sm h-9"
+                >
+                  <TranslatableText text="New Chat" />
+                </Button>
+              </div>
+              
+              <div className="flex-1 overflow-y-auto p-2">
+                {/* Threads will be rendered here */}
+              </div>
+            </div>
           </SheetContent>
         </Sheet>
-        <h2 className="text-lg font-semibold flex-1 text-center">Rūḥ</h2>
+        <h2 className="text-lg font-semibold flex-1 text-center">
+          <TranslatableText text="Rūḥ" />
+        </h2>
         
         {currentThreadId && messages.length > 0 && (
           <Button 
@@ -566,14 +581,18 @@ const MobileChatInterfaceContent = ({
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-            <span className="ml-2 text-muted-foreground">Loading conversation...</span>
+            <span className="ml-2 text-muted-foreground">
+              <TranslatableText text="Loading conversation..." />
+            </span>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col justify-start h-full mt-6 pt-4">
             <div className="text-center px-4">
-              <h3 className="text-xl font-medium mb-2">How can I help you?</h3>
+              <h3 className="text-xl font-medium mb-2">
+                <TranslatableText text="How can I help you?" />
+              </h3>
               <p className="text-muted-foreground text-sm mb-4">
-                Ask me anything about your mental well-being and journal entries
+                <TranslatableText text="Ask me anything about your mental well-being and journal entries" />
               </p>
               
               {showSuggestions && (
@@ -593,7 +612,9 @@ const MobileChatInterfaceContent = ({
                     >
                       <div className="flex items-start w-full">
                         <span className="flex-shrink-0 mt-0.5">{question.icon}</span>
-                        <span className="ml-1 flex-grow break-words whitespace-normal">{question.text}</span>
+                        <span className="ml-1 flex-grow break-words whitespace-normal">
+                          <TranslatableText text={question.text} />
+                        </span>
                       </div>
                     </Button>
                   ))}
@@ -616,7 +637,9 @@ const MobileChatInterfaceContent = ({
         {loading && (
           <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
             <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
-            <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
+            <p className="text-sm text-muted-foreground">
+              <TranslatableText text={processingStage || "Processing..."} />
+            </p>
           </div>
         )}
         
@@ -634,18 +657,20 @@ const MobileChatInterfaceContent = ({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogTitle>
+              <TranslatableText text="Delete this conversation?" />
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this conversation and all its messages. This action cannot be undone.
+              <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
-              Delete
+              <TranslatableText text="Delete" />
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

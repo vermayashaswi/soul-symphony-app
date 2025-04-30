@@ -68,7 +68,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       >
         {displayRole === 'assistant' ? (
           <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words">
-            <TranslatableText text={formattedContent} />
+            {formattedContent}
           </ReactMarkdown>
         ) : (
           <p className="break-words">{message.content}</p>
@@ -77,11 +77,17 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         {showAnalysis && displayRole === 'assistant' && message.analysis && (
           <div className="mt-3 text-xs opacity-70">
             <Separator className="my-2" />
-            <div className="font-semibold"><TranslatableText text="Analysis:" /></div>
-            <p><TranslatableText text={message.analysis.analysis} /></p>
+            <div className="font-semibold">
+              <TranslatableText text="Analysis:" />
+            </div>
+            <p>
+              <TranslatableText text={message.analysis.analysis} />
+            </p>
             {message.analysis.requiresSql && (
               <>
-                <div className="font-semibold mt-1"><TranslatableText text="SQL Query:" /></div>
+                <div className="font-semibold mt-1">
+                  <TranslatableText text="SQL Query:" />
+                </div>
                 <pre className="text-[10px] bg-black/10 p-1 rounded overflow-x-auto">
                   {message.analysis.sqlQuery}
                 </pre>
