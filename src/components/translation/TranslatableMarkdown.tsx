@@ -9,12 +9,16 @@ interface TranslatableMarkdownProps {
   children: string;
   className?: string;
   forceTranslate?: boolean; // Added forceTranslate prop for consistency
+  onTranslationStart?: () => void;
+  onTranslationEnd?: () => void;
 }
 
 export function TranslatableMarkdown({ 
   children, 
   className = "",
-  forceTranslate = true // Default to true to fix chat messages
+  forceTranslate = true, // Default to true to fix chat messages
+  onTranslationStart,
+  onTranslationEnd
 }: TranslatableMarkdownProps) {
   const [translatedContent, setTranslatedContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +37,7 @@ export function TranslatableMarkdown({
       return;
     }
     
-    // Skip translations for the marketing website pages, unless forceTranslate is true
+    // CRITICAL FIX: forceTranslate should override website route check
     if (isOnWebsite && !forceTranslate) {
       setTranslatedContent(children);
       return;
@@ -48,6 +52,9 @@ export function TranslatableMarkdown({
     // Only translate if not in English or if language has changed
     if (!isLoading) {
       setIsLoading(true);
+      if (onTranslationStart) {
+        onTranslationStart();
+      }
     }
       
     console.log(`TranslatableMarkdown: Translating markdown content to ${currentLanguage}`);
@@ -76,6 +83,9 @@ export function TranslatableMarkdown({
       }
     } finally {
       setIsLoading(false);
+      if (onTranslationEnd) {
+        onTranslationEnd();
+      }
     }
   };
 
@@ -140,6 +150,7 @@ export function TranslatableMarkdown({
       data-translating={isLoading ? 'true' : 'false'}
       data-translated={translatedContent !== children ? 'true' : 'false'}
       data-lang={currentLanguage}
+      data-force-translate={forceTranslate ? 'true' : 'false'}
     >
       <ReactMarkdown className={className}>
         {contentToRender}

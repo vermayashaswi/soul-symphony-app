@@ -44,13 +44,23 @@ export const formatShortDate = (timestamp: string | number | Date): string => {
   const now = new Date();
   const isCurrentYear = date.getFullYear() === now.getFullYear();
   
-  // Use options to format the date
-  if (isCurrentYear) {
-    // If it's the current year, show only the month and day (e.g., "Jan 5")
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-  } else {
-    // If it's a different year, include the year (e.g., "Jan 5, 2024")
-    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+  // Get the language from the HTML document
+  // This will use whatever language the TranslationContext has set on the document
+  const lang = document.documentElement.lang || 'en';
+  
+  try {
+    // Use options to format the date according to the user's language
+    if (isCurrentYear) {
+      // If it's the current year, show only the month and day
+      return date.toLocaleDateString(lang, { month: 'short', day: 'numeric' });
+    } else {
+      // If it's a different year, include the year
+      return date.toLocaleDateString(lang, { month: 'short', day: 'numeric', year: 'numeric' });
+    }
+  } catch (error) {
+    console.error('Date formatting error:', error);
+    // Fallback to a safe format
+    return date.toLocaleDateString('en', { month: 'short', day: 'numeric', year: 'numeric' });
   }
 };
 

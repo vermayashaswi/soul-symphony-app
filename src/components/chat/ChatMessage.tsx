@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -69,7 +70,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
             {formattedContent}
           </TranslatableMarkdown>
         ) : (
-          <p>{message.content}</p>
+          <TranslatableText text={message.content} forceTranslate={true} />
         )}
         
         {showAnalysis && message.role === 'assistant' && message.analysis && (

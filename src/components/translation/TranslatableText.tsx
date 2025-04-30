@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
@@ -33,7 +32,7 @@ export function TranslatableText({
   const initialLoadDoneRef = useRef<boolean>(false);
   const textRef = useRef<string>(text); // Track text changes
   
-  // Always treat / route as an app route for translation purposes
+  // Check if on website route - but allow forced translation
   const pathname = location.pathname;
   const isOnWebsite = isWebsiteRoute(pathname);
   
@@ -45,10 +44,8 @@ export function TranslatableText({
       return;
     }
 
-    // For diagnostic purposes
-    console.log(`TranslatableText: Route ${pathname} is ${isOnWebsite ? 'website' : 'app'} route, forceTranslate: ${forceTranslate}`);
-
-    // Skip translations for the marketing website pages, unless forceTranslate is true
+    // CRITICAL FIX: forceTranslate should override website route check
+    // This fixes the mixed language issue when forceTranslate is true
     if (isOnWebsite && !forceTranslate) {
       console.log(`TranslatableText: Skipping translation for website route: "${text.substring(0, 30)}..."`);
       setTranslatedText(text);
@@ -161,7 +158,8 @@ export function TranslatableText({
       className: `${className} ${isLoading ? 'opacity-70' : ''}`.trim(),
       'data-translating': isLoading ? 'true' : 'false',
       'data-translated': translatedText !== text ? 'true' : 'false',
-      'data-lang': currentLanguage
+      'data-lang': currentLanguage,
+      'data-force-translate': forceTranslate ? 'true' : 'false'
     }, 
     translatedText || text  // Ensure we always show something, even if translation fails
   );

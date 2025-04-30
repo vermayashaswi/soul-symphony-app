@@ -53,7 +53,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             loading="eager"
           />
           <AvatarFallback className="bg-primary/10 text-primary text-xs">
-            <TranslatableText text="R" />
+            <TranslatableText text="R" forceTranslate={true} />
           </AvatarFallback>
         </Avatar>
       )}
@@ -67,26 +67,26 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         )}
       >
         {displayRole === 'assistant' ? (
-          <TranslatableMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words">
+          <TranslatableMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words" forceTranslate={true}>
             {formattedContent}
           </TranslatableMarkdown>
         ) : (
-          <p className="break-words">{message.content}</p>
+          <TranslatableText text={message.content} forceTranslate={true} className="break-words" />
         )}
         
         {showAnalysis && displayRole === 'assistant' && message.analysis && (
           <div className="mt-3 text-xs opacity-70">
             <Separator className="my-2" />
             <div className="font-semibold">
-              <TranslatableText text="Analysis:" />
+              <TranslatableText text="Analysis:" forceTranslate={true} />
             </div>
             <p>
-              <TranslatableText text={message.analysis.analysis} />
+              <TranslatableText text={message.analysis.analysis} forceTranslate={true} />
             </p>
             {message.analysis.requiresSql && (
               <>
                 <div className="font-semibold mt-1">
-                  <TranslatableText text="SQL Query:" />
+                  <TranslatableText text="SQL Query:" forceTranslate={true} />
                 </div>
                 <pre className="text-[10px] bg-black/10 p-1 rounded overflow-x-auto">
                   {message.analysis.sqlQuery}
@@ -106,7 +106,8 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             >
               <FileText className="h-3 w-3 mr-1" />
               <TranslatableText 
-                text={`${message.references!.length} journal entries`} 
+                text={`${message.references!.length} journal entries`}
+                forceTranslate={true}
               />
               {showReferences ? (
                 <ChevronUp className="h-3 w-3 ml-1" />
@@ -128,17 +129,18 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                       <div className="font-medium dark:text-white/90">
                         {ref.date && !isNaN(new Date(ref.date).getTime()) 
                           ? formatShortDate(new Date(ref.date))
-                          : <TranslatableText text="Unknown date" />}
+                          : <TranslatableText text="Unknown date" forceTranslate={true} />}
                       </div>
                       <div className="text-muted-foreground dark:text-white/70">
-                        <TranslatableText text={ref.snippet} />
+                        <TranslatableText text={ref.snippet} forceTranslate={true} />
                       </div>
                     </div>
                   ))}
                   {message.references!.length > 2 && (
                     <div className="text-xs text-muted-foreground dark:text-white/60">
                       <TranslatableText 
-                        text={`+${message.references!.length - 2} more entries`} 
+                        text={`+${message.references!.length - 2} more entries`}
+                        forceTranslate={true}
                       />
                     </div>
                   )}

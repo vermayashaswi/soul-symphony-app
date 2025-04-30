@@ -16,7 +16,8 @@ const ViewportManager: React.FC = () => {
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
-    isWebsiteRoute: isWebsiteRoute(location.pathname)
+    isWebsiteRoute: isWebsiteRoute(location.pathname),
+    user: !!user
   });
   
   // Render the appropriate layout based on route and device
@@ -26,7 +27,7 @@ const ViewportManager: React.FC = () => {
         <Outlet />
       </div>
       
-      {/* Display mobile navigation ONLY on actual app routes */}
+      {/* Display mobile navigation ONLY on actual app routes AND when user is logged in */}
       {isAppRoute(location.pathname) && user && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}

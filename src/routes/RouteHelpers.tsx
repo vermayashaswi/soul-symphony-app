@@ -9,23 +9,28 @@ export const isNativeApp = (): boolean => {
 
 // Update the path-based check to be more comprehensive and accurate
 export const isAppRoute = (pathname: string): boolean => {
-  // More specific matching to ensure we catch all app routes properly
-  
-  // Explicitly define app routes - the root path should NOT be an app route
+  // Explicitly define app routes - the root path should NEVER be an app route
   const appPrefixes = ['/app/', '/app', '/journal', '/chat', '/insights', '/settings', '/auth', '/profile'];
   
+  // Debug logging to help diagnose route classification
+  const isApp = appPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  if (pathname === '/') {
+    console.log('Root path / is NOT an app route');
+  }
+  
   // Check for specific app routes including paths under /app
-  return appPrefixes.some(prefix => 
-    pathname === prefix || pathname.startsWith(`${prefix}/`)
-  );
+  return isApp;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
   // Consider website routes like /about, /pricing, etc.
   const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq'];
   
-  // The root path (/) is explicitly a website route
-  if (pathname === "/") return true;
+  // The root path (/) is ALWAYS explicitly a website route
+  if (pathname === "/") {
+    console.log('Root path / is explicitly a website route');
+    return true;
+  }
   
   // If it has an app prefix, it's not a website route
   if (isAppRoute(pathname)) return false;
@@ -71,6 +76,8 @@ export const AppRouteWrapper = ({
   console.log('AppRouteWrapper rendering:', location.pathname, { 
     requiresAuth, 
     userExists: !!user,
+    isAppRoute: isAppRoute(location.pathname),
+    isWebsiteRoute: isWebsiteRoute(location.pathname)
   });
   
   useEffect(() => {
