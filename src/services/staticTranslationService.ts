@@ -5,6 +5,140 @@
 import { translationCache } from './translationCache';
 import { toast } from 'sonner';
 
+// Helper function to create simple realistic mock translations
+const createMockTranslation = (text: string, language: string): string => {
+  if (language === 'en' || !text) return text;
+  
+  // Create a map of common words for each language
+  // This provides a more realistic translation experience than just adding a suffix
+  const commonTranslations: Record<string, Record<string, string>> = {
+    es: {
+      'the': 'el', 'a': 'un', 'is': 'es', 'are': 'son', 'you': 'tú', 
+      'welcome': 'bienvenido', 'hello': 'hola', 'goodbye': 'adiós',
+      'journal': 'diario', 'entry': 'entrada', 'day': 'día',
+      'new': 'nuevo', 'delete': 'eliminar', 'edit': 'editar',
+      'your': 'tu', 'today': 'hoy', 'yesterday': 'ayer',
+      'entries': 'entradas', 'emotions': 'emociones', 'mood': 'humor',
+      'analysis': 'análisis', 'recording': 'grabación', 'save': 'guardar',
+      'cancel': 'cancelar', 'search': 'buscar', 'settings': 'configuración',
+      'insights': 'percepciones', 'connection': 'conexión', 'offline': 'desconectado',
+      'online': 'en línea', 'slow': 'lento'
+    },
+    fr: {
+      'the': 'le', 'a': 'un', 'is': 'est', 'are': 'sont', 'you': 'vous',
+      'welcome': 'bienvenue', 'hello': 'bonjour', 'goodbye': 'au revoir',
+      'journal': 'journal', 'entry': 'entrée', 'day': 'jour',
+      'new': 'nouveau', 'delete': 'supprimer', 'edit': 'modifier',
+      'your': 'votre', 'today': 'aujourd\'hui', 'yesterday': 'hier',
+      'entries': 'entrées', 'emotions': 'émotions', 'mood': 'humeur',
+      'analysis': 'analyse', 'recording': 'enregistrement', 'save': 'sauvegarder',
+      'cancel': 'annuler', 'search': 'rechercher', 'settings': 'paramètres',
+      'insights': 'aperçus', 'connection': 'connexion', 'offline': 'hors ligne',
+      'online': 'en ligne', 'slow': 'lent'
+    },
+    de: {
+      'the': 'die', 'a': 'ein', 'is': 'ist', 'are': 'sind', 'you': 'du',
+      'welcome': 'willkommen', 'hello': 'hallo', 'goodbye': 'auf wiedersehen',
+      'journal': 'tagebuch', 'entry': 'eintrag', 'day': 'tag',
+      'new': 'neu', 'delete': 'löschen', 'edit': 'bearbeiten',
+      'your': 'dein', 'today': 'heute', 'yesterday': 'gestern',
+      'entries': 'einträge', 'emotions': 'emotionen', 'mood': 'stimmung',
+      'analysis': 'analyse', 'recording': 'aufnahme', 'save': 'speichern',
+      'cancel': 'abbrechen', 'search': 'suchen', 'settings': 'einstellungen',
+      'insights': 'erkenntnisse', 'connection': 'verbindung', 'offline': 'offline',
+      'online': 'online', 'slow': 'langsam'
+    },
+    zh: {
+      'the': '的', 'a': '一个', 'is': '是', 'are': '是', 'you': '你',
+      'welcome': '欢迎', 'hello': '你好', 'goodbye': '再见',
+      'journal': '日记', 'entry': '条目', 'day': '天',
+      'new': '新的', 'delete': '删除', 'edit': '编辑',
+      'your': '你的', 'today': '今天', 'yesterday': '昨天',
+      'entries': '条目', 'emotions': '情感', 'mood': '情绪',
+      'analysis': '分析', 'recording': '录音', 'save': '保存',
+      'cancel': '取消', 'search': '搜索', 'settings': '设置',
+      'insights': '洞察', 'connection': '连接', 'offline': '离线',
+      'online': '在线', 'slow': '慢的'
+    },
+    ja: {
+      'the': 'その', 'a': '一つの', 'is': 'です', 'are': 'です', 'you': 'あなた',
+      'welcome': 'ようこそ', 'hello': 'こんにちは', 'goodbye': 'さようなら',
+      'journal': '日記', 'entry': 'エントリ', 'day': '日',
+      'new': '新しい', 'delete': '削除', 'edit': '編集',
+      'your': 'あなたの', 'today': '今日', 'yesterday': '昨日',
+      'entries': 'エントリー', 'emotions': '感情', 'mood': '気分',
+      'analysis': '分析', 'recording': '録音', 'save': '保存',
+      'cancel': 'キャンセル', 'search': '検索', 'settings': '設定',
+      'insights': '洞察', 'connection': '接続', 'offline': 'オフライン',
+      'online': 'オンライン', 'slow': '遅い'
+    },
+    hi: {
+      'the': 'वह', 'a': 'एक', 'is': 'है', 'are': 'हैं', 'you': 'आप',
+      'welcome': 'स्वागत है', 'hello': 'नमस्ते', 'goodbye': 'अलविदा',
+      'journal': 'पत्रिका', 'entry': 'प्रविष्टि', 'day': 'दिन',
+      'new': 'नया', 'delete': 'हटाएं', 'edit': 'संपादित करें',
+      'your': 'आपका', 'today': 'आज', 'yesterday': 'कल',
+      'entries': 'प्रविष्टियां', 'emotions': 'भावनाएं', 'mood': 'मूड',
+      'analysis': 'विश्लेषण', 'recording': 'रिकॉर्डिंग', 'save': 'सहेजें',
+      'cancel': 'रद्द करें', 'search': 'खोज', 'settings': 'सेटिंग्स',
+      'insights': 'अंतर्दृष्टि', 'connection': 'कनेक्शन', 'offline': 'ऑफलाइन',
+      'online': 'ऑनलाइन', 'slow': 'धीमा'
+    },
+    ru: {
+      'the': '', 'a': '', 'is': 'это', 'are': 'являются', 'you': 'вы',
+      'welcome': 'добро пожаловать', 'hello': 'привет', 'goodbye': 'до свидания',
+      'journal': 'журнал', 'entry': 'запись', 'day': 'день',
+      'new': 'новый', 'delete': 'удалить', 'edit': 'редактировать',
+      'your': 'ваш', 'today': 'сегодня', 'yesterday': 'вчера',
+      'entries': 'записи', 'emotions': 'эмоции', 'mood': 'настроение',
+      'analysis': 'анализ', 'recording': 'запись', 'save': 'сохранить',
+      'cancel': 'отмена', 'search': 'поиск', 'settings': 'настройки',
+      'insights': 'аналитика', 'connection': 'соединение', 'offline': 'не в сети',
+      'online': 'в сети', 'slow': 'медленный'
+    },
+    ar: {
+      'the': 'ال', 'a': 'أحد', 'is': 'هو', 'are': 'هم', 'you': 'أنت',
+      'welcome': 'مرحبا', 'hello': 'مرحبا', 'goodbye': 'وداعا',
+      'journal': 'مجلة', 'entry': 'إدخال', 'day': 'يوم',
+      'new': 'جديد', 'delete': 'حذف', 'edit': 'تحرير',
+      'your': 'لك', 'today': 'اليوم', 'yesterday': 'أمس',
+      'entries': 'إدخالات', 'emotions': 'مشاعر', 'mood': 'مزاج',
+      'analysis': 'تحليل', 'recording': 'تسجيل', 'save': 'حفظ',
+      'cancel': 'إلغاء', 'search': 'بحث', 'settings': 'إعدادات',
+      'insights': 'رؤى', 'connection': 'اتصال', 'offline': 'غير متصل',
+      'online': 'متصل', 'slow': 'بطيء'
+    },
+    pt: {
+      'the': 'o', 'a': 'um', 'is': 'é', 'are': 'são', 'you': 'você',
+      'welcome': 'bem-vindo', 'hello': 'olá', 'goodbye': 'adeus',
+      'journal': 'diário', 'entry': 'entrada', 'day': 'dia',
+      'new': 'novo', 'delete': 'excluir', 'edit': 'editar',
+      'your': 'seu', 'today': 'hoje', 'yesterday': 'ontem',
+      'entries': 'entradas', 'emotions': 'emoções', 'mood': 'humor',
+      'analysis': 'análise', 'recording': 'gravação', 'save': 'salvar',
+      'cancel': 'cancelar', 'search': 'buscar', 'settings': 'configurações',
+      'insights': 'insights', 'connection': 'conexão', 'offline': 'offline',
+      'online': 'online', 'slow': 'lento'
+    }
+  };
+  
+  // If we don't have translations for this language, return original text
+  if (!commonTranslations[language]) {
+    return text;
+  }
+  
+  // Split the text into words
+  const words = text.split(/\b/);
+  
+  // Replace common words with translations
+  const translatedWords = words.map(word => {
+    const lowerWord = word.toLowerCase();
+    return commonTranslations[language][lowerWord] || word;
+  });
+  
+  return translatedWords.join('');
+};
+
 // A basic static translation service that uses mock translations
 class StaticTranslationService {
   private language: string = 'en';
@@ -56,8 +190,8 @@ class StaticTranslationService {
         // Simulate API call delay
         await new Promise(resolve => setTimeout(resolve, this.mockTranslationDelay));
         
-        // For demo purposes, we'll just modify the text slightly based on the language
-        const translatedText = this.mockTranslate(text, this.language);
+        // Use our improved mock translation function
+        const translatedText = createMockTranslation(text, this.language);
         
         // Cache the result
         await translationCache.setTranslation({
@@ -131,7 +265,7 @@ class StaticTranslationService {
       
       // Translate each text
       for (const text of uncachedTexts) {
-        const translatedText = this.mockTranslate(text, this.language);
+        const translatedText = createMockTranslation(text, this.language);
         results.set(text, translatedText);
         
         // Cache the result
@@ -146,36 +280,6 @@ class StaticTranslationService {
     }
     
     return results;
-  }
-  
-  // Mock translate function - now with proper formatting that doesn't add language code prefix
-  private mockTranslate(text: string, targetLang: string): string {
-    if (targetLang === 'en') return text;
-    
-    // Instead of adding a language prefix, we'll simulate real translation
-    // by adding some simple modifications based on the target language
-    switch (targetLang) {
-      case 'es':
-        return text.length > 5 ? text + " (traducido)" : text;
-      case 'fr':
-        return text.length > 5 ? text + " (traduit)" : text;
-      case 'de':
-        return text.length > 5 ? text + " (übersetzt)" : text;
-      case 'zh':
-        return text.length > 5 ? text + " (已翻译)" : text;
-      case 'ja':
-        return text.length > 5 ? text + " (翻訳済み)" : text;
-      case 'hi':
-        return text.length > 5 ? text + " (अनुवादित)" : text;
-      case 'ru':
-        return text.length > 5 ? text + " (переведено)" : text;
-      case 'ar':
-        return text.length > 5 ? text + " (مترجم)" : text;
-      case 'pt':
-        return text.length > 5 ? text + " (traduzido)" : text;
-      default:
-        return text;
-    }
   }
 }
 

@@ -5,6 +5,7 @@ import { Brain, Mic, MessageSquare, LineChart, ArrowRight, TrendingUp } from 'lu
 import SouloLogo from '@/components/SouloLogo';
 import EmotionBubblesDemo from '@/components/website/EmotionBubblesDemo';
 import SentimentChartDemo from '@/components/website/SentimentChartDemo';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export const PhoneVoiceAnimation = () => {
   const [animationStage, setAnimationStage] = useState(0);
@@ -49,7 +50,9 @@ export const PhoneVoiceAnimation = () => {
                 className="flex-1 flex flex-col items-center justify-center"
               >
                 <div className="text-white text-center mb-6">
-                  <span className="text-sm mb-2">Recording your journal...</span>
+                  <span className="text-sm mb-2">
+                    <TranslatableText text="Recording your journal..." />
+                  </span>
                 </div>
                 <div className="w-full h-24 flex items-center justify-center gap-1 mb-8">
                   {waveform.map((height, index) => (
@@ -91,7 +94,9 @@ export const PhoneVoiceAnimation = () => {
                 className="flex-1 flex flex-col items-center justify-center"
               >
                 <div className="text-white text-center mb-8">
-                  <span className="text-sm mb-2">Processing your entry...</span>
+                  <span className="text-sm mb-2">
+                    <TranslatableText text="Processing your entry..." />
+                  </span>
                 </div>
                 <motion.div 
                   className="w-20 h-20 rounded-full bg-purple-600/30 flex items-center justify-center"
@@ -149,7 +154,9 @@ export const PhoneVoiceAnimation = () => {
                 exit={{ opacity: 0 }}
                 className="flex-1 flex flex-col"
               >
-                <h3 className="text-white text-center mb-3 text-sm">Your Journal Insights</h3>
+                <h3 className="text-white text-center mb-3 text-sm">
+                  <TranslatableText text="Your Journal Insights" />
+                </h3>
                 
                 {/* Enhanced Insights with Visualizations */}
                 <div className="space-y-3">
@@ -164,7 +171,9 @@ export const PhoneVoiceAnimation = () => {
                       <div className="min-w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
                         <LineChart className="h-3 w-3 text-primary" />
                       </div>
-                      <p className="text-white text-xs">Emotional patterns</p>
+                      <p className="text-white text-xs">
+                        <TranslatableText text="Emotional patterns" />
+                      </p>
                     </div>
                     <div className="h-[60px] mt-2">
                       <EmotionBubblesDemo isPhonePreview={true} />
@@ -182,7 +191,9 @@ export const PhoneVoiceAnimation = () => {
                       <div className="min-w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
                         <TrendingUp className="h-3 w-3 text-primary" />
                       </div>
-                      <p className="text-white text-xs">Sentiment trending up</p>
+                      <p className="text-white text-xs">
+                        <TranslatableText text="Sentiment trending up" />
+                      </p>
                     </div>
                     <div className="h-[60px] mt-1">
                       <SentimentChartDemo isPhonePreview={true} />
@@ -200,7 +211,9 @@ export const PhoneVoiceAnimation = () => {
                       <div className="min-w-6 h-6 rounded-full bg-primary/20 flex items-center justify-center">
                         <LineChart className="h-3 w-3 text-primary" />
                       </div>
-                      <p className="text-white text-xs">Sleep pattern improving since last week</p>
+                      <p className="text-white text-xs">
+                        <TranslatableText text="Sleep pattern improving since last week" />
+                      </p>
                     </div>
                   </motion.div>
                 </div>
@@ -211,7 +224,9 @@ export const PhoneVoiceAnimation = () => {
                   animate={{ opacity: 1, y: 0 }}
                   transition={{ delay: 0.8 }}
                 >
-                  <span className="text-primary text-xs">View full analysis</span>
+                  <span className="text-primary text-xs">
+                    <TranslatableText text="View full analysis" />
+                  </span>
                   <ArrowRight className="h-4 w-4 text-primary" />
                 </motion.div>
               </motion.div>
