@@ -115,7 +115,7 @@ export function TranslatableMarkdown({
   return (
     <div className={`${isLoading ? 'opacity-70' : ''}`} data-translating={isLoading ? 'true' : 'false'}>
       <ReactMarkdown className={className}>
-        {contentToRender}  {/* Fixed to ensure we're passing a string */}
+        {contentToRender}
       </ReactMarkdown>
     </div>
   );
