@@ -42,7 +42,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`relative flex items-start gap-2 ${displayRole === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={`relative flex items-start gap-2 ${displayRole === 'user' ? 'justify-end' : 'justify-start'} mb-3`}
     >
       {displayRole === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">

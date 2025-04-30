@@ -10,7 +10,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
-import { translateChatString } from "@/components/chat/ChatThreadList"; // Import the named export instead
+import { translateChatString } from "@/components/chat/ChatThreadList"; // Import as named export
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
 import { ChatMessage as ChatMessageType, getThreadMessages, saveMessage } from "@/services/chatPersistenceService";
@@ -542,9 +542,6 @@ const MobileChatInterfaceContent = ({
           <SheetContent side="left" className="p-0 sm:max-w-sm w-[85vw]">
             <div className="h-full flex flex-col">
               <div className="p-4 flex items-center justify-between border-b">
-                <h2 className="text-lg font-semibold">
-                  <TranslatableText text="Chat History" />
-                </h2>
                 <Button 
                   variant="outline" 
                   onClick={handleStartNewThread}
@@ -553,6 +550,8 @@ const MobileChatInterfaceContent = ({
                   <Plus className="h-4 w-4" />
                   <TranslatableText text="New Chat" />
                 </Button>
+                
+                <div className="flex-1"></div>
               </div>
               
               <div className="flex-1 overflow-y-auto p-2">
@@ -578,7 +577,7 @@ const MobileChatInterfaceContent = ({
         )}
       </div>
       
-      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
+      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col pb-24">
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>

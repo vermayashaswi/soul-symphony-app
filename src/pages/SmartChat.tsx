@@ -4,7 +4,7 @@ import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
-import { AlertCircle, Trash2 } from "lucide-react";
+import { AlertCircle, Trash2, Plus } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -349,11 +349,12 @@ export default function SmartChat() {
         <div className="w-72 h-full border-r">
           {/* ChatThreadList component replacement - we'll create a simple wrapper */}
           <div className="h-full flex flex-col">
-            <div className="p-4 border-b">
+            <div className="p-4 border-b flex items-center">
               <Button 
-                className="w-full"
+                className="flex items-center gap-1"
                 onClick={createNewThread}
               >
+                <Plus className="h-4 w-4" />
                 <TranslatableText text="New Chat" />
               </Button>
             </div>

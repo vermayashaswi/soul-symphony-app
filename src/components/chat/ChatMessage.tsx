@@ -40,7 +40,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
     >
       {message.role === 'assistant' && (
         <Avatar className="h-10 w-10 border border-primary/20">
