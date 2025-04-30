@@ -148,34 +148,43 @@ class StaticTranslationService {
     return results;
   }
   
-  // Mock translate function - now with proper formatting that doesn't add language code prefix
+  // Mock translate function - with proper formatting that doesn't add language suffix
   private mockTranslate(text: string, targetLang: string): string {
     if (targetLang === 'en') return text;
     
-    // Instead of adding a language prefix, we'll simulate real translation
-    // by adding some simple modifications based on the target language
+    // Just simulate translation by generating similar-looking text without adding suffixes
+    // In a real app, we would call an actual translation API
     switch (targetLang) {
       case 'es':
-        return text.length > 5 ? text + " (traducido)" : text;
+        // Simple placeholder translations for demo purposes
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       case 'fr':
-        return text.length > 5 ? text + " (traduit)" : text;
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       case 'de':
-        return text.length > 5 ? text + " (übersetzt)" : text;
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       case 'zh':
-        return text.length > 5 ? text + " (已翻译)" : text;
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       case 'ja':
-        return text.length > 5 ? text + " (翻訳済み)" : text;
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       case 'hi':
-        return text.length > 5 ? text + " (अनुवादित)" : text;
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       case 'ru':
-        return text.length > 5 ? text + " (переведено)" : text;
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       case 'ar':
-        return text.length > 5 ? text + " (مترجم)" : text;
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       case 'pt':
-        return text.length > 5 ? text + " (traduzido)" : text;
+        return text.length > 5 ? this.generateMockTranslation(text) : text;
       default:
         return text;
     }
+  }
+
+  // Helper method to generate mock translations without adding a suffix
+  private generateMockTranslation(text: string): string {
+    // For demo purposes, this simply returns the original text,
+    // pretending it was translated but without adding any marker
+    // In a real app, this would call an actual translation API
+    return text;
   }
 }
 
