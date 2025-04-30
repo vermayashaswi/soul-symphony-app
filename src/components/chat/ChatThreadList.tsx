@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -235,6 +236,3 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
     </div>
   );
 };
-
-// Export both the component and the helper function
-export { translateChatString };
