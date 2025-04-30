@@ -130,27 +130,26 @@ class StaticTranslationService {
   private mockTranslate(text: string, targetLang: string): string {
     if (targetLang === 'en') return text;
     
-    // Very simple mock translations for demo purposes
-    // We're removing the language markers to avoid showing them in the UI
+    // Add simple mock translations for demo purposes
     switch (targetLang) {
       case 'es':
-        return `${text}`;  // Removed [ES] prefix
+        return `¡Hola! ${text}`;
       case 'fr':
-        return `${text}`;  // Removed [FR] prefix
+        return `Bonjour! ${text}`;
       case 'de':
-        return `${text}`;  // Removed [DE] prefix
+        return `Guten Tag! ${text}`;
       case 'zh':
-        return `${text}`;  // Removed [ZH] prefix
+        return `你好! ${text}`;
       case 'ja':
-        return `${text}`;  // Removed [JA] prefix
+        return `こんにちは! ${text}`;
       case 'hi':
-        return `${text}`;  // Removed [HI] prefix
+        return `नमस्ते! ${text}`;
       case 'ru':
-        return `${text}`;  // Removed [RU] prefix
+        return `Привет! ${text}`;
       case 'ar':
-        return `${text}`;  // Removed [AR] prefix
+        return `مرحبا! ${text}`;
       case 'pt':
-        return `${text}`;  // Removed [PT] prefix
+        return `Olá! ${text}`;
       default:
         return text;
     }
