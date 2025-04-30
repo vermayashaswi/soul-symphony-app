@@ -1,17 +1,10 @@
 
-import { cn } from '@/lib/utils';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import React from 'react';
 
 export const LoadingState = () => {
   return (
-    <div className={cn(
-      "bg-background rounded-xl shadow-sm border w-full p-6 md:p-8",
-      "flex flex-col items-center justify-center py-16"
-    )}>
-      <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
-      <p className="text-muted-foreground">
-        <TranslatableText text="Loading visualization..." />
-      </p>
+    <div className="flex justify-center items-center h-96">
+      <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
     </div>
   );
 };

@@ -109,9 +109,9 @@ export function TranslatableMarkdown({
     };
   }, [children, currentLanguage]);
 
-  // Ensure we're passing a string to ReactMarkdown (fix for the TypeScript error)
+  // The key issue is here - we need to make sure we're passing a string to ReactMarkdown
   const contentToRender = translatedContent || children;
-  
+
   return (
     <div className={`${isLoading ? 'opacity-70' : ''}`} data-translating={isLoading ? 'true' : 'false'}>
       <ReactMarkdown className={className}>
