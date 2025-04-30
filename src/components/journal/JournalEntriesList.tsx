@@ -7,6 +7,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Plus } from 'lucide-react';
 import JournalEntriesHeader from './JournalEntriesHeader';
 import EmptyJournalState from './EmptyJournalState';
+import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -52,8 +53,11 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     }
   };
 
+  // Check if there are processing entries to display
+  const hasProcessingEntries = processingEntries && processingEntries.length > 0;
+
   // NEW: Debug logging for rendered state
-  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}, processingEntries=${processingEntries.length}`);
+  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}, processingEntries=${processingEntries.length}, hasProcessingEntries=${hasProcessingEntries}`);
 
   return (
     <div className="journal-entries-list" id="journal-entries-container">
@@ -65,8 +69,25 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             <TranslatableText text="Loading journal entries..." />
           </p>
         </div>
-      ) : hasEntries ? (
+      ) : hasEntries || hasProcessingEntries ? (
         <div className="grid gap-4" data-entries-count={entries.length}>
+          {/* Display processing entry cards first */}
+          {hasProcessingEntries && processingEntries.map((tempId) => (
+            <JournalEntryCard
+              key={`processing-${tempId}`}
+              entry={{
+                id: 0, // Temporary ID, will be replaced
+                content: "Processing entry...",
+                created_at: new Date().toISOString(),
+                tempId: tempId
+              }}
+              processing={true}
+              isProcessing={true}
+              setEntries={null}
+            />
+          ))}
+          
+          {/* Then display regular entries */}
           {entries.map((entry) => (
             <JournalEntryCard
               key={entry.id || entry.tempId || Math.random()}
