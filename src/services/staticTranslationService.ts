@@ -9,12 +9,15 @@ import { toast } from 'sonner';
 class StaticTranslationService {
   private language: string = 'en';
   private mockTranslationDelay: number = 200; // 200ms delay to simulate API call
+  private pendingTranslations: Map<string, Promise<string>> = new Map();
   
   // Change the language
   setLanguage(lang: string): void {
     if (this.language !== lang) {
       console.log(`StaticTranslationService: Changing language to ${lang}`);
       this.language = lang;
+      // Clear pending translations when language changes
+      this.pendingTranslations.clear();
     }
   }
   
@@ -33,33 +36,52 @@ class StaticTranslationService {
       return text;
     }
     
-    try {
-      // Check cache first
-      const cached = await translationCache.getTranslation(text, this.language);
-      if (cached) {
-        return cached.translatedText;
-      }
-      
-      // Simulate API call delay
-      await new Promise(resolve => setTimeout(resolve, this.mockTranslationDelay));
-      
-      // For demo purposes, we'll just modify the text slightly based on the language
-      const translatedText = this.mockTranslate(text, this.language);
-      
-      // Cache the result
-      await translationCache.setTranslation({
-        originalText: text,
-        translatedText: translatedText,
-        language: this.language,
-        timestamp: Date.now(),
-        version: 1
-      });
-      
-      return translatedText;
-    } catch (error) {
-      console.error("Static translation error:", error);
-      return text;
+    // Create a unique key for this translation request
+    const translationKey = `${text}__${this.language}__${entryId || ''}`;
+    
+    // Check if this translation is already in progress
+    if (this.pendingTranslations.has(translationKey)) {
+      return this.pendingTranslations.get(translationKey)!;
     }
+    
+    // Create a new translation promise
+    const translationPromise = (async () => {
+      try {
+        // Check cache first
+        const cached = await translationCache.getTranslation(text, this.language);
+        if (cached) {
+          return cached.translatedText;
+        }
+        
+        // Simulate API call delay
+        await new Promise(resolve => setTimeout(resolve, this.mockTranslationDelay));
+        
+        // For demo purposes, we'll just modify the text slightly based on the language
+        const translatedText = this.mockTranslate(text, this.language);
+        
+        // Cache the result
+        await translationCache.setTranslation({
+          originalText: text,
+          translatedText: translatedText,
+          language: this.language,
+          timestamp: Date.now(),
+          version: 1
+        });
+        
+        return translatedText;
+      } catch (error) {
+        console.error("Static translation error:", error);
+        return text;
+      } finally {
+        // Remove from pending translations when complete
+        this.pendingTranslations.delete(translationKey);
+      }
+    })();
+    
+    // Store the promise so we can return it for duplicate requests
+    this.pendingTranslations.set(translationKey, translationPromise);
+    
+    return translationPromise;
   }
   
   // Pre-translate multiple texts - used for batch operations
@@ -126,30 +148,31 @@ class StaticTranslationService {
     return results;
   }
   
-  // Mock translate function
+  // Mock translate function - now with proper formatting that doesn't add language code prefix
   private mockTranslate(text: string, targetLang: string): string {
     if (targetLang === 'en') return text;
     
-    // Very simple mock translations for demo purposes
+    // Instead of adding a language prefix, we'll simulate real translation
+    // by adding some simple modifications based on the target language
     switch (targetLang) {
       case 'es':
-        return `[ES] ${text}`;
+        return text.length > 5 ? text + " (traducido)" : text;
       case 'fr':
-        return `[FR] ${text}`;
+        return text.length > 5 ? text + " (traduit)" : text;
       case 'de':
-        return `[DE] ${text}`;
+        return text.length > 5 ? text + " (übersetzt)" : text;
       case 'zh':
-        return `[ZH] ${text}`;
+        return text.length > 5 ? text + " (已翻译)" : text;
       case 'ja':
-        return `[JA] ${text}`;
+        return text.length > 5 ? text + " (翻訳済み)" : text;
       case 'hi':
-        return `[HI] ${text}`;
+        return text.length > 5 ? text + " (अनुवादित)" : text;
       case 'ru':
-        return `[RU] ${text}`;
+        return text.length > 5 ? text + " (переведено)" : text;
       case 'ar':
-        return `[AR] ${text}`;
+        return text.length > 5 ? text + " (مترجم)" : text;
       case 'pt':
-        return `[PT] ${text}`;
+        return text.length > 5 ? text + " (traduzido)" : text;
       default:
         return text;
     }
