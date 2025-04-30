@@ -52,6 +52,55 @@ class StaticTranslationService {
     }
   }
   
+  // Add the missing preTranslate method to batch translate multiple strings at once
+  async preTranslate(texts: string[], sourceLanguage: string = 'en'): Promise<Map<string, string>> {
+    if (this.language === 'en' || !texts || texts.length === 0) {
+      // If target language is English or no texts to translate, return original texts
+      const resultMap = new Map<string, string>();
+      texts.forEach(text => resultMap.set(text, text));
+      return resultMap;
+    }
+    
+    console.log(`StaticTranslationService: Batch translating ${texts.length} items to ${this.language}`);
+    
+    const translationMap = new Map<string, string>();
+    const translationPromises: Promise<void>[] = [];
+    
+    // Process each text in the array
+    for (const text of texts) {
+      if (!text || text.trim() === '') {
+        translationMap.set(text, text);
+        continue;
+      }
+      
+      const translationPromise = (async () => {
+        try {
+          // Try to get from cache first
+          const cached = await translationCache.getTranslation(text, this.language);
+          if (cached?.translatedText) {
+            translationMap.set(text, cached.translatedText);
+            return;
+          }
+          
+          // If not in cache, translate and store
+          const translatedText = await this.fetchTranslation(text, sourceLanguage);
+          translationMap.set(text, translatedText);
+        } catch (error) {
+          console.error(`Error translating text: "${text.substring(0, 20)}..."`, error);
+          translationMap.set(text, text); // Fallback to original on error
+        }
+      })();
+      
+      translationPromises.push(translationPromise);
+    }
+    
+    // Wait for all translations to complete
+    await Promise.all(translationPromises);
+    console.log(`StaticTranslationService: Completed batch translation of ${texts.length} items`);
+    
+    return translationMap;
+  }
+  
   private async fetchTranslation(text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string> {
     // For debugging/development, we're using a simple mock translation
     // that prepends the target language code to show it's been "translated"
@@ -154,3 +203,4 @@ class StaticTranslationService {
 }
 
 export const staticTranslationService = new StaticTranslationService();
+
