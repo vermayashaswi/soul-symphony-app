@@ -163,7 +163,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
               dataKey="sentiment"
               stroke="#3b82f6" // blue-500 for bright line as in screenshot
               strokeWidth={2}
-              dot={<CustomDot />}
+              dot={(props) => <CustomDot cx={props.cx} cy={props.cy} payload={props.payload} />}
               activeDot={{ r: 6 }}
             />
             <ReferenceLine y={-0.2} stroke="#facc15" strokeDasharray="4 2" ifOverflow="visible" strokeWidth={1} />
