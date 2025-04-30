@@ -93,7 +93,7 @@ export function EntryContent({
       <TranslatedContent 
         content={content} 
         isExpanded={isExpanded} 
-        language={detectedLanguage || "en"} 
+        language={detectedLanguage} 
         entryId={entryId} 
       />
     </div>

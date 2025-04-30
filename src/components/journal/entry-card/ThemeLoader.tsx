@@ -83,7 +83,7 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
       <h3 className="text-sm font-medium mb-1 text-primary">
         <TranslatableText 
           text="Themes" 
-          sourceLanguage={entryLanguage || "en"}
+          sourceLanguage={entryLanguage}
           entryId={entryId}
         />
       </h3>
@@ -104,14 +104,14 @@ export function ThemeLoader({ entryId, initialThemes = [], content, isProcessing
         <p className="text-xs text-muted-foreground">
           <TranslatableText 
             text="No themes detected" 
-            sourceLanguage={entryLanguage || "en"}
+            sourceLanguage={entryLanguage}
             entryId={entryId}
           />
         </p>
       )}
 
       {!loading && !error && themes.length > 0 && (
-        <ThemeBoxes themes={themes} entryId={entryId} sourceLanguage={entryLanguage || "en"} />
+        <ThemeBoxes themes={themes} entryId={entryId} sourceLanguage={entryLanguage} />
       )}
     </div>
   );

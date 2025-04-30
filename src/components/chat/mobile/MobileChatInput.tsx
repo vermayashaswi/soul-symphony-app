@@ -153,25 +153,25 @@ export default function MobileChatInput({
   return (
     <div 
       ref={inputContainerRef}
-      className={`p-2 bg-background border-t border-border flex items-center gap-2 mb-1 ${
+      className={`p-2 bg-background border-t border-border flex items-center gap-2 ${
         isKeyboardVisible ? 'input-keyboard-active' : ''
       }`}
       style={{
         position: 'fixed',
-        bottom: isKeyboardVisible ? 0 : '3.6rem', // Adjusted from 69px to 3.6rem (to match the new navbar height)
+        bottom: isKeyboardVisible ? 0 : '69px', // Key change: position based on keyboard visibility
         left: 0,
         right: 0,
         paddingBottom: isKeyboardVisible ? '5px' : 'env(safe-area-inset-bottom, 8px)',
         marginBottom: 0,
-        zIndex: 60,
+        zIndex: 60, // High z-index to be above the navigation bar
         boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
         transition: 'all 0.2s ease',
         borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
         borderBottom: !isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
         visibility: 'visible',
         opacity: 1,
-        transform: 'translateZ(0)',
-        willChange: 'transform, bottom',
+        transform: 'translateZ(0)', // Force hardware acceleration
+        willChange: 'transform, bottom', // Optimize for animation
       }}
     >
       <div className="flex-1 relative">
@@ -182,7 +182,7 @@ export default function MobileChatInput({
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
           placeholder="Type your message..."
-          className="w-full pr-10 focus:outline-none focus:ring-2 focus:ring-primary border-2 border-primary/40 shadow-[0_0_8px_rgba(155,135,245,0.5)] bg-background"
+          className="w-full pr-10 focus:outline-none focus:ring-1 focus:ring-primary bg-background"
           disabled={isLoading || isSubmitting}
         />
       </div>

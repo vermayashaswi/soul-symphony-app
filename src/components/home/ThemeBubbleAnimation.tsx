@@ -1,15 +1,10 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { staticTranslationService } from '@/services/staticTranslationService';
 
 interface ThemeData {
   theme: string;
   sentiment: number;
-  translatedTheme?: string;
 }
 
 interface ThemeBubbleProps {
@@ -20,7 +15,6 @@ interface ThemeBubbleProps {
   onCollision: (id: string, newVelocity: { x: number; y: number }) => void;
   id: string;
   themeColor: string;
-  currentLanguage: string;
 }
 
 const ThemeBubble: React.FC<ThemeBubbleProps> = ({ 
@@ -30,8 +24,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
   velocity, 
   onCollision,
   id,
-  themeColor,
-  currentLanguage
+  themeColor
 }) => {
   const controls = useAnimation();
   const bubbleRef = useRef<HTMLDivElement>(null);
@@ -63,9 +56,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
 
   // Calculate font size based on text length and bubble size
   const calculateFontSize = () => {
-    // Use translatedTheme's length if available, otherwise use original theme length
-    const text = currentLanguage === 'en' ? themeData.theme : (themeData.translatedTheme || themeData.theme);
-    const textLength = text.length;
+    const textLength = themeData.theme.length;
     
     if (textLength <= 3) return '16px';
     if (textLength <= 6) return '14px';
@@ -82,11 +73,6 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
   const createBubbleShadow = () => {
     return `0 0 3px 1.5px rgba(255, 255, 255, 1), inset 0 0 5px rgba(255, 255, 255, 1), 0 0 3px ${themeColor}`;
   };
-
-  // Display the translated text if available
-  const displayText = currentLanguage === 'en' ? 
-    themeData.theme : 
-    (themeData.translatedTheme || themeData.theme);
   
   return (
     <motion.div
@@ -125,7 +111,7 @@ const ThemeBubble: React.FC<ThemeBubbleProps> = ({
           letterSpacing: '0.01em',
         }}
       >
-        {displayText}
+        {themeData.theme}
       </span>
     </motion.div>
   );
@@ -151,8 +137,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   }>>([]);
   const [themePool, setThemePool] = useState<ThemeData[]>([]);
   const { colorTheme, customColor } = useTheme();
-  const { currentLanguage } = useTranslation();
-  const [translatedThemeData, setTranslatedThemeData] = useState<ThemeData[]>([]);
   
   // Get the theme color based on the current theme
   const getThemeColorHex = (): string => {
@@ -176,45 +160,13 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   
   // Track current animation frame for cleanup
   const animationFrameRef = useRef<number | null>(null);
-
-  // Function to translate all themes at once
-  const translateAllThemes = async (themes: ThemeData[]) => {
-    if (currentLanguage === 'en' || themes.length === 0) {
-      setTranslatedThemeData(themes);
-      return themes;
-    }
-    
-    try {
-      // Extract all theme strings
-      const themeTexts = themes.map(item => item.theme);
-      
-      // Pre-translate all at once
-      const translationsMap = await staticTranslationService.preTranslate(themeTexts, "en");
-      
-      // Apply translations
-      const translated = themes.map(item => ({
-        ...item,
-        translatedTheme: translationsMap.get(item.theme) || item.theme
-      }));
-      
-      setTranslatedThemeData(translated);
-      return translated;
-    } catch (error) {
-      console.error('Error translating theme bubbles:', error);
-      setTranslatedThemeData(themes);
-      return themes;
-    }
-  };
   
   // Setup container dimensions and themes
   useEffect(() => {
     if (!themesData.length) return;
     
-    // Translate the theme data when it first loads
-    translateAllThemes(themesData).then(translatedData => {
-      // Initial theme pool with duplicates to make animation more interesting
-      setThemePool([...translatedData, ...translatedData].sort(() => Math.random() - 0.5));
-    });
+    // Initial theme pool with duplicates to make animation more interesting
+    setThemePool([...themesData, ...themesData].sort(() => Math.random() - 0.5));
     
     const updateDimensions = () => {
       if (containerRef.current) {
@@ -232,44 +184,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       window.removeEventListener('resize', updateDimensions);
     };
   }, [themesData]);
-  
-  // Handle language changes
-  useEffect(() => {
-    if (themesData.length > 0) {
-      translateAllThemes(themesData).then(translatedData => {
-        // Update theme pool with translated data
-        setThemePool(prevPool => {
-          if (prevPool.length === 0) return [];
-          
-          // Create a mapping between original themes and their translations
-          const translationMap = new Map<string, ThemeData>();
-          translatedData.forEach(item => {
-            translationMap.set(item.theme, item);
-          });
-          
-          // Update theme pool with translations
-          return prevPool.map(item => translationMap.get(item.theme) || item);
-        });
-        
-        // Update active bubbles with translations
-        setActiveBubbles(prevBubbles => {
-          if (prevBubbles.length === 0) return [];
-          
-          // Create a mapping between original themes and their translations
-          const translationMap = new Map<string, ThemeData>();
-          translatedData.forEach(item => {
-            translationMap.set(item.theme, item);
-          });
-          
-          // Update active bubbles with translations
-          return prevBubbles.map(bubble => ({
-            ...bubble,
-            themeData: translationMap.get(bubble.themeData.theme) || bubble.themeData
-          }));
-        });
-      });
-    }
-  }, [currentLanguage, themesData]);
   
   // Bubble management (creation, movement, collision)
   useEffect(() => {
@@ -292,10 +206,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       const MAX_SIZE = 75; // 1.5x increase from baseline
       
       // Calculate size based on text length to avoid text wrapping
-      const textLength = currentLanguage === 'en' ? 
-        themeData.theme.length : 
-        (themeData.translatedTheme || themeData.theme).length;
-      
+      const textLength = themeData.theme.length;
       let bubbleSize = MIN_SIZE;
       
       // Adjust size based on text length
@@ -483,7 +394,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
         cancelAnimationFrame(animationFrameRef.current);
       }
     };
-  }, [dimensions, themePool, activeBubbles, maxBubbles, currentLanguage]);
+  }, [dimensions, themePool, activeBubbles, maxBubbles]);
   
   const handleCollision = (id: string, newVelocity: { x: number; y: number }) => {
     setActiveBubbles(bubbles => 
@@ -507,9 +418,9 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
   
   return (
     <div ref={containerRef} className="relative w-full h-full overflow-hidden">
-      {activeBubbles.map((bubble) => (
+      {activeBubbles.map((bubble, index) => (
         <ThemeBubble
-          key={`${bubble.id}-${currentLanguage}`}
+          key={bubble.id}
           id={bubble.id}
           themeData={bubble.themeData}
           size={bubble.size}
@@ -517,7 +428,6 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
           velocity={bubble.velocity}
           onCollision={handleCollision}
           themeColor={themeColor}
-          currentLanguage={currentLanguage}
         />
       ))}
     </div>

@@ -1,14 +1,15 @@
 
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import React from 'react';
 
-const SoulNetDescription = () => {
+export const SoulNetDescription: React.FC = () => {
+  console.log("Rendering SoulNetDescription component");
+  
   return (
-    <div className="text-center mb-6">
-      <h2 className="text-lg font-semibold mb-1">
-        <TranslatableText text="SoulNet Visualization" />
-      </h2>
-      <p className="text-sm text-muted-foreground px-4">
-        <TranslatableText text="Explore connections between entities and emotions in your journal" />
+    <div className="mb-4 p-4 md:mb-6">
+      <h2 className="text-lg font-semibold mb-2">SoulNet Visualization</h2>
+      <p className="text-muted-foreground text-sm">
+        Explore the connections between people, places, and emotions in your journal entries. 
+        The visualization shows how different entities in your life relate to various emotional states.
       </p>
     </div>
   );

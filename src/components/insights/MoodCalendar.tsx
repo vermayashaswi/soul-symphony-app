@@ -1,123 +1,401 @@
-
-import React from 'react';
-import { useTheme } from '@/hooks/use-theme';
+import React, { useState, useEffect } from 'react';
+import { Card, CardHeader, CardTitle, CardContent } from '@/components/ui/card';
 import { TimeRange } from '@/hooks/use-insights-data';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import {
-  ResponsiveContainer,
-  LineChart,
-  Line,
-  XAxis,
-  YAxis,
-  CartesianGrid,
-  Tooltip,
-  ReferenceLine,
-  ReferenceArea
+import { 
+  format, parseISO, isValid, 
+  startOfMonth, endOfMonth, eachDayOfInterval, isSameDay,
+  addMonths, subMonths, startOfWeek, endOfWeek, addWeeks, subWeeks,
+  addDays, subDays, getYear, getMonth, getDaysInMonth,
+  isWithinInterval, startOfYear, endOfYear, startOfDay, endOfDay
+} from 'date-fns';
+import { 
+  ResponsiveContainer, LineChart, Line, XAxis, YAxis, 
+  Tooltip, ReferenceLine, Area, CartesianGrid, ReferenceArea
 } from 'recharts';
-
-interface SentimentData {
-  date: Date;
-  sentiment: number;
-}
+import { Calendar as CalendarIcon, ChevronLeft, ChevronRight } from 'lucide-react';
+import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { cn } from '@/lib/utils';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useTheme } from '@/hooks/use-theme';
+import { MoodDataPoint } from '@/types/journal';
 
 interface MoodCalendarProps {
-  sentimentData: SentimentData[];
+  sentimentData: MoodDataPoint[];
   timeRange: TimeRange;
 }
 
-interface CustomDotProps {
-  cx: number;
-  cy: number;
-  payload: any;
-}
-
-const CustomDot = (props: CustomDotProps) => {
-  const { cx, cy, payload } = props;
-  const sentiment = payload.sentiment;
+const MoodCalendar = ({ sentimentData, timeRange }: MoodCalendarProps) => {
+  const [selectedView, setSelectedView] = useState<'calendar' | 'chart'>('calendar');
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  const isMobile = useIsMobile();
+  const { theme } = useTheme();
   
-  let color = '#3b82f6'; // default blue
-  if (sentiment >= 0.2) {
-    color = '#4ade80'; // green for positive
-  } else if (sentiment <= -0.2) {
-    color = '#ea384c'; // red for negative
-  } else {
-    color = '#facc15'; // yellow for neutral
-  }
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, [timeRange]);
   
-  return (
-    <circle cx={cx} cy={cy} r={4} stroke="white" strokeWidth={1} fill={color} />
-  );
-};
+  const processedData = React.useMemo(() => {
+    if (!sentimentData || sentimentData.length === 0) return [];
 
-const CustomTooltip = ({ active, payload, label }: any) => {
-  if (active && payload && payload.length) {
-    const sentiment = payload[0].value;
-    let moodText = "Neutral";
-    let moodColor = "#facc15";
+    const dateMap = new Map<string, { total: number; count: number }>();
     
-    if (sentiment >= 0.2) {
-      moodText = "Positive";
-      moodColor = "#4ade80";
-    } else if (sentiment <= -0.2) {
-      moodText = "Negative";
-      moodColor = "#ea384c";
+    sentimentData.forEach(point => {
+      if (!point.date || !isValid(new Date(point.date))) {
+        console.warn('Invalid date in sentiment data:', point);
+        return;
+      }
+
+      const sentimentValue = typeof point.sentiment === 'number' 
+        ? point.sentiment 
+        : typeof point.sentiment === 'string' 
+          ? parseFloat(point.sentiment) 
+          : null;
+          
+      if (sentimentValue === null || isNaN(sentimentValue)) {
+        console.warn('Invalid sentiment value:', point.sentiment);
+        return;
+      }
+      
+      const dateKey = format(new Date(point.date), 'yyyy-MM-dd');
+      
+      if (!dateMap.has(dateKey)) {
+        dateMap.set(dateKey, { total: 0, count: 0 });
+      }
+      
+      const existing = dateMap.get(dateKey)!;
+      existing.total += sentimentValue;
+      existing.count += 1;
+    });
+    
+    return Array.from(dateMap.entries()).map(([date, data]) => {
+      const avgSentiment = data.total / data.count;
+      return {
+        date,
+        formattedDate: format(parseISO(date), 'MMM d'),
+        sentiment: avgSentiment,
+        category: avgSentiment >= 0.3 
+          ? 'positive' 
+          : avgSentiment >= -0.1 
+            ? 'neutral' 
+            : 'negative'
+      };
+    }).sort((a, b) => a.date.localeCompare(b.date));
+  }, [sentimentData]);
+
+  const filteredChartData = React.useMemo(() => {
+    const now = new Date();
+    let startDate: Date;
+    let endDate: Date;
+    
+    switch (timeRange) {
+      case 'today':
+        startDate = startOfDay(currentDate);
+        endDate = endOfDay(currentDate);
+        break;
+      case 'week':
+        startDate = startOfWeek(currentDate, { weekStartsOn: 1 });
+        endDate = endOfWeek(currentDate, { weekStartsOn: 1 });
+        break;
+      case 'month':
+        startDate = startOfMonth(currentDate);
+        endDate = endOfMonth(currentDate);
+        break;
+      case 'year':
+        startDate = startOfYear(currentDate);
+        endDate = endOfYear(currentDate);
+        break;
+      default:
+        startDate = startOfDay(now);
+        endDate = endOfDay(now);
     }
+    
+    return processedData.filter(dataPoint => {
+      const date = parseISO(dataPoint.date);
+      return isWithinInterval(date, { start: startDate, end: endDate });
+    });
+  }, [processedData, timeRange, currentDate]);
+
+  const getSentimentColor = (category: string): string => {
+    switch (category) {
+      case 'positive': return '#4ade80';
+      case 'neutral': return '#facc15';
+      case 'negative': return '#ef4444';
+      default: return '#94a3b8';
+    }
+  };
+
+  const calendarDays = React.useMemo(() => {
+    if (timeRange === 'today') {
+      return [currentDate];
+    } else if (timeRange === 'week') {
+      const startDay = startOfWeek(currentDate, { weekStartsOn: 1 });
+      return eachDayOfInterval({ start: startDay, end: endOfWeek(currentDate, { weekStartsOn: 1 }) });
+    } else if (timeRange === 'month') {
+      const startDate = startOfMonth(currentDate);
+      const endDate = endOfMonth(currentDate);
+      return eachDayOfInterval({ start: startDate, end: endDate });
+    } else if (timeRange === 'year') {
+      return [];
+    }
+    return [];
+  }, [currentDate, timeRange]);
+
+  const CustomTooltip = ({ active, payload }: any) => {
+    if (active && payload && payload.length) {
+      const data = payload[0].payload;
+      return (
+        <div className="bg-background border p-2 rounded-md shadow-md">
+          <p className="font-medium">{data.formattedDate}</p>
+          <p className="text-sm text-muted-foreground">
+            {data.sentiment >= 0.3 
+              ? 'Positive' 
+              : data.sentiment >= -0.1 
+                ? 'Neutral' 
+                : 'Negative'
+            }
+          </p>
+        </div>
+      );
+    }
+    return null;
+  };
+
+  const goToPrevious = () => {
+    if (timeRange === 'today') {
+      setCurrentDate(prev => subDays(prev, 1));
+    } else if (timeRange === 'week') {
+      setCurrentDate(prev => subWeeks(prev, 1));
+    } else if (timeRange === 'month') {
+      setCurrentDate(prev => subMonths(prev, 1));
+    } else if (timeRange === 'year') {
+      setCurrentDate(prev => new Date(prev.getFullYear() - 1, 0, 1));
+    }
+  };
+
+  const goToNext = () => {
+    if (timeRange === 'today') {
+      setCurrentDate(prev => addDays(prev, 1));
+    } else if (timeRange === 'week') {
+      setCurrentDate(prev => addWeeks(prev, 1));
+    } else if (timeRange === 'month') {
+      setCurrentDate(prev => addMonths(prev, 1));
+    } else if (timeRange === 'year') {
+      setCurrentDate(prev => new Date(prev.getFullYear() + 1, 0, 1));
+    }
+  };
+
+  const getSentimentForDate = (date: Date) => {
+    const dateString = format(date, 'yyyy-MM-dd');
+    return processedData.find(d => d.date === dateString);
+  };
+
+  const renderYearView = () => {
+    const year = getYear(currentDate);
+    const months = Array.from({ length: 12 }, (_, i) => i);
     
     return (
-      <div className="custom-tooltip bg-background p-2 border rounded-md shadow-md">
-        <p className="date">{label}</p>
-        <p className="sentiment" style={{ color: moodColor }}>
-          <TranslatableText text={moodText} />: {sentiment.toFixed(2)}
-        </p>
+      <div className="w-full overflow-auto">
+        <div className="min-w-full">
+          <div className="grid grid-cols-12 text-center mb-1">
+            {months.map(month => (
+              <div key={month} className="text-xs text-muted-foreground">
+                {format(new Date(year, month, 1), 'MMM')}
+              </div>
+            ))}
+          </div>
+          
+          <div className="flex">
+            <div className="flex flex-col mr-1">
+              {Array.from({ length: 31 }, (_, i) => i + 1).map(day => (
+                <div key={day} className="h-[10px] text-[9px] text-muted-foreground flex items-center">
+                  {day}
+                </div>
+              ))}
+            </div>
+            
+            <div className="grid grid-cols-12 gap-[2px] flex-1">
+              {months.map(month => {
+                const daysInMonth = getDaysInMonth(new Date(year, month));
+                
+                return (
+                  <div key={month} className="flex flex-col gap-[2px]">
+                    {Array.from({ length: 31 }, (_, i) => i + 1).map(day => {
+                      if (day > daysInMonth) {
+                        return <div key={day} className="h-[10px]"></div>;
+                      }
+                      
+                      const date = new Date(year, month, day);
+                      const sentimentData = getSentimentForDate(date);
+                      
+                      return (
+                        <div 
+                          key={day}
+                          className={cn(
+                            "h-[10px] w-[10px] rounded-full",
+                            !sentimentData && "bg-gray-100 dark:bg-gray-800 opacity-20"
+                          )}
+                          style={{
+                            backgroundColor: sentimentData 
+                              ? getSentimentColor(sentimentData.category) 
+                              : undefined
+                          }}
+                          title={sentimentData 
+                            ? `${format(date, 'MMM d')}: ${sentimentData.sentiment.toFixed(2)}` 
+                            : `${format(date, 'MMM d')}: No data`
+                          }
+                        />
+                      );
+                    })}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </div>
       </div>
     );
-  }
-  return null;
-};
+  };
 
-const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange }) => {
-  const { theme } = useTheme();
-  const isMobile = useIsMobile();
-  
-  // Format the data for the chart
-  const processChartData = () => {
-    if (!sentimentData || sentimentData.length === 0) return [];
+  const renderDayView = () => {
+    const sentimentData = getSentimentForDate(currentDate);
     
-    return sentimentData.map(item => ({
-      formattedDate: formatDate(item.date, timeRange),
-      sentiment: item.sentiment
-    })).sort((a, b) => {
-      // Sort by date in ascending order for the chart
-      return new Date(a.formattedDate).getTime() - new Date(b.formattedDate).getTime();
-    });
-  };
-  
-  const formatDate = (date: Date, range: TimeRange): string => {
-    const d = new Date(date);
-    switch (range) {
-      case 'today':
-        return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
-      case 'week':
-        return d.toLocaleDateString(undefined, { weekday: 'short' });
-      case 'month':
-        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
-      case 'year':
-        return d.toLocaleDateString(undefined, { month: 'short' });
-      default:
-        return d.toLocaleDateString();
-    }
+    return (
+      <div className="flex justify-center py-10">
+        <div 
+          className={cn(
+            "h-16 w-16 rounded-full flex items-center justify-center",
+            !sentimentData && "bg-gray-100 dark:bg-gray-800"
+          )}
+          style={{
+            backgroundColor: sentimentData 
+              ? getSentimentColor(sentimentData.category) + '40'
+              : undefined
+          }}
+        />
+      </div>
+    );
   };
 
-  const filteredChartData = processChartData();
+  const renderWeekView = () => {
+    return (
+      <div className="py-4">
+        <div className="grid grid-cols-7 gap-2 text-center">
+          {calendarDays.map(day => (
+            <div key={day.toString()} className="flex flex-col items-center">
+              <div className="text-xs text-muted-foreground mb-2">
+                {format(day, 'EEE')}
+              </div>
+              <div className="text-xs mb-2">
+                {format(day, 'd')}
+              </div>
+              
+              {renderDayMood(day)}
+            </div>
+          ))}
+        </div>
+      </div>
+    );
+  };
+
+  const renderDayMood = (day: Date) => {
+    const sentimentData = getSentimentForDate(day);
+    
+    return (
+      <div 
+        className={cn(
+          "h-10 w-10 rounded-full flex items-center justify-center",
+          !sentimentData && "bg-gray-100 dark:bg-gray-800"
+        )}
+        style={{
+          backgroundColor: sentimentData 
+            ? getSentimentColor(sentimentData.category) + '40'
+            : undefined
+        }}
+        title={sentimentData 
+          ? `Sentiment: ${sentimentData.sentiment.toFixed(2)}` 
+          : 'No data'
+        }
+      />
+    );
+  };
+
+  const renderMonthView = () => {
+    const firstDayOfMonth = startOfMonth(currentDate);
+    const firstDayWeekday = firstDayOfMonth.getDay();
+    const startOffset = firstDayWeekday === 0 ? 6 : firstDayWeekday - 1;
+    
+    return (
+      <div className="space-y-4">
+        <div className="grid grid-cols-7 gap-1 text-center text-xs text-muted-foreground">
+          {['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'].map((day) => (
+            <div key={day} className="py-1">{day}</div>
+          ))}
+        </div>
+        
+        <div className="grid grid-cols-7 gap-1">
+          {Array.from({ length: startOffset }).map((_, i) => (
+            <div key={`empty-start-${i}`} className="aspect-square" />
+          ))}
+          
+          {calendarDays.map((day) => {
+            const sentimentData = getSentimentForDate(day);
+            const isToday = isSameDay(day, new Date());
+            
+            return (
+              <div 
+                key={day.toString()} 
+                className={cn(
+                  "relative aspect-square flex items-center justify-center",
+                  isToday && "ring-2 ring-primary ring-offset-1"
+                )}
+              >
+                <div 
+                  className={cn(
+                    "h-8 w-8 rounded-full flex items-center justify-center text-sm",
+                    !sentimentData && "bg-gray-100 dark:bg-gray-800 opacity-30"
+                  )}
+                  style={{
+                    backgroundColor: sentimentData 
+                      ? getSentimentColor(sentimentData.category) + '40'
+                      : undefined
+                  }}
+                  title={sentimentData 
+                    ? `Sentiment: ${sentimentData.sentiment.toFixed(2)}` 
+                    : 'No data'
+                  }
+                >
+                  {format(day, 'd')}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
+  const CustomDot = (props: any) => {
+    const { cx, cy, stroke, strokeWidth, r, value } = props;
+    
+    if (value === null) return null;
+    
+    return (
+      <circle 
+        cx={cx} 
+        cy={cy} 
+        r={r} 
+        fill={theme === 'dark' ? '#1e293b' : 'white'} 
+        stroke={stroke} 
+        strokeWidth={strokeWidth} 
+      />
+    );
+  };
 
   const renderLineChart = () => {
     if (filteredChartData.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">
-            <TranslatableText text="No data available for this timeframe" />
-          </p>
+          <p className="text-muted-foreground">No data available for this timeframe</p>
         </div>
       );
     }
@@ -163,7 +441,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
               dataKey="sentiment"
               stroke="#3b82f6" // blue-500 for bright line as in screenshot
               strokeWidth={2}
-              dot={(props) => <CustomDot cx={props.cx} cy={props.cy} payload={props.payload} />}
+              dot={<CustomDot />}
               activeDot={{ r: 6 }}
             />
             <ReferenceLine y={-0.2} stroke="#facc15" strokeDasharray="4 2" ifOverflow="visible" strokeWidth={1} />
@@ -174,15 +452,15 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#4ade80" }} />
-            <TranslatableText text="Positive" />
+            <span>Positive</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#facc15" }} />
-            <TranslatableText text="Neutral" />
+            <span>Neutral</span>
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#ea384c" }} />
-            <TranslatableText text="Negative" />
+            <span>Negative</span>
           </div>
         </div>
       </div>
@@ -190,20 +468,82 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
   };
 
   return (
-    <div className="bg-background rounded-xl shadow-sm border w-full p-6 md:p-8">
-      <div className="text-center mb-6">
-        <h2 className="text-lg font-semibold mb-1">
-          <TranslatableText text="Mood Trends" />
-        </h2>
-        <p className="text-sm text-muted-foreground">
-          <TranslatableText text="Your sentiment changes over time" />
-        </p>
-      </div>
+    <Card className="rounded-xl border shadow-sm">
+      <CardHeader className="pb-2">
+        <div className="flex items-center justify-between">
+          <CardTitle className="text-lg md:text-xl font-bold">
+            <div className="flex items-center gap-2">
+              <CalendarIcon className="h-5 w-5" />
+              <span>Mood Calendar</span>
+            </div>
+          </CardTitle>
+          
+          <Tabs value={selectedView} onValueChange={(v) => setSelectedView(v as 'calendar' | 'chart')} className="ml-auto">
+            <TabsList className="h-8">
+              <TabsTrigger value="calendar" className="h-7 px-3 text-xs">Calendar</TabsTrigger>
+              <TabsTrigger value="chart" className="h-7 px-3 text-xs">Trend</TabsTrigger>
+            </TabsList>
+          </Tabs>
+        </div>
+      </CardHeader>
       
-      <div className="h-[300px] md:h-[350px]">
-        {renderLineChart()}
-      </div>
-    </div>
+      <CardContent>
+        {processedData.length === 0 ? (
+          <div className="h-[250px] flex items-center justify-center">
+            <p className="text-muted-foreground">No mood data available for this period</p>
+          </div>
+        ) : selectedView === 'calendar' ? (
+          <div className="space-y-4">
+            <div className="flex items-center justify-between">
+              <button 
+                onClick={goToPrevious}
+                className="p-1 rounded-full hover:bg-secondary"
+                aria-label="Previous"
+              >
+                <ChevronLeft className="h-5 w-5" />
+              </button>
+              
+              <h3 className="font-medium">
+                {timeRange === 'today' && format(currentDate, 'MMMM d, yyyy')}
+                {timeRange === 'week' && `Week of ${format(startOfWeek(currentDate, { weekStartsOn: 1 }), 'MMM d')} - ${format(endOfWeek(currentDate, { weekStartsOn: 1 }), 'MMM d, yyyy')}`}
+                {timeRange === 'month' && format(currentDate, 'MMMM yyyy')}
+                {timeRange === 'year' && format(currentDate, 'yyyy')}
+              </h3>
+              
+              <button 
+                onClick={goToNext}
+                className="p-1 rounded-full hover:bg-secondary"
+                aria-label="Next"
+              >
+                <ChevronRight className="h-5 w-5" />
+              </button>
+            </div>
+            
+            {timeRange === 'today' && renderDayView()}
+            {timeRange === 'week' && renderWeekView()}
+            {timeRange === 'month' && renderMonthView()}
+            {timeRange === 'year' && renderYearView()}
+            
+            <div className="flex justify-center items-center gap-4 text-xs text-muted-foreground pt-2">
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-red-500/40" />
+                <span>Negative</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-yellow-400/40" />
+                <span>Neutral</span>
+              </div>
+              <div className="flex items-center gap-1">
+                <div className="w-3 h-3 rounded-full bg-green-400/40" />
+                <span>Positive</span>
+              </div>
+            </div>
+          </div>
+        ) : (
+          renderLineChart()
+        )}
+      </CardContent>
+    </Card>
   );
 };
 

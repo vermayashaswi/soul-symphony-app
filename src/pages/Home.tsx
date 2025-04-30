@@ -23,7 +23,6 @@ const Home = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [journalLabel, setJournalLabel] = useState("Journal");
   const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
-  const [translatedDate, setTranslatedDate] = useState<string>("");
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
@@ -32,31 +31,13 @@ const Home = () => {
     // Pre-translate common labels to avoid async issues
     const loadTranslations = async () => {
       if (translate) {
-        setJournalLabel(await translate("Journal", "en"));
-        setYourJournalLabel(await translate("Your Journal", "en"));
-        setTranslatedDate(await translate(formattedDate, "en"));
+        setJournalLabel(await translate("Journal"));
+        setYourJournalLabel(await translate("Your Journal"));
       }
     };
     
     loadTranslations();
-  }, [translate, formattedDate]);
-
-  // Listen for language changes and update translations
-  useEffect(() => {
-    const handleLanguageChange = async () => {
-      if (translate) {
-        setJournalLabel(await translate("Journal", "en"));
-        setYourJournalLabel(await translate("Your Journal", "en"));
-        setTranslatedDate(await translate(formattedDate, "en"));
-      }
-    };
-    
-    window.addEventListener('languageChange', handleLanguageChange as EventListener);
-    
-    return () => {
-      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
-    };
-  }, [translate, formattedDate]);
+  }, [translate]);
 
   useEffect(() => {
     const preloadImage = new Image();
@@ -168,12 +149,10 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      {/* Background Animation */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
       </div>
 
-      {/* Preload Image */}
       <div className="hidden">
         <img
           src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png"
@@ -200,7 +179,7 @@ const Home = () => {
               </h1>
             </div>
 
-            <div className="flex items-center z-50">
+            <div className="flex items-center">
               <motion.div
                 variants={dateStripVariants}
                 initial="hidden"
@@ -216,10 +195,10 @@ const Home = () => {
                     MozOsxFontSmoothing: 'grayscale'
                   }}
                 >
-                  {translatedDate || formattedDate}
+                  <TranslatableText text={formattedDate} />
                 </div>
               </motion.div>
-              <div className="ml-2 relative z-[1000] pointer-events-auto">
+              <div className="ml-2 z-[100]">
                 <LanguageSelector />
               </div>
             </div>
@@ -227,8 +206,7 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Central arrow button */}
-      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-auto">
+      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40">
         <motion.div
           className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
           initial={{ scale: 1, opacity: 0.5 }}
@@ -261,8 +239,7 @@ const Home = () => {
         </motion.button>
       </div>
 
-      {/* Journal Summary */}
-      <div className="flex-1 px-0 absolute inset-0 z-30 pointer-events-none">
+      <div className="flex-1 px-0 absolute inset-0 z-30">
         <motion.div
           variants={containerVariants}
           initial="hidden"
@@ -280,9 +257,12 @@ const Home = () => {
         </motion.div>
       </div>
 
-      {/* Inspirational Quote */}
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
+      </div>
+
+      <div className="absolute top-4 right-4 z-[100]">
+        <LanguageSelector />
       </div>
     </div>
   );

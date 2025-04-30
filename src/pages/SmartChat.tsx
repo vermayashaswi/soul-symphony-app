@@ -4,13 +4,13 @@ import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
-import { AlertCircle, Trash2, Plus } from "lucide-react";
+import { AlertCircle, Trash2 } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import MobilePreviewFrame from "@/components/MobilePreviewFrame";
-import { ChatThreadList } from "@/components/chat/ChatThreadList";
+import ChatThreadList from "@/components/chat/ChatThreadList";
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
 import { generateThreadTitle } from "@/utils/chat/threadUtils";
@@ -26,7 +26,6 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { TranslatableText } from "@/components/translation/TranslatableText";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
 
@@ -331,16 +330,16 @@ export default function SmartChat() {
         {!hasEnoughEntries && !loading && (
           <Alert className="absolute z-10 top-4 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle><TranslatableText text="No journal entries found" /></AlertTitle>
+            <AlertTitle>No journal entries found</AlertTitle>
             <AlertDescription className="mt-2">
-              <p><TranslatableText text="The AI Assistant works best when you have journal entries to analyze. Create some journal entries to get personalized insights." /></p>
+              <p>The AI Assistant works best when you have journal entries to analyze. Create some journal entries to get personalized insights.</p>
               <Button 
                 variant="outline" 
                 size="sm" 
                 className="mt-2 border-amber-300 text-amber-800 hover:bg-amber-100"
                 onClick={() => navigate('/journal')}
               >
-                <TranslatableText text="Go to Journal" />
+                Go to Journal
               </Button>
             </AlertDescription>
           </Alert>
@@ -348,9 +347,11 @@ export default function SmartChat() {
         
         <div className="w-72 h-full border-r">
           <ChatThreadList 
-            activeThreadId={currentThreadId}
+            userId={user?.id} 
             onSelectThread={handleSelectThread}
-            onCreateThread={createNewThread}
+            onStartNewThread={createNewThread}
+            currentThreadId={currentThreadId}
+            showDeleteButtons={false}
           />
         </div>
         
@@ -375,18 +376,18 @@ export default function SmartChat() {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle><TranslatableText text="Delete this conversation?" /></AlertDialogTitle>
+            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
             <AlertDialogDescription>
-              <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
+              This will permanently delete this conversation and all its messages. This action cannot be undone.
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
+            <AlertDialogCancel>Cancel</AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
-              <TranslatableText text="Delete" />
+              Delete
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
@@ -405,16 +406,16 @@ export default function SmartChat() {
         {!hasEnoughEntries && !loading && (
           <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
             <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="text-sm"><TranslatableText text="No journal entries found" /></AlertTitle>
+            <AlertTitle className="text-sm">No journal entries found</AlertTitle>
             <AlertDescription className="mt-1 text-xs">
-              <p><TranslatableText text="Create journal entries to get personalized insights." /></p>
+              <p>Create journal entries to get personalized insights.</p>
               <Button 
                 variant="outline" 
                 size="sm" 
                 className="mt-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
                 onClick={() => navigate('/journal')}
               >
-                <TranslatableText text="Go to Journal" />
+                Go to Journal
               </Button>
             </AlertDescription>
           </Alert>

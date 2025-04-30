@@ -12,7 +12,6 @@ import SoulNetDescription from './soulnet/SoulNetDescription';
 import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import ErrorBoundary from './ErrorBoundary';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface NodeData {
   id: string;
@@ -114,15 +113,13 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   if (loading) return <LoadingState />;
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
-      <h2 className="text-xl font-semibold text-red-600 mb-4">
-        <TranslatableText text="Error Loading SoulNet" />
-      </h2>
+      <h2 className="text-xl font-semibold text-red-600 mb-4">Error Loading SoulNet</h2>
       <p className="text-muted-foreground mb-4">{error.message}</p>
       <button 
         className="px-4 py-2 bg-primary text-white rounded-md" 
         onClick={() => window.location.reload()}
       >
-        <TranslatableText text="Retry" />
+        Retry
       </button>
     </div>
   );
@@ -142,17 +139,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         <ErrorBoundary fallback={
           <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
             <div className="text-center">
-              <h3 className="text-lg font-medium">
-                <TranslatableText text="Error in SoulNet Visualization" />
-              </h3>
+              <h3 className="text-lg font-medium">Error in SoulNet Visualization</h3>
               <p className="text-muted-foreground mt-2">
-                <TranslatableText text="There was a problem rendering the visualization." />
+                There was a problem rendering the visualization.
               </p>
               <button 
                 className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
                 onClick={() => window.location.reload()}
               >
-                <TranslatableText text="Reload" />
+                Reload
               </button>
             </div>
           </div>
@@ -188,7 +183,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       
       <div className="w-full text-center mt-2 px-4 md:px-8">
         <p className="text-xs text-muted-foreground">
-          <TranslatableText text="<b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections" />
+          <b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections
         </p>
       </div>
     </div>

@@ -35,12 +35,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
 
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
-    if (currentLanguage === 'en' || !text || text.trim() === '') return text;
+    if (currentLanguage === 'en' || !text) return text;
     
     try {
-      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'en'}${entryId ? ` for entry ${entryId}` : ''}`);
+      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'} for entry ${entryId || 'unknown'}`);
       const translated = await staticTranslationService.translateText(text, sourceLanguage, entryId);
-      console.log(`Translation result: "${translated?.substring(0, 30) || 'empty'}..."`);
+      console.log(`Translation result: "${translated.substring(0, 30)}..."`);
       return translated;
     } catch (error) {
       console.error('Translation error in context:', error);
@@ -58,9 +58,6 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     try {
       // Store language preference
       localStorage.setItem('preferredLanguage', lang);
-      
-      // Clear translation cache when changing languages to prevent issues with markers
-      await translationCache.clearCache();
       
       // Update the service language
       staticTranslationService.setLanguage(lang);
@@ -83,11 +80,11 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       setTranslationProgress(50);
       setTimeout(() => {
         setTranslationProgress(100);
-        setIsTranslating(false);
       }, 300);
     } catch (error) {
       console.error('Language change error:', error);
       toast.error('Failed to change language');
+    } finally {
       setIsTranslating(false);
     }
   };

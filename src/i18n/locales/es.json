@@ -1,62 +1,91 @@
 
 {
-  "app": {
-    "name": "SOULo",
-    "tagline": "Tu Diario del Alma"
+  "navbar": {
+    "home": "Inicio",
+    "blog": "Blog",
+    "faq": "Preguntas Frecuentes",
+    "download": "Descargar",
+    "openApp": "Abrir App",
+    "tryWebApp": "Probar Web App",
+    "signIn": "Iniciar Sesión",
+    "privacy": "Privacidad"
+  },
+  "hero": {
+    "welcome": "Bienvenido a",
+    "tagline": "Tu compañero de IA personal para el bienestar emocional y la autorreflexión usando diario por VOZ",
+    "getStarted": "Comenzar",
+    "exploreMore": "Descubrir Más"
+  },
+  "features": {
+    "title": "Cómo Funciona SOULo",
+    "subtitle": "Nuestro enfoque innovador combina el diario por voz con tecnología de IA para brindarte información significativa sobre ti mismo."
+  },
+  "feature1": {
+    "title": "Diario por Voz",
+    "description": "Graba tus pensamientos con la voz y deja que SOULo los transcriba y analice automáticamente."
+  },
+  "feature2": {
+    "title": "Análisis de IA",
+    "description": "Obtén información sobre tus patrones y emociones a través del análisis avanzado de IA."
+  },
+  "feature3": {
+    "title": "Seguimiento Emocional",
+    "description": "Visualiza tu viaje emocional a lo largo del tiempo con gráficos interactivos."
+  },
+  "feature4": {
+    "title": "Asistente de IA",
+    "description": "Chatea con tu diario y obtén información personalizada de tus entradas anteriores."
+  },
+  "download": {
+    "title": "Obtén SOULo Hoy",
+    "subtitle": "Disponible en iOS y Android",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "Puedes contactarnos en cualquier momento en",
+    "rights": "Todos los derechos reservados.",
+    "privacy": "Política de Privacidad",
+    "terms": "Términos de Servicio"
+  },
+  "mainTagline": "¡Mantén un diario y captura tu día sin escribir una sola palabra!",
+  "homepage": {
+    "hero": {
+      "title": "Expresa. Reflexiona. Crece.",
+      "subtitle": "Escribir un diario debe ser tan simple como hablar. Usa tu voz y déjanos el resto.",
+      "appStore": "App Store",
+      "googlePlay": "Google Play",
+      "privacyFocused": "Centrado en la Privacidad",
+      "freeTrial": "Prueba Gratuita de 14 Días"
+    },
+    "phoneAnimation": {
+      "recording": "Grabando tu diario...",
+      "processing": "Procesando tu entrada...",
+      "insights": "Tus Ideas del Diario",
+      "viewAnalysis": "Ver análisis completo"
+    }
+  },
+  "common": {
+    "loading": "Cargando...",
+    "error": "Ocurrió un error",
+    "retry": "Reintentar",
+    "save": "Guardar",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "edit": "Editar",
+    "close": "Cerrar"
   },
   "navigation": {
     "home": "Inicio",
     "journal": "Diario",
-    "insights": "Percepciones",
-    "chat": "Chat",
-    "settings": "Configuración"
+    "insights": "Perspectivas",
+    "settings": "Configuración",
+    "chat": "Chat"
   },
-  "assistant": {
-    "name": "Ruh"
-  },
-  "chat": {
-    "newChat": "Nuevo Chat",
-    "yourMessage": "Tu mensaje...",
-    "send": "Enviar",
-    "typing": "Escribiendo...",
-    "errorOccurred": "Ocurrió un error",
-    "tryAgain": "Inténtalo de nuevo",
-    "journalEntries": "entradas de diario",
-    "moreEntries": "más entradas",
-    "unknownDate": "Fecha desconocida",
-    "chatHistory": "Historial de Chat",
-    "loadingConversation": "Cargando conversación...",
-    "howCanIHelp": "¿Cómo puedo ayudarte?",
-    "askMeAnything": "Pregúntame cualquier cosa sobre tu bienestar mental y tus entradas de diario",
-    "deleteConversation": "¿Eliminar esta conversación?",
-    "deleteWarning": "Esto eliminará permanentemente esta conversación y todos sus mensajes. Esta acción no se puede deshacer.",
-    "cancel": "Cancelar",
-    "delete": "Eliminar",
-    "processing": "Procesando...",
-    "noJournalEntries": "No se encontraron entradas de diario",
-    "createJournalEntries": "Crea entradas de diario para obtener información personalizada.",
-    "goToJournal": "Ir al Diario",
-    "analysis": "Análisis:"
-  },
-  "journal": {
-    "entry": "entrada",
-    "entries": "entradas",
-    "searchFor": "Buscar"
-  },
-  "insights": {
-    "moodTrends": "Tendencias de Ánimo",
-    "sentimentChanges": "Tus cambios de sentimiento a lo largo del tiempo",
-    "positive": "Positivo",
-    "neutral": "Neutral",
-    "negative": "Negativo", 
-    "noData": "No hay datos disponibles para este período de tiempo",
-    "soulNet": {
-      "title": "Visualización SoulNet",
-      "description": "Explora conexiones entre entidades y emociones en tu diario",
-      "loading": "Cargando visualización...",
-      "noConnections": "No se encontraron conexiones",
-      "addMore": "Agrega más entradas en tu diario para visualizar conexiones entre entidades y emociones.",
-      "dragInfo": "<b>Arrastra</b> para rotar • <b>Desplázate</b> para hacer zoom • <b>Toca/Haz clic</b> en un nodo para resaltar conexiones"
-    }
+  "auth": {
+    "signIn": "Iniciar Sesión",
+    "signOut": "Cerrar Sesión",
+    "welcome": "Bienvenido de nuevo",
+    "googleSignIn": "Iniciar sesión con Google"
   }
 }

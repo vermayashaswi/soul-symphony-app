@@ -1,62 +1,102 @@
 
 {
-  "app": {
-    "name": "SOULo",
-    "tagline": "Your Soulful Journal"
+  "common": {
+    "loading": "Loading...",
+    "error": "An error occurred",
+    "retry": "Retry",
+    "save": "Save",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "edit": "Edit",
+    "close": "Close"
   },
   "navigation": {
     "home": "Home",
     "journal": "Journal",
     "insights": "Insights",
-    "chat": "Chat",
-    "settings": "Settings"
+    "settings": "Settings",
+    "chat": "Chat"
   },
-  "assistant": {
-    "name": "Ruh"
-  },
-  "chat": {
-    "newChat": "New Chat",
-    "yourMessage": "Your message...",
-    "send": "Send",
-    "typing": "Typing...",
-    "errorOccurred": "An error occurred",
-    "tryAgain": "Try again",
-    "journalEntries": "journal entries",
-    "moreEntries": "more entries",
-    "unknownDate": "Unknown date",
-    "chatHistory": "Chat History",
-    "loadingConversation": "Loading conversation...",
-    "howCanIHelp": "How can I help you?",
-    "askMeAnything": "Ask me anything about your mental well-being and journal entries",
-    "deleteConversation": "Delete this conversation?",
-    "deleteWarning": "This will permanently delete this conversation and all its messages. This action cannot be undone.",
-    "cancel": "Cancel",
-    "delete": "Delete",
-    "processing": "Processing...",
-    "noJournalEntries": "No journal entries found",
-    "createJournalEntries": "Create journal entries to get personalized insights.",
-    "goToJournal": "Go to Journal",
-    "analysis": "Analysis:"
+  "auth": {
+    "signIn": "Sign In",
+    "signOut": "Sign Out",
+    "welcome": "Welcome back",
+    "googleSignIn": "Sign in with Google"
   },
   "journal": {
-    "entry": "entry",
-    "entries": "entries",
-    "searchFor": "Search for"
+    "title": "{{name}}'s Journal",
+    "possessiveTitle": "{{name}}' Journal",
+    "defaultTitle": "Your Journal",
+    "empty": {
+      "title": "Welcome to Voice Journaling",
+      "description": "Just speak and we'll do the rest. Your personal AI journaling companion is ready.",
+      "startButton": "Start Journaling"
+    }
   },
   "insights": {
-    "moodTrends": "Mood Trends",
-    "sentimentChanges": "Your sentiment changes over time",
-    "positive": "Positive",
-    "neutral": "Neutral",
-    "negative": "Negative",
-    "noData": "No data available for this timeframe",
-    "soulNet": {
+    "soulnet": {
       "title": "SoulNet Visualization",
-      "description": "Explore connections between entities and emotions in your journal",
-      "loading": "Loading visualization...",
-      "noConnections": "No connections found",
-      "addMore": "Add more journal entries to visualize connections between entities and emotions in your journaling.",
-      "dragInfo": "<b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections"
+      "description": "Explore the connections between people, places, and emotions in your journal entries. The visualization shows how different entities in your life relate to various emotional states.",
+      "empty": {
+        "title": "No entity-emotion data available",
+        "description": "Continue journaling to see the connections between entities and emotions in your life.",
+        "button": "Go to Journal"
+      }
+    },
+    "moodChart": {
+      "title": "Mood Analysis",
+      "description": "Track your emotional journey over time",
+      "empty": "Start journaling to see your mood patterns"
+    }
+  },
+  "chat": {
+    "placeholder": "Type your message...",
+    "send": "Send",
+    "newChat": "New Chat",
+    "empty": {
+      "title": "Start a Conversation",
+      "description": "Ask me anything about your journal insights"
+    }
+  },
+  "settings": {
+    "title": "Settings",
+    "profile": "Profile",
+    "language": "Language",
+    "theme": "Theme",
+    "notifications": "Notifications",
+    "privacy": "Privacy",
+    "about": "About"
+  },
+  "footer": {
+    "contact": "Contact us at",
+    "rights": "All rights reserved",
+    "privacy": "Privacy Policy",
+    "terms": "Terms of Service"
+  },
+  "navbar": {
+    "home": "Home",
+    "blog": "Blog",
+    "faq": "FAQ",
+    "privacy": "Privacy"
+  },
+  "download": {
+    "appStore": "Download on App Store",
+    "googlePlay": "Get it on Google Play"
+  },
+  "homepage": {
+    "hero": {
+      "title": "Express. Reflect. Grow.",
+      "subtitle": "Journaling should be as simple as talking. Use voice and leave the rest to us.",
+      "appStore": "App Store",
+      "googlePlay": "Google Play",
+      "privacyFocused": "Privacy-Focused",
+      "freeTrial": "14-Day Free Trial"
+    },
+    "phoneAnimation": {
+      "recording": "Recording your journal...",
+      "processing": "Processing your entry...",
+      "insights": "Your Journal Insights",
+      "viewAnalysis": "View full analysis"
     }
   }
 }

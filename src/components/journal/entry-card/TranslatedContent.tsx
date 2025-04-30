@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { LoadingEntryContent } from './LoadingEntryContent';
 
@@ -14,7 +13,6 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
   const [translatedContent, setTranslatedContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const { currentLanguage, translate } = useTranslation();
-  const prevLanguageRef = useRef<string>(currentLanguage);
 
   // Function to handle translation
   const handleTranslation = async () => {
@@ -26,8 +24,7 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
         // Always keep the original content initially
         setTranslatedContent(content);
         // Pass the detected language and entryId to the translation service
-        // Use "en" as default source language when none is provided
-        const translated = await translate(content, language || "en", entryId);
+        const translated = await translate(content, language, entryId);
         if (translated) {
           setTranslatedContent(translated);
         }
@@ -42,10 +39,6 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
 
   // Effect to translate content when it changes or language changes
   useEffect(() => {
-    // Update the ref with current language
-    prevLanguageRef.current = currentLanguage;
-    
-    // Handle translation
     handleTranslation();
   }, [content, currentLanguage, language, entryId]);
 
@@ -54,13 +47,8 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
     const handleLanguageChange = () => {
       // First set to original content to ensure visibility
       setTranslatedContent(content);
-      
-      // Only retranslate if the language has actually changed
-      if (prevLanguageRef.current !== currentLanguage) {
-        prevLanguageRef.current = currentLanguage;
-        // Then retranslate
-        handleTranslation();
-      }
+      // Then retranslate
+      handleTranslation();
     };
     
     window.addEventListener('languageChange', handleLanguageChange as EventListener);
@@ -68,7 +56,7 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [content, language, entryId, currentLanguage]);
+  }, [content, language, entryId]);
 
   return (
     <div>

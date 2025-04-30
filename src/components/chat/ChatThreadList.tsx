@@ -1,70 +1,52 @@
-
-import React, { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { Button } from "@/components/ui/button";
-import { Separator } from "@/components/ui/separator";
-import { Pencil, Check, X, Plus, Loader2 } from "lucide-react";
-import { Input } from "@/components/ui/input";
-import { TranslatableText } from "@/components/translation/TranslatableText";
-import { getUserChatThreads, updateThreadTitle } from "@/services/chat/threadService";
-import { useAuth } from "@/contexts/AuthContext";
+import React, { useState, useEffect } from 'react';
+import { ChatThread, getUserChatThreads } from '@/services/chat';
+import { Plus, MessageCircle, Loader2 } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { cn } from '@/lib/utils';
 
 interface ChatThreadListProps {
-  activeThreadId: string | null;
+  userId?: string;
   onSelectThread: (threadId: string) => void;
-  onCreateThread?: () => void;
-  showHeader?: boolean;
+  onStartNewThread: () => Promise<string | null>;
+  currentThreadId: string | null;
+  showDeleteButtons?: boolean;
+  newChatButtonWidth?: 'full' | 'half';
 }
 
-// Helper function to translate chat strings
-export function translateChatString(text: string): string {
-  // This is a placeholder function that will be replaced with actual translation logic
-  return text;
-}
-
-export const ChatThreadList: React.FC<ChatThreadListProps> = ({
-  activeThreadId,
+const ChatThreadList: React.FC<ChatThreadListProps> = ({
+  userId,
   onSelectThread,
-  onCreateThread,
-  showHeader = true,
+  onStartNewThread,
+  currentThreadId,
+  showDeleteButtons = true,
+  newChatButtonWidth = 'full'
 }) => {
-  const [threads, setThreads] = useState<any[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
-  const [editedTitle, setEditedTitle] = useState("");
-  const { user } = useAuth();
+  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [creatingThread, setCreatingThread] = useState(false);
   
-  // Load threads when component mounts or user changes
   useEffect(() => {
     const loadThreads = async () => {
-      if (!user?.id) {
+      if (!userId) {
         setThreads([]);
-        setIsLoading(false);
+        setLoading(false);
         return;
       }
       
-      setIsLoading(true);
+      setLoading(true);
       try {
-        const threadsData = await getUserChatThreads(user.id);
-        setThreads(threadsData);
+        const threads = await getUserChatThreads(userId);
+        setThreads(threads);
       } catch (error) {
-        console.error("Error loading threads:", error);
+        console.error("Error loading chat threads:", error);
       } finally {
-        setIsLoading(false);
+        setLoading(false);
       }
     };
     
     loadThreads();
     
-    // Listen for thread selection events
-    const handleThreadSelected = (event: any) => {
-      if (event.detail?.threadId) {
-        // Update the active thread in the list
-      }
-    };
-    
-    // Listen for thread title updates
-    const handleThreadTitleUpdated = (event: any) => {
+    const handleThreadTitleUpdate = (event: CustomEvent) => {
       if (event.detail?.threadId && event.detail?.title) {
         setThreads(prevThreads => 
           prevThreads.map(thread => 
@@ -76,163 +58,80 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
       }
     };
     
-    window.addEventListener('threadSelected', handleThreadSelected);
-    window.addEventListener('threadTitleUpdated', handleThreadTitleUpdated);
-    
-    // Set up real-time subscription for thread updates if user exists
-    let subscription: any;
-    if (user?.id) {
-      subscription = supabase
-        .channel(`threads_for_${user.id}`)
-        .on('postgres_changes', {
-          event: '*',
-          schema: 'public',
-          table: 'chat_threads',
-          filter: `user_id=eq.${user.id}`
-        }, () => {
-          loadThreads();
-        })
-        .subscribe();
-    }
+    window.addEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
     
     return () => {
-      window.removeEventListener('threadSelected', handleThreadSelected);
-      window.removeEventListener('threadTitleUpdated', handleThreadTitleUpdated);
-      if (subscription) {
-        supabase.removeChannel(subscription);
-      }
+      window.removeEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
     };
-  }, [user?.id]);
+  }, [userId]);
   
-  const handleEditStart = (thread: any) => {
-    setEditingThreadId(thread.id);
-    setEditedTitle(thread.title);
-  };
-  
-  const handleEditCancel = () => {
-    setEditingThreadId(null);
-    setEditedTitle("");
-  };
-  
-  const handleEditSave = async (threadId: string) => {
-    if (!editedTitle.trim()) return;
+  const handleStartNewThread = async () => {
+    if (!userId) return;
     
+    setCreatingThread(true);
     try {
-      const success = await updateThreadTitle(threadId, editedTitle.trim());
-      if (success) {
-        setThreads(prevThreads =>
-          prevThreads.map(thread =>
-            thread.id === threadId
-              ? { ...thread, title: editedTitle.trim() }
-              : thread
-          )
-        );
-        
-        // Dispatch event for other components to listen to
-        window.dispatchEvent(
-          new CustomEvent('threadTitleUpdated', { 
-            detail: { threadId, title: editedTitle.trim() } 
-          })
-        );
+      const newThreadId = await onStartNewThread();
+      if (newThreadId) {
+        const updatedThreads = await getUserChatThreads(userId);
+        setThreads(updatedThreads);
       }
     } catch (error) {
-      console.error("Error updating thread title:", error);
+      console.error("Error creating new thread:", error);
+    } finally {
+      setCreatingThread(false);
     }
-    
-    setEditingThreadId(null);
-    setEditedTitle("");
   };
-
+  
   return (
     <div className="h-full flex flex-col">
-      {showHeader && (
-        <div className="p-2 border-b flex items-center justify-between">
-          <Button 
-            className="flex items-center gap-1"
-            onClick={onCreateThread}
-            size="sm"
-          >
-            <Plus className="h-4 w-4" />
-            <TranslatableText text="New Chat" />
-          </Button>
-        </div>
-      )}
+      <div className="p-4 border-b">
+        <Button 
+          onClick={handleStartNewThread}
+          className={cn(
+            newChatButtonWidth === 'full' ? "w-full" : "w-1/2", 
+            "px-4 py-2 flex items-center justify-center gap-2 rounded-md"
+          )}
+          disabled={creatingThread}
+        >
+          {creatingThread ? (
+            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+          ) : (
+            <Plus className="h-4 w-4 mr-2" />
+          )}
+          New Chat
+        </Button>
+      </div>
       
-      <div className="flex-1 overflow-y-auto p-2">
-        {isLoading ? (
+      <div className="flex-1 overflow-y-auto">
+        {loading ? (
           <div className="flex justify-center p-4">
             <Loader2 className="h-6 w-6 animate-spin text-primary" />
           </div>
         ) : threads.length === 0 ? (
-          <div className="text-center p-4 text-sm text-muted-foreground">
-            <TranslatableText text="No conversations yet" />
+          <div className="p-4 text-center text-muted-foreground">
+            No conversations yet
           </div>
         ) : (
-          <div className="space-y-0.5">
-            {threads.map((thread) => (
-              <div
-                key={thread.id}
-                className={`group px-2 py-2 rounded-md transition-colors ${
-                  activeThreadId === thread.id
-                    ? "bg-primary/10 text-primary"
-                    : "hover:bg-muted/60"
-                }`}
-              >
-                {editingThreadId === thread.id ? (
-                  <div className="flex items-center gap-1">
-                    <Input
-                      value={editedTitle}
-                      onChange={(e) => setEditedTitle(e.target.value)}
-                      autoFocus
-                      className="h-8 text-sm"
-                      onKeyDown={(e) => {
-                        if (e.key === 'Enter') handleEditSave(thread.id);
-                        if (e.key === 'Escape') handleEditCancel();
-                      }}
-                    />
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6"
-                      onClick={() => handleEditSave(thread.id)}
-                    >
-                      <Check className="h-4 w-4" />
-                    </Button>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6"
-                      onClick={handleEditCancel}
-                    >
-                      <X className="h-4 w-4" />
-                    </Button>
-                  </div>
-                ) : (
-                  <div 
-                    className="flex items-center justify-between cursor-pointer"
-                    onClick={() => onSelectThread(thread.id)}
-                  >
-                    <div className="flex-1 truncate text-sm font-medium">
-                      <TranslatableText text={thread.title} />
-                    </div>
-                    <Button
-                      size="icon"
-                      variant="ghost"
-                      className="h-6 w-6 opacity-0 group-hover:opacity-100"
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleEditStart(thread);
-                      }}
-                    >
-                      <Pencil className="h-3 w-3" />
-                    </Button>
-                  </div>
-                )}
-              </div>
+          <ul className="space-y-1 p-2">
+            {threads.map(thread => (
+              <li key={thread.id}>
+                <button 
+                  className={cn(
+                    "w-full text-left px-3 py-2 rounded-md flex items-start hover:bg-secondary/50 transition-colors",
+                    currentThreadId === thread.id ? "bg-secondary" : ""
+                  )}
+                  onClick={() => onSelectThread(thread.id)}
+                >
+                  <MessageCircle className="h-4 w-4 mr-2 mt-1 flex-shrink-0" />
+                  <span className="text-sm line-clamp-2">{thread.title}</span>
+                </button>
+              </li>
             ))}
-          </div>
+          </ul>
         )}
       </div>
     </div>
   );
 };
+
+export default ChatThreadList;

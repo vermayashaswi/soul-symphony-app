@@ -5,32 +5,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 const Chat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { translate } = useTranslation();
-
-  // Translate the app name to initialize the language support
-  useEffect(() => {
-    const initializeLanguageSupport = async () => {
-      if (translate) {
-        try {
-          // Pre-translate common chat-related strings
-          await translate("New Chat", "en");
-          await translate("Ruh", "en");
-          await translate("Your message...", "en");
-          await translate("Send", "en");
-        } catch (e) {
-          console.error("Error pre-translating chat strings:", e);
-        }
-      }
-    };
-    
-    initializeLanguageSupport();
-  }, [translate]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
@@ -76,12 +55,11 @@ const Chat = () => {
       .mobile-chat-input-container {
         padding-bottom: calc(env(safe-area-inset-bottom, 16px) + 5px);
         z-index: 9999;
-        bottom: 3.6rem !important; /* Adjusted to match the new navbar height */
       }
       
       /* Add extra padding to chat area to prevent content from being hidden */
       .chat-messages-container {
-        padding-bottom: 100px;
+        padding-bottom: 90px;
       }
       
       /* Ensure keyboard doesn't obscure input */
@@ -89,17 +67,6 @@ const Chat = () => {
         position: sticky !important; 
         bottom: 0 !important;
         z-index: 9999 !important;
-      }
-      
-      /* Make sidebar header compact */
-      .sheet-header {
-        padding: 12px !important;
-        margin-bottom: 0 !important;
-      }
-      
-      /* Reduce space after sidebar header */
-      .sheet-content .mt-5 {
-        margin-top: 0.5rem !important;
       }
     `;
     document.head.appendChild(style);

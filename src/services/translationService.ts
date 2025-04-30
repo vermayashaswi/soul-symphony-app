@@ -7,7 +7,7 @@ interface TranslationRequest {
   text: string;
   sourceLanguage?: string;
   targetLanguage: string;
-  entryId?: number;
+  entryId?: number; // Added entryId parameter
 }
 
 interface BatchTranslationRequest {
@@ -21,11 +21,6 @@ export class TranslationService {
   
   static async translateText(request: TranslationRequest): Promise<string> {
     try {
-      // Skip empty or whitespace-only strings
-      if (!request.text || request.text.trim() === '') {
-        return request.text;
-      }
-      
       // Check cache first
       const cached = await translationCache.getTranslation(request.text, request.targetLanguage);
       if (cached) {
@@ -38,18 +33,13 @@ export class TranslationService {
           text: request.text,
           sourceLanguage: request.sourceLanguage,
           targetLanguage: request.targetLanguage,
-          entryId: request.entryId // This is now optional
+          entryId: request.entryId // Pass entryId to edge function
         },
       });
 
       if (error) {
         console.error('Translation error:', error);
         toast.error('Translation failed. Falling back to original text.');
-        return request.text;
-      }
-
-      if (!data || !data.translatedText) {
-        console.error('Translation response missing translatedText:', data);
         return request.text;
       }
 
@@ -74,15 +64,8 @@ export class TranslationService {
     const results = new Map<string, string>();
     const needsTranslation: string[] = [];
 
-    // Filter out empty strings
-    const validTexts = request.texts.filter(text => text && text.trim() !== '');
-    
-    if (validTexts.length === 0) {
-      return results;
-    }
-
     // Check cache first for all texts
-    for (const text of validTexts) {
+    for (const text of request.texts) {
       const cached = await translationCache.getTranslation(text, request.targetLanguage);
       if (cached) {
         results.set(text, cached.translatedText);
@@ -104,23 +87,18 @@ export class TranslationService {
 
         if (error) throw error;
 
-        if (data && data.translatedTexts && Array.isArray(data.translatedTexts)) {
-          // Cache and store results
-          batch.forEach((text, index) => {
-            const translatedText = data.translatedTexts[index];
-            results.set(text, translatedText);
-            translationCache.setTranslation({
-              originalText: text,
-              translatedText,
-              language: request.targetLanguage,
-              timestamp: Date.now(),
-              version: 1,
-            });
+        // Cache and store results
+        batch.forEach((text, index) => {
+          const translatedText = data.translatedTexts[index];
+          results.set(text, translatedText);
+          translationCache.setTranslation({
+            originalText: text,
+            translatedText,
+            language: request.targetLanguage,
+            timestamp: Date.now(),
+            version: 1,
           });
-        } else {
-          console.error('Invalid response format for batch translation:', data);
-          batch.forEach(text => results.set(text, text)); // Fallback to original text
-        }
+        });
       } catch (error) {
         console.error('Batch translation error:', error);
         batch.forEach(text => results.set(text, text)); // Fallback to original text
