@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -23,7 +22,6 @@ const Home = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [journalLabel, setJournalLabel] = useState("Journal");
   const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
-  const [translatedDate, setTranslatedDate] = useState<string>("");
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
@@ -34,7 +32,6 @@ const Home = () => {
       if (translate) {
         setJournalLabel(await translate("Journal", "en"));
         setYourJournalLabel(await translate("Your Journal", "en"));
-        setTranslatedDate(await translate(formattedDate, "en"));
       }
     };
     
@@ -47,7 +44,6 @@ const Home = () => {
       if (translate) {
         setJournalLabel(await translate("Journal", "en"));
         setYourJournalLabel(await translate("Your Journal", "en"));
-        setTranslatedDate(await translate(formattedDate, "en"));
       }
     };
     
@@ -56,7 +52,7 @@ const Home = () => {
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [translate, formattedDate]);
+  }, [translate]);
 
   useEffect(() => {
     const preloadImage = new Image();
@@ -196,7 +192,7 @@ const Home = () => {
                   MozOsxFontSmoothing: 'grayscale'
                 }}
               >
-                <TranslatableText text={getJournalName()} />
+                <TranslatableText text={getJournalName()} forceTranslate={true} />
               </h1>
             </div>
 
@@ -216,7 +212,8 @@ const Home = () => {
                     MozOsxFontSmoothing: 'grayscale'
                   }}
                 >
-                  {translatedDate || formattedDate}
+                  {/* Always force translate the date */}
+                  <TranslatableText text={formattedDate} forceTranslate={true} />
                 </div>
               </motion.div>
               <div className="ml-2 relative z-[1000] pointer-events-auto">

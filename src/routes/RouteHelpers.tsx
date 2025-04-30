@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,15 +7,33 @@ export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
-// Update the path-based check to be more comprehensive
+// Update the path-based check to be more comprehensive and accurate
 export const isAppRoute = (pathname: string): boolean => {
-  const appRoutes = ['/app', '/journal', '/chat', '/insights', '/settings', '/auth', '/profile'];
-  // Check if the pathname starts with any of these routes or is exactly one of them
-  return appRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`));
+  // More specific matching to ensure we catch all app routes
+  // Add / and /app as exact matches, and handle all paths that start with /app/ properly
+  if (pathname === "/" || pathname === "/app") return true;
+  
+  // Check for specific app routes including paths under /app
+  const appPrefixes = ['/app/', '/journal', '/chat', '/insights', '/settings', '/auth', '/profile'];
+  return appPrefixes.some(prefix => 
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  );
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
-  return !isAppRoute(pathname);
+  // Only consider true website routes like /about, /pricing, etc.
+  const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact'];
+  
+  // For the root path (/), consider it an app route for translation purposes
+  if (pathname === "/" || pathname === "/app") return false;
+  
+  // If it has an app prefix, it's not a website route
+  if (isAppRoute(pathname)) return false;
+  
+  // Check for specific website routes
+  return websitePrefixes.some(prefix => 
+    pathname === prefix || pathname.startsWith(`${prefix}/`)
+  ) || (!isAppRoute(pathname) && pathname !== "/");
 };
 
 export const getBaseUrl = (): string => {

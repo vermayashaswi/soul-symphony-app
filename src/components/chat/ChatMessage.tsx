@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -51,7 +50,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
             loading="eager"
           />
           <AvatarFallback className="bg-primary/10 text-primary">
-            <TranslatableText text="R" />
+            <TranslatableText text="R" forceTranslate={true} />
           </AvatarFallback>
         </Avatar>
       )}
@@ -63,9 +62,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
             ? 'bg-primary text-primary-foreground rounded-tr-none' 
             : 'bg-muted/60 border border-border/50 rounded-tl-none'
         )}
+        data-role={message.role}
       >
         {message.role === 'assistant' ? (
-          <TranslatableMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none">
+          <TranslatableMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none" forceTranslate={true}>
             {formattedContent}
           </TranslatableMarkdown>
         ) : (
@@ -76,15 +76,15 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
           <div className="mt-3 text-xs md:text-sm opacity-80">
             <Separator className="my-2" />
             <div className="font-semibold">
-              <TranslatableText text="Analysis:" />
+              <TranslatableText text="Analysis:" forceTranslate={true} />
             </div>
             <p>
-              <TranslatableText text={message.analysis.analysis} />
+              <TranslatableText text={message.analysis.analysis} forceTranslate={true} />
             </p>
             {message.analysis.requiresSql && (
               <>
                 <div className="font-semibold mt-1">
-                  <TranslatableText text="SQL Query:" />
+                  <TranslatableText text="SQL Query:" forceTranslate={true} />
                 </div>
                 <pre className={`${isMobile ? 'text-[10px]' : 'text-xs'} bg-black/10 p-1 rounded overflow-x-auto`}>
                   {message.analysis.sqlQuery}
@@ -107,6 +107,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
               <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" />
               <TranslatableText 
                 text={`${message.references.length} journal entries`}
+                forceTranslate={true}
               />
               {showReferences ? (
                 <ChevronUp className="h-3 w-3 md:h-4 md:w-4 ml-1" />
@@ -128,10 +129,10 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                       <div className="font-medium text-xs md:text-sm">
                         {ref.date && !isNaN(new Date(ref.date).getTime())
                           ? formatShortDate(new Date(ref.date))
-                          : <TranslatableText text="Unknown date" />}
+                          : <TranslatableText text="Unknown date" forceTranslate={true} />}
                       </div>
                       <div className="text-muted-foreground text-xs">
-                        <TranslatableText text={ref.snippet} />
+                        <TranslatableText text={ref.snippet} forceTranslate={true} />
                       </div>
                     </div>
                   ))}
@@ -139,6 +140,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                     <div className="text-xs text-muted-foreground">
                       <TranslatableText 
                         text={`+${message.references.length - (isMobile ? 2 : 3)} more entries`}
+                        forceTranslate={true}
                       />
                     </div>
                   )}
@@ -168,6 +170,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
   );
 };
 
+// Extracted this function to keep the main component cleaner
 const renderDiagnostics = (diagnostics: any, isMobile: boolean) => {
   if (!diagnostics) return null;
   
@@ -175,40 +178,40 @@ const renderDiagnostics = (diagnostics: any, isMobile: boolean) => {
     <div className="mt-3 text-xs">
       <Separator className="my-2" />
       <div className="font-semibold">
-        <TranslatableText text="Query Diagnostics:" />
+        <TranslatableText text="Query Diagnostics:" forceTranslate={true} />
       </div>
       <div className={`max-h-40 md:max-h-60 overflow-y-auto mt-1 bg-slate-800 p-2 rounded text-slate-200 ${isMobile ? 'text-[9px]' : 'text-xs'}`}>
         {diagnostics.query_plan && (
           <div>
             <div className="font-medium">
-              <TranslatableText text="Sample Answer:" />
+              <TranslatableText text="Sample Answer:" forceTranslate={true} />
             </div>
             <div className="text-xs whitespace-pre-wrap mb-2">{diagnostics.query_plan.sample_answer}</div>
             
             {!isMobile && (
               <>
                 <div className="font-medium">
-                  <TranslatableText text="Execution Plan:" />
+                  <TranslatableText text="Execution Plan:" forceTranslate={true} />
                 </div>
                 {diagnostics.query_plan.execution_plan.map((segment: any, idx: number) => (
                   <div key={idx} className="mb-2 border-l-2 border-blue-500 pl-2">
                     <div><span className="font-medium">
-                      <TranslatableText text="Segment:" />
+                      <TranslatableText text="Segment:" forceTranslate={true} />
                     </span> {segment.segment}</div>
                     <div><span className="font-medium">
-                      <TranslatableText text="Type:" />
+                      <TranslatableText text="Type:" forceTranslate={true} />
                     </span> {segment.segment_type}</div>
                     {segment.sql_query && (
                       <div>
                         <span className="font-medium">
-                          <TranslatableText text="SQL:" />
+                          <TranslatableText text="SQL:" forceTranslate={true} />
                         </span>
                         <pre className="text-xs overflow-x-auto">{segment.sql_query}</pre>
                       </div>
                     )}
                     {segment.vector_search && (
                       <div><span className="font-medium">
-                        <TranslatableText text="Vector Search:" />
+                        <TranslatableText text="Vector Search:" forceTranslate={true} />
                       </span> {segment.vector_search}</div>
                     )}
                   </div>
@@ -221,24 +224,24 @@ const renderDiagnostics = (diagnostics: any, isMobile: boolean) => {
         {!isMobile && diagnostics.execution_results && (
           <div className="mt-2">
             <div className="font-medium">
-              <TranslatableText text="Execution Results:" />
+              <TranslatableText text="Execution Results:" forceTranslate={true} />
             </div>
             {diagnostics.execution_results.execution_results.map((result: any, idx: number) => (
               <div key={idx} className="mb-2 border-l-2 border-green-500 pl-2">
                 <div><span className="font-medium">
-                  <TranslatableText text="Segment:" />
+                  <TranslatableText text="Segment:" forceTranslate={true} />
                 </span> {result.segment}</div>
                 <div><span className="font-medium">
-                  <TranslatableText text="Type:" />
+                  <TranslatableText text="Type:" forceTranslate={true} />
                 </span> {result.type}</div>
                 {result.error ? (
                   <div className="text-red-400"><span className="font-medium">
-                    <TranslatableText text="Error:" />
+                    <TranslatableText text="Error:" forceTranslate={true} />
                   </span> {result.error}</div>
                 ) : (
                   <div>
                     <span className="font-medium">
-                      <TranslatableText text="Result:" />
+                      <TranslatableText text="Result:" forceTranslate={true} />
                     </span>
                     <pre className="text-xs overflow-x-auto">{JSON.stringify(result.result, null, 2)}</pre>
                   </div>

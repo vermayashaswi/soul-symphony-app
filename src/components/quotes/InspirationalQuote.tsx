@@ -7,7 +7,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { staticTranslationService } from '@/services/staticTranslationService';
 
 interface QuoteItem {
   quote: string;
@@ -21,15 +20,17 @@ export const InspirationalQuote: React.FC = () => {
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState<number>(0);
   const [isReady, setIsReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
+  const [isTranslating, setIsTranslating] = useState<boolean>(false);
   const { ref, inView } = useInView({
     triggerOnce: false,
     threshold: 0.1,
   });
   const { colorTheme } = useTheme();
-  const { currentLanguage } = useTranslation();
+  const { currentLanguage, translate } = useTranslation();
   const rotationIntervalRef = useRef<number | null>(null);
   const isTranslatingRef = useRef<boolean>(false);
   const languageRef = useRef<string>(currentLanguage);
+  const rotationPausedRef = useRef<boolean>(false);
 
   useEffect(() => {
     // Set a default quote immediately for visibility testing
@@ -80,7 +81,7 @@ export const InspirationalQuote: React.FC = () => {
     }
   };
 
-  // Setup quote rotation
+  // Setup quote rotation with translation protection
   const setupQuoteRotation = () => {
     // Clear existing interval if any
     if (rotationIntervalRef.current !== null) {
@@ -91,21 +92,25 @@ export const InspirationalQuote: React.FC = () => {
     // Only setup rotation if we have quotes
     if (quotes.length > 0) {
       rotationIntervalRef.current = window.setInterval(() => {
-        // Skip rotation if currently translating
-        if (isTranslatingRef.current) return;
+        // Skip rotation if currently translating or rotation is paused
+        if (isTranslatingRef.current || rotationPausedRef.current) {
+          console.log('Quote rotation skipped - translation in progress or rotation paused');
+          return;
+        }
         
         setCurrentQuoteIndex((prevIndex) => {
           const newIndex = (prevIndex + 1) % quotes.length;
           
           const nextQuote = quotes[newIndex];
           if (nextQuote) {
+            console.log(`Quote rotating to index ${newIndex}: "${nextQuote.quote.substring(0, 30)}..."`);
             setQuote(nextQuote.quote);
             setAuthor(nextQuote.author || 'Unknown');
           }
           
           return newIndex;
         });
-      }, 7000);
+      }, 10000); // Increased from 7 seconds to 10 seconds to give more time for translations
     }
   };
 
@@ -145,21 +150,38 @@ export const InspirationalQuote: React.FC = () => {
     };
   }, [inView]);
 
-  // Handle language change
+  // Handle language change - pause rotation during translation
   useEffect(() => {
     if (languageRef.current !== currentLanguage) {
-      console.log(`Language changed to ${currentLanguage}, need to update quotes`);
+      console.log(`Language changed to ${currentLanguage}, pausing quote rotation`);
+      rotationPausedRef.current = true;
       languageRef.current = currentLanguage;
+      
+      // Resume rotation after a delay to allow translations to complete
+      setTimeout(() => {
+        console.log('Resuming quote rotation after language change');
+        rotationPausedRef.current = false;
+      }, 3000);
     }
   }, [currentLanguage]);
 
   // Listen for language change events
   useEffect(() => {
     const handleLanguageChangeEvent = () => {
-      // Force refresh
+      // Pause rotation during language change
+      console.log('Language change event detected, pausing quote rotation');
+      rotationPausedRef.current = true;
+      
+      // Update language reference
       if (languageRef.current !== currentLanguage) {
         languageRef.current = currentLanguage;
       }
+      
+      // Resume rotation after a delay
+      setTimeout(() => {
+        console.log('Resuming quote rotation after language change event');
+        rotationPausedRef.current = false;
+      }, 3000);
     };
     
     window.addEventListener('languageChange', handleLanguageChangeEvent as EventListener);
@@ -182,6 +204,15 @@ export const InspirationalQuote: React.FC = () => {
       }
     };
   }, [quotes]);
+
+  // Setup translation tracking
+  const handleTranslationStart = () => {
+    isTranslatingRef.current = true;
+  };
+
+  const handleTranslationEnd = () => {
+    isTranslatingRef.current = false;
+  };
 
   if (!isReady && !error) {
     return null;
@@ -206,11 +237,21 @@ export const InspirationalQuote: React.FC = () => {
               <Quote className="h-6 w-6 text-theme opacity-100" />
             </div>
             <p className="text-foreground text-center text-lg font-medium italic mb-1">
-              <TranslatableText text={`"${quote}"`} />
+              <TranslatableText 
+                text={`"${quote}"`} 
+                forceTranslate={true}
+                onTranslationStart={handleTranslationStart}
+                onTranslationEnd={handleTranslationEnd}
+              />
             </p>
             {author && (
               <p className="text-theme text-center font-bold text-sm">
-                <TranslatableText text={`— ${author}`} />
+                <TranslatableText 
+                  text={`— ${author}`}
+                  forceTranslate={true}
+                  onTranslationStart={handleTranslationStart}
+                  onTranslationEnd={handleTranslationEnd}
+                />
               </p>
             )}
           </motion.div>
