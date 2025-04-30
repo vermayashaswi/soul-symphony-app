@@ -3,87 +3,95 @@ import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/b
 
 /**
  * Transcribe audio using OpenAI's Whisper API
- * @param audioBlob The audio blob to transcribe
- * @param fileExtension The file extension (e.g., 'webm', 'mp3')
- * @param apiKey OpenAI API key
- * @param language Language code or 'auto' for automatic detection
+ * @param audioBlob - The audio blob to transcribe
+ * @param fileType - The audio file type (webm, mp4, wav, etc.)
+ * @param apiKey - The OpenAI API key
+ * @param language - The language code or 'auto' for auto-detection
  * @returns Transcribed text and detected languages
  */
 export async function transcribeAudioWithWhisper(
   audioBlob: Blob,
-  fileExtension: string,
+  fileType: string,
   apiKey: string,
   language: string = 'auto'
 ): Promise<{ text: string; detectedLanguages: string[] }> {
   try {
-    console.log("[Transcription] Preparing audio for OpenAI:", { 
-      blobSize: audioBlob.size, 
-      blobType: audioBlob.type, 
-      fileExtension 
-    });
+    // Determine the appropriate filename extension based on audio type
+    const fileExtension = fileType === 'webm' ? 'webm' : 
+                         fileType === 'mp4' ? 'm4a' :
+                         fileType === 'wav' ? 'wav' : 'ogg';
     
-    // Generate a valid filename with the correct extension
+    // Prepare the audio file with an appropriate name for the OpenAI API
     const filename = `audio.${fileExtension}`;
     console.log("[Transcription] Using filename:", filename);
     
-    // Create form data for the API request
-    const formData = new FormData();
-    formData.append("file", audioBlob, filename);
-    formData.append("model", "gpt-4o-transcribe"); // Updated from gpt-4o-mini-transcribe to gpt-4o-transcribe
+    // Convert the blob to an ArrayBuffer
+    const arrayBuffer = await audioBlob.arrayBuffer();
+    const audioBytes = new Uint8Array(arrayBuffer);
     
-    // Set language parameter if provided
-    if (language && language !== 'auto') {
+    console.log("[Transcription] Preparing audio for OpenAI:", {
+      blobSize: audioBlob.size,
+      blobType: audioBlob.type,
+      fileExtension
+    });
+    
+    // Create form data to send to the OpenAI API
+    const formData = new FormData();
+    formData.append("file", new Blob([audioBytes], { type: audioBlob.type }), filename);
+    formData.append("model", "gpt-4o-mini-transcribe"); // Corrected model name
+    
+    // Only add language parameter if it's not 'auto'
+    if (language !== 'auto') {
       formData.append("language", language);
     }
-    
-    // Set response format to JSON
-    formData.append("response_format", "verbose_json");
     
     console.log("[Transcription] Sending request to OpenAI with:", {
       fileSize: audioBlob.size,
       fileType: audioBlob.type,
       fileExtension,
       hasApiKey: !!apiKey,
-      model: "gpt-4o-transcribe", // Updated model name
+      model: "gpt-4o-mini-transcribe", // Corrected model name
       autoLanguageDetection: language === 'auto'
     });
     
-    // Make the API request
+    // Call the OpenAI API for transcription
     const response = await fetch("https://api.openai.com/v1/audio/transcriptions", {
       method: "POST",
       headers: {
-        Authorization: `Bearer ${apiKey}`,
+        "Authorization": `Bearer ${apiKey}`
       },
-      body: formData,
+      body: formData
     });
-
-    // Handle API response
+    
     if (!response.ok) {
-      const errorData = await response.text();
-      console.error("[Transcription] OpenAI API error:", errorData);
-      throw new Error(`OpenAI API error: ${response.status} ${errorData}`);
+      const errorText = await response.text();
+      console.error("[Transcription] OpenAI API error:", errorText);
+      throw new Error(`OpenAI API error: ${errorText}`);
     }
-
+    
     // Parse the response
-    const data = await response.json();
+    const result = await response.json();
     
-    // Extract the transcribed text
-    const text = data.text || "";
+    // Get the transcribed text from the result
+    const transcribedText = result.text || "";
     
-    // Extract detected languages if available
-    const detectedLanguages = data.detected_language ? [data.detected_language] : ["unknown"];
+    // Get detected languages from the API response, not defaulting to any specific language
+    const detectedLanguages = result.language ? [result.language] : ["unknown"];
     
     console.log("[Transcription] Success:", {
-      textLength: text.length,
-      sampleText: text.length > 30 ? text.substring(0, 30) + "..." : text,
-      model: "gpt-4o-transcribe", // Updated model name
-      detectedLanguage: detectedLanguages.join(', ')
+      textLength: transcribedText.length,
+      sampleText: transcribedText.substring(0, 50) + "...",
+      model: "gpt-4o-mini-transcribe", // Corrected model name
+      detectedLanguage: detectedLanguages[0]
     });
     
-    return { text, detectedLanguages };
+    return {
+      text: transcribedText,
+      detectedLanguages
+    };
   } catch (error) {
     console.error("[Transcription] Error:", error);
-    throw new Error(`Transcription failed: ${error.message}`);
+    throw error;
   }
 }
 
