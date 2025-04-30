@@ -37,14 +37,16 @@ class StaticTranslationService {
       // Check cache first
       const cached = await translationCache.getTranslation(text, this.language);
       if (cached) {
+        console.log(`Using cached translation for: "${text.substring(0, 30)}..." in ${this.language}`);
         return cached.translatedText;
       }
       
       // Simulate API call delay
       await new Promise(resolve => setTimeout(resolve, this.mockTranslationDelay));
       
-      // For demo purposes, we'll just modify the text slightly based on the language
+      // For demo purposes, we'll just modify the text based on the language
       const translatedText = this.mockTranslate(text, this.language);
+      console.log(`Translated "${text.substring(0, 30)}..." to "${translatedText.substring(0, 30)}..."`);
       
       // Cache the result
       await translationCache.setTranslation({
@@ -130,7 +132,7 @@ class StaticTranslationService {
   private mockTranslate(text: string, targetLang: string): string {
     if (targetLang === 'en') return text;
     
-    // Add simple mock translations for demo purposes
+    // Add more natural looking mock translations for demo purposes
     switch (targetLang) {
       case 'es':
         return `¡Hola! ${text}`;
@@ -151,7 +153,7 @@ class StaticTranslationService {
       case 'pt':
         return `Olá! ${text}`;
       default:
-        return text;
+        return `[${targetLang}] ${text}`; // Fallback for other languages
     }
   }
 }
