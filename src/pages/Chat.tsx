@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
@@ -11,18 +10,42 @@ const Chat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
-  const { translate } = useTranslation();
+  const { translate, currentLanguage } = useTranslation();
 
-  // Translate the app name to initialize the language support
+  // Pre-translate common chat-related strings more comprehensively 
   useEffect(() => {
     const initializeLanguageSupport = async () => {
-      if (translate) {
+      if (translate && currentLanguage !== 'en') {
         try {
-          // Pre-translate common chat-related strings
+          console.log("Pre-translating chat strings for language:", currentLanguage);
+          // Common UI strings
           await translate("New Chat", "en");
           await translate("Ruh", "en");
           await translate("Your message...", "en");
           await translate("Send", "en");
+          await translate("Chat", "en");
+          await translate("Loading...", "en");
+          
+          // Chat message related strings
+          await translate("Analysis:", "en");
+          await translate("SQL Query:", "en");
+          await translate("journal entries", "en");
+          await translate("Unknown date", "en");
+          await translate("more entries", "en");
+          
+          // Error messages
+          await translate("Error loading messages", "en");
+          await translate("Could not load conversation history.", "en");
+          await translate("Authentication required", "en");
+          await translate("Please sign in to use the chat feature.", "en");
+          
+          // Processing messages
+          await translate("Analyzing your question...", "en");
+          await translate("Analyzing patterns in your journal...", "en");
+          await translate("Planning search strategy...", "en");
+          await translate("Searching for insights...", "en");
+          
+          console.log("Chat strings pre-translated successfully");
         } catch (e) {
           console.error("Error pre-translating chat strings:", e);
         }
@@ -30,7 +53,7 @@ const Chat = () => {
     };
     
     initializeLanguageSupport();
-  }, [translate]);
+  }, [translate, currentLanguage]);
 
   // Redirect to login if not authenticated
   useEffect(() => {

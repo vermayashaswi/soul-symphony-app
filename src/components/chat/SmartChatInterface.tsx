@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -24,6 +23,8 @@ import {
 import { ChatMessage } from "@/services/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { useTranslation } from "@/contexts/TranslationContext";
 
 const SmartChatInterface = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -36,6 +37,7 @@ const SmartChatInterface = () => {
   const [showDebugPanel, setShowDebugPanel] = useState(false);
   const { toast } = useToast();
   const { user } = useAuth();
+  const { translate } = useTranslation();
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
@@ -441,7 +443,7 @@ const SmartChatInterface = () => {
   return (
     <div className="chat-interface flex flex-col h-full">
       <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
-        <h2 className="text-xl font-semibold">Rūḥ</h2>
+        <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
         
         <div className="flex items-center gap-2">
           {currentThreadId && (
@@ -462,7 +464,7 @@ const SmartChatInterface = () => {
         {initialLoading ? (
           <div className="flex items-center justify-center h-full">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-            <span className="ml-2 text-muted-foreground">Loading conversation...</span>
+            <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
           </div>
         ) : chatHistory.length === 0 ? (
           <EmptyChatState />
@@ -498,18 +500,18 @@ const SmartChatInterface = () => {
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogTitle><TranslatableText text="Delete this conversation?" /></AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this conversation and all its messages. This action cannot be undone.
+              <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
               className="bg-red-500 hover:bg-red-600 text-white"
             >
-              Delete
+              <TranslatableText text="Delete" />
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>

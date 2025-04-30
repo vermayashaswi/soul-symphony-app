@@ -10,6 +10,7 @@ interface TranslatableTextProps {
   as?: keyof JSX.IntrinsicElements;
   sourceLanguage?: string;
   entryId?: number;
+  forceTranslate?: boolean; // New prop to force translation regardless of route
 }
 
 export function TranslatableText({ 
@@ -17,7 +18,8 @@ export function TranslatableText({
   className = "",
   as: Component = 'span',
   sourceLanguage,
-  entryId
+  entryId,
+  forceTranslate = false
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
@@ -37,8 +39,8 @@ export function TranslatableText({
       return;
     }
 
-    // Skip translations for the marketing website pages
-    if (isOnWebsite) {
+    // Skip translations for the marketing website pages, unless forceTranslate is true
+    if (isOnWebsite && !forceTranslate) {
       setTranslatedText(text);
       return;
     }
@@ -103,7 +105,7 @@ export function TranslatableText({
     return () => {
       isMounted = false;
     };
-  }, [text, currentLanguage, sourceLanguage, entryId]);
+  }, [text, currentLanguage, sourceLanguage, entryId, forceTranslate]);
   
   // Listen to language change events to force re-translate
   useEffect(() => {

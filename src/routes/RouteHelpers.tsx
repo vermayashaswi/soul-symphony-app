@@ -8,13 +8,14 @@ export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
-// Remove subdomain check, replace with path-based check
+// Update the path-based check to be more comprehensive
 export const isAppRoute = (pathname: string): boolean => {
-  return pathname.startsWith('/app/') || pathname === '/app';
+  const appRoutes = ['/app', '/journal', '/chat', '/insights', '/settings', '/auth', '/profile'];
+  // Check if the pathname starts with any of these routes or is exactly one of them
+  return appRoutes.some(route => pathname === route || pathname.startsWith(`${route}/`));
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
-  // Website routes are everything not starting with /app/
   return !isAppRoute(pathname);
 };
 
