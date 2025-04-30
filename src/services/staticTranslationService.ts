@@ -62,14 +62,6 @@ class StaticTranslationService {
     }
   }
   
-  // Pre-translate multiple texts - used for batch operations
-  async preTranslate(
-    texts: string[],
-    sourceLanguage: string = 'en'
-  ): Promise<Map<string, string>> {
-    return this.batchTranslateTexts(texts, sourceLanguage);
-  }
-  
   // Batch translate multiple texts at once
   async batchTranslateTexts(
     texts: string[],
