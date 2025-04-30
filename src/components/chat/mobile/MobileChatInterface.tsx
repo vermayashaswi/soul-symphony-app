@@ -1,14 +1,41 @@
-import React, { useState, useEffect } from "react";
+
+import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, X, Plus } from "lucide-react";
+import { Menu, X, Plus, BarChart2, Lightbulb, Search, Brain } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { supabase } from "@/integrations/supabase/client";
 import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
-import { Json } from "@/integrations/supabase/types";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
+import { v4 as uuidv4 } from "uuid";
+import { useDebugLog } from "@/utils/debug/DebugContext";
+import { getThreadMessages, saveMessage } from "@/services/chat";
+import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
+import { processChatMessage } from "@/services/chatService";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
+
+// Define the UIChatMessage interface
+interface UIChatMessage {
+  role: 'user' | 'assistant' | 'error';
+  content: string;
+  references?: any[];
+  analysis?: any;
+  hasNumericResult?: boolean;
+}
 
 interface MobileChatInterfaceProps {
   currentThreadId: string | null;
@@ -18,7 +45,7 @@ interface MobileChatInterfaceProps {
 }
 
 export default function MobileChatInterface({
-  currentThreadId,
+  currentThreadId: initialThreadId,
   onSelectThread,
   onCreateNewThread,
   userId,
@@ -27,7 +54,7 @@ export default function MobileChatInterface({
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(currentThreadId || null);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(initialThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const debugLog = useDebugLog();
@@ -64,7 +91,6 @@ export default function MobileChatInterface({
 
   useEffect(() => {
     if (currentThreadId) {
-      setCurrentThreadId(currentThreadId);
       loadThreadMessages(currentThreadId);
       debugLog.addEvent("Thread Initialization", `Loading current thread: ${currentThreadId}`, "info");
     } else {

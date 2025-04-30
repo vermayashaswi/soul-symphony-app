@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -6,7 +5,6 @@ import { Separator } from "@/components/ui/separator";
 import { Pencil, Check, X, Plus, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { TranslatableText } from "@/components/translation/TranslatableText";
-import { translateChatString } from "./ChatThreadList";
 import { getUserChatThreads, updateThreadTitle } from "@/services/chat/threadService";
 import { useAuth } from "@/contexts/AuthContext";
 
@@ -16,6 +14,12 @@ interface ChatThreadListProps {
   onCreateThread?: () => void;
   showHeader?: boolean;
 }
+
+// Helper function to translate chat strings
+export const translateChatString = (text: string): string => {
+  // This is a placeholder function that will be replaced with actual translation logic
+  return text;
+};
 
 export const ChatThreadList: React.FC<ChatThreadListProps> = ({
   activeThreadId,
