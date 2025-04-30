@@ -59,6 +59,9 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       // Store language preference
       localStorage.setItem('preferredLanguage', lang);
       
+      // Clear translation cache when changing languages to prevent issues with markers
+      await translationCache.clearCache();
+      
       // Update the service language
       staticTranslationService.setLanguage(lang);
       

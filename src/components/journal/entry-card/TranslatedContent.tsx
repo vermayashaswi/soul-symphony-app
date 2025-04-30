@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { LoadingEntryContent } from './LoadingEntryContent';
@@ -47,9 +46,6 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
   // Listen for language change events
   useEffect(() => {
     const handleLanguageChange = () => {
-      // First set to original content to ensure visibility
-      setTranslatedContent(content);
-      // Then retranslate
       handleTranslation();
     };
     

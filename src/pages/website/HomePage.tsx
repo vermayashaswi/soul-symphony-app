@@ -4,6 +4,7 @@ import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import LanguageSelector from '@/components/LanguageSelector';
 
 const HomePage = () => {
   const openAppStore = () => {
@@ -36,6 +37,9 @@ const HomePage = () => {
 
   return (
     <div className="min-h-screen bg-white">
+      <div className="absolute top-4 right-4 z-20">
+        <LanguageSelector />
+      </div>
       <Navbar />
       <HeroSection 
         openAppStore={openAppStore}

@@ -131,25 +131,26 @@ class StaticTranslationService {
     if (targetLang === 'en') return text;
     
     // Very simple mock translations for demo purposes
+    // We're removing the language markers to avoid showing them in the UI
     switch (targetLang) {
       case 'es':
-        return `[ES] ${text}`;
+        return `${text}`;  // Removed [ES] prefix
       case 'fr':
-        return `[FR] ${text}`;
+        return `${text}`;  // Removed [FR] prefix
       case 'de':
-        return `[DE] ${text}`;
+        return `${text}`;  // Removed [DE] prefix
       case 'zh':
-        return `[ZH] ${text}`;
+        return `${text}`;  // Removed [ZH] prefix
       case 'ja':
-        return `[JA] ${text}`;
+        return `${text}`;  // Removed [JA] prefix
       case 'hi':
-        return `[HI] ${text}`;
+        return `${text}`;  // Removed [HI] prefix
       case 'ru':
-        return `[RU] ${text}`;
+        return `${text}`;  // Removed [RU] prefix
       case 'ar':
-        return `[AR] ${text}`;
+        return `${text}`;  // Removed [AR] prefix
       case 'pt':
-        return `[PT] ${text}`;
+        return `${text}`;  // Removed [PT] prefix
       default:
         return text;
     }
