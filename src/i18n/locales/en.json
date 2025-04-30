@@ -23,7 +23,20 @@
     "tryAgain": "Try again",
     "journalEntries": "journal entries",
     "moreEntries": "more entries",
-    "unknownDate": "Unknown date"
+    "unknownDate": "Unknown date",
+    "chatHistory": "Chat History",
+    "loadingConversation": "Loading conversation...",
+    "howCanIHelp": "How can I help you?",
+    "askMeAnything": "Ask me anything about your mental well-being and journal entries",
+    "deleteConversation": "Delete this conversation?",
+    "deleteWarning": "This will permanently delete this conversation and all its messages. This action cannot be undone.",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "processing": "Processing...",
+    "noJournalEntries": "No journal entries found",
+    "createJournalEntries": "Create journal entries to get personalized insights.",
+    "goToJournal": "Go to Journal",
+    "analysis": "Analysis:"
   },
   "journal": {
     "entry": "entry",

@@ -1,7 +1,7 @@
 import { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2 } from "lucide-react";
+import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2, Plus } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
 import { processChatMessage } from "@/services/chatService";
@@ -548,8 +548,9 @@ const MobileChatInterfaceContent = ({
                 <Button 
                   variant="outline" 
                   onClick={handleStartNewThread}
-                  className="text-sm h-9"
+                  className="text-sm h-9 flex items-center gap-1"
                 >
+                  <Plus className="h-4 w-4" />
                   <TranslatableText text="New Chat" />
                 </Button>
               </div>

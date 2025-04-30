@@ -23,7 +23,20 @@
     "tryAgain": "Inténtalo de nuevo",
     "journalEntries": "entradas de diario",
     "moreEntries": "más entradas",
-    "unknownDate": "Fecha desconocida"
+    "unknownDate": "Fecha desconocida",
+    "chatHistory": "Historial de Chat",
+    "loadingConversation": "Cargando conversación...",
+    "howCanIHelp": "¿Cómo puedo ayudarte?",
+    "askMeAnything": "Pregúntame cualquier cosa sobre tu bienestar mental y tus entradas de diario",
+    "deleteConversation": "¿Eliminar esta conversación?",
+    "deleteWarning": "Esto eliminará permanentemente esta conversación y todos sus mensajes. Esta acción no se puede deshacer.",
+    "cancel": "Cancelar",
+    "delete": "Eliminar",
+    "processing": "Procesando...",
+    "noJournalEntries": "No se encontraron entradas de diario",
+    "createJournalEntries": "Crea entradas de diario para obtener información personalizada.",
+    "goToJournal": "Ir al Diario",
+    "analysis": "Análisis:"
   },
   "journal": {
     "entry": "entrada",

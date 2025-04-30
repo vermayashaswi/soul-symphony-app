@@ -10,6 +10,7 @@ import { cn } from "@/lib/utils";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatShortDate } from "@/utils/format-time";
+import { TranslatableText } from "@/components/translation/TranslatableText";
 
 interface ChatMessageProps {
   message: {
@@ -49,7 +50,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
             className="bg-primary/10 object-cover"
             loading="eager"
           />
-          <AvatarFallback className="bg-primary/10 text-primary">R</AvatarFallback>
+          <AvatarFallback className="bg-primary/10 text-primary">
+            <TranslatableText text="R" />
+          </AvatarFallback>
         </Avatar>
       )}
       
@@ -72,11 +75,17 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
         {showAnalysis && message.role === 'assistant' && message.analysis && (
           <div className="mt-3 text-xs md:text-sm opacity-80">
             <Separator className="my-2" />
-            <div className="font-semibold">Analysis:</div>
-            <p>{message.analysis.analysis}</p>
+            <div className="font-semibold">
+              <TranslatableText text="Analysis:" />
+            </div>
+            <p>
+              <TranslatableText text={message.analysis.analysis} />
+            </p>
             {message.analysis.requiresSql && (
               <>
-                <div className="font-semibold mt-1">SQL Query:</div>
+                <div className="font-semibold mt-1">
+                  <TranslatableText text="SQL Query:" />
+                </div>
                 <pre className={`${isMobile ? 'text-[10px]' : 'text-xs'} bg-black/10 p-1 rounded overflow-x-auto`}>
                   {message.analysis.sqlQuery}
                 </pre>
@@ -96,7 +105,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
               onClick={() => setShowReferences(!showReferences)}
             >
               <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" />
-              {message.references.length} journal entries
+              <TranslatableText 
+                text={`${message.references.length} journal entries`}
+              />
               {showReferences ? (
                 <ChevronUp className="h-3 w-3 md:h-4 md:w-4 ml-1" />
               ) : (
@@ -117,14 +128,18 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                       <div className="font-medium text-xs md:text-sm">
                         {ref.date && !isNaN(new Date(ref.date).getTime())
                           ? formatShortDate(new Date(ref.date))
-                          : "Unknown date"}
+                          : <TranslatableText text="Unknown date" />}
                       </div>
-                      <div className="text-muted-foreground text-xs">{ref.snippet}</div>
+                      <div className="text-muted-foreground text-xs">
+                        <TranslatableText text={ref.snippet} />
+                      </div>
                     </div>
                   ))}
                   {message.references.length > (isMobile ? 2 : 3) && (
                     <div className="text-xs text-muted-foreground">
-                      +{message.references.length - (isMobile ? 2 : 3)} more entries
+                      <TranslatableText 
+                        text={`+${message.references.length - (isMobile ? 2 : 3)} more entries`}
+                      />
                     </div>
                   )}
                 </motion.div>
@@ -159,28 +174,42 @@ const renderDiagnostics = (diagnostics: any, isMobile: boolean) => {
   return (
     <div className="mt-3 text-xs">
       <Separator className="my-2" />
-      <div className="font-semibold">Query Diagnostics:</div>
+      <div className="font-semibold">
+        <TranslatableText text="Query Diagnostics:" />
+      </div>
       <div className={`max-h-40 md:max-h-60 overflow-y-auto mt-1 bg-slate-800 p-2 rounded text-slate-200 ${isMobile ? 'text-[9px]' : 'text-xs'}`}>
         {diagnostics.query_plan && (
           <div>
-            <div className="font-medium">Sample Answer:</div>
+            <div className="font-medium">
+              <TranslatableText text="Sample Answer:" />
+            </div>
             <div className="text-xs whitespace-pre-wrap mb-2">{diagnostics.query_plan.sample_answer}</div>
             
             {!isMobile && (
               <>
-                <div className="font-medium">Execution Plan:</div>
+                <div className="font-medium">
+                  <TranslatableText text="Execution Plan:" />
+                </div>
                 {diagnostics.query_plan.execution_plan.map((segment: any, idx: number) => (
                   <div key={idx} className="mb-2 border-l-2 border-blue-500 pl-2">
-                    <div><span className="font-medium">Segment:</span> {segment.segment}</div>
-                    <div><span className="font-medium">Type:</span> {segment.segment_type}</div>
+                    <div><span className="font-medium">
+                      <TranslatableText text="Segment:" />
+                    </span> {segment.segment}</div>
+                    <div><span className="font-medium">
+                      <TranslatableText text="Type:" />
+                    </span> {segment.segment_type}</div>
                     {segment.sql_query && (
                       <div>
-                        <span className="font-medium">SQL:</span>
+                        <span className="font-medium">
+                          <TranslatableText text="SQL:" />
+                        </span>
                         <pre className="text-xs overflow-x-auto">{segment.sql_query}</pre>
                       </div>
                     )}
                     {segment.vector_search && (
-                      <div><span className="font-medium">Vector Search:</span> {segment.vector_search}</div>
+                      <div><span className="font-medium">
+                        <TranslatableText text="Vector Search:" />
+                      </span> {segment.vector_search}</div>
                     )}
                   </div>
                 ))}
@@ -191,16 +220,26 @@ const renderDiagnostics = (diagnostics: any, isMobile: boolean) => {
         
         {!isMobile && diagnostics.execution_results && (
           <div className="mt-2">
-            <div className="font-medium">Execution Results:</div>
+            <div className="font-medium">
+              <TranslatableText text="Execution Results:" />
+            </div>
             {diagnostics.execution_results.execution_results.map((result: any, idx: number) => (
               <div key={idx} className="mb-2 border-l-2 border-green-500 pl-2">
-                <div><span className="font-medium">Segment:</span> {result.segment}</div>
-                <div><span className="font-medium">Type:</span> {result.type}</div>
+                <div><span className="font-medium">
+                  <TranslatableText text="Segment:" />
+                </span> {result.segment}</div>
+                <div><span className="font-medium">
+                  <TranslatableText text="Type:" />
+                </span> {result.type}</div>
                 {result.error ? (
-                  <div className="text-red-400"><span className="font-medium">Error:</span> {result.error}</div>
+                  <div className="text-red-400"><span className="font-medium">
+                    <TranslatableText text="Error:" />
+                  </span> {result.error}</div>
                 ) : (
                   <div>
-                    <span className="font-medium">Result:</span>
+                    <span className="font-medium">
+                      <TranslatableText text="Result:" />
+                    </span>
                     <pre className="text-xs overflow-x-auto">{JSON.stringify(result.result, null, 2)}</pre>
                   </div>
                 )}
