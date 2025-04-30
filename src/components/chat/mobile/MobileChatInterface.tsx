@@ -1,75 +1,33 @@
-import { useState, useEffect, useRef } from "react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+import React, { useState, useEffect } from "react";
+import { Sheet, SheetContent, SheetHeader, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2, Plus } from "lucide-react";
+import { Menu, X, Plus } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
-import { processChatMessage } from "@/services/chatService";
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
-import { translateChatString } from "@/components/chat/ChatThreadList"; // Import as named export
+import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
 import { Json } from "@/integrations/supabase/types";
-import { ChatMessage as ChatMessageType, getThreadMessages, saveMessage } from "@/services/chatPersistenceService";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { useDebugLog } from "@/utils/debug/DebugContext";
-import { useTranslation } from '@/contexts/TranslationContext';
 import { TranslatableText } from "@/components/translation/TranslatableText";
 
-type UIChatMessage = {
-  role: 'user' | 'assistant';
-  content: string;
-  references?: any[];
-  analysis?: any;
-  diagnostics?: any;
-  hasNumericResult?: boolean;
-}
-
-type ChatMessageFromDB = {
-  content: string;
-  created_at: string;
-  id: string;
-  reference_entries: Json | null;
-  analysis_data?: Json | null;
-  has_numeric_result?: boolean;
-  sender: string;
-  thread_id: string;
-}
-
 interface MobileChatInterfaceProps {
-  currentThreadId?: string | null;
-  onSelectThread?: (threadId: string) => void;
-  onCreateNewThread?: () => Promise<string | null>;
+  currentThreadId: string | null;
+  onSelectThread: (threadId: string) => void;
+  onCreateNewThread: () => Promise<string | null>;
   userId?: string;
-  onSwipeLeft?: () => void;
-  onSwipeRight?: () => void;
 }
 
-const MobileChatInterfaceContent = ({
-  currentThreadId: propThreadId,
+export default function MobileChatInterface({
+  currentThreadId,
   onSelectThread,
   onCreateNewThread,
   userId,
-  onSwipeLeft,
-  onSwipeRight
-}: MobileChatInterfaceProps) => {
+}: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(currentThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const debugLog = useDebugLog();
@@ -105,10 +63,10 @@ const MobileChatInterfaceContent = ({
   const loadedThreadRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (propThreadId) {
-      setCurrentThreadId(propThreadId);
-      loadThreadMessages(propThreadId);
-      debugLog.addEvent("Thread Initialization", `Loading prop thread: ${propThreadId}`, "info");
+    if (currentThreadId) {
+      setCurrentThreadId(currentThreadId);
+      loadThreadMessages(currentThreadId);
+      debugLog.addEvent("Thread Initialization", `Loading current thread: ${currentThreadId}`, "info");
     } else {
       const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
       if (storedThreadId && user?.id) {
@@ -120,7 +78,7 @@ const MobileChatInterfaceContent = ({
         debugLog.addEvent("Thread Initialization", "No stored thread found", "info");
       }
     }
-  }, [propThreadId, user?.id]);
+  }, [currentThreadId, user?.id]);
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -531,50 +489,68 @@ const MobileChatInterfaceContent = ({
   };
 
   return (
-    <div className="flex flex-col h-full" ref={containerRef}>
-      <div className="mobile-chat-header flex items-center justify-between py-2 px-3 sticky top-0 z-10 bg-background border-b">
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="mr-1 h-8 w-8">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 sm:max-w-sm w-[85vw]">
-            <div className="h-full flex flex-col">
-              <div className="p-4 flex items-center justify-between border-b">
-                <Button 
-                  variant="outline" 
-                  onClick={handleStartNewThread}
-                  className="text-sm h-9 flex items-center gap-1"
+    <div className="mobile-chat-interface h-full flex flex-col pb-20 relative">
+      <div className="sticky top-0 z-40 w-full bg-background border-b">
+        <div className="container flex h-14 max-w-screen-lg items-center">
+          <Sheet>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="mr-2">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">
+                  <TranslatableText text="Toggle Menu" />
+                </span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[80%] sm:w-[350px]">
+              <SheetHeader className="flex flex-row items-center justify-between">
+                <Button
+                  className="flex items-center gap-1"
+                  onClick={() => {
+                    onCreateNewThread();
+                  }}
+                  size="sm"
                 >
                   <Plus className="h-4 w-4" />
                   <TranslatableText text="New Chat" />
                 </Button>
-                
-                <div className="flex-1"></div>
-              </div>
+                <SheetTrigger asChild>
+                  <Button variant="ghost" size="icon" className="h-7 w-7">
+                    <X className="h-5 w-5" />
+                  </Button>
+                </SheetTrigger>
+              </SheetHeader>
               
-              <div className="flex-1 overflow-y-auto p-2">
-                {/* Threads will be rendered here */}
+              <div className="mt-5 h-[calc(100vh-80px)]">
+                <ChatThreadList
+                  activeThreadId={currentThreadId}
+                  onSelectThread={(threadId) => {
+                    onSelectThread(threadId);
+                    // Close the sheet after selecting a thread
+                    const closeEvent = new Event('click');
+                    document.querySelector('[data-radix-collection-item]')?.dispatchEvent(closeEvent);
+                  }}
+                  showHeader={false}
+                />
               </div>
-            </div>
-          </SheetContent>
-        </Sheet>
-        <h2 className="text-lg font-semibold flex-1 text-center">
-          <TranslatableText text="Rūḥ" />
-        </h2>
-        
-        {currentThreadId && messages.length > 0 && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="ml-1 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
-            onClick={() => setShowDeleteDialog(true)}
-            aria-label="Delete conversation"
+            </SheetContent>
+          </Sheet>
+          <div className="flex-1 flex justify-center">
+            <h1 className="text-lg font-semibold">
+              <TranslatableText text="Ruh" />
+            </h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-2"
+            onClick={onCreateNewThread}
           >
-            <Trash2 className="h-5 w-5" />
+            <Plus className="h-5 w-5" />
+            <span className="sr-only">
+              <TranslatableText text="New Chat" />
+            </span>
           </Button>
-        )}
+        </div>
       </div>
       
       <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col pb-24">
@@ -677,8 +653,4 @@ const MobileChatInterfaceContent = ({
       </AlertDialog>
     </div>
   );
-};
-
-export default function MobileChatInterface(props: MobileChatInterfaceProps) {
-  return <MobileChatInterfaceContent {...props} />;
 }
