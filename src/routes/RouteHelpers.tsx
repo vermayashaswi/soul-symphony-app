@@ -9,23 +9,23 @@ export const isNativeApp = (): boolean => {
 
 // Update the path-based check to be more comprehensive and accurate
 export const isAppRoute = (pathname: string): boolean => {
-  // More specific matching to ensure we catch all app routes
-  // Add / and /app as exact matches, and handle all paths that start with /app/ properly
-  if (pathname === "/" || pathname === "/app") return true;
+  // More specific matching to ensure we catch all app routes properly
+  
+  // Explicitly define app routes - the root path should NOT be an app route
+  const appPrefixes = ['/app/', '/app', '/journal', '/chat', '/insights', '/settings', '/auth', '/profile'];
   
   // Check for specific app routes including paths under /app
-  const appPrefixes = ['/app/', '/journal', '/chat', '/insights', '/settings', '/auth', '/profile'];
   return appPrefixes.some(prefix => 
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
-  // Only consider true website routes like /about, /pricing, etc.
-  const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact'];
+  // Consider website routes like /about, /pricing, etc.
+  const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq'];
   
-  // For the root path (/), consider it an app route for translation purposes
-  if (pathname === "/" || pathname === "/app") return false;
+  // The root path (/) is explicitly a website route
+  if (pathname === "/") return true;
   
   // If it has an app prefix, it's not a website route
   if (isAppRoute(pathname)) return false;
@@ -33,7 +33,7 @@ export const isWebsiteRoute = (pathname: string): boolean => {
   // Check for specific website routes
   return websitePrefixes.some(prefix => 
     pathname === prefix || pathname.startsWith(`${prefix}/`)
-  ) || (!isAppRoute(pathname) && pathname !== "/");
+  ) || (!isAppRoute(pathname) && pathname !== "/app");
 };
 
 export const getBaseUrl = (): string => {

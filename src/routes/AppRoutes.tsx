@@ -52,7 +52,7 @@ const AppRoutes = () => {
           <Route path="settings" element={<Settings />} />
         </Route>
         
-        {/* Legacy Route Redirects */}
+        {/* Legacy Route Redirects - these should be handled by the server */}
         <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
         <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
         <Route path="/home" element={<Navigate to="/app/home" replace />} />

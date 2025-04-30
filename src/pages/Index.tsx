@@ -50,9 +50,9 @@ const Index = () => {
     }
   }, [networkStatus.speed, translate]);
   
-  // Add a specific log to track if this component is properly rendering
-  console.log('Rendering Index.tsx component');
+  console.log('Rendering Index.tsx component, path:', window.location.pathname);
 
+  // This should only render the website home page component
   return (
     <>
       <NetworkAwareContent

@@ -4,7 +4,7 @@ import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
-import { isAppRoute } from './RouteHelpers';
+import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
 const ViewportManager: React.FC = () => {
@@ -13,6 +13,12 @@ const ViewportManager: React.FC = () => {
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
   
+  // Debug log to understand route detection
+  console.log('ViewportManager - Path:', location.pathname, {
+    isAppRoute: isAppRoute(location.pathname),
+    isWebsiteRoute: isWebsiteRoute(location.pathname)
+  });
+  
   // Render the appropriate layout based on route and device
   return (
     <>
@@ -20,8 +26,8 @@ const ViewportManager: React.FC = () => {
         <Outlet />
       </div>
       
-      {/* Display mobile navigation when appropriate */}
-      {isAppRoute(location.pathname) && (
+      {/* Display mobile navigation ONLY on actual app routes */}
+      {isAppRoute(location.pathname) && user && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </>
