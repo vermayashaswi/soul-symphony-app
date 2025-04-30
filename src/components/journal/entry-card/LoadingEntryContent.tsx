@@ -12,6 +12,7 @@ import {
   HeartHandshake,
   AlertTriangle
 } from 'lucide-react';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const processingSteps = [
   { 
@@ -259,8 +260,12 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         {error ? (
           <div className="flex flex-col items-center">
             <AlertTriangle className="h-8 w-8 text-red-500 mb-2" />
-            <p className="text-red-500 font-medium text-sm text-center">{error}</p>
-            <p className="text-muted-foreground text-xs text-center mt-2">Try refreshing the page or recording again</p>
+            <p className="text-red-500 font-medium text-sm text-center">
+              <TranslatableText text={error} />
+            </p>
+            <p className="text-muted-foreground text-xs text-center mt-2">
+              <TranslatableText text="Try refreshing the page or recording again" />
+            </p>
           </div>
         ) : (
           <>
@@ -301,7 +306,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                 transition={{ duration: 0.3 }}
                 className="text-sm text-center text-primary font-medium"
               >
-                {currentStep.text}
+                <TranslatableText text={currentStep.text} />
               </motion.div>
             </AnimatePresence>
             
@@ -311,7 +316,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                 animate={{ opacity: 1 }}
                 className="text-xs text-muted-foreground text-center mt-2"
               >
-                This is taking longer than usual. Please wait a moment...
+                <TranslatableText text="This is taking longer than usual. Please wait a moment..." />
               </motion.p>
             )}
           </>

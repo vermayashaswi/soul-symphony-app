@@ -1,10 +1,11 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
 import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface JournalSearchProps {
   entries: JournalEntry[];
@@ -26,6 +27,7 @@ const searchPrompts = [
 ];
 
 const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, onSearchResults }) => {
+  const { translate } = useTranslation();
   const [searchQuery, setSearchQuery] = useState('');
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
   const [placeholderIndex, setPlaceholderIndex] = useState(0);
@@ -33,12 +35,40 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   const [isTyping, setIsTyping] = useState(true);
   const [typingIndex, setTypingIndex] = useState(0);
   const [isFocused, setIsFocused] = useState(false);
+  const [translatedPrompts, setTranslatedPrompts] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const mobile = useIsMobile();
 
+  // Translate the search prompts when language changes
+  useEffect(() => {
+    const translatePrompts = async () => {
+      if (translate) {
+        const translated = await Promise.all(
+          searchPrompts.map(prompt => translate(prompt, "en"))
+        );
+        setTranslatedPrompts(translated);
+      }
+    };
+    
+    translatePrompts();
+    
+    // Reset the animation when language changes
+    setTypingPlaceholder("");
+    setTypingIndex(0);
+    setIsTyping(true);
+    setPlaceholderIndex(0);
+    
+    window.addEventListener('languageChange', translatePrompts as EventListener);
+    return () => {
+      window.removeEventListener('languageChange', translatePrompts as EventListener);
+    };
+  }, [translate]);
+
   useEffect(() => {
     if (isTyping) {
-      const currentWord = searchPrompts[placeholderIndex];
+      const currentWord = translatedPrompts.length > placeholderIndex 
+        ? translatedPrompts[placeholderIndex] 
+        : searchPrompts[placeholderIndex];
       
       if (typingIndex < currentWord.length) {
         const typingTimeout = setTimeout(() => {
@@ -57,7 +87,10 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
     } else {
       if (typingIndex > 0) {
         const erasingTimeout = setTimeout(() => {
-          setTypingPlaceholder(searchPrompts[placeholderIndex].substring(0, typingIndex - 1));
+          const currentWord = translatedPrompts.length > placeholderIndex 
+            ? translatedPrompts[placeholderIndex] 
+            : searchPrompts[placeholderIndex];
+          setTypingPlaceholder(currentWord.substring(0, typingIndex - 1));
           setTypingIndex(typingIndex - 1);
         }, 60);
         
@@ -71,7 +104,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
         return () => clearTimeout(nextWordTimeout);
       }
     }
-  }, [isTyping, typingIndex, placeholderIndex]);
+  }, [isTyping, typingIndex, placeholderIndex, translatedPrompts]);
 
   useEffect(() => {
     const handleBackButton = (event: PopStateEvent) => {
@@ -189,7 +222,9 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
 
           <div className="flex flex-wrap items-center justify-end gap-1 py-0.5"> 
             <div className="text-xs text-muted-foreground">
-              {filteredEntries.length} total {filteredEntries.length === 1 ? 'entry' : 'entries'}
+              <TranslatableText 
+                text={`${filteredEntries.length} total ${filteredEntries.length === 1 ? 'entry' : 'entries'}`} 
+              />
             </div>
           </div>
         </div>

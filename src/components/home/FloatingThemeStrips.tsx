@@ -1,12 +1,15 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
+import { staticTranslationService } from '@/services/staticTranslationService';
 
 interface ThemeData {
   theme: string;
   sentiment: number;
+  translatedTheme?: string;
 }
 
 interface FloatingThemeStripsProps {
@@ -19,9 +22,40 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   themeColor
 }) => {
   const [uniqueThemes, setUniqueThemes] = useState<ThemeData[]>([]);
+  const [translatedThemes, setTranslatedThemes] = useState<ThemeData[]>([]);
   const { theme } = useTheme();
+  const { translate, currentLanguage } = useTranslation();
+  const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
+  const animationsRef = useRef<{[key: string]: any}>({});
   
+  // Translate the label
+  useEffect(() => {
+    const translateLabel = async () => {
+      if (translate) {
+        const result = await translate("7-day themes", "en");
+        setTranslatedLabel(result);
+      }
+    };
+    
+    translateLabel();
+    
+    // Listen for language changes
+    const handleLanguageChange = async () => {
+      if (translate) {
+        const result = await translate("7-day themes", "en");
+        setTranslatedLabel(result);
+      }
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+    };
+  }, [translate]);
+  
+  // Process themes data
   useEffect(() => {
     if (themesData.length === 0) return;
     
@@ -46,11 +80,51 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       .map(({ theme, sentiment }) => ({ theme, sentiment }));
     
     setUniqueThemes(sortedThemes);
+    
+    // Translate all themes at once for better performance
+    translateAllThemes(sortedThemes);
   }, [themesData]);
+  
+  // Translate all themes at once
+  const translateAllThemes = async (themes: ThemeData[]) => {
+    if (currentLanguage === 'en' || themes.length === 0) {
+      setTranslatedThemes(themes);
+      return;
+    }
+    
+    try {
+      // Extract all theme strings
+      const themeTexts = themes.map(item => item.theme);
+      
+      // Pre-translate all at once
+      const translationsMap = await staticTranslationService.preTranslate(themeTexts, "en");
+      
+      // Apply translations
+      const translated = themes.map(item => ({
+        ...item,
+        translatedTheme: translationsMap.get(item.theme) || item.theme
+      }));
+      
+      setTranslatedThemes(translated);
+    } catch (error) {
+      console.error('Error translating themes:', error);
+      setTranslatedThemes(themes);
+    }
+  };
+  
+  // Handle language changes
+  useEffect(() => {
+    if (uniqueThemes.length > 0) {
+      translateAllThemes(uniqueThemes);
+    }
+  }, [currentLanguage, uniqueThemes]);
 
   if (!themesData.length) {
     return null;
   }
+
+  // Get current theme list based on language
+  const themesToShow = currentLanguage === 'en' ? uniqueThemes : translatedThemes;
 
   return (
     <div className="relative w-full h-full overflow-hidden">
@@ -82,23 +156,31 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               MozOsxFontSmoothing: 'grayscale'
             }}
           >
-            <TranslatableText text="7-day themes" />
+            {translatedLabel}
           </span>
         </motion.div>
       </div>
       
       <div className="absolute inset-x-0 top-20 bottom-80 pointer-events-none">
-        {uniqueThemes.slice(0, 6).map((themeItem, index) => {
-          const sectionHeight = 100 / Math.min(6, uniqueThemes.length);
+        {themesToShow.slice(0, 6).map((themeItem, index) => {
+          const sectionHeight = 100 / Math.min(6, themesToShow.length);
           const randomOffset = Math.random() * 5 - 2.5;
           const yPosition = (index * sectionHeight) + (sectionHeight / 2) + randomOffset;
           
           const direction = index % 2 === 0;
           const speed = 15 + Math.random() * 10;
           
+          // Create a stable key for animations
+          const animationKey = `theme-strip-${themeItem.theme}-${index}-${currentLanguage}`;
+          
+          // Display the translated theme if available
+          const displayText = currentLanguage === 'en' ? 
+            themeItem.theme : 
+            (themeItem.translatedTheme || themeItem.theme);
+          
           return (
             <motion.div
-              key={`theme-strip-${themeItem.theme}`}
+              key={animationKey}
               className="absolute left-0 w-auto h-8 px-3 py-1 flex items-center rounded-sm"
               style={{
                 top: `${yPosition}%`,
@@ -135,7 +217,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                   MozOsxFontSmoothing: 'grayscale',
                 }}
               >
-                <TranslatableText text={themeItem.theme} />
+                {displayText}
               </span>
             </motion.div>
           );

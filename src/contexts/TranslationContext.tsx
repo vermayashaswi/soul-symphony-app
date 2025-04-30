@@ -35,12 +35,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
 
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
-    if (currentLanguage === 'en' || !text) return text;
+    if (currentLanguage === 'en' || !text || text.trim() === '') return text;
     
     try {
-      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'unknown'} for entry ${entryId || 'unknown'}`);
+      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'en'}${entryId ? ` for entry ${entryId}` : ''}`);
       const translated = await staticTranslationService.translateText(text, sourceLanguage, entryId);
-      console.log(`Translation result: "${translated.substring(0, 30)}..."`);
+      console.log(`Translation result: "${translated?.substring(0, 30) || 'empty'}..."`);
       return translated;
     } catch (error) {
       console.error('Translation error in context:', error);

@@ -1,19 +1,22 @@
-import { useState, useEffect, useRef } from "react";
-import { Sheet, SheetContent, SheetTrigger } from "@/components/ui/sheet";
+
+import React, { useState, useEffect, useRef } from "react";
+import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Menu, Brain, BarChart2, Search, Lightbulb, Trash2 } from "lucide-react";
+import { Menu, X, Plus, BarChart2, Lightbulb, Search, Brain, Trash2 } from "lucide-react";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
-import { processChatMessage } from "@/services/chatService";
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { useToast } from "@/hooks/use-toast";
-import { useAuth } from "@/contexts/AuthContext";
-import { v4 as uuidv4 } from 'uuid';
 import { supabase } from "@/integrations/supabase/client";
-import ChatThreadList from "@/components/chat/ChatThreadList";
+import { ChatThreadList } from "@/components/chat/ChatThreadList";
 import { motion } from "framer-motion";
-import { Json } from "@/integrations/supabase/types";
-import { ChatMessage as ChatMessageType, getThreadMessages, saveMessage } from "@/services/chatPersistenceService";
+import { useAuth } from "@/contexts/AuthContext";
+import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/contexts/TranslationContext";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { v4 as uuidv4 } from "uuid";
+import { useDebugLog } from "@/utils/debug/DebugContext";
+import { getThreadMessages, saveMessage } from "@/services/chat";
+import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
+import { processChatMessage } from "@/services/chatService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -24,50 +27,34 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { useDebugLog } from "@/utils/debug/DebugContext";
 
-type UIChatMessage = {
-  role: 'user' | 'assistant';
+// Define the UIChatMessage interface
+interface UIChatMessage {
+  role: 'user' | 'assistant' | 'error';
   content: string;
   references?: any[];
   analysis?: any;
-  diagnostics?: any;
   hasNumericResult?: boolean;
 }
 
-type ChatMessageFromDB = {
-  content: string;
-  created_at: string;
-  id: string;
-  reference_entries: Json | null;
-  analysis_data?: Json | null;
-  has_numeric_result?: boolean;
-  sender: string;
-  thread_id: string;
-}
-
 interface MobileChatInterfaceProps {
-  currentThreadId?: string | null;
-  onSelectThread?: (threadId: string) => void;
-  onCreateNewThread?: () => Promise<string | null>;
+  currentThreadId: string | null;
+  onSelectThread: (threadId: string) => void;
+  onCreateNewThread: () => Promise<string | null>;
   userId?: string;
-  onSwipeLeft?: () => void;
-  onSwipeRight?: () => void;
 }
 
-const MobileChatInterfaceContent = ({
-  currentThreadId: propThreadId,
+export default function MobileChatInterface({
+  currentThreadId: initialThreadId,
   onSelectThread,
   onCreateNewThread,
   userId,
-  onSwipeLeft,
-  onSwipeRight
-}: MobileChatInterfaceProps) => {
+}: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [processingStage, setProcessingStage] = useState<string | null>(null);
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(propThreadId || null);
+  const [threadId, setThreadId] = useState<string | null>(initialThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const debugLog = useDebugLog();
@@ -96,20 +83,20 @@ const MobileChatInterfaceContent = ({
   ];
   const { toast } = useToast();
   const { user } = useAuth();
+  const { translate } = useTranslation();
   const [sheetOpen, setSheetOpen] = useState(false);
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
 
   useEffect(() => {
-    if (propThreadId) {
-      setCurrentThreadId(propThreadId);
-      loadThreadMessages(propThreadId);
-      debugLog.addEvent("Thread Initialization", `Loading prop thread: ${propThreadId}`, "info");
+    if (threadId) {
+      loadThreadMessages(threadId);
+      debugLog.addEvent("Thread Initialization", `Loading current thread: ${threadId}`, "info");
     } else {
       const storedThreadId = localStorage.getItem("lastActiveChatThreadId");
       if (storedThreadId && user?.id) {
-        setCurrentThreadId(storedThreadId);
+        setThreadId(storedThreadId);
         loadThreadMessages(storedThreadId);
         debugLog.addEvent("Thread Initialization", `Loading stored thread: ${storedThreadId}`, "info");
       } else {
@@ -117,12 +104,12 @@ const MobileChatInterfaceContent = ({
         debugLog.addEvent("Thread Initialization", "No stored thread found", "info");
       }
     }
-  }, [propThreadId, user?.id]);
-
+  }, [threadId, user?.id]);
+  
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
       if (event.detail.threadId) {
-        setCurrentThreadId(event.detail.threadId);
+        setThreadId(event.detail.threadId);
         loadThreadMessages(event.detail.threadId);
         debugLog.addEvent("Thread Change", `Thread selected: ${event.detail.threadId}`, "info");
       }
@@ -145,27 +132,27 @@ const MobileChatInterfaceContent = ({
     }, 100);
   };
 
-  const loadThreadMessages = async (threadId: string) => {
-    if (!threadId || !user?.id) {
+  const loadThreadMessages = async (currentThreadId: string) => {
+    if (!currentThreadId || !user?.id) {
       setInitialLoading(false);
       return;
     }
     
-    if (loadedThreadRef.current === threadId) {
-      debugLog.addEvent("Thread Loading", `Thread ${threadId} already loaded, skipping`, "info");
+    if (loadedThreadRef.current === currentThreadId) {
+      debugLog.addEvent("Thread Loading", `Thread ${currentThreadId} already loaded, skipping`, "info");
       return;
     }
     
     setInitialLoading(true);
-    debugLog.addEvent("Thread Loading", `[Mobile] Loading messages for thread ${threadId}`, "info");
+    debugLog.addEvent("Thread Loading", `[Mobile] Loading messages for thread ${currentThreadId}`, "info");
     
     try {
-      console.log(`[Mobile] Loading messages for thread ${threadId}`);
+      console.log(`[Mobile] Loading messages for thread ${currentThreadId}`);
       
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
         .select('id')
-        .eq('id', threadId)
+        .eq('id', currentThreadId)
         .eq('user_id', user.id)
         .single();
         
@@ -178,12 +165,12 @@ const MobileChatInterfaceContent = ({
         return;
       }
       
-      debugLog.addEvent("Thread Loading", `[Mobile] Thread ${threadId} found, fetching messages`, "success");
-      const chatMessages = await getThreadMessages(threadId);
+      debugLog.addEvent("Thread Loading", `[Mobile] Thread ${currentThreadId} found, fetching messages`, "success");
+      const chatMessages = await getThreadMessages(currentThreadId);
       
       if (chatMessages && chatMessages.length > 0) {
-        debugLog.addEvent("Thread Loading", `[Mobile] Loaded ${chatMessages.length} messages for thread ${threadId}`, "success");
-        console.log(`[Mobile] Loaded ${chatMessages.length} messages for thread ${threadId}`);
+        debugLog.addEvent("Thread Loading", `[Mobile] Loaded ${chatMessages.length} messages for thread ${currentThreadId}`, "success");
+        console.log(`[Mobile] Loaded ${chatMessages.length} messages for thread ${currentThreadId}`);
         
         const uiMessages = chatMessages.map(msg => ({
           role: msg.sender as 'user' | 'assistant',
@@ -194,10 +181,10 @@ const MobileChatInterfaceContent = ({
         
         setMessages(uiMessages);
         setShowSuggestions(false);
-        loadedThreadRef.current = threadId;
+        loadedThreadRef.current = currentThreadId;
       } else {
-        debugLog.addEvent("Thread Loading", `[Mobile] No messages found for thread ${threadId}`, "info");
-        console.log(`[Mobile] No messages found for thread ${threadId}`);
+        debugLog.addEvent("Thread Loading", `[Mobile] No messages found for thread ${currentThreadId}`, "info");
+        console.log(`[Mobile] No messages found for thread ${currentThreadId}`);
         setMessages([]);
         setShowSuggestions(true);
       }
@@ -228,10 +215,10 @@ const MobileChatInterfaceContent = ({
       return;
     }
 
-    let threadId = currentThreadId;
+    let currentThreadId = threadId;
     let isFirstMessage = false;
     
-    if (!threadId) {
+    if (!currentThreadId) {
       try {
         debugLog.addEvent("Thread Creation", "[Mobile] Creating new thread for message", "info");
         if (onCreateNewThread) {
@@ -239,7 +226,7 @@ const MobileChatInterfaceContent = ({
           if (!newThreadId) {
             throw new Error("Failed to create new thread");
           }
-          threadId = newThreadId;
+          currentThreadId = newThreadId;
           debugLog.addEvent("Thread Creation", `[Mobile] New thread created: ${newThreadId}`, "success");
         } else {
           const newThreadId = uuidv4();
@@ -259,8 +246,8 @@ const MobileChatInterfaceContent = ({
             throw error;
           }
           
-          threadId = newThreadId;
-          setCurrentThreadId(newThreadId);
+          currentThreadId = newThreadId;
+          setThreadId(newThreadId);
           debugLog.addEvent("Thread Creation", `[Mobile] New thread created: ${newThreadId}`, "success");
         }
       } catch (error: any) {
@@ -274,15 +261,15 @@ const MobileChatInterfaceContent = ({
         return;
       }
     } else {
-      debugLog.addEvent("Message Check", `[Mobile] Checking if first message in thread ${threadId}`, "info");
+      debugLog.addEvent("Message Check", `[Mobile] Checking if first message in thread ${currentThreadId}`, "info");
       const { count, error } = await supabase
         .from('chat_messages')
         .select('*', { count: 'exact', head: true })
-        .eq('thread_id', threadId);
+        .eq('thread_id', currentThreadId);
         
       isFirstMessage = !error && count === 0;
       if (isFirstMessage) {
-        debugLog.addEvent("Message Check", `[Mobile] This is the first message in thread ${threadId}`, "info");
+        debugLog.addEvent("Message Check", `[Mobile] This is the first message in thread ${currentThreadId}`, "info");
       }
     }
     
@@ -292,15 +279,15 @@ const MobileChatInterfaceContent = ({
     setProcessingStage("Analyzing your question...");
     
     try {
-      debugLog.addEvent("Database", `[Mobile] Saving user message to thread ${threadId}`, "info");
-      const savedUserMessage = await saveMessage(threadId, message, 'user');
+      debugLog.addEvent("Database", `[Mobile] Saving user message to thread ${currentThreadId}`, "info");
+      const savedUserMessage = await saveMessage(currentThreadId, message, 'user');
       debugLog.addEvent("Database", `[Mobile] User message saved: ${savedUserMessage?.id}`, "success");
       console.log("[Mobile] User message saved:", savedUserMessage?.id);
       
       window.dispatchEvent(
         new CustomEvent('messageCreated', { 
           detail: { 
-            threadId, 
+            threadId: currentThreadId, 
             isFirstMessage,
             content: message
           } 
@@ -330,7 +317,7 @@ const MobileChatInterfaceContent = ({
         message, 
         user.id, 
         queryTypes, 
-        threadId,
+        currentThreadId,
         false
       );
       
@@ -361,7 +348,7 @@ const MobileChatInterfaceContent = ({
       
       debugLog.addEvent("Database", "[Mobile] Saving assistant response to database", "info");
       const savedResponse = await saveMessage(
-        threadId,
+        currentThreadId,
         response.content,
         'assistant',
         response.references || null,
@@ -384,14 +371,14 @@ const MobileChatInterfaceContent = ({
             title: truncatedTitle,
             updated_at: new Date().toISOString()
           })
-          .eq('id', threadId);
+          .eq('id', currentThreadId);
       }
       
-      debugLog.addEvent("Thread Update", `[Mobile] Updating thread timestamp for ${threadId}`, "info");
+      debugLog.addEvent("Thread Update", `[Mobile] Updating thread timestamp for ${currentThreadId}`, "info");
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
-        .eq('id', threadId);
+        .eq('id', currentThreadId);
       
       debugLog.addEvent("UI Update", "[Mobile] Adding assistant response to chat", "info");
       setMessages(prev => [...prev, uiResponse]);
@@ -414,7 +401,7 @@ const MobileChatInterfaceContent = ({
       try {
         debugLog.addEvent("Database", "[Mobile] Saving error message to database", "info");
         const savedErrorMessage = await saveMessage(
-          threadId,
+          currentThreadId,
           errorMessageContent,
           'assistant'
         );
@@ -435,7 +422,7 @@ const MobileChatInterfaceContent = ({
     if (onSelectThread) {
       onSelectThread(threadId);
     } else {
-      setCurrentThreadId(threadId);
+      setThreadId(threadId);
       loadThreadMessages(threadId);
     }
   };
@@ -451,7 +438,7 @@ const MobileChatInterfaceContent = ({
   };
 
   const handleDeleteCurrentThread = async () => {
-    if (!currentThreadId || !user?.id) {
+    if (!threadId || !user?.id) {
       toast({
         title: "Error",
         description: "No active conversation to delete",
@@ -464,7 +451,7 @@ const MobileChatInterfaceContent = ({
       const { error: messagesError } = await supabase
         .from('chat_messages')
         .delete()
-        .eq('thread_id', currentThreadId);
+        .eq('thread_id', threadId);
         
       if (messagesError) {
         console.error("[Mobile] Error deleting messages:", messagesError);
@@ -474,7 +461,7 @@ const MobileChatInterfaceContent = ({
       const { error: threadError } = await supabase
         .from('chat_threads')
         .delete()
-        .eq('id', currentThreadId);
+        .eq('id', threadId);
         
       if (threadError) {
         console.error("[Mobile] Error deleting thread:", threadError);
@@ -495,7 +482,7 @@ const MobileChatInterfaceContent = ({
       if (error) throw error;
 
       if (threads && threads.length > 0) {
-        setCurrentThreadId(threads[0].id);
+        setThreadId(threads[0].id);
         loadThreadMessages(threads[0].id);
       } else {
         const newThreadId = uuidv4();
@@ -508,7 +495,7 @@ const MobileChatInterfaceContent = ({
             created_at: new Date().toISOString(),
             updated_at: new Date().toISOString()
           });
-        setCurrentThreadId(newThreadId);
+        setThreadId(newThreadId);
       }
 
       toast({
@@ -528,52 +515,82 @@ const MobileChatInterfaceContent = ({
   };
 
   return (
-    <div className="flex flex-col h-full" ref={containerRef}>
-      <div className="mobile-chat-header flex items-center justify-between py-2 px-3 sticky top-0 z-10 bg-background border-b">
-        <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
-          <SheetTrigger asChild>
-            <Button variant="ghost" size="icon" className="mr-1 h-8 w-8">
-              <Menu className="h-5 w-5" />
-            </Button>
-          </SheetTrigger>
-          <SheetContent side="left" className="p-0 sm:max-w-sm w-[85vw]">
-            <ChatThreadList 
-              userId={userId || user?.id} 
-              onSelectThread={handleSelectThread}
-              onStartNewThread={handleStartNewThread}
-              currentThreadId={currentThreadId}
-              newChatButtonWidth="half"
-              showDeleteButtons={false}
-            />
-          </SheetContent>
-        </Sheet>
-        <h2 className="text-lg font-semibold flex-1 text-center">Rūḥ</h2>
-        
-        {currentThreadId && messages.length > 0 && (
-          <Button 
-            variant="ghost" 
-            size="icon" 
-            className="ml-1 h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
+    <div className="mobile-chat-interface h-full flex flex-col pb-20 relative">
+      <div className="sticky top-0 z-40 w-full bg-background border-b">
+        <div className="container flex h-14 max-w-screen-lg items-center">
+          <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
+            <SheetTrigger asChild>
+              <Button variant="ghost" size="icon" className="mr-2">
+                <Menu className="h-5 w-5" />
+                <span className="sr-only">
+                  <TranslatableText text="Toggle Menu" />
+                </span>
+              </Button>
+            </SheetTrigger>
+            <SheetContent side="left" className="w-[80%] sm:w-[350px]">
+              <SheetHeader className="flex flex-row items-center justify-between py-2">
+                <Button
+                  className="flex items-center gap-1"
+                  onClick={() => {
+                    onCreateNewThread();
+                    setSheetOpen(false);
+                  }}
+                  size="sm"
+                >
+                  <Plus className="h-4 w-4" />
+                  <TranslatableText text="New Chat" />
+                </Button>
+                {/* Removed extra close button here */}
+              </SheetHeader>
+              
+              <div className="mt-2 h-[calc(100vh-80px)]">
+                <ChatThreadList
+                  activeThreadId={threadId}
+                  onSelectThread={(threadId) => {
+                    onSelectThread(threadId);
+                    // Close the sheet after selecting a thread
+                    setSheetOpen(false);
+                  }}
+                  showHeader={false}
+                />
+              </div>
+            </SheetContent>
+          </Sheet>
+          <div className="flex-1 flex justify-center">
+            <h1 className="text-lg font-semibold">
+              <TranslatableText text="Ruh" />
+            </h1>
+          </div>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="ml-2"
             onClick={() => setShowDeleteDialog(true)}
-            aria-label="Delete conversation"
           >
             <Trash2 className="h-5 w-5" />
+            <span className="sr-only">
+              <TranslatableText text="Delete Chat" />
+            </span>
           </Button>
-        )}
+        </div>
       </div>
       
-      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col">
+      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col pb-24">
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-            <span className="ml-2 text-muted-foreground">Loading conversation...</span>
+            <span className="ml-2 text-muted-foreground">
+              <TranslatableText text="Loading conversation..." />
+            </span>
           </div>
         ) : messages.length === 0 ? (
           <div className="flex flex-col justify-start h-full mt-6 pt-4">
             <div className="text-center px-4">
-              <h3 className="text-xl font-medium mb-2">How can I help you?</h3>
+              <h3 className="text-xl font-medium mb-2">
+                <TranslatableText text="How can I help you?" />
+              </h3>
               <p className="text-muted-foreground text-sm mb-4">
-                Ask me anything about your mental well-being and journal entries
+                <TranslatableText text="Ask me anything about your mental well-being and journal entries" />
               </p>
               
               {showSuggestions && (
@@ -593,7 +610,9 @@ const MobileChatInterfaceContent = ({
                     >
                       <div className="flex items-start w-full">
                         <span className="flex-shrink-0 mt-0.5">{question.icon}</span>
-                        <span className="ml-1 flex-grow break-words whitespace-normal">{question.text}</span>
+                        <span className="ml-1 flex-grow break-words whitespace-normal">
+                          <TranslatableText text={question.text} />
+                        </span>
                       </div>
                     </Button>
                   ))}
@@ -616,7 +635,9 @@ const MobileChatInterfaceContent = ({
         {loading && (
           <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
             <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
-            <p className="text-sm text-muted-foreground">{processingStage || "Processing..."}</p>
+            <p className="text-sm text-muted-foreground">
+              <TranslatableText text={processingStage || "Processing..."} />
+            </p>
           </div>
         )}
         
@@ -634,26 +655,24 @@ const MobileChatInterfaceContent = ({
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
-            <AlertDialogTitle>Delete this conversation?</AlertDialogTitle>
+            <AlertDialogTitle>
+              <TranslatableText text="Delete this conversation?" />
+            </AlertDialogTitle>
             <AlertDialogDescription>
-              This will permanently delete this conversation and all its messages. This action cannot be undone.
+              <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel>Cancel</AlertDialogCancel>
+            <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
               className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
             >
-              Delete
+              <TranslatableText text="Delete" />
             </AlertDialogAction>
           </AlertDialogFooter>
         </AlertDialogContent>
       </AlertDialog>
     </div>
   );
-};
-
-export default function MobileChatInterface(props: MobileChatInterfaceProps) {
-  return <MobileChatInterfaceContent {...props} />;
 }

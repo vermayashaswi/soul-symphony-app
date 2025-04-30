@@ -1,16 +1,23 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useInView } from 'react-intersection-observer';
 import { Quote } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
+import { staticTranslationService } from '@/services/staticTranslationService';
+
+interface QuoteItem {
+  quote: string;
+  author: string;
+}
 
 export const InspirationalQuote: React.FC = () => {
   const [quote, setQuote] = useState<string>('');
   const [author, setAuthor] = useState<string>('');
-  const [quotes, setQuotes] = useState<Array<{quote: string, author: string}>>([]);
+  const [quotes, setQuotes] = useState<QuoteItem[]>([]);
   const [currentQuoteIndex, setCurrentQuoteIndex] = useState<number>(0);
   const [isReady, setIsReady] = useState<boolean>(false);
   const [error, setError] = useState<string | null>(null);
@@ -19,6 +26,10 @@ export const InspirationalQuote: React.FC = () => {
     threshold: 0.1,
   });
   const { colorTheme } = useTheme();
+  const { currentLanguage } = useTranslation();
+  const rotationIntervalRef = useRef<number | null>(null);
+  const isTranslatingRef = useRef<boolean>(false);
+  const languageRef = useRef<string>(currentLanguage);
 
   useEffect(() => {
     // Set a default quote immediately for visibility testing
@@ -49,9 +60,11 @@ export const InspirationalQuote: React.FC = () => {
         // Shuffle the quotes for more randomness
         const shuffledQuotes = [...data.quotes].sort(() => Math.random() - 0.5);
         setQuotes(shuffledQuotes);
+        
         if (shuffledQuotes.length > 0) {
-          setQuote(shuffledQuotes[0].quote);
-          setAuthor(shuffledQuotes[0].author || 'Unknown');
+          const firstQuote = shuffledQuotes[0];
+          setQuote(firstQuote.quote);
+          setAuthor(firstQuote.author || 'Unknown');
           setIsReady(true);
         }
       } else if (data && data.error) {
@@ -67,12 +80,45 @@ export const InspirationalQuote: React.FC = () => {
     }
   };
 
+  // Setup quote rotation
+  const setupQuoteRotation = () => {
+    // Clear existing interval if any
+    if (rotationIntervalRef.current !== null) {
+      clearInterval(rotationIntervalRef.current);
+      rotationIntervalRef.current = null;
+    }
+    
+    // Only setup rotation if we have quotes
+    if (quotes.length > 0) {
+      rotationIntervalRef.current = window.setInterval(() => {
+        // Skip rotation if currently translating
+        if (isTranslatingRef.current) return;
+        
+        setCurrentQuoteIndex((prevIndex) => {
+          const newIndex = (prevIndex + 1) % quotes.length;
+          
+          const nextQuote = quotes[newIndex];
+          if (nextQuote) {
+            setQuote(nextQuote.quote);
+            setAuthor(nextQuote.author || 'Unknown');
+          }
+          
+          return newIndex;
+        });
+      }, 7000);
+    }
+  };
+
   useEffect(() => {
     if (inView) {
       console.log('Quote component in view, fetching quotes');
       fetchQuotes();
       return () => {
         setCurrentQuoteIndex(0);
+        if (rotationIntervalRef.current !== null) {
+          clearInterval(rotationIntervalRef.current);
+          rotationIntervalRef.current = null;
+        }
       };
     }
   }, [inView]);
@@ -92,23 +138,49 @@ export const InspirationalQuote: React.FC = () => {
     return () => {
       document.removeEventListener('visibilitychange', handleVisibilityChange);
       window.removeEventListener('focus', handleVisibilityChange);
+      if (rotationIntervalRef.current !== null) {
+        clearInterval(rotationIntervalRef.current);
+        rotationIntervalRef.current = null;
+      }
     };
   }, [inView]);
 
+  // Handle language change
+  useEffect(() => {
+    if (languageRef.current !== currentLanguage) {
+      console.log(`Language changed to ${currentLanguage}, need to update quotes`);
+      languageRef.current = currentLanguage;
+    }
+  }, [currentLanguage]);
+
+  // Listen for language change events
+  useEffect(() => {
+    const handleLanguageChangeEvent = () => {
+      // Force refresh
+      if (languageRef.current !== currentLanguage) {
+        languageRef.current = currentLanguage;
+      }
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChangeEvent as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChangeEvent as EventListener);
+    };
+  }, [currentLanguage]);
+
+  // Setup quote rotation when quotes are loaded
   useEffect(() => {
     if (quotes.length > 0) {
-      console.log('Setting up quote rotation with', quotes.length, 'quotes');
-      const intervalId = setInterval(() => {
-        setCurrentQuoteIndex((prevIndex) => {
-          const newIndex = (prevIndex + 1) % quotes.length;
-          setQuote(quotes[newIndex].quote);
-          setAuthor(quotes[newIndex].author || 'Unknown');
-          return newIndex;
-        });
-      }, 7000);
-      
-      return () => clearInterval(intervalId);
+      setupQuoteRotation();
     }
+    
+    return () => {
+      if (rotationIntervalRef.current !== null) {
+        clearInterval(rotationIntervalRef.current);
+        rotationIntervalRef.current = null;
+      }
+    };
   }, [quotes]);
 
   if (!isReady && !error) {
@@ -123,7 +195,7 @@ export const InspirationalQuote: React.FC = () => {
       <AnimatePresence mode="wait">
         {isReady && (
           <motion.div
-            key={currentQuoteIndex}
+            key={`quote-${currentQuoteIndex}-${currentLanguage}`}
             className="flex flex-col justify-center w-full max-w-2xl px-6"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
@@ -147,3 +219,5 @@ export const InspirationalQuote: React.FC = () => {
     </div>
   );
 };
+
+export default InspirationalQuote;

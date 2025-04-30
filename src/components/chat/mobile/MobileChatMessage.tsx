@@ -1,6 +1,5 @@
 
 import React from "react";
-import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -10,6 +9,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatShortDate } from "@/utils/format-time";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
 
 interface MobileChatMessageProps {
   message: {
@@ -41,7 +42,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className={`relative flex items-start gap-2 ${displayRole === 'user' ? 'justify-end' : 'justify-start'}`}
+      className={`relative flex items-start gap-2 ${displayRole === 'user' ? 'justify-end' : 'justify-start'} mb-3`}
     >
       {displayRole === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">
@@ -51,7 +52,9 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             className="bg-primary/10 object-cover"
             loading="eager"
           />
-          <AvatarFallback className="bg-primary/10 text-primary text-xs">R</AvatarFallback>
+          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+            <TranslatableText text="R" />
+          </AvatarFallback>
         </Avatar>
       )}
       
@@ -64,9 +67,9 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         )}
       >
         {displayRole === 'assistant' ? (
-          <ReactMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words">
+          <TranslatableMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words">
             {formattedContent}
-          </ReactMarkdown>
+          </TranslatableMarkdown>
         ) : (
           <p className="break-words">{message.content}</p>
         )}
@@ -74,11 +77,17 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
         {showAnalysis && displayRole === 'assistant' && message.analysis && (
           <div className="mt-3 text-xs opacity-70">
             <Separator className="my-2" />
-            <div className="font-semibold">Analysis:</div>
-            <p>{message.analysis.analysis}</p>
+            <div className="font-semibold">
+              <TranslatableText text="Analysis:" />
+            </div>
+            <p>
+              <TranslatableText text={message.analysis.analysis} />
+            </p>
             {message.analysis.requiresSql && (
               <>
-                <div className="font-semibold mt-1">SQL Query:</div>
+                <div className="font-semibold mt-1">
+                  <TranslatableText text="SQL Query:" />
+                </div>
                 <pre className="text-[10px] bg-black/10 p-1 rounded overflow-x-auto">
                   {message.analysis.sqlQuery}
                 </pre>
@@ -96,7 +105,9 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
               onClick={() => setShowReferences(!showReferences)}
             >
               <FileText className="h-3 w-3 mr-1" />
-              {message.references!.length} journal entries
+              <TranslatableText 
+                text={`${message.references!.length} journal entries`} 
+              />
               {showReferences ? (
                 <ChevronUp className="h-3 w-3 ml-1" />
               ) : (
@@ -117,14 +128,18 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                       <div className="font-medium dark:text-white/90">
                         {ref.date && !isNaN(new Date(ref.date).getTime()) 
                           ? formatShortDate(new Date(ref.date))
-                          : "Unknown date"}
+                          : <TranslatableText text="Unknown date" />}
                       </div>
-                      <div className="text-muted-foreground dark:text-white/70">{ref.snippet}</div>
+                      <div className="text-muted-foreground dark:text-white/70">
+                        <TranslatableText text={ref.snippet} />
+                      </div>
                     </div>
                   ))}
                   {message.references!.length > 2 && (
                     <div className="text-xs text-muted-foreground dark:text-white/60">
-                      +{message.references!.length - 2} more entries
+                      <TranslatableText 
+                        text={`+${message.references!.length - 2} more entries`} 
+                      />
                     </div>
                   )}
                 </motion.div>

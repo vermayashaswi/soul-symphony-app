@@ -23,8 +23,8 @@ const App: React.FC = () => {
 
   return (
     <TranslationProvider>
-      <AppRoutes />
       <TranslationLoadingOverlay />
+      <AppRoutes />
       <Toaster />
       <SonnerToaster position="top-right" />
     </TranslationProvider>
