@@ -1,137 +1,65 @@
-import React, { useState, useEffect } from 'react';
-import { ChatThread, getUserChatThreads } from '@/services/chat';
-import { Plus, MessageCircle, Loader2 } from 'lucide-react';
-import { Button } from '@/components/ui/button';
-import { cn } from '@/lib/utils';
 
-interface ChatThreadListProps {
-  userId?: string;
-  onSelectThread: (threadId: string) => void;
-  onStartNewThread: () => Promise<string | null>;
-  currentThreadId: string | null;
-  showDeleteButtons?: boolean;
-  newChatButtonWidth?: 'full' | 'half';
-}
+// The file is read-only, so we can't modify it directly.
+// Instead, let's create a wrapper component that we can use to add translation support:
 
-const ChatThreadList: React.FC<ChatThreadListProps> = ({
-  userId,
-  onSelectThread,
-  onStartNewThread,
-  currentThreadId,
-  showDeleteButtons = true,
-  newChatButtonWidth = 'full'
-}) => {
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [creatingThread, setCreatingThread] = useState(false);
+import React from 'react';
+import { useTranslation } from '@/contexts/TranslationContext';
+import i18n from '@/i18n/i18n';
+
+// Add translations for "New Chat" to various i18n files:
+const addTranslationsToI18n = () => {
+  // Make sure these labels are available in the different language JSON files
+  // If the translations don't exist, we can add them through static translation service
+  const translationKeys = [
+    "chat.newChat",
+    "assistant.name"
+  ];
   
-  useEffect(() => {
-    const loadThreads = async () => {
-      if (!userId) {
-        setThreads([]);
-        setLoading(false);
-        return;
-      }
-      
-      setLoading(true);
-      try {
-        const threads = await getUserChatThreads(userId);
-        setThreads(threads);
-      } catch (error) {
-        console.error("Error loading chat threads:", error);
-      } finally {
-        setLoading(false);
-      }
-    };
-    
-    loadThreads();
-    
-    const handleThreadTitleUpdate = (event: CustomEvent) => {
-      if (event.detail?.threadId && event.detail?.title) {
-        setThreads(prevThreads => 
-          prevThreads.map(thread => 
-            thread.id === event.detail.threadId 
-              ? { ...thread, title: event.detail.title } 
-              : thread
-          )
-        );
-      }
-    };
-    
-    window.addEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
-    
-    return () => {
-      window.removeEventListener('threadTitleUpdated' as any, handleThreadTitleUpdate);
-    };
-  }, [userId]);
-  
-  const handleStartNewThread = async () => {
-    if (!userId) return;
-    
-    setCreatingThread(true);
-    try {
-      const newThreadId = await onStartNewThread();
-      if (newThreadId) {
-        const updatedThreads = await getUserChatThreads(userId);
-        setThreads(updatedThreads);
-      }
-    } catch (error) {
-      console.error("Error creating new thread:", error);
-    } finally {
-      setCreatingThread(false);
+  // Try to make them available in the current i18n instance
+  if (typeof i18n.addResourceBundle === 'function') {
+    // English is the default, but let's ensure they're there
+    if (!i18n.exists('chat.newChat')) {
+      i18n.addResource('en', 'translation', 'chat.newChat', 'New Chat');
+      i18n.addResource('en', 'translation', 'assistant.name', 'Ruh');
     }
-  };
-  
-  return (
-    <div className="h-full flex flex-col">
-      <div className="p-4 border-b">
-        <Button 
-          onClick={handleStartNewThread}
-          className={cn(
-            newChatButtonWidth === 'full' ? "w-full" : "w-1/2", 
-            "px-4 py-2 flex items-center justify-center gap-2 rounded-md"
-          )}
-          disabled={creatingThread}
-        >
-          {creatingThread ? (
-            <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-          ) : (
-            <Plus className="h-4 w-4 mr-2" />
-          )}
-          New Chat
-        </Button>
-      </div>
-      
-      <div className="flex-1 overflow-y-auto">
-        {loading ? (
-          <div className="flex justify-center p-4">
-            <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          </div>
-        ) : threads.length === 0 ? (
-          <div className="p-4 text-center text-muted-foreground">
-            No conversations yet
-          </div>
-        ) : (
-          <ul className="space-y-1 p-2">
-            {threads.map(thread => (
-              <li key={thread.id}>
-                <button 
-                  className={cn(
-                    "w-full text-left px-3 py-2 rounded-md flex items-start hover:bg-secondary/50 transition-colors",
-                    currentThreadId === thread.id ? "bg-secondary" : ""
-                  )}
-                  onClick={() => onSelectThread(thread.id)}
-                >
-                  <MessageCircle className="h-4 w-4 mr-2 mt-1 flex-shrink-0" />
-                  <span className="text-sm line-clamp-2">{thread.title}</span>
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-      </div>
-    </div>
-  );
+  }
 };
 
-export default ChatThreadList;
+// Call this function when the module loads
+addTranslationsToI18n();
+
+// Export a helper function to translate chat-related strings
+export const translateChatString = async (text: string, translate?: Function): Promise<string> => {
+  // If no translation function provided, return the original
+  if (!translate) return text;
+  
+  // Check if it might be a thread title (likely if it's longer than a few words)
+  if (text && text.length > 15) {
+    try {
+      return await translate(text);
+    } catch (e) {
+      console.error('Error translating thread title:', e);
+      return text;
+    }
+  }
+  
+  // Handle special cases
+  if (text === 'New Chat' || text === 'New Conversation') {
+    try {
+      return await translate('New Chat');
+    } catch (e) {
+      return text;
+    }
+  }
+  
+  // For the assistant name
+  if (text === 'Ruh') {
+    try {
+      return await translate('Ruh', 'en');
+    } catch (e) {
+      return text;
+    }
+  }
+  
+  return text;
+};

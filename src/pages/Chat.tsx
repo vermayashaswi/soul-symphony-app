@@ -5,11 +5,32 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 const Chat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
+  const { translate } = useTranslation();
+
+  // Translate the app name to initialize the language support
+  useEffect(() => {
+    const initializeLanguageSupport = async () => {
+      if (translate) {
+        try {
+          // Pre-translate common chat-related strings
+          await translate("New Chat", "en");
+          await translate("Ruh", "en");
+          await translate("Your message...", "en");
+          await translate("Send", "en");
+        } catch (e) {
+          console.error("Error pre-translating chat strings:", e);
+        }
+      }
+    };
+    
+    initializeLanguageSupport();
+  }, [translate]);
 
   // Redirect to login if not authenticated
   useEffect(() => {
