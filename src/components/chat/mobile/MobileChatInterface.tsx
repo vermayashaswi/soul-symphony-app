@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -527,21 +528,22 @@ export default function MobileChatInterface({
               </Button>
             </SheetTrigger>
             <SheetContent side="left" className="w-[80%] sm:w-[350px]">
-              <SheetHeader className="flex flex-row items-center justify-between">
+              <SheetHeader className="flex flex-row items-center justify-between py-2">
                 <Button
                   className="flex items-center gap-1"
                   onClick={() => {
                     onCreateNewThread();
+                    setSheetOpen(false);
                   }}
                   size="sm"
                 >
                   <Plus className="h-4 w-4" />
                   <TranslatableText text="New Chat" />
                 </Button>
-                {/* Only one X button here - remove the SheetTrigger around the X button */}
+                {/* Removed extra close button here */}
               </SheetHeader>
               
-              <div className="mt-5 h-[calc(100vh-80px)]">
+              <div className="mt-2 h-[calc(100vh-80px)]">
                 <ChatThreadList
                   activeThreadId={threadId}
                   onSelectThread={(threadId) => {

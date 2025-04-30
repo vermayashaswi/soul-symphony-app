@@ -90,6 +90,17 @@ const Chat = () => {
         bottom: 0 !important;
         z-index: 9999 !important;
       }
+      
+      /* Make sidebar header compact */
+      .sheet-header {
+        padding: 12px !important;
+        margin-bottom: 0 !important;
+      }
+      
+      /* Reduce space after sidebar header */
+      .sheet-content .mt-5 {
+        margin-top: 0.5rem !important;
+      }
     `;
     document.head.appendChild(style);
     

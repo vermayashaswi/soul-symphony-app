@@ -17,10 +17,10 @@ interface ChatThreadListProps {
 }
 
 // Helper function to translate chat strings
-export const translateChatString = (text: string): string => {
+export function translateChatString(text: string): string {
   // This is a placeholder function that will be replaced with actual translation logic
   return text;
-};
+}
 
 export const ChatThreadList: React.FC<ChatThreadListProps> = ({
   activeThreadId,
@@ -146,7 +146,7 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
   return (
     <div className="h-full flex flex-col">
       {showHeader && (
-        <div className="p-4 border-b flex items-center justify-between">
+        <div className="p-2 border-b flex items-center justify-between">
           <Button 
             className="flex items-center gap-1"
             onClick={onCreateThread}
