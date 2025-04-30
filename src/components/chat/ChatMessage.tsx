@@ -1,6 +1,5 @@
 
 import React, { useState } from "react";
-import ReactMarkdown from 'react-markdown';
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
@@ -11,6 +10,7 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatShortDate } from "@/utils/format-time";
 import { TranslatableText } from "@/components/translation/TranslatableText";
+import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
 
 interface ChatMessageProps {
   message: {
@@ -65,9 +65,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
         )}
       >
         {message.role === 'assistant' ? (
-          <ReactMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none">
+          <TranslatableMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none">
             {formattedContent}
-          </ReactMarkdown>
+          </TranslatableMarkdown>
         ) : (
           <p>{message.content}</p>
         )}
