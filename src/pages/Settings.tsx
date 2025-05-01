@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
@@ -24,6 +25,8 @@ import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -40,8 +43,12 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
           <Icon className="h-5 w-5 text-muted-foreground" />
         </div>
         <div>
-          <h3 className="font-medium text-foreground">{title}</h3>
-          <p className="text-sm text-muted-foreground">{description}</p>
+          <h3 className="font-medium text-foreground">
+            <TranslatableText text={title} />
+          </h3>
+          <p className="text-sm text-muted-foreground">
+            <TranslatableText text={description} />
+          </p>
         </div>
       </div>
       <div>{children}</div>
@@ -60,6 +67,7 @@ export default function Settings() {
   const { entries } = useJournalEntries(user?.id, 0, !!user);
   const navigate = useNavigate();
   const isMobile = useIsMobile();
+  const { currentLanguage } = useTranslation();
   
   const [showFAQ, setShowFAQ] = useState(false);
   const [showPrivacyPolicy, setShowPrivacyPolicy] = useState(false);
@@ -229,7 +237,7 @@ export default function Settings() {
   
   const handleLogout = async () => {
     try {
-      toast.info('Logging out...');
+      toast.info(<TranslatableText text="Logging out..." forceTranslate={true} />);
       await signOut();
     } catch (error) {
       console.error('Error logging out from Settings page:', error);
@@ -240,7 +248,7 @@ export default function Settings() {
   const applyCustomColor = () => {
     setCustomColor(colorPickerValue);
     setColorTheme('Custom');
-    toast.success('Custom color applied');
+    toast.success(<TranslatableText text="Custom color applied" forceTranslate={true} />);
     setShowColorPicker(false);
   };
 
@@ -257,17 +265,17 @@ export default function Settings() {
         .eq('id', user.id);
       
       if (error) {
-        toast.error('Failed to update display name');
+        toast.error(<TranslatableText text="Failed to update display name" forceTranslate={true} />);
         console.error(error);
         return;
       }
       
       setOriginalDisplayName(displayName.trim());
-      toast.success('Display name updated successfully');
+      toast.success(<TranslatableText text="Display name updated successfully" forceTranslate={true} />);
       setIsEditingName(false);
     } catch (error) {
       console.error('Error updating display name', error);
-      toast.error('Something went wrong');
+      toast.error(<TranslatableText text="Something went wrong" forceTranslate={true} />);
     }
   };
 
@@ -281,9 +289,9 @@ export default function Settings() {
     
     if (checked) {
       setShowNotificationSettings(true);
-      toast.success("Customize your notification settings");
+      toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
     } else {
-      toast.info("Notifications disabled");
+      toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
       // Clear notification settings from localStorage
       if (typeof window !== 'undefined') {
         localStorage.removeItem('notification_enabled');
@@ -329,7 +337,7 @@ export default function Settings() {
   };
   
   const getNotificationSummary = () => {
-    if (!notificationsEnabled) return "Disabled";
+    if (!notificationsEnabled) return <TranslatableText text="Disabled" />;
     
     const frequencyText = {
       'once': 'Once',
@@ -346,15 +354,28 @@ export default function Settings() {
       }[time];
     });
     
-    return `${frequencyText} daily: ${timeLabels.join(', ')}`;
+    return (
+      <>
+        <TranslatableText text={frequencyText} /> <TranslatableText text="daily" />: {timeLabels.map((label, idx) => (
+          <React.Fragment key={idx}>
+            {idx > 0 && ", "}
+            <TranslatableText text={label} />
+          </React.Fragment>
+        ))}
+      </>
+    );
   };
 
   return (
     <div className="min-h-screen pb-20">
       <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
         <div className="mb-6">
-          <h1 className="text-3xl font-bold mb-2 text-theme-color">Settings</h1>
-          <p className="text-muted-foreground">Personalize your SOuLO experience</p>
+          <h1 className="text-3xl font-bold mb-2 text-theme-color">
+            <TranslatableText text="Settings" forceTranslate={true} />
+          </h1>
+          <p className="text-muted-foreground">
+            <TranslatableText text="Personalize your SOuLO experience" />
+          </p>
         </div>
         
         <div className="space-y-6">
@@ -365,7 +386,9 @@ export default function Settings() {
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
             <div className="flex items-center justify-between mb-6">
-              <h2 className="text-xl font-semibold text-theme-color">Your Profile</h2>
+              <h2 className="text-xl font-semibold text-theme-color">
+                <TranslatableText text="Your Profile" />
+              </h2>
             </div>
             
             <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
@@ -385,7 +408,8 @@ export default function Settings() {
                       <Input
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder="Enter your display name"
+                        placeholder={currentLanguage === 'en' ? "Enter your display name" : 
+                          <TranslatableText text="Enter your display name" />}
                         className="max-w-xs"
                         autoFocus
                       />
@@ -397,7 +421,7 @@ export default function Settings() {
                           className="flex items-center gap-1"
                         >
                           <X className="h-3 w-3" />
-                          Cancel
+                          <TranslatableText text="Cancel" />
                         </Button>
                         <Button 
                           variant="default" 
@@ -407,15 +431,15 @@ export default function Settings() {
                           disabled={!displayName.trim() || displayName.trim() === originalDisplayName}
                         >
                           <Save className="h-3 w-3" />
-                          Save
+                          <TranslatableText text="Save" />
                         </Button>
                       </div>
                     </div>
                   ) : (
                     <div className="flex items-center justify-center sm:justify-start gap-2">
                       <h3 className="text-xl font-semibold text-foreground">
-                        {isLoadingProfile ? "Loading..." : 
-                         originalDisplayName || user?.user_metadata?.full_name || 'User'}
+                        {isLoadingProfile ? <TranslatableText text="Loading..." /> : 
+                         originalDisplayName || user?.user_metadata?.full_name || <TranslatableText text="User" />}
                       </h3>
                       <Button 
                         variant="ghost" 
@@ -432,12 +456,18 @@ export default function Settings() {
                 
                 <div className="grid grid-cols-2 gap-4">
                   <div className="bg-secondary rounded-lg p-3">
-                    <p className="text-muted-foreground text-sm">Journal Entries</p>
+                    <p className="text-muted-foreground text-sm">
+                      <TranslatableText text="Journal Entries" />
+                    </p>
                     <p className="text-xl font-medium text-foreground">{entries.length}</p>
                   </div>
                   <div className="bg-secondary rounded-lg p-3">
-                    <p className="text-muted-foreground text-sm">Max Streak</p>
-                    <p className="text-xl font-medium text-foreground">{maxStreak} days</p>
+                    <p className="text-muted-foreground text-sm">
+                      <TranslatableText text="Max Streak" />
+                    </p>
+                    <p className="text-xl font-medium text-foreground">
+                      {maxStreak} <TranslatableText text="days" />
+                    </p>
                   </div>
                 </div>
                 
@@ -447,7 +477,7 @@ export default function Settings() {
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4" />
-                  Logout
+                  <TranslatableText text="Logout" />
                 </Button>
               </div>
             </div>
@@ -459,16 +489,20 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.1 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4 text-theme-color">Appearance</h2>
+            <h2 className="text-xl font-semibold mb-4 text-theme-color">
+              <TranslatableText text="Appearance" />
+            </h2>
             
             <div className="space-y-4">
               <div>
-                <label className="text-sm font-medium mb-2 block text-foreground">Theme Mode</label>
+                <label className="text-sm font-medium mb-2 block text-foreground">
+                  <TranslatableText text="Theme Mode" />
+                </label>
                 <div className="flex p-1 bg-secondary rounded-full w-fit">
                   <button
                     onClick={() => {
                       setTheme('light');
-                      toast.success('Light theme applied');
+                      toast.success(<TranslatableText text="Light theme applied" forceTranslate={true} />);
                     }}
                     className={cn(
                       "flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all",
@@ -476,12 +510,12 @@ export default function Settings() {
                     )}
                   >
                     <Sun className="h-4 w-4" />
-                    <span>Light</span>
+                    <TranslatableText text="Light" />
                   </button>
                   <button
                     onClick={() => {
                       setTheme('dark');
-                      toast.success('Dark theme applied');
+                      toast.success(<TranslatableText text="Dark theme applied" forceTranslate={true} />);
                     }}
                     className={cn(
                       "flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all",
@@ -489,12 +523,12 @@ export default function Settings() {
                     )}
                   >
                     <Moon className="h-4 w-4" />
-                    <span>Dark</span>
+                    <TranslatableText text="Dark" />
                   </button>
                   <button
                     onClick={() => {
                       setTheme('system');
-                      toast.success('System theme applied');
+                      toast.success(<TranslatableText text="System theme applied" forceTranslate={true} />);
                     }}
                     className={cn(
                       "flex items-center gap-1.5 px-4 py-1.5 rounded-full transition-all",
@@ -502,25 +536,35 @@ export default function Settings() {
                     )}
                   >
                     <Monitor className="h-4 w-4 mr-1" />
-                    <span>System {theme === 'system' && `(${systemTheme})`}</span>
+                    <span>
+                      <TranslatableText text="System" />
+                      {theme === 'system' && ` (${systemTheme})`}
+                    </span>
                   </button>
                 </div>
                 {theme === 'system' && (
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Using your device's {systemTheme} theme preference
+                    <TranslatableText text="Using your device's" /> {systemTheme} <TranslatableText text="theme preference" />
                   </p>
                 )}
               </div>
               
               <div>
-                <label className="text-sm font-medium mb-2 block text-theme-color">Color Theme</label>
+                <label className="text-sm font-medium mb-2 block text-theme-color">
+                  <TranslatableText text="Color Theme" />
+                </label>
                 <div className="flex flex-wrap gap-3">
                   {colorThemes.map((themeOption) => (
                     <button
                       key={themeOption.name}
                       onClick={() => {
                         setColorTheme(themeOption.name as any);
-                        toast.success(`${themeOption.name} theme applied`);
+                        toast.success(
+                          <TranslatableText 
+                            text={`${themeOption.name} theme applied`} 
+                            forceTranslate={true} 
+                          />
+                        );
                       }}
                       className={cn(
                         "flex flex-col items-center gap-1.5 transition-all",
@@ -545,7 +589,7 @@ export default function Settings() {
                           ? "text-theme-color font-medium" 
                           : "text-foreground"
                       )}>
-                        {themeOption.name}
+                        <TranslatableText text={themeOption.name} />
                       </span>
                     </button>
                   ))}
@@ -562,7 +606,7 @@ export default function Settings() {
                     }}
                   >
                     <Palette className="h-4 w-4" />
-                    Customize Your Color
+                    <TranslatableText text="Customize Your Color" />
                   </Button>
                 </div>
               </div>
@@ -575,13 +619,19 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.2 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4 text-theme-color">Preferences</h2>
+            <h2 className="text-xl font-semibold mb-4 text-theme-color">
+              <TranslatableText text="Preferences" />
+            </h2>
             
             <div className="space-y-3 divide-y">
               <SettingItem
                 icon={Bell}
                 title="Notifications"
-                description={notificationsEnabled ? getNotificationSummary() : "Get reminders to journal and stay on track"}
+                description={
+                  notificationsEnabled 
+                    ? "" // This is replaced by getNotificationSummary function
+                    : "Get reminders to journal and stay on track"
+                }
               >
                 <div className="flex items-center gap-2">
                   <Switch 
@@ -594,7 +644,7 @@ export default function Settings() {
                       size="sm"
                       onClick={() => setShowNotificationSettings(true)}
                     >
-                      Customize
+                      <TranslatableText text="Customize" />
                     </Button>
                   )}
                 </div>
@@ -608,7 +658,9 @@ export default function Settings() {
             transition={{ duration: 0.3, delay: 0.3 }}
             className="bg-background rounded-xl p-6 shadow-sm border"
           >
-            <h2 className="text-xl font-semibold mb-4 text-theme-color">Help & Support</h2>
+            <h2 className="text-xl font-semibold mb-4 text-theme-color">
+              <TranslatableText text="Help & Support" />
+            </h2>
             
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Button 
@@ -622,9 +674,13 @@ export default function Settings() {
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
                     <HelpCircle className="h-4 w-4 text-theme-color" />
-                    <span className="font-medium text-foreground">FAQ</span>
+                    <span className="font-medium text-foreground">
+                      <TranslatableText text="FAQ" />
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">Frequently asked questions</p>
+                  <p className="text-xs text-muted-foreground">
+                    <TranslatableText text="Frequently asked questions" />
+                  </p>
                 </div>
               </Button>
               
@@ -639,9 +695,13 @@ export default function Settings() {
                 <div className="flex flex-col items-start text-left">
                   <div className="flex items-center gap-2 mb-1">
                     <Shield className="h-4 w-4 text-theme-color" />
-                    <span className="font-medium text-foreground">Privacy Policy</span>
+                    <span className="font-medium text-foreground">
+                      <TranslatableText text="Privacy Policy" />
+                    </span>
                   </div>
-                  <p className="text-xs text-muted-foreground">How we protect your data</p>
+                  <p className="text-xs text-muted-foreground">
+                    <TranslatableText text="How we protect your data" />
+                  </p>
                 </div>
               </Button>
             </div>
@@ -653,7 +713,7 @@ export default function Settings() {
                 onClick={handleContactSupport}
               >
                 <Mail className="h-4 w-4" />
-                Contact Support
+                <TranslatableText text="Contact Support" />
               </Button>
             </div>
           </motion.div>
@@ -674,80 +734,102 @@ export default function Settings() {
       >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
           <DialogHeader>
-            <DialogTitle className="text-xl text-theme-color">Frequently Asked Questions</DialogTitle>
+            <DialogTitle className="text-xl text-theme-color">
+              <TranslatableText text="Frequently Asked Questions" />
+            </DialogTitle>
             <DialogDescription>
-              Find answers to common questions about SOuLO
+              <TranslatableText text="Find answers to common questions about SOuLO" />
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="h-[60vh] pr-4">
             <div className="space-y-6 py-2">
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">What is SOuLO?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="What is SOuLO?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  SOuLO is an AI-powered journaling app designed to help you track, analyze, and understand your emotions through voice recordings and text entries. Our app creates a safe space for self-reflection and personal growth.
+                  <TranslatableText text="SOuLO is an AI-powered journaling app designed to help you track, analyze, and understand your emotions through voice recordings and text entries. Our app creates a safe space for self-reflection and personal growth." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">How do I create a journal entry?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="How do I create a journal entry?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  You can create a journal entry by navigating to the Journal tab and clicking on the "+" button. You can either type your entry or use the voice recording feature, which will automatically transcribe and analyze your spoken thoughts.
+                  <TranslatableText text="You can create a journal entry by navigating to the Journal tab and clicking on the '+' button. You can either type your entry or use the voice recording feature, which will automatically transcribe and analyze your spoken thoughts." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Is my data private?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="Is my data private?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Yes, your privacy is our top priority. All journal entries are encrypted and only accessible to you. We do not share or sell your personal data with third parties. See our Privacy Policy for more details.
+                  <TranslatableText text="Yes, your privacy is our top priority. All journal entries are encrypted and only accessible to you. We do not share or sell your personal data with third parties. See our Privacy Policy for more details." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">How does the emotion analysis work?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="How does the emotion analysis work?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Our AI technology analyzes the text and tone of your journal entries to identify emotions and themes. It recognizes patterns in your writing or speech to provide insights about your emotional state and recurring topics.
+                  <TranslatableText text="Our AI technology analyzes the text and tone of your journal entries to identify emotions and themes. It recognizes patterns in your writing or speech to provide insights about your emotional state and recurring topics." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Can I chat with my journal?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="Can I chat with my journal?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Yes! One of SOuLO's unique features is the ability to chat with your journal. You can ask questions about your mood patterns, seek insights about your emotional trends, or get personalized reflections based on your journal entries.
+                  <TranslatableText text="Yes! One of SOuLO's unique features is the ability to chat with your journal. You can ask questions about your mood patterns, seek insights about your emotional trends, or get personalized reflections based on your journal entries." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">What is a journal streak?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="What is a journal streak?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  A journal streak represents the number of consecutive days you've created at least one journal entry. It's a way to track your consistency and build a regular journaling habit.
+                  <TranslatableText text="A journal streak represents the number of consecutive days you've created at least one journal entry. It's a way to track your consistency and build a regular journaling habit." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">How do I set up daily reminders?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="How do I set up daily reminders?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  You can enable daily reminders by toggling on the Notifications option in the Settings page. You'll need to grant notification permissions to the app for this feature to work.
+                  <TranslatableText text="You can enable daily reminders by toggling on the Notifications option in the Settings page. You'll need to grant notification permissions to the app for this feature to work." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">How do I customize the app's appearance?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="How do I customize the app's appearance?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  In the Settings page, you can switch between light and dark mode, and choose from several color themes. You can even create your own custom color theme to personalize your experience.
+                  <TranslatableText text="In the Settings page, you can switch between light and dark mode, and choose from several color themes. You can even create your own custom color theme to personalize your experience." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">How do I view my emotional insights?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="How do I view my emotional insights?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Navigate to the Insights tab to see visualizations of your emotional patterns over time. You can view your mood calendar, emotion distribution, and recurring themes from your journal entries.
+                  <TranslatableText text="Navigate to the Insights tab to see visualizations of your emotional patterns over time. You can view your mood calendar, emotion distribution, and recurring themes from your journal entries." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Is SOuLO available on all devices?</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="Is SOuLO available on all devices?" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  SOuLO is available as a web application that works on all modern browsers. The responsive design ensures a great experience on both desktop and mobile devices.
+                  <TranslatableText text="SOuLO is available as a web application that works on all modern browsers. The responsive design ensures a great experience on both desktop and mobile devices." />
                 </p>
               </div>
             </div>
@@ -763,90 +845,106 @@ export default function Settings() {
       >
         <DialogContent className="max-w-2xl max-h-[80vh] overflow-hidden">
           <DialogHeader>
-            <DialogTitle className="text-xl text-theme-color">Privacy Policy</DialogTitle>
+            <DialogTitle className="text-xl text-theme-color">
+              <TranslatableText text="Privacy Policy" />
+            </DialogTitle>
             <DialogDescription>
-              How we protect your data and respect your privacy
+              <TranslatableText text="How we protect your data and respect your privacy" />
             </DialogDescription>
           </DialogHeader>
           <ScrollArea className="h-[60vh] pr-4">
             <div className="space-y-6 py-2">
-              <p className="text-sm text-muted-foreground">Last Updated: April 8, 2025</p>
+              <p className="text-sm text-muted-foreground">
+                <TranslatableText text="Last Updated" />: April 8, 2025
+              </p>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Introduction</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="Introduction" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Welcome to SOuLO ("we," "our," or "us"). We are committed to protecting your privacy and handling your data with transparency and care. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our journaling application.
+                  <TranslatableText text="Welcome to SOuLO ('we,' 'our,' or 'us'). We are committed to protecting your privacy and handling your data with transparency and care. This Privacy Policy explains how we collect, use, disclose, and safeguard your information when you use our journaling application." />
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  This Privacy Policy is available at <a href="https://soulo.online/privacy-policy" className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer">https://soulo.online/privacy-policy</a>
+                  <TranslatableText text="This Privacy Policy is available at" /> <a href="https://soulo.online/privacy-policy" className="text-blue-500 hover:underline" target="_blank" rel="noopener noreferrer">https://soulo.online/privacy-policy</a>
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Information We Collect</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="Information We Collect" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  <strong>Account Information:</strong> When you create an account, we collect your email address, name, and password.
+                  <strong><TranslatableText text="Account Information:" /></strong> <TranslatableText text="When you create an account, we collect your email address, name, and password." />
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  <strong>Journal Entries:</strong> We store the content of your journal entries, including text and voice recordings.
+                  <strong><TranslatableText text="Journal Entries:" /></strong> <TranslatableText text="We store the content of your journal entries, including text and voice recordings." />
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  <strong>Usage Data:</strong> We collect information about how you interact with our application, such as features used, time spent, and actions taken.
+                  <strong><TranslatableText text="Usage Data:" /></strong> <TranslatableText text="We collect information about how you interact with our application, such as features used, time spent, and actions taken." />
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  <strong>Device Information:</strong> We collect information about your device, including IP address, browser type, and operating system.
-                </p>
-              </div>
-              
-              <div className="space-y-2">
-                <h3 className="text-base font-semibold">How We Use Your Information</h3>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Provide and Improve Services:</strong> We use your information to deliver our journaling features, analyze your entries, and generate insights.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Personalization:</strong> We personalize your experience based on your preferences and usage patterns.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Communication:</strong> We may send you notifications, updates, and support messages.
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  <strong>Research and Development:</strong> We use anonymized data to improve our AI algorithms and develop new features.
+                  <strong><TranslatableText text="Device Information:" /></strong> <TranslatableText text="We collect information about your device, including IP address, browser type, and operating system." />
                 </p>
               </div>
               
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Data Security</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="How We Use Your Information" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet or electronic storage is 100% secure, and we cannot guarantee absolute security.
+                  <strong><TranslatableText text="Provide and Improve Services:" /></strong> <TranslatableText text="We use your information to deliver our journaling features, analyze your entries, and generate insights." />
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong><TranslatableText text="Personalization:" /></strong> <TranslatableText text="We personalize your experience based on your preferences and usage patterns." />
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong><TranslatableText text="Communication:" /></strong> <TranslatableText text="We may send you notifications, updates, and support messages." />
+                </p>
+                <p className="text-sm text-muted-foreground">
+                  <strong><TranslatableText text="Research and Development:" /></strong> <TranslatableText text="We use anonymized data to improve our AI algorithms and develop new features." />
+                </p>
+              </div>
+              
+              <div className="space-y-2">
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="Data Security" />
+                </h3>
+                <p className="text-sm text-muted-foreground">
+                  <TranslatableText text="We implement appropriate technical and organizational measures to protect your personal information against unauthorized access, alteration, disclosure, or destruction. However, no method of transmission over the Internet or electronic storage is 100% secure, and we cannot guarantee absolute security." />
                 </p>
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Your Rights</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="Your Rights" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  Depending on your location, you may have rights regarding your personal information, including:
+                  <TranslatableText text="Depending on your location, you may have rights regarding your personal information, including:" />
                 </p>
                 <ul className="list-disc pl-5 text-sm text-muted-foreground space-y-1">
-                  <li>Access to your personal data</li>
-                  <li>Correction of inaccurate data</li>
-                  <li>Deletion of your data</li>
-                  <li>Restriction of processing</li>
-                  <li>Data portability</li>
-                  <li>Objection to processing</li>
+                  <li><TranslatableText text="Access to your personal data" /></li>
+                  <li><TranslatableText text="Correction of inaccurate data" /></li>
+                  <li><TranslatableText text="Deletion of your data" /></li>
+                  <li><TranslatableText text="Restriction of processing" /></li>
+                  <li><TranslatableText text="Data portability" /></li>
+                  <li><TranslatableText text="Objection to processing" /></li>
                 </ul>
                 <p className="text-sm text-muted-foreground mt-2">
-                  To exercise these rights, please contact us at support@soulo.online.
+                  <TranslatableText text="To exercise these rights, please contact us at support@soulo.online." />
                 </p>
               </div>
 
               <div className="space-y-2">
-                <h3 className="text-base font-semibold">Contact Us</h3>
+                <h3 className="text-base font-semibold">
+                  <TranslatableText text="Contact Us" />
+                </h3>
                 <p className="text-sm text-muted-foreground">
-                  If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at:
+                  <TranslatableText text="If you have any questions or concerns about this Privacy Policy or our data practices, please contact us at:" />
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  Email: support@soulo.online<br />
-                  Address: 123 Journal Street, San Francisco, CA 94105, USA
+                  <TranslatableText text="Email" />: support@soulo.online<br />
+                  <TranslatableText text="Address" />: 123 Journal Street, San Francisco, CA 94105, USA
                 </p>
               </div>
             </div>
@@ -862,15 +960,19 @@ export default function Settings() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Notification Settings</DialogTitle>
+            <DialogTitle>
+              <TranslatableText text="Notification Settings" />
+            </DialogTitle>
             <DialogDescription>
-              Customize when you want to receive journal reminders
+              <TranslatableText text="Customize when you want to receive journal reminders" />
             </DialogDescription>
           </DialogHeader>
           
           <div className="space-y-6 py-4">
             <div className="space-y-4">
-              <h3 className="font-medium text-sm">Frequency</h3>
+              <h3 className="font-medium text-sm">
+                <TranslatableText text="Frequency" />
+              </h3>
               <RadioGroup 
                 value={notificationFrequency} 
                 onValueChange={(value) => setNotificationFrequency(value as NotificationFrequency)}
@@ -880,7 +982,7 @@ export default function Settings() {
                   <div key={option.value} className="flex items-center space-x-2">
                     <RadioGroupItem value={option.value} id={`frequency-${option.value}`} />
                     <Label htmlFor={`frequency-${option.value}`} className="cursor-pointer">
-                      {option.label}
+                      <TranslatableText text={option.label} />
                     </Label>
                   </div>
                 ))}
@@ -889,11 +991,17 @@ export default function Settings() {
             
             <div className="space-y-4">
               <div className="flex justify-between items-center">
-                <h3 className="font-medium text-sm">Time of Day</h3>
+                <h3 className="font-medium text-sm">
+                  <TranslatableText text="Time of Day" />
+                </h3>
                 <p className="text-xs text-muted-foreground">
-                  {notificationFrequency === 'once' ? 'Select 1 time' : 
-                   notificationFrequency === 'twice' ? 'Select up to 2 times' : 
-                   'Select up to 3 times'}
+                  {notificationFrequency === 'once' ? (
+                    <TranslatableText text="Select 1 time" />
+                  ) : notificationFrequency === 'twice' ? (
+                    <TranslatableText text="Select up to 2 times" />
+                  ) : (
+                    <TranslatableText text="Select up to 3 times" />
+                  )}
                 </p>
               </div>
               
@@ -918,7 +1026,7 @@ export default function Settings() {
                       htmlFor={`time-${option.value}`} 
                       className="flex-1 cursor-pointer text-sm"
                     >
-                      {option.label}
+                      <TranslatableText text={option.label} />
                     </Label>
                   </div>
                 ))}
@@ -931,13 +1039,13 @@ export default function Settings() {
               variant="outline" 
               onClick={() => setShowNotificationSettings(false)}
             >
-              Cancel
+              <TranslatableText text="Cancel" />
             </Button>
             <Button 
               onClick={applyNotificationSettings}
               disabled={notificationTimes.length === 0}
             >
-              Apply Settings
+              <TranslatableText text="Apply Settings" />
             </Button>
           </div>
         </DialogContent>
@@ -951,9 +1059,11 @@ export default function Settings() {
       >
         <DialogContent className="max-w-md">
           <DialogHeader>
-            <DialogTitle>Custom Color</DialogTitle>
+            <DialogTitle>
+              <TranslatableText text="Custom Color" />
+            </DialogTitle>
             <DialogDescription>
-              Choose your own theme color
+              <TranslatableText text="Choose your own theme color" />
             </DialogDescription>
           </DialogHeader>
           <div className="py-4">
@@ -968,14 +1078,14 @@ export default function Settings() {
               variant="outline" 
               onClick={() => setShowColorPicker(false)}
             >
-              Cancel
+              <TranslatableText text="Cancel" />
             </Button>
             <Button 
               onClick={applyCustomColor}
               style={{ backgroundColor: colorPickerValue }}
               className="text-white"
             >
-              Apply Color
+              <TranslatableText text="Apply Color" />
             </Button>
           </div>
         </DialogContent>
