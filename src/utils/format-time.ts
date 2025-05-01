@@ -1,6 +1,15 @@
 
 import { formatRelative, format, differenceInSeconds, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
-import { enUS, es, fr, de, hi, zh, ja, ru, ar, pt } from 'date-fns/locale';
+import { enUS } from 'date-fns/locale/en-US';
+import { es } from 'date-fns/locale/es';
+import { fr } from 'date-fns/locale/fr';
+import { de } from 'date-fns/locale/de';
+import { hi } from 'date-fns/locale/hi';
+import { zhCN } from 'date-fns/locale/zh-CN';  // Using zhCN instead of zh
+import { ja } from 'date-fns/locale/ja';
+import { ru } from 'date-fns/locale/ru';
+import { ar } from 'date-fns/locale/ar';
+import { pt } from 'date-fns/locale/pt';
 
 // Helper function to get locale based on language code
 const getLocale = (lang: string) => {
@@ -9,7 +18,7 @@ const getLocale = (lang: string) => {
     case 'fr': return fr;
     case 'de': return de;
     case 'hi': return hi;
-    case 'zh': return zh;
+    case 'zh': return zhCN;  // Using zhCN for Chinese
     case 'ja': return ja;
     case 'ru': return ru;
     case 'ar': return ar;
