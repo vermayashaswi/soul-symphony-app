@@ -409,8 +409,7 @@ export default function Settings() {
                       <Input
                         value={displayName}
                         onChange={(e) => setDisplayName(e.target.value)}
-                        placeholder={currentLanguage === 'en' ? "Enter your display name" : 
-                          <TranslatableText text="Enter your display name" />}
+                        placeholder="Enter your display name"
                         className="max-w-xs"
                         autoFocus
                       />
