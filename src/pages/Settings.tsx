@@ -346,30 +346,24 @@ export default function Settings() {
       'thrice': 'Three times'
     }[notificationFrequency];
     
-    // Create React elements for time labels
-    const timeLabelElements = notificationTimes.map((time, idx) => {
-      const label = {
+    // Create a display text for the time labels
+    const timeLabels = notificationTimes.map(time => {
+      return {
         'morning': 'Morning',
         'afternoon': 'Afternoon',
         'evening': 'Evening',
         'night': 'Night'
       }[time];
-      
-      return (
-        <React.Fragment key={idx}>
-          {idx > 0 && ", "}
-          <TranslatableText text={label} />
-        </React.Fragment>
-      );
-    });
+    }).join(", ");
     
-    // Return composed JSX with proper components
+    // Return composed JSX with proper components and string props
     return (
-      <>
-        <TranslatableText text={frequencyText} /> <TranslatableText text="daily" />
-        <span>{': '}</span>
-        {timeLabelElements}
-      </>
+      <div className="flex flex-wrap items-center gap-1">
+        <TranslatableText text={frequencyText} />
+        <TranslatableText text="daily" />
+        <span>: </span>
+        <TranslatableText text={timeLabels} />
+      </div>
     );
   };
 
