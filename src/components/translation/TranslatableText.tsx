@@ -5,7 +5,7 @@ import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
 
 interface TranslatableTextProps {
-  text: string; // Note: This needs to remain a string type
+  text: string; // This must remain a string type
   className?: string;
   as?: keyof JSX.IntrinsicElements;
   sourceLanguage?: string;
@@ -169,3 +169,4 @@ export function TranslatableText({
 }
 
 export default TranslatableText;
+
