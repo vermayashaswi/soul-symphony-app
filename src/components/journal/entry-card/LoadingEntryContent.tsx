@@ -43,15 +43,16 @@ const processingSteps = [
 
 export function LoadingEntryContent({ error }: { error?: string }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
-  const [processingTakingTooLong, setProcessingTakingTooLong] = useState(false);
+  const [processingTakingTooLong, setProcesssingTakingTooLong] = useState(false);
   const mountedRef = useRef(true);
   const componentId = useRef(`loading-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
   const stepsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const longProcessingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
   const unmountingRef = useRef<boolean>(false);
+  const forceRemoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
-  // Self cleanup safety - if this component exists for too long (20 seconds), automatically trigger cleanup
+  // Self cleanup safety - if this component exists for too long (15 seconds), automatically trigger cleanup
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
       if (mountedRef.current && !unmountingRef.current) {
@@ -77,8 +78,11 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             reason: 'safety-timeout'
           }
         }));
+        
+        // Force immediate parent card removal
+        removeParentCard();
       }
-    }, 20000); // 20 seconds max lifetime (reduced from 30s)
+    }, 15000); // 15 seconds max lifetime (reduced from 20s)
     
     cleanupTimersRef.current.push(safetyTimeout);
     
@@ -86,6 +90,28 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       clearTimeout(safetyTimeout);
     };
   }, []);
+  
+  // Function to remove the parent card - called in multiple places for reliability
+  const removeParentCard = () => {
+    const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
+    if (parentCard) {
+      parentCard.classList.add('force-hidden');
+      setTimeout(() => {
+        if (parentCard.parentNode) {
+          parentCard.parentNode.removeChild(parentCard);
+          console.log('[LoadingEntryContent] Parent card removed from DOM');
+          
+          // Notify that this card has been removed
+          window.dispatchEvent(new CustomEvent('processingCardRemoved', {
+            detail: { 
+              componentId: componentId.current,
+              timestamp: Date.now()
+            }
+          }));
+        }
+      }, 50);
+    }
+  };
   
   useEffect(() => {
     const stepInterval = setInterval(() => {
@@ -110,7 +136,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     // Set a timeout to show a message if processing is taking too long
     const longProcessingTimeout = setTimeout(() => {
       if (mountedRef.current && !unmountingRef.current) {
-        setProcessingTakingTooLong(true);
+        setProcesssingTakingTooLong(true);
         
         // Notify that processing is taking a long time
         window.dispatchEvent(new CustomEvent('processingTakingLong', {
@@ -134,7 +160,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     // Listen for forces removal events targeted at this component
     const handleForceRemoval = (event: CustomEvent) => {
-      if ((event.detail?.componentId === componentId.current || !event.detail?.componentId) && !unmountingRef.current) {
+      const isTargetedRemoval = event.detail?.componentId === componentId.current;
+      const isBroadcastRemoval = !event.detail?.componentId && event.detail?.forceCleanup;
+      
+      if ((isTargetedRemoval || isBroadcastRemoval) && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Forced removal event received for', componentId.current);
         unmountingRef.current = true;
         
@@ -148,16 +177,13 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           }));
           
           // Force immediate parent card removal
-          const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
-          if (parentCard) {
-            parentCard.classList.add('force-hidden');
-            setTimeout(() => {
-              if (parentCard.parentNode) {
-                parentCard.parentNode.removeChild(parentCard);
-              }
-            }, 50);
-          }
+          removeParentCard();
         }
+        
+        // Clear all our timers
+        if (stepsIntervalRef.current) clearInterval(stepsIntervalRef.current);
+        if (longProcessingTimeoutRef.current) clearTimeout(longProcessingTimeoutRef.current);
+        cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
       }
     };
     
@@ -167,19 +193,13 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     // Also listen for content ready events which should remove this component
     const handleContentReady = () => {
       if (!unmountingRef.current) {
+        console.log('[LoadingEntryContent] Content ready event received, removing card');
         unmountingRef.current = true;
         
-        // Force immediate parent card removal after a short delay
-        setTimeout(() => {
-          const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
-          if (parentCard) {
-            parentCard.classList.add('force-hidden');
-            setTimeout(() => {
-              if (parentCard.parentNode) {
-                parentCard.parentNode.removeChild(parentCard);
-              }
-            }, 50);
-          }
+        // Set a timeout to ensure this card is removed even if the animation doesn't complete
+        if (forceRemoveTimeoutRef.current) clearTimeout(forceRemoveTimeoutRef.current);
+        forceRemoveTimeoutRef.current = setTimeout(() => {
+          removeParentCard();
         }, 100);
       }
     };
@@ -195,6 +215,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       
       if (longProcessingTimeoutRef.current) {
         clearTimeout(longProcessingTimeoutRef.current);
+      }
+      
+      if (forceRemoveTimeoutRef.current) {
+        clearTimeout(forceRemoveTimeoutRef.current);
       }
       
       cleanupTimersRef.current.forEach(timer => clearTimeout(timer));
@@ -244,6 +268,15 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       exit={{ opacity: 0.7 }}
       transition={{ duration: 0.5 }}
       data-component-id={componentId.current}
+      onAnimationComplete={() => {
+        // Broadcast that this component has finished animating in
+        window.dispatchEvent(new CustomEvent('loadingContentAnimated', {
+          detail: { 
+            componentId: componentId.current,
+            timestamp: Date.now()
+          }
+        }));
+      }}
     >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />

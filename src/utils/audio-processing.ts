@@ -137,6 +137,11 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
     console.error('[Audio Processing] Error setting entry ID for processing ID:', error);
   }
   
+  // IMPORTANT: Tell the UI to clean up loading components
+  window.dispatchEvent(new CustomEvent('entryContentReady', {
+    detail: { tempId, entryId, timestamp: Date.now() }
+  }));
+  
   // Dispatch an event to notify components of the correlation
   window.dispatchEvent(new CustomEvent('processingEntryMapped', {
     detail: { tempId, entryId, timestamp: Date.now() }
@@ -154,6 +159,13 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
   window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
     detail: { tempId, entryId, timestamp: Date.now() }
   }));
+
+  // Force removal of any loading content components associated with this tempId
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+      detail: { tempId, entryId, timestamp: Date.now(), forceCleanup: true }
+    }));
+  }, 50);
 }
 
 /**
@@ -266,15 +278,21 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
       audioDuration: (audioBlob as any).duration || 'unknown'
     });
     
+    // Before dispatching, clean up any existing processing entries that might be duplicates
+    const cleanedEntries = updatedEntries.filter((id, index, self) => 
+      self.indexOf(id) === index && !isProcessingEntryCompleted(id)
+    );
+
     // Force multiple custom event dispatches immediately to ensure loading state appears
     window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-      detail: { entries: updatedEntries, lastUpdate: Date.now(), forceUpdate: true }
+      detail: { entries: cleanedEntries, lastUpdate: Date.now(), forceUpdate: true }
     }));
     
     // Also dispatch after a small delay - iOS needs this redundancy
     setTimeout(() => {
+      const currentEntries = getProcessingEntries().filter(id => !isProcessingEntryCompleted(id));
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-        detail: { entries: updatedEntries, lastUpdate: Date.now() + 1, forceUpdate: true }
+        detail: { entries: currentEntries, lastUpdate: Date.now() + 1, forceUpdate: true }
       }));
     }, 50);
     
@@ -353,6 +371,14 @@ export function isProcessingEntryCompleted(tempId: string): boolean {
     // Also mark as completed for future checks
     completedProcessingEntries.set(tempId, true);
     completedProcessingEntries.set(baseTempId, true);
+
+    // Force removal of any loading content components
+    setTimeout(() => {
+      window.dispatchEvent(new CustomEvent('entryContentReady', {
+        detail: { tempId, entryId, timestamp: Date.now() }
+      }));
+    }, 0);
+    
     return true;
   }
   
@@ -381,6 +407,27 @@ export function removeProcessingEntryById(entryId: number | string): void {
     // Also mark as completed to prevent reappearance
     completedProcessingEntries.set(baseTempId, true);
   }
+  
+  // Trigger UI cleanup by dispatching relevant events
+  window.dispatchEvent(new CustomEvent('entryContentReady', {
+    detail: { 
+      tempId: typeof entryId === 'string' ? entryId : undefined, 
+      entryId: typeof entryId === 'number' ? entryId : undefined,
+      timestamp: Date.now() 
+    }
+  }));
+
+  // Force removal of any processing cards
+  setTimeout(() => {
+    window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+      detail: { 
+        tempId: typeof entryId === 'string' ? entryId : undefined,
+        entryId: typeof entryId === 'number' ? entryId : undefined,
+        timestamp: Date.now(),
+        forceCleanup: true
+      }
+    }));
+  }, 10);
   
   // Clean up the map storage
   try {
@@ -424,7 +471,7 @@ export function removeProcessingEntryById(entryId: number | string): void {
         
         window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
           detail: { 
-            tempId: entryId, 
+            tempId: typeof entryId === 'string' ? entryId : undefined, 
             timestamp: Date.now() 
           }
         }));
