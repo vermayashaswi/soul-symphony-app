@@ -1,11 +1,12 @@
 
 import { translationCache } from './translationCache';
+import { supabase } from '@/integrations/supabase/client';
 
 class StaticTranslationService {
   private language = 'en';
   private translationQueue: Map<string, Promise<string>> = new Map();
   
-  // Static translations for common UI text elements
+  // Static translations for common UI text elements - fallback only
   private staticTranslations: Record<string, Record<string, string>> = {
     'en': {}, // No translations needed for English
     'es': {
@@ -37,7 +38,7 @@ class StaticTranslationService {
       return text;
     }
     
-    // Check for static translations first
+    // Check for static translations first as fallback
     if (this.staticTranslations[this.language]?.[text]) {
       return this.staticTranslations[this.language][text];
     }
@@ -77,7 +78,6 @@ class StaticTranslationService {
     }
   }
   
-  // Add the missing preTranslate method to batch translate multiple strings at once
   async preTranslate(texts: string[], sourceLanguage: string = 'en'): Promise<Map<string, string>> {
     if (this.language === 'en' || !texts || texts.length === 0) {
       // If target language is English or no texts to translate, return original texts
@@ -88,148 +88,96 @@ class StaticTranslationService {
     
     console.log(`StaticTranslationService: Batch translating ${texts.length} items to ${this.language}`);
     
-    const translationMap = new Map<string, string>();
-    const translationPromises: Promise<void>[] = [];
-    
-    // Process each text in the array
-    for (const text of texts) {
-      if (!text || text.trim() === '') {
-        translationMap.set(text, text);
-        continue;
-      }
-      
-      // Check for static translations first
-      if (this.staticTranslations[this.language]?.[text]) {
-        translationMap.set(text, this.staticTranslations[this.language][text]);
-        continue;
-      }
-      
-      const translationPromise = (async () => {
-        try {
-          // Try to get from cache first
-          const cached = await translationCache.getTranslation(text, this.language);
-          if (cached?.translatedText) {
-            translationMap.set(text, cached.translatedText);
-            return;
-          }
-          
-          // If not in cache, translate and store
-          const translatedText = await this.fetchTranslation(text, sourceLanguage);
-          translationMap.set(text, translatedText);
-        } catch (error) {
-          console.error(`Error translating text: "${text.substring(0, 20)}..."`, error);
-          translationMap.set(text, text); // Fallback to original on error
+    try {
+      // Call the batch translation API
+      const { data, error } = await supabase.functions.invoke('translate-static-content', {
+        body: {
+          texts: texts,
+          targetLanguage: this.language,
+          sourceLanguage: sourceLanguage
         }
-      })();
+      });
       
-      translationPromises.push(translationPromise);
+      if (error) {
+        console.error('Batch translation error:', error);
+        throw error;
+      }
+      
+      // Create a map of original text to translated text
+      const translationMap = new Map<string, string>();
+      
+      if (data && data.translations) {
+        data.translations.forEach((item: { original: string, translated: string }) => {
+          translationMap.set(item.original, item.translated);
+          
+          // Also store in cache
+          translationCache.setTranslation({
+            originalText: item.original,
+            translatedText: item.translated,
+            language: this.language,
+            timestamp: Date.now(),
+            version: 1,
+          });
+        });
+      }
+      
+      // For any texts that weren't translated, add the original
+      texts.forEach(text => {
+        if (!translationMap.has(text)) {
+          translationMap.set(text, text);
+        }
+      });
+      
+      return translationMap;
+    } catch (error) {
+      console.error('Batch translation error:', error);
+      
+      // On error, return original texts
+      const fallbackMap = new Map<string, string>();
+      texts.forEach(text => fallbackMap.set(text, text));
+      return fallbackMap;
     }
-    
-    // Wait for all translations to complete
-    await Promise.all(translationPromises);
-    console.log(`StaticTranslationService: Completed batch translation of ${texts.length} items`);
-    
-    return translationMap;
   }
   
   private async fetchTranslation(text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string> {
-    // For debugging/development, we're using a simple mock translation
-    // that prepends the target language code to show it's been "translated"
-    
-    // Log what's being translated
     console.log(`StaticTranslationService: Translating to ${this.language}: "${text.substring(0, 30)}..."`);
     
-    // This is a mock translation for debugging - in production this would call an API
-    // Hindi Translation Mock
-    if (this.language === 'hi') {
-      // For Hindi, use transliterated Hindi to show it's "translated"
-      // Use a mock mapping of common English words to Hindi
-      const mockHindiDict: {[key: string]: string} = {
-        'the': 'यह',
-        'a': 'एक',
-        'is': 'है',
-        'to': 'को',
-        'in': 'में',
-        'for': 'के लिए',
-        'back': 'वापस',
-        'online': 'ऑनलाइन',
-        'your': 'आपका',
-        'has': 'है',
-        'been': 'हो गया',
-        'restored': 'बहाल',
-        'offline': 'ऑफ़लाइन',
-        'some': 'कुछ',
-        'content': 'सामग्री',
-        'may': 'सकता',
-        'not': 'नहीं',
-        'be': 'हो',
-        'available': 'उपलब्ध',
-        'slow': 'धीमी',
-        'connection': 'कनेक्शन',
-        'detected': 'का पता चला',
-        'loading': 'लोड हो रहा है',
-        'optimized': 'अनुकूलित',
-        'speed': 'गति',
-        'analysis': 'विश्लेषण',
-        'unknown': 'अज्ञात',
-        'date': 'दिनांक',
-        'journal': 'जर्नल',
-        'entries': 'प्रविष्टियां',
-        'more': 'अधिक',
-        'entry': 'प्रविष्टि',
-        'delete': 'हटाएं',
-        'this': 'यह',
-        'conversation': 'बातचीत',
-        'cancel': 'रद्द करें',
-        'hour': 'घंटा',
-        'hours': 'घंटे',
-        'day': 'दिन',
-        'days': 'दिनों',
-        'week': 'सप्ताह',
-        'weeks': 'सप्ताह',
-        'month': 'महीना',
-        'months': 'महीने',
-        'year': 'वर्ष',
-        'years': 'साल',
-        'ago': 'पहले',
-      };
-      
-      // Simple word-by-word mock translation
-      let translatedText = text;
-      Object.keys(mockHindiDict).forEach(word => {
-        // Use word boundary regex to replace whole words only
-        const regex = new RegExp(`\\b${word}\\b`, 'gi');
-        translatedText = translatedText.replace(regex, mockHindiDict[word]);
+    try {
+      // Call the Supabase function to translate the text
+      const { data, error } = await supabase.functions.invoke('translate-text', {
+        body: {
+          text,
+          sourceLanguage,
+          targetLanguage: this.language,
+          entryId
+        }
       });
       
-      // Make the translation longer to simulate real translations
-      translatedText = `${translatedText} (${this.language})`;
+      if (error) {
+        console.error('Translation API error:', error);
+        return text; // Fallback to original
+      }
       
-      // Store in cache
-      await translationCache.setTranslation({
-        originalText: text,
-        translatedText: translatedText,
-        language: this.language,
-        timestamp: Date.now(),
-        version: 1,
-      });
+      if (data && data.translatedText) {
+        const translatedText = data.translatedText;
+        
+        // Store in cache
+        await translationCache.setTranslation({
+          originalText: text,
+          translatedText,
+          language: this.language,
+          timestamp: Date.now(),
+          version: 1,
+        });
+        
+        return translatedText;
+      }
       
-      return translatedText;
+      return text; // Fallback to original if no translation
+    } catch (error) {
+      console.error('Translation fetch error:', error);
+      return text; // Fallback to original
     }
-    
-    // For other languages, just add a suffix to show it was "translated"
-    const translatedText = `${text} (${this.language})`;
-    
-    // Store in cache
-    await translationCache.setTranslation({
-      originalText: text,
-      translatedText: translatedText,
-      language: this.language,
-      timestamp: Date.now(),
-      version: 1,
-    });
-    
-    return translatedText;
   }
 }
 

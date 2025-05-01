@@ -47,7 +47,6 @@ export function TranslatableText({
 
     // Don't translate on website routes unless forced
     if (isOnWebsite && !forceTranslate) {
-      console.log(`TranslatableText: Skipping translation for website route: ${pathname} - "${text.substring(0, 30)}..."`);
       setTranslatedText(text);
       return;
     }
@@ -66,8 +65,6 @@ export function TranslatableText({
       }
     }
       
-    console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'en'}${entryId ? ` for entry: ${entryId}` : ''}`);
-
     try {
       // Use "en" as default source language when none is provided
       const result = await translate(text, sourceLanguage || "en", entryId);
@@ -77,19 +74,14 @@ export function TranslatableText({
       if (prevLangRef.current === currentLanguage && textRef.current === text) {
         if (result) {
           setTranslatedText(result);
-          console.log(`TranslatableText: Successfully translated to "${result.substring(0, 30)}..."`);
         } else {
           setTranslatedText(text); // Fallback to original if result is empty
-          console.log(`TranslatableText: Empty translation result, using original text`);
         }
-      } else {
-        console.log('Language or text changed during translation, discarding result');
       }
     } catch (error) {
       console.error('Translation error:', error);
       if (prevLangRef.current === currentLanguage && textRef.current === text) {
         setTranslatedText(text); // Fallback to original
-        console.warn(`TranslatableText: Failed to translate "${text.substring(0, 30)}..." to ${currentLanguage}`);
       }
     } finally {
       setIsLoading(false);

@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
 import { staticTranslationService } from '@/services/staticTranslationService';
+import { preloadWebsiteTranslations } from '@/utils/website-translations';
 
 // Define the language options
 export const languages = [
@@ -74,6 +75,18 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       
       // Set new language
       setCurrentLanguage(lang);
+      
+      // If changing to a non-English language, preload common website translations
+      if (lang !== 'en') {
+        try {
+          // Preload common website translations in the background
+          preloadWebsiteTranslations(lang).catch(err => {
+            console.error('Failed to preload website translations:', err);
+          });
+        } catch (error) {
+          console.error('Error preloading translations:', error);
+        }
+      }
       
       // Dispatch language change event for components to react
       window.dispatchEvent(new CustomEvent('languageChange', { 
