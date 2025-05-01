@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -325,7 +325,7 @@ export default function Settings() {
     
     if (limitedTimes.length > maxTimes) {
       limitedTimes = limitedTimes.slice(0, maxTimes);
-      // Fix: Use string concatenation outside the TranslatableText component
+      // Create the message string first, then pass it to TranslatableText
       const message = `Limited to ${maxTimes} time${maxTimes > 1 ? 's' : ''} based on frequency`;
       toast.info(<TranslatableText text={message} forceTranslate={true} />);
     }
