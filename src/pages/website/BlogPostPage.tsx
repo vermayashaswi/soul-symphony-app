@@ -7,13 +7,12 @@ import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import { getBlogPostBySlug } from '@/utils/blog-utils';
 import { BlogPost } from '@/types/blog';
-import { useTranslation } from 'react-i18next';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 const BlogPostPage = () => {
   const { slug } = useParams<{ slug: string }>();
   const [post, setPost] = useState<BlogPost | null>(null);
   const [loading, setLoading] = useState(true);
-  const { t } = useTranslation();
 
   useEffect(() => {
     if (slug) {
@@ -42,12 +41,19 @@ const BlogPostPage = () => {
       <div className="min-h-screen bg-white">
         <Navbar />
         <div className="pt-32 pb-16 container mx-auto px-4 text-center">
-          <h1 className="text-3xl font-bold mb-4">Post Not Found</h1>
+          <h1 className="text-3xl font-bold mb-4">
+            <TranslatableText text="Post Not Found" forceTranslate={true} />
+          </h1>
           <p className="text-muted-foreground mb-8">
-            The blog post you're looking for doesn't exist or has been moved.
+            <TranslatableText 
+              text="The blog post you're looking for doesn't exist or has been moved."
+              forceTranslate={true}
+            />
           </p>
           <Button asChild>
-            <Link to="/blog">Back to Blog</Link>
+            <Link to="/blog">
+              <TranslatableText text="Back to Blog" forceTranslate={true} />
+            </Link>
           </Button>
         </div>
         <Footer />
@@ -64,7 +70,7 @@ const BlogPostPage = () => {
           <div className="max-w-3xl mx-auto">
             <Link to="/blog" className="flex items-center text-primary hover:underline mb-8">
               <ArrowLeft className="h-4 w-4 mr-2" />
-              Back to Blog
+              <TranslatableText text="Back to Blog" forceTranslate={true} />
             </Link>
             
             <div className="aspect-video overflow-hidden rounded-lg mb-8">
@@ -78,27 +84,34 @@ const BlogPostPage = () => {
             <div className="mb-8">
               <div className="flex flex-wrap items-center gap-4 mb-4 text-sm text-muted-foreground">
                 <span className="text-xs font-medium uppercase text-primary bg-primary/10 px-2 py-1 rounded-full">
-                  {post.category}
+                  <TranslatableText text={post.category} forceTranslate={true} />
                 </span>
                 <div className="flex items-center gap-1">
                   <Calendar className="h-4 w-4" />
-                  <span>{post.date}</span>
+                  <span><TranslatableText text={post.date} forceTranslate={true} /></span>
                 </div>
                 <div className="flex items-center gap-1">
                   <User className="h-4 w-4" />
-                  <span>{post.author.name}</span>
+                  <span><TranslatableText text={post.author.name} forceTranslate={true} /></span>
                 </div>
                 <div className="flex items-center gap-1">
                   <Clock className="h-4 w-4" />
-                  <span>{post.readTime}</span>
+                  <span><TranslatableText text={post.readTime} forceTranslate={true} /></span>
                 </div>
               </div>
               
-              <h1 className="text-3xl md:text-4xl font-bold mb-4">{post.title}</h1>
-              <p className="text-lg text-muted-foreground">{post.excerpt}</p>
+              <h1 className="text-3xl md:text-4xl font-bold mb-4">
+                <TranslatableText text={post.title} forceTranslate={true} />
+              </h1>
+              <p className="text-lg text-muted-foreground">
+                <TranslatableText text={post.excerpt} forceTranslate={true} />
+              </p>
             </div>
             
-            <div className="prose prose-lg max-w-none" dangerouslySetInnerHTML={{ __html: post.content }}></div>
+            {/* For the content, we need to create a way to translate HTML content safely */}
+            <div className="prose prose-lg max-w-none">
+              <TranslatableText as="div" text={post.content} forceTranslate={true} />
+            </div>
             
             <div className="border-t border-gray-100 mt-12 pt-8">
               <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
@@ -107,13 +120,19 @@ const BlogPostPage = () => {
                     {post.author.avatar}
                   </div>
                   <div>
-                    <p className="font-medium">{post.author.name}</p>
-                    <p className="text-sm text-muted-foreground">{post.author.role}</p>
+                    <p className="font-medium">
+                      <TranslatableText text={post.author.name} forceTranslate={true} />
+                    </p>
+                    <p className="text-sm text-muted-foreground">
+                      <TranslatableText text={post.author.role} forceTranslate={true} />
+                    </p>
                   </div>
                 </div>
                 <div className="flex gap-4">
                   <Button variant="outline" asChild>
-                    <Link to="/blog">More Articles</Link>
+                    <Link to="/blog">
+                      <TranslatableText text="More Articles" forceTranslate={true} />
+                    </Link>
                   </Button>
                 </div>
               </div>

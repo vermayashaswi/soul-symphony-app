@@ -3,7 +3,6 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
 import { staticTranslationService } from '@/services/staticTranslationService';
-import i18n from '@/i18n/i18n';
 
 // Define the language options
 export const languages = [
@@ -69,12 +68,6 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       
       // Update the HTML lang attribute
       updateHtmlLang(lang);
-      
-      // Update the i18n language if available
-      if (i18n) {
-        console.log(`TranslationContext: Changing i18n language to ${lang}`);
-        await i18n.changeLanguage(lang);
-      }
       
       // Update the service language
       staticTranslationService.setLanguage(lang);

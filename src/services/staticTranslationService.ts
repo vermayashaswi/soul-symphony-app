@@ -1,10 +1,30 @@
 
-// Create this file if it doesn't exist already
 import { translationCache } from './translationCache';
 
 class StaticTranslationService {
   private language = 'en';
   private translationQueue: Map<string, Promise<string>> = new Map();
+  
+  // Static translations for common UI text elements
+  private staticTranslations: Record<string, Record<string, string>> = {
+    'en': {}, // No translations needed for English
+    'es': {
+      'Back to Home': 'Volver al inicio',
+      'Privacy Policy': 'Política de Privacidad',
+      'Last Updated': 'Última actualización',
+      'Read More': 'Leer más',
+      'Back to Blog': 'Volver al Blog',
+      'More Articles': 'Más artículos'
+    },
+    'fr': {
+      'Back to Home': 'Retour à l\'accueil',
+      'Privacy Policy': 'Politique de confidentialité', 
+      'Last Updated': 'Dernière mise à jour',
+      'Read More': 'Lire plus',
+      'Back to Blog': 'Retour au blog',
+      'More Articles': 'Plus d\'articles'
+    }
+  };
 
   setLanguage(lang: string) {
     console.log(`StaticTranslationService: Setting language to ${lang}`);
@@ -15,6 +35,11 @@ class StaticTranslationService {
     // If already in English or empty text, return as is
     if (this.language === 'en' || !text || text.trim() === '') {
       return text;
+    }
+    
+    // Check for static translations first
+    if (this.staticTranslations[this.language]?.[text]) {
+      return this.staticTranslations[this.language][text];
     }
 
     // Generate a unique key for this translation request
@@ -70,6 +95,12 @@ class StaticTranslationService {
     for (const text of texts) {
       if (!text || text.trim() === '') {
         translationMap.set(text, text);
+        continue;
+      }
+      
+      // Check for static translations first
+      if (this.staticTranslations[this.language]?.[text]) {
+        translationMap.set(text, this.staticTranslations[this.language][text]);
         continue;
       }
       
@@ -203,4 +234,3 @@ class StaticTranslationService {
 }
 
 export const staticTranslationService = new StaticTranslationService();
-
