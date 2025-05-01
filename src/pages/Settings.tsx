@@ -1,5 +1,4 @@
-
-import { useState, useEffect } from 'react';
+import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
 import { Button } from "@/components/ui/button";
@@ -315,7 +314,7 @@ export default function Settings() {
   const applyNotificationSettings = () => {
     // Ensure we have at least one time selected
     if (notificationTimes.length === 0) {
-      toast.error("Please select at least one time for notifications");
+      toast.error(<TranslatableText text="Please select at least one time for notifications" forceTranslate={true} />);
       return;
     }
     
@@ -327,12 +326,12 @@ export default function Settings() {
     if (limitedTimes.length > maxTimes) {
       limitedTimes = limitedTimes.slice(0, maxTimes);
       setNotificationTimes(limitedTimes);
-      toast.info(`Limited to ${maxTimes} time${maxTimes > 1 ? 's' : ''} based on frequency`);
+      toast.info(<TranslatableText text={`Limited to ${maxTimes} time${maxTimes > 1 ? 's' : ''} based on frequency`} forceTranslate={true} />);
     }
     
     // Apply settings
     setupJournalReminder(true, notificationFrequency, limitedTimes);
-    toast.success("Notification settings saved");
+    toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
     setShowNotificationSettings(false);
   };
   
