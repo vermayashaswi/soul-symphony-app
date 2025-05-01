@@ -336,6 +336,7 @@ export default function Settings() {
     setShowNotificationSettings(false);
   };
   
+  // Function to format notification settings for display
   const getNotificationSummary = () => {
     if (!notificationsEnabled) return <TranslatableText text="Disabled" />;
     
@@ -345,7 +346,7 @@ export default function Settings() {
       'thrice': 'Three times'
     }[notificationFrequency];
     
-    // Explicitly define return value to handle string vs JSX element typing
+    // Create React elements for time labels
     const timeLabelElements = notificationTimes.map((time, idx) => {
       const label = {
         'morning': 'Morning',
@@ -362,9 +363,12 @@ export default function Settings() {
       );
     });
     
+    // Return composed JSX with proper components
     return (
       <>
-        <TranslatableText text={frequencyText} /> <TranslatableText text="daily" />: {timeLabelElements}
+        <TranslatableText text={frequencyText} /> <TranslatableText text="daily" />
+        {': '}
+        {timeLabelElements}
       </>
     );
   };
@@ -632,7 +636,7 @@ export default function Settings() {
                 title="Notifications"
                 description={
                   notificationsEnabled 
-                    ? "" // This is replaced by getNotificationSummary function
+                    ? "" // This description is replaced by getNotificationSummary function
                     : "Get reminders to journal and stay on track"
                 }
               >
@@ -652,6 +656,13 @@ export default function Settings() {
                   )}
                 </div>
               </SettingItem>
+              
+              {/* Display notification summary when enabled */}
+              {notificationsEnabled && (
+                <div className="pt-2 text-sm text-muted-foreground">
+                  {getNotificationSummary()}
+                </div>
+              )}
             </div>
           </motion.div>
           
