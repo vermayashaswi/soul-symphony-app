@@ -325,8 +325,9 @@ export default function Settings() {
     
     if (limitedTimes.length > maxTimes) {
       limitedTimes = limitedTimes.slice(0, maxTimes);
-      setNotificationTimes(limitedTimes);
-      toast.info(<TranslatableText text={`Limited to ${maxTimes} time${maxTimes > 1 ? 's' : ''} based on frequency`} forceTranslate={true} />);
+      // Fix: Use string concatenation outside the TranslatableText component
+      const message = `Limited to ${maxTimes} time${maxTimes > 1 ? 's' : ''} based on frequency`;
+      toast.info(<TranslatableText text={message} forceTranslate={true} />);
     }
     
     // Apply settings
