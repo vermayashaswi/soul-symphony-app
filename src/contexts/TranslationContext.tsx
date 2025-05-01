@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
@@ -34,6 +33,15 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
 
+  // Helper function to clean translation results
+  const cleanTranslationResult = (result: string): string => {
+    if (!result) return '';
+    
+    // Remove language code suffix like "(hi)" or "[hi]" that might be appended
+    const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+    return result.replace(languageCodeRegex, '').trim();
+  };
+
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
     if (currentLanguage === 'en' || !text || text.trim() === '') return text;
@@ -41,8 +49,11 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     try {
       console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'en'}${entryId ? ` for entry ${entryId}` : ''}`);
       const translated = await staticTranslationService.translateText(text, sourceLanguage, entryId);
-      console.log(`Translation result: "${translated?.substring(0, 30) || 'empty'}..."`);
-      return translated;
+      
+      // Clean the result in case the service didn't do it
+      const cleanedTranslation = cleanTranslationResult(translated);
+      console.log(`Translation result: "${cleanedTranslation?.substring(0, 30) || 'empty'}..."`);
+      return cleanedTranslation || text;
     } catch (error) {
       console.error('Translation error in context:', error);
       return text; // Fallback to original
@@ -64,6 +75,11 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     setTranslationProgress(0);
     
     try {
+      // Clear translation cache when language changes to force fresh translations
+      // This step is important to avoid keeping any problematic translations
+      await translationCache.clearCache(lang);
+      console.log(`Cleared translation cache for ${lang}`);
+      
       // Store language preference
       localStorage.setItem('preferredLanguage', lang);
       

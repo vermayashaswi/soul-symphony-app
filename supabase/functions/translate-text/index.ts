@@ -26,7 +26,7 @@ serve(async (req) => {
     console.log('Starting translation with provided API key');
     
     // Parse request body
-    const { text, sourceLanguage, targetLanguage = 'hi', entryId } = await req.json();
+    const { text, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true } = await req.json();
 
     if (!text) {
       throw new Error('Missing required parameter: text is required');
@@ -76,7 +76,7 @@ serve(async (req) => {
         q: text,
         source: detectedLanguage,
         target: targetLanguage,
-        format: 'text'
+        format: 'text' // Ensure we're using text format, not HTML
       })
     });
 
@@ -95,8 +95,16 @@ serve(async (req) => {
       throw new Error('Invalid translation response format');
     }
     
-    const translatedText = translateData.data.translations[0].translatedText;
-    console.log(`Translated text: "${translatedText.substring(0, 50)}..."`);
+    let translatedText = translateData.data.translations[0].translatedText;
+    console.log(`Raw translated text: "${translatedText.substring(0, 50)}..."`);
+    
+    // Clean the translation result if requested
+    if (cleanResult) {
+      // Remove language code suffix like "(hi)" or "[hi]" that might be appended
+      const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+      translatedText = translatedText.replace(languageCodeRegex, '').trim();
+      console.log(`Cleaned translated text: "${translatedText.substring(0, 50)}..."`);
+    }
 
     // Update the database with the translation only if entryId is provided
     if (entryId) {

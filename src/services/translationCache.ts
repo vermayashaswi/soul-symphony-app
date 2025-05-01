@@ -1,7 +1,7 @@
 
 import { openDB, IDBPDatabase } from 'idb';
 
-interface TranslationRecord {
+interface TranslationEntry {
   originalText: string;
   translatedText: string;
   language: string;
@@ -9,93 +9,91 @@ interface TranslationRecord {
   version: number;
 }
 
-interface LanguageMetadata {
-  lastUpdated: number;
-  version: number;
-  available: boolean;
-  completionPercentage: number;
-}
-
 class TranslationCache {
-  private db: IDBPDatabase | null = null;
-  private readonly DB_NAME = 'translations_db';
+  private dbPromise: Promise<IDBPDatabase>;
+  private readonly DB_NAME = 'translation-cache';
+  private readonly STORE_NAME = 'translations';
   private readonly DB_VERSION = 1;
-  private initPromise: Promise<IDBPDatabase> | null = null;
 
-  async initialize() {
-    if (this.initPromise) return this.initPromise;
-    
-    console.log('Initializing translation cache database');
-    
-    this.initPromise = openDB(this.DB_NAME, this.DB_VERSION, {
+  constructor() {
+    this.dbPromise = this.initDatabase();
+  }
+
+  private async initDatabase(): Promise<IDBPDatabase> {
+    return openDB(this.DB_NAME, this.DB_VERSION, {
       upgrade(db) {
-        console.log('Upgrading translation cache database');
+        // Create object store if it doesn't exist
         if (!db.objectStoreNames.contains('translations')) {
-          db.createObjectStore('translations');
-        }
-        if (!db.objectStoreNames.contains('languageMetadata')) {
-          db.createObjectStore('languageMetadata');
+          const store = db.createObjectStore('translations', { keyPath: 'id' });
+          store.createIndex('language', 'language', { unique: false });
+          console.log('TranslationCache: Created translations store');
         }
       },
     });
-    
+  }
+
+  // Generate a consistent ID for caching
+  private generateId(text: string, language: string): string {
+    return `${language}-${text.substring(0, 50)}`;
+  }
+
+  async getTranslation(originalText: string, targetLanguage: string): Promise<TranslationEntry | undefined> {
     try {
-      this.db = await this.initPromise;
-      console.log('Translation cache database initialized successfully');
-      return this.db;
+      const db = await this.dbPromise;
+      const id = this.generateId(originalText, targetLanguage);
+      return db.get(this.STORE_NAME, id);
     } catch (error) {
-      console.error('Failed to initialize translation cache:', error);
-      this.initPromise = null;
-      throw error;
+      console.error('TranslationCache: Error getting translation:', error);
+      return undefined;
     }
   }
 
-  async getTranslation(originalText: string, language: string): Promise<TranslationRecord | null> {
+  async setTranslation(entry: TranslationEntry): Promise<void> {
     try {
-      if (!this.db) await this.initialize();
-      const key = `${originalText}_${language}`;
-      return this.db!.get('translations', key);
+      const db = await this.dbPromise;
+      const id = this.generateId(entry.originalText, entry.language);
+      await db.put(this.STORE_NAME, {
+        ...entry,
+        id,
+      });
     } catch (error) {
-      console.error('Error getting translation from cache:', error);
-      return null;
+      console.error('TranslationCache: Error setting translation:', error);
     }
   }
 
-  async setTranslation(record: TranslationRecord): Promise<void> {
+  // Clear all cached translations for a specific language
+  async clearCache(language: string): Promise<void> {
     try {
-      if (!this.db) await this.initialize();
-      const key = `${record.originalText}_${record.language}`;
-      await this.db!.put('translations', record, key);
+      console.log(`TranslationCache: Clearing cache for language ${language}`);
+      const db = await this.dbPromise;
+      
+      // Get all keys from the object store
+      const tx = db.transaction(this.STORE_NAME, 'readwrite');
+      const store = tx.objectStore(this.STORE_NAME);
+      const index = store.index('language');
+      let cursor = await index.openCursor(language);
+      
+      // Delete each entry for the specified language
+      while (cursor) {
+        await cursor.delete();
+        cursor = await cursor.continue();
+      }
+      
+      await tx.done;
+      console.log(`TranslationCache: Successfully cleared cache for ${language}`);
     } catch (error) {
-      console.error('Error setting translation in cache:', error);
+      console.error(`TranslationCache: Error clearing cache for ${language}:`, error);
     }
   }
 
-  async clearCache(): Promise<void> {
+  // For debugging - get all translations
+  async getAllTranslations(): Promise<TranslationEntry[]> {
     try {
-      if (!this.db) await this.initialize();
-      await this.db!.clear('translations');
+      const db = await this.dbPromise;
+      return db.getAll(this.STORE_NAME);
     } catch (error) {
-      console.error('Error clearing translation cache:', error);
-    }
-  }
-
-  async getLanguageMetadata(language: string): Promise<LanguageMetadata | null> {
-    try {
-      if (!this.db) await this.initialize();
-      return this.db!.get('languageMetadata', language);
-    } catch (error) {
-      console.error('Error getting language metadata from cache:', error);
-      return null;
-    }
-  }
-
-  async setLanguageMetadata(language: string, metadata: LanguageMetadata): Promise<void> {
-    try {
-      if (!this.db) await this.initialize();
-      await this.db!.put('languageMetadata', metadata, language);
-    } catch (error) {
-      console.error('Error setting language metadata in cache:', error);
+      console.error('TranslationCache: Error getting all translations:', error);
+      return [];
     }
   }
 }

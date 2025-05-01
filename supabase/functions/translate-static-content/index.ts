@@ -24,13 +24,22 @@ serve(async (req) => {
     }
     
     // Parse request body
-    const { texts, targetLanguage = 'hi', sourceLanguage = 'en' } = await req.json();
+    const { texts, targetLanguage = 'hi', sourceLanguage = 'en', cleanResult = true } = await req.json();
 
     if (!texts || !Array.isArray(texts) || texts.length === 0) {
       throw new Error('Missing required parameter: texts (array)');
     }
 
     console.log(`Translating ${texts.length} text items to ${targetLanguage}`);
+
+    // Helper function to clean translation results
+    const cleanTranslationResult = (result: string): string => {
+      if (!result) return '';
+      
+      // Remove language code suffix like "(hi)" or "[hi]" that might be appended
+      const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+      return result.replace(languageCodeRegex, '').trim();
+    };
 
     // Translate the texts
     const translateUrl = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
@@ -43,7 +52,7 @@ serve(async (req) => {
         q: texts,
         source: sourceLanguage,
         target: targetLanguage,
-        format: 'text'
+        format: 'text' // Ensure we're using text format, not HTML
       })
     });
 
@@ -61,10 +70,19 @@ serve(async (req) => {
       throw new Error('Invalid translation response format');
     }
     
-    const translations = translateData.data.translations.map((item, index) => ({
-      original: texts[index],
-      translated: item.translatedText
-    }));
+    const translations = translateData.data.translations.map((item, index) => {
+      let translatedText = item.translatedText;
+      
+      // Clean the result if requested
+      if (cleanResult) {
+        translatedText = cleanTranslationResult(translatedText);
+      }
+      
+      return {
+        original: texts[index],
+        translated: translatedText
+      };
+    });
 
     console.log(`Successfully translated ${translations.length} items`);
     

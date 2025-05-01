@@ -37,6 +37,15 @@ export function TranslatableText({
   const pathname = location.pathname;
   const isOnWebsite = isWebsiteRoute(pathname);
   
+  // Helper function to clean translation results
+  const cleanTranslationResult = (result: string): string => {
+    if (!result) return '';
+    
+    // Remove language code suffix like "(hi)" or "[hi]" that might be appended
+    const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+    return result.replace(languageCodeRegex, '').trim();
+  };
+  
   // Function to translate text with better error handling
   const translateText = async () => {
     // Skip translation if text is empty
@@ -73,7 +82,9 @@ export function TranslatableText({
       // the input text is still the same as when we started
       if (prevLangRef.current === currentLanguage && textRef.current === text) {
         if (result) {
-          setTranslatedText(result);
+          // Clean the translation result before setting it
+          const cleanedResult = cleanTranslationResult(result);
+          setTranslatedText(cleanedResult || text); // Fallback to original if cleaning removes everything
         } else {
           setTranslatedText(text); // Fallback to original if result is empty
         }

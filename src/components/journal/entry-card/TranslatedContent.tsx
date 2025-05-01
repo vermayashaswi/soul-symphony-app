@@ -15,6 +15,15 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
   const [isLoading, setIsLoading] = useState(true);
   const { currentLanguage, translate } = useTranslation();
 
+  // Helper function to clean translation results
+  const cleanTranslationResult = (result: string): string => {
+    if (!result) return '';
+    
+    // Remove language code suffix like "(hi)" or "[hi]" that might be appended
+    const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+    return result.replace(languageCodeRegex, '').trim();
+  };
+
   // Function to handle translation
   const handleTranslation = async () => {
     setIsLoading(true);
@@ -28,7 +37,9 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
         // Use "en" as default source language when none is provided
         const translated = await translate(content, language || "en", entryId);
         if (translated) {
-          setTranslatedContent(translated);
+          // Clean the translation result before setting it
+          const cleanedResult = cleanTranslationResult(translated);
+          setTranslatedContent(cleanedResult || content);
         }
       }
     } catch (error) {

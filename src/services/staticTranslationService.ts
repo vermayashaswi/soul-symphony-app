@@ -32,6 +32,15 @@ class StaticTranslationService {
     this.language = lang;
   }
 
+  // Helper function to clean translation results
+  private cleanTranslationResult(result: string): string {
+    if (!result) return '';
+    
+    // Remove language code suffix like "(hi)" or "[hi]" that might be appended
+    const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+    return result.replace(languageCodeRegex, '').trim();
+  }
+
   async translateText(text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string> {
     // If already in English or empty text, return as is
     if (this.language === 'en' || !text || text.trim() === '') {
@@ -51,13 +60,14 @@ class StaticTranslationService {
       const cached = await translationCache.getTranslation(text, this.language);
       if (cached?.translatedText) {
         console.log(`StaticTranslationService: Cache hit for "${text.substring(0, 20)}..."`);
-        return cached.translatedText;
+        return this.cleanTranslationResult(cached.translatedText);
       }
       
       // If we're already translating this text, return the in-flight promise
       if (this.translationQueue.has(cacheKey)) {
         console.log(`StaticTranslationService: Reusing in-flight request for "${text.substring(0, 20)}..."`);
-        return this.translationQueue.get(cacheKey)!;
+        const result = await this.translationQueue.get(cacheKey)!;
+        return this.cleanTranslationResult(result);
       }
       
       // Create a new translation promise
@@ -71,7 +81,8 @@ class StaticTranslationService {
         this.translationQueue.delete(cacheKey);
       });
       
-      return translationPromise;
+      const result = await translationPromise;
+      return this.cleanTranslationResult(result);
     } catch (error) {
       console.error('StaticTranslationService error:', error);
       return text; // Fallback to original
@@ -108,12 +119,14 @@ class StaticTranslationService {
       
       if (data && data.translations) {
         data.translations.forEach((item: { original: string, translated: string }) => {
-          translationMap.set(item.original, item.translated);
+          // Clean the translation before storing it
+          const cleanedTranslation = this.cleanTranslationResult(item.translated);
+          translationMap.set(item.original, cleanedTranslation);
           
           // Also store in cache
           translationCache.setTranslation({
             originalText: item.original,
-            translatedText: item.translated,
+            translatedText: cleanedTranslation,
             language: this.language,
             timestamp: Date.now(),
             version: 1,
@@ -149,7 +162,8 @@ class StaticTranslationService {
           text,
           sourceLanguage,
           targetLanguage: this.language,
-          entryId
+          entryId,
+          cleanResult: true // Tell the function to clean the result
         }
       });
       
@@ -161,7 +175,7 @@ class StaticTranslationService {
       if (data && data.translatedText) {
         const translatedText = data.translatedText;
         
-        // Store in cache
+        // Store in cache (cleaned version will be returned from API)
         await translationCache.setTranslation({
           originalText: text,
           translatedText,
