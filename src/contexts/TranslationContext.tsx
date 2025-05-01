@@ -3,6 +3,7 @@ import React, { createContext, useContext, useState, useEffect } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
 import { staticTranslationService } from '@/services/staticTranslationService';
+import i18n from '@/i18n/i18n';
 
 // Define the language options
 export const languages = [
@@ -48,6 +49,13 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     }
   };
 
+  // Set the HTML document language attribute
+  const updateHtmlLang = (lang: string) => {
+    document.documentElement.lang = lang;
+    document.documentElement.setAttribute('data-language', lang);
+    console.log(`TranslationContext: Updated HTML lang attribute to ${lang}`);
+  };
+
   const setLanguage = async (lang: string) => {
     if (lang === currentLanguage) return;
     
@@ -58,6 +66,15 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     try {
       // Store language preference
       localStorage.setItem('preferredLanguage', lang);
+      
+      // Update the HTML lang attribute
+      updateHtmlLang(lang);
+      
+      // Update the i18n language if available
+      if (i18n) {
+        console.log(`TranslationContext: Changing i18n language to ${lang}`);
+        await i18n.changeLanguage(lang);
+      }
       
       // Update the service language
       staticTranslationService.setLanguage(lang);
@@ -94,7 +111,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     const storedLang = localStorage.getItem('preferredLanguage');
     if (storedLang) {
       console.log(`Initializing with stored language preference: ${storedLang}`);
+      // Set HTML lang attribute immediately
+      updateHtmlLang(storedLang);
       setLanguage(storedLang);
+    } else {
+      // Ensure HTML lang is set to default
+      updateHtmlLang('en');
     }
   }, []);
 

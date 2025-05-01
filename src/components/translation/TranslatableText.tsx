@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
@@ -44,10 +45,9 @@ export function TranslatableText({
       return;
     }
 
-    // CRITICAL FIX: forceTranslate should override website route check
-    // This fixes the mixed language issue when forceTranslate is true
+    // Don't translate on website routes unless forced
     if (isOnWebsite && !forceTranslate) {
-      console.log(`TranslatableText: Skipping translation for website route: "${text.substring(0, 30)}..."`);
+      console.log(`TranslatableText: Skipping translation for website route: ${pathname} - "${text.substring(0, 30)}..."`);
       setTranslatedText(text);
       return;
     }

@@ -26,7 +26,7 @@ export const InspirationalQuote: React.FC = () => {
     threshold: 0.1,
   });
   const { colorTheme } = useTheme();
-  const { currentLanguage, translate } = useTranslation();
+  const { currentLanguage } = useTranslation();
   const rotationIntervalRef = useRef<number | null>(null);
   const isTranslatingRef = useRef<boolean>(false);
   const languageRef = useRef<string>(currentLanguage);
@@ -208,10 +208,12 @@ export const InspirationalQuote: React.FC = () => {
   // Setup translation tracking
   const handleTranslationStart = () => {
     isTranslatingRef.current = true;
+    setIsTranslating(true); // Added state update for UI feedback
   };
 
   const handleTranslationEnd = () => {
     isTranslatingRef.current = false;
+    setIsTranslating(false); // Added state update for UI feedback
   };
 
   if (!isReady && !error) {
@@ -254,11 +256,16 @@ export const InspirationalQuote: React.FC = () => {
                 />
               </p>
             )}
+            {isTranslating && (
+              <div className="flex justify-center mt-2">
+                <div className="w-2 h-2 bg-theme/50 rounded-full animate-pulse"></div>
+              </div>
+            )}
           </motion.div>
         )}
       </AnimatePresence>
     </div>
   );
-};
+}
 
 export default InspirationalQuote;

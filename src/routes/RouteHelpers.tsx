@@ -12,13 +12,12 @@ export const isAppRoute = (pathname: string): boolean => {
   // Explicitly define app routes - the root path should NEVER be an app route
   const appPrefixes = ['/app/', '/app', '/journal', '/chat', '/insights', '/settings', '/auth', '/profile'];
   
-  // Debug logging to help diagnose route classification
-  const isApp = appPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
-  if (pathname === '/') {
-    console.log('Root path / is NOT an app route');
-  }
-  
   // Check for specific app routes including paths under /app
+  const isApp = appPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
+  
+  // Debug logging
+  console.log(`isAppRoute check for ${pathname}: ${isApp}`);
+  
   return isApp;
 };
 
@@ -27,18 +26,27 @@ export const isWebsiteRoute = (pathname: string): boolean => {
   const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq'];
   
   // The root path (/) is ALWAYS explicitly a website route
-  if (pathname === "/") {
+  if (pathname === "/" || pathname === "") {
     console.log('Root path / is explicitly a website route');
     return true;
   }
   
   // If it has an app prefix, it's not a website route
-  if (isAppRoute(pathname)) return false;
+  if (isAppRoute(pathname)) {
+    console.log(`${pathname} is an app route, so not a website route`);
+    return false;
+  }
   
   // Check for specific website routes
-  return websitePrefixes.some(prefix => 
+  const isWebsite = websitePrefixes.some(prefix => 
     pathname === prefix || pathname.startsWith(`${prefix}/`)
-  ) || (!isAppRoute(pathname) && pathname !== "/app");
+  );
+  
+  // If not explicitly app or explicitly website, treat as website
+  const result = isWebsite || (!isAppRoute(pathname) && pathname !== "/app");
+  console.log(`isWebsiteRoute check for ${pathname}: ${result}`);
+  
+  return result;
 };
 
 export const getBaseUrl = (): string => {

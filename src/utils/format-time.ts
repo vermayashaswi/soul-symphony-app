@@ -1,4 +1,23 @@
 
+import { formatRelative, format, differenceInSeconds, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
+import { enUS, es, fr, de, hi, zh, ja, ru, ar, pt } from 'date-fns/locale';
+
+// Helper function to get locale based on language code
+const getLocale = (lang: string) => {
+  switch (lang.substring(0, 2)) {
+    case 'es': return es;
+    case 'fr': return fr;
+    case 'de': return de;
+    case 'hi': return hi;
+    case 'zh': return zh;
+    case 'ja': return ja;
+    case 'ru': return ru;
+    case 'ar': return ar;
+    case 'pt': return pt;
+    default: return enUS;
+  }
+};
+
 // Format a timestamp to a relative time string (e.g., "2 hours ago")
 export const formatRelativeTime = (timestamp: string | number | Date): string => {
   const date = new Date(timestamp);
@@ -13,6 +32,11 @@ export const formatRelativeTime = (timestamp: string | number | Date): string =>
   if (diffInMinutes < 60) {
     return 'just now'; // Changed to show "just now" for entries within the last hour
   }
+
+  // Get the language from the HTML document
+  // This will use whatever language the TranslationContext has set on the document
+  const lang = document.documentElement.lang || 'en';
+  console.log(`formatRelativeTime: Using language: ${lang}`);
 
   const diffInHours = Math.floor(diffInMinutes / 60);
   if (diffInHours < 24) {
@@ -47,6 +71,7 @@ export const formatShortDate = (timestamp: string | number | Date): string => {
   // Get the language from the HTML document
   // This will use whatever language the TranslationContext has set on the document
   const lang = document.documentElement.lang || 'en';
+  console.log(`formatShortDate: Using language: ${lang} for date: ${date}`);
   
   try {
     // Use options to format the date according to the user's language
