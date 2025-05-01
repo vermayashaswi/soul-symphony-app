@@ -23,4 +23,10 @@ export default defineConfig(({ mode }) => ({
   optimizeDeps: {
     exclude: ['lovable-tagger'],
   },
+  // Ensure that Vite correctly resolves Node.js built-in modules
+  build: {
+    commonjsOptions: {
+      transformMixedEsModules: true,
+    },
+  },
 }));
