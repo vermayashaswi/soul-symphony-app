@@ -367,7 +367,7 @@ export default function Settings() {
     return (
       <>
         <TranslatableText text={frequencyText} /> <TranslatableText text="daily" />
-        {': '}
+        <span>{': '}</span>
         {timeLabelElements}
       </>
     );
