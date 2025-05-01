@@ -345,23 +345,26 @@ export default function Settings() {
       'thrice': 'Three times'
     }[notificationFrequency];
     
-    const timeLabels = notificationTimes.map(time => {
-      return {
+    // Explicitly define return value to handle string vs JSX element typing
+    const timeLabelElements = notificationTimes.map((time, idx) => {
+      const label = {
         'morning': 'Morning',
         'afternoon': 'Afternoon',
         'evening': 'Evening',
         'night': 'Night'
       }[time];
+      
+      return (
+        <React.Fragment key={idx}>
+          {idx > 0 && ", "}
+          <TranslatableText text={label} />
+        </React.Fragment>
+      );
     });
     
     return (
       <>
-        <TranslatableText text={frequencyText} /> <TranslatableText text="daily" />: {timeLabels.map((label, idx) => (
-          <React.Fragment key={idx}>
-            {idx > 0 && ", "}
-            <TranslatableText text={label} />
-          </React.Fragment>
-        ))}
+        <TranslatableText text={frequencyText} /> <TranslatableText text="daily" />: {timeLabelElements}
       </>
     );
   };
