@@ -250,7 +250,8 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
   
   const renderYearGrid = () => {
     const currentYear = currentDate.getFullYear();
-    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    // Use single letter abbreviations for months instead of three letters
+    const months = ['J', 'F', 'M', 'A', 'M', 'J', 'J', 'A', 'S', 'O', 'N', 'D'];
     
     // Generate all days for the entire year (1-31)
     const allYearDates = Array.from({ length: 31 }, (_, i) => i + 1);
@@ -260,9 +261,9 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
         <table className="w-full border-collapse">
           <thead>
             <tr>
-              <th className="text-xs text-muted-foreground p-1 w-8 sticky top-0 bg-background z-10"></th>
-              {months.map(month => (
-                <th key={month} className="text-xs text-center text-muted-foreground p-1 sticky top-0 bg-background z-10">
+              <th className="text-xs text-muted-foreground px-0.5 w-4 sticky top-0 bg-background z-10"></th>
+              {months.map((month, index) => (
+                <th key={month} className="text-xs text-center text-muted-foreground px-0.5 sticky top-0 bg-background z-10">
                   <TranslatableText text={month} forceTranslate={true} />
                 </th>
               ))}
@@ -271,13 +272,13 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
           <tbody className="text-xs">
             {allYearDates.map(day => (
               <tr key={`day-${day}`}>
-                <td className="text-xs text-center text-muted-foreground p-1 sticky left-0 bg-background">{day}</td>
+                <td className="text-xs text-center text-muted-foreground px-0.5 sticky left-0 bg-background">{day}</td>
                 {months.map((_, monthIndex) => {
                   // Check if this day exists in this month (e.g., no Feb 30th)
                   const daysInMonth = new Date(currentYear, monthIndex + 1, 0).getDate();
                   
                   if (day > daysInMonth) {
-                    return <td key={`empty-${monthIndex}-${day}`} className="p-[1px]"></td>;
+                    return <td key={`empty-${monthIndex}-${day}`} className="p-0"></td>;
                   }
                   
                   const date = new Date(currentYear, monthIndex, day);
@@ -286,10 +287,10 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                   const sentiment = sentimentByDate.get(dateKey) || 0;
                   
                   return (
-                    <td key={dateKey} className="p-[1px] text-center">
+                    <td key={dateKey} className="p-0 text-center">
                       <div 
                         className={cn(
-                          "w-3 h-3 rounded-full mx-auto",
+                          "w-2.5 h-2.5 rounded-full mx-auto",
                           hasMood 
                             ? getSentimentColor(sentiment)
                             : "bg-muted/30",
