@@ -51,8 +51,35 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   const cleanupTimersRef = useRef<NodeJS.Timeout[]>([]);
   const unmountingRef = useRef<boolean>(false);
   const forceRemoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const visibilityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const isVisibleRef = useRef<boolean>(true);
   
-  // Self cleanup safety - if this component exists for too long (15 seconds), automatically trigger cleanup
+  // Broadcast that this component was mounted to help track processing entries
+  useEffect(() => {
+    console.log('[LoadingEntryContent] Component mounted:', componentId.current);
+    
+    // Notify that we're now visible
+    window.dispatchEvent(new CustomEvent('loadingContentMounted', {
+      detail: { 
+        timestamp: Date.now(),
+        componentId: componentId.current,
+        visible: true
+      }
+    }));
+    
+    // Set a minimum visibility time to ensure loading state is visible
+    visibilityTimeoutRef.current = setTimeout(() => {
+      console.log('[LoadingEntryContent] Minimum visibility time elapsed');
+    }, 2000); // Ensure loading is visible for at least 2 seconds
+    
+    return () => {
+      if (visibilityTimeoutRef.current) {
+        clearTimeout(visibilityTimeoutRef.current);
+      }
+    };
+  }, []);
+  
+  // Self cleanup safety - if this component exists for too long (10 seconds), automatically trigger cleanup
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
       if (mountedRef.current && !unmountingRef.current) {
@@ -82,7 +109,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         // Force immediate parent card removal
         removeParentCard();
       }
-    }, 15000); // 15 seconds max lifetime (reduced from 20s)
+    }, 10000); // 10 seconds max lifetime (reduced from 15s)
     
     cleanupTimersRef.current.push(safetyTimeout);
     
@@ -93,6 +120,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   
   // Function to remove the parent card - called in multiple places for reliability
   const removeParentCard = () => {
+    if (!isVisibleRef.current) return; // Skip if already removed
+    
+    isVisibleRef.current = false;
+    
     const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
     if (parentCard) {
       parentCard.classList.add('force-hidden');
@@ -150,18 +181,11 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
-    // Notify when loading content is mounted
-    window.dispatchEvent(new CustomEvent('loadingContentMounted', {
-      detail: { 
-        timestamp: Date.now(),
-        componentId: componentId.current
-      }
-    }));
-    
     // Listen for forces removal events targeted at this component
     const handleForceRemoval = (event: CustomEvent) => {
       const isTargetedRemoval = event.detail?.componentId === componentId.current;
       const isBroadcastRemoval = !event.detail?.componentId && event.detail?.forceCleanup;
+      const tempId = event.detail?.tempId;
       
       if ((isTargetedRemoval || isBroadcastRemoval) && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Forced removal event received for', componentId.current);
@@ -172,7 +196,8 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           window.dispatchEvent(new CustomEvent('loadingContentForceRemoved', {
             detail: { 
               timestamp: Date.now(),
-              componentId: componentId.current
+              componentId: componentId.current,
+              tempId
             }
           }));
           
@@ -191,7 +216,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     window.addEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
     
     // Also listen for content ready events which should remove this component
-    const handleContentReady = () => {
+    const handleContentReady = (event: CustomEvent) => {
       if (!unmountingRef.current) {
         console.log('[LoadingEntryContent] Content ready event received, removing card');
         unmountingRef.current = true;

@@ -36,14 +36,36 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   const [processedTempIds, setProcessedTempIds] = useState<Set<string>>(new Set());
   // Track entries that have been added to the UI to prevent duplicates
   const [renderedTempIds, setRenderedTempIds] = useState<Set<string>>(new Set());
+  // Track active processing entries currently shown in the UI
+  const [activeProcessingEntries, setActiveProcessingEntries] = useState<string[]>([]);
   
-  // Filter processingEntries to avoid duplicates
-  const uniqueProcessingEntries = processingEntries.filter(tempId => 
-    !processedTempIds.has(tempId) && !renderedTempIds.has(tempId)
-  );
-  
-  // Check if there are unique processing entries to display
-  const hasProcessingEntries = uniqueProcessingEntries && uniqueProcessingEntries.length > 0;
+  // Process and filter the processing entries to show
+  useEffect(() => {
+    if (processingEntries && processingEntries.length > 0) {
+      // Filter out processing entries that have already been completed or rendered as real entries
+      const entriesTempIds = new Set(entries
+        .filter(entry => entry.tempId)
+        .map(entry => entry.tempId as string));
+        
+      // Find which ones should be actively shown
+      const activeEntries = processingEntries.filter(tempId => {
+        // Don't show if it's already rendered as a real entry
+        if (entriesTempIds.has(tempId)) {
+          return false;
+        }
+        // Don't show if it's marked as processed
+        if (processedTempIds.has(tempId)) {
+          return false;
+        }
+        return true;
+      });
+      
+      console.log(`[JournalEntriesList] Active processing entries: ${activeEntries.length} of ${processingEntries.length} total`);
+      setActiveProcessingEntries(activeEntries);
+    } else {
+      setActiveProcessingEntries([]);
+    }
+  }, [processingEntries, entries, processedTempIds]);
   
   // Update processed temp IDs when processed entry IDs change
   useEffect(() => {
@@ -92,26 +114,58 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         
         // Log for debugging
         console.log(`[JournalEntriesList] Processing completed for tempId: ${tempId}`);
+        
+        // Also update active processing entries
+        setActiveProcessingEntries(prev => prev.filter(id => id !== tempId));
       }
     };
     
     // Listen for content ready events which indicate a processing entry has been completed
     const handleContentReady = (event: CustomEvent) => {
-      // Trigger a refresh of the processed entries list
-      setRenderedTempIds(prev => new Set(prev));
+      // Get the tempId from the event if available
+      const tempId = event.detail?.tempId;
       
-      // Force a cleanup of any loading entries
-      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-        detail: { timestamp: Date.now(), forceCleanup: true }
-      }));
+      if (tempId) {
+        // Mark this specific tempId as processed
+        setProcessedTempIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(tempId);
+          return newSet;
+        });
+        
+        // Also update active processing entries
+        setActiveProcessingEntries(prev => prev.filter(id => id !== tempId));
+      }
+      
+      // Force a refresh of the processed entries list
+      setRenderedTempIds(prev => new Set(prev));
+    };
+    
+    // Listen for force removal events
+    const handleForceRemove = (event: CustomEvent) => {
+      const tempId = event.detail?.tempId;
+      
+      if (tempId) {
+        // Mark this specific tempId as processed
+        setProcessedTempIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(tempId);
+          return newSet;
+        });
+        
+        // Also update active processing entries
+        setActiveProcessingEntries(prev => prev.filter(id => id !== tempId));
+      }
     };
     
     window.addEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
     window.addEventListener('entryContentReady', handleContentReady as EventListener);
+    window.addEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
     
     return () => {
       window.removeEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
       window.removeEventListener('entryContentReady', handleContentReady as EventListener);
+      window.removeEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
     };
   }, []);
   
@@ -161,8 +215,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     }
   }, [entries, processingEntries, processedEntryIds, processedTempIds]);
 
-  // NEW: Debug logging for rendered state
-  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}, processingEntries=${processingEntries.length}, hasProcessingEntries=${hasProcessingEntries}, uniqueProcessingEntries=${uniqueProcessingEntries.length}, renderedTempIds=${[...renderedTempIds].join(',')}, processedTempIds=${[...processedTempIds].join(',')}`);
+  // DEBUG logging for rendered state
+  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, hasEntries=${hasEntries}, isLoading=${isLoading}, processingEntries=${processingEntries.length}, activeProcessingEntries=${activeProcessingEntries.length}, renderedTempIds=${[...renderedTempIds].join(',')}, processedTempIds=${[...processedTempIds].join(',')}`);
 
   return (
     <div className="journal-entries-list" id="journal-entries-container">
@@ -174,11 +228,13 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             <TranslatableText text="Loading journal entries..." />
           </p>
         </div>
-      ) : hasEntries || hasProcessingEntries ? (
+      ) : hasEntries || activeProcessingEntries.length > 0 ? (
         <div className="grid gap-4" data-entries-count={entries.length}>
-          {/* Display processing entry cards first - only show unique ones that haven't been processed */}
-          {hasProcessingEntries && uniqueProcessingEntries.map((tempId) => {
-            // Track this tempId as being rendered to prevent duplicates
+          {/* Display processing entry cards first with better tracking */}
+          {activeProcessingEntries.length > 0 && activeProcessingEntries.map((tempId) => {
+            console.log(`[JournalEntriesList] Rendering processing card for: ${tempId}`);
+            
+            // Track this tempId as being rendered
             if (!renderedTempIds.has(tempId)) {
               setRenderedTempIds(prev => {
                 const newSet = new Set(prev);

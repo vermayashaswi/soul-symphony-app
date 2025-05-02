@@ -137,35 +137,40 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
     console.error('[Audio Processing] Error setting entry ID for processing ID:', error);
   }
   
-  // IMPORTANT: Tell the UI to clean up loading components
-  window.dispatchEvent(new CustomEvent('entryContentReady', {
-    detail: { tempId, entryId, timestamp: Date.now() }
-  }));
-  
-  // Dispatch an event to notify components of the correlation
-  window.dispatchEvent(new CustomEvent('processingEntryMapped', {
-    detail: { tempId, entryId, timestamp: Date.now() }
-  }));
-  
-  // IMPORTANT: Explicitly remove the processing entry to update UI
-  removeProcessingEntryById(tempId);
-  
-  // Dispatch a completion event too
-  window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-    detail: { tempId, entryId, timestamp: Date.now() }
-  }));
-  
-  // Also trigger a fetch refresh
-  window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
-    detail: { tempId, entryId, timestamp: Date.now() }
-  }));
-
-  // Force removal of any loading content components associated with this tempId
+  // IMPROVED: Don't immediately remove the processing entry, give UI time to show it
+  // IMPORTANT: We'll delay the cleanup by 2 second to ensure loading UI is visible
   setTimeout(() => {
-    window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-      detail: { tempId, entryId, timestamp: Date.now(), forceCleanup: true }
+    // Tell the UI to clean up loading components after a short delay
+    window.dispatchEvent(new CustomEvent('entryContentReady', {
+      detail: { tempId, entryId, timestamp: Date.now() }
     }));
-  }, 50);
+    
+    // After another short delay, clean up processing entries
+    setTimeout(() => {
+      // Dispatch an event to notify components of the correlation
+      window.dispatchEvent(new CustomEvent('processingEntryMapped', {
+        detail: { tempId, entryId, timestamp: Date.now() }
+      }));
+      
+      // IMPORTANT: Explicitly remove the processing entry to update UI
+      removeProcessingEntryById(tempId);
+      
+      // Dispatch a completion event too
+      window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
+        detail: { tempId, entryId, timestamp: Date.now() }
+      }));
+      
+      // Also trigger a fetch refresh
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { tempId, entryId, timestamp: Date.now() }
+      }));
+    
+      // Force removal of any loading content components associated with this tempId
+      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+        detail: { tempId, entryId, timestamp: Date.now(), forceCleanup: true }
+      }));
+    }, 1000);
+  }, 2000);
 }
 
 /**
@@ -306,16 +311,6 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
         if (result.entryId) {
           setEntryIdForProcessingId(tempId, result.entryId);
           console.log(`[AudioProcessing] Mapped tempId ${tempId} to entryId ${result.entryId}`);
-          
-          // Explicitly trigger a refresh
-          window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
-            detail: { 
-              tempId, 
-              entryId: result.entryId, 
-              timestamp: Date.now(), 
-              forceUpdate: true 
-            }
-          }));
         }
       })
       .catch(err => {
@@ -357,6 +352,8 @@ export {
  * @returns True if the processing is completed, false otherwise
  */
 export function isProcessingEntryCompleted(tempId: string): boolean {
+  // IMPORTANT: Modified to prevent premature completion detection
+  
   // Extract base tempId without timestamp if it has one
   const baseTempId = tempId.includes('-') ? tempId.split('-')[0] : tempId;
   
@@ -368,16 +365,8 @@ export function isProcessingEntryCompleted(tempId: string): boolean {
   // Check if it has a mapped entry ID
   const entryId = getEntryIdForProcessingId(tempId);
   if (entryId !== undefined) {
-    // Also mark as completed for future checks
-    completedProcessingEntries.set(tempId, true);
-    completedProcessingEntries.set(baseTempId, true);
-
-    // Force removal of any loading content components
-    setTimeout(() => {
-      window.dispatchEvent(new CustomEvent('entryContentReady', {
-        detail: { tempId, entryId, timestamp: Date.now() }
-      }));
-    }, 0);
+    // Do NOT immediately mark as completed - let the UI have time to show processing state
+    // This was causing the processing card to disappear too quickly
     
     return true;
   }
