@@ -103,6 +103,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
         }
         
         console.log(`Found ${entries?.length || 0} entries`);
+        console.log('Sample entities data:', entries?.[0]?.entities);
         
         // Process entries to extract entities and calculate sentiments
         const entityMap = new Map<string, { count: number, totalSentiment: number }>();
@@ -117,30 +118,25 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
             
           if (isNaN(sentimentScore)) return;
           
-          let entitiesArray: Array<{ name: string, type: string }> = [];
+          let entitiesArray: Array<{ name: string, type: string } | string> = [];
           
-          // Parse entities if it's a string
+          // Handle different formats of entities data
           if (typeof entry.entities === 'string') {
+            // Case 1: entities is a JSON string
             try {
-              entitiesArray = JSON.parse(entry.entities);
+              const parsed = JSON.parse(entry.entities);
+              if (Array.isArray(parsed)) {
+                entitiesArray = parsed;
+              }
             } catch (e) {
               console.error('Failed to parse entities JSON:', e);
             }
           } 
-          // Handle if entities is already an array
+          // Case 2: entities is already an array
           else if (Array.isArray(entry.entities)) {
-            // Make sure each element has the expected structure
-            entitiesArray = entry.entities.map(entity => {
-              if (typeof entity === 'object' && entity !== null) {
-                return {
-                  name: 'name' in entity ? String(entity.name) : 'unknown',
-                  type: 'type' in entity ? String(entity.type) : 'unknown'
-                };
-              }
-              return { name: String(entity), type: 'unknown' };
-            });
+            entitiesArray = entry.entities;
           } 
-          // Handle if entities is an object with properties
+          // Case 3: entities is an object with properties
           else if (typeof entry.entities === 'object' && entry.entities !== null) {
             entitiesArray = Object.entries(entry.entities).map(([key, value]) => {
               if (typeof value === 'object' && value !== null) {
@@ -153,11 +149,28 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
             });
           }
           
-          // Process each entity
+          // Process each entity, handling both object and string formats
           entitiesArray.forEach(entity => {
-            if (entity && entity.name && entity.type !== 'others') {
-              const entityName = entity.name.toLowerCase();
-              
+            let entityName = '';
+            let entityType = 'unknown';
+            
+            // Handle entity based on its format
+            if (typeof entity === 'string') {
+              // Simple string entity
+              entityName = entity.toLowerCase();
+            } else if (typeof entity === 'object' && entity !== null) {
+              // Object entity with name and type properties
+              if ('name' in entity && typeof entity.name === 'string') {
+                entityName = entity.name.toLowerCase();
+                
+                if ('type' in entity && typeof entity.type === 'string') {
+                  entityType = entity.type;
+                }
+              }
+            }
+            
+            // Add entity to map if it's valid and not of type 'others'
+            if (entityName && entityType !== 'others') {
               if (!entityMap.has(entityName)) {
                 entityMap.set(entityName, { count: 0, totalSentiment: 0 });
               }
@@ -202,9 +215,14 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
       if (containerRef.current) {
         const { offsetWidth, offsetHeight } = containerRef.current;
         console.log(`Container dimensions: ${offsetWidth}x${offsetHeight}`);
+        
+        // Ensure we have valid dimensions, with fallbacks
+        const width = offsetWidth || 300;
+        const height = offsetHeight || 300;
+        
         setDimensions({
-          width: offsetWidth || 300,  // Fallback to default if 0
-          height: offsetHeight || 300 // Fallback to default if 0
+          width,
+          height
         });
       }
     };
@@ -254,13 +272,13 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
     
     console.log(`Calculating positions with dimensions: ${dimensions.width}x${dimensions.height}`);
     
-    return entities.map((entity, index) => {
+    return entities.map((entity, i) => {
       // Calculate size based on frequency
       const size = minSize + ((entity.count / maxCount) * (maxSize - minSize));
       
       // Calculate position - distribute across space
       const angleStep = (2 * Math.PI) / entities.length;
-      const angle = index * angleStep;
+      const angle = i * angleStep;
       
       // Use a circular layout with some variation
       const radius = Math.min(dimensions.width, dimensions.height) * 0.35; 
