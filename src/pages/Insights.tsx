@@ -120,10 +120,14 @@ export default function Insights() {
     const entries = insightsData.allEntries || [];
     if (entries.length === 0) return [];
     
-    return entries.map(entry => ({
-      date: new Date(entry.created_at),
-      sentiment: parseFloat(entry.sentiment || 0)
-    }));
+    // Ensure we have valid dates and sentiment values
+    return entries
+      .filter(entry => entry.created_at && entry.sentiment !== undefined && entry.sentiment !== null)
+      .map(entry => ({
+        date: new Date(entry.created_at),
+        sentiment: parseFloat(entry.sentiment || 0) || 0
+      }))
+      .filter(item => !isNaN(item.sentiment) && !isNaN(item.date.getTime()));
   };
 
   return (

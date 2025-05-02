@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -16,6 +15,7 @@ import {
   ReferenceLine,
   ReferenceArea
 } from 'recharts';
+import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 
 interface SentimentData {
   date: Date;
@@ -86,13 +86,70 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
   const processChartData = () => {
     if (!sentimentData || sentimentData.length === 0) return [];
     
-    return sentimentData.map(item => ({
-      formattedDate: formatDate(item.date, timeRange, currentLanguage),
-      sentiment: item.sentiment,
-      originalDate: item.date // Keep original date for proper sorting
-    })).sort((a, b) => {
-      // Sort by original date in ascending order for the chart
-      return new Date(a.originalDate).getTime() - new Date(b.originalDate).getTime();
+    // Filter data based on the selected time range
+    const filteredData = filterDataByTimeRange(sentimentData, timeRange);
+    
+    // Group data by formatted date to avoid duplicates
+    const groupedData = new Map();
+    
+    filteredData.forEach(item => {
+      const formattedDate = formatDate(item.date, timeRange, currentLanguage);
+      const dateKey = formattedDate;
+      
+      if (!groupedData.has(dateKey)) {
+        groupedData.set(dateKey, {
+          formattedDate,
+          originalDate: item.date,
+          sentimentSum: item.sentiment,
+          count: 1
+        });
+      } else {
+        const existing = groupedData.get(dateKey);
+        existing.sentimentSum += item.sentiment;
+        existing.count += 1;
+        
+        // Keep the latest entry time for "today" view
+        if (timeRange === 'today' && item.date > existing.originalDate) {
+          existing.originalDate = item.date;
+        }
+      }
+    });
+    
+    // Calculate averages for grouped data
+    return Array.from(groupedData.values())
+      .map(group => ({
+        formattedDate: group.formattedDate,
+        sentiment: group.sentimentSum / group.count,
+        originalDate: group.originalDate
+      }))
+      .sort((a, b) => new Date(a.originalDate).getTime() - new Date(b.originalDate).getTime());
+  };
+  
+  // Helper function to filter data based on time range
+  const filterDataByTimeRange = (data: SentimentData[], range: TimeRange): SentimentData[] => {
+    const now = new Date();
+    let startDate: Date;
+    
+    switch (range) {
+      case 'today':
+        startDate = startOfDay(now);
+        break;
+      case 'week':
+        startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
+        break;
+      case 'month':
+        startDate = startOfMonth(now);
+        break;
+      case 'year':
+        startDate = startOfYear(now);
+        break;
+      default:
+        startDate = startOfWeek(now, { weekStartsOn: 1 });
+    }
+    
+    return data.filter(item => {
+      const itemDate = new Date(item.date);
+      return itemDate >= startDate;
     });
   };
   
@@ -105,42 +162,59 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     // Language-aware date formatting options
     const options: Intl.DateTimeFormatOptions = {};
     
-    switch (range) {
-      case 'today':
-        // Format as HH:MM
-        options.hour = '2-digit';
-        options.minute = '2-digit';
-        options.hour12 = false; // Use 24-hour format for consistency
-        break;
-        
-      case 'week':
-        // Format as day of week (e.g., Mon, Tue)
-        options.weekday = 'short';
-        break;
-        
-      case 'month':
-        // Format as day of month (e.g., 1, 15)
-        options.day = 'numeric';
-        break;
-        
-      case 'year':
-        // Format as short month (e.g., Jan, Feb)
-        options.month = 'short';
-        break;
-        
-      default:
-        // Default to day + short month (e.g., 15 Jan)
-        options.day = 'numeric';
-        options.month = 'short';
-    }
-    
     try {
-      // Format the date using the current language
-      return new Intl.DateTimeFormat(language, options).format(d);
+      switch (range) {
+        case 'today': {
+          // Format as HH:MM or use "Now" for very recent entries
+          const now = new Date();
+          const diffMinutes = (now.getTime() - d.getTime()) / (1000 * 60);
+          
+          if (diffMinutes < 5) {
+            return new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(d) + '*';
+          }
+          
+          return new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(d);
+        }
+        
+        case 'week': {
+          // Format as "Mon 1" (Short weekday + day number)
+          const dayNum = d.getDate();
+          const weekday = new Intl.DateTimeFormat(language, { weekday: 'short' }).format(d);
+          
+          // For consistent width, add the day number
+          return `${weekday} ${dayNum}`;
+        }
+        
+        case 'month': {
+          // Day of month with suffix (1st, 2nd, etc.) - but language aware
+          const day = d.getDate();
+          
+          // For most languages, just showing the day number is good
+          return new Intl.DateTimeFormat(language, { day: 'numeric' }).format(d);
+        }
+        
+        case 'year': {
+          // Month with shortened year (Jan '23)
+          const yearShort = d.getFullYear().toString().substr(2);
+          const month = new Intl.DateTimeFormat(language, { month: 'short' }).format(d);
+          
+          return `${month} '${yearShort}`;
+        }
+        
+        default:
+          // Default to day + short month (e.g., 15 Jan)
+          return new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' }).format(d);
+      }
     } catch (error) {
       console.error('Error formatting date:', error);
-      // Fallback to English formatting
-      return new Intl.DateTimeFormat('en', options).format(d);
+      
+      // Fallback formatting
+      try {
+        return new Intl.DateTimeFormat('en', { dateStyle: 'short' }).format(d);
+      } catch {
+        // Ultimate fallback
+        return d.toLocaleDateString() || 'Invalid date';
+      }
     }
   };
 
@@ -157,10 +231,12 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
       );
     }
     
-    // Prepare data for chart display
-    const lineData = filteredChartData.map(item => ({
+    // Prepare data for chart display - use a display index to ensure even spacing on x-axis
+    const lineData = filteredChartData.map((item, index) => ({
       day: item.formattedDate,
-      sentiment: item.sentiment
+      sentiment: item.sentiment,
+      originalDate: item.originalDate,
+      displayIndex: index // Add display index for even spacing
     }));
 
     return (
@@ -184,7 +260,8 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
               stroke="#888" 
               fontSize={12} 
               tickMargin={10}
-              tickFormatter={(value) => value} // Use the already formatted date
+              tickFormatter={(value, index) => value}
+              interval={isMobile ? (lineData.length > 10 ? Math.floor(lineData.length / 6) : 0) : 0}
             />
             <YAxis 
               stroke="#888" 
