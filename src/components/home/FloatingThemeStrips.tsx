@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -27,6 +28,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
   const animationsRef = useRef<{[key: string]: any}>({});
+  const prevLanguageRef = useRef<string>(currentLanguage);
   
   // Translate the label
   useEffect(() => {
@@ -41,6 +43,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     
     // Listen for language changes
     const handleLanguageChange = async () => {
+      console.log('FloatingThemeStrips: Language change detected, retranslating label');
       if (translate) {
         const result = await translate("7-day themes", "en");
         setTranslatedLabel(result);
@@ -84,19 +87,29 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     translateAllThemes(sortedThemes);
   }, [themesData]);
   
-  // Translate all themes at once
+  // Improved translate all themes at once function
   const translateAllThemes = async (themes: ThemeData[]) => {
-    if (currentLanguage === 'en' || themes.length === 0) {
+    if (themes.length === 0) {
+      setTranslatedThemes([]);
+      return;
+    }
+    
+    // Skip translation for English
+    if (currentLanguage === 'en') {
       setTranslatedThemes(themes);
       return;
     }
     
     try {
+      console.log(`FloatingThemeStrips: Translating ${themes.length} themes to ${currentLanguage}`);
+      
       // Extract all theme strings
       const themeTexts = themes.map(item => item.theme);
       
-      // Pre-translate all at once
-      const translationsMap = await staticTranslationService.preTranslate(themeTexts);
+      // Pre-translate all at once with proper error handling
+      const translationsMap = await staticTranslationService.batchTranslateTexts(themeTexts);
+      
+      console.log('FloatingThemeStrips: Translation results:', translationsMap);
       
       // Apply translations
       const translated = themes.map(item => ({
@@ -104,19 +117,44 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         translatedTheme: translationsMap.get(item.theme) || item.theme
       }));
       
+      // Update state and force re-render
       setTranslatedThemes(translated);
+      
+      console.log('FloatingThemeStrips: Updated translated themes:', translated);
     } catch (error) {
-      console.error('Error translating themes:', error);
+      console.error('FloatingThemeStrips: Error translating themes:', error);
       setTranslatedThemes(themes);
     }
   };
   
-  // Handle language changes
+  // Handle language changes with improved detection
   useEffect(() => {
-    if (uniqueThemes.length > 0) {
-      translateAllThemes(uniqueThemes);
+    // Only retranslate if language actually changed
+    if (prevLanguageRef.current !== currentLanguage) {
+      console.log(`FloatingThemeStrips: Language changed from ${prevLanguageRef.current} to ${currentLanguage}`);
+      prevLanguageRef.current = currentLanguage;
+      
+      if (uniqueThemes.length > 0) {
+        translateAllThemes(uniqueThemes);
+      }
     }
   }, [currentLanguage, uniqueThemes]);
+  
+  // Add explicit language change event listener
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      console.log('FloatingThemeStrips: Language change event received');
+      if (uniqueThemes.length > 0) {
+        translateAllThemes(uniqueThemes);
+      }
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+    };
+  }, [uniqueThemes]);
 
   if (!themesData.length) {
     return null;
@@ -169,7 +207,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           const direction = index % 2 === 0;
           const speed = 15 + Math.random() * 10;
           
-          // Create a stable key for animations
+          // Create a stable key for animations that includes language
           const animationKey = `theme-strip-${themeItem.theme}-${index}-${currentLanguage}`;
           
           // Display the translated theme if available

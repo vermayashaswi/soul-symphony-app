@@ -1,4 +1,5 @@
-import React from 'react';
+
+import React, { useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import {
   DropdownMenu,
@@ -49,11 +50,29 @@ export function LanguageSelector({
     // If external handler provided (for onboarding), call it
     if (onLanguageChange) {
       onLanguageChange(code);
-    } else {
-      // Otherwise use the context method
-      setLanguage(code);
-    }
+    } 
+    
+    // Always use context method to ensure consistency
+    setLanguage(code).then(() => {
+      // Dispatch a custom event after language is set to force components to update
+      window.dispatchEvent(new CustomEvent('manualLanguageChange', { 
+        detail: { language: code, timestamp: Date.now() } 
+      }));
+    });
   };
+
+  // Listen for language changes from other components
+  useEffect(() => {
+    const updateLanguageUI = () => {
+      console.log('LanguageSelector: Detected language change event');
+    };
+    
+    window.addEventListener('languageChange', updateLanguageUI);
+    
+    return () => {
+      window.removeEventListener('languageChange', updateLanguageUI);
+    };
+  }, []);
 
   // For onboarding variant, use a more integrated look
   if (variant === 'onboarding') {

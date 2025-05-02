@@ -36,10 +36,17 @@ export class StaticTranslationService {
       texts.forEach(text => results.set(text, text));
       return results;
     }
+    
+    // Filter out empty texts first
+    const validTexts = texts.filter(text => text && text.trim() !== '');
+    
+    if (validTexts.length === 0) {
+      return new Map<string, string>();
+    }
 
     try {
       return await TranslationService.batchTranslate({
-        texts,
+        texts: validTexts,
         targetLanguage: this.language,
       });
     } catch (error) {
@@ -51,7 +58,7 @@ export class StaticTranslationService {
     }
   }
 
-  // New method to support batch translation with explicit source language
+  // Method to support batch translation with explicit source language
   async batchTranslateTexts(texts: string[]): Promise<Map<string, string>> {
     if (this.language === 'en') {
       // For English, just return originals
@@ -60,19 +67,23 @@ export class StaticTranslationService {
       return results;
     }
 
+    // Filter out empty texts
+    const validTexts = texts.filter(text => text && text.trim() !== '');
+    
+    // If no valid texts, return empty map
+    if (validTexts.length === 0) {
+      return new Map<string, string>();
+    }
+    
     try {
-      // Filter out empty texts
-      const validTexts = texts.filter(text => text && text.trim() !== '');
-      
-      // If no valid texts, return empty map
-      if (validTexts.length === 0) {
-        return new Map<string, string>();
-      }
+      console.log(`StaticTranslationService: Batch translating ${validTexts.length} texts to ${this.language}`);
       
       const translationResults = await TranslationService.batchTranslate({
         texts: validTexts,
         targetLanguage: this.language,
       });
+      
+      console.log(`StaticTranslationService: Translation complete, got ${translationResults.size} results`);
       
       return translationResults;
     } catch (error) {
