@@ -1,5 +1,5 @@
 
-import { processingStateManager } from './processing-state-manager';
+import { processingStateManager, EntryProcessingState } from './processing-state-manager';
 
 export function initializeJournalProcessing() {
   // Restore state from localStorage on app start
@@ -22,7 +22,7 @@ export function initializeJournalProcessing() {
       }
       
       // Mark as completed, which will schedule a cleanup after the minimum visibility time
-      processingStateManager.updateEntryState(tempId, 'completed');
+      processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
     }
   });
   
@@ -48,7 +48,7 @@ export function initializeJournalProcessing() {
     entries.forEach(entry => {
       // If entry has been in the system for more than 30 seconds and is completed, force cleanup
       const entryAge = now - entry.startTime;
-      if (entry.state === 'completed' && entryAge > 30000) {
+      if (entry.state === EntryProcessingState.COMPLETED && entryAge > 30000) {
         processingStateManager.removeEntry(entry.tempId);
         console.log(`[Journal] Force cleaned up entry ${entry.tempId} (age: ${entryAge}ms)`);
       }
