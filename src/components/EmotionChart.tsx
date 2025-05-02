@@ -510,6 +510,7 @@ export function EmotionChart({
                   userId={user?.id}
                   timeRange={timeframe}
                   onEntityClick={handleEntityClick}
+                  className="w-full h-full"
                 />
               )}
             </div>

@@ -6,6 +6,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { TimeRange } from '@/hooks/use-insights-data';
+import { toast } from 'sonner';
 
 type Entity = {
   name: string;
@@ -30,7 +31,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
   const [loading, setLoading] = useState(true);
   const [highlightedEntity, setHighlightedEntity] = useState<string | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
-  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [dimensions, setDimensions] = useState({ width: 300, height: 300 }); // Default dimensions
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   
@@ -78,12 +79,14 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
   useEffect(() => {
     const fetchEntities = async () => {
       if (!userId) {
+        console.log('No user ID provided');
         setLoading(false);
         return;
       }
       
       setLoading(true);
       try {
+        console.log(`Fetching entities for timeRange: ${timeRange}, userId: ${userId}`);
         const { startDate, endDate } = getDateRange();
         
         // Query journal entries within the time range
@@ -94,13 +97,25 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
           .gte('created_at', startDate)
           .lte('created_at', endDate);
         
-        if (error) throw error;
+        if (error) {
+          console.error('Error fetching entries:', error);
+          throw error;
+        }
+        
+        console.log(`Found ${entries?.length || 0} entries`);
         
         // Process entries to extract entities and calculate sentiments
         const entityMap = new Map<string, { count: number, totalSentiment: number }>();
         
         entries?.forEach(entry => {
           if (!entry.entities || !entry.sentiment) return;
+          
+          // Convert sentiment to number if it's a string
+          const sentimentScore = typeof entry.sentiment === 'string' 
+            ? parseFloat(entry.sentiment) 
+            : Number(entry.sentiment);
+            
+          if (isNaN(sentimentScore)) return;
           
           let entitiesArray: Array<{ name: string, type: string }> = [];
           
@@ -126,7 +141,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
             });
           } 
           // Handle if entities is an object with properties
-          else if (typeof entry.entities === 'object') {
+          else if (typeof entry.entities === 'object' && entry.entities !== null) {
             entitiesArray = Object.entries(entry.entities).map(([key, value]) => {
               if (typeof value === 'object' && value !== null) {
                 return {
@@ -138,25 +153,20 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
             });
           }
           
-          // Extract sentiment score
-          const sentimentScore = parseFloat(entry.sentiment);
-          
-          // Only process valid entities and sentiment
-          if (!isNaN(sentimentScore)) {
-            entitiesArray.forEach(entity => {
-              if (entity && entity.name && entity.type !== 'others') {
-                const entityName = entity.name.toLowerCase();
-                
-                if (!entityMap.has(entityName)) {
-                  entityMap.set(entityName, { count: 0, totalSentiment: 0 });
-                }
-                
-                const entityData = entityMap.get(entityName)!;
-                entityData.count += 1;
-                entityData.totalSentiment += sentimentScore;
+          // Process each entity
+          entitiesArray.forEach(entity => {
+            if (entity && entity.name && entity.type !== 'others') {
+              const entityName = entity.name.toLowerCase();
+              
+              if (!entityMap.has(entityName)) {
+                entityMap.set(entityName, { count: 0, totalSentiment: 0 });
               }
-            });
-          }
+              
+              const entityData = entityMap.get(entityName)!;
+              entityData.count += 1;
+              entityData.totalSentiment += sentimentScore;
+            }
+          });
         });
         
         // Convert map to array and calculate average sentiment
@@ -166,14 +176,18 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
           sentiment: data.totalSentiment / data.count
         }));
         
+        console.log(`Processed ${entitiesArray.length} entities`);
+        
         // Sort by frequency and take top 7
         const topEntities = entitiesArray
           .sort((a, b) => b.count - a.count)
           .slice(0, 7);
         
+        console.log('Top entities:', topEntities);
         setEntities(topEntities);
       } catch (error) {
         console.error('Error fetching entity data:', error);
+        toast.error('Failed to load life areas');
       } finally {
         setLoading(false);
       }
@@ -182,23 +196,32 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
     fetchEntities();
   }, [userId, timeRange]);
   
-  // Update dimensions on resize
+  // Update dimensions when the component mounts and on resize
   useEffect(() => {
-    if (containerRef.current) {
-      const updateDimensions = () => {
+    const updateDimensions = () => {
+      if (containerRef.current) {
+        const { offsetWidth, offsetHeight } = containerRef.current;
+        console.log(`Container dimensions: ${offsetWidth}x${offsetHeight}`);
         setDimensions({
-          width: containerRef.current?.offsetWidth || 0,
-          height: containerRef.current?.offsetHeight || 0
+          width: offsetWidth || 300,  // Fallback to default if 0
+          height: offsetHeight || 300 // Fallback to default if 0
         });
-      };
-      
-      updateDimensions();
-      window.addEventListener('resize', updateDimensions);
-      
-      return () => {
-        window.removeEventListener('resize', updateDimensions);
-      };
-    }
+      }
+    };
+    
+    // Initial update
+    updateDimensions();
+    
+    // Add event listener
+    window.addEventListener('resize', updateDimensions);
+    
+    // Update dimensions after a small delay to ensure the container is rendered
+    const timeoutId = setTimeout(updateDimensions, 200);
+    
+    return () => {
+      window.removeEventListener('resize', updateDimensions);
+      clearTimeout(timeoutId);
+    };
   }, []);
   
   if (loading) {
@@ -219,12 +242,17 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
   
   // Calculate positions for bubbles
   const calculatePositions = () => {
-    if (dimensions.width === 0) return [];
+    if (dimensions.width === 0 || dimensions.height === 0) {
+      console.log('Invalid dimensions, using defaults');
+      return [];
+    }
     
     // Find the max count for bubble sizing
     const maxCount = Math.max(...entities.map(e => e.count));
     const minSize = 40; // Minimum size in pixels
     const maxSize = Math.min(dimensions.width / 4, 120); // Maximum size
+    
+    console.log(`Calculating positions with dimensions: ${dimensions.width}x${dimensions.height}`);
     
     return entities.map((entity, index) => {
       // Calculate size based on frequency
@@ -254,11 +282,13 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
   };
   
   const positions = calculatePositions();
+  console.log(`Generated ${positions.length} bubble positions`);
   
   return (
     <div 
       ref={containerRef}
       className={cn("relative w-full h-full", className)}
+      style={{ minHeight: '300px' }} // Ensure minimum height
     >
       {positions.map(({ entity, size, x, y }, bubbleIndex) => {
         const isHighlighted = highlightedEntity === entity.name;

@@ -57,6 +57,12 @@
       "noConnections": "No connections found",
       "addMore": "Add more journal entries to visualize connections between life areas and emotions in your journaling.",
       "dragInfo": "Drag to rotate • Scroll to zoom • Tap/Click a node to highlight connections"
+    },
+    "lifeAreas": {
+      "title": "Life Areas",
+      "description": "Important areas mentioned in your journal",
+      "noData": "No life areas found in this time period",
+      "colorInfo": "Color indicates sentiment: red (negative), yellow (neutral), green (positive)"
     }
   }
 }
