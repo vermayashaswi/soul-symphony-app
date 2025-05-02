@@ -55,27 +55,17 @@ export const extractSummary = (text: string, wordCount: number = 20): string => 
 };
 
 /**
- * Returns true if the text is likely to overflow when limited to the specified number of lines
+ * Returns true if the text is long enough to benefit from expand/collapse functionality
  * @param text Text content to check
- * @param lineHeight Approximate line height in characters
- * @param maxLines Maximum number of lines before overflow
  */
-export const textWillOverflow = (text: string, lineHeight = 60, maxLines = 3): boolean => {
+export const textWillOverflow = (text: string): boolean => {
   if (!text) return false;
   
-  // Check for line breaks which force new lines
+  // Check for line breaks which indicate multiple paragraphs
   const lineBreaks = (text.match(/\n/g) || []).length;
-  if (lineBreaks >= maxLines) return true;
   
-  // Adjust for the possibility of words wrapping
-  const totalChars = text.length;
-  const avgWordLength = 6; // Estimated average word length in English
-  
-  // This approach estimates how many characters can fit in the specified line height
-  // and then adjusts based on word-wrapping behavior
-  const estimatedLines = Math.ceil(totalChars / (lineHeight - Math.min(avgWordLength - 1, lineHeight * 0.2)));
-  
-  return estimatedLines > maxLines || lineBreaks > 0 && estimatedLines + lineBreaks > maxLines;
+  // Consider text as "long" if it's more than 280 characters or has multiple paragraphs
+  return text.length > 280 || lineBreaks > 0;
 };
 
 /**

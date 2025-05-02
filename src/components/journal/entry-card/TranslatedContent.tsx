@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { LoadingEntryContent } from './LoadingEntryContent';
@@ -80,7 +79,7 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
         </div>
       ) : (
         <div className="relative">
-          <p className="text-xs md:text-sm text-foreground line-clamp-3">{translatedContent || content}</p>
+          <p className="text-xs md:text-sm text-foreground">{translatedContent || content}</p>
           {isLoading && <div className="absolute top-0 right-0 w-2 h-2 bg-primary/50 rounded-full animate-pulse"></div>}
         </div>
       )}

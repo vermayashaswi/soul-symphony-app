@@ -32,20 +32,22 @@ export function EntryContent({
   const [detectedLanguage, setDetectedLanguage] = useState<string | undefined>(undefined);
   const contentRef = React.useRef<HTMLDivElement>(null);
 
-  // Function to check if content will overflow container
+  // Function to check for long content that might benefit from expand/collapse functionality
   useEffect(() => {
-    const checkOverflow = () => {
+    const checkForLongContent = () => {
       if (!contentRef.current) return;
       
-      const hasOverflow = contentRef.current.scrollHeight > contentRef.current.clientHeight;
-      onOverflowChange?.(hasOverflow);
+      // Consider content as "long" if it's more than a certain number of characters
+      // or has multiple paragraphs
+      const isLongContent = content.length > 280 || content.split('\n').length > 2;
+      onOverflowChange?.(isLongContent);
     };
 
     // Wait for any potential content changes to finish before checking
-    const timer = setTimeout(checkOverflow, 100);
+    const timer = setTimeout(checkForLongContent, 100);
     
     return () => clearTimeout(timer);
-  }, [content, isExpanded, onOverflowChange]);
+  }, [content, onOverflowChange]);
 
   // Check for language information from the entry
   useEffect(() => {
@@ -89,7 +91,7 @@ export function EntryContent({
   }
 
   return (
-    <div ref={contentRef}>
+    <div ref={contentRef} className="w-full">
       <TranslatedContent 
         content={content} 
         isExpanded={isExpanded} 
