@@ -1,12 +1,8 @@
+
 import { TranslationService } from './translationService';
 
 export class StaticTranslationService {
   private language: string = 'en';
-  private translationService: TranslationService;
-
-  constructor() {
-    this.translationService = new TranslationService();
-  }
 
   setLanguage(language: string): void {
     this.language = language;
@@ -19,7 +15,7 @@ export class StaticTranslationService {
     }
 
     try {
-      const result = await this.translationService.translateText({
+      const result = await TranslationService.translateText({
         text,
         sourceLanguage,
         targetLanguage: this.language,
@@ -42,7 +38,7 @@ export class StaticTranslationService {
     }
 
     try {
-      return await this.translationService.batchTranslate({
+      return await TranslationService.batchTranslate({
         texts,
         targetLanguage: this.language,
       });
@@ -56,7 +52,7 @@ export class StaticTranslationService {
   }
 
   // New method to support batch translation with explicit source language
-  async batchTranslateTexts(texts: string[], sourceLanguage = 'en'): Promise<Map<string, string>> {
+  async batchTranslateTexts(texts: string[]): Promise<Map<string, string>> {
     if (this.language === 'en') {
       // For English, just return originals
       const results = new Map<string, string>();
@@ -73,7 +69,7 @@ export class StaticTranslationService {
         return new Map<string, string>();
       }
       
-      const translationResults = await this.translationService.batchTranslate({
+      const translationResults = await TranslationService.batchTranslate({
         texts: validTexts,
         targetLanguage: this.language,
       });

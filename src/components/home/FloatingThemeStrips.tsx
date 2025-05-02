@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -97,7 +96,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       const themeTexts = themes.map(item => item.theme);
       
       // Pre-translate all at once
-      const translationsMap = await staticTranslationService.preTranslate(themeTexts, "en");
+      const translationsMap = await staticTranslationService.preTranslate(themeTexts);
       
       // Apply translations
       const translated = themes.map(item => ({

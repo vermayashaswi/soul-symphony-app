@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { motion, useAnimation } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -189,7 +188,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       const themeTexts = themes.map(item => item.theme);
       
       // Pre-translate all at once
-      const translationsMap = await staticTranslationService.preTranslate(themeTexts, "en");
+      const translationsMap = await staticTranslationService.preTranslate(themeTexts);
       
       // Apply translations
       const translated = themes.map(item => ({
