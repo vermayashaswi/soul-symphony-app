@@ -13,10 +13,9 @@ import {
 } from './entry-card';
 import { EditEntryButton } from './entry-card/EditEntryButton';
 import ErrorBoundary from './ErrorBoundary';
-import { ThumbsUp, ThumbsDown, ArrowDown, ArrowUp } from 'lucide-react';
+import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { Button } from '@/components/ui/button';
 import { textWillOverflow } from '@/utils/textUtils';
 
 export interface JournalEntry {
@@ -78,7 +77,7 @@ export function JournalEntryCard({
     tempId: entry?.tempId
   };
 
-  const [isExpanded, setIsExpanded] = useState(isNew);
+  const [isExpanded, setIsExpanded] = useState(true); // Always expanded now
   const [showThemes, setShowThemes] = useState(false);
   const [highlightNew, setHighlightNew] = useState(isNew);
   const [hasError, setHasError] = useState(false);
@@ -162,11 +161,7 @@ export function JournalEntryCard({
     });
     
     setContentLoaded(hasValidContent);
-    
-    if (isNew && hasValidContent && !isExpanded) {
-      setIsExpanded(true);
-    }
-  }, [safeEntry.content, isNew, isExpanded, isProcessing, processing]);
+  }, [safeEntry.content, isProcessing, processing]);
   
   useEffect(() => {
     console.log(`[JournalEntryCard] Mounted entry ${safeEntry.id} with tempId ${safeEntry.tempId}`);
@@ -193,9 +188,11 @@ export function JournalEntryCard({
     }
   }, [isNew]);
 
+  // This function is no longer needed as we're removing the expand/collapse button
+  // but we'll keep it for other components that might use it
   const toggleExpanded = () => {
     console.log(`[JournalEntryCard] Toggling expansion for entry ${safeEntry.id}, current state:`, isExpanded);
-    setIsExpanded(!isExpanded);
+    setIsExpanded(!isExpanded); // Will always be true now
   };
 
   const toggleThemes = () => {
@@ -557,21 +554,6 @@ export function JournalEntryCard({
               </div>
             )}
           </div>
-
-          {/* Only show the expand/collapse button if there is content overflow or themes are shown */}
-          {(hasOverflow || showThemes || isExpanded) && (
-            <div className="flex justify-end p-2">
-              <Button
-                onClick={toggleExpanded}
-                className="rounded-full h-8 w-8 p-0"
-                size="icon"
-                variant="ghost"
-                aria-label={isExpanded ? "Show less" : "Show more"}
-              >
-                {isExpanded ? <ArrowUp size={18} /> : <ArrowDown size={18} />}
-              </Button>
-            </div>
-          )}
         </Card>
       </motion.div>
     </ErrorBoundary>
