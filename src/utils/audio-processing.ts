@@ -1,3 +1,4 @@
+
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -25,6 +26,8 @@ const deletedProcessingIds = new Set<string>();
 const deletedEntryIds = new Set<number>();
 // Map to track which processing entries have been completed
 const completedProcessingEntries = new Map<string, boolean>();
+// Track timestamps of processing start
+const processingStartTimes = new Map<string, number>();
 
 /**
  * Check if a processing entry or actual entry has been deleted
@@ -118,9 +121,14 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
   processingToEntryIdMap.set(tempId, entryId);
   processingToEntryIdMap.set(baseTempId, entryId);
   
-  // Mark this processing entry as completed
-  completedProcessingEntries.set(tempId, true);
-  completedProcessingEntries.set(baseTempId, true);
+  // Calculate processing time
+  const startTime = processingStartTimes.get(tempId) || processingStartTimes.get(baseTempId);
+  const processingDuration = startTime ? Date.now() - startTime : 0;
+  
+  console.log(`[Audio Processing] Entry processed in ${processingDuration}ms: ${tempId} -> ${entryId}`);
+  
+  // IMPORTANT: DO NOT mark as completed immediately - need to show UI first
+  // Delayed completion marking happens below
   
   // Also persist to localStorage for cross-page survival - this is crucial for iOS
   try {
@@ -137,40 +145,49 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
     console.error('[Audio Processing] Error setting entry ID for processing ID:', error);
   }
   
-  // IMPROVED: Don't immediately remove the processing entry, give UI time to show it
-  // IMPORTANT: We'll delay the cleanup by 2 second to ensure loading UI is visible
+  // IMPROVED: Ensure cards are visible for at least 4 seconds
+  // First tell the UI that content is ready but don't remove cards yet
+  const minVisibleTime = 4000; // ms
+  const processingTime = processingDuration;
+  const timeToWait = Math.max(0, minVisibleTime - processingTime);
+  
+  console.log(`[Audio Processing] Ensuring card visibility for ${timeToWait}ms more after ${processingTime}ms of processing`);
+  
+  // First dispatch an event to indicate content is ready (this triggers UI transition)
+  window.dispatchEvent(new CustomEvent('entryContentReady', {
+    detail: { tempId, entryId, timestamp: Date.now() }
+  }));
+  
+  // After ensuring minimum visibility, mark as complete and clean up
   setTimeout(() => {
-    // Tell the UI to clean up loading components after a short delay
-    window.dispatchEvent(new CustomEvent('entryContentReady', {
+    console.log(`[Audio Processing] Now marking entry as completed after minimum visibility: ${tempId} -> ${entryId}`);
+    
+    // Now mark as completed AFTER minimum display time
+    completedProcessingEntries.set(tempId, true);
+    completedProcessingEntries.set(baseTempId, true);
+    
+    // Dispatch completion events
+    window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
       detail: { tempId, entryId, timestamp: Date.now() }
     }));
     
-    // After another short delay, clean up processing entries
+    // Trigger fetch refresh
+    window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+      detail: { tempId, entryId, timestamp: Date.now() }
+    }));
+  
+    // After a bit more time, force removal of any processing cards
     setTimeout(() => {
-      // Dispatch an event to notify components of the correlation
-      window.dispatchEvent(new CustomEvent('processingEntryMapped', {
-        detail: { tempId, entryId, timestamp: Date.now() }
+      console.log(`[Audio Processing] Now forcing removal of processing cards: ${tempId}`);
+      
+      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
+        detail: { tempId, entryId, timestamp: Date.now(), forceCleanup: true }
       }));
       
       // IMPORTANT: Explicitly remove the processing entry to update UI
       removeProcessingEntryById(tempId);
-      
-      // Dispatch a completion event too
-      window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
-        detail: { tempId, entryId, timestamp: Date.now() }
-      }));
-      
-      // Also trigger a fetch refresh
-      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
-        detail: { tempId, entryId, timestamp: Date.now() }
-      }));
-    
-      // Force removal of any loading content components associated with this tempId
-      window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-        detail: { tempId, entryId, timestamp: Date.now(), forceCleanup: true }
-      }));
-    }, 1000);
-  }, 2000);
+    }, 500);
+  }, timeToWait);
 }
 
 /**
@@ -179,6 +196,7 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
 export function clearProcessingToEntryIdMap(): void {
   processingToEntryIdMap.clear();
   completedProcessingEntries.clear();
+  processingStartTimes.clear();
   localStorage.removeItem('processingToEntryMap');
   
   // Clear session storage entries too
@@ -253,6 +271,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
   console.log('[AudioProcessing] Generated temporary ID:', tempId);
   
   try {
+    // Record the start time for this processing task
+    processingStartTimes.set(tempId, Date.now());
+    
     // Set processing lock to prevent multiple simultaneous processing
     setProcessingLock(true);
     setIsEntryBeingProcessed(true);
@@ -300,6 +321,16 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
         detail: { entries: currentEntries, lastUpdate: Date.now() + 1, forceUpdate: true }
       }));
     }, 50);
+    
+    // And repeat a few more times to ensure iOS sees it
+    [100, 300, 600, 1000].forEach(delay => {
+      setTimeout(() => {
+        const currentEntries = getProcessingEntries().filter(id => !isProcessingEntryCompleted(id));
+        window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+          detail: { entries: currentEntries, lastUpdate: Date.now() + delay, forceUpdate: true }
+        }));
+      }, delay);
+    });
     
     // Launch the processing without awaiting it
     console.log('[AudioProcessing] Launching background processing');
@@ -365,8 +396,22 @@ export function isProcessingEntryCompleted(tempId: string): boolean {
   // Check if it has a mapped entry ID
   const entryId = getEntryIdForProcessingId(tempId);
   if (entryId !== undefined) {
-    // Do NOT immediately mark as completed - let the UI have time to show processing state
-    // This was causing the processing card to disappear too quickly
+    // CRITICAL: Do not mark as immediately completed even if mapped
+    // This allows the UI time to show the processing state
+    
+    // Calculate how long it's been processing
+    const startTime = processingStartTimes.get(tempId) || processingStartTimes.get(baseTempId);
+    if (startTime) {
+      const processingDuration = Date.now() - startTime;
+      
+      // If it's been processing for at least 3 seconds, we can consider it done
+      if (processingDuration > 3000) {
+        return true;
+      } else {
+        console.log(`[Audio Processing] Entry mapped but only processed for ${processingDuration}ms, keeping visible`);
+        return false;
+      }
+    }
     
     return true;
   }

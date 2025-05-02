@@ -53,6 +53,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   const forceRemoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const visibilityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isVisibleRef = useRef<boolean>(true);
+  // IMPORTANT: Track when this component was mounted to enforce minimum visibility time
+  const mountTimeRef = useRef<number>(Date.now());
+  // Track visibility state
+  const [visibilityState, setVisibilityState] = useState<string>('visible');
   
   // Broadcast that this component was mounted to help track processing entries
   useEffect(() => {
@@ -67,24 +71,40 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       }
     }));
     
+    // Add a class to the document to indicate processing is happening
+    document.documentElement.classList.add('processing-active');
+    
     // Set a minimum visibility time to ensure loading state is visible
     visibilityTimeoutRef.current = setTimeout(() => {
       console.log('[LoadingEntryContent] Minimum visibility time elapsed');
+      setVisibilityState('minimum-time-elapsed');
+      
+      // Dispatch event to notify that we've been visible for at least 2 seconds
+      window.dispatchEvent(new CustomEvent('loadingContentMinTimeElapsed', {
+        detail: { 
+          timestamp: Date.now(),
+          componentId: componentId.current
+        }
+      }));
     }, 2000); // Ensure loading is visible for at least 2 seconds
     
     return () => {
       if (visibilityTimeoutRef.current) {
         clearTimeout(visibilityTimeoutRef.current);
       }
+      
+      // Remove the processing class when unmounted
+      document.documentElement.classList.remove('processing-active');
     };
   }, []);
   
-  // Self cleanup safety - if this component exists for too long (10 seconds), automatically trigger cleanup
+  // Self cleanup safety - if this component exists for too long (15 seconds), automatically trigger cleanup
   useEffect(() => {
     const safetyTimeout = setTimeout(() => {
       if (mountedRef.current && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Safety timeout triggered - component existed for too long');
         unmountingRef.current = true;
+        setVisibilityState('safety-timeout');
         
         // Signal that this component should be removed
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
@@ -106,10 +126,17 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           }
         }));
         
-        // Force immediate parent card removal
-        removeParentCard();
+        // Force immediate parent card removal but only if we've been visible for at least 3 seconds
+        const timeSinceMounted = Date.now() - mountTimeRef.current;
+        if (timeSinceMounted > 3000) {
+          removeParentCard();
+        } else {
+          // If we haven't been visible long enough, set a timeout to remove after minimum time
+          const remainingTime = Math.max(0, 3000 - timeSinceMounted);
+          setTimeout(() => removeParentCard(), remainingTime);
+        }
       }
-    }, 10000); // 10 seconds max lifetime (reduced from 15s)
+    }, 15000); // 15 seconds max lifetime
     
     cleanupTimersRef.current.push(safetyTimeout);
     
@@ -123,10 +150,34 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     if (!isVisibleRef.current) return; // Skip if already removed
     
     isVisibleRef.current = false;
+    setVisibilityState('removing');
     
+    // IMPORTANT: Check if we've been visible for at least 2 seconds
+    const timeVisible = Date.now() - mountTimeRef.current;
+    if (timeVisible < 2000) {
+      console.log(`[LoadingEntryContent] Not removing parent card yet, only visible for ${timeVisible}ms`);
+      
+      // Set a timeout to remove after we've been visible for at least 2 seconds
+      const remainingTime = 2000 - timeVisible;
+      setTimeout(() => {
+        console.log('[LoadingEntryContent] Now removing parent card after enforced minimum visibility');
+        actuallyRemoveCard();
+      }, remainingTime);
+      
+      return;
+    }
+    
+    actuallyRemoveCard();
+  };
+  
+  const actuallyRemoveCard = () => {
+    // Find the parent card using the component ID
     const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
     if (parentCard) {
-      parentCard.classList.add('force-hidden');
+      // Add a transition class first
+      parentCard.classList.add('processing-card-removing');
+      
+      // Then actually remove after a short transition
       setTimeout(() => {
         if (parentCard.parentNode) {
           parentCard.parentNode.removeChild(parentCard);
@@ -140,7 +191,9 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             }
           }));
         }
-      }, 50);
+      }, 300);
+    } else {
+      console.log('[LoadingEntryContent] Could not find parent card to remove');
     }
   };
   
@@ -183,6 +236,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     // Listen for forces removal events targeted at this component
     const handleForceRemoval = (event: CustomEvent) => {
+      // Check if this is targeted at our component or a broadcast
       const isTargetedRemoval = event.detail?.componentId === componentId.current;
       const isBroadcastRemoval = !event.detail?.componentId && event.detail?.forceCleanup;
       const tempId = event.detail?.tempId;
@@ -190,6 +244,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       if ((isTargetedRemoval || isBroadcastRemoval) && !unmountingRef.current) {
         console.log('[LoadingEntryContent] Forced removal event received for', componentId.current);
         unmountingRef.current = true;
+        setVisibilityState('force-removed');
         
         // Signal that we're unmounting
         if (mountedRef.current) {
@@ -201,8 +256,18 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             }
           }));
           
-          // Force immediate parent card removal
-          removeParentCard();
+          // IMPORTANT: Only force remove if we've been visible for at least 2 seconds
+          const timeVisible = Date.now() - mountTimeRef.current;
+          if (timeVisible >= 2000) {
+            // Force immediate parent card removal
+            removeParentCard();
+          } else {
+            // Wait for the minimum visibility time
+            const remainingTime = 2000 - timeVisible;
+            console.log(`[LoadingEntryContent] Delaying removal for ${remainingTime}ms to ensure minimum visibility`);
+            
+            setTimeout(() => removeParentCard(), remainingTime);
+          }
         }
         
         // Clear all our timers
@@ -220,12 +285,28 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       if (!unmountingRef.current) {
         console.log('[LoadingEntryContent] Content ready event received, removing card');
         unmountingRef.current = true;
+        setVisibilityState('content-ready');
         
-        // Set a timeout to ensure this card is removed even if the animation doesn't complete
-        if (forceRemoveTimeoutRef.current) clearTimeout(forceRemoveTimeoutRef.current);
-        forceRemoveTimeoutRef.current = setTimeout(() => {
-          removeParentCard();
-        }, 100);
+        // IMPORTANT: Ensure we've been visible for at least 2 seconds before removing
+        const timeVisible = Date.now() - mountTimeRef.current;
+        if (timeVisible >= 2000) {
+          // Set a timeout to ensure this card is removed even if the animation doesn't complete
+          if (forceRemoveTimeoutRef.current) clearTimeout(forceRemoveTimeoutRef.current);
+          forceRemoveTimeoutRef.current = setTimeout(() => {
+            removeParentCard();
+          }, 300);
+        } else {
+          // Wait for the minimum visibility time
+          const remainingTime = 2000 - timeVisible;
+          console.log(`[LoadingEntryContent] Delaying removal for ${remainingTime}ms to ensure minimum visibility`);
+          
+          setTimeout(() => {
+            if (forceRemoveTimeoutRef.current) clearTimeout(forceRemoveTimeoutRef.current);
+            forceRemoveTimeoutRef.current = setTimeout(() => {
+              removeParentCard();
+            }, 300);
+          }, remainingTime);
+        }
       }
     };
     
@@ -256,7 +337,8 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {
         detail: { 
           timestamp: Date.now(),
-          componentId: componentId.current
+          componentId: componentId.current,
+          visibilityState
         }
       }));
     };
@@ -264,21 +346,39 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   
   const currentStep = processingSteps[currentStepIndex];
   
-  // Add CSS to handle forced hiding
+  // Add CSS to handle forced hiding and transitions
   useEffect(() => {
-    // Add a style for forced hiding if not already present
-    if (!document.getElementById('force-hidden-style')) {
+    // Add styles for forced hiding and transitions if not already present
+    if (!document.getElementById('processing-card-styles')) {
       const style = document.createElement('style');
-      style.id = 'force-hidden-style';
-      style.textContent = `.force-hidden { display: none !important; opacity: 0 !important; pointer-events: none !important; }`;
+      style.id = 'processing-card-styles';
+      style.textContent = `
+        .force-hidden { 
+          display: none !important; 
+          opacity: 0 !important; 
+          pointer-events: none !important; 
+        }
+        .processing-card {
+          transition: all 0.3s ease-out;
+        }
+        .processing-card-removing {
+          opacity: 0.5;
+          transform: translateY(-10px);
+          pointer-events: none;
+        }
+        .processing-active .journal-entry-card.processing-card {
+          border-color: hsl(var(--primary)/0.5);
+          border-width: 2px;
+        }
+      `;
       document.head.appendChild(style);
     }
     
     return () => {
       // Cleanup only if no other instances are active
       if (!document.querySelector('.journal-entry-card:not(.force-hidden)')) {
-        const style = document.getElementById('force-hidden-style');
-        if (style) {
+        const style = document.getElementById('processing-card-styles');
+        if (style && !document.querySelector('.processing-active')) {
           document.head.removeChild(style);
         }
       }
@@ -293,6 +393,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       exit={{ opacity: 0.7 }}
       transition={{ duration: 0.5 }}
       data-component-id={componentId.current}
+      data-visibility-state={visibilityState}
       onAnimationComplete={() => {
         // Broadcast that this component has finished animating in
         window.dispatchEvent(new CustomEvent('loadingContentAnimated', {
@@ -313,7 +414,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       <ShimmerSkeleton className="h-4 w-5/6" />
       <ShimmerSkeleton className="h-4 w-1/2" />
       
-      <div className="flex flex-col items-center mt-6 justify-center space-y-2 bg-primary/5 p-3 rounded-lg">
+      <div className="flex flex-col items-center mt-6 justify-center space-y-2 bg-primary/5 p-3 rounded-lg processing-indicator">
         {error ? (
           <div className="flex flex-col items-center">
             <AlertTriangle className="h-8 w-8 text-red-500 mb-2" />
