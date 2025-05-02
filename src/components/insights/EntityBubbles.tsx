@@ -114,18 +114,28 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
           } 
           // Handle if entities is already an array
           else if (Array.isArray(entry.entities)) {
-            entitiesArray = entry.entities;
-          }
+            // Make sure each element has the expected structure
+            entitiesArray = entry.entities.map(entity => {
+              if (typeof entity === 'object' && entity !== null) {
+                return {
+                  name: 'name' in entity ? String(entity.name) : 'unknown',
+                  type: 'type' in entity ? String(entity.type) : 'unknown'
+                };
+              }
+              return { name: String(entity), type: 'unknown' };
+            });
+          } 
           // Handle if entities is an object with properties
           else if (typeof entry.entities === 'object') {
-            entitiesArray = Object.entries(entry.entities).map(([key, value]) => ({
-              name: typeof value === 'object' && value !== null && 'name' in value
-                ? (value as any).name
-                : key,
-              type: typeof value === 'object' && value !== null && 'type' in value
-                ? (value as any).type
-                : 'unknown'
-            }));
+            entitiesArray = Object.entries(entry.entities).map(([key, value]) => {
+              if (typeof value === 'object' && value !== null) {
+                return {
+                  name: 'name' in value ? String((value as any).name) : key,
+                  type: 'type' in value ? String((value as any).type) : 'unknown'
+                };
+              }
+              return { name: key, type: 'unknown' };
+            });
           }
           
           // Extract sentiment score
@@ -250,7 +260,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
       ref={containerRef}
       className={cn("relative w-full h-full", className)}
     >
-      {positions.map(({ entity, size, x, y }) => {
+      {positions.map(({ entity, size, x, y }, bubbleIndex) => {
         const isHighlighted = highlightedEntity === entity.name;
         const sentimentColor = getSentimentColor(entity.sentiment);
         
@@ -280,7 +290,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
               type: "spring",
               stiffness: 200,
               damping: 15,
-              delay: index * 0.05 
+              delay: bubbleIndex * 0.05 
             }}
             onMouseEnter={() => setHighlightedEntity(entity.name)}
             onMouseLeave={() => setHighlightedEntity(null)}
