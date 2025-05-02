@@ -13,7 +13,7 @@ interface ThemeData {
 }
 
 interface ProcessedThemeData extends ThemeData {
-  count: number; // Add count property to fix TypeScript error
+  count: number;
 }
 
 interface FloatingThemeStripsProps {
@@ -32,7 +32,8 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
   const animationsRef = useRef<{[key: string]: any}>({});
-  const animationKey = useRef<number>(0);
+  const animationKeyRef = useRef<number>(0);
+  const [renderKey, setRenderKey] = useState<number>(0);
   
   // Translate the label
   useEffect(() => {
@@ -52,6 +53,8 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     // Listen for language changes
     const handleLanguageChange = async () => {
       translateLabel();
+      // Force re-render of animations when language changes
+      setRenderKey(prev => prev + 1);
     };
     
     window.addEventListener('languageChange', handleLanguageChange as EventListener);
@@ -81,11 +84,12 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       }
     });
     
+    // Convert map to array and ensure proper typing
     return Array.from(themeMap.entries())
       .map(([theme, { count, sentiment }]) => ({ 
-        theme, 
+        theme,
         sentiment,
-        count // Ensure count is included
+        count // Now explicitly included in ProcessedThemeData interface
       }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8);
@@ -96,7 +100,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     if (processThemeData.length > 0) {
       setUniqueThemes(processThemeData);
       // Force animation refresh on data change
-      animationKey.current += 1;
+      animationKeyRef.current += 1;
     }
   }, [processThemeData]);
   
@@ -209,7 +213,8 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           const speed = 15 + Math.random() * 10;
           
           // Create a stable key for animations that updates with language changes
-          const animationKey = `theme-strip-${themeItem.theme}-${index}-${currentLanguage}-${animationKey.current}`;
+          // Using animationKeyRef.current instead of animationKey
+          const uniqueAnimationKey = `theme-strip-${themeItem.theme}-${index}-${currentLanguage}-${animationKeyRef.current}-${renderKey}`;
           
           // Display the translated theme if available
           const displayText = currentLanguage === 'en' ? 
@@ -218,7 +223,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           
           return (
             <motion.div
-              key={animationKey}
+              key={uniqueAnimationKey}
               className="absolute left-0 w-auto h-8 px-3 py-1 flex items-center rounded-sm"
               style={{
                 top: `${yPosition}%`,
@@ -246,7 +251,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               }}
               onAnimationStart={(definition) => {
                 // Store animation reference for cleanup
-                animationsRef.current[animationKey] = definition;
+                animationsRef.current[uniqueAnimationKey] = definition;
               }}
             >
               <span 
