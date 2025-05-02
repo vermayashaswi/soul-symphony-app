@@ -99,8 +99,8 @@ export function EmotionChart({
   const initialRenderRef = useRef(true);
   
   const chartTypes = [
-    { id: 'line', label: 'Line' },
-    { id: 'bubble', label: 'Emotion Bubbles' },
+    { id: 'line', label: 'Emotions' },
+    { id: 'bubble', label: 'Life Areas' },
   ];
   
   const bubbleData = useMemo(() => {
@@ -457,7 +457,7 @@ export function EmotionChart({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">Top Emotions</h3>
+        <h3 className="text-xl font-semibold">TOP</h3>
         <div className="flex gap-2">
           {chartTypes.map((type) => (
             <button
