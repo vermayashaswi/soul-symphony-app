@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -18,13 +17,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const { currentLanguage, prefetchTranslationsForRoute } = useTranslation();
-  
-  // Pre-fetch translations for navigation items
-  useEffect(() => {
-    const navLabels = ['Home', 'Journal', 'Chat', 'Insights', 'Settings'];
-    prefetchTranslationsForRoute(navLabels).catch(console.error);
-  }, [currentLanguage, prefetchTranslationsForRoute]);
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
@@ -115,12 +107,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
           const isActive = getActiveStatus(item.path);
-          // Create a key that changes with language to force re-render
-          const itemKey = `nav-item-${item.path}-${currentLanguage}`;
           
           return (
             <Link
-              key={itemKey}
+              key={item.path}
               to={item.path}
               className={cn(
                 "flex flex-col items-center py-1 transition-colors",
@@ -140,7 +130,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 )}
               </div>
               <span className="text-xs mt-0.5">
-                <TranslatableText text={item.label} forceTranslate={true} />
+                <TranslatableText text={item.label} />
               </span>
             </Link>
           );

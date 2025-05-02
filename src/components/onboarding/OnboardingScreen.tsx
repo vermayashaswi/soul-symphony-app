@@ -3,15 +3,13 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User, Globe } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { RecordingVisualizer } from "@/components/voice-recorder/RecordingVisualizer";
 import { toast } from "sonner";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
-import { useTranslation } from '@/contexts/TranslationContext';
-import { LanguageSelector } from '@/components/translation/LanguageSelector';
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -20,8 +18,6 @@ interface OnboardingScreenProps {
 interface NameStepProps {
   name: string;
   setName: React.Dispatch<React.SetStateAction<string>>;
-  selectedLanguage: string;
-  setSelectedLanguage: React.Dispatch<React.SetStateAction<string>>;
 }
 
 const createWavePath = (
@@ -521,31 +517,16 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            <div className="space-y-2">
-              <label htmlFor="name-input" className="text-sm text-muted-foreground">Your Name</label>
-              <Input
-                id="name-input"
-                placeholder="Enter your name"
-                value={props.name}
-                onChange={(e) => props.setName(e.target.value)}
-                className="bg-background/80 border-theme/20 focus:border-theme"
-                autoFocus
-              />
-            </div>
+            <Input
+              placeholder="Enter your name"
+              value={props.name}
+              onChange={(e) => props.setName(e.target.value)}
+              className="bg-background/80 border-theme/20 focus:border-theme text-white"
+              autoFocus
+            />
             
-            <div className="space-y-2">
-              <label htmlFor="language-select" className="text-sm text-muted-foreground">Preferred Language</label>
-              <LanguageSelector 
-                variant="onboarding"
-                initialLanguage={props.selectedLanguage}
-                onLanguageChange={props.setSelectedLanguage}
-                showLabel={true}
-                className="w-full"
-              />
-            </div>
-            
-            <div className="text-sm text-muted-foreground text-center mt-2">
-              This is how SOuLO will address you and communicate with you
+            <div className="text-sm text-muted-foreground text-center">
+              This is how SOuLO will address you
             </div>
           </motion.div>
           
@@ -610,11 +591,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [name, setName] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
-  const { setLanguage } = useTranslation();
   
   useEffect(() => {
     setColorTheme('Calm');
@@ -631,13 +610,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     } else {
       if (name) {
         localStorage.setItem("user_display_name", name.trim());
-      }
-      
-      // Save the selected language preference
-      if (selectedLanguage) {
-        localStorage.setItem("preferredLanguage", selectedLanguage);
-        // Apply the language change immediately
-        setLanguage(selectedLanguage);
       }
       
       localStorage.setItem("onboardingComplete", "true");
@@ -659,13 +631,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const handleSkip = () => {
     if (name) {
       localStorage.setItem("user_display_name", name.trim());
-    }
-    
-    // Save the selected language preference even when skipping
-    if (selectedLanguage) {
-      localStorage.setItem("preferredLanguage", selectedLanguage);
-      // Apply the language change immediately
-      setLanguage(selectedLanguage);
     }
     
     localStorage.setItem("onboardingComplete", "true");
@@ -745,12 +710,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
                   )}
-                  <CurrentIllustration 
-                    name={name} 
-                    setName={setName} 
-                    selectedLanguage={selectedLanguage} 
-                    setSelectedLanguage={setSelectedLanguage} 
-                  />
+                  <CurrentIllustration name={name} setName={setName} />
                 </>
               ) : (
                 <>

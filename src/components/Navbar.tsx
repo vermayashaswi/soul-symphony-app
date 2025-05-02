@@ -7,7 +7,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import SouloLogo from './SouloLogo';
 import { Button } from '@/components/ui/button';
 import { useIsMobile } from '@/hooks/use-mobile';
-import React, { useEffect } from 'react';
+import React from 'react';
 import { 
   MoreVertical, 
   LogOut,
@@ -24,14 +24,12 @@ import {
 } from '@/components/ui/popover';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 const Navbar = () => {
   const navigate = useNavigate();
   const { user, signOut } = useAuth(); 
   const { theme, setTheme } = useTheme();
   const isMobile = useIsMobile();
-  const { currentLanguage, prefetchTranslationsForRoute } = useTranslation();
 
   const handleLogout = async () => {
     await signOut();
@@ -41,12 +39,6 @@ const Navbar = () => {
   const toggleTheme = () => {
     setTheme(theme === 'dark' ? 'light' : 'dark');
   };
-  
-  // Pre-fetch common navbar translations
-  useEffect(() => {
-    const navLabels = ['Home', 'Settings', 'Help', 'Logout', 'Sign In'];
-    prefetchTranslationsForRoute(navLabels).catch(console.error);
-  }, [currentLanguage, prefetchTranslationsForRoute]);
 
   return (
     <motion.nav
@@ -66,10 +58,10 @@ const Navbar = () => {
           {!user ? (
             <>
               <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-                <TranslatableText text="Home" forceTranslate={true} />
+                <TranslatableText text="Home" />
               </Button>
               <Button variant="outline" size="sm" onClick={() => navigate('/auth')}>
-                <TranslatableText text="Sign In" forceTranslate={true} />
+                <TranslatableText text="Sign In" />
               </Button>
             </>
           ) : (
@@ -103,7 +95,7 @@ const Navbar = () => {
                       onClick={() => navigate('/')}
                     >
                       <Home className="mr-2 h-4 w-4" />
-                      <TranslatableText text="Home" forceTranslate={true} />
+                      <TranslatableText text="Home" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -112,7 +104,7 @@ const Navbar = () => {
                       onClick={() => navigate('/settings')}
                     >
                       <Settings className="mr-2 h-4 w-4" />
-                      <TranslatableText text="Settings" forceTranslate={true} />
+                      <TranslatableText text="Settings" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -121,7 +113,7 @@ const Navbar = () => {
                       onClick={() => navigate('/help')}
                     >
                       <HelpCircle className="mr-2 h-4 w-4" />
-                      <TranslatableText text="Help" forceTranslate={true} />
+                      <TranslatableText text="Help" />
                     </Button>
                     <Button
                       variant="ghost"
@@ -130,7 +122,7 @@ const Navbar = () => {
                       onClick={handleLogout}
                     >
                       <LogOut className="mr-2 h-4 w-4" />
-                      <TranslatableText text="Logout" forceTranslate={true} />
+                      <TranslatableText text="Logout" />
                     </Button>
                   </div>
                 </PopoverContent>
