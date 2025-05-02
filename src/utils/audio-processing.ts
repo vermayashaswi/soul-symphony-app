@@ -12,6 +12,9 @@ import { processingStateManager, EntryProcessingState } from './journal/processi
 let processingLock = false;
 let processingTimeoutId: NodeJS.Timeout | null = null;
 
+// Map to track temporary IDs to entry IDs
+const processingToEntryMap = new Map<string, number>();
+
 /**
  * Process and validate the audio blob
  */
@@ -120,6 +123,9 @@ export async function processRecording(audioBlob: Blob | null, userId: string | 
           processingStateManager.setEntryId(tempId, result.entryId);
           processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
           console.log(`[AudioProcessing] Mapped tempId ${tempId} to entryId ${result.entryId}`);
+          
+          // Also store in our local map
+          setEntryIdForProcessingId(tempId, result.entryId);
         }
       })
       .catch(err => {
@@ -213,6 +219,9 @@ async function processRecordingInBackground(
     if (data.entryId) {
       processingStateManager.setEntryId(tempId, data.entryId);
       processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
+      
+      // Also store in our local map
+      setEntryIdForProcessingId(tempId, data.entryId);
     }
     
     // Notify anyone who cares that processing is complete
@@ -257,6 +266,51 @@ async function processRecordingInBackground(
       error: error.message || 'Unknown error' 
     };
   }
+}
+
+/**
+ * Set entry ID for a processing ID (temp ID)
+ */
+export function setEntryIdForProcessingId(tempId: string, entryId: number): void {
+  processingToEntryMap.set(tempId, entryId);
+  
+  // Also add to localStorage for persistence across page loads
+  try {
+    const mapStr = localStorage.getItem('processingToEntryMap') || '{}';
+    const map = JSON.parse(mapStr);
+    map[tempId] = entryId;
+    localStorage.setItem('processingToEntryMap', JSON.stringify(map));
+    console.log(`[AudioProcessing] Stored tempId -> entryId mapping in localStorage: ${tempId} -> ${entryId}`);
+  } catch (error) {
+    console.error('[AudioProcessing] Error storing mapping in localStorage:', error);
+  }
+}
+
+/**
+ * Get entry ID for a processing ID (temp ID)
+ */
+export function getEntryIdForProcessingId(tempId: string): number | undefined {
+  // First check our in-memory map
+  if (processingToEntryMap.has(tempId)) {
+    return processingToEntryMap.get(tempId);
+  }
+  
+  // Try to get from localStorage as fallback
+  try {
+    const mapStr = localStorage.getItem('processingToEntryMap') || '{}';
+    const map = JSON.parse(mapStr);
+    const entryId = map[tempId];
+    
+    // If found, also add to in-memory map for faster access next time
+    if (entryId) {
+      processingToEntryMap.set(tempId, Number(entryId));
+      return Number(entryId);
+    }
+  } catch (error) {
+    console.error('[AudioProcessing] Error getting mapping from localStorage:', error);
+  }
+  
+  return undefined;
 }
 
 /**

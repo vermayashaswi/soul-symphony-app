@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { blobToBase64 } from './blob-utils';
 import { sendAudioForTranscription } from './transcription-service';
-import { setEntryIdForProcessingId } from '../audio-processing';
+import { getEntryIdForProcessingId, setEntryIdForProcessingId } from '../audio-processing';
 
 /**
  * Process audio recording in the background
