@@ -13,6 +13,7 @@ interface TranslatableTextProps {
   forceTranslate?: boolean; // Prop to force translation regardless of route
   onTranslationStart?: () => void; // Added callback for translation start
   onTranslationEnd?: () => void; // Added callback for translation end
+  style?: React.CSSProperties; // Add style prop to the interface
 }
 
 export function TranslatableText({ 
@@ -23,7 +24,8 @@ export function TranslatableText({
   entryId,
   forceTranslate = false,
   onTranslationStart,
-  onTranslationEnd
+  onTranslationEnd,
+  style // Add style to the destructuring
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState<string>(text); // Initialize with source text
   const [isLoading, setIsLoading] = useState(false);
@@ -162,7 +164,8 @@ export function TranslatableText({
       'data-translating': isLoading ? 'true' : 'false',
       'data-translated': translatedText !== text ? 'true' : 'false',
       'data-lang': currentLanguage,
-      'data-force-translate': forceTranslate ? 'true' : 'false'
+      'data-force-translate': forceTranslate ? 'true' : 'false',
+      style // Pass style prop to the element
     }, 
     translatedText || text  // Ensure we always show something, even if translation fails
   );
