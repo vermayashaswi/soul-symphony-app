@@ -3,21 +3,25 @@ import { TranslationService } from './translationService';
 
 export class StaticTranslationService {
   private language: string = 'en';
+  private translationInProgress: boolean = false;
+  private batchTranslationQueue: Map<string, (result: string) => void> = new Map();
+  private batchTranslationTimer: NodeJS.Timeout | null = null;
+  private readonly BATCH_DELAY = 100; // ms to wait before sending batch
 
   setLanguage(language: string): void {
     this.language = language;
   }
 
   async translateText(text: string, sourceLanguage?: string, entryId?: number): Promise<string> {
-    // Skip translation for English or empty text
+    // Skip translation for English, empty text, or null text
     if (this.language === 'en' || !text || text.trim() === '') {
-      return text;
+      return text || '';
     }
 
     try {
       const result = await TranslationService.translateText({
         text,
-        sourceLanguage,
+        sourceLanguage: sourceLanguage || 'en',
         targetLanguage: this.language,
         entryId,
       });
@@ -33,30 +37,42 @@ export class StaticTranslationService {
     if (this.language === 'en') {
       // For English, just return originals
       const results = new Map<string, string>();
-      texts.forEach(text => results.set(text, text));
+      texts.forEach(text => {
+        if (text) results.set(text, text);
+      });
       return results;
     }
 
     try {
+      // Filter out empty or null texts
+      const validTexts = texts.filter(text => text && text.trim() !== '');
+      
+      if (validTexts.length === 0) {
+        return new Map<string, string>();
+      }
+      
       return await TranslationService.batchTranslate({
-        texts,
+        texts: validTexts,
         targetLanguage: this.language,
       });
     } catch (error) {
       console.error('Error batch translating texts:', error);
       // Return original texts as fallback
       const results = new Map<string, string>();
-      texts.forEach(text => results.set(text, text));
+      texts.forEach(text => {
+        if (text) results.set(text, text);
+      });
       return results;
     }
   }
 
-  // New method to support batch translation with explicit source language
   async batchTranslateTexts(texts: string[]): Promise<Map<string, string>> {
     if (this.language === 'en') {
       // For English, just return originals
       const results = new Map<string, string>();
-      texts.forEach(text => results.set(text, text));
+      texts.forEach(text => {
+        if (text) results.set(text, text);
+      });
       return results;
     }
 
@@ -69,18 +85,114 @@ export class StaticTranslationService {
         return new Map<string, string>();
       }
       
-      const translationResults = await TranslationService.batchTranslate({
-        texts: validTexts,
-        targetLanguage: this.language,
-      });
+      // Add retry logic with max 3 attempts
+      let attempts = 0;
+      const maxAttempts = 3;
+      let translationResults: Map<string, string> | null = null;
+      
+      while (attempts < maxAttempts && !translationResults) {
+        try {
+          translationResults = await TranslationService.batchTranslate({
+            texts: validTexts,
+            targetLanguage: this.language,
+          });
+        } catch (error) {
+          attempts++;
+          if (attempts >= maxAttempts) {
+            throw error;
+          }
+          // Wait before retrying
+          await new Promise(resolve => setTimeout(resolve, 500 * attempts));
+        }
+      }
+      
+      if (!translationResults) {
+        throw new Error("Failed to translate after multiple attempts");
+      }
       
       return translationResults;
     } catch (error) {
-      console.error('Error batch translating texts with source language:', error);
+      console.error('Error batch translating texts:', error);
       // Return original texts as fallback
       const results = new Map<string, string>();
-      texts.forEach(text => results.set(text, text));
+      texts.forEach(text => {
+        if (text) results.set(text, text);
+      });
       return results;
+    }
+  }
+  
+  // Queue a text for batch translation with promise-based result
+  queueForBatchTranslation(text: string): Promise<string> {
+    if (this.language === 'en' || !text) {
+      return Promise.resolve(text || '');
+    }
+    
+    return new Promise((resolve) => {
+      // Add to queue
+      this.batchTranslationQueue.set(text, resolve);
+      
+      // Set/reset timer for batch processing
+      if (this.batchTranslationTimer) {
+        clearTimeout(this.batchTranslationTimer);
+      }
+      
+      this.batchTranslationTimer = setTimeout(() => {
+        this.processBatchQueue();
+      }, this.BATCH_DELAY);
+    });
+  }
+  
+  // Process all queued translations as a batch
+  private async processBatchQueue(): Promise<void> {
+    if (this.batchTranslationQueue.size === 0) return;
+    
+    // Clear the timer
+    if (this.batchTranslationTimer) {
+      clearTimeout(this.batchTranslationTimer);
+      this.batchTranslationTimer = null;
+    }
+    
+    // Prevent concurrent batch processing
+    if (this.translationInProgress) return;
+    
+    this.translationInProgress = true;
+    
+    try {
+      // Extract texts from queue
+      const textsToTranslate = Array.from(this.batchTranslationQueue.keys());
+      const resolvers = Array.from(this.batchTranslationQueue.values());
+      
+      // Clear queue
+      this.batchTranslationQueue.clear();
+      
+      // Translate
+      const results = await this.batchTranslateTexts(textsToTranslate);
+      
+      // Resolve promises with results
+      textsToTranslate.forEach((text, index) => {
+        const translatedText = results.get(text) || text;
+        resolvers[index](translatedText);
+      });
+    } catch (error) {
+      console.error('Batch translation failed:', error);
+      
+      // Resolve all with original text in case of error
+      Array.from(this.batchTranslationQueue.entries()).forEach(([text, resolver]) => {
+        resolver(text);
+      });
+      
+      // Clear queue
+      this.batchTranslationQueue.clear();
+    } finally {
+      this.translationInProgress = false;
+      
+      // If new items were added while processing, trigger another batch
+      if (this.batchTranslationQueue.size > 0) {
+        this.batchTranslationTimer = setTimeout(() => {
+          this.processBatchQueue();
+        }, this.BATCH_DELAY);
+      }
     }
   }
 }
