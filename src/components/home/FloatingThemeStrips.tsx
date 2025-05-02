@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -28,7 +27,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   const [uniqueThemes, setUniqueThemes] = useState<ProcessedThemeData[]>([]);
   const [translatedThemes, setTranslatedThemes] = useState<ProcessedThemeData[]>([]);
   const { theme } = useTheme();
-  const { translate, currentLanguage } = useTranslation();
   const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
   
@@ -38,24 +36,33 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   const [translationReady, setTranslationReady] = useState<boolean>(false);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
   
-  // Debug state for animation status
-  const [debugStatus, setDebugStatus] = useState<string>("initializing");
+  // Safely access the translation context
+  let translate, currentLanguage;
+  try {
+    const translationContext = useTranslation();
+    translate = translationContext?.translate;
+    currentLanguage = translationContext?.currentLanguage || 'en';
+  } catch (error) {
+    console.error('FloatingThemeStrips: Error accessing translation context', error);
+    currentLanguage = 'en';
+  }
   
-  // Translate the label
+  // Translate the label immediately with fallback
   useEffect(() => {
     console.log("FloatingThemeStrips: Translating label");
     const translateLabel = async () => {
       if (!translate) {
-        console.log("FloatingThemeStrips: translate function not available");
+        console.log("FloatingThemeStrips: translate function not available, using default");
         return;
       }
       
       try {
         const result = await translate("7-day themes", "en");
-        setTranslatedLabel(result);
-        console.log("FloatingThemeStrips: Label translated successfully");
+        console.log("FloatingThemeStrips: Label translated to:", result);
+        setTranslatedLabel(result || "7-day themes");
       } catch (error) {
         console.error('FloatingThemeStrips: Error translating label:', error);
+        // Keep using existing label
       }
     };
     
@@ -64,7 +71,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     // Listen for language changes
     const handleLanguageChange = async () => {
       console.log("FloatingThemeStrips: Language change detected");
-      setDebugStatus("language-changed");
       
       // Clear existing animations on language change
       Object.values(animationsRef.current).forEach((anim: any) => {
@@ -88,9 +94,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       
       // Force animation refresh with new key
       animationKeyRef.current += 1;
-      
-      // Trigger a re-render
-      setDebugStatus("language-change-processed");
     };
     
     window.addEventListener('languageChange', handleLanguageChange as EventListener);
@@ -103,7 +106,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   // Process themes data with memoization
   const processThemeData = useMemo(() => {
     console.log("FloatingThemeStrips: Processing theme data", { themesCount: themesData?.length || 0 });
-    setDebugStatus("processing-themes");
     
     if (!themesData?.length) return [];
     
@@ -146,7 +148,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     if (processThemeData.length > 0) {
       console.log("FloatingThemeStrips: Updating unique themes", { count: processThemeData.length });
       setUniqueThemes(processThemeData);
-      setDebugStatus("themes-updated");
       
       // Force animation refresh on data change
       animationKeyRef.current += 1;
@@ -165,17 +166,16 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     }
   }, [processThemeData]);
   
-  // Translate all themes at once with improved error handling
+  // Directly translate all themes with staticTranslationService for maximum reliability
   const translateAllThemes = useCallback(async (themes: ProcessedThemeData[]) => {
-    if (currentLanguage === 'en' || !themes.length) {
-      console.log("FloatingThemeStrips: No need for translation (English or no themes)");
-      setTranslatedThemes(themes);
+    if (!themes.length) {
+      console.log("FloatingThemeStrips: No themes to translate");
       setTranslationReady(true);
       return;
     }
     
-    setDebugStatus("translating-themes");
-    console.log(`FloatingThemeStrips: Translating ${themes.length} themes to ${currentLanguage}`);
+    // Always translate regardless of language to ensure consistency
+    console.log(`FloatingThemeStrips: Translating ${themes.length} themes to ${currentLanguage || 'en'}`);
     
     try {
       // Extract all theme strings
@@ -188,37 +188,8 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
         return;
       }
       
-      // Pre-translate all at once with retry mechanism
-      let translationsMap: Map<string, string>;
-      let attempts = 0;
-      const maxAttempts = 3;
-      
-      while (attempts < maxAttempts) {
-        try {
-          translationsMap = new Map<string, string>();
-          
-          // Use staticTranslationService directly
-          translationsMap = await staticTranslationService.batchTranslateTexts(themeTexts);
-          
-          // Check if we got enough translations
-          if (translationsMap && translationsMap.size > 0) {
-            break;
-          }
-          
-          console.warn(`FloatingThemeStrips: Attempt ${attempts + 1} returned empty translations, retrying...`);
-          attempts++;
-          await new Promise(resolve => setTimeout(resolve, 500));
-        } catch (error) {
-          console.error(`FloatingThemeStrips: Translation attempt ${attempts + 1} failed:`, error);
-          attempts++;
-          
-          if (attempts >= maxAttempts) {
-            throw error;
-          }
-          
-          await new Promise(resolve => setTimeout(resolve, 500 * attempts));
-        }
-      }
+      // Direct translation using static service to bypass route checks
+      const translationsMap = await staticTranslationService.batchTranslateTexts(themeTexts);
       
       // Apply translations
       const translated = themes.map(item => ({
@@ -229,26 +200,15 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       console.log("FloatingThemeStrips: Translations completed successfully");
       setTranslatedThemes(translated);
       setTranslationReady(true);
-      setDebugStatus("translations-ready");
       
       // Trigger animation refresh after translations are ready
       animationKeyRef.current += 1;
-      
-      // Force a re-render after translations are ready
-      setDebugStatus("translations-applied");
     } catch (error) {
       console.error('FloatingThemeStrips: Error translating themes:', error);
       
       // Fallback to using original themes in case of error
-      const fallbackThemes = themes.map(item => ({
-        ...item,
-        translatedTheme: item.theme // Use original theme as fallback
-      }));
-      
-      console.log("FloatingThemeStrips: Using fallback translations");
-      setTranslatedThemes(fallbackThemes);
+      setTranslatedThemes(themes);
       setTranslationReady(true);
-      setDebugStatus("translations-fallback");
       
       // Still trigger animation refresh even with fallbacks
       animationKeyRef.current += 1;
@@ -258,7 +218,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   // Handle language changes & uniqueThemes updates
   useEffect(() => {
     if (uniqueThemes.length > 0) {
-      console.log(`FloatingThemeStrips: Unique themes updated or language changed to ${currentLanguage}`);
+      console.log(`FloatingThemeStrips: Themes updated or language changed to ${currentLanguage}`);
       translateAllThemes(uniqueThemes);
     }
   }, [currentLanguage, uniqueThemes, translateAllThemes]);
@@ -268,7 +228,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     if (isInitialLoad && uniqueThemes.length > 0) {
       console.log("FloatingThemeStrips: Initial load completed");
       setIsInitialLoad(false);
-      setDebugStatus("initialized");
     }
   }, [isInitialLoad, uniqueThemes]);
 
@@ -301,7 +260,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   }
 
   // Get current theme list based on language and translation status
-  const themesToShow = currentLanguage === 'en' ? uniqueThemes : (translationReady ? translatedThemes : uniqueThemes);
+  const themesToShow = translationReady ? translatedThemes : uniqueThemes;
   
   // Additional safety check to ensure we have themes to display
   if (!themesToShow?.length) {
@@ -309,7 +268,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     return null;
   }
 
-  console.log(`FloatingThemeStrips: Rendering with status ${debugStatus}, animation key ${animationKeyRef.current}`);
+  console.log(`FloatingThemeStrips: Rendering with animation key ${animationKeyRef.current}, language: ${currentLanguage}`);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
@@ -331,7 +290,9 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
             backdropFilter: 'blur(4px)',
           }}
         >
-          <span 
+          <TranslatableText 
+            text={translatedLabel || "7-day themes"} 
+            forceTranslate={true}
             className="text-xs font-medium whitespace-nowrap"
             style={{
               color: isDarkMode ? '#ffffff' : '#000000',
@@ -340,9 +301,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               WebkitFontSmoothing: 'antialiased',
               MozOsxFontSmoothing: 'grayscale'
             }}
-          >
-            {translatedLabel}
-          </span>
+          />
         </motion.div>
       </div>
       
@@ -359,9 +318,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           const uniqueAnimKey = `theme-strip-${themeItem.theme}-${index}-${currentLanguage}-${animationKeyRef.current}`;
           
           // Display the translated theme if available
-          const displayText = currentLanguage === 'en' ? 
-            themeItem.theme : 
-            (themeItem.translatedTheme || themeItem.theme);
+          const displayText = themeItem.translatedTheme || themeItem.theme;
           
           return (
             <motion.div
@@ -392,13 +349,8 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                 delay: index * 2.5,
               }}
               onAnimationStart={(definition) => {
-                // Store animation reference for cleanup and log it
-                console.log(`FloatingThemeStrips: Animation started for ${uniqueAnimKey}`);
+                // Store animation reference for cleanup
                 animationsRef.current[uniqueAnimKey] = definition;
-              }}
-              onAnimationComplete={() => {
-                // Log animation completion for debugging
-                console.log(`FloatingThemeStrips: Animation completed for ${uniqueAnimKey}`);
               }}
             >
               <span 
