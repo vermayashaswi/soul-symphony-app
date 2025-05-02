@@ -15,7 +15,7 @@ import {
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
-import EntityBubbles from './insights/EntityBubbles';
+import EntityStrips from './insights/EntityStrips';
 import { Sparkles, CircleDot } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -494,19 +494,15 @@ export function EmotionChart({
         {chartType === 'line' && renderLineChart()}
         {chartType === 'bubble' && (
           <div className="w-full">
-            <div className="absolute top-2 right-2 text-xs text-muted-foreground z-10">
-              * Size shows frequency, color shows sentiment (red=negative, yellow=neutral, green=positive)
-            </div>
-            
             {topRightPercentage && (
-              <div className="absolute top-2 right-32 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
+              <div className="absolute top-2 right-2 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
                 {topRightPercentage.emotion}: {topRightPercentage.percentage}
               </div>
             )}
             
             <div className="h-[300px]" key={bubbleKey}>
               {chartType === 'bubble' && (
-                <EntityBubbles 
+                <EntityStrips
                   userId={user?.id}
                   timeRange={timeframe}
                   onEntityClick={handleEntityClick}
