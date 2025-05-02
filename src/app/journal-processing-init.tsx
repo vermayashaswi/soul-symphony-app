@@ -19,9 +19,12 @@ export function JournalProcessingInitializer() {
     let cleanedCount = 0;
     
     entries.forEach(entry => {
-      // If an entry has been in the system for more than 15 seconds, force cleanup
+      // If an entry has been in the system for more than 10 seconds, force cleanup
+      // Reduced from 15 seconds to 10 seconds to be more aggressive
       const entryAge = Date.now() - entry.startTime;
-      if (entryAge > 15000 || entry.state === EntryProcessingState.COMPLETED) {
+      const shouldClean = entryAge > 10000 || entry.state === EntryProcessingState.COMPLETED;
+      
+      if (shouldClean) {
         processingStateManager.removeEntry(entry.tempId);
         cleanedCount++;
         console.log(`[JournalProcessingInitializer] Force cleaned up entry ${entry.tempId} (age: ${entryAge}ms, state: ${entry.state})`);
@@ -42,7 +45,7 @@ export function JournalProcessingInitializer() {
       }));
     }
     
-    // Also set up a periodic cleanup check
+    // Also set up a periodic cleanup check - reduced interval from 10s to 5s
     const cleanupInterval = setInterval(() => {
       const currentEntries = processingStateManager.getProcessingEntries();
       const now = Date.now();
@@ -50,9 +53,11 @@ export function JournalProcessingInitializer() {
       
       currentEntries.forEach(entry => {
         const entryAge = now - entry.startTime;
-        if (entryAge > 30000) { // Remove any entry older than 30 seconds
+        // Remove entries older than 20 seconds (reduced from 30s)
+        if (entryAge > 20000) { 
           processingStateManager.removeEntry(entry.tempId);
           removedCount++;
+          console.log(`[JournalProcessingInitializer] Cleaned up stale entry ${entry.tempId} (age: ${entryAge}ms)`);
         }
       });
       
@@ -61,10 +66,15 @@ export function JournalProcessingInitializer() {
         
         // Notify components about the cleanup
         window.dispatchEvent(new CustomEvent('processingEntriesForceCleanup', {
+          detail: { timestamp: now, forceUpdate: true, immediate: true }
+        }));
+        
+        // Add a new event that forces all components to refresh their UI state
+        window.dispatchEvent(new CustomEvent('journalUIForceRefresh', {
           detail: { timestamp: now, forceUpdate: true }
         }));
       }
-    }, 10000); // Check every 10 seconds
+    }, 5000); // Check every 5 seconds
     
     // Cleanup on unmount
     return () => {

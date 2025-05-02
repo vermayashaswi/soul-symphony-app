@@ -16,6 +16,7 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
   const { addEvent } = useDebugLog();
   const isVisibleRef = useRef(false);
   const mountTimeRef = useRef(Date.now());
+  const forceRemoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     if (tempId) {
@@ -36,6 +37,27 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       }
     }
     
+    // Add listener for force remove events
+    const handleForceRemove = (event: CustomEvent<any>) => {
+      if (!event.detail) return;
+      
+      if (event.detail.tempId === tempId || !event.detail.tempId) {
+        console.log(`[JournalEntryLoadingSkeleton] Received force remove event for ${tempId || 'all cards'}`);
+        if (forceRemoveTimeoutRef.current) {
+          clearTimeout(forceRemoveTimeoutRef.current);
+        }
+        
+        // Directly notify that card is being removed
+        isVisibleRef.current = false;
+        window.dispatchEvent(new CustomEvent('processingCardRemoved', {
+          detail: { tempId, timestamp: Date.now(), forceRemoved: true }
+        }));
+      }
+    };
+    
+    window.addEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
+    window.addEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
+    
     // Add a delayed visibility notification to help with tracking
     const visibilityTimeout = setTimeout(() => {
       if (isVisibleRef.current && tempId) {
@@ -46,6 +68,25 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
         }));
       }
     }, 500);
+    
+    // Add a safety timeout to force remove this skeleton after 15 seconds
+    // This prevents skeletons from getting "stuck" in the UI
+    forceRemoveTimeoutRef.current = setTimeout(() => {
+      if (tempId) {
+        console.log(`[JournalEntryLoadingSkeleton] Force removing skeleton ${tempId} after timeout`);
+        isVisibleRef.current = false;
+        processingStateManager.removeEntry(tempId);
+        
+        // Dispatch event to force UI update elsewhere
+        window.dispatchEvent(new CustomEvent('processingCardRemoved', {
+          detail: { tempId, timestamp: Date.now(), forceRemoved: true }
+        }));
+        
+        window.dispatchEvent(new CustomEvent('journalUIForceRefresh', {
+          detail: { timestamp: Date.now(), forceRemove: tempId }
+        }));
+      }
+    }, 15000);
     
     return () => {
       // Notify when skeleton is unmounted
@@ -60,7 +101,13 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
         }));
       }
       
+      // Clean up all timeouts and event listeners
       clearTimeout(visibilityTimeout);
+      if (forceRemoveTimeoutRef.current) {
+        clearTimeout(forceRemoveTimeoutRef.current);
+      }
+      window.removeEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
+      window.removeEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
     };
   }, [count, addEvent, tempId]);
   
@@ -82,6 +129,7 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
           key={`skeleton-${tempId || index}`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -10 }}
           transition={{ duration: 0.3 }}
           className="overflow-hidden skeleton-container"
           data-loading-skeleton={true}

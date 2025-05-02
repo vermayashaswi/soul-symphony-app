@@ -1,4 +1,3 @@
-
 /**
  * Main audio processing module
  * Orchestrates the audio recording and transcription process
@@ -274,6 +273,10 @@ async function processRecordingInBackground(
 export function setEntryIdForProcessingId(tempId: string, entryId: number): void {
   processingToEntryMap.set(tempId, entryId);
   
+  // Also notify the state manager
+  processingStateManager.setEntryId(tempId, entryId);
+  processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
+  
   // Also add to localStorage for persistence across page loads
   try {
     const mapStr = localStorage.getItem('processingToEntryMap') || '{}';
@@ -281,6 +284,16 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
     map[tempId] = entryId;
     localStorage.setItem('processingToEntryMap', JSON.stringify(map));
     console.log(`[AudioProcessing] Stored tempId -> entryId mapping in localStorage: ${tempId} -> ${entryId}`);
+    
+    // Dispatch a global event to notify all components
+    window.dispatchEvent(new CustomEvent('processingEntryMapped', {
+      detail: { 
+        tempId, 
+        entryId, 
+        timestamp: Date.now(),
+        forceNotify: true 
+      }
+    }));
   } catch (error) {
     console.error('[AudioProcessing] Error storing mapping in localStorage:', error);
   }
@@ -290,7 +303,13 @@ export function setEntryIdForProcessingId(tempId: string, entryId: number): void
  * Get entry ID for a processing ID (temp ID)
  */
 export function getEntryIdForProcessingId(tempId: string): number | undefined {
-  // First check our in-memory map
+  // First check with the state manager
+  const entryFromManager = processingStateManager.getEntryId(tempId);
+  if (entryFromManager) {
+    return entryFromManager;
+  }
+  
+  // Next check our in-memory map
   if (processingToEntryMap.has(tempId)) {
     return processingToEntryMap.get(tempId);
   }
@@ -304,6 +323,8 @@ export function getEntryIdForProcessingId(tempId: string): number | undefined {
     // If found, also add to in-memory map for faster access next time
     if (entryId) {
       processingToEntryMap.set(tempId, Number(entryId));
+      // Also update the state manager
+      processingStateManager.setEntryId(tempId, Number(entryId));
       return Number(entryId);
     }
   } catch (error) {
@@ -339,7 +360,48 @@ export function resetProcessingState(): void {
  * Remove a processing entry by ID
  */
 export function removeProcessingEntryById(entryId: number | string): void {
+  // First notify the state manager
   processingStateManager.removeEntry(entryId);
+  
+  // If it's a number (real entry ID), also clean up any mappings
+  if (typeof entryId === 'number') {
+    // Find all tempIds that map to this entryId
+    for (const [tempId, mappedId] of processingToEntryMap.entries()) {
+      if (mappedId === entryId) {
+        processingToEntryMap.delete(tempId);
+        console.log(`[AudioProcessing] Removed mapping for tempId ${tempId} -> entryId ${entryId}`);
+      }
+    }
+    
+    // Also clean up localStorage
+    try {
+      const mapStr = localStorage.getItem('processingToEntryMap') || '{}';
+      const map = JSON.parse(mapStr);
+      let modified = false;
+      
+      Object.entries(map).forEach(([tempId, mappedId]) => {
+        if (Number(mappedId) === entryId) {
+          delete map[tempId];
+          modified = true;
+        }
+      });
+      
+      if (modified) {
+        localStorage.setItem('processingToEntryMap', JSON.stringify(map));
+        console.log(`[AudioProcessing] Cleaned up localStorage mappings for entryId ${entryId}`);
+      }
+    } catch (error) {
+      console.error('[AudioProcessing] Error cleaning up localStorage mappings:', error);
+    }
+  }
+  
+  // Dispatch an event to notify all components
+  window.dispatchEvent(new CustomEvent('processingEntryRemoved', {
+    detail: {
+      id: entryId,
+      timestamp: Date.now()
+    }
+  }));
 }
 
 /**

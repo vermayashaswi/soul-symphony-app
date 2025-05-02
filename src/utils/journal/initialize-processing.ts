@@ -46,13 +46,40 @@ export function initializeJournalProcessing() {
     const now = Date.now();
     
     entries.forEach(entry => {
-      // If entry has been in the system for more than 30 seconds and is completed, force cleanup
+      // If entry has been in the system for more than 20 seconds and is completed, force cleanup
       const entryAge = now - entry.startTime;
-      if (entry.state === EntryProcessingState.COMPLETED && entryAge > 30000) {
+      if (entry.state === EntryProcessingState.COMPLETED && entryAge > 20000) {
         processingStateManager.removeEntry(entry.tempId);
         console.log(`[Journal] Force cleaned up entry ${entry.tempId} (age: ${entryAge}ms)`);
       }
     });
+  });
+  
+  // Add a new handler for entry deletion
+  window.addEventListener('journalEntryDeleted', (event: any) => {
+    if (event.detail && event.detail.entryId) {
+      const { entryId } = event.detail;
+      console.log(`[Journal] Entry deleted event for entry ID: ${entryId}, checking for related processing entries`);
+      
+      // Find any processing entries related to this entry ID
+      const entries = processingStateManager.getProcessingEntries();
+      let removedCount = 0;
+      
+      entries.forEach(entry => {
+        if (entry.entryId === entryId) {
+          processingStateManager.removeEntry(entry.tempId);
+          removedCount++;
+          console.log(`[Journal] Removed processing entry ${entry.tempId} related to deleted entry ${entryId}`);
+        }
+      });
+      
+      if (removedCount > 0) {
+        // Force UI refresh
+        window.dispatchEvent(new CustomEvent('journalUIForceRefresh', {
+          detail: { timestamp: Date.now(), deletedEntryId: entryId }
+        }));
+      }
+    }
   });
   
   console.log('[Journal] Processing state management initialized');

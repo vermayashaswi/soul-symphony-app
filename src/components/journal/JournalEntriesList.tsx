@@ -1,5 +1,5 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -35,23 +35,39 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   const renderedTempIdsRef = useRef<Set<string>>(new Set());
   // Keep track of rendered entry IDs to prevent duplicates
   const renderedEntryIdsRef = useRef<Set<number>>(new Set());
+  // Track if we're currently recovering from a deletion
+  const [recoveringFromDelete, setRecoveringFromDelete] = useState(false);
+  // Track the last action taken
+  const [lastAction, setLastAction] = useState<string | null>(null);
   
   // Determine if we have any entries to show
   const hasEntries = entries && entries.length > 0;
   
   // Only show loading on initial load, not during refreshes
-  const isLoading = loading && !hasEntries;
+  const isLoading = loading && !hasEntries && !recoveringFromDelete;
   
   // Track when component mounts/unmounts
   useEffect(() => {
     console.log('[JournalEntriesList] Component mounted');
+    setLastAction('Component Mounted');
     
     // Clean up any stale processing entries on mount
     const entries = processingStateManager.getProcessingEntries();
     console.log(`[JournalEntriesList] Found ${entries.length} entries in state manager on mount`);
     
+    // Listen for force refresh events
+    const handleForceRefresh = () => {
+      console.log('[JournalEntriesList] Received force refresh event');
+      renderedTempIdsRef.current.clear();
+      // Force re-render by updating state
+      setLastAction('Force Refresh: ' + Date.now());
+    };
+    
+    window.addEventListener('journalUIForceRefresh', handleForceRefresh);
+    
     return () => {
       console.log('[JournalEntriesList] Component unmounted');
+      window.removeEventListener('journalUIForceRefresh', handleForceRefresh);
     };
   }, []);
   
@@ -76,7 +92,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
             detail: { tempId: entry.tempId, entryId: entry.id, timestamp: Date.now(), forceCleanup: true }
           }));
-        }, 500);
+        }, 300); // Decreased from 500ms to 300ms for faster cleanup
       }
     });
     
@@ -119,32 +135,82 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         // Force remove after a short delay
         setTimeout(() => {
           processingStateManager.removeEntry(entry.tempId);
-        }, 1000);
+        }, 500);
       }
     });
-  }, [processingEntries, entries, processedEntryIds, isProcessing, activeProcessingIds]);
+    
+    // Reset recovering state if we have entries
+    if (hasEntries && recoveringFromDelete) {
+      setRecoveringFromDelete(false);
+      console.log('[JournalEntriesList] Reset recovery state - entries exist');
+    }
+    
+  }, [processingEntries, entries, processedEntryIds, isProcessing, activeProcessingIds, hasEntries, recoveringFromDelete]);
   
   // Handle entry deletion with improved error handling
-  const handleDeleteEntry = (entryId: number) => {
+  const handleDeleteEntry = async (entryId: number) => {
     try {
       console.log(`[JournalEntriesList] Handling delete for entry: ${entryId}`);
+      setLastAction(`Deleting Entry ${entryId}`);
       
       if (!entryId) {
         console.error("[JournalEntriesList] Invalid entry ID for deletion");
         return Promise.reject(new Error("Invalid entry ID"));
       }
       
+      // Mark that we're recovering from a deletion to prevent blank screen
+      setRecoveringFromDelete(true);
+      
       // Remove from processing state manager if present
       processingStateManager.removeEntry(entryId);
       
-      // Call the parent component's delete handler and return the Promise
-      return Promise.resolve(onDeleteEntry(entryId))
-        .then(() => {
-          console.log(`[JournalEntriesList] Delete handler completed for entry: ${entryId}`);
+      // Find any temporary processing entries that map to this entry ID and remove them
+      const processingEntriesToRemove: string[] = [];
+      
+      // Get all processing entries
+      const allProcessingEntries = processingStateManager.getProcessingEntries();
+      allProcessingEntries.forEach(entry => {
+        if (entry.entryId === entryId) {
+          processingEntriesToRemove.push(entry.tempId);
+        }
+      });
+      
+      // Remove any temporary entries that are for this entry
+      if (processingEntriesToRemove.length > 0) {
+        console.log(`[JournalEntriesList] Removing ${processingEntriesToRemove.length} processing entries for deleted entry ${entryId}`);
+        processingEntriesToRemove.forEach(tempId => {
+          processingStateManager.removeEntry(tempId);
         });
+      }
+      
+      // Call the parent component's delete handler
+      await onDeleteEntry(entryId);
+      
+      console.log(`[JournalEntriesList] Delete handler completed for entry: ${entryId}`);
+      
+      // Check if we still have entries after deletion
+      if (entries.filter(e => e.id !== entryId).length === 0) {
+        console.log('[JournalEntriesList] No entries left after deletion, showing empty state');
+        // Stay in recovering state until new entries come in
+      } else {
+        // Reset recovery state if we still have entries
+        setTimeout(() => {
+          setRecoveringFromDelete(false);
+          console.log('[JournalEntriesList] Reset recovery state after deletion - other entries exist');
+        }, 100);
+      }
+      
+      // Force update any component that needs to know about deleted entries
+      window.dispatchEvent(new CustomEvent('journalEntryDeleted', {
+        detail: { entryId, timestamp: Date.now() }
+      }));
+      
+      return Promise.resolve();
       
     } catch (error) {
       console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
+      // Reset recovering state even if there was an error
+      setRecoveringFromDelete(false);
       return Promise.reject(error);
     }
   };
@@ -163,9 +229,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       return false;
     }
     
-    // Skip if this processing entry is older than 30 seconds
+    // Skip if this processing entry is older than 20 seconds
     const entry = processingStateManager.getEntryById(tempId);
-    if (entry && (Date.now() - entry.startTime > 30000)) {
+    if (entry && (Date.now() - entry.startTime > 20000)) {
       console.log(`[JournalEntriesList] Skipping stale processing card for tempId ${tempId} (age: ${Date.now() - entry.startTime}ms)`);
       // Clean it up
       processingStateManager.removeEntry(tempId);
@@ -179,8 +245,12 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   
   console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, activeProcessingIds=${activeProcessingIds.length}, filteredProcessingIds=${filteredProcessingIds.length}`);
 
+  // Determine what content to show based on entries, loading state, and processing state
+  const shouldShowEmpty = !hasEntries && !isLoading && filteredProcessingIds.length === 0 && !recoveringFromDelete;
+  const shouldShowEntries = hasEntries || filteredProcessingIds.length > 0 || recoveringFromDelete;
+  
   return (
-    <div className="journal-entries-list" id="journal-entries-container">
+    <div className="journal-entries-list" id="journal-entries-container" data-last-action={lastAction}>
       <JournalEntriesHeader onStartRecording={onStartRecording} />
 
       {isLoading ? (
@@ -189,7 +259,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             <TranslatableText text="Loading journal entries..." />
           </p>
         </div>
-      ) : hasEntries || filteredProcessingIds.length > 0 ? (
+      ) : shouldShowEntries ? (
         <div className="grid gap-4" data-entries-count={entries.length}>
           {/* Show processing entry skeletons for any active processing entries */}
           {filteredProcessingIds.length > 0 && (
@@ -222,9 +292,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             />
           ))}
         </div>
-      ) : (
+      ) : shouldShowEmpty ? (
         <EmptyJournalState onStartRecording={onStartRecording} />
-      )}
+      ) : null}
     </div>
   );
 }
