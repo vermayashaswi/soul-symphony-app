@@ -26,13 +26,14 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Multiplying base calculation by 10
-    const base = (12.825 + Math.max(0, (z - 18) * 0.8)) * 10;
-    return Math.round(Math.max(Math.min(base, 324), 118.8) * 100) / 100;
+    // Calculate appropriate size based on camera distance
+    // Lower base size for better visibility
+    const base = 14 + Math.max(0, (26 - z) * 0.5);
+    return Math.max(Math.min(base, 20), 12);
   }, [cameraZoom]);
 
   const labelStyle = useMemo(() => ({
-    transform: isHighlighted ? 'scale(1.1) !important' : 'scale(1) !important',
+    transform: isHighlighted ? 'scale(1.1)' : 'scale(1)',
     minWidth: 'auto',
     minHeight: 'auto',
     pointerEvents: 'none' as const,
@@ -40,7 +41,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     fontWeight: isHighlighted ? 800 : 600,
     lineHeight: 1.1,
     zIndex: isHighlighted ? 100000 : 99999,
-    userSelect: 'text' as const,
+    userSelect: 'none' as const,
     whiteSpace: 'nowrap' as const,
     transition: 'transform 0.2s ease-out, font-weight 0.2s ease',
     willChange: 'transform',
@@ -52,15 +53,17 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   const labelTextStyle = useMemo(() => ({
     color: type === 'entity' ? '#fff' : themeHex,
-    padding: '0.1rem 0.2rem',
+    padding: '0.1rem 0.3rem',
     fontWeight: isHighlighted ? 'bold' : 'normal',
+    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.5)' : 'transparent',
+    borderRadius: '2px',
   }), [type, themeHex, isHighlighted]);
 
-  return shouldShowLabel ? (
+  return (
     <Html
-      position={[0, type === 'entity' ? 1.2 : 1.4, 0]}
+      position={[0, type === 'entity' ? 0.8 : 0.9, 0]}
       center
-      distanceFactor={1.2}
+      distanceFactor={15}
       occlude={false}
       className="z-40"
       style={labelStyle}
@@ -70,7 +73,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         <TranslatableText text={id} forceTranslate={true} />
       </div>
     </Html>
-  ) : null;
+  );
 };
 
 export default NodeLabel;

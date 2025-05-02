@@ -50,6 +50,13 @@ export const Node: React.FC<NodeProps> = ({
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
+  // Debug log for visibility
+  useEffect(() => {
+    if (isHighlighted && showPercentage) {
+      console.log(`Node ${node.id} is highlighted, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
+    }
+  }, [isHighlighted, showPercentage, node.id, connectionPercentage]);
+  
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = isHighlighted 
     ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
@@ -112,6 +119,12 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
+  // Ensure label visibility
+  const shouldShowLabel = showLabel || isHighlighted || isSelected;
+  
+  // Enhanced logic for percentage visibility
+  const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;
+
   return (
     <group position={node.position}>
       <NodeMesh
@@ -134,7 +147,7 @@ export const Node: React.FC<NodeProps> = ({
         type={node.type}
         position={node.position}
         isHighlighted={isHighlighted}
-        shouldShowLabel={showLabel}
+        shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
       />
@@ -142,8 +155,9 @@ export const Node: React.FC<NodeProps> = ({
       <ConnectionPercentage
         position={node.position}
         percentage={connectionPercentage}
-        isVisible={showPercentage && isHighlighted && !isSelected}
-        offsetY={node.type === 'entity' ? 2.2 : 2.4}
+        isVisible={shouldShowPercentage}
+        offsetY={node.type === 'entity' ? 1.2 : 1.0}
+        nodeType={node.type}
       />
     </group>
   );
