@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -81,7 +80,9 @@ export default function Insights() {
 
   const renderTimeToggle = () => (
     <div className="insights-time-toggle flex items-center gap-3">
-      <span className="text-sm text-muted-foreground"><TranslatableText text="View:" /></span>
+      <span className="text-sm text-muted-foreground">
+        <TranslatableText text="View:" forceTranslate={true} />
+      </span>
       <ToggleGroup 
         type="single" 
         value={timeRange}
@@ -100,7 +101,7 @@ export default function Insights() {
                 : "text-muted-foreground hover:text-foreground bg-transparent"
             )}
           >
-            <TranslatableText text={range.label} />
+            <TranslatableText text={range.label} forceTranslate={true} />
           </ToggleGroupItem>
         ))}
       </ToggleGroup>
@@ -147,8 +148,12 @@ export default function Insights() {
         )}>
           <div className="flex flex-col md:flex-row justify-between items-start md:items-center mb-8 px-2">
             <div>
-              <h1 className="text-3xl font-bold mb-2"><TranslatableText text="Insights" /></h1>
-              <p className="text-muted-foreground"><TranslatableText text="Discover patterns in your emotional journey" /></p>
+              <h1 className="text-3xl font-bold mb-2">
+                <TranslatableText text="Insights" forceTranslate={true} />
+              </h1>
+              <p className="text-muted-foreground">
+                <TranslatableText text="Discover patterns in your emotional journey" forceTranslate={true} />
+              </p>
             </div>
             
             <div className={cn(
@@ -165,12 +170,14 @@ export default function Insights() {
             </div>
           ) : insightsData.entries.length === 0 ? (
             <div className="bg-background rounded-xl p-8 text-center border mx-2">
-              <h2 className="text-xl font-semibold mb-4"><TranslatableText text="No journal data available" /></h2>
+              <h2 className="text-xl font-semibold mb-4">
+                <TranslatableText text="No journal data available" forceTranslate={true} />
+              </h2>
               <p className="text-muted-foreground mb-6">
-                <TranslatableText text="Start recording journal entries to see your emotional insights." />
+                <TranslatableText text="Start recording journal entries to see your emotional insights." forceTranslate={true} />
               </p>
               <Button onClick={() => window.location.href = '/journal'}>
-                <TranslatableText text="Go to Journal" />
+                <TranslatableText text="Go to Journal" forceTranslate={true} />
               </Button>
             </div>
           ) : (
@@ -185,9 +192,11 @@ export default function Insights() {
                   className="bg-background p-6 rounded-xl shadow-sm border w-full"
                 >
                   <div className="flex justify-between items-start mb-4">
-                    <h2 className="font-semibold text-lg"><TranslatableText text="Dominant Mood" /></h2>
+                    <h2 className="font-semibold text-lg">
+                      <TranslatableText text="Dominant Mood" forceTranslate={true} />
+                    </h2>
                     <span className="px-2 py-1 bg-blue-100 dark:bg-blue-900 text-blue-700 dark:text-blue-200 rounded-full text-xs font-medium">
-                      <TranslatableText text={`This ${timeRange}`} />
+                      <TranslatableText text={`This ${timeRange}`} forceTranslate={true} />
                     </span>
                   </div>
                   {insightsData.dominantMood ? (
@@ -196,8 +205,12 @@ export default function Insights() {
                         <span className="text-2xl">{insightsData.dominantMood.emoji}</span>
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold capitalize"><TranslatableText text={insightsData.dominantMood.emotion} /></h3>
-                        <p className="text-muted-foreground text-sm"><TranslatableText text="Appeared in most entries" /></p>
+                        <h3 className="text-2xl font-bold capitalize">
+                          <TranslatableText text={insightsData.dominantMood.emotion} forceTranslate={true} />
+                        </h3>
+                        <p className="text-muted-foreground text-sm">
+                          <TranslatableText text="Appeared in most entries" forceTranslate={true} />
+                        </p>
                       </div>
                     </div>
                   ) : (
@@ -206,8 +219,12 @@ export default function Insights() {
                         <span className="text-2xl">🤔</span>
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold"><TranslatableText text="Not enough data" /></h3>
-                        <p className="text-muted-foreground text-sm"><TranslatableText text="Add more journal entries" /></p>
+                        <h3 className="text-2xl font-bold">
+                          <TranslatableText text="Not enough data" forceTranslate={true} />
+                        </h3>
+                        <p className="text-muted-foreground text-sm">
+                          <TranslatableText text="Add more journal entries" forceTranslate={true} />
+                        </p>
                       </div>
                     </div>
                   )}
@@ -220,7 +237,9 @@ export default function Insights() {
                   className="bg-background p-6 rounded-xl shadow-sm border w-full"
                 >
                   <div className="flex justify-between items-start mb-4">
-                    <h2 className="font-semibold text-lg"><TranslatableText text="Biggest Change" /></h2>
+                    <h2 className="font-semibold text-lg">
+                      <TranslatableText text="Biggest Change" forceTranslate={true} />
+                    </h2>
                     {insightsData.biggestImprovement && (
                       <span 
                         className={cn(
@@ -257,13 +276,16 @@ export default function Insights() {
                         )}
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold capitalize"><TranslatableText text={insightsData.biggestImprovement.emotion} /></h3>
+                        <h3 className="text-2xl font-bold capitalize">
+                          <TranslatableText text={insightsData.biggestImprovement.emotion} forceTranslate={true} />
+                        </h3>
                         <p className="text-muted-foreground text-sm">
                           <TranslatableText 
                             text={insightsData.biggestImprovement.percentage >= 0 
                               ? "Increased significantly" 
                               : "Decreased significantly"
                             } 
+                            forceTranslate={true}
                           />
                         </p>
                       </div>
@@ -274,8 +296,12 @@ export default function Insights() {
                         <TrendingUp className="h-8 w-8 text-gray-500 dark:text-gray-400" />
                       </div>
                       <div>
-                        <h3 className="text-2xl font-bold"><TranslatableText text="Not enough data" /></h3>
-                        <p className="text-muted-foreground text-sm"><TranslatableText text="Need more entries to compare" /></p>
+                        <h3 className="text-2xl font-bold">
+                          <TranslatableText text="Not enough data" forceTranslate={true} />
+                        </h3>
+                        <p className="text-muted-foreground text-sm">
+                          <TranslatableText text="Need more entries to compare" forceTranslate={true} />
+                        </p>
                       </div>
                     </div>
                   )}
@@ -288,11 +314,14 @@ export default function Insights() {
                   className="bg-background p-6 rounded-xl shadow-sm border w-full"
                 >
                   <div className="flex justify-between items-start mb-4">
-                    <h2 className="font-semibold text-lg"><TranslatableText text="Journal Activity" /></h2>
+                    <h2 className="font-semibold text-lg">
+                      <TranslatableText text="Journal Activity" forceTranslate={true} />
+                    </h2>
                     {insightsData.journalActivity.maxStreak > 0 && (
                       <span className="px-2 py-1 bg-purple-100 dark:bg-purple-900 text-purple-700 dark:text-purple-200 rounded-full text-xs font-medium">
                         <TranslatableText 
-                          text={`Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 'entries' : 'days'}`} 
+                          text={`Max streak: ${insightsData.journalActivity.maxStreak} ${timeRange === 'today' ? 'entries' : 'days'}`}
+                          forceTranslate={true}
                         />
                       </span>
                     )}
@@ -307,10 +336,10 @@ export default function Insights() {
                     </div>
                     <div>
                       <h3 className="text-2xl font-bold">
-                        <TranslatableText text={`${insightsData.journalActivity.entryCount} entries`} />
+                        <TranslatableText text={`${insightsData.journalActivity.entryCount} entries`} forceTranslate={true} />
                       </h3>
                       <p className="text-muted-foreground text-sm capitalize">
-                        <TranslatableText text={`This ${timeRange}`} />
+                        <TranslatableText text={`This ${timeRange}`} forceTranslate={true} />
                       </p>
                     </div>
                   </div>

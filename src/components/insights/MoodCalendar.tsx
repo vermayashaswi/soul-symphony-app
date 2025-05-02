@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -68,7 +67,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="custom-tooltip bg-background p-2 border rounded-md shadow-md">
         <p className="date">{label}</p>
         <p className="sentiment" style={{ color: moodColor }}>
-          <TranslatableText text={moodText} />: {sentiment.toFixed(2)}
+          <TranslatableText text={moodText} forceTranslate={true} />: {sentiment.toFixed(2)}
         </p>
       </div>
     );

@@ -21,6 +21,7 @@ import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
 import { useAuth } from '@/contexts/AuthContext';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 type EmotionData = {
   day: string;
@@ -356,7 +357,9 @@ export function EmotionChart({
     if (lineData.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">No data available for this timeframe</p>
+          <p className="text-muted-foreground">
+            <TranslatableText text="No data available for this timeframe" forceTranslate={true} />
+          </p>
         </div>
       );
     }
@@ -368,7 +371,9 @@ export function EmotionChart({
     if (allEmotions.length === 0) {
       return (
         <div className="flex items-center justify-center h-full">
-          <p className="text-muted-foreground">No emotional data found</p>
+          <p className="text-muted-foreground">
+            <TranslatableText text="No emotional data found" forceTranslate={true} />
+          </p>
         </div>
       );
     }
@@ -471,7 +476,9 @@ export function EmotionChart({
   return (
     <div className={cn("w-full", className)}>
       <div className="flex flex-wrap justify-between items-center mb-4">
-        <h3 className="text-xl font-semibold">TOP</h3>
+        <h3 className="text-xl font-semibold">
+          <TranslatableText text="TOP" forceTranslate={true} />
+        </h3>
         <div className="flex gap-2">
           {chartTypes.map((type) => (
             <button
@@ -484,7 +491,7 @@ export function EmotionChart({
                   : "bg-secondary text-muted-foreground hover:text-foreground"
               )}
             >
-              {type.label}
+              <TranslatableText text={type.label} forceTranslate={true} />
             </button>
           ))}
         </div>
@@ -496,7 +503,7 @@ export function EmotionChart({
           <div className="w-full">
             {topRightPercentage && (
               <div className="absolute top-2 right-2 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
-                {topRightPercentage.emotion}: {topRightPercentage.percentage}
+                <TranslatableText text={topRightPercentage.emotion} forceTranslate={true} />: {topRightPercentage.percentage}
               </div>
             )}
             
