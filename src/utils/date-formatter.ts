@@ -1,10 +1,11 @@
+
 import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import { TimeRange } from '@/hooks/use-insights-data';
 
 /**
  * Formats a date based on the specified time range and language
  */
-export const formatDateForTimeRange = (date: Date | string, range: TimeRange, language: string = 'en'): string => {
+export const formatDateForTimeRange = (date: Date | string, range: TimeRange | 'day' | 'short' | 'month', language: string = 'en'): string => {
   if (!date) return '';
   
   // Ensure we have a valid Date object
@@ -23,6 +24,15 @@ export const formatDateForTimeRange = (date: Date | string, range: TimeRange, la
           hour12: false 
         }).format(d);
       }
+      
+      case 'day': {
+        // Format as full date (e.g., "January 1, 2025")
+        return new Intl.DateTimeFormat(language, {
+          year: 'numeric',
+          month: 'long',
+          day: 'numeric'
+        }).format(d);
+      }
         
       case 'week': {
         // Format as "Mon 1" (Short weekday + day number)
@@ -30,10 +40,21 @@ export const formatDateForTimeRange = (date: Date | string, range: TimeRange, la
         const weekday = new Intl.DateTimeFormat(language, { weekday: 'short' }).format(d);
         return `${weekday} ${dayNum}`;
       }
+      
+      case 'short': {
+        // Format as "Jan 1" (Short month + day number)
+        return new Intl.DateTimeFormat(language, {
+          month: 'short',
+          day: 'numeric'
+        }).format(d);
+      }
         
       case 'month': {
-        // Just the day number
-        return new Intl.DateTimeFormat(language, { day: 'numeric' }).format(d);
+        // Format as "January 2025"
+        return new Intl.DateTimeFormat(language, {
+          year: 'numeric',
+          month: 'long'
+        }).format(d);
       }
         
       case 'year': {

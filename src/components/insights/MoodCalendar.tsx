@@ -6,8 +6,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { LineChart, Calendar } from 'lucide-react';
+import { LineChart, Calendar, ChevronLeft, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
 import {
   ResponsiveContainer,
   LineChart as RechartsLineChart,
@@ -21,6 +22,7 @@ import {
 } from 'recharts';
 import MoodCalendarGrid from './MoodCalendarGrid';
 import { filterDataByTimeRange, formatDateForTimeRange } from '@/utils/date-formatter';
+import { addDays, addMonths, addWeeks, addYears, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from 'date-fns';
 
 interface SentimentData {
   date: Date;
@@ -89,13 +91,117 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
   const isMobile = useIsMobile();
   const { currentLanguage } = useTranslation();
   const [viewMode, setViewMode] = useState<ViewMode>('chart');
+  const [currentDate, setCurrentDate] = useState<Date>(new Date());
+  
+  // Function to navigate to previous time period
+  const goToPrevious = () => {
+    switch (timeRange) {
+      case 'today':
+        setCurrentDate(prevDate => subDays(prevDate, 1));
+        break;
+      case 'week':
+        setCurrentDate(prevDate => subWeeks(prevDate, 1));
+        break;
+      case 'month':
+        setCurrentDate(prevDate => subMonths(prevDate, 1));
+        break;
+      case 'year':
+        setCurrentDate(prevDate => subYears(prevDate, 1));
+        break;
+    }
+  };
+
+  // Function to navigate to next time period
+  const goToNext = () => {
+    switch (timeRange) {
+      case 'today':
+        setCurrentDate(prevDate => addDays(prevDate, 1));
+        break;
+      case 'week':
+        setCurrentDate(prevDate => addWeeks(prevDate, 1));
+        break;
+      case 'month':
+        setCurrentDate(prevDate => addMonths(prevDate, 1));
+        break;
+      case 'year':
+        setCurrentDate(prevDate => addYears(prevDate, 1));
+        break;
+    }
+  };
+
+  // Reset current date when time range changes
+  useEffect(() => {
+    setCurrentDate(new Date());
+  }, [timeRange]);
+  
+  // Get the period label based on timeRange and current date
+  const getPeriodLabel = () => {
+    const now = currentDate;
+    switch (timeRange) {
+      case 'today':
+        return formatDateForTimeRange(now, 'day', currentLanguage);
+      case 'week': {
+        const weekStart = startOfWeek(now, { weekStartsOn: 1 });
+        const weekEnd = addDays(weekStart, 6);
+        return `${formatDateForTimeRange(weekStart, 'short', currentLanguage)} - ${formatDateForTimeRange(weekEnd, 'short', currentLanguage)}`;
+      }
+      case 'month':
+        return formatDateForTimeRange(now, 'month', currentLanguage);
+      case 'year':
+        return now.getFullYear().toString();
+      default:
+        return '';
+    }
+  };
   
   // Format the data for the chart
   const processChartData = () => {
     if (!sentimentData || sentimentData.length === 0) return [];
     
-    // Filter data based on the selected time range
-    const filteredData = filterDataByTimeRange(sentimentData, timeRange);
+    // Get the start date for the selected time period
+    let periodStart: Date;
+    switch (timeRange) {
+      case 'today':
+        periodStart = startOfDay(currentDate);
+        break;
+      case 'week':
+        periodStart = startOfWeek(currentDate, { weekStartsOn: 1 });
+        break;
+      case 'month':
+        periodStart = startOfMonth(currentDate);
+        break;
+      case 'year':
+        periodStart = startOfYear(currentDate);
+        break;
+      default:
+        periodStart = startOfDay(currentDate);
+    }
+    
+    // Filter data based on the selected time period
+    const filteredData = sentimentData.filter(item => {
+      const itemDate = item.date instanceof Date ? item.date : new Date(item.date);
+      
+      // Calculate end date based on time range
+      let periodEnd: Date;
+      switch (timeRange) {
+        case 'today':
+          periodEnd = addDays(periodStart, 1);
+          break;
+        case 'week':
+          periodEnd = addWeeks(periodStart, 1);
+          break;
+        case 'month':
+          periodEnd = addMonths(periodStart, 1);
+          break;
+        case 'year':
+          periodEnd = addYears(periodStart, 1);
+          break;
+        default:
+          periodEnd = addDays(periodStart, 1);
+      }
+      
+      return itemDate >= periodStart && itemDate < periodEnd;
+    });
     
     // Group data by formatted date to avoid duplicates
     const groupedData = new Map();
@@ -240,6 +346,32 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         </p>
       </div>
       
+      <div className="flex items-center justify-between mb-6">
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={goToPrevious}
+          className="text-muted-foreground hover:text-foreground"
+          title="Previous period"
+        >
+          <ChevronLeft className="h-5 w-5" />
+        </Button>
+        
+        <div className="text-center font-medium">
+          <TranslatableText text={getPeriodLabel()} forceTranslate={true} />
+        </div>
+        
+        <Button 
+          variant="ghost" 
+          size="icon" 
+          onClick={goToNext}
+          className="text-muted-foreground hover:text-foreground"
+          title="Next period"
+        >
+          <ChevronRight className="h-5 w-5" />
+        </Button>
+      </div>
+      
       <div className="flex justify-center mb-6">
         <ToggleGroup 
           type="single" 
@@ -282,6 +414,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
           <MoodCalendarGrid 
             sentimentData={sentimentData}
             timeRange={timeRange}
+            currentDate={currentDate}
           />
         )}
       </div>

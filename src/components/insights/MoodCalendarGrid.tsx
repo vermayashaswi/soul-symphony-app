@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { format, isSameDay, isToday, parseISO } from 'date-fns';
+import { format, isSameDay, isToday, parseISO, startOfDay, startOfMonth, startOfWeek, startOfYear, addDays, addMonths, addWeeks, addYears } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -17,6 +17,7 @@ interface MoodData {
 interface MoodCalendarGridProps {
   sentimentData: MoodData[];
   timeRange: TimeRange;
+  currentDate: Date;
 }
 
 // Helper function to determine the color based on sentiment
@@ -32,7 +33,7 @@ const getSentimentLabel = (sentiment: number): string => {
   return 'Neutral';
 };
 
-const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, timeRange }) => {
+const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, timeRange, currentDate }) => {
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const { currentLanguage } = useTranslation();
@@ -66,50 +67,53 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
     }
   });
   
-  // Generate dates based on time range
+  // Generate dates based on time range and current date
   const getDates = () => {
-    const now = new Date();
     let dates: Date[] = [];
     
     switch (timeRange) {
-      case 'today':
+      case 'today': {
         // For today, use hours instead of days
+        const selectedDay = startOfDay(currentDate);
         dates = Array.from({ length: 12 }, (_, i) => {
-          const date = new Date(now);
+          const date = new Date(selectedDay);
           date.setHours(9 + i); // Start from 9 AM to 8 PM
           date.setMinutes(0);
           date.setSeconds(0);
           return date;
         });
         break;
-      case 'week':
-        // 7 days of the week
+      }
+      case 'week': {
+        // Get the start of the week for the current date
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
         dates = Array.from({ length: 7 }, (_, i) => {
-          const date = new Date(now);
-          date.setDate(date.getDate() - date.getDay() + i);
-          return date;
+          return addDays(weekStart, i);
         });
         break;
-      case 'month':
+      }
+      case 'month': {
+        // Get the first day of the month
+        const monthStart = startOfMonth(currentDate);
         // Get days in the current month
-        const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+        const daysInMonth = new Date(monthStart.getFullYear(), monthStart.getMonth() + 1, 0).getDate();
         dates = Array.from({ length: daysInMonth }, (_, i) => {
-          const date = new Date(now.getFullYear(), now.getMonth(), i + 1);
-          return date;
+          return new Date(monthStart.getFullYear(), monthStart.getMonth(), i + 1);
         });
         break;
-      case 'year':
+      }
+      case 'year': {
         // We'll handle the year view differently - see renderYearGrid
+        const yearStart = startOfYear(currentDate);
         dates = Array.from({ length: 12 }, (_, i) => {
-          const date = new Date(now.getFullYear(), i, 1);
-          return date;
+          return new Date(yearStart.getFullYear(), i, 1);
         });
         break;
+      }
       default:
+        const weekStart = startOfWeek(currentDate, { weekStartsOn: 1 });
         dates = Array.from({ length: 7 }, (_, i) => {
-          const date = new Date(now);
-          date.setDate(date.getDate() - date.getDay() + i);
-          return date;
+          return addDays(weekStart, i);
         });
     }
     
@@ -245,8 +249,7 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
   };
   
   const renderYearGrid = () => {
-    const now = new Date();
-    const currentYear = now.getFullYear();
+    const currentYear = currentDate.getFullYear();
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
     // Generate all days for the entire year (1-31)
