@@ -51,12 +51,12 @@
     "negative": "Negative",
     "noData": "No data available for this timeframe",
     "soulNet": {
-      "title": "SoulNet Visualization",
-      "description": "Explore connections between entities and emotions in your journal",
+      "title": "Soul-Net",
+      "description": "Explore connections between life areas and emotions in your journal",
       "loading": "Loading visualization...",
       "noConnections": "No connections found",
-      "addMore": "Add more journal entries to visualize connections between entities and emotions in your journaling.",
-      "dragInfo": "<b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections"
+      "addMore": "Add more journal entries to visualize connections between life areas and emotions in your journaling.",
+      "dragInfo": "Drag to rotate • Scroll to zoom • Tap/Click a node to highlight connections"
     }
   }
 }

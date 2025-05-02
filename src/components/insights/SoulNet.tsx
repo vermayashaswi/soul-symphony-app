@@ -115,7 +115,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
       <h2 className="text-xl font-semibold text-red-600 mb-4">
-        <TranslatableText text="Error Loading SoulNet" />
+        <TranslatableText text="Error Loading Soul-Net" />
       </h2>
       <p className="text-muted-foreground mb-4">{error.message}</p>
       <button 
@@ -127,6 +127,14 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     </div>
   );
   if (graphData.nodes.length === 0) return <EmptyState />;
+
+  // Get appropriate instructions based on device type
+  const getInstructions = () => {
+    if (isMobile) {
+      return <TranslatableText text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" />;
+    }
+    return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" />;
+  };
 
   return (
     <div className={cn(
@@ -143,7 +151,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
             <div className="text-center">
               <h3 className="text-lg font-medium">
-                <TranslatableText text="Error in SoulNet Visualization" />
+                <TranslatableText text="Error in Soul-Net Visualization" />
               </h3>
               <p className="text-muted-foreground mt-2">
                 <TranslatableText text="There was a problem rendering the visualization." />
@@ -161,8 +169,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             style={{
               width: '100%',
               height: '100%',
-              maxWidth: '800px',
-              maxHeight: '500px'
+              maxWidth: isFullScreen ? 'none' : '800px',
+              maxHeight: isFullScreen ? 'none' : '500px'
             }}
             camera={{ position: [0, 0, 26] }}
             onPointerMissed={() => setSelectedEntity(null)}
@@ -188,7 +196,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       
       <div className="w-full text-center mt-2 px-4 md:px-8">
         <p className="text-xs text-muted-foreground">
-          <TranslatableText text="<b>Drag</b> to rotate • <b>Scroll</b> to zoom • <b>Tap/Click</b> a node to highlight connections" />
+          {getInstructions()}
         </p>
       </div>
     </div>

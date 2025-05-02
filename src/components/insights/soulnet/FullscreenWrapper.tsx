@@ -17,7 +17,7 @@ export const FullscreenWrapper: React.FC<FullscreenWrapperProps> = ({
   return (
     <div className={`relative rounded-lg overflow-hidden transition-all duration-300 ease-in-out ${
       isFullScreen 
-        ? 'fixed top-0 left-0 w-screen h-screen z-50 bg-background p-4 flex items-center justify-center' 
+        ? 'fixed top-0 left-0 w-screen h-screen z-50 bg-background p-0 flex items-center justify-center' 
         : 'w-full h-[400px] md:h-[500px] bg-background/50'
     }`}>
       <button
@@ -34,7 +34,7 @@ export const FullscreenWrapper: React.FC<FullscreenWrapperProps> = ({
           <TranslatableText text={isFullScreen ? "Exit fullscreen" : "Enter fullscreen"} />
         </span>
       </button>
-      <div className={`flex items-center justify-center h-full`}>
+      <div className={`flex items-center justify-center h-full w-full`}>
         {children}
       </div>
     </div>
