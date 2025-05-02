@@ -156,7 +156,6 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                     : "bg-muted",
                   isToday(date) && "ring-2 ring-primary ring-offset-2"
                 )}
-                title={hasMood ? `${getSentimentLabel(sentiment)}: ${sentiment.toFixed(2)}` : "No data"}
               />
             </div>
           );
@@ -191,7 +190,6 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                     ? getSentimentColor(sentiment)
                     : "bg-muted"
                 )}
-                title={hasMood ? `${getSentimentLabel(sentiment)}: ${sentiment.toFixed(2)}` : "No data"}
               />
             </div>
           );
@@ -231,7 +229,6 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                     : "bg-muted/30",
                   isToday(date) && "ring-1 ring-primary ring-offset-1"
                 )}
-                title={hasMood ? `${getSentimentLabel(sentiment)}: ${sentiment.toFixed(2)}` : "No data"}
               >
                 <span className={cn(
                   "text-xs font-medium",
@@ -252,11 +249,11 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
     const currentYear = now.getFullYear();
     const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
     
-    // Generate all days for the entire year
+    // Generate all days for the entire year (1-31)
     const allYearDates = Array.from({ length: 31 }, (_, i) => i + 1);
     
     return (
-      <div className="overflow-auto max-h-[260px] pb-2">
+      <div className="w-full">
         <table className="w-full border-collapse">
           <thead>
             <tr>
@@ -268,7 +265,7 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
               ))}
             </tr>
           </thead>
-          <tbody className="text-sm">
+          <tbody className="text-xs">
             {allYearDates.map(day => (
               <tr key={`day-${day}`}>
                 <td className="text-xs text-center text-muted-foreground p-1 sticky left-0 bg-background">{day}</td>
@@ -277,7 +274,7 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                   const daysInMonth = new Date(currentYear, monthIndex + 1, 0).getDate();
                   
                   if (day > daysInMonth) {
-                    return <td key={`empty-${monthIndex}-${day}`} className="p-[2px]"></td>;
+                    return <td key={`empty-${monthIndex}-${day}`} className="p-[1px]"></td>;
                   }
                   
                   const date = new Date(currentYear, monthIndex, day);
@@ -286,16 +283,15 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                   const sentiment = sentimentByDate.get(dateKey) || 0;
                   
                   return (
-                    <td key={dateKey} className="p-[2px] text-center">
+                    <td key={dateKey} className="p-[1px] text-center">
                       <div 
                         className={cn(
-                          "w-4 h-4 rounded-full mx-auto",
+                          "w-3 h-3 rounded-full mx-auto",
                           hasMood 
                             ? getSentimentColor(sentiment)
                             : "bg-muted/30",
                           isToday(date) && "ring-1 ring-primary ring-offset-1"
                         )}
-                        title={`${format(date, 'MMM d')}: ${hasMood ? `${getSentimentLabel(sentiment)}` : "No data"}`}
                       />
                     </td>
                   );
@@ -309,7 +305,7 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
   };
 
   return (
-    <div className="h-full py-4 overflow-hidden">
+    <div className="h-full py-4">
       {renderGrid()}
       
       <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">

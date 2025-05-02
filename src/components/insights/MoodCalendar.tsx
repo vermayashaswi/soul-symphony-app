@@ -76,7 +76,7 @@ const CustomTooltip = ({ active, payload, label }: any) => {
       <div className="custom-tooltip bg-background p-2 border rounded-md shadow-md">
         <p className="date">{label}</p>
         <p className="sentiment" style={{ color: moodColor }}>
-          <TranslatableText text={moodText} forceTranslate={true} />: {sentiment.toFixed(2)}
+          <TranslatableText text={moodText} forceTranslate={true} />
         </p>
       </div>
     );
@@ -271,7 +271,11 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         </ToggleGroup>
       </div>
       
-      <div className="h-[300px] md:h-[350px]">
+      <div className={cn(
+        "h-auto", 
+        viewMode === 'chart' ? "h-[300px] md:h-[350px]" : "",
+        viewMode === 'calendar' && timeRange === 'year' ? "min-h-[490px]" : "h-[300px] md:h-[350px]"
+      )}>
         {viewMode === 'chart' ? (
           renderLineChart()
         ) : (
