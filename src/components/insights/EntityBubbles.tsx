@@ -7,6 +7,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { supabase } from '@/integrations/supabase/client';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { toast } from 'sonner';
+import { Json } from '@/types/journal';
 
 type Entity = {
   name: string;
@@ -75,6 +76,17 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
     return '#FBBF24';                        // Yellow for neutral
   };
   
+  // Type guard to check if entity is a string or has name property
+  const isValidEntity = (entity: Json): entity is string | { name: string; type?: string } => {
+    if (typeof entity === 'string') {
+      return true;
+    }
+    if (typeof entity === 'object' && entity !== null && 'name' in entity && typeof entity.name === 'string') {
+      return true;
+    }
+    return false;
+  };
+  
   // Fetch entities and their sentiments
   useEffect(() => {
     const fetchEntities = async () => {
@@ -118,7 +130,7 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
             
           if (isNaN(sentimentScore)) return;
           
-          let entitiesArray: Array<{ name: string, type: string } | string> = [];
+          let entitiesArray: Array<Json> = [];
           
           // Handle different formats of entities data
           if (typeof entry.entities === 'string') {
@@ -151,6 +163,12 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
           
           // Process each entity, handling both object and string formats
           entitiesArray.forEach(entity => {
+            // Skip invalid entities
+            if (!isValidEntity(entity)) {
+              console.log('Skipping invalid entity:', entity);
+              return;
+            }
+            
             let entityName = '';
             let entityType = 'unknown';
             
@@ -159,13 +177,11 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
               // Simple string entity
               entityName = entity.toLowerCase();
             } else if (typeof entity === 'object' && entity !== null) {
-              // Object entity with name and type properties
-              if ('name' in entity && typeof entity.name === 'string') {
-                entityName = entity.name.toLowerCase();
-                
-                if ('type' in entity && typeof entity.type === 'string') {
-                  entityType = entity.type;
-                }
+              // Object entity with name property
+              entityName = entity.name.toLowerCase();
+              
+              if ('type' in entity && typeof entity.type === 'string') {
+                entityType = entity.type;
               }
             }
             
