@@ -34,6 +34,9 @@ const HomePage = () => {
     }
   };
 
+  // Log the route to help with debugging
+  console.log('HomePage: Rendering the website home page at route "/"');
+
   return (
     <div className="min-h-screen bg-white">
       <Navbar />

@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,7 +26,7 @@ export const isWebsiteRoute = (pathname: string): boolean => {
   // Consider website routes like /about, /pricing, etc.
   const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq'];
   
-  // The root path (/) is ALWAYS explicitly a website route
+  // The root path (/) is explicitly a website route
   if (pathname === "/" || pathname === "") {
     console.log('Root path / is explicitly a website route');
     return true;

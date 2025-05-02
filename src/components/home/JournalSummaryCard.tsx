@@ -78,6 +78,11 @@ const JournalSummaryCard: React.FC = () => {
           .gte('created_at', sevenDaysAgo.toISOString())
           .not('master_themes', 'is', null);
         
+        console.log('JournalSummaryCard: Fetched journal entries', {
+          entriesCount: journalEntries?.length || 0,
+          error: entriesError?.message
+        });
+        
         if (entriesError) {
           console.error('Error fetching master themes:', entriesError);
         } else if (journalEntries && journalEntries.length > 0) {

@@ -57,8 +57,9 @@ export function TranslatableText({
       return;
     }
 
-    // Don't translate on website routes unless forced
+    // IMPORTANT CHANGE: Don't skip translation on website routes if forceTranslate is true
     if (isOnWebsite && !forceTranslate) {
+      console.log(`TranslatableText: Skipping translation for "${text}" because on website route without force translate`);
       setTranslatedText(text);
       return;
     }
@@ -85,6 +86,7 @@ export function TranslatableText({
     }
       
     try {
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
       // Use "en" as default source language when none is provided
       const result = await translate(text, sourceLanguage || "en", entryId);
       
@@ -94,13 +96,15 @@ export function TranslatableText({
         if (result) {
           // Clean the translation result before setting it
           const cleanedResult = cleanTranslationResult(result);
+          console.log(`TranslatableText: Translation result for "${text.substring(0, 30)}...": "${cleanedResult.substring(0, 30)}..."`);
           setTranslatedText(cleanedResult || text); // Fallback to original if cleaning removes everything
         } else {
+          console.log(`TranslatableText: Empty translation result for "${text.substring(0, 30)}..."`);
           setTranslatedText(text); // Fallback to original if result is empty
         }
       }
     } catch (error) {
-      console.error('Translation error:', error);
+      console.error(`TranslatableText: Translation error for "${text.substring(0, 30)}..."`, error);
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         setTranslatedText(text); // Fallback to original
       }
@@ -141,6 +145,7 @@ export function TranslatableText({
   // Listen to language change events to force re-translate
   useEffect(() => {
     const handleLanguageChange = () => {
+      console.log(`TranslatableText: Language change event for "${text.substring(0, 30)}..."`);
       // Update the refs
       prevLangRef.current = currentLanguage;
       textRef.current = text;
