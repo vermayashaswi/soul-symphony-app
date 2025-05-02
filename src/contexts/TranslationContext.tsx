@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
@@ -109,7 +108,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       // Batch translate in groups of 20
       for (let i = 0; i < textsToTranslate.length; i += 20) {
         const batch = textsToTranslate.slice(i, i + 20);
-        const batchTranslations = await staticTranslationService.batchTranslateTexts(batch, 'en');
+        const batchTranslations = await staticTranslationService.batchTranslateTexts(batch);
         
         // Cache all results
         batchTranslations.forEach((translation, originalText) => {
