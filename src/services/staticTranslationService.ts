@@ -10,6 +10,7 @@ export class StaticTranslationService {
 
   setLanguage(language: string): void {
     this.language = language;
+    console.log(`StaticTranslationService: Language set to ${language}`);
   }
 
   async translateText(text: string, sourceLanguage?: string, entryId?: number): Promise<string> {
@@ -19,6 +20,7 @@ export class StaticTranslationService {
     }
 
     try {
+      console.log(`StaticTranslationService: Translating text to ${this.language}: "${text.substring(0, 30)}..."`);
       const result = await TranslationService.translateText({
         text,
         sourceLanguage: sourceLanguage || 'en',
@@ -28,7 +30,7 @@ export class StaticTranslationService {
 
       return result;
     } catch (error) {
-      console.error('Error translating text:', error);
+      console.error('StaticTranslationService: Error translating text:', error);
       return text;
     }
   }
@@ -48,15 +50,17 @@ export class StaticTranslationService {
       const validTexts = texts.filter(text => text && text.trim() !== '');
       
       if (validTexts.length === 0) {
+        console.log('StaticTranslationService: No valid texts to pre-translate');
         return new Map<string, string>();
       }
       
+      console.log(`StaticTranslationService: Pre-translating ${validTexts.length} texts to ${this.language}`);
       return await TranslationService.batchTranslate({
         texts: validTexts,
         targetLanguage: this.language,
       });
     } catch (error) {
-      console.error('Error batch translating texts:', error);
+      console.error('StaticTranslationService: Error batch translating texts:', error);
       // Return original texts as fallback
       const results = new Map<string, string>();
       texts.forEach(text => {
@@ -82,8 +86,11 @@ export class StaticTranslationService {
       
       // If no valid texts, return empty map
       if (validTexts.length === 0) {
+        console.log('StaticTranslationService: No valid texts to batch translate');
         return new Map<string, string>();
       }
+      
+      console.log(`StaticTranslationService: Batch translating ${validTexts.length} texts to ${this.language}`);
       
       // Add retry logic with max 3 attempts
       let attempts = 0;
@@ -92,17 +99,33 @@ export class StaticTranslationService {
       
       while (attempts < maxAttempts && !translationResults) {
         try {
+          console.log(`StaticTranslationService: Translation attempt ${attempts + 1} of ${maxAttempts}`);
           translationResults = await TranslationService.batchTranslate({
             texts: validTexts,
             targetLanguage: this.language,
           });
+          
+          // Validate results
+          if (translationResults && translationResults.size > 0) {
+            console.log(`StaticTranslationService: Successfully translated ${translationResults.size} texts`);
+          } else {
+            console.warn('StaticTranslationService: Empty translation results received');
+            translationResults = null; // Force retry
+            throw new Error('Empty translation results');
+          }
         } catch (error) {
           attempts++;
+          console.warn(`StaticTranslationService: Translation attempt ${attempts} failed:`, error);
+          
           if (attempts >= maxAttempts) {
+            console.error('StaticTranslationService: All translation attempts failed');
             throw error;
           }
-          // Wait before retrying
-          await new Promise(resolve => setTimeout(resolve, 500 * attempts));
+          
+          // Wait before retrying with exponential backoff
+          const waitTime = 500 * Math.pow(2, attempts - 1);
+          console.log(`StaticTranslationService: Waiting ${waitTime}ms before retry`);
+          await new Promise(resolve => setTimeout(resolve, waitTime));
         }
       }
       
@@ -112,12 +135,14 @@ export class StaticTranslationService {
       
       return translationResults;
     } catch (error) {
-      console.error('Error batch translating texts:', error);
+      console.error('StaticTranslationService: Error batch translating texts:', error);
+      
       // Return original texts as fallback
       const results = new Map<string, string>();
       texts.forEach(text => {
         if (text) results.set(text, text);
       });
+      
       return results;
     }
   }
@@ -154,9 +179,19 @@ export class StaticTranslationService {
     }
     
     // Prevent concurrent batch processing
-    if (this.translationInProgress) return;
+    if (this.translationInProgress) {
+      console.log('StaticTranslationService: Another batch translation already in progress, will retry later');
+      
+      // Re-schedule processing for later
+      this.batchTranslationTimer = setTimeout(() => {
+        this.processBatchQueue();
+      }, this.BATCH_DELAY);
+      
+      return;
+    }
     
     this.translationInProgress = true;
+    console.log(`StaticTranslationService: Processing batch queue with ${this.batchTranslationQueue.size} items`);
     
     try {
       // Extract texts from queue
@@ -168,6 +203,7 @@ export class StaticTranslationService {
       
       // Translate
       const results = await this.batchTranslateTexts(textsToTranslate);
+      console.log(`StaticTranslationService: Batch translation completed for ${textsToTranslate.length} items`);
       
       // Resolve promises with results
       textsToTranslate.forEach((text, index) => {
@@ -175,7 +211,7 @@ export class StaticTranslationService {
         resolvers[index](translatedText);
       });
     } catch (error) {
-      console.error('Batch translation failed:', error);
+      console.error('StaticTranslationService: Batch translation failed:', error);
       
       // Resolve all with original text in case of error
       Array.from(this.batchTranslationQueue.entries()).forEach(([text, resolver]) => {
@@ -189,6 +225,7 @@ export class StaticTranslationService {
       
       // If new items were added while processing, trigger another batch
       if (this.batchTranslationQueue.size > 0) {
+        console.log(`StaticTranslationService: ${this.batchTranslationQueue.size} new items were added while processing, triggering another batch`);
         this.batchTranslationTimer = setTimeout(() => {
           this.processBatchQueue();
         }, this.BATCH_DELAY);
