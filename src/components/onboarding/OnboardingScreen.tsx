@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -11,14 +10,8 @@ import { useTheme } from "@/hooks/use-theme";
 import { RecordingVisualizer } from "@/components/voice-recorder/RecordingVisualizer";
 import { toast } from "sonner";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
-import { useTranslation, languages } from '@/contexts/TranslationContext';
-import {
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { useTranslation } from '@/contexts/TranslationContext';
+import { LanguageSelector } from '@/components/translation/LanguageSelector';
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -542,21 +535,13 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             
             <div className="space-y-2">
               <label htmlFor="language-select" className="text-sm text-muted-foreground">Preferred Language</label>
-              <Select
-                value={props.selectedLanguage}
-                onValueChange={props.setSelectedLanguage}
-              >
-                <SelectTrigger className="w-full bg-background/80 border-theme/20 focus:border-theme">
-                  <SelectValue placeholder="Select language" />
-                </SelectTrigger>
-                <SelectContent>
-                  {languages.map((language) => (
-                    <SelectItem key={language.code} value={language.code}>
-                      {language.label}
-                    </SelectItem>
-                  ))}
-                </SelectContent>
-              </Select>
+              <LanguageSelector 
+                variant="onboarding"
+                initialLanguage={props.selectedLanguage}
+                onLanguageChange={props.setSelectedLanguage}
+                showLabel={true}
+                className="w-full"
+              />
             </div>
             
             <div className="text-sm text-muted-foreground text-center mt-2">
