@@ -27,7 +27,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   const { translate, currentLanguage } = useTranslation();
   const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
-  const animationsRef = useRef<{[key: string]: any}>({});
   const prevLanguageRef = useRef<string>(currentLanguage);
   
   // Translate the label
@@ -51,9 +50,11 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     };
     
     window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    window.addEventListener('manualLanguageChange', handleLanguageChange as EventListener);
     
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+      window.removeEventListener('manualLanguageChange', handleLanguageChange as EventListener);
     };
   }, [translate]);
   
@@ -76,7 +77,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     });
     
     const sortedThemes = Array.from(themeMap.entries())
-      .map(([theme, { count, sentiment }]) => ({ theme, count, sentiment }))
+      .map(([theme, { count, sentiment }]) => ({ theme, sentiment }))
       .sort((a, b) => b.count - a.count)
       .slice(0, 8)
       .map(({ theme, sentiment }) => ({ theme, sentiment }));
@@ -106,7 +107,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       // Extract all theme strings
       const themeTexts = themes.map(item => item.theme);
       
-      // Pre-translate all at once with proper error handling
+      // Use batchTranslateTexts instead of preTranslate for consistency and better error handling
       const translationsMap = await staticTranslationService.batchTranslateTexts(themeTexts);
       
       console.log('FloatingThemeStrips: Translation results:', translationsMap);
@@ -140,7 +141,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     }
   }, [currentLanguage, uniqueThemes]);
   
-  // Add explicit language change event listener
+  // Add explicit language change event listener with both events
   useEffect(() => {
     const handleLanguageChange = () => {
       console.log('FloatingThemeStrips: Language change event received');
@@ -150,9 +151,11 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     };
     
     window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    window.addEventListener('manualLanguageChange', handleLanguageChange as EventListener);
     
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+      window.removeEventListener('manualLanguageChange', handleLanguageChange as EventListener);
     };
   }, [uniqueThemes]);
 

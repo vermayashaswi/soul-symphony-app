@@ -54,8 +54,15 @@ export function LanguageSelector({
     
     // Always use context method to ensure consistency
     setLanguage(code).then(() => {
-      // Dispatch a custom event after language is set to force components to update
+      console.log(`LanguageSelector: Language set to ${code}, dispatching manualLanguageChange event`);
+      
+      // Dispatch a more specific custom event for components that need immediate updates
       window.dispatchEvent(new CustomEvent('manualLanguageChange', { 
+        detail: { language: code, timestamp: Date.now() } 
+      }));
+      
+      // Also dispatch the standard event for backward compatibility
+      window.dispatchEvent(new CustomEvent('languageChange', { 
         detail: { language: code, timestamp: Date.now() } 
       }));
     });
@@ -63,14 +70,17 @@ export function LanguageSelector({
 
   // Listen for language changes from other components
   useEffect(() => {
-    const updateLanguageUI = () => {
-      console.log('LanguageSelector: Detected language change event');
+    const updateLanguageUI = (event: Event) => {
+      const customEvent = event as CustomEvent;
+      console.log('LanguageSelector: Detected language change event', customEvent.detail);
     };
     
     window.addEventListener('languageChange', updateLanguageUI);
+    window.addEventListener('manualLanguageChange', updateLanguageUI);
     
     return () => {
       window.removeEventListener('languageChange', updateLanguageUI);
+      window.removeEventListener('manualLanguageChange', updateLanguageUI);
     };
   }, []);
 
@@ -94,7 +104,7 @@ export function LanguageSelector({
           <DropdownMenuContent align="start" className="w-full min-w-[200px] max-h-[200px] overflow-y-auto bg-background border border-border">
             {languages.map((language) => (
               <DropdownMenuItem
-                key={language.code}
+                key={`${language.code}-${currentLanguage}`}
                 onClick={() => handleLanguageChange(language.code)}
                 className={`cursor-pointer ${
                   effectiveLanguage === language.code ? "bg-primary/10 text-primary font-medium" : ""
@@ -127,7 +137,7 @@ export function LanguageSelector({
       <DropdownMenuContent align="end" className="bg-background border border-border">
         {languages.map((language) => (
           <DropdownMenuItem
-            key={language.code}
+            key={`${language.code}-${currentLanguage}`}
             onClick={() => handleLanguageChange(language.code)}
             className={`cursor-pointer ${
               effectiveLanguage === language.code ? "bg-secondary" : ""

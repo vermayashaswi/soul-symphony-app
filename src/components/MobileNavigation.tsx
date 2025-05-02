@@ -18,7 +18,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const { currentLanguage } = useTranslation();
+  const { currentLanguage, prefetchTranslationsForRoute } = useTranslation();
+  
+  // Pre-fetch translations for navigation items
+  useEffect(() => {
+    const navLabels = ['Home', 'Journal', 'Chat', 'Insights', 'Settings'];
+    prefetchTranslationsForRoute(navLabels).catch(console.error);
+  }, [currentLanguage, prefetchTranslationsForRoute]);
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
