@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -5,7 +6,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
-import { LineChart, BarChartIcon, Calendar } from 'lucide-react';
+import { LineChart, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import {
   ResponsiveContainer,
@@ -19,7 +20,6 @@ import {
   ReferenceArea
 } from 'recharts';
 import MoodCalendarGrid from './MoodCalendarGrid';
-import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
 import { filterDataByTimeRange, formatDateForTimeRange } from '@/utils/date-formatter';
 
 interface SentimentData {

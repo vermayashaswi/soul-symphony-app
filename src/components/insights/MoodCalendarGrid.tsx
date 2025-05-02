@@ -8,7 +8,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { formatDateForTimeRange } from '@/utils/date-formatter';
-import { Calendar } from 'lucide-react';
 
 interface MoodData {
   date: Date;
@@ -100,7 +99,7 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
         });
         break;
       case 'year':
-        // 12 months of the year
+        // We'll handle the year view differently - see renderYearGrid
         dates = Array.from({ length: 12 }, (_, i) => {
           const date = new Date(now.getFullYear(), i, 1);
           return date;
@@ -151,20 +150,14 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
               </div>
               <div 
                 className={cn(
-                  "w-12 h-12 rounded-full flex items-center justify-center transition-all",
+                  "w-10 h-10 rounded-full flex items-center justify-center transition-all",
                   hasMood 
                     ? getSentimentColor(sentiment)
                     : "bg-muted",
                   isToday(date) && "ring-2 ring-primary ring-offset-2"
                 )}
                 title={hasMood ? `${getSentimentLabel(sentiment)}: ${sentiment.toFixed(2)}` : "No data"}
-              >
-                {hasMood && (
-                  <span className="text-white font-medium">
-                    {sentiment >= 0 ? "+" : ""}{Math.round(sentiment * 10) / 10}
-                  </span>
-                )}
-              </div>
+              />
             </div>
           );
         })}
@@ -193,19 +186,13 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
               </div>
               <div 
                 className={cn(
-                  "w-10 h-10 rounded-full flex items-center justify-center transition-all",
+                  "w-8 h-8 rounded-full flex items-center justify-center transition-all",
                   hasMood 
                     ? getSentimentColor(sentiment)
                     : "bg-muted"
                 )}
                 title={hasMood ? `${getSentimentLabel(sentiment)}: ${sentiment.toFixed(2)}` : "No data"}
-              >
-                {hasMood && (
-                  <span className="text-white text-xs font-medium">
-                    {sentiment >= 0 ? "+" : ""}{Math.round(sentiment * 10) / 10}
-                  </span>
-                )}
-              </div>
+              />
             </div>
           );
         })}
@@ -225,7 +212,7 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
         
         {/* Empty cells for days before the first of the month */}
         {Array.from({ length: dates[0].getDay() }).map((_, i) => (
-          <div key={`empty-${i}`} className="h-10" />
+          <div key={`empty-${i}`} className="h-8" />
         ))}
         
         {/* Month days */}
@@ -238,11 +225,11 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
             <div key={dateKey} className="flex flex-col items-center">
               <div 
                 className={cn(
-                  "w-10 h-10 rounded-full flex flex-col items-center justify-center transition-all",
+                  "w-8 h-8 rounded-full flex flex-col items-center justify-center transition-all",
                   hasMood 
                     ? getSentimentColor(sentiment)
                     : "bg-muted/30",
-                  isToday(date) && "ring-2 ring-primary ring-offset-1"
+                  isToday(date) && "ring-1 ring-primary ring-offset-1"
                 )}
                 title={hasMood ? `${getSentimentLabel(sentiment)}: ${sentiment.toFixed(2)}` : "No data"}
               >
@@ -252,11 +239,6 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
                 )}>
                   {format(date, 'd')}
                 </span>
-                {hasMood && (
-                  <span className="text-white text-[8px]">
-                    {sentiment >= 0 ? "+" : ""}{Math.round(sentiment * 10) / 10}
-                  </span>
-                )}
               </div>
             </div>
           );
@@ -266,58 +248,71 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
   };
   
   const renderYearGrid = () => {
+    const now = new Date();
+    const currentYear = now.getFullYear();
+    const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    
+    // Generate all days for the entire year
+    const allYearDates = Array.from({ length: 31 }, (_, i) => i + 1);
+    
     return (
-      <div className="grid grid-cols-4 gap-4 mt-4">
-        {dates.map(date => {
-          const monthKey = format(date, 'yyyy-MM');
-          // Find sentiment data for this month
-          const monthData = Array.from(sentimentByDate.entries())
-            .filter(([key]) => key.startsWith(monthKey))
-            .map(([_, value]) => value);
-          
-          const hasMood = monthData.length > 0;
-          // Average sentiment for the month
-          const averageSentiment = hasMood 
-            ? monthData.reduce((sum, val) => sum + val, 0) / monthData.length
-            : 0;
-          
-          return (
-            <div key={monthKey} className="flex flex-col items-center">
-              <div className="text-sm mb-2">
-                {format(date, 'MMM')}
-              </div>
-              <div 
-                className={cn(
-                  "w-16 h-16 rounded-full flex items-center justify-center transition-all",
-                  hasMood 
-                    ? getSentimentColor(averageSentiment)
-                    : "bg-muted"
-                )}
-                title={hasMood ? `${getSentimentLabel(averageSentiment)}: ${averageSentiment.toFixed(2)}` : "No data"}
-              >
-                {hasMood && (
-                  <div className="text-center">
-                    <span className="text-white text-sm font-medium">
-                      {averageSentiment >= 0 ? "+" : ""}{Math.round(averageSentiment * 10) / 10}
-                    </span>
-                    <div className="text-white text-xs">
-                      ({monthData.length})
-                    </div>
-                  </div>
-                )}
-              </div>
-            </div>
-          );
-        })}
+      <div className="overflow-auto max-h-[260px] pb-2">
+        <table className="w-full border-collapse">
+          <thead>
+            <tr>
+              <th className="text-xs text-muted-foreground p-1 w-8 sticky top-0 bg-background z-10"></th>
+              {months.map(month => (
+                <th key={month} className="text-xs text-center text-muted-foreground p-1 sticky top-0 bg-background z-10">
+                  <TranslatableText text={month} forceTranslate={true} />
+                </th>
+              ))}
+            </tr>
+          </thead>
+          <tbody className="text-sm">
+            {allYearDates.map(day => (
+              <tr key={`day-${day}`}>
+                <td className="text-xs text-center text-muted-foreground p-1 sticky left-0 bg-background">{day}</td>
+                {months.map((_, monthIndex) => {
+                  // Check if this day exists in this month (e.g., no Feb 30th)
+                  const daysInMonth = new Date(currentYear, monthIndex + 1, 0).getDate();
+                  
+                  if (day > daysInMonth) {
+                    return <td key={`empty-${monthIndex}-${day}`} className="p-[2px]"></td>;
+                  }
+                  
+                  const date = new Date(currentYear, monthIndex, day);
+                  const dateKey = format(date, 'yyyy-MM-dd');
+                  const hasMood = sentimentByDate.has(dateKey);
+                  const sentiment = sentimentByDate.get(dateKey) || 0;
+                  
+                  return (
+                    <td key={dateKey} className="p-[2px] text-center">
+                      <div 
+                        className={cn(
+                          "w-4 h-4 rounded-full mx-auto",
+                          hasMood 
+                            ? getSentimentColor(sentiment)
+                            : "bg-muted/30",
+                          isToday(date) && "ring-1 ring-primary ring-offset-1"
+                        )}
+                        title={`${format(date, 'MMM d')}: ${hasMood ? `${getSentimentLabel(sentiment)}` : "No data"}`}
+                      />
+                    </td>
+                  );
+                })}
+              </tr>
+            ))}
+          </tbody>
+        </table>
       </div>
     );
   };
 
   return (
-    <div className="h-full py-4">
+    <div className="h-full py-4 overflow-hidden">
       {renderGrid()}
       
-      <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-8">
+      <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
         <div className="flex items-center gap-1">
           <div className="w-3 h-3 rounded-full bg-green-500" />
           <TranslatableText text="Positive" forceTranslate={true} />
