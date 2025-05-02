@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { cn } from '@/lib/utils';
@@ -8,6 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { toast } from 'sonner';
 import { Json } from '@/types/journal';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 type Entity = {
   name: string;
@@ -262,7 +262,9 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
   if (entities.length === 0) {
     return (
       <div className="flex items-center justify-center h-full w-full">
-        <p className="text-muted-foreground">No life areas found in this time period</p>
+        <p className="text-muted-foreground">
+          <TranslatableText text="No life areas found in this time period" forceTranslate={true} />
+        </p>
       </div>
     );
   }
@@ -319,7 +321,9 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
               onClick={() => onEntityClick?.(entity.name, entity.sentiment)}
             >
               <div className="text-center px-2 truncate max-w-full">
-                <span className="font-medium">{entity.name}</span>
+                <span className="font-medium">
+                  <TranslatableText text={entity.name} forceTranslate={true} />
+                </span>
                 {isHighlighted && (
                   <span className="ml-2 text-white/90 text-xs">
                     ({entity.sentiment.toFixed(2)})
@@ -342,9 +346,15 @@ const EntityStrips: React.FC<EntityStripsProps> = ({
           <div className="w-1/6 bg-[#22c55e]"></div>
         </div>
         <div className="flex justify-between mt-1 text-xs text-muted-foreground">
-          <span>Negative (-1.0)</span>
-          <span>Neutral (0.0)</span>
-          <span>Positive (1.0)</span>
+          <span>
+            <TranslatableText text="Negative (-1.0)" forceTranslate={true} />
+          </span>
+          <span>
+            <TranslatableText text="Neutral (0.0)" forceTranslate={true} />
+          </span>
+          <span>
+            <TranslatableText text="Positive (1.0)" forceTranslate={true} />
+          </span>
         </div>
       </div>
     </div>

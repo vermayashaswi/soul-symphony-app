@@ -353,6 +353,29 @@ export function EmotionChart({
     );
   };
 
+  const CustomTooltip = (props: any) => {
+    const { active, payload, label }: any = props;
+    
+    if (active && payload && payload.length) {
+      const emotionName = payload[0].dataKey.charAt(0).toUpperCase() + payload[0].dataKey.slice(1);
+      const value = payload[0].value;
+      
+      return (
+        <div className="bg-card/95 backdrop-blur-sm p-2 rounded-lg border shadow-md">
+          <p className="text-sm font-medium">{label}</p>
+          <div className="flex items-center gap-2">
+            <div className="w-2 h-2 rounded-full" style={{ backgroundColor: payload[0].stroke }}></div>
+            <p className="text-sm">
+              <TranslatableText text={emotionName} forceTranslate={true} />: {value?.toFixed(1) || 'N/A'}
+            </p>
+          </div>
+        </div>
+      );
+    }
+    
+    return null;
+  };
+
   const renderLineChart = () => {
     if (lineData.length === 0) {
       return (
@@ -402,16 +425,7 @@ export function EmotionChart({
               tickFormatter={(value) => value.toFixed(1)}
               width={isMobile ? 25 : 40}
             />
-            <Tooltip 
-              contentStyle={{ 
-                backgroundColor: theme === 'dark' ? 'hsl(var(--card))' : 'rgba(255, 255, 255, 0.8)', 
-                borderRadius: '8px',
-                boxShadow: '0 4px 12px rgba(0, 0, 0, 0.1)', 
-                border: 'none',
-                color: theme === 'dark' ? 'hsl(var(--card-foreground))' : 'inherit'
-              }}
-              formatter={(value: any) => value !== null ? [parseFloat(value).toFixed(1), ''] : ['No data', '']}
-            />
+            <Tooltip content={<CustomTooltip />} />
             {allEmotions.map((emotion, index) => (
               <Line
                 key={emotion}
@@ -455,7 +469,10 @@ export function EmotionChart({
                     isSelected ? "font-bold" : "text-muted-foreground"
                   )}
                 >
-                  {emotion.charAt(0).toUpperCase() + emotion.slice(1)}
+                  <TranslatableText 
+                    text={emotion.charAt(0).toUpperCase() + emotion.slice(1)} 
+                    forceTranslate={true}
+                  />
                 </span>
               </div>
             );
@@ -463,7 +480,7 @@ export function EmotionChart({
         </div>
         
         <div className="flex justify-center flex-wrap gap-4 mt-4 text-xs text-muted-foreground">
-          <span>* Click on a legend item to focus on that emotion</span>
+          <TranslatableText text="* Click on a legend item to focus on that emotion" forceTranslate={true} />
         </div>
       </div>
     );

@@ -1,8 +1,10 @@
-import React from 'react';
+
+import React, { useEffect } from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 import {
   ResponsiveContainer,
   LineChart,
@@ -78,13 +80,14 @@ const CustomTooltip = ({ active, payload, label }: any) => {
 const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange }) => {
   const { theme } = useTheme();
   const isMobile = useIsMobile();
+  const { currentLanguage } = useTranslation();
   
   // Format the data for the chart
   const processChartData = () => {
     if (!sentimentData || sentimentData.length === 0) return [];
     
     return sentimentData.map(item => ({
-      formattedDate: formatDate(item.date, timeRange),
+      formattedDate: formatDate(item.date, timeRange, currentLanguage),
       sentiment: item.sentiment
     })).sort((a, b) => {
       // Sort by date in ascending order for the chart
@@ -92,19 +95,41 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     });
   };
   
-  const formatDate = (date: Date, range: TimeRange): string => {
+  const formatDate = (date: Date, range: TimeRange, language: string): string => {
     const d = new Date(date);
+    
+    // Language-aware date formatting options
+    const options: Intl.DateTimeFormatOptions = {};
+    
     switch (range) {
       case 'today':
         return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+        
       case 'week':
-        return d.toLocaleDateString(undefined, { weekday: 'short' });
+        options.weekday = 'short';
+        break;
+        
       case 'month':
-        return d.toLocaleDateString(undefined, { day: 'numeric', month: 'short' });
+        options.day = 'numeric';
+        options.month = 'short';
+        break;
+        
       case 'year':
-        return d.toLocaleDateString(undefined, { month: 'short' });
+        options.month = 'short';
+        break;
+        
       default:
-        return d.toLocaleDateString();
+        options.day = 'numeric';
+        options.month = 'short';
+    }
+    
+    try {
+      // Format the date using the current language
+      return new Intl.DateTimeFormat(language, options).format(d);
+    } catch (error) {
+      console.error('Error formatting date:', error);
+      // Fallback to English formatting
+      return new Intl.DateTimeFormat('en', options).format(d);
     }
   };
 
@@ -115,7 +140,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
       return (
         <div className="flex items-center justify-center h-full">
           <p className="text-muted-foreground">
-            <TranslatableText text="No data available for this timeframe" />
+            <TranslatableText text="No data available for this timeframe" forceTranslate={true} />
           </p>
         </div>
       );
@@ -173,29 +198,35 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#4ade80" }} />
-            <TranslatableText text="Positive" />
+            <TranslatableText text="Positive" forceTranslate={true} />
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#facc15" }} />
-            <TranslatableText text="Neutral" />
+            <TranslatableText text="Neutral" forceTranslate={true} />
           </div>
           <div className="flex items-center gap-1">
             <div className="w-3 h-3 rounded-full" style={{ background: "#ea384c" }} />
-            <TranslatableText text="Negative" />
+            <TranslatableText text="Negative" forceTranslate={true} />
           </div>
         </div>
       </div>
     );
   };
 
+  // Force rerender when language changes
+  useEffect(() => {
+    // This will trigger a rerender when the language changes
+    console.log('Language changed in MoodCalendar:', currentLanguage);
+  }, [currentLanguage, timeRange]);
+
   return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6 md:p-8">
       <div className="text-center mb-6">
         <h2 className="text-lg font-semibold mb-1">
-          <TranslatableText text="Mood Trends" />
+          <TranslatableText text="Mood Trends" forceTranslate={true} />
         </h2>
         <p className="text-sm text-muted-foreground">
-          <TranslatableText text="Your sentiment changes over time" />
+          <TranslatableText text="Your sentiment changes over time" forceTranslate={true} />
         </p>
       </div>
       
