@@ -1,12 +1,15 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useTheme } from '@/hooks/use-theme';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { ToggleGroup, ToggleGroupItem } from '@/components/ui/toggle-group';
+import { LineChart, BarChartIcon, Calendar } from 'lucide-react';
+import { cn } from '@/lib/utils';
 import {
   ResponsiveContainer,
-  LineChart,
+  LineChart as RechartsLineChart,
   Line,
   XAxis,
   YAxis,
@@ -15,7 +18,9 @@ import {
   ReferenceLine,
   ReferenceArea
 } from 'recharts';
+import MoodCalendarGrid from './MoodCalendarGrid';
 import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
+import { filterDataByTimeRange, formatDateForTimeRange } from '@/utils/date-formatter';
 
 interface SentimentData {
   date: Date;
@@ -26,6 +31,8 @@ interface MoodCalendarProps {
   sentimentData: SentimentData[];
   timeRange: TimeRange;
 }
+
+type ViewMode = 'chart' | 'calendar';
 
 interface CustomDotProps {
   cx: number;
@@ -81,6 +88,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const { currentLanguage } = useTranslation();
+  const [viewMode, setViewMode] = useState<ViewMode>('chart');
   
   // Format the data for the chart
   const processChartData = () => {
@@ -93,7 +101,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     const groupedData = new Map();
     
     filteredData.forEach(item => {
-      const formattedDate = formatDate(item.date, timeRange, currentLanguage);
+      const formattedDate = formatDateForTimeRange(item.date, timeRange, currentLanguage);
       const dateKey = formattedDate;
       
       if (!groupedData.has(dateKey)) {
@@ -124,99 +132,6 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
       }))
       .sort((a, b) => new Date(a.originalDate).getTime() - new Date(b.originalDate).getTime());
   };
-  
-  // Helper function to filter data based on time range
-  const filterDataByTimeRange = (data: SentimentData[], range: TimeRange): SentimentData[] => {
-    const now = new Date();
-    let startDate: Date;
-    
-    switch (range) {
-      case 'today':
-        startDate = startOfDay(now);
-        break;
-      case 'week':
-        startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
-        break;
-      case 'month':
-        startDate = startOfMonth(now);
-        break;
-      case 'year':
-        startDate = startOfYear(now);
-        break;
-      default:
-        startDate = startOfWeek(now, { weekStartsOn: 1 });
-    }
-    
-    return data.filter(item => {
-      const itemDate = new Date(item.date);
-      return itemDate >= startDate;
-    });
-  };
-  
-  const formatDate = (date: Date, range: TimeRange, language: string): string => {
-    if (!date) return '';
-    
-    // Ensure we have a valid Date object
-    const d = date instanceof Date ? date : new Date(date);
-    
-    // Language-aware date formatting options
-    const options: Intl.DateTimeFormatOptions = {};
-    
-    try {
-      switch (range) {
-        case 'today': {
-          // Format as HH:MM or use "Now" for very recent entries
-          const now = new Date();
-          const diffMinutes = (now.getTime() - d.getTime()) / (1000 * 60);
-          
-          if (diffMinutes < 5) {
-            return new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(d) + '*';
-          }
-          
-          return new Intl.DateTimeFormat(language, { hour: '2-digit', minute: '2-digit' }).format(d);
-        }
-        
-        case 'week': {
-          // Format as "Mon 1" (Short weekday + day number)
-          const dayNum = d.getDate();
-          const weekday = new Intl.DateTimeFormat(language, { weekday: 'short' }).format(d);
-          
-          // For consistent width, add the day number
-          return `${weekday} ${dayNum}`;
-        }
-        
-        case 'month': {
-          // Day of month with suffix (1st, 2nd, etc.) - but language aware
-          const day = d.getDate();
-          
-          // For most languages, just showing the day number is good
-          return new Intl.DateTimeFormat(language, { day: 'numeric' }).format(d);
-        }
-        
-        case 'year': {
-          // Month with shortened year (Jan '23)
-          const yearShort = d.getFullYear().toString().substr(2);
-          const month = new Intl.DateTimeFormat(language, { month: 'short' }).format(d);
-          
-          return `${month} '${yearShort}`;
-        }
-        
-        default:
-          // Default to day + short month (e.g., 15 Jan)
-          return new Intl.DateTimeFormat(language, { day: 'numeric', month: 'short' }).format(d);
-      }
-    } catch (error) {
-      console.error('Error formatting date:', error);
-      
-      // Fallback formatting
-      try {
-        return new Intl.DateTimeFormat('en', { dateStyle: 'short' }).format(d);
-      } catch {
-        // Ultimate fallback
-        return d.toLocaleDateString() || 'Invalid date';
-      }
-    }
-  };
 
   const filteredChartData = processChartData();
 
@@ -242,7 +157,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     return (
       <div className="flex flex-col h-full">
         <ResponsiveContainer width="100%" height={isMobile ? 250 : 300}>
-          <LineChart
+          <RechartsLineChart
             data={lineData}
             margin={{ top: 20, right: isMobile ? 10 : 60, left: 0, bottom: 10 }}
           >
@@ -287,7 +202,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
             />
             <ReferenceLine y={-0.2} stroke="#facc15" strokeDasharray="4 2" ifOverflow="visible" strokeWidth={1} />
             <ReferenceLine y={0.2} stroke="#4ade80" strokeDasharray="4 2" ifOverflow="visible" strokeWidth={1} />
-          </LineChart>
+          </RechartsLineChart>
         </ResponsiveContainer>
         
         <div className="flex justify-center gap-4 text-xs text-muted-foreground mt-4">
@@ -316,7 +231,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
 
   return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6 md:p-8">
-      <div className="text-center mb-6">
+      <div className="text-center mb-4">
         <h2 className="text-lg font-semibold mb-1">
           <TranslatableText text="Mood Trends" forceTranslate={true} />
         </h2>
@@ -325,8 +240,46 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
         </p>
       </div>
       
+      <div className="flex justify-center mb-6">
+        <ToggleGroup 
+          type="single" 
+          value={viewMode}
+          onValueChange={(value) => value && setViewMode(value as ViewMode)}
+          variant="outline"
+          className="border rounded-md"
+        >
+          <ToggleGroupItem 
+            value="chart" 
+            aria-label="Chart view"
+            className={cn(
+              "data-[state=on]:bg-muted",
+              "w-10 h-10 p-2"
+            )}
+          >
+            <LineChart className="h-4 w-4" />
+          </ToggleGroupItem>
+          <ToggleGroupItem 
+            value="calendar" 
+            aria-label="Calendar view"
+            className={cn(
+              "data-[state=on]:bg-muted",
+              "w-10 h-10 p-2"
+            )}
+          >
+            <Calendar className="h-4 w-4" />
+          </ToggleGroupItem>
+        </ToggleGroup>
+      </div>
+      
       <div className="h-[300px] md:h-[350px]">
-        {renderLineChart()}
+        {viewMode === 'chart' ? (
+          renderLineChart()
+        ) : (
+          <MoodCalendarGrid 
+            sentimentData={sentimentData}
+            timeRange={timeRange}
+          />
+        )}
       </div>
     </div>
   );
