@@ -257,53 +257,71 @@ const MoodCalendarGrid: React.FC<MoodCalendarGridProps> = ({ sentimentData, time
     const allYearDates = Array.from({ length: 31 }, (_, i) => i + 1);
     
     return (
-      <div className="w-full">
-        <table className="w-full border-collapse">
-          <thead>
-            <tr>
-              <th className="text-xs text-muted-foreground px-0.5 w-4 sticky top-0 bg-background z-10"></th>
-              {months.map((month, index) => (
-                <th key={month} className="text-xs text-center text-muted-foreground px-0.5 sticky top-0 bg-background z-10">
-                  <TranslatableText text={month} forceTranslate={true} />
-                </th>
-              ))}
-            </tr>
-          </thead>
-          <tbody className="text-xs">
-            {allYearDates.map(day => (
-              <tr key={`day-${day}`}>
-                <td className="text-xs text-center text-muted-foreground px-0.5 sticky left-0 bg-background">{day}</td>
-                {months.map((_, monthIndex) => {
-                  // Check if this day exists in this month (e.g., no Feb 30th)
-                  const daysInMonth = new Date(currentYear, monthIndex + 1, 0).getDate();
-                  
-                  if (day > daysInMonth) {
-                    return <td key={`empty-${monthIndex}-${day}`} className="p-0"></td>;
-                  }
-                  
-                  const date = new Date(currentYear, monthIndex, day);
-                  const dateKey = format(date, 'yyyy-MM-dd');
-                  const hasMood = sentimentByDate.has(dateKey);
-                  const sentiment = sentimentByDate.get(dateKey) || 0;
-                  
-                  return (
-                    <td key={dateKey} className="p-0 text-center">
-                      <div 
-                        className={cn(
-                          "w-2.5 h-2.5 rounded-full mx-auto",
-                          hasMood 
-                            ? getSentimentColor(sentiment)
-                            : "bg-muted/30",
-                          isToday(date) && "ring-1 ring-primary ring-offset-1"
-                        )}
-                      />
-                    </td>
-                  );
-                })}
+      <div className="w-full overflow-x-hidden">
+        <div className="compact-year-view overflow-x-auto">
+          <table className={cn(
+            "w-full border-collapse table-fixed",
+            isMobile ? "compact-table-mobile" : ""
+          )}>
+            <thead>
+              <tr>
+                <th className={cn(
+                  "text-xs text-muted-foreground sticky top-0 bg-background z-10",
+                  isMobile ? "w-4 px-0" : "w-6 px-0.5"
+                )}></th>
+                {months.map((month, index) => (
+                  <th key={month} className={cn(
+                    "text-xs text-center text-muted-foreground sticky top-0 bg-background z-10",
+                    isMobile ? "px-0 py-1" : "px-0.5 py-1"
+                  )}>
+                    <TranslatableText text={month} forceTranslate={true} />
+                  </th>
+                ))}
               </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody className="text-xs">
+              {allYearDates.map(day => (
+                <tr key={`day-${day}`} className={day % 2 === 0 ? "bg-muted/5" : ""}>
+                  <td className={cn(
+                    "text-xs text-center text-muted-foreground sticky left-0 bg-background",
+                    isMobile ? "px-0" : "px-0.5"
+                  )}>{day}</td>
+                  {months.map((_, monthIndex) => {
+                    // Check if this day exists in this month (e.g., no Feb 30th)
+                    const daysInMonth = new Date(currentYear, monthIndex + 1, 0).getDate();
+                    
+                    if (day > daysInMonth) {
+                      return <td key={`empty-${monthIndex}-${day}`} className="p-0"></td>;
+                    }
+                    
+                    const date = new Date(currentYear, monthIndex, day);
+                    const dateKey = format(date, 'yyyy-MM-dd');
+                    const hasMood = sentimentByDate.has(dateKey);
+                    const sentiment = sentimentByDate.get(dateKey) || 0;
+                    
+                    return (
+                      <td key={dateKey} className={cn(
+                        "text-center align-middle",
+                        isMobile ? "p-0" : "p-0"
+                      )}>
+                        <div 
+                          className={cn(
+                            isMobile ? "w-1.5 h-1.5" : "w-2 h-2",
+                            "rounded-full mx-auto",
+                            hasMood 
+                              ? getSentimentColor(sentiment)
+                              : "bg-muted/30",
+                            isToday(date) && "ring-1 ring-primary ring-offset-1"
+                          )}
+                        />
+                      </td>
+                    );
+                  })}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       </div>
     );
   };

@@ -110,6 +110,23 @@
   .mobile-chat-content {
     padding-bottom: 70px !important;
   }
+  
+  /* Year view calendar compact styling for mobile */
+  .compact-table-mobile {
+    table-layout: fixed !important;
+    font-size: 10px !important;
+  }
+  
+  .compact-table-mobile th,
+  .compact-table-mobile td {
+    padding: 0 !important;
+  }
+  
+  .compact-table-mobile div.rounded-full {
+    width: 1.5px !important;
+    height: 1.5px !important;
+    margin: 1px auto !important;
+  }
 }
 
 /* Styles for both mobile and desktop */
@@ -122,5 +139,25 @@
   /* Fix for mobile navigation to stay on top */
   .fixed.bottom-0.left-0.right-0.bg-background.border-t.border-muted {
     z-index: 9999 !important;
+  }
+  
+  /* Year view calendar compact styling */
+  .compact-year-view {
+    width: 100%;
+    overflow-x: hidden;
+  }
+  
+  .compact-year-view table {
+    table-layout: fixed;
+    width: 100%;
+  }
+  
+  .compact-year-view th:first-child,
+  .compact-year-view td:first-child {
+    width: 20px;
+  }
+  
+  .compact-year-view td {
+    height: 14px;
   }
 }
