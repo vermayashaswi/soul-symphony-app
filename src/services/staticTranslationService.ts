@@ -80,6 +80,12 @@ export class StaticTranslationService {
       return results;
     }
 
+    // Extra safety checks for empty arrays
+    if (!texts || texts.length === 0) {
+      console.log('StaticTranslationService: Empty input array for batch translation');
+      return new Map<string, string>();
+    }
+
     try {
       // Filter out empty texts
       const validTexts = texts.filter(text => text && text.trim() !== '');
@@ -119,7 +125,15 @@ export class StaticTranslationService {
           
           if (attempts >= maxAttempts) {
             console.error('StaticTranslationService: All translation attempts failed');
-            throw error;
+            
+            // After all attempts fail, return a fallback with original texts
+            const fallbackResults = new Map<string, string>();
+            validTexts.forEach(text => {
+              if (text) fallbackResults.set(text, text);
+            });
+            
+            console.log('StaticTranslationService: Using fallback translations (original text)');
+            return fallbackResults;
           }
           
           // Wait before retrying with exponential backoff
@@ -130,7 +144,16 @@ export class StaticTranslationService {
       }
       
       if (!translationResults) {
-        throw new Error("Failed to translate after multiple attempts");
+        // This should never happen due to the fallback above, but just for safety
+        console.error("StaticTranslationService: Failed to translate after multiple attempts");
+        
+        // Return original texts as fallback
+        const fallbackResults = new Map<string, string>();
+        validTexts.forEach(text => {
+          if (text) fallbackResults.set(text, text);
+        });
+        
+        return fallbackResults;
       }
       
       return translationResults;

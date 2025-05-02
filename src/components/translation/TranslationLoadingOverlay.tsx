@@ -5,7 +5,18 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
 
 export function TranslationLoadingOverlay() {
-  const { isTranslating, translationProgress } = useTranslation();
+  // Safe access to the translation context
+  let isTranslating = false;
+  let translationProgress = 0;
+  
+  try {
+    const translationContext = useTranslation();
+    isTranslating = translationContext.isTranslating;
+    translationProgress = translationContext.translationProgress;
+  } catch (error) {
+    console.error('TranslationLoadingOverlay: Error accessing translation context', error);
+    return null; // Return nothing if context isn't available yet
+  }
 
   return (
     <AnimatePresence>

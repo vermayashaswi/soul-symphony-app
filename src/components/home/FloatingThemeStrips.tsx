@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -33,7 +34,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   
   // Enhanced animation management
   const animationsRef = useRef<{[key: string]: any}>({});
-  const [animationKey, setAnimationKey] = useState<number>(0);
+  const animationKeyRef = useRef<number>(0);
   const [translationReady, setTranslationReady] = useState<boolean>(false);
   const [isInitialLoad, setIsInitialLoad] = useState<boolean>(true);
   
@@ -44,7 +45,10 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   useEffect(() => {
     console.log("FloatingThemeStrips: Translating label");
     const translateLabel = async () => {
-      if (!translate) return;
+      if (!translate) {
+        console.log("FloatingThemeStrips: translate function not available");
+        return;
+      }
       
       try {
         const result = await translate("7-day themes", "en");
@@ -83,7 +87,10 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       setTranslationReady(false);
       
       // Force animation refresh with new key
-      setAnimationKey(prev => prev + 1);
+      animationKeyRef.current += 1;
+      
+      // Trigger a re-render
+      setDebugStatus("language-change-processed");
     };
     
     window.addEventListener('languageChange', handleLanguageChange as EventListener);
@@ -142,7 +149,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       setDebugStatus("themes-updated");
       
       // Force animation refresh on data change
-      setAnimationKey(prev => prev + 1);
+      animationKeyRef.current += 1;
       
       // Clear old animation references when data changes
       Object.values(animationsRef.current).forEach((anim: any) => {
@@ -188,10 +195,13 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       
       while (attempts < maxAttempts) {
         try {
+          translationsMap = new Map<string, string>();
+          
+          // Use staticTranslationService directly
           translationsMap = await staticTranslationService.batchTranslateTexts(themeTexts);
           
           // Check if we got enough translations
-          if (translationsMap.size > 0) {
+          if (translationsMap && translationsMap.size > 0) {
             break;
           }
           
@@ -222,7 +232,10 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       setDebugStatus("translations-ready");
       
       // Trigger animation refresh after translations are ready
-      setAnimationKey(prev => prev + 1);
+      animationKeyRef.current += 1;
+      
+      // Force a re-render after translations are ready
+      setDebugStatus("translations-applied");
     } catch (error) {
       console.error('FloatingThemeStrips: Error translating themes:', error);
       
@@ -238,7 +251,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       setDebugStatus("translations-fallback");
       
       // Still trigger animation refresh even with fallbacks
-      setAnimationKey(prev => prev + 1);
+      animationKeyRef.current += 1;
     }
   }, [currentLanguage]);
   
@@ -296,7 +309,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     return null;
   }
 
-  console.log(`FloatingThemeStrips: Rendering with status ${debugStatus}, animation key ${animationKey}`);
+  console.log(`FloatingThemeStrips: Rendering with status ${debugStatus}, animation key ${animationKeyRef.current}`);
 
   return (
     <div className="relative w-full h-full overflow-hidden">
@@ -343,7 +356,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
           const speed = 15 + Math.random() * 10;
           
           // Create a unique and stable animation key that changes when needed
-          const uniqueAnimKey = `theme-strip-${themeItem.theme}-${index}-${currentLanguage}-${animationKey}`;
+          const uniqueAnimKey = `theme-strip-${themeItem.theme}-${index}-${currentLanguage}-${animationKeyRef.current}`;
           
           // Display the translated theme if available
           const displayText = currentLanguage === 'en' ? 

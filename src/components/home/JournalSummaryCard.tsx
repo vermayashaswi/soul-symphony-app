@@ -77,7 +77,7 @@ const JournalSummaryCard: React.FC = () => {
         
         if (entriesError) {
           console.error('Error fetching master themes:', entriesError);
-        } else {
+        } else if (journalEntries && journalEntries.length > 0) {
           const themesWithSentiment: ThemeData[] = [];
           
           journalEntries.forEach(entry => {
@@ -95,7 +95,15 @@ const JournalSummaryCard: React.FC = () => {
             }
           });
           
+          console.log('JournalSummaryCard: Processed theme data', { 
+            count: themesWithSentiment.length,
+            samples: themesWithSentiment.slice(0, 3).map(t => t.theme)
+          });
+          
           setThemeData(themesWithSentiment);
+        } else {
+          console.log('JournalSummaryCard: No journal entries with themes found');
+          setThemeData([]);
         }
         
         setSummaryData(summaryData);
@@ -111,22 +119,25 @@ const JournalSummaryCard: React.FC = () => {
     fetchSummary();
   }, [user?.id]);
 
+  // Don't render anything until we're ready
   if (!isReady) {
     return null;
   }
 
+  // If there's an error, log it but still render the component (it might recover with theme data)
   if (error) {
     console.error('JournalSummaryCard error:', error);
-    return <div className="h-full w-full"></div>;
   }
 
+  // Provide a default empty array if themeData is falsy to avoid rendering issues
+  const safeThemeData = themeData || [];
   const themeColor = getThemeColorHex();
 
   return (
     <div className="h-full w-full">
       {isReady && !loading && (
         <FloatingThemeStrips 
-          themesData={themeData}
+          themesData={safeThemeData} 
           themeColor={themeColor}
         />
       )}
