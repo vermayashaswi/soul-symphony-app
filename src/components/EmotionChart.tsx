@@ -15,10 +15,12 @@ import {
 import { cn } from '@/lib/utils';
 import { AggregatedEmotionData, TimeRange } from '@/hooks/use-insights-data';
 import EmotionBubbles from './EmotionBubbles';
+import EntityBubbles from './insights/EntityBubbles';
 import { Sparkles, CircleDot } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { Separator } from '@/components/ui/separator';
+import { useAuth } from '@/contexts/AuthContext';
 
 type EmotionData = {
   day: string;
@@ -97,6 +99,7 @@ export function EmotionChart({
   const { theme } = useTheme();
   const isMobile = useIsMobile();
   const initialRenderRef = useRef(true);
+  const { user } = useAuth();
   
   const chartTypes = [
     { id: 'line', label: 'Emotions' },
@@ -177,6 +180,17 @@ export function EmotionChart({
         setTopRightPercentage(null);
       }, 2000);
     }
+  };
+  
+  const handleEntityClick = (entity: string, sentiment: number) => {
+    setTopRightPercentage({
+      emotion: entity,
+      percentage: Math.round(sentiment * 100) / 100
+    });
+    
+    setTimeout(() => {
+      setTopRightPercentage(null);
+    }, 2000);
   };
   
   const lineData = useMemo(() => {
@@ -481,26 +495,22 @@ export function EmotionChart({
         {chartType === 'bubble' && (
           <div className="w-full">
             <div className="absolute top-2 right-2 text-xs text-muted-foreground z-10">
-              * Darker colors represent higher scores of emotion
+              * Size shows frequency, color shows sentiment (red=negative, yellow=neutral, green=positive)
             </div>
             
             {topRightPercentage && (
               <div className="absolute top-2 right-32 bg-background/90 py-1 px-3 rounded-lg shadow-lg text-primary font-medium z-20">
-                {topRightPercentage.emotion}: {topRightPercentage.percentage}%
+                {topRightPercentage.emotion}: {topRightPercentage.percentage}
               </div>
             )}
             
             <div className="h-[300px]" key={bubbleKey}>
-              {Object.keys(bubbleData).length > 0 ? (
-                <EmotionBubbles 
-                  emotions={bubbleData} 
-                  preventOverlap={true}
-                  onEmotionClick={handleEmotionClick}
+              {chartType === 'bubble' && (
+                <EntityBubbles 
+                  userId={user?.id}
+                  timeRange={timeframe}
+                  onEntityClick={handleEntityClick}
                 />
-              ) : (
-                <div className="flex items-center justify-center h-full text-muted-foreground">
-                  No emotions data available for this timeframe
-                </div>
               )}
             </div>
           </div>
