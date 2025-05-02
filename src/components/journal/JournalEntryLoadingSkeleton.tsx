@@ -5,6 +5,7 @@ import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { useDebugLog } from '@/utils/debug/DebugContext';
+import { processingStateManager } from '@/utils/journal/processing-state-manager';
 
 interface JournalEntryLoadingSkeletonProps {
   count?: number;
@@ -22,6 +23,11 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       window.dispatchEvent(new CustomEvent('loadingSkeletonVisible', {
         detail: { tempId, timestamp: Date.now() }
       }));
+      
+      // Register this entry with our processing state manager if it's not already tracked
+      if (!processingStateManager.isProcessing(tempId)) {
+        processingStateManager.startProcessing(tempId);
+      }
     }
     
     // Add a delayed visibility notification to help with tracking
