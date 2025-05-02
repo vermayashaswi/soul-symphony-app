@@ -1,5 +1,5 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
@@ -14,13 +14,19 @@ interface JournalEntryLoadingSkeletonProps {
 
 export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: JournalEntryLoadingSkeletonProps) {
   const { addEvent } = useDebugLog();
+  const isVisibleRef = useRef(false);
+  const mountTimeRef = useRef(Date.now());
   
   useEffect(() => {
-    addEvent('LoadingUI', `JournalEntryLoadingSkeleton rendered with ${count} items${tempId ? ` and tempId ${tempId}` : ''}`, 'info');
-    
-    // Dispatch event to indicate skeleton is visible
     if (tempId) {
-      window.dispatchEvent(new CustomEvent('loadingSkeletonVisible', {
+      console.log(`[JournalEntryLoadingSkeleton] Mounted with tempId ${tempId} at ${new Date().toISOString()}`);
+      addEvent('LoadingUI', `JournalEntryLoadingSkeleton rendered with tempId ${tempId}`, 'info');
+      
+      // Mark this skeleton as visible
+      isVisibleRef.current = true;
+      
+      // Dispatch event to indicate skeleton is visible
+      window.dispatchEvent(new CustomEvent('processingCardDisplayed', {
         detail: { tempId, timestamp: Date.now() }
       }));
       
@@ -32,38 +38,42 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
     
     // Add a delayed visibility notification to help with tracking
     const visibilityTimeout = setTimeout(() => {
-      console.log('[JournalEntryLoadingSkeleton] Skeleton has been visible for 500ms');
-      
-      if (tempId) {
+      if (isVisibleRef.current && tempId) {
+        console.log(`[JournalEntryLoadingSkeleton] Skeleton ${tempId} has been visible for 500ms`);
+        
         window.dispatchEvent(new CustomEvent('loadingSkeletonStillVisible', {
           detail: { tempId, timestamp: Date.now(), duration: 500 }
         }));
       }
     }, 500);
     
-    // Add a longer timeout to ensure we stay visible
-    const longVisibilityTimeout = setTimeout(() => {
-      console.log('[JournalEntryLoadingSkeleton] Skeleton has been visible for 2s');
-      
-      if (tempId) {
-        window.dispatchEvent(new CustomEvent('loadingSkeletonLongVisible', {
-          detail: { tempId, timestamp: Date.now(), duration: 2000 }
-        }));
-      }
-    }, 2000);
-    
     return () => {
       // Notify when skeleton is unmounted
       if (tempId) {
-        window.dispatchEvent(new CustomEvent('loadingSkeletonUnmounted', {
-          detail: { tempId, timestamp: Date.now() }
+        const visibleDuration = Date.now() - mountTimeRef.current;
+        
+        console.log(`[JournalEntryLoadingSkeleton] Unmounting skeleton with tempId ${tempId}. Was visible for ${visibleDuration}ms`);
+        isVisibleRef.current = false;
+        
+        window.dispatchEvent(new CustomEvent('processingCardRemoved', {
+          detail: { tempId, timestamp: Date.now(), visibleDuration }
         }));
       }
       
       clearTimeout(visibilityTimeout);
-      clearTimeout(longVisibilityTimeout);
     };
   }, [count, addEvent, tempId]);
+  
+  const handleAnimationComplete = () => {
+    if (tempId) {
+      console.log(`[JournalEntryLoadingSkeleton] Animation completed for ${tempId}`);
+      
+      // Dispatch an event when animation is complete to help with tracking
+      window.dispatchEvent(new CustomEvent('loadingSkeletonAnimated', {
+        detail: { tempId, timestamp: Date.now() }
+      }));
+    }
+  };
   
   return (
     <div className="space-y-4 relative z-10">
@@ -72,21 +82,11 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
           key={`skeleton-${tempId || index}`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.3, delay: index * 0.1 }}
+          transition={{ duration: 0.3 }}
           className="overflow-hidden skeleton-container"
           data-loading-skeleton={true}
           data-temp-id={tempId}
-          onAnimationStart={() => addEvent('LoadingUI', `Skeleton ${index} animation started${tempId ? ` for ${tempId}` : ''}`, 'info')}
-          onAnimationComplete={() => {
-            addEvent('LoadingUI', `Skeleton ${index} animation completed${tempId ? ` for ${tempId}` : ''}`, 'info');
-            
-            // Dispatch an event when animation is complete to help with tracking
-            if (tempId) {
-              window.dispatchEvent(new CustomEvent('loadingSkeletonAnimated', {
-                detail: { tempId, timestamp: Date.now(), index }
-              }));
-            }
-          }}
+          onAnimationComplete={handleAnimationComplete}
         >
           <Card className="p-4 bg-card border-2 border-primary/20 shadow-md relative journal-entry-card processing-card highlight-processing">
             <div className="flex justify-between items-start mb-4">
@@ -109,6 +109,14 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
               <div className="h-4 w-4 rounded-full bg-primary/40 animate-ping absolute"></div>
               <div className="h-3 w-3 rounded-full bg-primary/80"></div>
             </div>
+            
+            {/* Add the tempId as a data attribute for debugging */}
+            {tempId && (
+              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-50" 
+                   data-temp-id={tempId}>
+                {tempId.substring(0, 8)}...
+              </div>
+            )}
           </Card>
         </motion.div>
       ))}

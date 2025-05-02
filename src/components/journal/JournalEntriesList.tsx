@@ -1,5 +1,4 @@
-
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
 import { Button } from '@/components/ui/button';
@@ -28,8 +27,13 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   onStartRecording,
   onDeleteEntry,
 }) => {
-  // Use our new hook to get processing entries
+  // Use our hook to get processing entries
   const { activeProcessingIds, isProcessing } = useProcessingEntries();
+  
+  // Keep track of rendered tempIds to prevent duplicates
+  const renderedTempIdsRef = useRef<Set<string>>(new Set());
+  // Keep track of rendered entry IDs to prevent duplicates
+  const renderedEntryIdsRef = useRef<Set<number>>(new Set());
   
   // Determine if we have any entries to show
   const hasEntries = entries && entries.length > 0;
@@ -39,17 +43,27 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   
   // Update processing manager with any entries we receive from props
   useEffect(() => {
+    console.log('[JournalEntriesList] Processing entries from props:', processingEntries);
+    
+    // Clear our tracking sets at the beginning of each update
+    renderedTempIdsRef.current.clear();
+    renderedEntryIdsRef.current = new Set(entries.map(entry => entry.id));
+    
     // Register any processingEntries from props with our manager
     processingEntries.forEach(tempId => {
       // Only add if not already tracked
       if (!isProcessing(tempId)) {
+        console.log(`[JournalEntriesList] Registering new processing entry: ${tempId}`);
         processingStateManager.startProcessing(tempId);
+      } else {
+        console.log(`[JournalEntriesList] Entry ${tempId} already being tracked, skipping registration`);
       }
     });
     
     // Mark processed entries as completed
     entries.forEach(entry => {
       if (entry.tempId && processedEntryIds.includes(entry.id)) {
+        console.log(`[JournalEntriesList] Marking entry as completed: ${entry.tempId} -> ${entry.id}`);
         processingStateManager.updateEntryState(entry.tempId, EntryProcessingState.COMPLETED);
         processingStateManager.setEntryId(entry.tempId, entry.id);
       }
@@ -81,7 +95,26 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     }
   };
   
-  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, loading=${loading}, activeProcessingIds=${activeProcessingIds.length}`);
+  // Filter active processing IDs to prevent duplicates with real entries
+  const filteredProcessingIds = activeProcessingIds.filter(tempId => {
+    // Skip if we've already seen this tempId in this render cycle
+    if (renderedTempIdsRef.current.has(tempId)) {
+      return false;
+    }
+    
+    // Skip if this tempId already exists in the real entries list
+    const alreadyInEntries = entries.some(entry => entry.tempId === tempId);
+    if (alreadyInEntries) {
+      console.log(`[JournalEntriesList] Skipping processing card for tempId ${tempId} as it's already in entries`);
+      return false;
+    }
+    
+    // Add to our tracking set and include in the filtered list
+    renderedTempIdsRef.current.add(tempId);
+    return true;
+  });
+  
+  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, activeProcessingIds=${activeProcessingIds.length}, filteredProcessingIds=${filteredProcessingIds.length}`);
 
   return (
     <div className="journal-entries-list" id="journal-entries-container">
@@ -93,28 +126,20 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             <TranslatableText text="Loading journal entries..." />
           </p>
         </div>
-      ) : hasEntries || activeProcessingIds.length > 0 ? (
+      ) : hasEntries || filteredProcessingIds.length > 0 ? (
         <div className="grid gap-4" data-entries-count={entries.length}>
           {/* Show processing entry skeletons for any active processing entries */}
-          {activeProcessingIds.length > 0 && (
+          {filteredProcessingIds.length > 0 && (
             <div data-processing-cards-container="true" className="processing-cards-container">
-              {activeProcessingIds.map((tempId) => {
+              {filteredProcessingIds.map((tempId) => {
                 console.log(`[JournalEntriesList] Rendering processing card for: ${tempId}`);
-                
-                // Check if this tempId already exists in the real entries list
-                const alreadyInEntries = entries.some(entry => entry.tempId === tempId);
-                
-                // Only render if not already in entries list
-                if (!alreadyInEntries) {
-                  return (
-                    <JournalEntryLoadingSkeleton
-                      key={`processing-${tempId}`}
-                      count={1}
-                      tempId={tempId}
-                    />
-                  );
-                }
-                return null;
+                return (
+                  <JournalEntryLoadingSkeleton
+                    key={`processing-${tempId}`}
+                    count={1}
+                    tempId={tempId}
+                  />
+                );
               })}
             </div>
           )}

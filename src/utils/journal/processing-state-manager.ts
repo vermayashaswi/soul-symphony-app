@@ -22,6 +22,7 @@ export interface ProcessingEntry {
   retryCount: number;
   error?: string;
   minVisibleUntil: number; // Timestamp for guaranteed minimum visibility
+  isDisplayed?: boolean; // Flag to track if this entry is currently displayed
 }
 
 // Singleton class to manage processing state across components
@@ -53,6 +54,10 @@ class ProcessingStateManager {
     if (typeof window !== 'undefined') {
       window.addEventListener('processingEntryCompleted', this.handleExternalCompletionEvent as EventListener);
       window.addEventListener('processingEntryFailed', this.handleExternalErrorEvent as EventListener);
+      
+      // Add a new listener for entry display tracking
+      window.addEventListener('processingCardDisplayed', this.handleCardDisplayedEvent as EventListener);
+      window.addEventListener('processingCardRemoved', this.handleCardRemovedEvent as EventListener);
     }
   }
 
@@ -67,6 +72,12 @@ class ProcessingStateManager {
   public startProcessing(tempId: string): void {
     if (this.shouldDebounce()) return;
     
+    // First check if we're already tracking this tempId
+    if (this.processingEntries.has(tempId)) {
+      console.log(`[ProcessingStateManager] Entry ${tempId} already exists, skipping duplicate registration`);
+      return;
+    }
+    
     const now = Date.now();
     const entry: ProcessingEntry = {
       tempId,
@@ -74,7 +85,8 @@ class ProcessingStateManager {
       startTime: now,
       lastUpdated: now,
       retryCount: 0,
-      minVisibleUntil: now + this.MIN_VISIBILITY_TIME
+      minVisibleUntil: now + this.MIN_VISIBILITY_TIME,
+      isDisplayed: false
     };
     
     this.processingEntries.set(tempId, entry);
@@ -84,6 +96,13 @@ class ProcessingStateManager {
     this.persistToLocalStorage();
     
     console.log(`[ProcessingStateManager] Started processing entry: ${tempId}`);
+    
+    // Emit an event to ensure the processing state is consistent across components
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('processingEntryRegistered', {
+        detail: { tempId, timestamp: Date.now() }
+      }));
+    }
   }
   
   // Update the state of a processing entry
@@ -100,6 +119,13 @@ class ProcessingStateManager {
     }
     
     const oldState = entry.state;
+    
+    // Skip if state hasn't changed
+    if (oldState === state && !error) {
+      console.log(`[ProcessingStateManager] State already ${state} for ${tempId}, skipping update`);
+      return;
+    }
+    
     const now = Date.now();
     
     // Update the entry properties
@@ -128,13 +154,30 @@ class ProcessingStateManager {
     // If completing, ensure minimum visibility time
     if (state === EntryProcessingState.COMPLETED) {
       const timeVisible = now - entry.startTime;
+      
+      console.log(`[ProcessingStateManager] Marking entry ${tempId} as completed. Visible time: ${timeVisible}ms`);
+      
       if (timeVisible < this.MIN_VISIBILITY_TIME) {
         // Don't remove yet, schedule removal after minimum visibility time
         entry.minVisibleUntil = now + (this.MIN_VISIBILITY_TIME - timeVisible);
         setTimeout(() => this.cleanupEntry(tempId), this.MIN_VISIBILITY_TIME - timeVisible + 500);
+        console.log(`[ProcessingStateManager] Scheduling cleanup for ${tempId} in ${this.MIN_VISIBILITY_TIME - timeVisible + 500}ms`);
       } else {
         // We've already been visible long enough, schedule a short cleanup
         setTimeout(() => this.cleanupEntry(tempId), 1500);
+        console.log(`[ProcessingStateManager] Scheduling immediate cleanup for ${tempId} in 1500ms`);
+      }
+      
+      // Fire a global event to ensure all instances know this entry is complete
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('processingEntryFullyCompleted', {
+          detail: { 
+            tempId, 
+            entryId: entry.entryId, 
+            timestamp: now,
+            forceCleanup: true
+          }
+        }));
       }
     }
     
@@ -149,10 +192,19 @@ class ProcessingStateManager {
   // Map a temp ID to an entry ID when processing completes
   public setEntryId(tempId: string, entryId: number): void {
     const entry = this.processingEntries.get(tempId);
-    if (!entry) return;
+    if (!entry) {
+      console.log(`[ProcessingStateManager] No entry found for tempId ${tempId}, creating new one`);
+      this.startProcessing(tempId);
+      const newEntry = this.processingEntries.get(tempId);
+      if (newEntry) {
+        newEntry.entryId = entryId;
+        this.processingEntries.set(tempId, newEntry);
+      }
+    } else {
+      entry.entryId = entryId;
+      this.processingEntries.set(tempId, entry);
+    }
     
-    entry.entryId = entryId;
-    this.processingEntries.set(tempId, entry);
     this.notifySubscribers();
     this.persistToLocalStorage();
     
@@ -163,6 +215,18 @@ class ProcessingStateManager {
     localStorage.setItem('processingToEntryMap', JSON.stringify(mapping));
     
     console.log(`[ProcessingStateManager] Mapped tempId ${tempId} to entryId ${entryId}`);
+    
+    // Dispatch an event to notify all components about this mapping
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new CustomEvent('processingEntryMapped', {
+        detail: { 
+          tempId, 
+          entryId,
+          timestamp: Date.now(),
+          forceNotify: true
+        }
+      }));
+    }
   }
   
   // Get entry ID from temp ID
@@ -205,23 +269,76 @@ class ProcessingStateManager {
   
   // Manually remove an entry (e.g. for deletion)
   public removeEntry(tempIdOrEntryId: string | number): void {
+    console.log(`[ProcessingStateManager] Removing entry: ${tempIdOrEntryId} (${typeof tempIdOrEntryId})`);
+    
     if (typeof tempIdOrEntryId === 'number') {
       // Find by entry ID
+      let tempIdsToRemove: string[] = [];
+      
       for (const [tempId, entry] of this.processingEntries.entries()) {
         if (entry.entryId === tempIdOrEntryId) {
-          this.processingEntries.delete(tempId);
+          tempIdsToRemove.push(tempId);
+          console.log(`[ProcessingStateManager] Found matching tempId ${tempId} for entryId ${tempIdOrEntryId}`);
         }
       }
+      
+      // Remove each matching tempId
+      tempIdsToRemove.forEach(tempId => {
+        this.processingEntries.delete(tempId);
+        console.log(`[ProcessingStateManager] Removed entry with tempId ${tempId}`);
+        
+        // Also dispatch cleanup events
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('processingCardRemove', {
+            detail: { tempId, timestamp: Date.now(), forceCleanup: true }
+          }));
+        }
+      });
     } else {
       // Remove by temp ID
       this.processingEntries.delete(tempIdOrEntryId);
+      console.log(`[ProcessingStateManager] Removed entry with tempId ${tempIdOrEntryId}`);
+      
+      // Dispatch a cleanup event
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('processingCardRemove', {
+          detail: { tempId: tempIdOrEntryId, timestamp: Date.now(), forceCleanup: true }
+        }));
+      }
     }
     
     this.notifySubscribers();
     this.persistToLocalStorage();
-    
-    console.log(`[ProcessingStateManager] Removed entry ${tempIdOrEntryId}`);
   }
+  
+  // Track when a processing card is displayed in the UI
+  private handleCardDisplayedEvent = (event: CustomEvent) => {
+    if (!event.detail?.tempId) return;
+    
+    const entry = this.processingEntries.get(event.detail.tempId);
+    if (entry) {
+      entry.isDisplayed = true;
+      this.processingEntries.set(event.detail.tempId, entry);
+      console.log(`[ProcessingStateManager] Entry ${event.detail.tempId} is now displayed`);
+    }
+  };
+  
+  // Track when a processing card is removed from the UI
+  private handleCardRemovedEvent = (event: CustomEvent) => {
+    if (!event.detail?.tempId) return;
+    
+    const entry = this.processingEntries.get(event.detail.tempId);
+    if (entry) {
+      entry.isDisplayed = false;
+      this.processingEntries.set(event.detail.tempId, entry);
+      console.log(`[ProcessingStateManager] Entry ${event.detail.tempId} is no longer displayed`);
+      
+      // If the entry is completed and no longer displayed, we can safely remove it
+      if (entry.state === EntryProcessingState.COMPLETED) {
+        setTimeout(() => this.cleanupEntry(event.detail.tempId), 500);
+      }
+    }
+  };
   
   // Get list of all processing entries
   public getProcessingEntries(): ProcessingEntry[] {
@@ -237,6 +354,8 @@ class ProcessingStateManager {
   
   // Check if an entry is still processing
   public isProcessing(tempIdOrEntryId: string | number): boolean {
+    if (!tempIdOrEntryId) return false;
+    
     if (typeof tempIdOrEntryId === 'number') {
       // Check by entry ID
       for (const entry of this.processingEntries.values()) {
@@ -287,15 +406,23 @@ class ProcessingStateManager {
   // Restore state from localStorage on reload/navigation
   public restoreFromLocalStorage(): void {
     try {
+      console.log('[ProcessingStateManager] Attempting to restore state from localStorage');
       // Restore processing entries
       const entriesStr = localStorage.getItem('processingEntries');
       if (entriesStr) {
         const entries: ProcessingEntry[] = JSON.parse(entriesStr);
+        console.log(`[ProcessingStateManager] Found ${entries.length} entries in localStorage`);
+        
         entries.forEach(entry => {
           // Don't restore really old entries (> 5 minutes)
           const isStale = Date.now() - entry.lastUpdated > 5 * 60 * 1000;
           if (!isStale) {
+            // Reset the isDisplayed flag on restore
+            entry.isDisplayed = false;
             this.processingEntries.set(entry.tempId, entry);
+            console.log(`[ProcessingStateManager] Restored entry ${entry.tempId} (state: ${entry.state})`);
+          } else {
+            console.log(`[ProcessingStateManager] Skipping stale entry ${entry.tempId}`);
           }
         });
       }
@@ -304,6 +431,7 @@ class ProcessingStateManager {
       this.processingEntries.forEach((entry, tempId) => {
         if (entry.state !== EntryProcessingState.PROCESSING && 
             Date.now() > entry.minVisibleUntil) {
+          console.log(`[ProcessingStateManager] Removing completed entry ${tempId} on restore`);
           this.processingEntries.delete(tempId);
         }
       });
@@ -319,31 +447,65 @@ class ProcessingStateManager {
   private handleExternalCompletionEvent = (event: CustomEvent) => {
     if (event.detail?.tempId) {
       const { tempId, entryId } = event.detail;
+      console.log(`[ProcessingStateManager] External completion event for ${tempId}${entryId ? ` -> ${entryId}` : ''}`);
+      
       if (entryId) {
         this.setEntryId(tempId, entryId);
       }
       this.updateEntryState(tempId, EntryProcessingState.COMPLETED);
+      
+      // If forceCleanup is set, clean up immediately
+      if (event.detail.forceClearProcessingCard) {
+        setTimeout(() => {
+          this.cleanupEntry(tempId);
+        }, 500);
+      }
     }
   };
   
   private handleExternalErrorEvent = (event: CustomEvent) => {
     if (event.detail?.tempId) {
       const { tempId, error } = event.detail;
+      console.log(`[ProcessingStateManager] External error event for ${tempId}: ${error}`);
       this.updateEntryState(tempId, EntryProcessingState.ERROR, error);
     }
   };
   
   // Clean up a specific entry
   private cleanupEntry(tempId: string): void {
-    const entry = this.processingEntries.get(tempId);
-    if (!entry) return;
+    console.log(`[ProcessingStateManager] Attempting to clean up entry ${tempId}`);
     
-    // Only clean up if we've met minimum visibility time
-    if (Date.now() >= entry.minVisibleUntil) {
+    const entry = this.processingEntries.get(tempId);
+    if (!entry) {
+      console.log(`[ProcessingStateManager] Entry ${tempId} not found for cleanup`);
+      return;
+    }
+    
+    // Only clean up if we've met minimum visibility time and entry is completed or errored
+    const isCompleted = entry.state === EntryProcessingState.COMPLETED;
+    const isErrored = entry.state === EntryProcessingState.ERROR;
+    const visibilityTimeMet = Date.now() >= entry.minVisibleUntil;
+    
+    if ((isCompleted || isErrored) && visibilityTimeMet) {
       this.processingEntries.delete(tempId);
       this.notifySubscribers();
       this.persistToLocalStorage();
-      console.log(`[ProcessingStateManager] Cleaned up entry ${tempId}`);
+      
+      console.log(`[ProcessingStateManager] Cleaned up entry ${tempId} (state: ${entry.state})`);
+      
+      // Also dispatch an event to ensure the UI clears any loading cards
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new CustomEvent('processingCardRemove', {
+          detail: { 
+            tempId, 
+            entryId: entry.entryId, 
+            timestamp: Date.now(), 
+            forceCleanup: true 
+          }
+        }));
+      }
+    } else {
+      console.log(`[ProcessingStateManager] Not cleaning up entry ${tempId} yet: completed=${isCompleted}, errored=${isErrored}, visibilityMet=${visibilityTimeMet}`);
     }
   }
   
@@ -358,6 +520,18 @@ class ProcessingStateManager {
         this.processingEntries.delete(tempId);
         hasChanges = true;
         console.log(`[ProcessingStateManager] Auto-cleaned completed entry ${tempId}`);
+        
+        // Also dispatch events to ensure UI is updated
+        if (typeof window !== 'undefined') {
+          window.dispatchEvent(new CustomEvent('processingCardRemove', {
+            detail: { 
+              tempId, 
+              entryId: entry.entryId, 
+              timestamp: now, 
+              forceCleanup: true 
+            }
+          }));
+        }
       }
       
       // Clean up error entries after 5 minutes
@@ -418,6 +592,8 @@ class ProcessingStateManager {
     if (typeof window !== 'undefined') {
       window.removeEventListener('processingEntryCompleted', this.handleExternalCompletionEvent as EventListener);
       window.removeEventListener('processingEntryFailed', this.handleExternalErrorEvent as EventListener);
+      window.removeEventListener('processingCardDisplayed', this.handleCardDisplayedEvent as EventListener);
+      window.removeEventListener('processingCardRemoved', this.handleCardRemovedEvent as EventListener);
     }
   }
 }

@@ -15,10 +15,44 @@ export function initializeJournalProcessing() {
   window.addEventListener('processingEntryCompleted', (event: any) => {
     if (event.detail && event.detail.tempId) {
       const { tempId, entryId } = event.detail;
+      console.log(`[Journal] Processing completed for ${tempId}${entryId ? ` -> ${entryId}` : ''}`);
+      
       if (entryId) {
         processingStateManager.setEntryId(tempId, entryId);
       }
+      
+      // Mark as completed, which will schedule a cleanup after the minimum visibility time
+      processingStateManager.updateEntryState(tempId, 'completed');
     }
+  });
+  
+  // Set up event listener for processing entry mapped events (for cross-component sync)
+  window.addEventListener('processingEntryMapped', (event: any) => {
+    if (event.detail && event.detail.tempId && event.detail.entryId) {
+      const { tempId, entryId } = event.detail;
+      console.log(`[Journal] Processing entry mapped: ${tempId} -> ${entryId}`);
+      
+      // Ensure this mapping is recorded in our state manager
+      processingStateManager.setEntryId(tempId, entryId);
+    }
+  });
+  
+  // Handle forced cleanup events
+  window.addEventListener('processingEntriesForceCleanup', () => {
+    console.log('[Journal] Received force cleanup event, cleaning stale entries');
+    
+    // Get all entries and process them
+    const entries = processingStateManager.getProcessingEntries();
+    const now = Date.now();
+    
+    entries.forEach(entry => {
+      // If entry has been in the system for more than 30 seconds and is completed, force cleanup
+      const entryAge = now - entry.startTime;
+      if (entry.state === 'completed' && entryAge > 30000) {
+        processingStateManager.removeEntry(entry.tempId);
+        console.log(`[Journal] Force cleaned up entry ${entry.tempId} (age: ${entryAge}ms)`);
+      }
+    });
   });
   
   console.log('[Journal] Processing state management initialized');
