@@ -76,11 +76,12 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       }
     });
     
+    // Fix: Sort themes without relying on the count property in ThemeData
+    // Instead, use the count from the themeMap
     const sortedThemes = Array.from(themeMap.entries())
-      .map(([theme, { count, sentiment }]) => ({ theme, sentiment }))
-      .sort((a, b) => b.count - a.count)
+      .sort((a, b) => b[1].count - a[1].count)
       .slice(0, 8)
-      .map(({ theme, sentiment }) => ({ theme, sentiment }));
+      .map(([theme, { sentiment }]) => ({ theme, sentiment }));
     
     setUniqueThemes(sortedThemes);
     
