@@ -1,18 +1,30 @@
 
-import React, { useState } from 'react';
-import { Link } from 'react-router-dom';
+import React, { useState, useEffect } from 'react';
+import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { LanguageSelector } from '@/components/translation/LanguageSelector';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const location = useLocation();
+  const { prefetchTranslationsForRoute } = useTranslation();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
   };
+  
+  // Prefetch translations for navbar items on mount and route change
+  useEffect(() => {
+    const navbarTexts = [
+      'Home', 'Blog', 'FAQ', 'Download on App Store'
+    ];
+    
+    prefetchTranslationsForRoute(navbarTexts);
+  }, [location.pathname, prefetchTranslationsForRoute]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm">

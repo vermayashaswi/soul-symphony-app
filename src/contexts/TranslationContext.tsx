@@ -1,8 +1,10 @@
-import React, { createContext, useContext, useState, useEffect } from 'react';
+
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
 import { staticTranslationService } from '@/services/staticTranslationService';
 import { preloadWebsiteTranslations } from '@/utils/website-translations';
+import { useLocation } from 'react-router-dom';
 
 // Define the language options
 export const languages = [
@@ -18,12 +20,17 @@ export const languages = [
   { code: 'pt', label: 'Português' },
 ];
 
+// Local memory cache to prevent flickering during navigation
+const memoryCache = new Map<string, string>();
+
 interface TranslationContextType {
   isTranslating: boolean;
   currentLanguage: string;
   setLanguage: (lang: string) => Promise<void>;
   translationProgress: number;
   translate: (text: string, sourceLanguage?: string, entryId?: number) => Promise<string>;
+  getCachedTranslation: (text: string, language: string) => string | null;
+  prefetchTranslationsForRoute: (routeTexts: string[]) => Promise<void>;
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -32,6 +39,28 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const [isTranslating, setIsTranslating] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
+  const location = useLocation();
+  
+  // Create a unique cache key
+  const createCacheKey = (text: string, language: string): string => {
+    return `${language}:${text.substring(0, 100)}`;
+  };
+
+  // Get cached translation from memory or IDB
+  const getCachedTranslation = useCallback((text: string, language: string): string | null => {
+    // Skip for English or empty text
+    if (language === 'en' || !text) return text;
+    
+    // Create cache key
+    const cacheKey = createCacheKey(text, language);
+    
+    // Check memory cache first (fastest)
+    if (memoryCache.has(cacheKey)) {
+      return memoryCache.get(cacheKey) || null;
+    }
+    
+    return null; // Will trigger a translation request
+  }, []);
 
   // Helper function to clean translation results
   const cleanTranslationResult = (result: string): string => {
@@ -42,9 +71,86 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     return result.replace(languageCodeRegex, '').trim();
   };
 
+  // Helper to cache a translation in both memory and IDB
+  const cacheTranslation = useCallback((text: string, translatedText: string, language: string): void => {
+    if (!text || !translatedText || language === 'en') return;
+    
+    const cacheKey = createCacheKey(text, language);
+    
+    // Store in memory cache
+    memoryCache.set(cacheKey, translatedText);
+    
+    // Also store in persistent cache
+    translationCache.setTranslation({
+      originalText: text,
+      translatedText,
+      language,
+      timestamp: Date.now(),
+      version: 1,
+    }).catch(err => console.error('Failed to cache translation:', err));
+  }, []);
+
+  // Function to prefetch translations for a route
+  const prefetchTranslationsForRoute = useCallback(async (routeTexts: string[]): Promise<void> => {
+    if (currentLanguage === 'en' || !routeTexts.length) return;
+    
+    try {
+      console.log(`Prefetching ${routeTexts.length} translations for route`);
+      const validTexts = routeTexts.filter(text => text && typeof text === 'string' && text.trim() !== '');
+      
+      // Deduplicate texts to translate
+      const uniqueTexts = [...new Set(validTexts)];
+      const textsToTranslate = uniqueTexts.filter(text => !getCachedTranslation(text, currentLanguage));
+      
+      if (textsToTranslate.length === 0) {
+        return; // All texts already cached
+      }
+      
+      // Batch translate in groups of 20
+      for (let i = 0; i < textsToTranslate.length; i += 20) {
+        const batch = textsToTranslate.slice(i, i + 20);
+        const batchTranslations = await staticTranslationService.batchTranslateTexts(batch, 'en');
+        
+        // Cache all results
+        batchTranslations.forEach((translation, originalText) => {
+          cacheTranslation(originalText, translation, currentLanguage);
+        });
+      }
+      
+      console.log(`Prefetching complete for ${textsToTranslate.length} texts`);
+    } catch (error) {
+      console.error('Error prefetching translations:', error);
+    }
+  }, [currentLanguage, getCachedTranslation, cacheTranslation]);
+
+  // Monitor route changes to load route-specific translations
+  useEffect(() => {
+    // When the route changes, we can prefetch translations for common UI elements
+    const commonUIElements = ['Home', 'Blog', 'Settings', 'Profile', 'Logout', 'Download'];
+    prefetchTranslationsForRoute(commonUIElements).catch(console.error);
+  }, [location.pathname, prefetchTranslationsForRoute]);
+
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
     if (currentLanguage === 'en' || !text || text.trim() === '') return text;
+    
+    // Check memory cache first
+    const cachedTranslation = getCachedTranslation(text, currentLanguage);
+    if (cachedTranslation) {
+      return cachedTranslation;
+    }
+    
+    // Then check persistent cache
+    try {
+      const cachedEntry = await translationCache.getTranslation(text, currentLanguage);
+      if (cachedEntry) {
+        // Store in memory cache for faster access next time
+        cacheTranslation(text, cachedEntry.translatedText, currentLanguage);
+        return cachedEntry.translatedText;
+      }
+    } catch (err) {
+      console.error('Error checking translation cache:', err);
+    }
     
     try {
       console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'en'}${entryId ? ` for entry ${entryId}` : ''}`);
@@ -52,6 +158,10 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       
       // Clean the result in case the service didn't do it
       const cleanedTranslation = cleanTranslationResult(translated);
+      
+      // Cache the result for future use
+      cacheTranslation(text, cleanedTranslation || text, currentLanguage);
+      
       console.log(`Translation result: "${cleanedTranslation?.substring(0, 30) || 'empty'}..."`);
       return cleanedTranslation || text;
     } catch (error) {
@@ -75,10 +185,9 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     setTranslationProgress(0);
     
     try {
-      // Clear translation cache when language changes to force fresh translations
-      // This step is important to avoid keeping any problematic translations
-      await translationCache.clearCache(lang);
-      console.log(`Cleared translation cache for ${lang}`);
+      // Clear memory cache when language changes
+      memoryCache.clear();
+      console.log(`Cleared translation memory cache`);
       
       // Store language preference
       localStorage.setItem('preferredLanguage', lang);
@@ -148,7 +257,9 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       currentLanguage, 
       setLanguage,
       translationProgress,
-      translate
+      translate,
+      getCachedTranslation,
+      prefetchTranslationsForRoute
     }}>
       {children}
     </TranslationContext.Provider>

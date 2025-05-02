@@ -46,3 +46,26 @@
 .read-the-docs {
   color: #888;
 }
+
+/* Translation stability styles */
+[data-translating="true"] {
+  opacity: 0.9;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Prevent layout shifts during translation */
+span, p, h1, h2, h3, h4, h5, h6, button, a {
+  min-height: 1em;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Smooth language change transitions */
+[data-translated="true"] {
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Prevent language flicker */
+body:not([data-language="en"]) [data-translated="false"] {
+  opacity: 0.7;
+}
+

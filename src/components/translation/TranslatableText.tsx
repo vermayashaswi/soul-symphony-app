@@ -25,13 +25,14 @@ export function TranslatableText({
   onTranslationStart,
   onTranslationEnd
 }: TranslatableTextProps) {
-  const [translatedText, setTranslatedText] = useState<string>('');
+  const [translatedText, setTranslatedText] = useState<string>(text); // Initialize with source text
   const [isLoading, setIsLoading] = useState(false);
-  const { translate, currentLanguage } = useTranslation();
+  const { translate, currentLanguage, getCachedTranslation } = useTranslation();
   const location = useLocation();
   const prevLangRef = useRef<string>(currentLanguage);
   const initialLoadDoneRef = useRef<boolean>(false);
   const textRef = useRef<string>(text); // Track text changes
+  const mountedRef = useRef<boolean>(true);
   
   // Check if on website route - but allow forced translation
   const pathname = location.pathname;
@@ -66,6 +67,13 @@ export function TranslatableText({
       return;
     }
     
+    // Check for cached translation first to prevent flicker
+    const cachedResult = getCachedTranslation(text, currentLanguage);
+    if (cachedResult) {
+      setTranslatedText(cachedResult);
+      return;
+    }
+    
     // Only initiate translation if not in English or if language has changed
     if (!isLoading) {
       setIsLoading(true);
@@ -78,9 +86,9 @@ export function TranslatableText({
       // Use "en" as default source language when none is provided
       const result = await translate(text, sourceLanguage || "en", entryId);
       
-      // Only update if the language hasn't changed during translation and
-      // the input text is still the same as when we started
-      if (prevLangRef.current === currentLanguage && textRef.current === text) {
+      // Only update if the component is still mounted, the language hasn't changed during translation
+      // and the input text is still the same as when we started
+      if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         if (result) {
           // Clean the translation result before setting it
           const cleanedResult = cleanTranslationResult(result);
@@ -91,34 +99,31 @@ export function TranslatableText({
       }
     } catch (error) {
       console.error('Translation error:', error);
-      if (prevLangRef.current === currentLanguage && textRef.current === text) {
+      if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         setTranslatedText(text); // Fallback to original
       }
     } finally {
-      setIsLoading(false);
-      if (onTranslationEnd) {
-        onTranslationEnd();
+      if (mountedRef.current) {
+        setIsLoading(false);
+        if (onTranslationEnd) {
+          onTranslationEnd();
+        }
       }
     }
   };
 
   // Effect to handle translation when text or language changes
   useEffect(() => {
-    let isMounted = true;
+    mountedRef.current = true;
     
     // Update the refs with current values
     prevLangRef.current = currentLanguage;
     textRef.current = text;
 
-    // Set to text immediately for better UX while translating
-    if (!initialLoadDoneRef.current || !translatedText) {
-      setTranslatedText(text);
-    }
-
     const handleTranslation = async () => {
-      if (isMounted) {
+      if (mountedRef.current) {
         await translateText();
-        if (isMounted) {
+        if (mountedRef.current) {
           initialLoadDoneRef.current = true;
         }
       }
@@ -127,7 +132,7 @@ export function TranslatableText({
     handleTranslation();
 
     return () => {
-      isMounted = false;
+      mountedRef.current = false;
     };
   }, [text, currentLanguage, sourceLanguage, entryId, forceTranslate]);
   
@@ -137,11 +142,6 @@ export function TranslatableText({
       // Update the refs
       prevLangRef.current = currentLanguage;
       textRef.current = text;
-      
-      // If we don't have a translation yet, set to original text during translation
-      if (!translatedText) {
-        setTranslatedText(text);
-      }
       
       // Then retranslate
       translateText();
@@ -169,4 +169,3 @@ export function TranslatableText({
 }
 
 export default TranslatableText;
-

@@ -20,14 +20,15 @@ export function TranslatableMarkdown({
   onTranslationStart,
   onTranslationEnd
 }: TranslatableMarkdownProps) {
-  const [translatedContent, setTranslatedContent] = useState<string>('');
+  const [translatedContent, setTranslatedContent] = useState<string>(children); // Initialize with source content
   const [isLoading, setIsLoading] = useState(false);
-  const { translate, currentLanguage } = useTranslation();
+  const { translate, currentLanguage, getCachedTranslation } = useTranslation();
   const prevLangRef = useRef<string>(currentLanguage);
   const initialLoadDoneRef = useRef<boolean>(false);
   const contentRef = useRef<string>(children);
   const location = useLocation();
   const isOnWebsite = isWebsiteRoute(location.pathname);
+  const mountedRef = useRef<boolean>(true);
   
   // Function to translate markdown content with improved error handling
   const translateMarkdown = async () => {
@@ -48,6 +49,13 @@ export function TranslatableMarkdown({
       setTranslatedContent(children);
       return;
     }
+    
+    // Check for cached translation first
+    const cachedTranslation = getCachedTranslation(children, currentLanguage);
+    if (cachedTranslation) {
+      setTranslatedContent(cachedTranslation);
+      return;
+    }
 
     // Only translate if not in English or if language has changed
     if (!isLoading) {
@@ -62,9 +70,9 @@ export function TranslatableMarkdown({
     try {
       const result = await translate(children, "en");
       
-      // Only update if the language hasn't changed during translation
+      // Only update if the component is still mounted, language hasn't changed during translation
       // and the content is still the same
-      if (prevLangRef.current === currentLanguage && contentRef.current === children) {
+      if (mountedRef.current && prevLangRef.current === currentLanguage && contentRef.current === children) {
         if (result) {
           setTranslatedContent(result);
           console.log(`TranslatableMarkdown: Successfully translated markdown content`);
@@ -77,35 +85,32 @@ export function TranslatableMarkdown({
       }
     } catch (error) {
       console.error('Markdown translation error:', error);
-      if (prevLangRef.current === currentLanguage && contentRef.current === children) {
+      if (mountedRef.current && prevLangRef.current === currentLanguage && contentRef.current === children) {
         setTranslatedContent(children); // Fallback to original
         console.warn(`TranslatableMarkdown: Failed to translate markdown content to ${currentLanguage}`);
       }
     } finally {
-      setIsLoading(false);
-      if (onTranslationEnd) {
-        onTranslationEnd();
+      if (mountedRef.current) {
+        setIsLoading(false);
+        if (onTranslationEnd) {
+          onTranslationEnd();
+        }
       }
     }
   };
 
   // Effect to handle translation when content or language changes
   useEffect(() => {
-    let isMounted = true;
+    mountedRef.current = true;
 
     // Update the refs with current values
     prevLangRef.current = currentLanguage;
     contentRef.current = children;
 
-    // Set to original content immediately for better UX while translating
-    if (!initialLoadDoneRef.current || !translatedContent) {
-      setTranslatedContent(children);
-    }
-
     const handleTranslation = async () => {
-      if (isMounted) {
+      if (mountedRef.current) {
         await translateMarkdown();
-        if (isMounted) {
+        if (mountedRef.current) {
           initialLoadDoneRef.current = true;
         }
       }
@@ -114,7 +119,7 @@ export function TranslatableMarkdown({
     handleTranslation();
 
     return () => {
-      isMounted = false;
+      mountedRef.current = false;
     };
   }, [children, currentLanguage, forceTranslate]);
   
@@ -124,11 +129,6 @@ export function TranslatableMarkdown({
       // Update the refs
       prevLangRef.current = currentLanguage;
       contentRef.current = children;
-      
-      // If we don't have a translation yet, set to original text during translation
-      if (!translatedContent) {
-        setTranslatedContent(children);
-      }
       
       // Then retranslate
       translateMarkdown();
