@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
@@ -57,7 +56,7 @@ export function TranslatableText({
       return;
     }
 
-    // IMPORTANT CHANGE: Don't skip translation on website routes if forceTranslate is true
+    // CRITICAL FIX: Don't skip translation on website routes if forceTranslate is true
     if (isOnWebsite && !forceTranslate) {
       console.log(`TranslatableText: Skipping translation for "${text}" because on website route without force translate`);
       setTranslatedText(text);

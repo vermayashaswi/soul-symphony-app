@@ -50,12 +50,12 @@ export const Node: React.FC<NodeProps> = ({
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
-  // Debug log for visibility
+  // Debug log for visibility with more informative details
   useEffect(() => {
-    if (isHighlighted && showPercentage) {
-      console.log(`Node ${node.id} is highlighted, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
+    if (isHighlighted || isSelected) {
+      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
     }
-  }, [isHighlighted, showPercentage, node.id, connectionPercentage]);
+  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage]);
   
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = isHighlighted 
@@ -119,11 +119,17 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
-  // Ensure label visibility
-  const shouldShowLabel = showLabel || isHighlighted || isSelected;
+  // Ensure label visibility - use explicit visibility for both NodeLabel and ConnectionPercentage
+  const shouldShowLabel = isHighlighted || isSelected || showLabel;
   
-  // Enhanced logic for percentage visibility
+  // Enhanced logic for percentage visibility - always show percentages for highlighted nodes that aren't selected
   const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;
+  
+  // Debug logs for label and percentage visibility
+  useEffect(() => {
+    console.log(`Node ${node.id} label visibility: shouldShowLabel=${shouldShowLabel}`);
+    console.log(`Node ${node.id} percentage visibility: shouldShowPercentage=${shouldShowPercentage}, percentage=${connectionPercentage}`);
+  }, [node.id, shouldShowLabel, shouldShowPercentage, connectionPercentage]);
 
   return (
     <group position={node.position}>

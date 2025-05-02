@@ -22,6 +22,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   cameraZoom,
   themeHex
 }) => {
+  console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}`);
+
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
@@ -55,9 +57,12 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     color: type === 'entity' ? '#fff' : themeHex,
     padding: '0.1rem 0.3rem',
     fontWeight: isHighlighted ? 'bold' : 'normal',
-    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.5)' : 'transparent',
+    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.3)',
     borderRadius: '2px',
   }), [type, themeHex, isHighlighted]);
+
+  // Don't render if not supposed to be shown
+  if (!shouldShowLabel) return null;
 
   return (
     <Html
@@ -70,7 +75,11 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       key={`label-${id}-${isHighlighted ? 'highlighted' : 'normal'}`}
     >
       <div style={labelTextStyle}>
-        <TranslatableText text={id} forceTranslate={true} />
+        <TranslatableText 
+          text={id} 
+          forceTranslate={true} 
+          style={{ textShadow: '0 0 2px rgba(0,0,0,0.9)' }}
+        />
       </div>
     </Html>
   );

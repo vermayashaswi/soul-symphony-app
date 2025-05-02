@@ -18,6 +18,8 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   offsetY = 0,
   nodeType = 'emotion'
 }) => {
+  console.log(`ConnectionPercentage: isVisible=${isVisible}, percentage=${percentage}, nodeType=${nodeType}`);
+  
   if (!isVisible) return null;
 
   const displayPercentage = Math.round(percentage);
@@ -51,6 +53,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           transform: 'scale(0.85)',
           transformOrigin: 'center center',
           lineHeight: '1',
+          opacity: 0.95,
         }}
       >
         <TranslatableText 
