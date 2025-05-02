@@ -88,37 +88,48 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     
     return sentimentData.map(item => ({
       formattedDate: formatDate(item.date, timeRange, currentLanguage),
-      sentiment: item.sentiment
+      sentiment: item.sentiment,
+      originalDate: item.date // Keep original date for proper sorting
     })).sort((a, b) => {
-      // Sort by date in ascending order for the chart
-      return new Date(a.formattedDate).getTime() - new Date(b.formattedDate).getTime();
+      // Sort by original date in ascending order for the chart
+      return new Date(a.originalDate).getTime() - new Date(b.originalDate).getTime();
     });
   };
   
   const formatDate = (date: Date, range: TimeRange, language: string): string => {
-    const d = new Date(date);
+    if (!date) return '';
+    
+    // Ensure we have a valid Date object
+    const d = date instanceof Date ? date : new Date(date);
     
     // Language-aware date formatting options
     const options: Intl.DateTimeFormatOptions = {};
     
     switch (range) {
       case 'today':
-        return `${d.getHours()}:${d.getMinutes().toString().padStart(2, '0')}`;
+        // Format as HH:MM
+        options.hour = '2-digit';
+        options.minute = '2-digit';
+        options.hour12 = false; // Use 24-hour format for consistency
+        break;
         
       case 'week':
+        // Format as day of week (e.g., Mon, Tue)
         options.weekday = 'short';
         break;
         
       case 'month':
+        // Format as day of month (e.g., 1, 15)
         options.day = 'numeric';
-        options.month = 'short';
         break;
         
       case 'year':
+        // Format as short month (e.g., Jan, Feb)
         options.month = 'short';
         break;
         
       default:
+        // Default to day + short month (e.g., 15 Jan)
         options.day = 'numeric';
         options.month = 'short';
     }
@@ -146,6 +157,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
       );
     }
     
+    // Prepare data for chart display
     const lineData = filteredChartData.map(item => ({
       day: item.formattedDate,
       sentiment: item.sentiment
@@ -167,7 +179,13 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
             </defs>
 
             <CartesianGrid strokeDasharray="3 3" stroke={theme === 'dark' ? '#333' : '#eee'} />
-            <XAxis dataKey="day" stroke="#888" fontSize={12} tickMargin={10} />
+            <XAxis 
+              dataKey="day" 
+              stroke="#888" 
+              fontSize={12} 
+              tickMargin={10}
+              tickFormatter={(value) => value} // Use the already formatted date
+            />
             <YAxis 
               stroke="#888" 
               fontSize={12} 
@@ -213,10 +231,10 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({ sentimentData, timeRange })
     );
   };
 
-  // Force rerender when language changes
+  // Force rerender when language or time range changes
   useEffect(() => {
-    // This will trigger a rerender when the language changes
-    console.log('Language changed in MoodCalendar:', currentLanguage);
+    // This will trigger a rerender when the language or time range changes
+    console.log('Language or timeRange changed in MoodCalendar:', currentLanguage, timeRange);
   }, [currentLanguage, timeRange]);
 
   return (
