@@ -23,7 +23,7 @@ const ViewportManager: React.FC = () => {
   // Render the appropriate layout based on route and device
   return (
     <>
-      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'}`}>
+      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} overflow-x-hidden`}>
         <Outlet />
       </div>
       

@@ -283,8 +283,10 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
     
     // Find the max count for bubble sizing
     const maxCount = Math.max(...entities.map(e => e.count));
-    const minSize = 40; // Minimum size in pixels
-    const maxSize = Math.min(dimensions.width / 4, 120); // Maximum size
+    // Make bubbles smaller on mobile
+    const minSize = isMobile ? 32 : 40; // Smaller minimum size
+    // Ensure max size is proportional to viewport
+    const maxSize = Math.min(dimensions.width / 4.5, isMobile ? 80 : 120); // Smaller on mobile
     
     console.log(`Calculating positions with dimensions: ${dimensions.width}x${dimensions.height}`);
     
@@ -296,21 +298,25 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
       const angleStep = (2 * Math.PI) / entities.length;
       const angle = i * angleStep;
       
-      // Use a circular layout with some variation
-      const radius = Math.min(dimensions.width, dimensions.height) * 0.35; 
-      const variation = 0.2; // Add some randomness
+      // Use a tighter circular layout with less variation on mobile
+      const radius = Math.min(dimensions.width, dimensions.height) * (isMobile ? 0.3 : 0.35); 
+      const variation = isMobile ? 0.1 : 0.2; // Less randomness on mobile
       
-      const x = dimensions.width / 2 + 
+      let x = dimensions.width / 2 + 
         radius * Math.cos(angle) * (1 + (Math.random() - 0.5) * variation);
       
-      const y = dimensions.height / 2 + 
+      let y = dimensions.height / 2 + 
         radius * Math.sin(angle) * (1 + (Math.random() - 0.5) * variation);
+      
+      // Ensure bubbles stay fully within container bounds, accounting for their size
+      x = Math.max(size/2, Math.min(dimensions.width - size/2, x));
+      y = Math.max(size/2, Math.min(dimensions.height - size/2, y));
       
       return {
         entity,
         size,
-        x: Math.max(size/2, Math.min(dimensions.width - size/2, x)),
-        y: Math.max(size/2, Math.min(dimensions.height - size/2, y))
+        x,
+        y
       };
     });
   };
@@ -321,8 +327,8 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
   return (
     <div 
       ref={containerRef}
-      className={cn("relative w-full h-full", className)}
-      style={{ minHeight: '300px' }} // Ensure minimum height
+      className={cn("relative w-full h-full overflow-hidden", className)}
+      style={{ minHeight: isMobile ? '250px' : '300px' }} // Smaller minimum height for mobile
     >
       {positions.map(({ entity, size, x, y }, bubbleIndex) => {
         const isHighlighted = highlightedEntity === entity.name;
@@ -366,7 +372,8 @@ const EntityBubbles: React.FC<EntityBubblesProps> = ({
                 "text-center",
                 isHighlighted ? "text-white" : "text-white/90"
               )} style={{ 
-                fontSize: Math.max(10, size * 0.25) 
+                fontSize: Math.max(10, size * 0.25),
+                maxWidth: size * 0.9 // Ensure text doesn't overflow
               }}>
                 {entity.name}
               </div>

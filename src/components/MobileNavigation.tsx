@@ -95,10 +95,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     <motion.div 
       className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted"
       style={{
-        zIndex: 50,
-        paddingTop: '0.40rem', // Reduced padding (10% less)
-        paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))', // Reduced padding (10% less)
-        height: 'calc(3.6rem + env(safe-area-inset-bottom))' // Reduced height by 10% from 4rem to 3.6rem
+        zIndex: 9999, // Increased z-index to ensure it stays above other elements
+        paddingTop: '0.40rem',
+        paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))',
+        height: 'calc(3.6rem + env(safe-area-inset-bottom))'
       }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
@@ -113,14 +113,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
               key={item.path}
               to={item.path}
               className={cn(
-                "flex flex-col items-center py-1 transition-colors", // Reduced padding
+                "flex flex-col items-center py-1 transition-colors",
                 isActive 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-primary"
               )}
             >
               <div className="relative">
-                <item.icon size={22} /> {/* Slightly smaller icon */}
+                <item.icon size={22} />
                 {isActive && (
                   <motion.div
                     layoutId="mobileNavIndicator"
@@ -129,7 +129,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                   />
                 )}
               </div>
-              <span className="text-xs mt-0.5"> {/* Reduced margin */}
+              <span className="text-xs mt-0.5">
                 <TranslatableText text={item.label} />
               </span>
             </Link>

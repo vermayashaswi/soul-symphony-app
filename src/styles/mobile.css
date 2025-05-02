@@ -11,7 +11,7 @@
   .journal-container,
   .insights-container,
   .settings-container {
-    padding-bottom: 3.6rem !important; /* Reduced from 4rem to 3.6rem (10% less) */
+    padding-bottom: 4.5rem !important; /* Increased to ensure content doesn't get cut off */
   }
 
   /* Make cards take full width in mobile view and remove horizontal padding */
@@ -29,6 +29,7 @@
   .insights-page-content {
     padding-left: 0 !important;
     padding-right: 0 !important;
+    overflow-x: hidden !important; /* Prevent horizontal scrolling */
   }
   
   /* Remove horizontal margins on cards */
@@ -42,13 +43,28 @@
     padding: 0 !important;
   }
   
+  /* Prevent horizontal scrolling at the root level */
+  html, body {
+    overflow-x: hidden !important;
+    width: 100% !important;
+    position: relative !important;
+  }
+  
+  /* Fix for the App.css padding causing overflow */
+  #root {
+    padding-left: 0 !important;
+    padding-right: 0 !important;
+    max-width: 100% !important;
+    overflow-x: hidden !important;
+  }
+  
   /* iOS-specific padding for safe areas */
   @supports (padding: max(0px)) {
     .smart-chat-container,
     .journal-container,
     .insights-container,
     .settings-container {
-      padding-bottom: max(3.6rem, env(safe-area-inset-bottom) + 3.6rem) !important; /* Reduced from 4rem to 3.6rem */
+      padding-bottom: max(4.5rem, env(safe-area-inset-bottom) + 3.6rem) !important;
       padding-left: max(8px, env(safe-area-inset-left) + 0px) !important;
       padding-right: max(8px, env(safe-area-inset-right) + 0px) !important;
     }
@@ -63,7 +79,7 @@
     bottom: 0 !important;
     width: 100vw !important;
     height: 100vh !important;
-    z-index: 9999 !important;
+    z-index: 9998 !important; /* Decreased to be below the navigation bar */
     margin: 0 !important;
     padding: 0 !important;
     background-color: hsl(var(--background)) !important;
@@ -87,7 +103,7 @@
 
   /* Ensure the mobile chat input is fully visible */
   .mobile-chat-input-container {
-    bottom: 3.6rem !important; /* Adjusted to match the new navbar height */
+    bottom: 4.5rem !important; /* Adjusted to match the increased bottom padding */
   }
 
   /* Add more space at the bottom of the chat content */
@@ -101,5 +117,10 @@
   /* Ensure SoulNet container has proper padding when not in fullscreen */
   .soulnet-container:not(.fixed) {
     margin: 0 8px !important;
+  }
+  
+  /* Fix for mobile navigation to stay on top */
+  .fixed.bottom-0.left-0.right-0.bg-background.border-t.border-muted {
+    z-index: 9999 !important;
   }
 }

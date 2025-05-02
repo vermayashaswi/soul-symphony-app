@@ -16,7 +16,7 @@ const MobileNavbar = () => {
 
   return (
     <motion.nav
-      className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t px-4 py-2 z-50"
+      className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t px-4 py-2 z-[9999]"
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
