@@ -2,6 +2,7 @@
 import React, { useState, useEffect } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
+import * as THREE from 'three';
 
 interface ThreeDimensionalTextProps {
   text: string;
@@ -47,7 +48,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   if (!visible || !text) return null;
 
   return (
-    <group opacity={opacity}>
+    <group>
       <Text
         position={position}
         color={color}
@@ -70,6 +71,12 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
             attach="material"
           />
         )}
+        <meshBasicMaterial 
+          color={color}
+          transparent={true}
+          opacity={opacity}
+          toneMapped={false}
+        />
       </Text>
     </group>
   );
