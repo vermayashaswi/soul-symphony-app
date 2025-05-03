@@ -13,7 +13,6 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import ErrorBoundary from './ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { staticTranslationService } from '@/services/staticTranslationService';
 
 interface NodeData {
   id: string;
@@ -38,12 +37,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [graphData, setGraphData] = useState<{nodes: NodeData[], links: LinkData[]}>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [translationsLoaded, setTranslationsLoaded] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
-  const [translatedTexts, setTranslatedTexts] = useState<Map<string, string>>(new Map());
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
 
@@ -53,37 +50,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       console.log("SoulNet unmounted");
     };
   }, []);
-
-  // Pre-translate all node texts when graph data is loaded
-  useEffect(() => {
-    const preloadTranslations = async () => {
-      if (!graphData.nodes || graphData.nodes.length === 0) {
-        setTranslationsLoaded(true);
-        return;
-      }
-      
-      console.log("Pre-translating node texts for SoulNet visualization");
-      
-      // Extract all node texts to translate
-      const allTexts = graphData.nodes.map(node => node.id);
-      
-      try {
-        // Pre-translate all node texts at once
-        const translations = await staticTranslationService.preTranslate(allTexts);
-        console.log(`Pre-translated ${translations.size}/${allTexts.length} texts for SoulNet`);
-        
-        // Store translations in state for use in visualization
-        setTranslatedTexts(translations);
-      } catch (error) {
-        console.error("Error pre-translating node texts:", error);
-      } finally {
-        // Mark translations as loaded even if there was an error
-        setTranslationsLoaded(true);
-      }
-    };
-    
-    preloadTranslations();
-  }, [graphData.nodes]);
 
   useEffect(() => {
     if (!userId) return;
@@ -166,11 +132,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   );
   if (graphData.nodes.length === 0) return <EmptyState />;
 
-  // If translations aren't loaded yet, show loading state
-  if (!translationsLoaded) {
-    return <LoadingState />;
-  }
-
   // Get appropriate instructions based on device type
   const getInstructions = () => {
     if (isMobile) {
@@ -242,7 +203,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               onNodeClick={handleNodeSelect}
               themeHex={themeHex}
               isFullScreen={isFullScreen}
-              translatedTexts={translatedTexts}
             />
           </Canvas>
         </ErrorBoundary>

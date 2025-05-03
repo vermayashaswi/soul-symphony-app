@@ -1,18 +1,21 @@
 
-import React, { useRef, useMemo } from 'react';
-import { useFrame } from '@react-three/fiber';
-import * as THREE from 'three'; // Add THREE import
-import NodeLabel from './NodeLabel';
-import NodeMesh from './NodeMesh';
-import ConnectionPercentage from './ConnectionPercentage';
+import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import { NodeMesh } from './NodeMesh';
+import { NodeLabel } from './NodeLabel';
+import { ConnectionPercentage } from './ConnectionPercentage';
+import { useTheme } from '@/hooks/use-theme';
+import { cn } from '@/lib/utils';
+
+interface NodeData {
+  id: string;
+  type: 'entity' | 'emotion';
+  value: number;
+  color: string;
+  position: [number, number, number];
+}
 
 interface NodeProps {
-  node: {
-    id: string;
-    type: 'entity' | 'emotion';
-    position: [number, number, number];
-    color: string;
-  };
+  node: NodeData;
   isSelected: boolean;
   onClick: (id: string) => void;
   highlightedNodes: Set<string>;
@@ -21,14 +24,13 @@ interface NodeProps {
   themeHex: string;
   selectedNodeId: string | null;
   cameraZoom?: number;
-  isHighlighted: boolean;
-  connectionStrength: number;
-  connectionPercentage: number;
-  showPercentage: boolean;
-  translatedText?: string; // Added prop for pre-translated text
+  isHighlighted?: boolean;
+  connectionStrength?: number;
+  connectionPercentage?: number;
+  showPercentage?: boolean;
 }
 
-const Node: React.FC<NodeProps> = ({
+export const Node: React.FC<NodeProps> = ({
   node,
   isSelected,
   onClick,
@@ -37,103 +39,132 @@ const Node: React.FC<NodeProps> = ({
   dimmed,
   themeHex,
   selectedNodeId,
-  cameraZoom = 26,
-  isHighlighted,
-  connectionStrength,
-  connectionPercentage,
-  showPercentage,
-  translatedText
+  cameraZoom,
+  isHighlighted = false,
+  connectionStrength = 0.5,
+  connectionPercentage = 0,
+  showPercentage = false,
 }) => {
-  const meshRef = useRef<THREE.Mesh>(null);
-  const previousPositionRef = useRef<[number, number, number]>(node.position);
-  const targetPositionRef = useRef<[number, number, number]>(node.position);
+  const { theme } = useTheme();
+  const [isTouching, setIsTouching] = useState(false);
+  const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
+  const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
-  // Use the pre-translated text if provided, or fall back to node.id
-  const displayText = translatedText || node.id;
+  // Debug log for visibility with more informative details
+  useEffect(() => {
+    if (isHighlighted || isSelected) {
+      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
+    }
+  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage]);
   
-  // Debug logging
-  if (isSelected || isHighlighted) {
-    console.log(
-      `Node: ${node.id}, isSelected: ${isSelected}, isHighlighted: ${isHighlighted}, ` +
-      `showLabel: ${showLabel}, displayText: ${displayText}`
-    );
-  }
+  const baseScale = node.type === 'entity' ? 0.5 : 0.4;
+  const scale = isHighlighted 
+    ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
+    : baseScale * (0.8 + node.value * 0.5);
 
-  // Update target position for animated transitions
-  targetPositionRef.current = node.position;
+  const displayColor = useMemo(() => {
+    if (isHighlighted) {
+      return node.type === 'entity' ? '#ffffff' : themeHex;
+    }
+    return node.type === 'entity'
+      ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
+      : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
+  }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
-  // Ease the mesh position towards target for smooth animation
-  useFrame(() => {
-    if (!meshRef.current) return;
-    
-    const mesh = meshRef.current;
-    
-    // Simple ease towards target position
-    const lerpFactor = 0.1;
-    mesh.position.x += (targetPositionRef.current[0] - mesh.position.x) * lerpFactor;
-    mesh.position.y += (targetPositionRef.current[1] - mesh.position.y) * lerpFactor;
-    mesh.position.z += (targetPositionRef.current[2] - mesh.position.z) * lerpFactor;
-    
-    // Slight rotation animation
-    if (!dimmed) {
-      mesh.rotation.x += 0.003;
-      mesh.rotation.y += 0.001;
+  const handlePointerDown = useCallback((e: any) => {
+    e.stopPropagation();
+    setIsTouching(true);
+    setTouchStartTime(Date.now());
+    setTouchStartPosition({x: e.clientX, y: e.clientY});
+    console.log(`Node pointer down: ${node.id}`);
+  }, [node.id]);
+
+  const handlePointerUp = useCallback((e: any) => {
+    e.stopPropagation();
+    if (touchStartTime && Date.now() - touchStartTime < 300) {
+      if (touchStartPosition) {
+        const deltaX = Math.abs(e.clientX - touchStartPosition.x);
+        const deltaY = Math.abs(e.clientY - touchStartPosition.y);
+        
+        if (deltaX < 10 && deltaY < 10) {
+          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
+          onClick(node.id);
+          
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
+        }
+      } else {
+        console.log(`Node clicked (no start position): ${node.id}`);
+        onClick(node.id);
+      }
     }
     
-    previousPositionRef.current = [mesh.position.x, mesh.position.y, mesh.position.z];
-  });
+    setIsTouching(false);
+    setTouchStartTime(null);
+    setTouchStartPosition(null);
+  }, [node.id, onClick, touchStartTime, touchStartPosition, isHighlighted]);
 
-  // Determine the appropriate size scaling for the node
-  const nodeScale = useMemo(() => {
-    const baseScale = node.type === 'entity' ? 1.2 : 0.85;
-    
-    // Scale up if selected or highlighted
-    if (isSelected) return baseScale * 1.3;
-    if (isHighlighted) return baseScale * (1 + connectionStrength * 0.4);
-    if (dimmed) return baseScale * 0.75;
-    
-    return baseScale;
-  }, [node.type, isSelected, isHighlighted, dimmed, connectionStrength]);
+  useEffect(() => {
+    if (isTouching && touchStartTime) {
+      const timer = setTimeout(() => {
+        if (isTouching) {
+          setIsTouching(false);
+          setTouchStartTime(null);
+          setTouchStartPosition(null);
+        }
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [isTouching, touchStartTime]);
 
-  // Handle node click
-  const handleNodeClick = (e: any) => {
-    e.stopPropagation();
-    onClick(node.id);
-  };
+  // Ensure label visibility - use explicit visibility for both NodeLabel and ConnectionPercentage
+  const shouldShowLabel = isHighlighted || isSelected || showLabel;
+  
+  // Always show percentages for highlighted nodes that aren't selected and have a non-zero percentage
+  const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;
+  
+  // Debug logs for label and percentage visibility
+  useEffect(() => {
+    console.log(`Node ${node.id} label visibility: shouldShowLabel=${shouldShowLabel}`);
+    console.log(`Node ${node.id} percentage visibility: shouldShowPercentage=${shouldShowPercentage}, percentage=${connectionPercentage}`);
+  }, [node.id, shouldShowLabel, shouldShowPercentage, connectionPercentage]);
 
   return (
     <group position={node.position}>
-      <NodeMesh 
-        ref={meshRef}
-        scale={nodeScale}
-        isSelected={isSelected}
+      <NodeMesh
+        type={node.type}
+        scale={scale}
+        displayColor={displayColor}
         isHighlighted={isHighlighted}
         dimmed={dimmed}
-        type={node.type}
-        themeHex={themeHex}
-        onClick={handleNodeClick} // Fixed: Passing handleNodeClick function that accepts an event parameter
+        connectionStrength={connectionStrength}
+        isSelected={isSelected}
+        onClick={() => onClick(node.id)}
+        onPointerDown={handlePointerDown}
+        onPointerUp={handlePointerUp}
+        onPointerOut={() => setIsTouching(false)}
+        onPointerLeave={() => setIsTouching(false)}
       />
       
-      {showLabel && (
-        <NodeLabel
-          id={displayText} // Use the translated text here
-          type={node.type}
-          position={node.position}
-          isHighlighted={isHighlighted || isSelected}
-          shouldShowLabel={showLabel}
-          cameraZoom={cameraZoom}
-          themeHex={themeHex}
-        />
-      )}
-      
-      {showPercentage && connectionPercentage > 0 && (
-        <ConnectionPercentage
-          position={node.position}
-          percentage={connectionPercentage}
-          isVisible={showPercentage}
-          nodeType={node.type}
-        />
-      )}
+      <NodeLabel
+        id={node.id}
+        type={node.type}
+        position={node.position}
+        isHighlighted={isHighlighted}
+        shouldShowLabel={shouldShowLabel}
+        cameraZoom={cameraZoom}
+        themeHex={themeHex}
+      />
+
+      <ConnectionPercentage
+        position={node.position}
+        percentage={connectionPercentage}
+        isVisible={shouldShowPercentage}
+        offsetY={node.type === 'entity' ? 1.2 : 1.0}
+        nodeType={node.type}
+      />
     </group>
   );
 };

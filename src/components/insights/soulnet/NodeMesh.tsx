@@ -6,42 +6,33 @@ import { useFrame } from '@react-three/fiber';
 interface NodeMeshProps {
   type: 'entity' | 'emotion';
   scale: number;
-  displayColor?: string;
+  displayColor: string;
   isHighlighted: boolean;
   dimmed: boolean;
   connectionStrength?: number;
   isSelected: boolean;
-  onClick: (e: any) => void; // Updated to accept an event parameter
-  themeHex?: string;
-  onPointerDown?: (e: any) => void;
-  onPointerUp?: (e: any) => void;
-  onPointerOut?: () => void;
-  onPointerLeave?: () => void;
+  onClick: () => void;
+  onPointerDown: (e: any) => void;
+  onPointerUp: (e: any) => void;
+  onPointerOut: () => void;
+  onPointerLeave: () => void;
 }
 
-export const NodeMesh = React.forwardRef<THREE.Mesh, NodeMeshProps>((
-  {
-    type,
-    scale,
-    displayColor,
-    isHighlighted,
-    dimmed,
-    connectionStrength = 0.5,
-    isSelected,
-    onClick,
-    themeHex = '#ffffff',
-    onPointerDown,
-    onPointerUp,
-    onPointerOut,
-    onPointerLeave,
-  },
-  ref
-) => {
+export const NodeMesh: React.FC<NodeMeshProps> = ({
+  type,
+  scale,
+  displayColor,
+  isHighlighted,
+  dimmed,
+  connectionStrength = 0.5,
+  isSelected,
+  onClick,
+  onPointerDown,
+  onPointerUp,
+  onPointerOut,
+  onPointerLeave,
+}) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const finalRef = ref || meshRef;
-  
-  // Use themeHex for the color if displayColor is not provided
-  const finalColor = displayColor || themeHex;
   
   const Geometry = useMemo(() => 
     type === 'entity'
@@ -81,9 +72,12 @@ export const NodeMesh = React.forwardRef<THREE.Mesh, NodeMeshProps>((
 
   return (
     <mesh
-      ref={finalRef as React.RefObject<THREE.Mesh>}
+      ref={meshRef}
       scale={[scale, scale, scale]}
-      onClick={onClick} // Pass the onClick handler
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick();
+      }}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}
       onPointerOut={onPointerOut}
@@ -91,18 +85,16 @@ export const NodeMesh = React.forwardRef<THREE.Mesh, NodeMeshProps>((
     >
       {Geometry}
       <meshStandardMaterial
-        color={finalColor}
+        color={displayColor}
         transparent
         opacity={isHighlighted ? 1 : (dimmed ? 0.5 : 0.8)}
-        emissive={finalColor}
+        emissive={displayColor}
         emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
         roughness={0.3}
         metalness={0.4}
       />
     </mesh>
   );
-});
-
-NodeMesh.displayName = 'NodeMesh';
+};
 
 export default NodeMesh;

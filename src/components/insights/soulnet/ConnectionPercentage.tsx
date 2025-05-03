@@ -33,7 +33,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
       center
       distanceFactor={15}
       occlude={false}
-      className="z-50"
+      className="z-[9999]"
       style={{
         pointerEvents: 'none',
         userSelect: 'none',
