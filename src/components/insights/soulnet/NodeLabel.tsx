@@ -1,3 +1,4 @@
+
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
 
@@ -54,10 +55,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     color: type === 'entity' ? '#fff' : themeHex,
     padding: '0.2rem 0.4rem',
     fontWeight: isHighlighted ? 'bold' : 'normal',
-    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)',
+    backgroundColor: 'transparent', // Changed from rgba background to transparent
     borderRadius: '4px',
-    boxShadow: '0 2px 4px rgba(0,0,0,0.5)',
-    border: isHighlighted ? `1px solid ${type === 'entity' ? '#ffffff40' : themeHex + '40'}` : 'none',
+    // Removed boxShadow
+    border: 'none', // Removed conditional border
   }), [type, themeHex, isHighlighted]);
 
   // Don't render if not supposed to be shown
