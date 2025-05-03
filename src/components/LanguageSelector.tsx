@@ -28,7 +28,17 @@ const languages = [
 ];
 
 const LanguageSelector = () => {
-  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
+  let translationContext;
+  
+  try {
+    translationContext = useTranslation();
+  } catch (error) {
+    console.error("LanguageSelector: Failed to access translation context", error);
+    // Return null or a fallback UI when the translation context isn't available
+    return null;
+  }
+  
+  const { currentLanguage, setLanguage, isTranslating } = translationContext;
 
   const handleLanguageChange = async (languageCode: string) => {
     debug.info('Language change requested:', languageCode);

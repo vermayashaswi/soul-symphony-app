@@ -30,11 +30,22 @@ export function TranslatableText({
   const [translatedText, setTranslatedText] = useState<string>(text); // Initialize with source text
   const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage, getCachedTranslation } = useTranslation();
-  const location = useLocation();
   const prevLangRef = useRef<string>(currentLanguage);
   const initialLoadDoneRef = useRef<boolean>(false);
   const textRef = useRef<string>(text); // Track text changes
   const mountedRef = useRef<boolean>(true);
+  
+  // Safely get location with fallback
+  let location;
+  let isRouter = true;
+  
+  try {
+    location = useLocation();
+  } catch (error) {
+    isRouter = false;
+    location = { pathname: window.location.pathname };
+    console.warn("TranslatableText: Router context not available, using fallback");
+  }
   
   // Check if on website route - but allow forced translation
   const pathname = location.pathname;

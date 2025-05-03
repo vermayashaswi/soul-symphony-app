@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
@@ -38,7 +39,19 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const [isTranslating, setIsTranslating] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
-  const location = useLocation();
+  
+  // Create a safe way to use location that works outside Router context
+  let location;
+  let isRouter = true;
+  
+  try {
+    location = useLocation();
+  } catch (error) {
+    // If useLocation throws, we're outside of a Router context
+    isRouter = false;
+    location = { pathname: window.location.pathname };
+    console.warn("TranslationProvider: Router context not available, using fallback location handling");
+  }
   
   // Create a unique cache key
   const createCacheKey = (text: string, language: string): string => {
@@ -124,10 +137,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
 
   // Monitor route changes to load route-specific translations
   useEffect(() => {
+    if (!isRouter) return; // Skip if not in Router context
+    
     // When the route changes, we can prefetch translations for common UI elements
     const commonUIElements = ['Home', 'Blog', 'Settings', 'Profile', 'Logout', 'Download'];
     prefetchTranslationsForRoute(commonUIElements).catch(console.error);
-  }, [location.pathname, prefetchTranslationsForRoute]);
+  }, [location.pathname, prefetchTranslationsForRoute, isRouter]);
 
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
