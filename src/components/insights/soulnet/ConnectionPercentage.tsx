@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 
 interface ConnectionPercentageProps {
@@ -14,28 +14,33 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   position,
   percentage,
   isVisible,
-  offsetY = 0,
+  offsetY = 1.0,
   nodeType = 'emotion'
 }) => {
-  console.log(`ConnectionPercentage: isVisible=${isVisible}, percentage=${percentage}, nodeType=${nodeType}`);
-  
-  if (!isVisible) return null;
+  // Round to nearest integer and format
+  const formattedPercentage = useMemo(() => {
+    const rounded = Math.round(percentage);
+    return `${rounded}%`;
+  }, [percentage]);
 
-  const displayPercentage = Math.round(percentage);
-  
-  // Position percentage label significantly higher than the node label
-  // Entity nodes are larger so they need more vertical spacing
-  const verticalOffset = nodeType === 'entity' ? 2.2 : 1.8;
-  const textPosition: [number, number, number] = [0, verticalOffset, 0];
-  
+  // Skip rendering if not visible or percentage is 0
+  if (!isVisible || percentage <= 0) {
+    return null;
+  }
+
+  // Position above the node
+  const labelPosition: [number, number, number] = [0, offsetY, 0];
+
+  // Increased font size by 2.5x (from previous default of ~0.15 to 0.375)
+  const fontSize = 0.375;
+
   return (
     <ThreeDimensionalText
-      text={`${displayPercentage}%`}
-      position={textPosition}
-      color="#ffffff"
-      size={0.17}
+      text={formattedPercentage}
+      position={labelPosition}
+      color={nodeType === 'entity' ? '#ffffff' : '#42a5f5'}
+      size={fontSize}
       bold={true}
-      backgroundColor="#000000"
       visible={isVisible}
     />
   );
