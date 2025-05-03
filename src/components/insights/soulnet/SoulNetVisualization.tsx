@@ -25,6 +25,7 @@ interface SoulNetVisualizationProps {
   onNodeClick: (id: string) => void;
   themeHex: string;
   isFullScreen?: boolean;
+  translatedTexts?: Map<string, string>;
 }
 
 function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
@@ -117,6 +118,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   onNodeClick,
   themeHex,
   isFullScreen = false,
+  translatedTexts = new Map(),
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
@@ -126,6 +128,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   
   console.log("Rendering SoulNetVisualization component with data:", 
     data?.nodes?.length, "nodes and", data?.links?.length, "links, fullscreen:", isFullScreen);
+  console.log("Translated texts available:", translatedTexts.size);
   
   useEffect(() => {
     console.log("SoulNetVisualization mounted");
@@ -218,21 +221,21 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   // Memoize connected nodes to prevent unnecessary recalculations
   const highlightedNodes = useMemo(() => {
-    if (!selectedNode || !validData || !validData.links) return new Set<string>();
-    return getConnectedNodes(selectedNode, validData.links);
-  }, [selectedNode, validData?.links]);
+    if (!selectedNode || !data || !data.links) return new Set<string>();
+    return getConnectedNodes(selectedNode, data.links);
+  }, [selectedNode, data?.links]);
 
   // Calculate relative strength of connections for the selected node
   const connectionStrengths = useMemo(() => {
-    if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
-    return calculateRelativeStrengths(selectedNode, validData.links);
-  }, [selectedNode, validData?.links]);
+    if (!selectedNode || !data || !data.links) return new Map<string, number>();
+    return calculateRelativeStrengths(selectedNode, data.links);
+  }, [selectedNode, data?.links]);
 
   // Calculate percentage distribution of connections for the selected node
   const connectionPercentages = useMemo(() => {
-    if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
-    return calculateConnectionPercentages(selectedNode, validData.links);
-  }, [selectedNode, validData?.links]);
+    if (!selectedNode || !data || !data.links) return new Map<string, number>();
+    return calculateConnectionPercentages(selectedNode, data.links);
+  }, [selectedNode, data?.links]);
 
   // Adjust controls dampingFactor based on fullscreen mode
   useEffect(() => {
@@ -253,8 +256,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     onNodeClick(id);
   };
 
-  if (!validData || !validData.nodes || !validData.links) {
-    console.error("SoulNetVisualization: Data is missing or invalid", validData);
+  if (!data || !data.nodes || !data.links) {
+    console.error("SoulNetVisualization: Data is missing or invalid", data);
     return null;
   }
 
@@ -287,14 +290,14 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       />
       
       {/* Display edges */}
-      {validData.links.map((link, index) => {
+      {data.links.map((link, index) => {
         if (!link || typeof link !== 'object') {
           console.warn(`Invalid link at index ${index}`, link);
           return null;
         }
         
-        const sourceNode = validData.nodes.find(n => n && n.id === link.source);
-        const targetNode = validData.nodes.find(n => n && n.id === link.target);
+        const sourceNode = data.nodes.find(n => n && n.id === link.source);
+        const targetNode = data.nodes.find(n => n && n.id === link.target);
         
         if (!sourceNode || !targetNode) {
           console.warn(`Missing source or target node for link: ${link.source} -> ${link.target}`);
@@ -335,7 +338,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       })}
       
       {/* Display nodes */}
-      {validData.nodes.map(node => {
+      {data.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
           console.warn("Invalid node:", node);
           return null;
@@ -365,6 +368,9 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           console.warn(`Node ${node.id} has invalid position:`, node.position);
           return null;
         }
+        
+        // Get pre-translated text if available
+        const translatedText = translatedTexts.get(node.id) || node.id;
           
         return (
           <Node
@@ -382,6 +388,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             connectionStrength={connectionStrength}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
+            translatedText={translatedText}
           />
         );
       })}

@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Html } from '@react-three/drei';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
@@ -26,25 +26,8 @@ export const TranslatableNodeText: React.FC<TranslatableNodeTextProps> = ({
   zIndexRange = [9997, 9999],
   forceTranslate = true
 }) => {
-  // Keep track of mount state to prevent memory leaks
-  const mountedRef = useRef(true);
-  const [isReady, setIsReady] = useState(false);
-
-  // Initialize component and handle unmounting
-  useEffect(() => {
-    // Small delay to ensure proper render after Three.js initialization
-    const timer = setTimeout(() => {
-      if (mountedRef.current) {
-        setIsReady(true);
-      }
-    }, 50);
-
-    return () => {
-      mountedRef.current = false;
-      clearTimeout(timer);
-    };
-  }, []);
-
+  console.log(`TranslatableNodeText rendering: "${text}"`);
+  
   if (!text) return null;
 
   return (
@@ -53,19 +36,17 @@ export const TranslatableNodeText: React.FC<TranslatableNodeTextProps> = ({
       center={center}
       distanceFactor={distanceFactor}
       occlude={occlude}
-      className={`z-[${zIndexRange[0]}] ${className}`}
+      className={`z-50 ${className}`}
     >
-      {isReady && (
-        <TranslatableText
-          text={text}
-          forceTranslate={forceTranslate}
-          style={{
-            pointerEvents: 'none',
-            userSelect: 'none',
-            ...style
-          }}
-        />
-      )}
+      <TranslatableText
+        text={text}
+        forceTranslate={forceTranslate}
+        style={{
+          pointerEvents: 'none',
+          userSelect: 'none',
+          ...style
+        }}
+      />
     </Html>
   );
 };
