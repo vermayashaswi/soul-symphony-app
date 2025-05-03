@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -20,7 +19,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   text,
   position,
   color = 'white',
-  size = 1.2, // Increased from 0.9 to 1.2 for better visibility
+  size = 1.7, // Increased from 1.2 to 1.7 for better visibility
   bold = false,
   backgroundColor,
   opacity = 1,
