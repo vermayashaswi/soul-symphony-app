@@ -57,7 +57,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     color: type === 'entity' ? '#fff' : themeHex,
     padding: '0.1rem 0.3rem',
     fontWeight: isHighlighted ? 'bold' : 'normal',
-    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.5)' : 'rgba(0,0,0,0.3)',
+    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)', // Darker background for better visibility
     borderRadius: '2px',
   }), [type, themeHex, isHighlighted]);
 
@@ -77,7 +77,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       <div style={labelTextStyle}>
         <TranslatableText 
           text={id} 
-          forceTranslate={true} 
+          forceTranslate={true}
           style={{ textShadow: '0 0 2px rgba(0,0,0,0.9)' }}
         />
       </div>

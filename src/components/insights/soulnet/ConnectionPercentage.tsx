@@ -18,8 +18,10 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   offsetY = 0,
   nodeType = 'emotion'
 }) => {
+  // Debug logging for understanding visibility issues
   console.log(`ConnectionPercentage: isVisible=${isVisible}, percentage=${percentage}, nodeType=${nodeType}`);
   
+  // Don't render if not visible
   if (!isVisible) return null;
 
   const displayPercentage = Math.round(percentage);
@@ -42,23 +44,23 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     >
       <div
         style={{
-          backgroundColor: 'rgba(0,0,0,0.7)',
+          backgroundColor: 'rgba(0,0,0,0.8)', // Darker background for better contrast
           color: '#ffffff',
-          padding: '2px 6px',
+          padding: '3px 7px', // Slightly larger padding for better visibility
           borderRadius: '4px',
           fontSize: '16px',
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
-          boxShadow: '0 2px 4px rgba(0,0,0,0.3)',
+          boxShadow: '0 2px 4px rgba(0,0,0,0.5)', // More prominent shadow
           transform: 'scale(0.85)',
           transformOrigin: 'center center',
           lineHeight: '1',
-          opacity: 0.95,
+          opacity: 1, // Full opacity for better visibility
         }}
       >
         <TranslatableText 
           text={`${displayPercentage}%`} 
-          forceTranslate={true} 
+          forceTranslate={true}
         />
       </div>
     </Html>
