@@ -16,16 +16,28 @@ export const isAppRoute = (pathname: string): boolean => {
   // Check for specific app routes including paths under /app
   const isApp = appPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
   
-  // Debug logging
-  console.log(`isAppRoute check for ${pathname}: ${isApp}`);
+  // Special case for root when it should be insights
+  const isRootButShouldBeInsights = 
+    (pathname === '/' || pathname === '' || pathname === '/index' || pathname === '/index.html') &&
+    (document.title.includes('Insights') || document.location.href.includes('insights'));
   
-  return isApp;
+  // Debug logging
+  console.log(`isAppRoute check for ${pathname}: ${isApp || isRootButShouldBeInsights}, title: ${document.title}`);
+  
+  return isApp || isRootButShouldBeInsights;
 };
 
 // CRITICAL: Always treat Insights as an app route
 const isSpecialAppPath = (pathname: string): boolean => {
   // If the path contains insights, it should NEVER be treated as a website route
-  return pathname.includes('/insights') || pathname === '/insights';
+  const hasInsights = pathname.includes('/insights') || pathname === '/insights';
+  
+  // Additional check for root path when it should be insights
+  const isRootButShouldBeInsights = 
+    (pathname === '/' || pathname === '' || pathname === '/index' || pathname === '/index.html') && 
+    (document.title.includes('Insights') || document.location.href.includes('insights'));
+  
+  return hasInsights || isRootButShouldBeInsights;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
@@ -34,12 +46,13 @@ export const isWebsiteRoute = (pathname: string): boolean => {
   
   // CRITICAL FIX: Special check for Insights page
   if (isSpecialAppPath(pathname)) {
-    console.log(`Special case: ${pathname} contains insights, treating as app route`);
+    console.log(`Special case: ${pathname} contains insights or should be insights, treating as app route`);
     return false;
   }
   
-  // The root path (/) is explicitly a website route
-  if (pathname === "/" || pathname === "") {
+  // The root path (/) is explicitly a website route unless it should be insights
+  if ((pathname === "/" || pathname === "") && 
+      !(document.title.includes('Insights') || document.location.href.includes('insights'))) {
     console.log('Root path / is explicitly a website route');
     return true;
   }
@@ -57,7 +70,7 @@ export const isWebsiteRoute = (pathname: string): boolean => {
   
   // If not explicitly app or explicitly website, treat as website
   const result = isWebsite || (!isAppRoute(pathname) && pathname !== "/app");
-  console.log(`isWebsiteRoute check for ${pathname}: ${result}`);
+  console.log(`isWebsiteRoute check for ${pathname}: ${result}, title: ${document.title}`);
   
   return result;
 };

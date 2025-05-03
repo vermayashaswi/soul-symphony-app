@@ -38,9 +38,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
     // Calculate appropriate size based on camera distance
-    // Lower base size for better visibility
-    const base = 14 + Math.max(0, (26 - z) * 0.5);
-    return Math.max(Math.min(base, 20), 12);
+    // Increase base size for better visibility
+    const base = 16 + Math.max(0, (26 - z) * 0.7);
+    return Math.max(Math.min(base, 24), 14);
   }, [cameraZoom]);
 
   const labelStyle = useMemo(() => ({
@@ -58,18 +58,20 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     willChange: 'transform',
     opacity: shouldShowLabel ? 1 : 0,
     textShadow: isHighlighted 
-      ? '0 0 5px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.8)' 
-      : '0 0 4px rgba(0,0,0,0.7), 0 0 3px rgba(0,0,0,0.7)'
+      ? '0 0 6px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.9), 0 0 6px rgba(0,0,0,0.9)' 
+      : '0 0 5px rgba(0,0,0,0.8), 0 0 5px rgba(0,0,0,0.8)',
+    backfaceVisibility: 'hidden' as const, // Prevent flickering
+    transformStyle: 'preserve-3d' as const, // Ensure 3D positioning
   }), [dynamicFontSize, shouldShowLabel, isHighlighted]);
 
   const labelTextStyle = useMemo(() => ({
     color: type === 'entity' ? '#fff' : themeHex,
-    padding: '0.2rem 0.4rem',
+    padding: '0.3rem 0.5rem',
     fontWeight: isHighlighted ? 'bold' : 'normal',
-    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.65)', // Even darker background for better visibility
+    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.9)' : 'rgba(0,0,0,0.8)', // Darker background for better visibility
     borderRadius: '4px',
-    boxShadow: isHighlighted ? '0 1px 3px rgba(0,0,0,0.5)' : 'none',
-    border: '1px solid rgba(255,255,255,0.1)', // Subtle border for better definition
+    boxShadow: isHighlighted ? '0 2px 4px rgba(0,0,0,0.7)' : '0 1px 3px rgba(0,0,0,0.5)',
+    border: '1px solid rgba(255,255,255,0.2)', // Subtle border for better definition
   }), [type, themeHex, isHighlighted]);
 
   // Don't render if not supposed to be shown
@@ -79,8 +81,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     <Html
       position={[0, type === 'entity' ? 0.9 : 1.0, 0]}
       center
-      distanceFactor={15}
+      distanceFactor={14} // Slightly reduced for better visibility
       occlude={false}
+      zIndexRange={[99980, 99990]} // Set extremely high z-index range
       className="z-40"
       style={labelStyle}
       key={`label-${id}-${isHighlighted ? 'highlighted' : 'normal'}`}
@@ -90,7 +93,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         <TranslatableText 
           text={id} 
           forceTranslate={true}
-          style={{ textShadow: '0 0 3px rgba(0,0,0,0.9)' }}
+          style={{ textShadow: '0 0 4px rgba(0,0,0,0.9)' }}
         />
       </div>
     </Html>
