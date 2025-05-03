@@ -20,6 +20,13 @@ const containsNonLatinScript = (text: string): boolean => {
   return Object.values(patterns).some(pattern => pattern.test(text));
 };
 
+// Specifically detect Devanagari script (Hindi)
+const containsDevanagari = (text: string): boolean => {
+  if (!text) return false;
+  const devanagariPattern = /[\u0900-\u097F]/;
+  return devanagariPattern.test(text);
+};
+
 interface NodeLabelProps {
   id: string;
   type: 'entity' | 'emotion';
@@ -41,17 +48,24 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   translatedText
 }) => {
-  console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}`);
+  console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}, translatedText=${translatedText}`);
   const prevTranslatedText = useRef<string | undefined>(translatedText);
   const isNonLatin = useRef<boolean>(false);
+  const isDevanagari = useRef<boolean>(false);
   
   // Check if text contains non-Latin script and memoize the result
   useEffect(() => {
     if (translatedText && translatedText !== prevTranslatedText.current) {
       isNonLatin.current = containsNonLatinScript(translatedText);
+      isDevanagari.current = containsDevanagari(translatedText);
       prevTranslatedText.current = translatedText;
+      
+      // Debug logging for Hindi text issues
+      if (isDevanagari.current) {
+        console.log(`Hindi text detected in node "${id}": "${translatedText}"`);
+      }
     }
-  }, [translatedText]);
+  }, [translatedText, id]);
 
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
@@ -61,11 +75,13 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     const baseSize = 0.26 + Math.max(0, (26 - z) * 0.0088);
     
     // Adjust size for non-Latin scripts - they often need slightly bigger font
-    const sizeAdjustment = isNonLatin.current ? 0.02 : 0;
+    // Devanagari (Hindi) scripts need even larger adjustment
+    const sizeAdjustment = isDevanagari.current ? 0.04 : 
+                           isNonLatin.current ? 0.02 : 0;
     
     // Ensure size stays within reasonable bounds
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.385), 0.23);
-  }, [cameraZoom, isNonLatin.current]);
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.4), 0.23);
+  }, [cameraZoom, isNonLatin.current, isDevanagari.current]);
 
   // Don't render if not supposed to be shown
   if (!shouldShowLabel) return null;

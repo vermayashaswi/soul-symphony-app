@@ -5,7 +5,6 @@ import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
-import { cn } from '@/lib/utils';
 
 interface NodeData {
   id: string;
@@ -54,10 +53,19 @@ export const Node: React.FC<NodeProps> = ({
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   const prevHighlightedRef = useRef<boolean>(isHighlighted);
   const prevSelectedRef = useRef<boolean>(isSelected);
+  const prevTranslatedTextRef = useRef<string | undefined>(undefined);
   
   // Cache translated text to prevent flickering
   const translatedText = useMemo(() => {
-    return translatedLabels?.get(node.id) || node.id;
+    const text = translatedLabels?.get(node.id) || node.id;
+    
+    // Log translation lookup for debugging
+    if (prevTranslatedTextRef.current !== text) {
+      console.log(`Node ${node.id}: Translation updated from "${prevTranslatedTextRef.current}" to "${text}"`);
+      prevTranslatedTextRef.current = text;
+    }
+    
+    return text;
   }, [node.id, translatedLabels]);
   
   // Debug log for visibility with more informative details
@@ -68,6 +76,7 @@ export const Node: React.FC<NodeProps> = ({
     
     // Track state changes that might cause flickering
     if (prevHighlightedRef.current !== isHighlighted || prevSelectedRef.current !== isSelected) {
+      console.log(`Node ${node.id}: State change - highlighted: ${prevHighlightedRef.current} → ${isHighlighted}, selected: ${prevSelectedRef.current} → ${isSelected}`);
       prevHighlightedRef.current = isHighlighted;
       prevSelectedRef.current = isSelected;
     }
