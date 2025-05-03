@@ -128,6 +128,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       size={dynamicFontSize}
       bold={isHighlighted}
       visible={stableVisibilityRef.current}
+      // Skip the translation in ThreeDimensionalText since we're using pre-translated text
+      skipTranslation={!!translatedText}
     />
   );
 };

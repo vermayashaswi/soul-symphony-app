@@ -14,6 +14,7 @@ interface ThreeDimensionalTextProps {
   backgroundColor?: string;
   opacity?: number;
   visible?: boolean;
+  skipTranslation?: boolean; // New prop to skip translation
 }
 
 // Helper function to detect non-Latin script
@@ -50,6 +51,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   backgroundColor,
   opacity = 1,
   visible = true,
+  skipTranslation = false, // Default to false for backward compatibility
 }) => {
   const { translate, currentLanguage } = useTranslation();
   const [translatedText, setTranslatedText] = useState(text);
@@ -130,6 +132,17 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   useEffect(() => {
     const translateText = async () => {
+      // Skip translation if skipTranslation is true
+      if (skipTranslation) {
+        console.log(`Skipping translation for pre-translated text: "${text}"`);
+        setTranslatedText(text);
+        
+        // Still check for script type for proper rendering
+        isNonLatinScript.current = containsNonLatinScript(text);
+        isDevanagari.current = containsDevanagari(text);
+        return;
+      }
+      
       if (currentLanguage !== 'en' && text) {
         try {
           const result = await translate(text);
@@ -158,7 +171,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     };
     
     translateText();
-  }, [text, currentLanguage, translate]);
+  }, [text, currentLanguage, translate, skipTranslation]);
 
   if (!visible || !text) return null;
 
