@@ -51,6 +51,13 @@ const AppRoutes = () => {
           <Route path="smart-chat" element={<SmartChat />} />
           <Route path="settings" element={<Settings />} />
         </Route>
+
+        {/* Additional routes for direct insights access */}
+        <Route path="/insights" element={
+          <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+            <Insights />
+          </React.Suspense>
+        } />
         
         {/* Legacy Route Redirects - these should be handled by the server */}
         <Route path="/auth" element={<Navigate to="/app/auth" replace />} />

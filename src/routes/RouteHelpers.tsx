@@ -11,7 +11,17 @@ export const isNativeApp = (): boolean => {
 // Update the path-based check to be more comprehensive and accurate
 export const isAppRoute = (pathname: string): boolean => {
   // Explicitly define app routes - the root path should NEVER be an app route
-  const appPrefixes = ['/app/', '/app', '/journal', '/chat', '/insights', '/settings', '/auth', '/profile'];
+  const appPrefixes = [
+    '/app/', '/app', 
+    '/journal', '/chat', '/insights', '/settings', 
+    '/auth', '/profile', '/home', '/smart-chat'
+  ];
+  
+  // Add special handling for Soul-Net visualization routes
+  if (pathname.includes('insights') || pathname === '/insights') {
+    console.log('SoulNet route detected, treating as app route:', pathname);
+    return true;
+  }
   
   // Check for specific app routes including paths under /app
   const isApp = appPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
@@ -25,6 +35,12 @@ export const isAppRoute = (pathname: string): boolean => {
 export const isWebsiteRoute = (pathname: string): boolean => {
   // Consider website routes like /about, /pricing, etc.
   const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq'];
+  
+  // Special handling for SoulNet visualization - always treat as app route
+  if (pathname.includes('insights') || pathname === '/insights') {
+    console.log('SoulNet route detected, NOT treating as website route:', pathname);
+    return false;
+  }
   
   // The root path (/) is explicitly a website route
   if (pathname === "/" || pathname === "") {

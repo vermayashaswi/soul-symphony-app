@@ -131,9 +131,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   // Get appropriate instructions based on device type
   const getInstructions = () => {
     if (isMobile) {
-      return <TranslatableText text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" />;
+      return <TranslatableText text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" forceTranslate={true} />;
     }
-    return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" />;
+    return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
   return (
@@ -151,16 +151,16 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
             <div className="text-center">
               <h3 className="text-lg font-medium">
-                <TranslatableText text="Error in Soul-Net Visualization" />
+                <TranslatableText text="Error in Soul-Net Visualization" forceTranslate={true} />
               </h3>
               <p className="text-muted-foreground mt-2">
-                <TranslatableText text="There was a problem rendering the visualization." />
+                <TranslatableText text="There was a problem rendering the visualization." forceTranslate={true} />
               </p>
               <button 
                 className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
                 onClick={() => window.location.reload()}
               >
-                <TranslatableText text="Reload" />
+                <TranslatableText text="Reload" forceTranslate={true} />
               </button>
             </div>
           </div>
@@ -170,9 +170,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               width: '100%',
               height: '100%',
               maxWidth: isFullScreen ? 'none' : '800px',
-              maxHeight: isFullScreen ? 'none' : '500px'
+              maxHeight: isFullScreen ? 'none' : '500px',
+              position: 'relative',
+              zIndex: 1,
             }}
-            camera={{ position: [0, 0, 26] }}
+            camera={{ position: [0, 0, 26], near: 1, far: 1000 }}
             onPointerMissed={() => setSelectedEntity(null)}
             gl={{ 
               preserveDrawingBuffer: true,
@@ -181,7 +183,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               alpha: true,
               depth: true,
               stencil: false,
-              precision: isMobile ? 'mediump' : 'highp'
+              precision: isMobile ? 'mediump' : 'highp',
+              logarithmicDepthBuffer: true // Enable logarithmic depth buffer for better z-sorting
             }}
           >
             <SoulNetVisualization
