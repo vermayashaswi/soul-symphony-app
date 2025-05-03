@@ -5,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { staticTranslationService } from '@/services/staticTranslationService';
 import SoulNetVisualization from './soulnet/SoulNetVisualization';
-import { LoadingState } from './soulnet/EmptyState';
+import LoadingState from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
 import SoulNetDescription from './soulnet/SoulNetDescription';

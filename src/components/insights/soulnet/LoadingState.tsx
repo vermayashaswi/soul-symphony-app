@@ -15,3 +15,5 @@ export const LoadingState = () => {
     </div>
   );
 };
+
+export default LoadingState;
