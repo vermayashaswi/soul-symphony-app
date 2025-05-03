@@ -1,6 +1,6 @@
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
-import TranslatableNodeText from './TranslatableNodeText';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface NodeLabelProps {
   id: string;
@@ -57,6 +57,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     display: 'block'
   };
 
+  // The issue might be with the nested Html components
+  // Let's use TranslatableText directly within a single Html component
   return (
     <Html
       position={[0, verticalPosition, 0]}
@@ -66,8 +68,13 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       className="z-[9999]"
       key={`label-${id}-${isHighlighted ? 'highlighted' : 'normal'}`}
     >
-      <div className="node-label-container" style={{ pointerEvents: 'none' }}>
-        <TranslatableNodeText
+      <div className="node-label-container" style={{ 
+        pointerEvents: 'none', 
+        margin: 0, 
+        padding: 0,
+        whiteSpace: 'nowrap'
+      }}>
+        <TranslatableText
           text={id}
           style={labelStyle}
           forceTranslate={true}

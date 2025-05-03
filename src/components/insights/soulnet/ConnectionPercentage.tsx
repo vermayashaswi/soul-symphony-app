@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { Html } from '@react-three/drei';
-import TranslatableNodeText from './TranslatableNodeText';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ConnectionPercentageProps {
   position: [number, number, number];
@@ -28,8 +28,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   // Entity nodes are larger so they need more vertical spacing
   const verticalOffset = nodeType === 'entity' ? 2.2 : 1.8;
   
-  // We're simplifying this component to directly use HTML positioning
-  // This often works more reliably in Three.js scenes
+  // We're simplifying this component to use TranslatableText directly
   return (
     <Html
       position={[0, verticalOffset, 0]}
