@@ -22,6 +22,19 @@ const MAX_AUTO_PROFILE_ATTEMPTS = 5;
 const BASE_RETRY_DELAY = 500;
 
 export function AuthProvider({ children }: { children: ReactNode }) {
+  // Create a safe way to use location that works outside Router context
+  let location;
+  let isRouter = true;
+  
+  try {
+    location = useLocation();
+  } catch (error) {
+    // If useLocation throws, we're outside of a Router context
+    isRouter = false;
+    location = { pathname: window.location.pathname };
+    console.warn("AuthProvider: Router context not available, using fallback location handling");
+  }
+
   const [session, setSession] = useState<Session | null>(null);
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -32,7 +45,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  const location = useLocation();
 
   const createUserSession = async (userId: string) => {
     try {
@@ -399,7 +411,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN') {
           logInfo('User signed in successfully', 'AuthContext');
-          if (isAppRoute(location.pathname)) {
+          if (isRouter && isAppRoute(location.pathname)) {
             toast.success('Signed in successfully');
           }
         } else if (event === 'SIGNED_OUT') {
@@ -413,7 +425,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAutoRetryTimeoutId(null);
           }
           
-          if (isAppRoute(location.pathname)) {
+          if (isRouter && isAppRoute(location.pathname)) {
             toast.info('Signed out');
           }
         }
@@ -463,7 +475,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [isMobileDevice, location.pathname]);
+  }, [isMobileDevice, location.pathname, isRouter]);
 
   const value = {
     session,

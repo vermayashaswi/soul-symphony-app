@@ -13,6 +13,8 @@ const ProtectedRoute: React.FC = () => {
   useEffect(() => {
     const checkAuth = async () => {
       try {
+        console.log('Protected Route: Checking authentication...');
+        
         // First set up the subscription to avoid missing any auth events
         const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
           console.log("Auth state changed:", event);
@@ -31,6 +33,7 @@ const ProtectedRoute: React.FC = () => {
           console.error('Error checking session in ProtectedRoute:', error);
           setAuthError(error.message);
         } else {
+          console.log('ProtectedRoute: Session check result:', data.session ? 'Has session' : 'No session');
           setUser(data.session?.user || null);
         }
         setIsLoading(false);

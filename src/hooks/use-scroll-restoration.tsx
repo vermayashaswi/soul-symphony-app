@@ -7,7 +7,16 @@ import { useLocation } from 'react-router-dom';
  * and handles hash navigation for anchor links
  */
 export const useScrollRestoration = () => {
-  const { pathname, hash } = useLocation();
+  let location;
+  try {
+    location = useLocation();
+  } catch (error) {
+    // If outside Router context, use a fallback
+    console.warn('useScrollRestoration: Router context not available');
+    return;
+  }
+
+  const { pathname, hash } = location;
 
   useEffect(() => {
     // If there's a hash, scroll to the element with that id
