@@ -20,6 +20,13 @@ const App: React.FC = () => {
       console.log('Fixing malformed URL path:', currentPath);
       window.history.replaceState(null, '', '/');
     }
+    
+    // CRITICAL FIX: If the user is at the root path and this is the Insights component,
+    // redirect them to the proper /app/insights path
+    if (currentPath === '/' && document.title.includes('Insights')) {
+      console.log('Detected Insights at root path, redirecting to /app/insights');
+      window.history.replaceState(null, '', '/app/insights');
+    }
   }, []);
 
   return (

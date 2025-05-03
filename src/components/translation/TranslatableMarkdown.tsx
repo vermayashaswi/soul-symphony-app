@@ -44,6 +44,7 @@ export function TranslatableMarkdown({
     }
     
     // CRITICAL FIX: forceTranslate should override website route check
+    // This is the key fix - forceTranslate must override website route check
     if (isOnWebsite && !forceTranslate) {
       setTranslatedContent(children);
       return;
@@ -70,7 +71,7 @@ export function TranslatableMarkdown({
       }
     }
       
-    console.log(`TranslatableMarkdown: Translating markdown content to ${currentLanguage}`);
+    console.log(`TranslatableMarkdown: Translating markdown content to ${currentLanguage}, forceTranslate=${forceTranslate}, path=${location.pathname}`);
 
     try {
       const result = await translate(children, "en");

@@ -27,7 +27,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   }, [isVisible, percentage, nodeType]);
   
   // Debug logging for understanding visibility issues
-  console.log(`ConnectionPercentage RENDER: isVisible=${isVisible}, percentage=${percentage}, nodeType=${nodeType}`);
+  console.log(`ConnectionPercentage RENDER: isVisible=${isVisible}, percentage=${percentage}, nodeType=${nodeType}, path=${window.location.pathname}`);
   
   // Don't render if not visible or percentage is zero/negative
   if (!isVisible || percentage <= 0) return null;
@@ -68,7 +68,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           border: '1px solid rgba(255,255,255,0.2)', // Subtle border for better definition
         }}
       >
-        {/* Always display original percentage if translation fails */}
+        {/* CRITICAL FIX: Always force translate the percentage */}
         <TranslatableText 
           text={`${displayPercentage}%`} 
           forceTranslate={true}

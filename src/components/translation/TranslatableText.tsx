@@ -62,8 +62,8 @@ export function TranslatableText({
       return;
     }
 
-    // CRITICAL FIX: forceTranslate should override website route check
-    // This was the key issue - we now completely ignore website route if forceTranslate is true
+    // CRITICAL FIX: If forceTranslate is true, ALWAYS translate regardless of route
+    // This is the key fix - forceTranslate must override website route check
     if (isOnWebsite && !forceTranslate) {
       console.log(`TranslatableText: Skipping translation for "${text}" because on website route without force translate`);
       setTranslatedText(text);
@@ -92,7 +92,7 @@ export function TranslatableText({
     }
       
     try {
-      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}, forceTranslate=${forceTranslate}, path=${pathname}`);
       // Use "en" as default source language when none is provided
       const result = await translate(text, sourceLanguage || "en", entryId);
       

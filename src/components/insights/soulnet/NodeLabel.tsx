@@ -86,6 +86,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       key={`label-${id}-${isHighlighted ? 'highlighted' : 'normal'}`}
     >
       <div style={labelTextStyle}>
+        {/* CRITICAL FIX: Always force translate */}
         <TranslatableText 
           text={id} 
           forceTranslate={true}

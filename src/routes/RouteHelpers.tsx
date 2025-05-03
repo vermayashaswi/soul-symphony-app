@@ -22,21 +22,26 @@ export const isAppRoute = (pathname: string): boolean => {
   return isApp;
 };
 
+// CRITICAL: Always treat Insights as an app route
+const isSpecialAppPath = (pathname: string): boolean => {
+  // If the path contains insights, it should NEVER be treated as a website route
+  return pathname.includes('/insights') || pathname === '/insights';
+};
+
 export const isWebsiteRoute = (pathname: string): boolean => {
   // Consider website routes like /about, /pricing, etc.
   const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq'];
+  
+  // CRITICAL FIX: Special check for Insights page
+  if (isSpecialAppPath(pathname)) {
+    console.log(`Special case: ${pathname} contains insights, treating as app route`);
+    return false;
+  }
   
   // The root path (/) is explicitly a website route
   if (pathname === "/" || pathname === "") {
     console.log('Root path / is explicitly a website route');
     return true;
-  }
-  
-  // CRITICAL FIX: Insights page should NOT be treated as website route when rendered at root
-  // If we detect /insights in the pathname or we're at /app/insights, it's definitely not a website
-  if (pathname.includes('/insights') || pathname.includes('/app/insights')) {
-    console.log(`Special case: ${pathname} contains insights, treating as app route`);
-    return false;
   }
   
   // If it has an app prefix, it's not a website route
