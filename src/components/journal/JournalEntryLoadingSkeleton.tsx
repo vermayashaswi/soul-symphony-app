@@ -1,11 +1,11 @@
 
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion } from 'framer-motion';
 import { Card } from '@/components/ui/card';
 import { useDebugLog } from '@/utils/debug/DebugContext';
-import { processingStateManager, EntryProcessingState } from '@/utils/journal/processing-state-manager';
+import { processingStateManager } from '@/utils/journal/processing-state-manager';
 
 interface JournalEntryLoadingSkeletonProps {
   count?: number;
@@ -17,58 +17,6 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
   const isVisibleRef = useRef(false);
   const mountTimeRef = useRef(Date.now());
   const forceRemoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const [shouldRender, setShouldRender] = useState(true);
-  const isUnmountingRef = useRef(false);
-  const processedEntryIdsRef = useRef<Set<number>>(new Set());
-  
-  // Define the event handlers outside of useEffect to make them accessible for cleanup
-  const handleEntryProcessed = (event: CustomEvent) => {
-    if (event.detail && event.detail.tempId === tempId && !isUnmountingRef.current) {
-      console.log(`[JournalEntryLoadingSkeleton] Entry processed for ${tempId}, initiating removal`);
-      
-      // Mark that we're unmounting to prevent duplicate removals
-      isUnmountingRef.current = true;
-      setShouldRender(false);
-      
-      if (event.detail.entryId) {
-        processedEntryIdsRef.current.add(event.detail.entryId);
-      }
-    }
-  };
-  
-  // Also define the mapping event handler outside useEffect
-  const handleEntryMapped = (event: CustomEvent) => {
-    if (event.detail && event.detail.tempId === tempId && event.detail.entryId && !isUnmountingRef.current) {
-      console.log(`[JournalEntryLoadingSkeleton] Entry mapped: ${tempId} -> ${event.detail.entryId}, initiating removal`);
-      
-      processedEntryIdsRef.current.add(event.detail.entryId);
-      
-      // Mark that we're unmounting to prevent duplicate removals
-      isUnmountingRef.current = true;
-      setShouldRender(false);
-    }
-  };
-  
-  // Define the force remove handler outside useEffect
-  const handleForceRemove = (event: CustomEvent<any>) => {
-    if (!event.detail) return;
-    
-    if ((event.detail.tempId === tempId || !event.detail.tempId) && !isUnmountingRef.current) {
-      console.log(`[JournalEntryLoadingSkeleton] Received force remove event for ${tempId || 'all cards'}`);
-      if (forceRemoveTimeoutRef.current) {
-        clearTimeout(forceRemoveTimeoutRef.current);
-      }
-      
-      // Directly notify that card is being removed
-      isVisibleRef.current = false;
-      isUnmountingRef.current = true;
-      setShouldRender(false);
-      
-      window.dispatchEvent(new CustomEvent('processingCardRemoved', {
-        detail: { tempId, timestamp: Date.now(), forceRemoved: true }
-      }));
-    }
-  };
   
   useEffect(() => {
     if (tempId) {
@@ -87,35 +35,26 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       if (!processingStateManager.isProcessing(tempId)) {
         processingStateManager.startProcessing(tempId);
       }
-      
-      // Check if this entry is already mapped to a real entry ID
-      const entryId = processingStateManager.getEntryId(tempId);
-      if (entryId) {
-        console.log(`[JournalEntryLoadingSkeleton] Skeleton ${tempId} already has entryId ${entryId}, starting removal countdown`);
-        processedEntryIdsRef.current.add(entryId);
-        
-        // Start removal countdown if we already have an entry ID
-        setTimeout(() => {
-          if (!isUnmountingRef.current) {
-            console.log(`[JournalEntryLoadingSkeleton] Auto-removing skeleton for ${tempId} with entryId ${entryId}`);
-            isUnmountingRef.current = true;
-            setShouldRender(false);
-            
-            // Also update the processing state
-            processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
-            setTimeout(() => {
-              processingStateManager.removeEntry(tempId);
-            }, 300);
-          }
-        }, 100);
-      }
-      
-      // Listen for entry content ready events specific to this tempId
-      window.addEventListener('entryProcessingComplete', handleEntryProcessed as EventListener);
-      window.addEventListener('processingEntryMapped', handleEntryMapped as EventListener);
     }
     
     // Add listener for force remove events
+    const handleForceRemove = (event: CustomEvent<any>) => {
+      if (!event.detail) return;
+      
+      if (event.detail.tempId === tempId || !event.detail.tempId) {
+        console.log(`[JournalEntryLoadingSkeleton] Received force remove event for ${tempId || 'all cards'}`);
+        if (forceRemoveTimeoutRef.current) {
+          clearTimeout(forceRemoveTimeoutRef.current);
+        }
+        
+        // Directly notify that card is being removed
+        isVisibleRef.current = false;
+        window.dispatchEvent(new CustomEvent('processingCardRemoved', {
+          detail: { tempId, timestamp: Date.now(), forceRemoved: true }
+        }));
+      }
+    };
+    
     window.addEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
     window.addEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
     
@@ -133,22 +72,18 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
     // Add a safety timeout to force remove this skeleton after 15 seconds
     // This prevents skeletons from getting "stuck" in the UI
     forceRemoveTimeoutRef.current = setTimeout(() => {
-      if (tempId && isVisibleRef.current && !isUnmountingRef.current) {
+      if (tempId) {
         console.log(`[JournalEntryLoadingSkeleton] Force removing skeleton ${tempId} after timeout`);
         isVisibleRef.current = false;
-        isUnmountingRef.current = true;
-        setShouldRender(false);
-        
-        processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
         processingStateManager.removeEntry(tempId);
         
         // Dispatch event to force UI update elsewhere
         window.dispatchEvent(new CustomEvent('processingCardRemoved', {
-          detail: { tempId, timestamp: Date.now(), forceRemoved: true, reason: 'timeout' }
+          detail: { tempId, timestamp: Date.now(), forceRemoved: true }
         }));
         
         window.dispatchEvent(new CustomEvent('journalUIForceRefresh', {
-          detail: { timestamp: Date.now(), forceRemove: tempId, reason: 'timeout' }
+          detail: { timestamp: Date.now(), forceRemove: tempId }
         }));
       }
     }, 15000);
@@ -160,20 +95,10 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
         
         console.log(`[JournalEntryLoadingSkeleton] Unmounting skeleton with tempId ${tempId}. Was visible for ${visibleDuration}ms`);
         isVisibleRef.current = false;
-        isUnmountingRef.current = true;
         
         window.dispatchEvent(new CustomEvent('processingCardRemoved', {
           detail: { tempId, timestamp: Date.now(), visibleDuration }
         }));
-        
-        // Also clean up the processing state
-        const entryId = processingStateManager.getEntryId(tempId);
-        if (entryId) {
-          processingStateManager.updateEntryState(tempId, EntryProcessingState.COMPLETED);
-          setTimeout(() => {
-            processingStateManager.removeEntry(tempId);
-          }, 300);
-        }
       }
       
       // Clean up all timeouts and event listeners
@@ -183,8 +108,6 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       }
       window.removeEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
       window.removeEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
-      window.removeEventListener('entryProcessingComplete', handleEntryProcessed as EventListener);
-      window.removeEventListener('processingEntryMapped', handleEntryMapped as EventListener);
     };
   }, [count, addEvent, tempId]);
   
@@ -198,11 +121,6 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       }));
     }
   };
-  
-  // Don't render if we shouldn't
-  if (!shouldRender) {
-    return null;
-  }
   
   return (
     <div className="space-y-4 relative z-10">
@@ -287,17 +205,4 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       `}</style>
     </div>
   );
-}
-
-// Add missing handleAnimationComplete function outside the component to fix the TypeScript error
-function handleAnimationComplete() {
-  const tempId = this?.props?.['data-temp-id'];
-  if (tempId) {
-    console.log(`[JournalEntryLoadingSkeleton] Animation completed for ${tempId}`);
-    
-    // Dispatch an event when animation is complete to help with tracking
-    window.dispatchEvent(new CustomEvent('loadingSkeletonAnimated', {
-      detail: { tempId, timestamp: Date.now() }
-    }));
-  }
 }
