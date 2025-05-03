@@ -61,7 +61,25 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         maxWidth={2}
         overflowWrap="break-word"
         textAlign="center"
-        billboard // Added billboard property to make text always face the camera
+        // Using a rotation matrix to make text face the camera instead of billboard prop
+        rotation={[0, 0, 0]}
+        // Add lookAt functionality in the next frame update
+        onAfterRender={(state) => {
+          if (state && state.camera) {
+            // Get the mesh from the Text component
+            const mesh = state.scene.children.find(child => 
+              child instanceof THREE.Mesh && 
+              child.material && 
+              child.parent && 
+              child.parent.uuid === state.scene.uuid
+            );
+            
+            if (mesh) {
+              // Make the text always face the camera
+              mesh.lookAt(state.camera.position);
+            }
+          }
+        }}
       >
         {translatedText}
         {backgroundColor && (
