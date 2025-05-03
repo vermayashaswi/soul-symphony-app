@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -60,6 +61,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         maxWidth={2}
         overflowWrap="break-word"
         textAlign="center"
+        billboard // Added billboard property to make text always face the camera
       >
         {translatedText}
         {backgroundColor && (
