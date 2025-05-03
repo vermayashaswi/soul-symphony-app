@@ -54,6 +54,26 @@ export const Node: React.FC<NodeProps> = ({
   const prevHighlightedRef = useRef<boolean>(isHighlighted);
   const prevSelectedRef = useRef<boolean>(isSelected);
   const prevTranslatedTextRef = useRef<string | undefined>(undefined);
+  const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
+  const stableLabelVisibilityRef = useRef<boolean>(showLabel || isHighlighted || isSelected);
+  
+  // Stabilize label visibility transitions to prevent flickering
+  useEffect(() => {
+    const newVisibility = showLabel || isHighlighted || isSelected;
+    
+    // Only update if there's a change, with a small delay when hiding to prevent flicker
+    if (newVisibility !== stableLabelVisibilityRef.current) {
+      if (newVisibility) {
+        // Show immediately
+        stableLabelVisibilityRef.current = true;
+      } else {
+        // Hide with delay
+        setTimeout(() => {
+          stableLabelVisibilityRef.current = newVisibility;
+        }, 100);
+      }
+    }
+  }, [showLabel, isHighlighted, isSelected]);
   
   // Cache translated text to prevent flickering
   const translatedText = useMemo(() => {
@@ -61,7 +81,10 @@ export const Node: React.FC<NodeProps> = ({
     
     // Log translation lookup for debugging
     if (prevTranslatedTextRef.current !== text) {
-      console.log(`Node ${node.id}: Translation updated from "${prevTranslatedTextRef.current}" to "${text}"`);
+      // Only log if there's an actual change
+      if (prevTranslatedTextRef.current) {
+        console.log(`Node ${node.id}: Translation updated from "${prevTranslatedTextRef.current}" to "${text}"`);
+      }
       prevTranslatedTextRef.current = text;
     }
     
@@ -79,6 +102,14 @@ export const Node: React.FC<NodeProps> = ({
       console.log(`Node ${node.id}: State change - highlighted: ${prevHighlightedRef.current} → ${isHighlighted}, selected: ${prevSelectedRef.current} → ${isSelected}`);
       prevHighlightedRef.current = isHighlighted;
       prevSelectedRef.current = isSelected;
+      
+      // Mark node as animating to stabilize transitions
+      nodeRef.current.isAnimating = true;
+      
+      // Reset animation flag after transition period
+      setTimeout(() => {
+        nodeRef.current.isAnimating = false;
+      }, 300);
     }
   }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage, translatedText]);
   
@@ -145,7 +176,7 @@ export const Node: React.FC<NodeProps> = ({
   }, [isTouching, touchStartTime]);
 
   // Ensure label visibility - use explicit visibility for both NodeLabel and ConnectionPercentage
-  const shouldShowLabel = isHighlighted || isSelected || showLabel;
+  const shouldShowLabel = stableLabelVisibilityRef.current;
   
   // Always show percentages for highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;

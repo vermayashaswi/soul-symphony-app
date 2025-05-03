@@ -52,6 +52,28 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const prevTranslatedText = useRef<string | undefined>(translatedText);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
+  const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
+  
+  // Stabilize visibility transitions to prevent flickering
+  useEffect(() => {
+    // For Devanagari text, we want to delay visibility changes to prevent flickering
+    if (isDevanagari.current) {
+      if (shouldShowLabel !== stableVisibilityRef.current) {
+        // Only update if going from invisible to visible immediately
+        // For hiding, delay briefly to prevent flickering during transitions
+        if (shouldShowLabel) {
+          stableVisibilityRef.current = true;
+        } else {
+          // Small timeout to prevent flicker during state transitions
+          setTimeout(() => {
+            stableVisibilityRef.current = false;
+          }, 50);
+        }
+      }
+    } else {
+      stableVisibilityRef.current = shouldShowLabel;
+    }
+  }, [shouldShowLabel]);
   
   // Check if text contains non-Latin script and memoize the result
   useEffect(() => {
@@ -62,7 +84,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       
       // Debug logging for Hindi text issues
       if (isDevanagari.current) {
-        console.log(`Hindi text detected in node "${id}": "${translatedText}"`);
+        console.log(`Hindi text detected in node "${id}": "${translatedText}", applying special rendering`);
       }
     }
   }, [translatedText, id]);
@@ -76,19 +98,26 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     
     // Adjust size for non-Latin scripts - they often need slightly bigger font
     // Devanagari (Hindi) scripts need even larger adjustment
-    const sizeAdjustment = isDevanagari.current ? 0.04 : 
-                           isNonLatin.current ? 0.02 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.06 : 
+                           isNonLatin.current ? 0.03 : 0;
     
     // Ensure size stays within reasonable bounds
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.4), 0.23);
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.5), 0.23);
   }, [cameraZoom, isNonLatin.current, isDevanagari.current]);
 
   // Don't render if not supposed to be shown
-  if (!shouldShowLabel) return null;
+  if (!stableVisibilityRef.current) return null;
 
-  // Keep node labels at a consistent position, lower than percentage labels
-  // Use different vertical positions for entity vs emotion nodes
-  const verticalPosition = type === 'entity' ? 0.9 : 0.8;
+  // Adjust vertical positioning for different script types
+  let verticalPosition = type === 'entity' ? 0.9 : 0.8;
+  
+  // For Devanagari text, position slightly higher to accommodate taller characters
+  if (isDevanagari.current) {
+    verticalPosition += 0.1;
+  } else if (isNonLatin.current) {
+    verticalPosition += 0.05;
+  }
+  
   const labelPosition: [number, number, number] = [0, verticalPosition, 0];
 
   return (
@@ -98,7 +127,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       color={type === 'entity' ? '#ffffff' : themeHex}
       size={dynamicFontSize}
       bold={isHighlighted}
-      visible={shouldShowLabel}
+      visible={stableVisibilityRef.current}
     />
   );
 };

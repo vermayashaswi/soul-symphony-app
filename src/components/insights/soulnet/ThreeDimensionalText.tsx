@@ -59,6 +59,16 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const isNonLatinScript = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   const cameraUpdateThrottleRef = useRef<number>(0);
+  const textStabilityCounter = useRef<number>(0);
+  const renderPriorityRef = useRef<number>(1);
+  
+  // First render priority boost for Devanagari text
+  useEffect(() => {
+    if (containsDevanagari(text)) {
+      renderPriorityRef.current = 10; // Higher priority for Devanagari
+      console.log(`Boosting render priority for Devanagari text: "${text}"`);
+    }
+  }, [text]);
   
   // Use a separate check for Devanagari to apply specific optimizations
   useEffect(() => {
@@ -68,26 +78,51 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       
       // Debug logging for Hindi text
       if (isDevanagari.current) {
-        console.log(`Hindi text detected: "${translatedText}"`);
+        console.log(`Hindi text detected: "${translatedText}", applying optimizations`);
+        if (textRef.current) {
+          // Increase priority for Hindi text rendering
+          textRef.current.renderOrder = 5;
+        }
       }
     }
   }, [translatedText]);
   
-  // Update text orientation with better throttling mechanism
+  // Enhanced billboarding with quaternion stabilization
   useFrame(() => {
-    if (textRef.current && camera) {
-      // Only update orientation every few frames
+    if (textRef.current && camera && visible) {
+      // Update every few frames, more frequently for Devanagari
+      const updateInterval = isDevanagari.current ? 2 : 5;
+      
       cameraUpdateThrottleRef.current++;
-      if (cameraUpdateThrottleRef.current > 5) {
+      if (cameraUpdateThrottleRef.current > updateInterval) {
         const distanceMoved = camera.position.distanceTo(lastCameraPosition.current);
         
-        // Only update orientation if camera moved enough
-        if (distanceMoved > 0.05) {
-          // For billboarding: make text always face the camera
-          // This creates quaternion that rotates text mesh to face camera
+        // More sensitive updates for Devanagari
+        const movementThreshold = isDevanagari.current ? 0.02 : 0.05;
+        
+        // Only update orientation if camera moved enough, or for Devanagari script
+        // which needs more frequent updates for better visibility
+        if (distanceMoved > movementThreshold || isDevanagari.current) {
+          // For billboarding: make text always face the camera using quaternion
+          // This is more stable than lookAt for text rendering
           textRef.current.quaternion.copy(camera.quaternion);
+          
+          // For Devanagari text, use specific orientation to maximize readability
+          if (isDevanagari.current) {
+            // Apply slight Y-axis rotation to improve readability
+            textRef.current.quaternion.multiply(
+              new THREE.Quaternion().setFromAxisAngle(
+                new THREE.Vector3(0, 1, 0), 
+                textStabilityCounter.current % 2 === 0 ? 0.01 : -0.01
+              )
+            );
+            textStabilityCounter.current++;
+          }
+          
+          // Save camera position for next comparison
           lastCameraPosition.current.copy(camera.position);
         }
+        
         cameraUpdateThrottleRef.current = 0;
       }
     }
@@ -107,7 +142,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
             
             // Debug logging for Hindi text
             if (isDevanagari.current) {
-              console.log(`Hindi translation: "${result}"`);
+              console.log(`Hindi translation: "${result}", adjusting rendering parameters`);
             }
           }
         } catch (e) {
@@ -131,7 +166,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const getMaxWidth = () => {
     if (isDevanagari.current) {
       // Much wider container for Devanagari specifically
-      return 30; // Significantly increased to accommodate Devanagari
+      return 35; // Further increased to accommodate Devanagari's wider character set
     } else if (isNonLatinScript.current) {
       // Wider container for other non-Latin scripts
       return 25;
@@ -143,7 +178,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   // Get letter spacing appropriate for the script
   const getLetterSpacing = () => {
     if (isDevanagari.current) {
-      return 0.1; // More spacing for Devanagari
+      return 0.12; // Increased spacing for Devanagari
     } else if (isNonLatinScript.current) {
       return 0.05; // Some spacing for other non-Latin scripts
     }
@@ -169,13 +204,15 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         // Add extra letter spacing for non-Latin scripts for better legibility
         letterSpacing={getLetterSpacing()}
         // Improve rendering quality
-        sdfGlyphSize={64}
+        sdfGlyphSize={isDevanagari.current ? 128 : 64} // Higher resolution for Devanagari
         // Reduce rendering artifacts
         clipRect={[-1000, -1000, 2000, 2000]}
         // Add throttling to prevent too many redraws
-        renderOrder={1}
+        renderOrder={isDevanagari.current ? 5 : 1} // Higher render order for Hindi
         // Add lineHeight for better vertical spacing
-        lineHeight={isNonLatinScript.current ? 1.5 : 1.2}
+        lineHeight={isDevanagari.current ? 1.7 : (isNonLatinScript.current ? 1.5 : 1.2)}
+        // Font subsetting optimization - more character support
+        font={undefined} // Use default font which has better glyph support
       >
         {translatedText}
         {backgroundColor && (
