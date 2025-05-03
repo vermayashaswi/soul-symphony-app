@@ -43,7 +43,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [error, setError] = useState<Error | null>(null);
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
-  console.log("Current route path:", window.location.pathname);
 
   useEffect(() => {
     console.log("SoulNet mounted");
@@ -132,9 +131,9 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   // Get appropriate instructions based on device type
   const getInstructions = () => {
     if (isMobile) {
-      return <TranslatableText text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" forceTranslate={true} />;
+      return <TranslatableText text="Drag to rotate • Pinch to zoom • Tap a node to highlight connections" />;
     }
-    return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
+    return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" />;
   };
 
   return (
@@ -152,16 +151,16 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
             <div className="text-center">
               <h3 className="text-lg font-medium">
-                <TranslatableText text="Error in Soul-Net Visualization" forceTranslate={true} />
+                <TranslatableText text="Error in Soul-Net Visualization" />
               </h3>
               <p className="text-muted-foreground mt-2">
-                <TranslatableText text="There was a problem rendering the visualization." forceTranslate={true} />
+                <TranslatableText text="There was a problem rendering the visualization." />
               </p>
               <button 
                 className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
                 onClick={() => window.location.reload()}
               >
-                <TranslatableText text="Reload" forceTranslate={true} />
+                <TranslatableText text="Reload" />
               </button>
             </div>
           </div>
@@ -171,25 +170,19 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               width: '100%',
               height: '100%',
               maxWidth: isFullScreen ? 'none' : '800px',
-              maxHeight: isFullScreen ? 'none' : '500px',
-              position: 'relative', // Ensure proper stacking context
-              zIndex: 1 // Lower than the HTML overlays
+              maxHeight: isFullScreen ? 'none' : '500px'
             }}
-            camera={{ position: [0, 0, 26], far: 100, near: 0.1 }}
+            camera={{ position: [0, 0, 26] }}
             onPointerMissed={() => setSelectedEntity(null)}
             gl={{ 
               preserveDrawingBuffer: true,
-              antialias: !isMobile, 
+              antialias: !isMobile,
               powerPreference: 'high-performance',
               alpha: true,
               depth: true,
               stencil: false,
-              precision: isMobile ? 'mediump' : 'highp',
-              logarithmicDepthBuffer: true // Enable for better z-depth handling
+              precision: isMobile ? 'mediump' : 'highp'
             }}
-            frameloop="always" // Ensure continuous rendering
-            linear // Use linear color space for more predictable results
-            flat // Disable tone mapping
           >
             <SoulNetVisualization
               data={graphData}

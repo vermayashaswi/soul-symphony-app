@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
@@ -40,11 +39,6 @@ export function TranslatableText({
   const pathname = location.pathname;
   const isOnWebsite = isWebsiteRoute(pathname);
   
-  // Enhanced logging to help debug translation issues
-  useEffect(() => {
-    console.log(`TranslatableText (${text.substring(0, 20)}...): forceTranslate=${forceTranslate}, isOnWebsite=${isOnWebsite}, path=${pathname}`);
-  }, [text, forceTranslate, isOnWebsite, pathname]);
-  
   // Helper function to clean translation results
   const cleanTranslationResult = (result: string): string => {
     if (!result) return '';
@@ -62,8 +56,7 @@ export function TranslatableText({
       return;
     }
 
-    // CRITICAL FIX: If forceTranslate is true, ALWAYS translate regardless of route
-    // This is the key fix - forceTranslate must override website route check
+    // CRITICAL FIX: Don't skip translation on website routes if forceTranslate is true
     if (isOnWebsite && !forceTranslate) {
       console.log(`TranslatableText: Skipping translation for "${text}" because on website route without force translate`);
       setTranslatedText(text);
@@ -92,7 +85,7 @@ export function TranslatableText({
     }
       
     try {
-      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}, forceTranslate=${forceTranslate}, path=${pathname}`);
+      console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
       // Use "en" as default source language when none is provided
       const result = await translate(text, sourceLanguage || "en", entryId);
       
@@ -176,7 +169,6 @@ export function TranslatableText({
       'data-translated': translatedText !== text ? 'true' : 'false',
       'data-lang': currentLanguage,
       'data-force-translate': forceTranslate ? 'true' : 'false',
-      'data-path': pathname, // Add current path for debugging
       style // Pass style prop to the element
     }, 
     translatedText || text  // Ensure we always show something, even if translation fails

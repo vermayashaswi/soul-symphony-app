@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -30,11 +29,6 @@ export function TranslatableMarkdown({
   const isOnWebsite = isWebsiteRoute(location.pathname);
   const mountedRef = useRef<boolean>(true);
   
-  // Debug logging for transparency
-  useEffect(() => {
-    console.log(`TranslatableMarkdown: path=${location.pathname}, isOnWebsite=${isOnWebsite}, forceTranslate=${forceTranslate}`);
-  }, [location.pathname, isOnWebsite, forceTranslate]);
-  
   // Function to translate markdown content with improved error handling
   const translateMarkdown = async () => {
     // Skip translation if content is empty
@@ -44,7 +38,6 @@ export function TranslatableMarkdown({
     }
     
     // CRITICAL FIX: forceTranslate should override website route check
-    // This is the key fix - forceTranslate must override website route check
     if (isOnWebsite && !forceTranslate) {
       setTranslatedContent(children);
       return;
@@ -71,7 +64,7 @@ export function TranslatableMarkdown({
       }
     }
       
-    console.log(`TranslatableMarkdown: Translating markdown content to ${currentLanguage}, forceTranslate=${forceTranslate}, path=${location.pathname}`);
+    console.log(`TranslatableMarkdown: Translating markdown content to ${currentLanguage}`);
 
     try {
       const result = await translate(children, "en");
@@ -157,7 +150,6 @@ export function TranslatableMarkdown({
       data-translated={translatedContent !== children ? 'true' : 'false'}
       data-lang={currentLanguage}
       data-force-translate={forceTranslate ? 'true' : 'false'}
-      data-path={location.pathname} // Add path for debugging
     >
       <ReactMarkdown className={className}>
         {contentToRender}
