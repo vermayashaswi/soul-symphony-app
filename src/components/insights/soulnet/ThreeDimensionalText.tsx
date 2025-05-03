@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -68,7 +69,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         anchorY="middle"
         outlineWidth={0.0035}
         outlineColor="#000000"
-        maxWidth={2}
+        maxWidth={5} // Increased from 2 to 5 to prevent text wrapping/breaking
         overflowWrap="break-word"
         textAlign="center"
         // Use a rotation that will be updated by useFrame
