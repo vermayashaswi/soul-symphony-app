@@ -31,8 +31,8 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   // Position above the node
   const labelPosition: [number, number, number] = [0, offsetY, 0];
 
-  // Increased font size by 2.5x (from previous default of ~0.15 to 0.375)
-  const fontSize = 0.375;
+  // Decreased font size by 30% (from 0.375 to 0.26)
+  const fontSize = 0.26;
 
   return (
     <ThreeDimensionalText

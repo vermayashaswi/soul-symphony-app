@@ -20,7 +20,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   text,
   position,
   color = 'white',
-  size = 1.7, // Increased from 1.2 to 1.7 for better visibility
+  size = 1.2, // Decreased by 30% from 1.7 to 1.2
   bold = false,
   backgroundColor,
   opacity = 1,
@@ -69,7 +69,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         anchorY="middle"
         outlineWidth={0.0035}
         outlineColor="#000000"
-        maxWidth={5} // Increased from 2 to 5 to prevent text wrapping/breaking
+        maxWidth={5} // Keeping this value to prevent text wrapping/breaking
         overflowWrap="break-word"
         textAlign="center"
         // Use a rotation that will be updated by useFrame
