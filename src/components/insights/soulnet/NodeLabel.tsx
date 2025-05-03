@@ -27,23 +27,6 @@ const containsDevanagari = (text: string): boolean => {
   return devanagariPattern.test(text);
 };
 
-// Normalize emotion names for better translation
-const normalizeEmotionName = (name: string): string => {
-  if (!name) return '';
-  
-  // Handle special cases that might cause translation issues
-  let normalized = name.replace(/[0-9.]+%?/g, '').trim(); // Remove any numbers and percentages
-  normalized = normalized.replace(/[_\-+]/g, ' '); // Replace underscores and hyphens with spaces
-  normalized = normalized.replace(/\s{2,}/g, ' '); // Replace multiple spaces with a single space
-  
-  // Capitalize first letter for consistency
-  if (normalized.length > 0) {
-    normalized = normalized.charAt(0).toUpperCase() + normalized.slice(1).toLowerCase();
-  }
-  
-  return normalized || name; // Return original if normalization results in empty string
-};
-
 interface NodeLabelProps {
   id: string;
   type: 'entity' | 'emotion';
@@ -70,19 +53,6 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
-  
-  // Process the displayed text to ensure it's clean and translatable
-  const displayText = useMemo(() => {
-    // Use translated text if available, otherwise use the normalized id
-    const baseText = translatedText || id;
-    
-    // For emotion nodes, apply additional normalization
-    if (type === 'emotion') {
-      return normalizeEmotionName(baseText);
-    }
-    
-    return baseText;
-  }, [id, translatedText, type]);
   
   // Stabilize visibility transitions to prevent flickering
   useEffect(() => {
@@ -152,7 +122,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   return (
     <ThreeDimensionalText
-      text={displayText}
+      text={translatedText || id}
       position={labelPosition}
       color={type === 'entity' ? '#ffffff' : themeHex}
       size={dynamicFontSize}
