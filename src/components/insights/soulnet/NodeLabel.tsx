@@ -48,7 +48,6 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   translatedText
 }) => {
-  console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}, translatedText=${translatedText}`);
   const prevTranslatedText = useRef<string | undefined>(translatedText);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
@@ -60,14 +59,13 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     if (isDevanagari.current) {
       if (shouldShowLabel !== stableVisibilityRef.current) {
         // Only update if going from invisible to visible immediately
-        // For hiding, delay briefly to prevent flickering during transitions
         if (shouldShowLabel) {
           stableVisibilityRef.current = true;
         } else {
-          // Small timeout to prevent flicker during state transitions
+          // Delay hiding to prevent flicker during transitions
           setTimeout(() => {
             stableVisibilityRef.current = false;
-          }, 50);
+          }, 100);
         }
       }
     } else {
@@ -84,7 +82,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       
       // Debug logging for Hindi text issues
       if (isDevanagari.current) {
-        console.log(`Hindi text detected in node "${id}": "${translatedText}", applying special rendering`);
+        console.log(`Hindi/Devanagari text detected in node "${id}": "${translatedText}", applying special rendering`);
       }
     }
   }, [translatedText, id]);
@@ -98,7 +96,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     
     // Adjust size for non-Latin scripts - they often need slightly bigger font
     // Devanagari (Hindi) scripts need even larger adjustment
-    const sizeAdjustment = isDevanagari.current ? 0.06 : 
+    const sizeAdjustment = isDevanagari.current ? 0.08 : 
                            isNonLatin.current ? 0.03 : 0;
     
     // Ensure size stays within reasonable bounds
@@ -113,7 +111,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   
   // For Devanagari text, position slightly higher to accommodate taller characters
   if (isDevanagari.current) {
-    verticalPosition += 0.1;
+    verticalPosition += 0.15;
   } else if (isNonLatin.current) {
     verticalPosition += 0.05;
   }
