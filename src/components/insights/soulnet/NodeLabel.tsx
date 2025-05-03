@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
 
@@ -27,9 +26,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Higher base size for better visibility
-    const base = 16 + Math.max(0, (26 - z) * 0.6);
-    return Math.max(Math.min(base, 22), 14);
+    // Higher base size for better visibility, but reduced by 30%
+    const base = (16 + Math.max(0, (26 - z) * 0.6)) * 0.7; // Reduced by 30%
+    return Math.max(Math.min(base, 15.4), 9.8); // Also reduced min/max by 30%
   }, [cameraZoom]);
 
   const labelStyle = useMemo(() => ({
@@ -55,10 +54,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     color: type === 'entity' ? '#fff' : themeHex,
     padding: '0.2rem 0.4rem',
     fontWeight: isHighlighted ? 'bold' : 'normal',
-    backgroundColor: 'transparent', // Changed from rgba background to transparent
+    backgroundColor: 'transparent',
     borderRadius: '4px',
-    // Removed boxShadow
-    border: 'none', // Removed conditional border
+    border: 'none',
   }), [type, themeHex, isHighlighted]);
 
   // Don't render if not supposed to be shown
