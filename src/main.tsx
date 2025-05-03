@@ -8,6 +8,31 @@ import { AuthProvider } from './contexts/AuthContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
 
+// Font loading status check
+const checkFontsLoaded = () => {
+  if (document.fonts && document.fonts.ready) {
+    document.fonts.ready.then(() => {
+      console.log("All fonts are loaded and ready");
+      // Add a class to the document when fonts are ready
+      document.documentElement.classList.add('fonts-loaded');
+    }).catch(err => {
+      console.warn("Error loading fonts:", err);
+      // Add the class anyway after a timeout to prevent indefinite loading
+      setTimeout(() => {
+        document.documentElement.classList.add('fonts-loaded');
+      }, 2000);
+    });
+  } else {
+    // Fallback for browsers that don't support document.fonts
+    setTimeout(() => {
+      document.documentElement.classList.add('fonts-loaded');
+    }, 1000);
+  }
+};
+
+// Call the font loading check
+checkFontsLoaded();
+
 // iOS Viewport Height Fix - addresses the iOS Safari issue with viewport height
 const fixViewportHeight = () => {
   // Set CSS variable for viewport height that updates on resize

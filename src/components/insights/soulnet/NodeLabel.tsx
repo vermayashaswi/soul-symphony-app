@@ -1,30 +1,30 @@
 
-import React, { useMemo, useRef, useEffect } from 'react';
+import React, { useMemo } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 
-// Helper function to detect non-Latin script
-const containsNonLatinScript = (text: string): boolean => {
-  if (!text) return false;
+// Helper function to detect script types - consolidated into one function
+const detectScriptType = (text: string): { isNonLatin: boolean, isDevanagari: boolean } => {
+  if (!text) return { isNonLatin: false, isDevanagari: false };
   
   // Regex patterns for different script ranges
-  const patterns = {
-    devanagari: /[\u0900-\u097F]/,  // Hindi, Sanskrit, etc.
+  const devanagariPattern = /[\u0900-\u097F]/;  // Hindi, Sanskrit, etc.
+  
+  // Non-Latin scripts
+  const nonLatinPatterns = {
     arabic: /[\u0600-\u06FF]/,      // Arabic
     chinese: /[\u4E00-\u9FFF]/,     // Chinese
     japanese: /[\u3040-\u309F\u30A0-\u30FF]/,  // Japanese Hiragana and Katakana
     korean: /[\uAC00-\uD7AF]/,      // Korean Hangul
-    cyrillic: /[\u0400-\u04FF]/     // Russian and other Cyrillic
+    cyrillic: /[\u0400-\u04FF]/,    // Russian and other Cyrillic
+    thai: /[\u0E00-\u0E7F]/,        // Thai
+    hebrew: /[\u0590-\u05FF]/,      // Hebrew
+    greek: /[\u0370-\u03FF]/        // Greek
   };
   
-  // Check if text contains any non-Latin script
-  return Object.values(patterns).some(pattern => pattern.test(text));
-};
-
-// Specifically detect Devanagari script (Hindi)
-const containsDevanagari = (text: string): boolean => {
-  if (!text) return false;
-  const devanagariPattern = /[\u0900-\u097F]/;
-  return devanagariPattern.test(text);
+  const isDevanagari = devanagariPattern.test(text);
+  const isNonLatin = isDevanagari || Object.values(nonLatinPatterns).some(pattern => pattern.test(text));
+  
+  return { isNonLatin, isDevanagari };
 };
 
 interface NodeLabelProps {
@@ -48,43 +48,37 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   translatedText
 }) => {
-  const isNonLatin = useRef<boolean>(false);
-  const isDevanagari = useRef<boolean>(false);
+  // Detect script type for positioning and size adjustments
+  const scriptType = useMemo(() => {
+    return detectScriptType(translatedText || id);
+  }, [translatedText, id]);
   
-  // Check if text contains non-Latin script and memoize the result
-  useEffect(() => {
-    if (translatedText) {
-      isNonLatin.current = containsNonLatinScript(translatedText);
-      isDevanagari.current = containsDevanagari(translatedText);
-    }
-  }, [translatedText]);
-
+  // Calculate font size with standardized approach for all scripts
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Base size calculation 
+    // Base size calculation with minor adjustments for script type
     const baseSize = 0.26 + Math.max(0, (26 - z) * 0.0088);
     
-    // Adjust size for non-Latin scripts - they often need slightly bigger font
-    // Reduced size adjustment for better consistency
-    const sizeAdjustment = isDevanagari.current ? 0.04 : 
-                          isNonLatin.current ? 0.02 : 0;
+    // Small size adjustment for non-Latin scripts
+    const sizeAdjustment = scriptType.isDevanagari ? 0.04 : 
+                          scriptType.isNonLatin ? 0.02 : 0;
     
     // Ensure size stays within reasonable bounds
     return Math.max(Math.min(baseSize + sizeAdjustment, 0.5), 0.23);
-  }, [cameraZoom, isNonLatin.current, isDevanagari.current]);
+  }, [cameraZoom, scriptType]);
 
   // Don't render if not supposed to be shown
   if (!shouldShowLabel) return null;
 
-  // Adjust vertical positioning for different script types - made more consistent
+  // Standardized vertical positioning with minor script-specific adjustments
   let verticalPosition = type === 'entity' ? 0.9 : 0.8;
   
-  // More subtle adjustments for different script types
-  if (isDevanagari.current) {
+  // Small adjustments for different script types
+  if (scriptType.isDevanagari) {
     verticalPosition += 0.08;
-  } else if (isNonLatin.current) {
+  } else if (scriptType.isNonLatin) {
     verticalPosition += 0.04;
   }
   

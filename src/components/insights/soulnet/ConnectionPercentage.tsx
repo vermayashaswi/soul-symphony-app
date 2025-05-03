@@ -42,7 +42,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
       size={fontSize}
       bold={true}
       visible={isVisible}
-      opacity={1} // Full opacity for better readability
+      opacity={1}
     />
   );
 };
