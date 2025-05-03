@@ -18,33 +18,50 @@
     <meta name="twitter:site" content="@soulo_online" />
     <meta name="twitter:image" content="https://soulo.online/opengraph-image.png" />
     
-    <!-- Noto Sans Devanagari Font for Hindi text rendering -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&display=swap" rel="stylesheet">
-    <!-- Preload Noto Sans Devanagari for faster rendering - high priority -->
-    <link rel="preload" href="https://fonts.gstatic.com/s/notosansdevanagari/v25/TuGoUUFzXI5FBtUq5a8bjKYTZjtRU6Sgv3kQ_iuU3i8sSg.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
-    
-    <!-- Add additional font preloading for better multi-language support -->
-    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <!-- Preconnect to Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
     
+    <!-- Main fonts with display=swap for faster rendering -->
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans:wght@400;500;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+Devanagari:wght@400;500;700&display=swap" rel="stylesheet">
+    
+    <!-- Preload critical fonts -->
+    <link rel="preload" href="https://fonts.gstatic.com/s/notosans/v28/o-0IIpQlx3QUlC5A4PNr5TRA.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
+    <link rel="preload" href="https://fonts.gstatic.com/s/notosansdevanagari/v25/TuGoUUFzXI5FBtUq5a8bjKYTZjtRU6Sgv3kQ_iuU3i8sSg.woff2" as="font" type="font/woff2" crossorigin fetchpriority="high">
+    
     <style>
-      /* Add specific styles for Devanagari text */
+      /* Font classes for specific scripts */
       .devanagari-text {
         font-family: 'Noto Sans Devanagari', sans-serif !important;
         letter-spacing: 0.05em;
       }
       
-      /* Add styles for all non-Latin text */
       .non-latin-text {
         font-family: 'Noto Sans', sans-serif !important;
         letter-spacing: 0.02em;
       }
       
-      /* Fix for ThreeJS canvas to ensure it renders properly */
+      /* Fix for ThreeJS canvas */
       canvas.three-canvas {
         display: block;
         width: 100%;
         height: 100%;
+      }
+      
+      /* Set default font for the entire application */
+      body {
+        font-family: 'Noto Sans', sans-serif;
+      }
+      
+      /* Font loading detection */
+      .fonts-loaded {
+        opacity: 1;
+        transition: opacity 0.5s ease;
+      }
+      
+      .fonts-loading {
+        opacity: 0.8;
       }
     </style>
   </head>
@@ -56,6 +73,36 @@
     <script src="https://cdn.gpteng.co/gptengineer.js" type="module"></script>
     
     <script>
+      // Check font availability and mark when fonts are loaded
+      document.addEventListener('DOMContentLoaded', function() {
+        document.body.classList.add('fonts-loading');
+        
+        if (document.fonts) {
+          document.fonts.ready.then(function() {
+            console.log('All fonts loaded successfully');
+            document.body.classList.remove('fonts-loading');
+            document.body.classList.add('fonts-loaded');
+          });
+          
+          // Check for specific fonts
+          Promise.all([
+            document.fonts.load('1em "Noto Sans"'),
+            document.fonts.load('1em "Noto Sans Devanagari"')
+          ]).then(function(loadedFonts) {
+            console.log('Critical fonts loaded:', 
+              loadedFonts[0].length > 0 ? 'Noto Sans ✓' : 'Noto Sans ✗',
+              loadedFonts[1].length > 0 ? 'Noto Sans Devanagari ✓' : 'Noto Sans Devanagari ✗'
+            );
+          });
+        }
+        
+        // Apply settings for Three.js
+        if (window.THREE) {
+          console.log('THREE.js detected - applying optimizations');
+          window.THREE_FORCE_WEBGL2 = true;
+        }
+      });
+      
       // Force reload if the app fails to load within 10 seconds
       setTimeout(function() {
         if (document.readyState !== 'complete') {
@@ -63,32 +110,6 @@
           window.location.reload();
         }
       }, 10000);
-      
-      // Preload Devanagari font and track its load status
-      document.addEventListener('DOMContentLoaded', function() {
-        console.log('DOM loaded, checking font availability');
-        if (document.fonts) {
-          document.fonts.ready.then(function() {
-            console.log('All fonts loaded, including Devanagari fonts');
-          });
-          
-          // Check for specific Devanagari font
-          document.fonts.load('1em "Noto Sans Devanagari"').then(function(fontFace) {
-            console.log('Noto Sans Devanagari font loaded:', fontFace.length > 0);
-          });
-          
-          // Check for standard Noto Sans font (for other languages)
-          document.fonts.load('1em "Noto Sans"').then(function(fontFace) {
-            console.log('Noto Sans font loaded:', fontFace.length > 0);
-          });
-        }
-        
-        // Apply settings to ensure Three.js renders correctly
-        if (window.THREE) {
-          console.log('THREE.js detected - applying optimizations');
-          window.THREE_FORCE_WEBGL2 = true;
-        }
-      });
     </script>
   </body>
 </html>

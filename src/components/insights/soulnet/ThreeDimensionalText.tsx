@@ -55,10 +55,9 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const [translatedText, setTranslatedText] = useState(text);
   const { camera } = useThree();
   const textRef = useRef<THREE.Mesh>(null);
-  const lastUpdateTime = useRef<number>(0);
   const isNonLatinScript = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
-  const loadingTimerRef = useRef<NodeJS.Timeout | null>(null);
+  const lastTranslation = useRef<string>(text);
   const [textReady, setTextReady] = useState<boolean>(false);
   
   // Detect script type on first render and when text changes
@@ -70,98 +69,81 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       isNonLatinScript.current = hasNonLatin;
       isDevanagari.current = hasDevanagari;
       
-      if (hasDevanagari) {
-        console.log(`Hindi/Devanagari text detected: "${translatedText}", applying optimizations`);
-      }
+      // Set text as ready immediately for all languages
+      setTextReady(true);
     }
-    
-    setTextReady(true); // Mark text as ready to render regardless of script
-    
-    // Set a timeout to ensure we proceed even if something gets stuck
-    if (loadingTimerRef.current) {
-      clearTimeout(loadingTimerRef.current);
-    }
-    loadingTimerRef.current = setTimeout(() => {
-      if (!textReady) {
-        console.log("Force setting text ready after timeout");
-        setTextReady(true);
-      }
-    }, 500);
-    
-    // Cleanup the timer
-    return () => {
-      if (loadingTimerRef.current) {
-        clearTimeout(loadingTimerRef.current);
-        loadingTimerRef.current = null;
-      }
-    };
-  }, [translatedText, textReady]);
+  }, [translatedText]);
   
-  // Enhanced billboarding - always update EVERY frame for ALL text types for consistency
+  // Enhanced billboarding - always update EVERY frame for ALL text types
   useFrame(() => {
     if (textRef.current && camera && visible) {
-      // Make text always face the camera for all language types
+      // Make text always face the camera
       textRef.current.quaternion.copy(camera.quaternion);
-      lastUpdateTime.current = Date.now();
     }
   });
 
+  // Handle translation for all languages consistently
   useEffect(() => {
     const translateText = async () => {
-      if (currentLanguage !== 'en' && text) {
-        try {
-          console.log(`Translating text "${text}" to ${currentLanguage}`);
-          const result = await translate(text);
-          
-          if (result) {
-            setTranslatedText(result);
-            console.log(`Translation complete: "${result}"`);
-            
-            // Detect script after translation
-            isNonLatinScript.current = containsNonLatinScript(result);
-            isDevanagari.current = containsDevanagari(result);
-            
-            if (isDevanagari.current) {
-              console.log(`Hindi/Devanagari translation: "${result}", adjusting rendering parameters`);
-            }
-          } else {
-            console.log(`No translation returned for "${text}", using original text`);
-            setTranslatedText(text);
-          }
-        } catch (e) {
-          console.error('Translation error:', e);
-          // Fallback to original text on error
-          setTranslatedText(text);
-        }
-      } else {
-        console.log(`Using original ${currentLanguage === 'en' ? 'English' : ''} text: "${text}"`);
-        setTranslatedText(text);
-        
-        // Check for non-Latin script in original text as well
-        isNonLatinScript.current = containsNonLatinScript(text);
-        isDevanagari.current = containsDevanagari(text);
+      if (!text) {
+        setTranslatedText('');
+        return;
       }
       
-      // Ensure text is ready for rendering
-      setTextReady(true);
+      // Avoid unnecessary translations
+      if (currentLanguage === 'en') {
+        setTranslatedText(text);
+        setTextReady(true);
+        return;
+      }
+      
+      // Skip retranslation if text hasn't changed
+      if (text === lastTranslation.current && translatedText) {
+        setTextReady(true);
+        return;
+      }
+      
+      try {
+        const result = await translate(text);
+        
+        if (result) {
+          setTranslatedText(result);
+          lastTranslation.current = text;
+          
+          // Update script detection after translation
+          isNonLatinScript.current = containsNonLatinScript(result);
+          isDevanagari.current = containsDevanagari(result);
+        } else {
+          // Fallback to original text
+          setTranslatedText(text);
+        }
+      } catch (e) {
+        console.error('Translation error:', e);
+        // Fallback to original text on error
+        setTranslatedText(text);
+      } finally {
+        // Always set text as ready at the end
+        setTextReady(true);
+      }
     };
     
     translateText();
   }, [text, currentLanguage, translate]);
 
-  if (!visible || !text) return null;
+  // Don't render if we're not supposed to be visible
+  if (!visible) return null;
+
+  // Also don't render if there's no text
+  if (!text && !translatedText) return null;
 
   // Calculate appropriate max width based on script type and text length
   const getMaxWidth = () => {
     if (isDevanagari.current) {
-      // Much wider container for Devanagari specifically
-      return 60; // Further increased to accommodate Devanagari's wider character set
+      return 60; // Wider container for Devanagari
     } else if (isNonLatinScript.current) {
-      // Wider container for other non-Latin scripts
-      return 30;
+      return 40; // Wider container for other non-Latin scripts
     }
-    // Standard width for Latin scripts, but increased slightly for better consistency
-    return 15; // Increased from 10 to 15 for more room for all languages
+    return 20; // Standard width for Latin scripts
   };
 
   // Get font family appropriate for the script
@@ -179,35 +161,13 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     } else if (isNonLatinScript.current) {
       return 0.05; // Some spacing for other non-Latin scripts
     }
-    // Slightly increased for Latin scripts too
-    return 0.02; // Was 0, now 0.02 for better readability
+    return 0.02; // Slightly increased for Latin scripts too
   };
 
-  // Set higher resolution for all text
-  const getGlyphSize = () => {
-    if (isDevanagari.current) {
-      return 128; // Higher resolution for Devanagari 
-    }
-    return 96; // Increased from 64 to 96 for all other languages
-  };
-
-  // Increase render order priority for all text for consistency
-  const getRenderOrder = () => {
-    if (isDevanagari.current) {
-      return 10; // Higher priority for Devanagari
-    }
-    return 5; // Increased from 1 to 5 for other text
-  };
-
-  // Adjusted line height for different scripts
-  const getLineHeight = () => {
-    if (isDevanagari.current) {
-      return 1.8; // Taller for Devanagari
-    } else if (isNonLatinScript.current) {
-      return 1.5; // Taller for other non-Latin
-    }
-    return 1.3; // Standard for Latin (slightly increased)
-  };
+  // Apply consistent rendering settings for all languages
+  const glyphSize = isDevanagari.current ? 128 : 96;
+  const lineHeight = isDevanagari.current ? 1.8 : (isNonLatinScript.current ? 1.5 : 1.3);
+  const renderOrder = isDevanagari.current ? 10 : 5;
 
   // If text is not ready yet, display nothing to prevent rendering artifacts
   if (!textReady) {
@@ -225,29 +185,20 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         font={getFont()}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.008} // Increased outline for better readability
+        outlineWidth={0.008}
         outlineColor="#000000"
         outlineOpacity={0.9}
         maxWidth={getMaxWidth()}
-        overflowWrap="normal" // Prevent syllable breaks
-        whiteSpace="normal" // Allow wrapping for better display of non-Latin text
+        overflowWrap="normal" 
+        whiteSpace="normal"
         textAlign="center"
         letterSpacing={getLetterSpacing()}
-        sdfGlyphSize={getGlyphSize()} 
-        clipRect={[-1000, -1000, 2000, 2000]} // Reduce rendering artifacts
-        renderOrder={getRenderOrder()} 
-        lineHeight={getLineHeight()}
-        // Special settings for Devanagari text
-        userData={{ 
-          isDevanagari: isDevanagari.current,
-          isNonLatinScript: isNonLatinScript.current,
-          language: currentLanguage
-        }}
+        sdfGlyphSize={glyphSize} 
+        clipRect={[-1000, -1000, 2000, 2000]}
+        renderOrder={renderOrder} 
+        lineHeight={lineHeight}
         // Include common characters for pre-caching
-        characters={isDevanagari.current ? 
-          "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:',.<>/?`~ ।॥॰॥०१२३४५६७८९अआइईउऊएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसहक्षत्रज्ञड़ढ़" : 
-          "abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:',.<>/?`~ áéíóúÁÉÍÓÚñÑüÜ¿¡"
-        }
+        characters="abcdefghijklmnopqrstuvwxyzABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789!@#$%^&*()_+-=[]{}|;:',.<>/?`~ áéíóúÁÉÍÓÚñÑüÜ¿¡"
       >
         {translatedText || text}
         {backgroundColor && (
@@ -263,7 +214,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
           transparent={true}
           opacity={opacity}
           toneMapped={false}
-          depthWrite={true} // Enable depth writing to fix z-fighting issues
+          depthWrite={true}
         />
       </Text>
     </group>

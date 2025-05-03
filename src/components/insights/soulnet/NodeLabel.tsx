@@ -48,90 +48,38 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   translatedText
 }) => {
-  const prevTranslatedText = useRef<string | undefined>(translatedText);
+  const isVisible = useRef<boolean>(shouldShowLabel);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
-  const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
-  const visibilityTimeout = useRef<NodeJS.Timeout | null>(null);
-  const initialRenderRef = useRef<boolean>(true);
   
-  // Stabilize visibility transitions to prevent flickering
+  // Detect if the text contains non-Latin characters
   useEffect(() => {
-    // Initial render should always show label if shouldShowLabel is true
-    if (initialRenderRef.current) {
-      stableVisibilityRef.current = shouldShowLabel;
-      initialRenderRef.current = false;
-      return;
-    }
-
-    // For all text, stabilize visibility transitions
-    if (shouldShowLabel !== stableVisibilityRef.current) {
-      // Update immediately when going from invisible to visible
-      if (shouldShowLabel) {
-        stableVisibilityRef.current = true;
-        
-        // Clear any existing timeout to prevent conflicts
-        if (visibilityTimeout.current) {
-          clearTimeout(visibilityTimeout.current);
-          visibilityTimeout.current = null;
-        }
-      } else {
-        // Use a delay for hiding text - longer for complex scripts
-        if (visibilityTimeout.current) {
-          clearTimeout(visibilityTimeout.current);
-        }
-        
-        const delay = isDevanagari.current ? 300 : isNonLatin.current ? 200 : 100;
-        visibilityTimeout.current = setTimeout(() => {
-          stableVisibilityRef.current = false;
-          visibilityTimeout.current = null;
-        }, delay);
-      }
-    }
-    
-    // Cleanup timeouts on unmount
-    return () => {
-      if (visibilityTimeout.current) {
-        clearTimeout(visibilityTimeout.current);
-      }
-    };
-  }, [shouldShowLabel]);
-  
-  // Check if text contains non-Latin script and memoize the result
-  useEffect(() => {
-    if (translatedText && translatedText !== prevTranslatedText.current) {
-      const hasDevanagari = containsDevanagari(translatedText);
-      const hasNonLatin = containsNonLatinScript(translatedText) || hasDevanagari;
-      
-      isNonLatin.current = hasNonLatin;
-      isDevanagari.current = hasDevanagari;
-      prevTranslatedText.current = translatedText;
-      
-      // Log detection of Hindi text
-      if (hasDevanagari) {
-        console.log(`Hindi/Devanagari text detected in node "${id}": "${translatedText}", applying special rendering`);
-      }
+    if (translatedText || id) {
+      const textToCheck = translatedText || id;
+      isDevanagari.current = containsDevanagari(textToCheck);
+      isNonLatin.current = containsNonLatinScript(textToCheck) || isDevanagari.current;
     }
   }, [translatedText, id]);
+  
+  // Update visibility immediately for all languages
+  useEffect(() => {
+    isVisible.current = shouldShowLabel;
+  }, [shouldShowLabel]);
 
   // Use fallback when translation is missing
   const displayText = useMemo(() => {
-    if (!translatedText && id) {
-      console.log(`Using fallback text for node "${id}" since translation is missing`);
-      return id;
-    }
     return translatedText || id;
   }, [translatedText, id]);
 
+  // Calculate dynamic font size based on camera zoom and script type
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Base size calculation adjusted by 30%
+    // Base size calculation
     const baseSize = 0.26 + Math.max(0, (26 - z) * 0.0088);
     
-    // Adjust size for non-Latin scripts - they often need slightly bigger font
-    // Devanagari (Hindi) scripts need even larger adjustment
+    // Adjust size for different scripts
     const sizeAdjustment = isDevanagari.current ? 0.1 : 
                            isNonLatin.current ? 0.05 : 0;
     
@@ -140,19 +88,19 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   }, [cameraZoom, isNonLatin.current, isDevanagari.current]);
 
   // Don't render if not supposed to be shown
-  if (!stableVisibilityRef.current) return null;
+  if (!isVisible.current) return null;
   
   // Fail-safe for missing text
   if (!displayText) return null;
 
-  // Adjust vertical positioning for different script types
+  // Adjust vertical positioning based on script type
   let verticalPosition = type === 'entity' ? 0.9 : 0.8;
   
-  // For Devanagari text, position significantly higher to accommodate taller characters
+  // Position adjustments for different scripts
   if (isDevanagari.current) {
-    verticalPosition += 0.2;
+    verticalPosition += 0.25; // Higher position for Devanagari
   } else if (isNonLatin.current) {
-    verticalPosition += 0.08;
+    verticalPosition += 0.1; // Slightly higher for other non-Latin
   }
   
   const labelPosition: [number, number, number] = [0, verticalPosition, 0];
@@ -164,7 +112,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       color={type === 'entity' ? '#ffffff' : themeHex}
       size={dynamicFontSize}
       bold={isHighlighted}
-      visible={stableVisibilityRef.current}
+      visible={isVisible.current}
     />
   );
 };
