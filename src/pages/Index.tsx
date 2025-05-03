@@ -10,6 +10,7 @@ import { useNetworkStatus } from '@/utils/network';
 import HomePage from '@/pages/website/HomePage';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import ErrorBoundary from '@/components/insights/ErrorBoundary';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -66,9 +67,9 @@ const Index = () => {
   
   console.log('Rendering Index.tsx component, path:', window.location.pathname);
 
-  // This should only render the website home page component
+  // Wrap the content in an ErrorBoundary to catch any rendering errors
   return (
-    <>
+    <ErrorBoundary>
       <NetworkAwareContent
         lowBandwidthFallback={
           <div className="flex flex-col items-center justify-center min-h-screen p-4">
@@ -102,7 +103,7 @@ const Index = () => {
       >
         <HomePage />
       </NetworkAwareContent>
-    </>
+    </ErrorBoundary>
   );
 };
 

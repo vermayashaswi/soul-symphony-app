@@ -39,31 +39,41 @@ export const useFontLoading = () => {
       checkFonts();
       
       // Also listen for loading events
-      document.fonts.addEventListener('loadingdone', () => {
+      const loadingDoneHandler = () => {
         const devanagariReady = document.fonts.check('16px "Noto Sans Devanagari"');
         setFontStatus(prev => ({
           ...prev,
           fontsLoaded: true,
           devanagariReady
         }));
-      });
+      };
       
-      document.fonts.addEventListener('loadingerror', () => {
+      const loadingErrorHandler = () => {
         setFontStatus(prev => ({
           ...prev,
           fontsLoaded: true,
           fontsError: true
         }));
-      });
+      };
+      
+      document.fonts.addEventListener('loadingdone', loadingDoneHandler);
+      document.fonts.addEventListener('loadingerror', loadingErrorHandler);
+      
+      return () => {
+        document.fonts.removeEventListener('loadingdone', loadingDoneHandler);
+        document.fonts.removeEventListener('loadingerror', loadingErrorHandler);
+      };
     } else {
       // Fallback for browsers that don't support document.fonts
-      setTimeout(() => {
+      const timer = setTimeout(() => {
         setFontStatus({
           fontsLoaded: true,
           fontsError: false,
           devanagariReady: true // Optimistically assume true if we can't check
         });
       }, 1000);
+      
+      return () => clearTimeout(timer);
     }
   }, []);
 

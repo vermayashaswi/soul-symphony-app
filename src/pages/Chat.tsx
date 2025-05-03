@@ -6,7 +6,7 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useFontLoading } from '@/main';
+import { useFontLoading } from '@/hooks/use-font-loading';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -15,12 +15,8 @@ const Chat = () => {
   const { translate, currentLanguage } = useTranslation();
   const [isInitialized, setIsInitialized] = useState(false);
   
-  // Get font loading status
-  const fontStatus = useFontLoading ? useFontLoading() : { 
-    fontsLoaded: true, 
-    fontsError: false,
-    devanagariReady: true
-  };
+  // Get font loading status from the dedicated hook
+  const fontStatus = useFontLoading();
 
   // Pre-translate common chat-related strings more comprehensively 
   useEffect(() => {
