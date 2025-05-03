@@ -11,7 +11,7 @@ interface NodeMeshProps {
   dimmed: boolean;
   connectionStrength?: number;
   isSelected: boolean;
-  onClick: () => void;
+  onClick: (e: any) => void;
   onPointerDown: (e: any) => void;
   onPointerUp: (e: any) => void;
   onPointerOut: () => void;
@@ -76,7 +76,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
       scale={[scale, scale, scale]}
       onClick={(e) => {
         e.stopPropagation();
-        onClick();
+        onClick(e);
       }}
       onPointerDown={onPointerDown}
       onPointerUp={onPointerUp}

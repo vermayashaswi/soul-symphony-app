@@ -1,5 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
@@ -17,7 +18,7 @@ interface NodeData {
 interface NodeProps {
   node: NodeData;
   isSelected: boolean;
-  onClick: (id: string) => void;
+  onClick: (id: string, e: any) => void;
   highlightedNodes: Set<string>;
   showLabel: boolean;
   dimmed: boolean;
@@ -28,6 +29,7 @@ interface NodeProps {
   connectionStrength?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
+  translatedLabels?: Map<string, string>;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -44,6 +46,7 @@ export const Node: React.FC<NodeProps> = ({
   connectionStrength = 0.5,
   connectionPercentage = 0,
   showPercentage = false,
+  translatedLabels
 }) => {
   const { theme } = useTheme();
   const [isTouching, setIsTouching] = useState(false);
@@ -88,7 +91,7 @@ export const Node: React.FC<NodeProps> = ({
         
         if (deltaX < 10 && deltaY < 10) {
           console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
-          onClick(node.id);
+          onClick(node.id, e);
           
           if (navigator.vibrate) {
             navigator.vibrate(50);
@@ -96,7 +99,7 @@ export const Node: React.FC<NodeProps> = ({
         }
       } else {
         console.log(`Node clicked (no start position): ${node.id}`);
-        onClick(node.id);
+        onClick(node.id, e);
       }
     }
     
@@ -125,6 +128,9 @@ export const Node: React.FC<NodeProps> = ({
   // Always show percentages for highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;
   
+  // Get translated text if available, otherwise use original
+  const translatedText = translatedLabels?.get(node.id) || node.id;
+  
   // Debug logs for label and percentage visibility
   useEffect(() => {
     console.log(`Node ${node.id} label visibility: shouldShowLabel=${shouldShowLabel}`);
@@ -141,7 +147,7 @@ export const Node: React.FC<NodeProps> = ({
         dimmed={dimmed}
         connectionStrength={connectionStrength}
         isSelected={isSelected}
-        onClick={() => onClick(node.id)}
+        onClick={(e) => onClick(node.id, e)}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
         onPointerOut={() => setIsTouching(false)}
@@ -156,6 +162,7 @@ export const Node: React.FC<NodeProps> = ({
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
+        translatedText={translatedText}
       />
 
       <ConnectionPercentage

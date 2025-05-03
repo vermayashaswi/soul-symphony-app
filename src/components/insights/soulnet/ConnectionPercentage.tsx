@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Html } from '@react-three/drei';
+import ThreeDimensionalText from './ThreeDimensionalText';
 
 interface ConnectionPercentageProps {
   position: [number, number, number];
@@ -26,46 +26,18 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   // Position percentage label significantly higher than the node label
   // Entity nodes are larger so they need more vertical spacing
   const verticalOffset = nodeType === 'entity' ? 2.2 : 1.8;
+  const textPosition: [number, number, number] = [0, verticalOffset, 0];
   
   return (
-    <Html
-      position={[0, verticalOffset, 0]}
-      center
-      distanceFactor={15}
-      occlude={false}
-      className="z-[9999]"
-      style={{
-        pointerEvents: 'none',
-        userSelect: 'none',
-        textShadow: '0 0 4px rgba(0,0,0,0.8)',
-        transform: 'translateZ(9999px)',
-        fontSize: '18px',
-        fontWeight: 'bold',
-        width: 'auto',
-        height: 'auto',
-      }}
-    >
-      <div
-        style={{
-          backgroundColor: 'rgba(0,0,0,0.7)',
-          color: '#ffffff',
-          padding: '4px 8px',
-          borderRadius: '6px',
-          fontSize: '16px',
-          fontWeight: 'bold',
-          whiteSpace: 'nowrap',
-          boxShadow: '0 2px 5px rgba(0,0,0,0.5)',
-          transform: 'scale(1)',
-          transformOrigin: 'center center',
-          lineHeight: '1.2',
-          opacity: 1,
-          zIndex: 9999,
-          position: 'relative',
-        }}
-      >
-        {`${displayPercentage}%`}
-      </div>
-    </Html>
+    <ThreeDimensionalText
+      text={`${displayPercentage}%`}
+      position={textPosition}
+      color="#ffffff"
+      size={0.17}
+      bold={true}
+      backgroundColor="#000000"
+      visible={isVisible}
+    />
   );
 };
 

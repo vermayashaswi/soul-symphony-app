@@ -25,6 +25,7 @@ interface SoulNetVisualizationProps {
   onNodeClick: (id: string) => void;
   themeHex: string;
   isFullScreen?: boolean;
+  translatedLabels?: Map<string, string>;
 }
 
 function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
@@ -117,6 +118,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   onNodeClick,
   themeHex,
   isFullScreen = false,
+  translatedLabels
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
@@ -248,7 +250,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const shouldDim = !!selectedNode;
 
   // Custom node click handler with debugging
-  const handleNodeClick = (id: string) => {
+  const handleNodeClick = (id: string, e: any) => {
     console.log(`Node clicked in visualization: ${id}`);
     onNodeClick(id);
   };
@@ -382,6 +384,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             connectionStrength={connectionStrength}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
+            translatedLabels={translatedLabels}
           />
         );
       })}

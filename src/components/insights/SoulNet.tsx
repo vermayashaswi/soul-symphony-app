@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { staticTranslationService } from '@/services/staticTranslationService';
 import SoulNetVisualization from './soulnet/SoulNetVisualization';
 import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
@@ -13,6 +13,7 @@ import { useUserColorThemeHex } from './soulnet/useUserColorThemeHex';
 import { cn } from '@/lib/utils';
 import ErrorBoundary from './ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface NodeData {
   id: string;
@@ -41,6 +42,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
+  const { currentLanguage } = useTranslation();
+  const [translatedLabels, setTranslatedLabels] = useState<Map<string, string>>(new Map());
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
 
@@ -50,6 +53,50 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       console.log("SoulNet unmounted");
     };
   }, []);
+
+  // Pre-translate all node labels
+  useEffect(() => {
+    if (!graphData.nodes.length || currentLanguage === 'en') {
+      return;
+    }
+
+    const translateLabels = async () => {
+      try {
+        console.log(`Pre-translating ${graphData.nodes.length} node labels to ${currentLanguage}`);
+        const nodeTexts = graphData.nodes.map(node => node.id);
+        
+        const translations = await staticTranslationService.preTranslate(nodeTexts);
+        setTranslatedLabels(translations);
+        
+        console.log(`Translated ${translations.size} node labels`);
+      } catch (error) {
+        console.error("Failed to pre-translate node labels:", error);
+      }
+    };
+
+    translateLabels();
+  }, [graphData.nodes, currentLanguage]);
+
+  // Re-translate when language changes
+  useEffect(() => {
+    if (graphData.nodes.length > 0 && currentLanguage !== 'en') {
+      console.log(`Language changed to ${currentLanguage}, re-translating node labels`);
+      // Clear current translations to avoid showing wrong language temporarily
+      setTranslatedLabels(new Map());
+      
+      const translateLabels = async () => {
+        try {
+          const nodeTexts = graphData.nodes.map(node => node.id);
+          const translations = await staticTranslationService.preTranslate(nodeTexts);
+          setTranslatedLabels(translations);
+        } catch (error) {
+          console.error("Failed to translate node labels after language change:", error);
+        }
+      };
+      
+      translateLabels();
+    }
+  }, [currentLanguage]);
 
   useEffect(() => {
     if (!userId) return;
@@ -84,6 +131,18 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         const processedData = processEntities(entries);
         console.log("Processed graph data:", processedData);
         setGraphData(processedData);
+        
+        // Pre-translate node labels when data is loaded
+        if (processedData.nodes.length > 0 && currentLanguage !== 'en') {
+          try {
+            const nodeTexts = processedData.nodes.map(node => node.id);
+            const translations = await staticTranslationService.preTranslate(nodeTexts);
+            setTranslatedLabels(translations);
+            console.log(`Pre-translated ${translations.size} node labels`);
+          } catch (err) {
+            console.error("Initial translation failed:", err);
+          }
+        }
       } catch (error) {
         console.error('Error processing entity-emotion data:', error);
         setError(error instanceof Error ? error : new Error('Unknown error occurred'));
@@ -93,7 +152,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     };
 
     fetchEntityEmotionData();
-  }, [userId, timeRange]);
+  }, [userId, timeRange, currentLanguage]);
 
   const handleNodeSelect = useCallback((id: string) => {
     console.log(`Node selected: ${id}`);
@@ -203,6 +262,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               onNodeClick={handleNodeSelect}
               themeHex={themeHex}
               isFullScreen={isFullScreen}
+              translatedLabels={translatedLabels}
             />
           </Canvas>
         </ErrorBoundary>
