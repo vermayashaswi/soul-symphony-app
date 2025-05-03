@@ -1,5 +1,5 @@
 
-import React, { useMemo } from 'react';
+import React, { useMemo, useEffect } from 'react';
 import { Html } from '@react-three/drei';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
@@ -22,7 +22,16 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   cameraZoom,
   themeHex
 }) => {
-  console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}, path=${window.location.pathname}`);
+  // Extended debug logging to track node label visibility
+  useEffect(() => {
+    console.log(`NodeLabel MOUNT "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}, path=${window.location.pathname}`);
+    return () => {
+      console.log(`NodeLabel UNMOUNT "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}`);
+    };
+  }, [id, isHighlighted, shouldShowLabel, type]);
+
+  // Debug logging each render
+  console.log(`NodeLabel RENDER for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}, path=${window.location.pathname}`);
 
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
@@ -60,6 +69,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     backgroundColor: isHighlighted ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.65)', // Even darker background for better visibility
     borderRadius: '4px',
     boxShadow: isHighlighted ? '0 1px 3px rgba(0,0,0,0.5)' : 'none',
+    border: '1px solid rgba(255,255,255,0.1)', // Subtle border for better definition
   }), [type, themeHex, isHighlighted]);
 
   // Don't render if not supposed to be shown

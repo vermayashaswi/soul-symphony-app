@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -28,6 +29,11 @@ export function TranslatableMarkdown({
   const location = useLocation();
   const isOnWebsite = isWebsiteRoute(location.pathname);
   const mountedRef = useRef<boolean>(true);
+  
+  // Debug logging for transparency
+  useEffect(() => {
+    console.log(`TranslatableMarkdown: path=${location.pathname}, isOnWebsite=${isOnWebsite}, forceTranslate=${forceTranslate}`);
+  }, [location.pathname, isOnWebsite, forceTranslate]);
   
   // Function to translate markdown content with improved error handling
   const translateMarkdown = async () => {
@@ -150,6 +156,7 @@ export function TranslatableMarkdown({
       data-translated={translatedContent !== children ? 'true' : 'false'}
       data-lang={currentLanguage}
       data-force-translate={forceTranslate ? 'true' : 'false'}
+      data-path={location.pathname} // Add path for debugging
     >
       <ReactMarkdown className={className}>
         {contentToRender}

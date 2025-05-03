@@ -42,9 +42,7 @@ export function TranslatableText({
   
   // Enhanced logging to help debug translation issues
   useEffect(() => {
-    if (forceTranslate) {
-      console.log(`TranslatableText (${text.substring(0, 20)}...): forceTranslate=${forceTranslate}, isOnWebsite=${isOnWebsite}, path=${pathname}`);
-    }
+    console.log(`TranslatableText (${text.substring(0, 20)}...): forceTranslate=${forceTranslate}, isOnWebsite=${isOnWebsite}, path=${pathname}`);
   }, [text, forceTranslate, isOnWebsite, pathname]);
   
   // Helper function to clean translation results
@@ -65,6 +63,7 @@ export function TranslatableText({
     }
 
     // CRITICAL FIX: forceTranslate should override website route check
+    // This was the key issue - we now completely ignore website route if forceTranslate is true
     if (isOnWebsite && !forceTranslate) {
       console.log(`TranslatableText: Skipping translation for "${text}" because on website route without force translate`);
       setTranslatedText(text);
@@ -177,6 +176,7 @@ export function TranslatableText({
       'data-translated': translatedText !== text ? 'true' : 'false',
       'data-lang': currentLanguage,
       'data-force-translate': forceTranslate ? 'true' : 'false',
+      'data-path': pathname, // Add current path for debugging
       style // Pass style prop to the element
     }, 
     translatedText || text  // Ensure we always show something, even if translation fails

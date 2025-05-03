@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Html } from '@react-three/drei';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
@@ -18,11 +18,19 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   offsetY = 0,
   nodeType = 'emotion'
 }) => {
-  // Debug logging for understanding visibility issues
-  console.log(`ConnectionPercentage: isVisible=${isVisible}, percentage=${percentage}, nodeType=${nodeType}`);
+  // Extended debug logging for understanding visibility issues
+  useEffect(() => {
+    console.log(`ConnectionPercentage MOUNT: isVisible=${isVisible}, percentage=${percentage}, nodeType=${nodeType}, pathname=${window.location.pathname}`);
+    return () => {
+      console.log(`ConnectionPercentage UNMOUNT: isVisible=${isVisible}, percentage=${percentage}`);
+    };
+  }, [isVisible, percentage, nodeType]);
   
-  // Don't render if not visible
-  if (!isVisible) return null;
+  // Debug logging for understanding visibility issues
+  console.log(`ConnectionPercentage RENDER: isVisible=${isVisible}, percentage=${percentage}, nodeType=${nodeType}`);
+  
+  // Don't render if not visible or percentage is zero/negative
+  if (!isVisible || percentage <= 0) return null;
 
   const displayPercentage = Math.round(percentage);
   
@@ -57,12 +65,14 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           lineHeight: '1',
           opacity: 1, // Full opacity for better visibility
           textShadow: '0 1px 2px rgba(0,0,0,0.9)', // Text shadow for better readability
+          border: '1px solid rgba(255,255,255,0.2)', // Subtle border for better definition
         }}
       >
         {/* Always display original percentage if translation fails */}
         <TranslatableText 
           text={`${displayPercentage}%`} 
           forceTranslate={true}
+          style={{ fontWeight: 'bold' }}
         />
       </div>
     </Html>

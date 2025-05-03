@@ -50,12 +50,17 @@ export const Node: React.FC<NodeProps> = ({
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
-  // Debug log for visibility with more informative details
+  // Comprehensive debug logs for node visibility and status
   useEffect(() => {
-    if (isHighlighted || isSelected) {
-      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}, on path=${window.location.pathname}`);
-    }
-  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage]);
+    console.log(`Node ${node.id} MOUNT: highlighted=${isHighlighted}, selected=${isSelected}, showLabel=${showLabel}, showPercentage=${showPercentage}, percentage=${connectionPercentage}, on path=${window.location.pathname}`);
+    
+    return () => {
+      console.log(`Node ${node.id} UNMOUNT: highlighted=${isHighlighted}, selected=${isSelected}`);
+    };
+  }, [node.id, isHighlighted, isSelected, showLabel, showPercentage, connectionPercentage]);
+  
+  // Detailed debug log for each render
+  console.log(`Node ${node.id} RENDER: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}, path=${window.location.pathname}`);
   
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = isHighlighted 
@@ -119,17 +124,17 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
-  // Ensure label visibility - use explicit visibility for both NodeLabel and ConnectionPercentage
+  // Critical fix: Ensure visibility logic is explicit and prioritized for both labels and percentages
+  // Always show labels for highlighted nodes and selected node
   const shouldShowLabel = isHighlighted || isSelected || showLabel;
   
   // Enhanced logic for percentage visibility - always show percentages for highlighted nodes that aren't selected
   const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;
   
-  // Debug logs for label and percentage visibility
+  // Debug logs for label and percentage visibility decisions
   useEffect(() => {
-    console.log(`Node ${node.id} label visibility: shouldShowLabel=${shouldShowLabel}`);
-    console.log(`Node ${node.id} percentage visibility: shouldShowPercentage=${shouldShowPercentage}, percentage=${connectionPercentage}`);
-  }, [node.id, shouldShowLabel, shouldShowPercentage, connectionPercentage]);
+    console.log(`Node ${node.id} visibility decision: shouldShowLabel=${shouldShowLabel}, shouldShowPercentage=${shouldShowPercentage}, showPercentage=${showPercentage}, isHighlighted=${isHighlighted}, isSelected=${isSelected}, connectionPercentage=${connectionPercentage}`);
+  }, [node.id, shouldShowLabel, shouldShowPercentage, showPercentage, isHighlighted, isSelected, connectionPercentage]);
 
   return (
     <group position={node.position}>

@@ -32,6 +32,13 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     return true;
   }
   
+  // CRITICAL FIX: Insights page should NOT be treated as website route when rendered at root
+  // If we detect /insights in the pathname or we're at /app/insights, it's definitely not a website
+  if (pathname.includes('/insights') || pathname.includes('/app/insights')) {
+    console.log(`Special case: ${pathname} contains insights, treating as app route`);
+    return false;
+  }
+  
   // If it has an app prefix, it's not a website route
   if (isAppRoute(pathname)) {
     console.log(`${pathname} is an app route, so not a website route`);
