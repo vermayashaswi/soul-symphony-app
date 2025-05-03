@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Html } from '@react-three/drei';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -11,6 +12,7 @@ interface TranslatableNodeTextProps {
   distanceFactor?: number;
   occlude?: boolean;
   zIndexRange?: [number, number];
+  forceTranslate?: boolean;
 }
 
 export const TranslatableNodeText: React.FC<TranslatableNodeTextProps> = ({
@@ -21,7 +23,8 @@ export const TranslatableNodeText: React.FC<TranslatableNodeTextProps> = ({
   center = true,
   distanceFactor = 15,
   occlude = false,
-  zIndexRange = [9997, 9999]
+  zIndexRange = [9997, 9999],
+  forceTranslate = true
 }) => {
   // Keep track of mount state to prevent memory leaks
   const mountedRef = useRef(true);
@@ -55,7 +58,7 @@ export const TranslatableNodeText: React.FC<TranslatableNodeTextProps> = ({
       {isReady && (
         <TranslatableText
           text={text}
-          forceTranslate={true}
+          forceTranslate={forceTranslate}
           style={{
             pointerEvents: 'none',
             userSelect: 'none',
