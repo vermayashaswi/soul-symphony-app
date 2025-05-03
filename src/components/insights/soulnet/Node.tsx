@@ -1,6 +1,7 @@
 
 import React, { useRef, useMemo } from 'react';
 import { useFrame } from '@react-three/fiber';
+import * as THREE from 'three'; // Add THREE import
 import NodeLabel from './NodeLabel';
 import NodeMesh from './NodeMesh';
 import ConnectionPercentage from './ConnectionPercentage';
@@ -110,7 +111,7 @@ const Node: React.FC<NodeProps> = ({
         dimmed={dimmed}
         type={node.type}
         themeHex={themeHex}
-        onClick={handleNodeClick}
+        onClick={handleNodeClick} // Fixed: Passing handleNodeClick function that accepts an event parameter
       />
       
       {showLabel && (
