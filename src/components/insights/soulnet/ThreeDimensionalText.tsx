@@ -69,8 +69,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         anchorY="middle"
         outlineWidth={0.0035}
         outlineColor="#000000"
-        maxWidth={5} // Keeping this value to prevent text wrapping/breaking
-        overflowWrap="break-word"
+        maxWidth={10} // Increased from 5 to 10 to ensure text doesn't wrap or get cut off
+        overflowWrap="normal" // Changed from "break-word" to "normal" to prevent syllable breaks
         textAlign="center"
         // Use a rotation that will be updated by useFrame
         rotation={[0, 0, 0]}
