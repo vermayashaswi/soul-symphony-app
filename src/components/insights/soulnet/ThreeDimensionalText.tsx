@@ -47,30 +47,31 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   if (!visible || !text) return null;
 
   return (
-    <Text
-      position={position}
-      color={color}
-      fontSize={size}
-      fontWeight={bold ? 700 : 400}
-      anchorX="center"
-      anchorY="middle"
-      outlineWidth={0.0035}
-      outlineColor="#000000"
-      opacity={opacity}
-      maxWidth={2}
-      overflowWrap="break-word"
-      textAlign="center"
-    >
-      {translatedText}
-      {backgroundColor && (
-        <meshBasicMaterial
-          color={backgroundColor}
-          transparent={true}
-          opacity={0.7}
-          attach="material"
-        />
-      )}
-    </Text>
+    <group opacity={opacity}>
+      <Text
+        position={position}
+        color={color}
+        fontSize={size}
+        fontWeight={bold ? 700 : 400}
+        anchorX="center"
+        anchorY="middle"
+        outlineWidth={0.0035}
+        outlineColor="#000000"
+        maxWidth={2}
+        overflowWrap="break-word"
+        textAlign="center"
+      >
+        {translatedText}
+        {backgroundColor && (
+          <meshBasicMaterial
+            color={backgroundColor}
+            transparent={true}
+            opacity={0.7}
+            attach="material"
+          />
+        )}
+      </Text>
+    </group>
   );
 };
 
