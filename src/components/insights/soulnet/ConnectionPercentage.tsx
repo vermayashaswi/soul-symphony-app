@@ -28,8 +28,8 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     return null;
   }
 
-  // Position above the node
-  const labelPosition: [number, number, number] = [0, offsetY, 0];
+  // Position above the node - slightly higher than before
+  const labelPosition: [number, number, number] = [0, offsetY + 0.1, 0];
 
   // Decreased font size by 30% (from 0.375 to 0.26)
   const fontSize = 0.26;

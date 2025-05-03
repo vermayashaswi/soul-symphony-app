@@ -1,5 +1,5 @@
 
-import React, { useState, useCallback, useEffect, useMemo } from 'react';
+import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
@@ -52,13 +52,26 @@ export const Node: React.FC<NodeProps> = ({
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
+  const prevHighlightedRef = useRef<boolean>(isHighlighted);
+  const prevSelectedRef = useRef<boolean>(isSelected);
+  
+  // Cache translated text to prevent flickering
+  const translatedText = useMemo(() => {
+    return translatedLabels?.get(node.id) || node.id;
+  }, [node.id, translatedLabels]);
   
   // Debug log for visibility with more informative details
   useEffect(() => {
     if (isHighlighted || isSelected) {
-      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
+      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}, translatedText=${translatedText}`);
     }
-  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage]);
+    
+    // Track state changes that might cause flickering
+    if (prevHighlightedRef.current !== isHighlighted || prevSelectedRef.current !== isSelected) {
+      prevHighlightedRef.current = isHighlighted;
+      prevSelectedRef.current = isSelected;
+    }
+  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage, translatedText]);
   
   const baseScale = node.type === 'entity' ? 0.5 : 0.4;
   const scale = isHighlighted 
@@ -128,15 +141,6 @@ export const Node: React.FC<NodeProps> = ({
   // Always show percentages for highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;
   
-  // Get translated text if available, otherwise use original
-  const translatedText = translatedLabels?.get(node.id) || node.id;
-  
-  // Debug logs for label and percentage visibility
-  useEffect(() => {
-    console.log(`Node ${node.id} label visibility: shouldShowLabel=${shouldShowLabel}`);
-    console.log(`Node ${node.id} percentage visibility: shouldShowPercentage=${shouldShowPercentage}, percentage=${connectionPercentage}`);
-  }, [node.id, shouldShowLabel, shouldShowPercentage, connectionPercentage]);
-
   return (
     <group position={node.position}>
       <NodeMesh
