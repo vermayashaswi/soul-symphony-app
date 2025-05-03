@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -6,7 +5,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { staticTranslationService } from '@/services/staticTranslationService';
 import SoulNetVisualization from './soulnet/SoulNetVisualization';
-import LoadingState from './soulnet/LoadingState';
+import { LoadingState } from './soulnet/LoadingState';
 import { EmptyState } from './soulnet/EmptyState';
 import { FullscreenWrapper } from './soulnet/FullscreenWrapper';
 import SoulNetDescription from './soulnet/SoulNetDescription';
@@ -15,72 +14,6 @@ import { cn } from '@/lib/utils';
 import ErrorBoundary from './ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-
-// Create a useFontLoading hook for better font loading detection
-const useFontLoading = () => {
-  const [fontStatus, setFontStatus] = useState({
-    fontsLoaded: false,
-    fontsError: false,
-    devanagariReady: false
-  });
-
-  useEffect(() => {
-    // Use the document.fonts API to check when fonts are loaded
-    if ('fonts' in document) {
-      const checkFonts = async () => {
-        try {
-          await document.fonts.ready;
-          // Check specifically for Devanagari font support
-          const devanagariReady = await document.fonts.check('16px "Noto Sans Devanagari"');
-          setFontStatus({
-            fontsLoaded: true,
-            fontsError: false,
-            devanagariReady
-          });
-          console.log("Fonts loaded successfully. Devanagari ready:", devanagariReady);
-        } catch (err) {
-          console.error("Error loading fonts:", err);
-          setFontStatus({
-            fontsLoaded: true, // Assume fonts are loaded despite error
-            fontsError: true,
-            devanagariReady: false
-          });
-        }
-      };
-
-      checkFonts();
-      
-      // Also listen for loading events
-      document.fonts.addEventListener('loadingdone', () => {
-        const devanagariReady = document.fonts.check('16px "Noto Sans Devanagari"');
-        setFontStatus(prev => ({
-          ...prev,
-          fontsLoaded: true,
-          devanagariReady
-        }));
-      });
-      
-      document.fonts.addEventListener('loadingerror', () => {
-        setFontStatus(prev => ({
-          ...prev,
-          fontsLoaded: true,
-          fontsError: true
-        }));
-      });
-    } else {
-      // Fallback for browsers that don't support document.fonts
-      setTimeout(() => {
-        setFontStatus({
-          fontsLoaded: true,
-          fontsError: false,
-          devanagariReady: true // Optimistically assume true if we can't check
-        });
-      }, 1000);
-    }
-  }, []);
-
-  return fontStatus;
-};
 
 interface NodeData {
   id: string;
@@ -111,23 +44,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
   const [translatedLabels, setTranslatedLabels] = useState<Map<string, string>>(new Map());
-  const [renderMode, setRenderMode] = useState<'3d' | '2d'>('3d');
-  const [webGLError, setWebGLError] = useState<boolean>(false);
-  
-  // Access font loading status
-  const fontStatus = useFontLoading();
-
-  // Detect if we're using Hindi/Devanagari script and adjust rendering accordingly
-  useEffect(() => {
-    const isHindi = currentLanguage === 'hi';
-    // Use 2D mode for Hindi if Devanagari fonts aren't ready
-    if (isHindi && !fontStatus.devanagariReady) {
-      console.log('Using 2D fallback for Hindi due to font issues');
-      setRenderMode('2d');
-    } else {
-      setRenderMode('3d');
-    }
-  }, [currentLanguage, fontStatus.devanagariReady]);
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
 
@@ -258,33 +174,21 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     });
   }, []);
 
-  // WebGL error handler
-  const handleWebGLError = useCallback(() => {
-    console.error("WebGL rendering error detected");
-    setWebGLError(true);
-    setRenderMode('2d');
-  }, []);
-
-  if (loading) {
-    console.log("SoulNet rendering loading state");
-    return <LoadingState />;
-  }
-  
+  if (loading) return <LoadingState />;
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
       <h2 className="text-xl font-semibold text-red-600 mb-4">
-        <TranslatableText text="Error Loading Soul-Net" forceTranslate={true} />
+        <TranslatableText text="Error Loading Soul-Net" />
       </h2>
       <p className="text-muted-foreground mb-4">{error.message}</p>
       <button 
         className="px-4 py-2 bg-primary text-white rounded-md" 
         onClick={() => window.location.reload()}
       >
-        <TranslatableText text="Retry" forceTranslate={true} />
+        <TranslatableText text="Retry" />
       </button>
     </div>
   );
-  
   if (graphData.nodes.length === 0) return <EmptyState />;
 
   // Get appropriate instructions based on device type
@@ -295,26 +199,12 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Check if we should show font loading warning
-  const showDevanagariWarning = () => {
-    return currentLanguage === 'hi' && !fontStatus.devanagariReady && renderMode === '2d';
-  };
-
   return (
     <div className={cn(
       "bg-background rounded-xl shadow-sm border w-full",
       isMobile ? "p-0" : "p-6 md:p-8"
     )}>
       {!isFullScreen && <SoulNetDescription />}
-      
-      {/* Font warning for Hindi users */}
-      {showDevanagariWarning() && (
-        <div className="m-4 p-4 bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800 rounded-md">
-          <p className="text-sm text-amber-800 dark:text-amber-300">
-            <TranslatableText text="Optimizing for Hindi text display. Some visual elements may appear simplified." forceTranslate={true} />
-          </p>
-        </div>
-      )}
       
       <FullscreenWrapper
         isFullScreen={isFullScreen}
@@ -338,65 +228,43 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           </div>
         }>
-          {renderMode === '3d' ? (
-            <Canvas
-              style={{
-                width: '100%',
-                height: '100%',
-                maxWidth: isFullScreen ? 'none' : '800px',
-                maxHeight: isFullScreen ? 'none' : '500px',
-                position: 'relative',
-                zIndex: 5,
-                transition: 'all 0.3s ease-in-out',
-              }}
-              camera={{ 
-                position: [0, 0, isFullScreen ? 22 : 26], 
-                near: 1, 
-                far: 1000,
-                fov: isFullScreen ? 60 : 50 // Adjust field of view for better fullscreen experience
-              }}
-              onPointerMissed={() => setSelectedEntity(null)}
-              onError={handleWebGLError}
-              gl={{ 
-                preserveDrawingBuffer: true,
-                antialias: !isMobile,
-                powerPreference: 'high-performance',
-                alpha: true,
-                depth: true,
-                stencil: false,
-                precision: isMobile ? 'mediump' : 'highp',
-                logarithmicDepthBuffer: true // Enable logarithmic depth buffer for better z-sorting
-              }}
-            >
-              <SoulNetVisualization
-                data={graphData}
-                selectedNode={selectedEntity}
-                onNodeClick={handleNodeSelect}
-                themeHex={themeHex}
-                isFullScreen={isFullScreen}
-                translatedLabels={translatedLabels}
-              />
-            </Canvas>
-          ) : (
-            <div 
-              className="bg-gray-100 dark:bg-gray-800 rounded-lg p-4" 
-              style={{
-                width: '100%',
-                height: '100%',
-                maxWidth: isFullScreen ? 'none' : '800px',
-                maxHeight: isFullScreen ? 'none' : '500px',
-                position: 'relative',
-              }}
-            >
-              <FallbackVisualization 
-                data={graphData}
-                selectedNode={selectedEntity}
-                onNodeClick={handleNodeSelect}
-                themeHex={themeHex}
-                translatedLabels={translatedLabels}
-              />
-            </div>
-          )}
+          <Canvas
+            style={{
+              width: '100%',
+              height: '100%',
+              maxWidth: isFullScreen ? 'none' : '800px',
+              maxHeight: isFullScreen ? 'none' : '500px',
+              position: 'relative',
+              zIndex: 5,
+              transition: 'all 0.3s ease-in-out',
+            }}
+            camera={{ 
+              position: [0, 0, isFullScreen ? 22 : 26], 
+              near: 1, 
+              far: 1000,
+              fov: isFullScreen ? 60 : 50 // Adjust field of view for better fullscreen experience
+            }}
+            onPointerMissed={() => setSelectedEntity(null)}
+            gl={{ 
+              preserveDrawingBuffer: true,
+              antialias: !isMobile,
+              powerPreference: 'high-performance',
+              alpha: true,
+              depth: true,
+              stencil: false,
+              precision: isMobile ? 'mediump' : 'highp',
+              logarithmicDepthBuffer: true // Enable logarithmic depth buffer for better z-sorting
+            }}
+          >
+            <SoulNetVisualization
+              data={graphData}
+              selectedNode={selectedEntity}
+              onNodeClick={handleNodeSelect}
+              themeHex={themeHex}
+              isFullScreen={isFullScreen}
+              translatedLabels={translatedLabels}
+            />
+          </Canvas>
         </ErrorBoundary>
       </FullscreenWrapper>
       
@@ -407,80 +275,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           </p>
         </div>
       )}
-    </div>
-  );
-};
-
-// Simple 2D fallback visualization for when WebGL/3D rendering fails
-const FallbackVisualization: React.FC<{
-  data: { nodes: NodeData[]; links: LinkData[] };
-  selectedNode: string | null;
-  onNodeClick: (id: string) => void;
-  themeHex: string;
-  translatedLabels?: Map<string, string>;
-}> = ({ data, selectedNode, onNodeClick, themeHex, translatedLabels }) => {
-  // Calculate which nodes are connected to the selected node
-  const connectedNodes = selectedNode 
-    ? new Set(data.links
-        .filter(link => link.source === selectedNode || link.target === selectedNode)
-        .flatMap(link => [link.source, link.target]))
-    : new Set();
-
-  if (selectedNode) connectedNodes.add(selectedNode);
-
-  return (
-    <div className="relative w-full h-full overflow-hidden">
-      <div className="absolute inset-0 flex items-center justify-center opacity-20">
-        <TranslatableText text="Soul Network" />
-      </div>
-      
-      <div className="max-h-full overflow-auto p-4">
-        <div className="flex flex-wrap gap-2 justify-center mb-8">
-          {data.nodes
-            .filter(node => node.type === 'entity')
-            .map(node => (
-              <button 
-                key={node.id}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
-                  selectedNode === node.id
-                    ? "bg-primary text-white border-primary"
-                    : selectedNode && connectedNodes.has(node.id)
-                      ? "bg-primary/10 border-primary/30 text-primary"
-                      : selectedNode
-                        ? "opacity-40 border-gray-300 dark:border-gray-700"
-                        : "border-gray-300 dark:border-gray-700"
-                )}
-                onClick={() => onNodeClick(node.id)}
-              >
-                {translatedLabels?.get(node.id) || node.id}
-              </button>
-            ))}
-        </div>
-        
-        <div className="flex flex-wrap gap-2 justify-center">
-          {data.nodes
-            .filter(node => node.type === 'emotion')
-            .map(node => (
-              <button 
-                key={node.id}
-                className={cn(
-                  "px-3 py-1.5 rounded-full text-sm font-medium border transition-colors",
-                  selectedNode === node.id
-                    ? "bg-blue-500 text-white border-blue-500"
-                    : selectedNode && connectedNodes.has(node.id)
-                      ? "bg-blue-500/10 border-blue-500/30 text-blue-500"
-                      : selectedNode
-                        ? "opacity-40 border-gray-300 dark:border-gray-700"
-                        : "border-gray-300 dark:border-gray-700"
-                )}
-                onClick={() => onNodeClick(node.id)}
-              >
-                {translatedLabels?.get(node.id) || node.id}
-              </button>
-            ))}
-        </div>
-      </div>
     </div>
   );
 };

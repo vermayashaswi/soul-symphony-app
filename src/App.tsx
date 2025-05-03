@@ -1,6 +1,5 @@
 
 import React, { useEffect } from 'react';
-import { BrowserRouter } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
@@ -24,15 +23,13 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <BrowserRouter>
-      <TranslationProvider>
-        <TranslationLoadingOverlay />
-        <JournalProcessingInitializer />
-        <AppRoutes />
-        <Toaster />
-        <SonnerToaster position="top-right" />
-      </TranslationProvider>
-    </BrowserRouter>
+    <TranslationProvider>
+      <TranslationLoadingOverlay />
+      <JournalProcessingInitializer />
+      <AppRoutes />
+      <Toaster />
+      <SonnerToaster position="top-right" />
+    </TranslationProvider>
   );
 };
 
