@@ -1,4 +1,3 @@
-
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
 
@@ -64,9 +63,13 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   // Don't render if not supposed to be shown
   if (!shouldShowLabel) return null;
 
+  // Keep node labels at a consistent position, lower than percentage labels
+  // Use different vertical positions for entity vs emotion nodes
+  const verticalPosition = type === 'entity' ? 0.9 : 0.8;
+
   return (
     <Html
-      position={[0, type === 'entity' ? 0.9 : 1.0, 0]}
+      position={[0, verticalPosition, 0]}
       center
       distanceFactor={15}
       occlude={false}

@@ -122,7 +122,7 @@ export const Node: React.FC<NodeProps> = ({
   // Ensure label visibility - use explicit visibility for both NodeLabel and ConnectionPercentage
   const shouldShowLabel = isHighlighted || isSelected || showLabel;
   
-  // Enhanced logic for percentage visibility - always show percentages for highlighted nodes that aren't selected
+  // Always show percentages for highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;
   
   // Debug logs for label and percentage visibility
