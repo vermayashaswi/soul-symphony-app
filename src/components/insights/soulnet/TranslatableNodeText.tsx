@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React from 'react';
 import { Html } from '@react-three/drei';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
@@ -26,26 +26,13 @@ export const TranslatableNodeText: React.FC<TranslatableNodeTextProps> = ({
   zIndexRange = [9997, 9999],
   forceTranslate = true
 }) => {
-  // Keep track of mount state to prevent memory leaks
-  const mountedRef = useRef(true);
-  const [isReady, setIsReady] = useState(false);
-
-  // Initialize component and handle unmounting
-  useEffect(() => {
-    // Small delay to ensure proper render after Three.js initialization
-    const timer = setTimeout(() => {
-      if (mountedRef.current) {
-        setIsReady(true);
-      }
-    }, 50);
-
-    return () => {
-      mountedRef.current = false;
-      clearTimeout(timer);
-    };
-  }, []);
-
+  // Skip rendering if no text provided
   if (!text) return null;
+  
+  console.log(`Rendering TranslatableNodeText: "${text}"`);
+
+  // Use a fixed z-index instead of template literals to avoid rendering issues
+  const zIndexClass = `z-[9999]`;
 
   return (
     <Html
@@ -53,19 +40,19 @@ export const TranslatableNodeText: React.FC<TranslatableNodeTextProps> = ({
       center={center}
       distanceFactor={distanceFactor}
       occlude={occlude}
-      className={`z-[${zIndexRange[0]}] ${className}`}
+      className={`${zIndexClass} ${className}`}
     >
-      {isReady && (
-        <TranslatableText
-          text={text}
-          forceTranslate={forceTranslate}
-          style={{
-            pointerEvents: 'none',
-            userSelect: 'none',
-            ...style
-          }}
-        />
-      )}
+      <TranslatableText
+        text={text}
+        forceTranslate={forceTranslate}
+        style={{
+          pointerEvents: 'none',
+          userSelect: 'none',
+          // Add better visibility attributes
+          textShadow: '0 0 4px rgba(0,0,0,0.8)',
+          ...style
+        }}
+      />
     </Html>
   );
 };
