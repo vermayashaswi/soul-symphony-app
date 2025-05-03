@@ -53,7 +53,7 @@ export const Node: React.FC<NodeProps> = ({
   // Debug log for visibility with more informative details
   useEffect(() => {
     if (isHighlighted || isSelected) {
-      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
+      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}, on path=${window.location.pathname}`);
     }
   }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage]);
   
@@ -87,7 +87,7 @@ export const Node: React.FC<NodeProps> = ({
         const deltaY = Math.abs(e.clientY - touchStartPosition.y);
         
         if (deltaX < 10 && deltaY < 10) {
-          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
+          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}, path: ${window.location.pathname}`);
           onClick(node.id);
           
           if (navigator.vibrate) {

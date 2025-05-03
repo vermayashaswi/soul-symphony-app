@@ -40,6 +40,13 @@ export function TranslatableText({
   const pathname = location.pathname;
   const isOnWebsite = isWebsiteRoute(pathname);
   
+  // Enhanced logging to help debug translation issues
+  useEffect(() => {
+    if (forceTranslate) {
+      console.log(`TranslatableText (${text.substring(0, 20)}...): forceTranslate=${forceTranslate}, isOnWebsite=${isOnWebsite}, path=${pathname}`);
+    }
+  }, [text, forceTranslate, isOnWebsite, pathname]);
+  
   // Helper function to clean translation results
   const cleanTranslationResult = (result: string): string => {
     if (!result) return '';
@@ -57,7 +64,7 @@ export function TranslatableText({
       return;
     }
 
-    // CRITICAL FIX: Don't skip translation on website routes if forceTranslate is true
+    // CRITICAL FIX: forceTranslate should override website route check
     if (isOnWebsite && !forceTranslate) {
       console.log(`TranslatableText: Skipping translation for "${text}" because on website route without force translate`);
       setTranslatedText(text);

@@ -22,7 +22,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   cameraZoom,
   themeHex
 }) => {
-  console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}`);
+  console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}, path=${window.location.pathname}`);
 
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
@@ -55,10 +55,11 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   const labelTextStyle = useMemo(() => ({
     color: type === 'entity' ? '#fff' : themeHex,
-    padding: '0.1rem 0.3rem',
+    padding: '0.2rem 0.4rem',
     fontWeight: isHighlighted ? 'bold' : 'normal',
-    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.7)' : 'rgba(0,0,0,0.5)', // Darker background for better visibility
-    borderRadius: '2px',
+    backgroundColor: isHighlighted ? 'rgba(0,0,0,0.85)' : 'rgba(0,0,0,0.65)', // Even darker background for better visibility
+    borderRadius: '4px',
+    boxShadow: isHighlighted ? '0 1px 3px rgba(0,0,0,0.5)' : 'none',
   }), [type, themeHex, isHighlighted]);
 
   // Don't render if not supposed to be shown
@@ -66,7 +67,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   return (
     <Html
-      position={[0, type === 'entity' ? 0.8 : 0.9, 0]}
+      position={[0, type === 'entity' ? 0.9 : 1.0, 0]}
       center
       distanceFactor={15}
       occlude={false}
@@ -78,7 +79,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         <TranslatableText 
           text={id} 
           forceTranslate={true}
-          style={{ textShadow: '0 0 2px rgba(0,0,0,0.9)' }}
+          style={{ textShadow: '0 0 3px rgba(0,0,0,0.9)' }}
         />
       </div>
     </Html>

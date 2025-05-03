@@ -44,11 +44,11 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     >
       <div
         style={{
-          backgroundColor: 'rgba(0,0,0,0.8)', // Darker background for better contrast
+          backgroundColor: 'rgba(0,0,0,0.85)', // Even darker background for better contrast
           color: '#ffffff',
-          padding: '3px 7px', // Slightly larger padding for better visibility
+          padding: '4px 8px', // Increased padding for better visibility
           borderRadius: '4px',
-          fontSize: '16px',
+          fontSize: '18px', // Slightly bigger font size
           fontWeight: 'bold',
           whiteSpace: 'nowrap',
           boxShadow: '0 2px 4px rgba(0,0,0,0.5)', // More prominent shadow
@@ -56,8 +56,10 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           transformOrigin: 'center center',
           lineHeight: '1',
           opacity: 1, // Full opacity for better visibility
+          textShadow: '0 1px 2px rgba(0,0,0,0.9)', // Text shadow for better readability
         }}
       >
+        {/* Always display original percentage if translation fails */}
         <TranslatableText 
           text={`${displayPercentage}%`} 
           forceTranslate={true}
