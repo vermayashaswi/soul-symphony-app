@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -39,6 +38,16 @@ const containsDevanagari = (text: string): boolean => {
   if (!text) return false;
   const devanagariPattern = /[\u0900-\u097F]/;
   return devanagariPattern.test(text);
+};
+
+// Get the appropriate font for the text
+const getFontFamily = (text: string): string => {
+  if (containsDevanagari(text)) {
+    return 'Noto Sans Devanagari, Mukta';
+  } else if (containsNonLatinScript(text)) {
+    return 'Noto Sans';
+  }
+  return undefined; // Use default font
 };
 
 export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
@@ -178,12 +187,14 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   // Get letter spacing appropriate for the script
   const getLetterSpacing = () => {
     if (isDevanagari.current) {
-      return 0.12; // Increased spacing for Devanagari
+      return 0.05; // Reduced spacing for Devanagari (was 0.12)
     } else if (isNonLatinScript.current) {
       return 0.05; // Some spacing for other non-Latin scripts
     }
     return 0; // Default spacing for Latin scripts
   };
+
+  const fontFamily = getFontFamily(translatedText);
 
   return (
     <group>
@@ -212,7 +223,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         // Add lineHeight for better vertical spacing
         lineHeight={isDevanagari.current ? 1.7 : (isNonLatinScript.current ? 1.5 : 1.2)}
         // Font subsetting optimization - more character support
-        font={undefined} // Use default font which has better glyph support
+        font={fontFamily} // Use specialized font for better glyph support
       >
         {translatedText}
         {backgroundColor && (

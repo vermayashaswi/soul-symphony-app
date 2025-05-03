@@ -28,13 +28,10 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     return null;
   }
 
-  // Position above the node - slightly higher for better separation
-  // Add extra height for Hindi/non-Latin script compatibility
-  // Position must be consistent across all nodes for better UX
+  // Position above the node with consistent height
   const labelPosition: [number, number, number] = [0, offsetY + 0.2, 0];
 
-  // Increased font size slightly for better visibility of percentages
-  // Use stable font size so percentages don't jump around
+  // Use stable font size for better consistency
   const fontSize = 0.3;
 
   return (
@@ -45,7 +42,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
       size={fontSize}
       bold={true}
       visible={isVisible}
-      opacity={0.95} // Slightly higher opacity for better readability
+      opacity={1} // Full opacity for better readability
     />
   );
 };
