@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,16 +15,25 @@ export const isAppRoute = (pathname: string): boolean => {
   // Check for specific app routes including paths under /app
   const isApp = appPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
   
-  // Debug logging
-  console.log(`isAppRoute check for ${pathname}: ${isApp}`);
+  // Extra check for insights-specific path
+  const isInsights = pathname.includes('/insights') || pathname === '/insights';
   
-  return isApp;
+  // Debug logging
+  console.log(`isAppRoute check for ${pathname}: ${isApp || isInsights}`);
+  
+  return isApp || isInsights;
 };
 
-// CRITICAL: Always treat Insights as an app route
+// CRITICAL: Always treat Insights as an app route, even at root path /
 const isSpecialAppPath = (pathname: string): boolean => {
-  // If the path contains insights, it should NEVER be treated as a website route
-  return pathname.includes('/insights') || pathname === '/insights';
+  // If the path contains insights or we detect insights DOM elements, always treat as app
+  const hasInsightsInPath = pathname.includes('/insights') || pathname === '/insights';
+  const hasInsightsDOMElement = typeof document !== 'undefined' && 
+    (document.querySelector('.insights-container') !== null || 
+     document.querySelector('.soul-net-visualization') !== null ||
+     document.title.includes('Insights'));
+  
+  return hasInsightsInPath || hasInsightsDOMElement;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
@@ -38,8 +46,8 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     return false;
   }
   
-  // The root path (/) is explicitly a website route
-  if (pathname === "/" || pathname === "") {
+  // The root path (/) is explicitly a website route, EXCEPT if we detect insights
+  if ((pathname === "/" || pathname === "") && !isSpecialAppPath(pathname)) {
     console.log('Root path / is explicitly a website route');
     return true;
   }
@@ -56,7 +64,7 @@ export const isWebsiteRoute = (pathname: string): boolean => {
   );
   
   // If not explicitly app or explicitly website, treat as website
-  const result = isWebsite || (!isAppRoute(pathname) && pathname !== "/app");
+  const result = isWebsite || (!isAppRoute(pathname) && pathname !== "/app" && !isSpecialAppPath(pathname));
   console.log(`isWebsiteRoute check for ${pathname}: ${result}`);
   
   return result;

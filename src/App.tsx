@@ -21,12 +21,43 @@ const App: React.FC = () => {
       window.history.replaceState(null, '', '/');
     }
     
-    // CRITICAL FIX: If the user is at the root path and this is the Insights component,
+    // CRITICAL FIX: If the user is at the root path (/) and trying to use Insights
     // redirect them to the proper /app/insights path
-    if (currentPath === '/' && document.title.includes('Insights')) {
+    if (currentPath === '/' && 
+        (document.title.includes('Insights') || 
+         window.location.href.includes('insights') ||
+         document.querySelector('.insights-container'))) {
       console.log('Detected Insights at root path, redirecting to /app/insights');
       window.history.replaceState(null, '', '/app/insights');
+      // Force reload page if needed
+      setTimeout(() => {
+        if (window.location.pathname === '/') {
+          console.log('Force navigating to /app/insights');
+          window.location.href = '/app/insights';
+        }
+      }, 50);
     }
+  }, []);
+  
+  // Add a second useEffect for post-render detection
+  useEffect(() => {
+    // After DOM has updated, look for insights components
+    const observer = new MutationObserver((mutations) => {
+      if (window.location.pathname === '/' && 
+          (document.querySelector('.insights-container') || 
+           document.querySelector('.soul-net-visualization'))) {
+        console.log('Detected Insights container at root path, redirecting');
+        window.history.replaceState(null, '', '/app/insights');
+        window.dispatchEvent(new Event('popstate'));
+      }
+    });
+    
+    observer.observe(document.body, { 
+      childList: true, 
+      subtree: true 
+    });
+    
+    return () => observer.disconnect();
   }, []);
 
   return (

@@ -11,9 +11,9 @@ interface TranslatableTextProps {
   sourceLanguage?: string;
   entryId?: number;
   forceTranslate?: boolean; // Prop to force translation regardless of route
-  onTranslationStart?: () => void; // Added callback for translation start
-  onTranslationEnd?: () => void; // Added callback for translation end
-  style?: React.CSSProperties; // Add style prop to the interface
+  onTranslationStart?: () => void;
+  onTranslationEnd?: () => void;
+  style?: React.CSSProperties;
 }
 
 export function TranslatableText({ 
@@ -25,7 +25,7 @@ export function TranslatableText({
   forceTranslate = false,
   onTranslationStart,
   onTranslationEnd,
-  style // Add style to the destructuring
+  style
 }: TranslatableTextProps) {
   const [translatedText, setTranslatedText] = useState<string>(text); // Initialize with source text
   const [isLoading, setIsLoading] = useState(false);
@@ -33,7 +33,7 @@ export function TranslatableText({
   const location = useLocation();
   const prevLangRef = useRef<string>(currentLanguage);
   const initialLoadDoneRef = useRef<boolean>(false);
-  const textRef = useRef<string>(text); // Track text changes
+  const textRef = useRef<string>(text);
   const mountedRef = useRef<boolean>(true);
   
   // Check if on website route - but allow forced translation
@@ -62,9 +62,16 @@ export function TranslatableText({
       return;
     }
 
-    // CRITICAL FIX: If forceTranslate is true, ALWAYS translate regardless of route
-    // This is the key fix - forceTranslate must override website route check
-    if (isOnWebsite && !forceTranslate) {
+    // CRITICAL FIX: In THREE.JS and Soul-Net context, ALWAYS translate regardless of route
+    // 100% Honor forceTranslate flag to override website route check
+    // Or if path contains insights or we detect we're in the insights visualization
+    const isInsightsRelated = pathname.includes('insights') || 
+                             window.location.href.includes('insights') || 
+                             document.querySelector('.soul-net-visualization') !== null;
+    
+    const shouldTranslate = forceTranslate || isInsightsRelated;
+    
+    if (isOnWebsite && !shouldTranslate) {
       console.log(`TranslatableText: Skipping translation for "${text}" because on website route without force translate`);
       setTranslatedText(text);
       return;
@@ -101,9 +108,9 @@ export function TranslatableText({
       if (mountedRef.current && prevLangRef.current === currentLanguage && textRef.current === text) {
         if (result) {
           // Clean the translation result before setting it
-          const cleanedResult = cleanTranslationResult(result);
-          console.log(`TranslatableText: Translation result for "${text.substring(0, 30)}...": "${cleanedResult.substring(0, 30)}..."`);
-          setTranslatedText(cleanedResult || text); // Fallback to original if cleaning removes everything
+          const cleanedTranslation = cleanTranslationResult(result);
+          console.log(`TranslatableText: Translation result for "${text.substring(0, 30)}...": "${cleanedTranslation.substring(0, 30)}..."`);
+          setTranslatedText(cleanedTranslation || text); // Fallback to original if cleaning removes everything
         } else {
           console.log(`TranslatableText: Empty translation result for "${text.substring(0, 30)}..."`);
           setTranslatedText(text); // Fallback to original if result is empty
@@ -176,10 +183,16 @@ export function TranslatableText({
       'data-translated': translatedText !== text ? 'true' : 'false',
       'data-lang': currentLanguage,
       'data-force-translate': forceTranslate ? 'true' : 'false',
-      'data-path': pathname, // Add current path for debugging
-      style // Pass style prop to the element
+      'data-path': pathname,
+      'data-insights': pathname.includes('insights') ? 'true' : 'false',
+      style: {
+        ...style,
+        // Increase style priority for Three.js contexts
+        textShadow: forceTranslate ? '0 0 5px rgba(0,0,0,0.9), 0 0 4px rgba(0,0,0,0.9)' : style?.textShadow,
+        zIndex: forceTranslate ? 100000 : style?.zIndex,
+      }
     }, 
-    translatedText || text  // Ensure we always show something, even if translation fails
+    translatedText || text
   );
 }
 

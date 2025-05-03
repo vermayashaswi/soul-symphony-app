@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -138,7 +137,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
 
   return (
     <div className={cn(
-      "bg-background rounded-xl shadow-sm border w-full",
+      "bg-background rounded-xl shadow-sm border w-full soul-net-visualization",
       isMobile ? "p-0" : "p-6 md:p-8"
     )}>
       <SoulNetDescription />
@@ -151,16 +150,16 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <div className="flex items-center justify-center p-10 bg-gray-100 dark:bg-gray-800 rounded-lg">
             <div className="text-center">
               <h3 className="text-lg font-medium">
-                <TranslatableText text="Error in Soul-Net Visualization" />
+                <TranslatableText text="Error in Soul-Net Visualization" forceTranslate={true} />
               </h3>
               <p className="text-muted-foreground mt-2">
-                <TranslatableText text="There was a problem rendering the visualization." />
+                <TranslatableText text="There was a problem rendering the visualization." forceTranslate={true} />
               </p>
               <button 
                 className="mt-4 px-4 py-2 bg-primary text-white rounded-lg"
                 onClick={() => window.location.reload()}
               >
-                <TranslatableText text="Reload" />
+                <TranslatableText text="Reload" forceTranslate={true} />
               </button>
             </div>
           </div>

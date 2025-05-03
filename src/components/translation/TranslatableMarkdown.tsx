@@ -43,9 +43,15 @@ export function TranslatableMarkdown({
       return;
     }
     
-    // CRITICAL FIX: forceTranslate should override website route check
-    // This is the key fix - forceTranslate must override website route check
-    if (isOnWebsite && !forceTranslate) {
+    // CRITICAL FIX: Honor forceTranslate regardless of path
+    // And if we're on the insights page, force translation
+    const isInsightsRelated = location.pathname.includes('insights') || 
+                             window.location.href.includes('insights') || 
+                             document.querySelector('.insights-container') !== null;
+    
+    const shouldTranslate = forceTranslate || isInsightsRelated;
+    
+    if (isOnWebsite && !shouldTranslate) {
       setTranslatedContent(children);
       return;
     }
@@ -158,6 +164,7 @@ export function TranslatableMarkdown({
       data-lang={currentLanguage}
       data-force-translate={forceTranslate ? 'true' : 'false'}
       data-path={location.pathname} // Add path for debugging
+      data-insights={location.pathname.includes('insights') ? 'true' : 'false'}
     >
       <ReactMarkdown className={className}>
         {contentToRender}
