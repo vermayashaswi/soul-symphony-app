@@ -1,5 +1,6 @@
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
+import TranslatableNodeText from './TranslatableNodeText';
 
 interface NodeLabelProps {
   id: string;
@@ -73,11 +74,17 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       distanceFactor={15}
       occlude={false}
       className="z-[9999]"
-      style={labelStyle}
       key={`label-${id}-${isHighlighted ? 'highlighted' : 'normal'}`}
     >
       <div style={labelTextStyle}>
-        {id}
+        <TranslatableNodeText 
+          text={id} 
+          style={{
+            pointerEvents: 'none',
+            userSelect: 'none',
+            ...labelStyle
+          }}
+        />
       </div>
     </Html>
   );
