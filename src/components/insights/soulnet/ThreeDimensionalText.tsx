@@ -1,7 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 
 interface ThreeDimensionalTextProps {
@@ -27,6 +28,15 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 }) => {
   const { translate, currentLanguage } = useTranslation();
   const [translatedText, setTranslatedText] = useState(text);
+  const { camera } = useThree();
+  const textRef = useRef<THREE.Mesh>(null);
+  
+  // Update the text mesh to face the camera on each frame
+  useFrame(() => {
+    if (textRef.current && camera) {
+      textRef.current.lookAt(camera.position);
+    }
+  });
   
   useEffect(() => {
     const translateText = async () => {
@@ -50,6 +60,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   return (
     <group>
       <Text
+        ref={textRef}
         position={position}
         color={color}
         fontSize={size}
@@ -61,25 +72,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         maxWidth={2}
         overflowWrap="break-word"
         textAlign="center"
-        // Using a rotation matrix to make text face the camera instead of billboard prop
+        // Use a rotation that will be updated by useFrame
         rotation={[0, 0, 0]}
-        // Add lookAt functionality in the next frame update
-        onAfterRender={(state) => {
-          if (state && state.camera) {
-            // Get the mesh from the Text component
-            const mesh = state.scene.children.find(child => 
-              child instanceof THREE.Mesh && 
-              child.material && 
-              child.parent && 
-              child.parent.uuid === state.scene.uuid
-            );
-            
-            if (mesh) {
-              // Make the text always face the camera
-              mesh.lookAt(state.camera.position);
-            }
-          }
-        }}
       >
         {translatedText}
         {backgroundColor && (
