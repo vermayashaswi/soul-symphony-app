@@ -1,6 +1,6 @@
 
 import React, { useMemo } from 'react';
-import ThreeDimensionalText from './ThreeDimensionalText';
+import TroikaText from './TroikaText';
 
 interface ConnectionPercentageProps {
   position: [number, number, number];
@@ -38,7 +38,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   const fontSize = 0.3;
 
   return (
-    <ThreeDimensionalText
+    <TroikaText
       text={formattedPercentage}
       position={labelPosition}
       color={nodeType === 'entity' ? '#ffffff' : '#42a5f5'}

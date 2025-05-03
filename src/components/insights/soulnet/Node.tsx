@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';

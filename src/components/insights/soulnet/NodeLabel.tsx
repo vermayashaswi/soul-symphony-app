@@ -1,6 +1,6 @@
 
 import React, { useMemo, useRef, useEffect } from 'react';
-import ThreeDimensionalText from './ThreeDimensionalText';
+import TroikaText from './TroikaText';
 
 // Helper function to detect non-Latin script
 const containsNonLatinScript = (text: string): boolean => {
@@ -84,7 +84,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       
       // Debug logging for Hindi text issues
       if (isDevanagari.current) {
-        console.log(`Hindi text detected in node "${id}": "${translatedText}", applying special rendering`);
+        console.log(`Hindi text detected in node "${id}": "${translatedText}", applying special rendering with TroikaText`);
       }
     }
   }, [translatedText, id]);
@@ -96,10 +96,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     // Base size calculation adjusted by 30%
     const baseSize = 0.26 + Math.max(0, (26 - z) * 0.0088);
     
-    // Adjust size for non-Latin scripts - they often need slightly bigger font
-    // Devanagari (Hindi) scripts need even larger adjustment
-    const sizeAdjustment = isDevanagari.current ? 0.06 : 
-                           isNonLatin.current ? 0.03 : 0;
+    // Adjust size for non-Latin scripts - they often need slightly smaller font in Troika
+    // because Troika renders generally larger than ThreeDimensionalText
+    const sizeAdjustment = isDevanagari.current ? -0.02 : 
+                           isNonLatin.current ? -0.01 : 0;
     
     // Ensure size stays within reasonable bounds
     return Math.max(Math.min(baseSize + sizeAdjustment, 0.5), 0.23);
@@ -121,13 +121,16 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const labelPosition: [number, number, number] = [0, verticalPosition, 0];
 
   return (
-    <ThreeDimensionalText
+    <TroikaText
       text={translatedText || id}
       position={labelPosition}
       color={type === 'entity' ? '#ffffff' : themeHex}
       size={dynamicFontSize}
       bold={isHighlighted}
       visible={stableVisibilityRef.current}
+      isNonLatin={isNonLatin.current}
+      isDevanagari={isDevanagari.current}
+      opacity={0.95}
     />
   );
 };
