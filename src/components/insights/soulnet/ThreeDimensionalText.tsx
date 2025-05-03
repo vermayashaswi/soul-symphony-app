@@ -45,7 +45,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   text,
   position,
   color = 'white',
-  size = 1.2, // Decreased by 30% from 1.7 to 1.2
+  size = 1.2,
   bold = false,
   backgroundColor,
   opacity = 1,
@@ -58,29 +58,41 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const lastCameraPosition = useRef<THREE.Vector3>(new THREE.Vector3());
   const isNonLatinScript = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
+  const cameraUpdateThrottleRef = useRef<number>(0);
   
-  // Update text orientation only when camera has moved significantly
-  useFrame(() => {
-    if (textRef.current && camera) {
-      // Calculate distance camera has moved
-      const distanceMoved = camera.position.distanceTo(lastCameraPosition.current);
-      
-      // Only update orientation if camera moved enough (reduces jitter)
-      if (distanceMoved > 0.05) {
-        textRef.current.lookAt(camera.position);
-        lastCameraPosition.current.copy(camera.position);
-      }
-    }
-  });
-  
-  // Check if the text contains non-Latin characters
+  // Use a separate check for Devanagari to apply specific optimizations
   useEffect(() => {
     if (translatedText) {
       isNonLatinScript.current = containsNonLatinScript(translatedText);
       isDevanagari.current = containsDevanagari(translatedText);
+      
+      // Debug logging for Hindi text
+      if (isDevanagari.current) {
+        console.log(`Hindi text detected: "${translatedText}"`);
+      }
     }
   }, [translatedText]);
   
+  // Update text orientation with better throttling mechanism
+  useFrame(() => {
+    if (textRef.current && camera) {
+      // Only update orientation every few frames
+      cameraUpdateThrottleRef.current++;
+      if (cameraUpdateThrottleRef.current > 5) {
+        const distanceMoved = camera.position.distanceTo(lastCameraPosition.current);
+        
+        // Only update orientation if camera moved enough
+        if (distanceMoved > 0.05) {
+          // For billboarding: make text always face the camera
+          // This creates quaternion that rotates text mesh to face camera
+          textRef.current.quaternion.copy(camera.quaternion);
+          lastCameraPosition.current.copy(camera.position);
+        }
+        cameraUpdateThrottleRef.current = 0;
+      }
+    }
+  });
+
   useEffect(() => {
     const translateText = async () => {
       if (currentLanguage !== 'en' && text) {
@@ -88,16 +100,23 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
           const result = await translate(text);
           if (result) {
             setTranslatedText(result);
-            // Check for non-Latin script after translation
+            
+            // Detect script after translation
             isNonLatinScript.current = containsNonLatinScript(result);
             isDevanagari.current = containsDevanagari(result);
+            
+            // Debug logging for Hindi text
+            if (isDevanagari.current) {
+              console.log(`Hindi translation: "${result}"`);
+            }
           }
         } catch (e) {
           console.error('Translation error:', e);
         }
       } else {
         setTranslatedText(text);
-        // Check for non-Latin script for original text too
+        
+        // Check for non-Latin script in original text as well
         isNonLatinScript.current = containsNonLatinScript(text);
         isDevanagari.current = containsDevanagari(text);
       }
@@ -112,7 +131,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const getMaxWidth = () => {
     if (isDevanagari.current) {
       // Much wider container for Devanagari specifically
-      return 30;
+      return 30; // Significantly increased to accommodate Devanagari
     } else if (isNonLatinScript.current) {
       // Wider container for other non-Latin scripts
       return 25;
@@ -147,8 +166,6 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         overflowWrap="normal" // Prevent syllable breaks
         whiteSpace="normal" // Allow wrapping for better display of non-Latin text
         textAlign="center"
-        // Use a rotation that will be updated by useFrame
-        rotation={[0, 0, 0]}
         // Add extra letter spacing for non-Latin scripts for better legibility
         letterSpacing={getLetterSpacing()}
         // Improve rendering quality
