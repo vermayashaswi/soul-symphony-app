@@ -25,6 +25,20 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
+  // Check if the user is trying to access app features directly from root
+  useEffect(() => {
+    // If user is logged in, redirect them to the app home page
+    if (user) {
+      console.log('User is logged in, redirecting to /app/home');
+      navigate('/app/home');
+    }
+    
+    // Check URL parameters for specific redirects
+    if (urlParams.has('insights')) {
+      navigate('/app/insights');
+    }
+  }, [user, navigate, urlParams]);
+
   useEffect(() => {
     // Pre-translate common strings used on the index page
     const preTranslateCommonStrings = async () => {

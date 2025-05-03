@@ -8,45 +8,17 @@ export const isNativeApp = (): boolean => {
   return /native/i.test(window.navigator.userAgent);
 };
 
-// Update the path-based check to be more comprehensive and accurate
+// Update the path-based check to be more strict about app routes
 export const isAppRoute = (pathname: string): boolean => {
-  // Explicitly define app routes - the root path should NEVER be an app route
-  const appPrefixes = [
-    '/app/', '/app', 
-    '/journal', '/chat', '/insights', '/settings', 
-    '/auth', '/profile', '/home', '/smart-chat'
-  ];
-  
-  // Add special handling for Soul-Net visualization routes
-  if (pathname.includes('insights') || pathname === '/insights') {
-    console.log('SoulNet route detected, treating as app route:', pathname);
-    return true;
-  }
-  
-  // Check for specific app routes including paths under /app
-  const isApp = appPrefixes.some(prefix => pathname === prefix || pathname.startsWith(`${prefix}/`));
-  
-  // Debug logging
+  // App routes must start with /app/ or be exactly /app
+  const isApp = pathname.startsWith('/app/') || pathname === '/app';
   console.log(`isAppRoute check for ${pathname}: ${isApp}`);
-  
   return isApp;
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
-  // Consider website routes like /about, /pricing, etc.
-  const websitePrefixes = ['/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq'];
-  
-  // Special handling for SoulNet visualization - always treat as app route
-  if (pathname.includes('insights') || pathname === '/insights') {
-    console.log('SoulNet route detected, NOT treating as website route:', pathname);
-    return false;
-  }
-  
-  // The root path (/) is explicitly a website route
-  if (pathname === "/" || pathname === "") {
-    console.log('Root path / is explicitly a website route');
-    return true;
-  }
+  // Explicitly define website routes
+  const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
   
   // If it has an app prefix, it's not a website route
   if (isAppRoute(pathname)) {
@@ -59,11 +31,8 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     pathname === prefix || pathname.startsWith(`${prefix}/`)
   );
   
-  // If not explicitly app or explicitly website, treat as website
-  const result = isWebsite || (!isAppRoute(pathname) && pathname !== "/app");
-  console.log(`isWebsiteRoute check for ${pathname}: ${result}`);
-  
-  return result;
+  console.log(`isWebsiteRoute check for ${pathname}: ${isWebsite}`);
+  return isWebsite;
 };
 
 export const getBaseUrl = (): string => {
@@ -101,8 +70,7 @@ export const AppRouteWrapper = ({
   console.log('AppRouteWrapper rendering:', location.pathname, { 
     requiresAuth, 
     userExists: !!user,
-    isAppRoute: isAppRoute(location.pathname),
-    isWebsiteRoute: isWebsiteRoute(location.pathname)
+    isAppRoute: isAppRoute(location.pathname)
   });
   
   useEffect(() => {

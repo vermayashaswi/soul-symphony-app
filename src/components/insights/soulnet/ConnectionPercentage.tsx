@@ -1,7 +1,6 @@
 
 import React from 'react';
 import { Html } from '@react-three/drei';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ConnectionPercentageProps {
   position: [number, number, number];
@@ -63,15 +62,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
           position: 'relative',
         }}
       >
-        <TranslatableText 
-          text={`${displayPercentage}%`} 
-          forceTranslate={true} 
-          style={{
-            textShadow: '0 0 4px rgba(0,0,0,0.8)',
-            color: '#fff',
-            fontWeight: 'bold',
-          }}
-        />
+        {`${displayPercentage}%`}
       </div>
     </Html>
   );

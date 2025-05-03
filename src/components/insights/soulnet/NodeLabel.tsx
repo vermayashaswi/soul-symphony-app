@@ -1,7 +1,6 @@
 
 import React, { useMemo } from 'react';
 import { Html } from '@react-three/drei';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface NodeLabelProps {
   id: string;
@@ -76,15 +75,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       key={`label-${id}-${isHighlighted ? 'highlighted' : 'normal'}`}
     >
       <div style={labelTextStyle}>
-        <TranslatableText 
-          text={id} 
-          forceTranslate={true} 
-          style={{ 
-            textShadow: '0 0 3px rgba(0,0,0,0.9)',
-            color: labelTextStyle.color,
-            fontWeight: isHighlighted ? 'bold' : 'normal',
-          }}
-        />
+        {id}
       </div>
     </Html>
   );
