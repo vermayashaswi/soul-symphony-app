@@ -1,16 +1,26 @@
-import React, { useEffect } from 'react';
+
+import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useFontLoading } from '@/main';
 
 const Chat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { translate, currentLanguage } = useTranslation();
+  const [isInitialized, setIsInitialized] = useState(false);
+  
+  // Get font loading status
+  const fontStatus = useFontLoading ? useFontLoading() : { 
+    fontsLoaded: true, 
+    fontsError: false,
+    devanagariReady: true
+  };
 
   // Pre-translate common chat-related strings more comprehensively 
   useEffect(() => {
@@ -46,9 +56,15 @@ const Chat = () => {
           await translate("Searching for insights...", "en");
           
           console.log("Chat strings pre-translated successfully");
+          setIsInitialized(true);
         } catch (e) {
           console.error("Error pre-translating chat strings:", e);
+          // Set initialized even in case of error to not block the UI
+          setIsInitialized(true);
         }
+      } else {
+        // For English, no translation needed
+        setIsInitialized(true);
       }
     };
     
@@ -132,6 +148,18 @@ const Chat = () => {
       document.head.removeChild(style);
     };
   }, []);
+
+  // Show loading state if not initialized or fonts not loaded for non-Latin scripts
+  const isLoading = !isInitialized || (currentLanguage === 'hi' && !fontStatus.devanagariReady);
+
+  if (isLoading) {
+    return (
+      <div className="w-full h-full flex flex-col items-center justify-center">
+        <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
+        <p className="text-muted-foreground">Loading chat interface...</p>
+      </div>
+    );
+  }
 
   return (
     <div className="w-full h-full flex flex-col">

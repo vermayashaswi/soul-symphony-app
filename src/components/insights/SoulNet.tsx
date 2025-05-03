@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
@@ -14,7 +15,72 @@ import { cn } from '@/lib/utils';
 import ErrorBoundary from './ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useFontLoading } from '@/main';
+
+// Create a useFontLoading hook for better font loading detection
+const useFontLoading = () => {
+  const [fontStatus, setFontStatus] = useState({
+    fontsLoaded: false,
+    fontsError: false,
+    devanagariReady: false
+  });
+
+  useEffect(() => {
+    // Use the document.fonts API to check when fonts are loaded
+    if ('fonts' in document) {
+      const checkFonts = async () => {
+        try {
+          await document.fonts.ready;
+          // Check specifically for Devanagari font support
+          const devanagariReady = await document.fonts.check('16px "Noto Sans Devanagari"');
+          setFontStatus({
+            fontsLoaded: true,
+            fontsError: false,
+            devanagariReady
+          });
+          console.log("Fonts loaded successfully. Devanagari ready:", devanagariReady);
+        } catch (err) {
+          console.error("Error loading fonts:", err);
+          setFontStatus({
+            fontsLoaded: true, // Assume fonts are loaded despite error
+            fontsError: true,
+            devanagariReady: false
+          });
+        }
+      };
+
+      checkFonts();
+      
+      // Also listen for loading events
+      document.fonts.addEventListener('loadingdone', () => {
+        const devanagariReady = document.fonts.check('16px "Noto Sans Devanagari"');
+        setFontStatus(prev => ({
+          ...prev,
+          fontsLoaded: true,
+          devanagariReady
+        }));
+      });
+      
+      document.fonts.addEventListener('loadingerror', () => {
+        setFontStatus(prev => ({
+          ...prev,
+          fontsLoaded: true,
+          fontsError: true
+        }));
+      });
+    } else {
+      // Fallback for browsers that don't support document.fonts
+      setTimeout(() => {
+        setFontStatus({
+          fontsLoaded: true,
+          fontsError: false,
+          devanagariReady: true // Optimistically assume true if we can't check
+        });
+      }, 1000);
+    }
+  }, []);
+
+  return fontStatus;
+};
 
 interface NodeData {
   id: string;
@@ -48,12 +114,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [renderMode, setRenderMode] = useState<'3d' | '2d'>('3d');
   const [webGLError, setWebGLError] = useState<boolean>(false);
   
-  // Access font loading status from context if available
-  const fontStatus = useFontLoading ? useFontLoading() : { 
-    fontsLoaded: true, 
-    fontsError: false,
-    devanagariReady: true
-  };
+  // Access font loading status
+  const fontStatus = useFontLoading();
 
   // Detect if we're using Hindi/Devanagari script and adjust rendering accordingly
   useEffect(() => {
@@ -65,7 +127,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     } else {
       setRenderMode('3d');
     }
-  }, [currentLanguage, fontStatus]);
+  }, [currentLanguage, fontStatus.devanagariReady]);
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
 
@@ -203,21 +265,26 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     setRenderMode('2d');
   }, []);
 
-  if (loading) return <LoadingState />;
+  if (loading) {
+    console.log("SoulNet rendering loading state");
+    return <LoadingState />;
+  }
+  
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
       <h2 className="text-xl font-semibold text-red-600 mb-4">
-        <TranslatableText text="Error Loading Soul-Net" />
+        <TranslatableText text="Error Loading Soul-Net" forceTranslate={true} />
       </h2>
       <p className="text-muted-foreground mb-4">{error.message}</p>
       <button 
         className="px-4 py-2 bg-primary text-white rounded-md" 
         onClick={() => window.location.reload()}
       >
-        <TranslatableText text="Retry" />
+        <TranslatableText text="Retry" forceTranslate={true} />
       </button>
     </div>
   );
+  
   if (graphData.nodes.length === 0) return <EmptyState />;
 
   // Get appropriate instructions based on device type

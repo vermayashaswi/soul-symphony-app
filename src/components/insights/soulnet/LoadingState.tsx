@@ -10,7 +10,7 @@ export const LoadingState = () => {
     )}>
       <div className="animate-spin rounded-full h-10 w-10 border-b-2 border-primary mb-4"></div>
       <p className="text-muted-foreground">
-        <TranslatableText text="Loading visualization..." />
+        <TranslatableText text="Loading visualization..." forceTranslate={true} />
       </p>
     </div>
   );
