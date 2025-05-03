@@ -29,7 +29,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   }
 
   // Position above the node with more height for better separation
-  // Add extra height for Hindi/non-Latin script compatibility
+  // Add extra height for better compatibility with all languages
   const labelPosition: [number, number, number] = [0, offsetY + 0.25, 0];
 
   // Increased font size for better visibility of percentages

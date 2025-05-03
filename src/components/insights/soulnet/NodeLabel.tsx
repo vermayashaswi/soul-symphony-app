@@ -53,36 +53,40 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const isDevanagari = useRef<boolean>(false);
   const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
   const visibilityTimeout = useRef<NodeJS.Timeout | null>(null);
+  const initialRenderRef = useRef<boolean>(true);
   
   // Stabilize visibility transitions to prevent flickering
   useEffect(() => {
-    // For Devanagari text, we want to ensure stability
-    if (isDevanagari.current) {
-      if (shouldShowLabel !== stableVisibilityRef.current) {
-        // Only update if going from invisible to visible immediately
-        if (shouldShowLabel) {
-          stableVisibilityRef.current = true;
-          
-          // Clear any existing timeout to prevent conflicts
-          if (visibilityTimeout.current) {
-            clearTimeout(visibilityTimeout.current);
-            visibilityTimeout.current = null;
-          }
-        } else {
-          // Use a longer delay for hiding Devanagari text
-          if (visibilityTimeout.current) {
-            clearTimeout(visibilityTimeout.current);
-          }
-          
-          visibilityTimeout.current = setTimeout(() => {
-            stableVisibilityRef.current = false;
-            visibilityTimeout.current = null;
-          }, 300); // Longer delay for Hindi text
-        }
-      }
-    } else {
-      // For non-Hindi text, transition more quickly
+    // Initial render should always show label if shouldShowLabel is true
+    if (initialRenderRef.current) {
       stableVisibilityRef.current = shouldShowLabel;
+      initialRenderRef.current = false;
+      return;
+    }
+
+    // For all text, stabilize visibility transitions
+    if (shouldShowLabel !== stableVisibilityRef.current) {
+      // Update immediately when going from invisible to visible
+      if (shouldShowLabel) {
+        stableVisibilityRef.current = true;
+        
+        // Clear any existing timeout to prevent conflicts
+        if (visibilityTimeout.current) {
+          clearTimeout(visibilityTimeout.current);
+          visibilityTimeout.current = null;
+        }
+      } else {
+        // Use a delay for hiding text - longer for complex scripts
+        if (visibilityTimeout.current) {
+          clearTimeout(visibilityTimeout.current);
+        }
+        
+        const delay = isDevanagari.current ? 300 : isNonLatin.current ? 200 : 100;
+        visibilityTimeout.current = setTimeout(() => {
+          stableVisibilityRef.current = false;
+          visibilityTimeout.current = null;
+        }, delay);
+      }
     }
     
     // Cleanup timeouts on unmount
@@ -137,6 +141,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   // Don't render if not supposed to be shown
   if (!stableVisibilityRef.current) return null;
+  
+  // Fail-safe for missing text
+  if (!displayText) return null;
 
   // Adjust vertical positioning for different script types
   let verticalPosition = type === 'entity' ? 0.9 : 0.8;
