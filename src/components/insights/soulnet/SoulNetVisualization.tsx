@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
@@ -25,6 +24,7 @@ interface SoulNetVisualizationProps {
   selectedNode: string | null;
   onNodeClick: (id: string) => void;
   themeHex: string;
+  isFullScreen?: boolean;
 }
 
 function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
@@ -116,6 +116,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   selectedNode,
   onNodeClick,
   themeHex,
+  isFullScreen = false,
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
@@ -124,7 +125,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const [isInitialized, setIsInitialized] = useState(false);
   
   console.log("Rendering SoulNetVisualization component with data:", 
-    data?.nodes?.length, "nodes and", data?.links?.length, "links");
+    data?.nodes?.length, "nodes and", data?.links?.length, "links, fullscreen:", isFullScreen);
   
   useEffect(() => {
     console.log("SoulNetVisualization mounted");
@@ -233,6 +234,17 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return calculateConnectionPercentages(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
+  // Adjust controls dampingFactor based on fullscreen mode
+  useEffect(() => {
+    if (controlsRef.current) {
+      controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
+      
+      // Adjust limits for better fullscreen experience
+      controlsRef.current.minDistance = isFullScreen ? 4 : 5;
+      controlsRef.current.maxDistance = isFullScreen ? 40 : 30;
+    }
+  }, [isFullScreen]);
+
   const shouldDim = !!selectedNode;
 
   // Custom node click handler with debugging
@@ -250,13 +262,19 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     <>
       <ambientLight intensity={0.5} />
       <pointLight position={[10, 10, 10]} intensity={0.8} />
+      {isFullScreen && (
+        <>
+          <hemisphereLight intensity={0.3} color="#ffffff" groundColor="#444444" />
+          <pointLight position={[-10, -10, -10]} intensity={0.2} />
+        </>
+      )}
       <OrbitControls
         ref={controlsRef}
         enableDamping
-        dampingFactor={0.05}
+        dampingFactor={isFullScreen ? 0.08 : 0.05}
         rotateSpeed={0.5}
-        minDistance={5}
-        maxDistance={30}
+        minDistance={isFullScreen ? 4 : 5}
+        maxDistance={isFullScreen ? 40 : 30}
         target={centerPosition}
         onChange={() => {
           if (camera) {

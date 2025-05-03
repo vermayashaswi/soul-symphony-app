@@ -108,7 +108,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   }, [selectedEntity]);
 
   const toggleFullScreen = useCallback(() => {
-    setIsFullScreen(prev => !prev);
+    setIsFullScreen(prev => {
+      // Force clear selected node when toggling fullscreen to reset view
+      if (!prev) setSelectedEntity(null);
+      return !prev;
+    });
   }, []);
 
   if (loading) return <LoadingState />;
@@ -141,7 +145,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       "bg-background rounded-xl shadow-sm border w-full",
       isMobile ? "p-0" : "p-6 md:p-8"
     )}>
-      <SoulNetDescription />
+      {!isFullScreen && <SoulNetDescription />}
       
       <FullscreenWrapper
         isFullScreen={isFullScreen}
@@ -172,9 +176,15 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               maxWidth: isFullScreen ? 'none' : '800px',
               maxHeight: isFullScreen ? 'none' : '500px',
               position: 'relative',
-              zIndex: 1,
+              zIndex: 5,
+              transition: 'all 0.3s ease-in-out',
             }}
-            camera={{ position: [0, 0, 26], near: 1, far: 1000 }}
+            camera={{ 
+              position: [0, 0, isFullScreen ? 22 : 26], 
+              near: 1, 
+              far: 1000,
+              fov: isFullScreen ? 60 : 50 // Adjust field of view for better fullscreen experience
+            }}
             onPointerMissed={() => setSelectedEntity(null)}
             gl={{ 
               preserveDrawingBuffer: true,
@@ -192,16 +202,19 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               selectedNode={selectedEntity}
               onNodeClick={handleNodeSelect}
               themeHex={themeHex}
+              isFullScreen={isFullScreen}
             />
           </Canvas>
         </ErrorBoundary>
       </FullscreenWrapper>
       
-      <div className="w-full text-center mt-2 px-4 md:px-8">
-        <p className="text-xs text-muted-foreground">
-          {getInstructions()}
-        </p>
-      </div>
+      {!isFullScreen && (
+        <div className="w-full text-center mt-2 px-4 md:px-8">
+          <p className="text-xs text-muted-foreground">
+            {getInstructions()}
+          </p>
+        </div>
+      )}
     </div>
   );
 };
