@@ -4,6 +4,7 @@ import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
+import { useFontLoading } from '../../../main';
 
 interface ThreeDimensionalTextProps {
   text: string;
@@ -46,11 +47,11 @@ const getFontFamily = (text: string): string | undefined => {
   const { isDevanagari } = detectScriptType(text);
   
   if (isDevanagari) {
-    return 'Noto Sans Devanagari, Mukta';
+    return 'Noto Sans Devanagari, Mukta, sans-serif';
   }
   
   // Use Noto Sans for all other scripts as a robust Unicode font
-  return 'Noto Sans';
+  return 'Noto Sans, sans-serif';
 };
 
 export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
@@ -73,32 +74,57 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     isNonLatin: false, 
     isDevanagari: false 
   });
+  const [renderError, setRenderError] = useState<boolean>(false);
+  
+  // Try to access the font loading context
+  const fontStatus = useFontLoading ? useFontLoading() : { 
+    fontsLoaded: true, 
+    fontsError: false,
+    devanagariReady: true 
+  };
   
   // Use a single consistent update interval for all scripts
   const UPDATE_INTERVAL = 3; // Update every 3 frames for all scripts
+  
+  // Check if we should use 2D fallback for complex scripts
+  const shouldUse2DFallback = () => {
+    // Use 2D fallback if:
+    // 1. We're dealing with Devanagari text
+    // 2. And either the font isn't ready or we've already encountered a render error
+    return scriptType.isDevanagari && 
+           (!fontStatus.devanagariReady || renderError || fontStatus.fontsError);
+  };
   
   // Detect script type when text changes
   useEffect(() => {
     if (translatedText) {
       const detected = detectScriptType(translatedText);
       setScriptType(detected);
+      
+      // Reset render error state when text changes
+      setRenderError(false);
     }
   }, [translatedText]);
   
-  // Consistent billboarding for all scripts
+  // Consistent billboarding for all scripts with error handling
   useFrame(() => {
-    if (textRef.current && camera && visible) {
-      // Use same update logic for all scripts
-      updateCounterRef.current++;
-      
-      if (updateCounterRef.current >= UPDATE_INTERVAL) {
-        // Apply consistent quaternion-based billboarding
-        textRef.current.quaternion.copy(camera.quaternion);
+    try {
+      if (textRef.current && camera && visible && !shouldUse2DFallback()) {
+        // Use same update logic for all scripts
+        updateCounterRef.current++;
         
-        // Store camera position
-        lastCameraPosition.current.copy(camera.position);
-        updateCounterRef.current = 0;
+        if (updateCounterRef.current >= UPDATE_INTERVAL) {
+          // Apply consistent quaternion-based billboarding
+          textRef.current.quaternion.copy(camera.quaternion);
+          
+          // Store camera position
+          lastCameraPosition.current.copy(camera.position);
+          updateCounterRef.current = 0;
+        }
       }
+    } catch (error) {
+      console.error("Error in ThreeDimensionalText useFrame:", error);
+      setRenderError(true);
     }
   });
 
@@ -128,6 +154,20 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   // Skip rendering if not visible or empty text
   if (!visible || !text) return null;
+  
+  // Use 2D fallback for Devanagari when necessary
+  if (shouldUse2DFallback()) {
+    // Return a simple HTML-based canvas object in 3D space instead of drei Text
+    return (
+      <group position={position}>
+        <sprite scale={[size * 4, size * 2, 1]}>
+          <spriteMaterial transparent opacity={opacity}>
+            <canvasTexture attach="map" args={[createTextCanvas(translatedText, color, bold)]} />
+          </spriteMaterial>
+        </sprite>
+      </group>
+    );
+  }
 
   // Calculate appropriate max width based on script type
   const getMaxWidth = () => {
@@ -191,6 +231,12 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         renderOrder={5} // Use consistent high render order for all text
         lineHeight={getLineHeight()}
         font={fontFamily}
+        onSync={(e) => {
+          if (e.error) {
+            console.error("Text sync error:", e.error);
+            setRenderError(true);
+          }
+        }}
       >
         {translatedText}
         {backgroundColor && (
@@ -211,5 +257,30 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     </group>
   );
 };
+
+// Helper function to create a canvas with text
+function createTextCanvas(text: string, color: string, bold: boolean): HTMLCanvasElement {
+  const canvas = document.createElement('canvas');
+  const ctx = canvas.getContext('2d');
+  if (!ctx) return canvas;
+  
+  // Set canvas size
+  canvas.width = 256;
+  canvas.height = 128;
+  
+  // Clear canvas
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  
+  // Set text properties
+  ctx.fillStyle = color;
+  ctx.font = `${bold ? 'bold' : 'normal'} 24px 'Noto Sans Devanagari', 'Mukta', sans-serif`;
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+  
+  // Add text
+  ctx.fillText(text, canvas.width / 2, canvas.height / 2);
+  
+  return canvas;
+}
 
 export default ThreeDimensionalText;

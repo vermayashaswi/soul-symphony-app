@@ -1,6 +1,7 @@
 
 import React, { useMemo } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
+import { useFontLoading } from '@/main';
 
 // Helper function to detect script types - consolidated into one function
 const detectScriptType = (text: string): { isNonLatin: boolean, isDevanagari: boolean } => {
@@ -48,10 +49,22 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   translatedText
 }) => {
+  // Access font loading status from context if available
+  const fontStatus = useFontLoading ? useFontLoading() : { 
+    fontsLoaded: true, 
+    fontsError: false,
+    devanagariReady: true
+  };
+  
   // Detect script type for positioning and size adjustments
   const scriptType = useMemo(() => {
     return detectScriptType(translatedText || id);
   }, [translatedText, id]);
+  
+  // Check if the text might have rendering issues
+  const mightHaveRenderingIssues = useMemo(() => {
+    return scriptType.isDevanagari && !fontStatus.devanagariReady;
+  }, [scriptType, fontStatus]);
   
   // Calculate font size with standardized approach for all scripts
   const dynamicFontSize = useMemo(() => {
@@ -65,9 +78,12 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     const sizeAdjustment = scriptType.isDevanagari ? 0.04 : 
                           scriptType.isNonLatin ? 0.02 : 0;
     
+    // If we might have rendering issues with this text, make it slightly larger for better readability
+    const renderIssueAdjustment = mightHaveRenderingIssues ? 0.03 : 0;
+    
     // Ensure size stays within reasonable bounds
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.5), 0.23);
-  }, [cameraZoom, scriptType]);
+    return Math.max(Math.min(baseSize + sizeAdjustment + renderIssueAdjustment, 0.5), 0.23);
+  }, [cameraZoom, scriptType, mightHaveRenderingIssues]);
 
   // Don't render if not supposed to be shown
   if (!shouldShowLabel) return null;
