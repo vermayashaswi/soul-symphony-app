@@ -46,6 +46,7 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
       bold={true}
       visible={isVisible}
       opacity={0.95} // Slightly higher opacity for better readability
+      skipTranslation={true} // Skip translation for percentage values
     />
   );
 };

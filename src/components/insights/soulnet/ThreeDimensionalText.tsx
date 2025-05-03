@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -14,6 +13,7 @@ interface ThreeDimensionalTextProps {
   backgroundColor?: string;
   opacity?: number;
   visible?: boolean;
+  skipTranslation?: boolean; // New prop to skip translation for certain texts
 }
 
 // Helper function to detect non-Latin script
@@ -41,6 +41,68 @@ const containsDevanagari = (text: string): boolean => {
   return devanagariPattern.test(text);
 };
 
+// Helper function to check if the text is a percentage
+const isPercentage = (text: string): boolean => {
+  return /^\d+%\.?\.?\.?$/.test(text);
+};
+
+// Helper function to clean emotion names for better translation
+const cleanEmotionName = (text: string): string => {
+  if (!text) return '';
+  
+  // Remove any strange punctuation or formatting that might affect translation
+  let cleaned = text.trim()
+    .replace(/\s*[.,;:!?]\s*$/, '')  // Remove trailing punctuation
+    .replace(/^\s*[.,;:!?]\s*/, '')  // Remove leading punctuation
+    .replace(/\s{2,}/g, ' ')        // Replace multiple spaces with single space
+    .replace(/[_\-+]/g, ' ');       // Replace underscores, hyphens with spaces
+  
+  // Capitalize first letter for consistency
+  cleaned = cleaned.charAt(0).toUpperCase() + cleaned.slice(1).toLowerCase();
+  
+  return cleaned;
+};
+
+// Map of common emotions for direct translation to avoid inconsistencies
+const emotionTranslationMap: Record<string, Record<string, string>> = {
+  hi: {
+    // Most common emotions and their correct Hindi translations
+    'Happy': 'खुश',
+    'Sad': 'दुखी',
+    'Angry': 'क्रोधित',
+    'Anxious': 'चिंतित',
+    'Peaceful': 'शांत',
+    'Joyful': 'आनंदित',
+    'Excited': 'उत्साहित',
+    'Fearful': 'भयभीत',
+    'Content': 'संतुष्ट',
+    'Frustrated': 'निराश',
+    'Calm': 'शांत',
+    'Love': 'प्यार',
+    'Gratitude': 'कृतज्ञता',
+    'Hope': 'आशा',
+    'Family': 'परिवार',
+    'Friend': 'मित���र',
+    'Work': 'काम',
+    'Health': 'स्वास्थ्य',
+    'Success': 'सफलता'
+  }
+};
+
+// Check if a string looks like it might be an emotion name
+const isEmotionName = (text: string): boolean => {
+  // Common emotion names - expand this list as needed
+  const commonEmotions = [
+    'happy', 'sad', 'angry', 'anxious', 'peaceful', 'joyful',
+    'excited', 'fearful', 'content', 'frustrated', 'calm', 'love',
+    'gratitude', 'hope', 'family', 'friend', 'work', 'health'
+  ];
+  
+  const normalized = text.toLowerCase().trim();
+  return commonEmotions.some(emotion => normalized.includes(emotion)) || 
+         /^[a-zA-Z]+$/.test(text); // Text that's just a single word is likely an emotion
+};
+
 export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   text,
   position,
@@ -50,6 +112,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   backgroundColor,
   opacity = 1,
   visible = true,
+  skipTranslation = false,
 }) => {
   const { translate, currentLanguage } = useTranslation();
   const [translatedText, setTranslatedText] = useState(text);
@@ -130,8 +193,50 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   useEffect(() => {
     const translateText = async () => {
-      if (currentLanguage !== 'en' && text) {
-        try {
+      // Skip translation for certain cases
+      if (skipTranslation || currentLanguage === 'en' || !text) {
+        setTranslatedText(text || '');
+        return;
+      }
+
+      // Don't translate percentage values
+      if (isPercentage(text)) {
+        console.log(`Skipping translation for percentage value: "${text}"`);
+        setTranslatedText(text);
+        return;
+      }
+
+      try {
+        // Special handling for emotion names
+        if (isEmotionName(text)) {
+          const cleanedText = cleanEmotionName(text);
+          console.log(`Translating emotion name: "${cleanedText}" to ${currentLanguage}`);
+          
+          // Check if we have a direct mapping for this emotion in the current language
+          if (currentLanguage in emotionTranslationMap && 
+              cleanedText in emotionTranslationMap[currentLanguage]) {
+            const directTranslation = emotionTranslationMap[currentLanguage][cleanedText];
+            console.log(`Using direct mapping for emotion "${cleanedText}": "${directTranslation}"`);
+            setTranslatedText(directTranslation);
+            return;
+          }
+          
+          // Otherwise use the translation service with the cleaned text
+          const result = await translate(cleanedText);
+          if (result) {
+            setTranslatedText(result);
+            
+            // Update script detection after translation
+            isNonLatinScript.current = containsNonLatinScript(result);
+            isDevanagari.current = containsDevanagari(result);
+            
+            // Debug logging for Hindi text
+            if (isDevanagari.current) {
+              console.log(`Hindi translation for emotion "${cleanedText}": "${result}"`);
+            }
+          }
+        } else {
+          // Standard translation for non-emotion text
           const result = await translate(text);
           if (result) {
             setTranslatedText(result);
@@ -145,20 +250,16 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
               console.log(`Hindi translation: "${result}", adjusting rendering parameters`);
             }
           }
-        } catch (e) {
-          console.error('Translation error:', e);
         }
-      } else {
+      } catch (e) {
+        console.error('Translation error:', e);
+        // Fallback to original text
         setTranslatedText(text);
-        
-        // Check for non-Latin script in original text as well
-        isNonLatinScript.current = containsNonLatinScript(text);
-        isDevanagari.current = containsDevanagari(text);
       }
     };
     
     translateText();
-  }, [text, currentLanguage, translate]);
+  }, [text, currentLanguage, translate, skipTranslation]);
 
   if (!visible || !text) return null;
 
