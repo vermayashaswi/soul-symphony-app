@@ -20,7 +20,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   text,
   position,
   color = 'white',
-  size = 0.45, // Increased from 0.15 to 0.45 (3x larger)
+  size = 0.9, // Increased from 0.45 to 0.9 (2x larger)
   bold = false,
   backgroundColor,
   opacity = 1,
