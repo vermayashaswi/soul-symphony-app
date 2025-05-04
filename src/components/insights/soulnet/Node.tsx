@@ -194,7 +194,7 @@ export const Node: React.FC<NodeProps> = ({
         position={node.position}
         percentage={connectionPercentage}
         isVisible={shouldShowPercentage}
-        offsetY={node.type === 'entity' ? 1.8 : 1.5} // Decreased from 2.4/2.0 to adjust for smaller nodes
+        offsetY={node.type === 'entity' ? 0 : 0} // Removed the offset since we're now handling it directly in ConnectionPercentage
         nodeType={node.type}
       />
     </group>
