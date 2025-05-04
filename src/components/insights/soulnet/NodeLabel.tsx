@@ -171,8 +171,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       size={dynamicFontSize}
       bold={isHighlighted}
       visible={stableVisibilityRef.current}
-      // We're still sending pre-translated text, but allow ThreeDimensionalText to handle fallback translation
-      skipTranslation={false}
+      // Set skipTranslation to true since we're already passing translated text
+      skipTranslation={true}
     />
   );
 };
