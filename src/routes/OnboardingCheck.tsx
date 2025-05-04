@@ -3,7 +3,7 @@ import React from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
-import { useOnboarding } from '@/contexts/OnboardingContext';
+import { useOnboarding } from '@/hooks/use-onboarding';
 
 const OnboardingCheck: React.FC = () => {
   const location = useLocation();

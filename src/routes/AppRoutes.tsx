@@ -2,7 +2,7 @@
 import React from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { ThemeProvider } from '@/hooks/use-theme';
-import { OnboardingProvider } from '@/contexts/OnboardingContext';
+import { OnboardingProvider } from '@/hooks/use-onboarding';
 import { isNativeApp } from './RouteHelpers';
 import ViewportManager from './ViewportManager';
 import ProtectedRoute from './ProtectedRoute';
@@ -41,7 +41,7 @@ const AppRoutes: React.FC = () => {
 
               {/* App routes */}
               <Route path="/app" element={<ProtectedRoute />}>
-                <Route path="" element={<OnboardingCheck />}>
+                <Route element={<OnboardingCheck />}>
                   <Route index element={<Navigate to="/app/home" replace />} />
                   <Route path="home" element={<Home />} />
                   <Route path="journal" element={<Journal />} />
