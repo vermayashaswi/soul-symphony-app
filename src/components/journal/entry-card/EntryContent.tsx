@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, Play, Pause } from 'lucide-react';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
@@ -17,24 +17,30 @@ interface EntryContentProps {
 
 export function EntryContent({ content, audioUrl, isProcessing, isProcessed, language, entryId }: EntryContentProps) {
   const [isExpanded, setIsExpanded] = useState(false);
+  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
   const { 
     isPlaying, 
     togglePlayback, 
     audioRef, 
     prepareAudio, 
     playbackProgress 
-  } = useAudioPlayback({ audioUrl }); // Pass the audioUrl here
+  } = useAudioPlayback({ 
+    audioBlob,
+    onPlaybackStart: () => console.log('Audio playback started'),
+    onPlaybackEnd: () => console.log('Audio playback ended')
+  });
   
   // Check if audio is ready
   const [audioLoaded, setAudioLoaded] = useState(false);
   const [audioError, setAudioError] = useState(false);
   
   // Load audio when component mounts or URL changes
-  React.useEffect(() => {
+  useEffect(() => {
     if (audioUrl) {
       fetch(audioUrl)
         .then(response => response.blob())
         .then(blob => {
+          setAudioBlob(blob);
           return prepareAudio()
             .then(() => setAudioLoaded(true))
             .catch(() => setAudioError(true));
