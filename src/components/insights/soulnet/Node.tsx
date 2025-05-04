@@ -159,8 +159,8 @@ export const Node: React.FC<NodeProps> = ({
   // Ensure label visibility - use explicit visibility for both NodeLabel and ConnectionPercentage
   const shouldShowLabel = stableLabelVisibilityRef.current;
   
-  // Always show percentages for highlighted nodes that aren't selected and have a non-zero percentage
-  const shouldShowPercentage = showPercentage && isHighlighted && !isSelected && connectionPercentage > 0;
+  // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
+  const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
   return (
     <group position={node.position}>

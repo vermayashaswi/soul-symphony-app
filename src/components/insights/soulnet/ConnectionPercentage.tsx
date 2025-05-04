@@ -34,16 +34,22 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
   // Adjust font size for percentages - decreased by 30%
   const fontSize = 0.2625; // Original 0.375 * 0.7 = 0.2625 (30% decrease)
 
+  // Determine text color based on node type
+  // Use white for entity nodes, brighter blue for emotion nodes
+  const textColor = nodeType === 'entity' ? '#ffffff' : '#ffffff';
+
   return (
     <ThreeDimensionalText
       text={formattedPercentage}
       position={labelPosition}
-      color={nodeType === 'entity' ? '#ffffff' : '#42a5f5'}
+      color={textColor}
       size={fontSize}
       bold={true}
       visible={isVisible}
       opacity={0.95} // Slightly higher opacity for better readability
       skipTranslation={true} // Always skip translation for percentage values
+      outlineWidth={0.02} // Add outline to make text more visible
+      outlineColor="#000000" // Black outline for contrast
     />
   );
 };

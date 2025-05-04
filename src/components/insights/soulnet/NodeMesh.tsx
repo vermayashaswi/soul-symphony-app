@@ -1,4 +1,3 @@
-
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
@@ -71,6 +70,16 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     }
   });
 
+  // Calculate opacity based on highlight state
+  // Make highlighted but non-selected nodes 30% opacity (70% transparent)
+  // Keep selected node at higher opacity
+  const nodeOpacity = useMemo(() => {
+    if (isHighlighted) {
+      return isSelected ? 0.8 : 0.3; // Selected node is 80% opaque, highlighted nodes are 30% opaque
+    }
+    return dimmed ? 0.5 : 0.8; // Normal state: dimmed is 50% opaque, regular is 80% opaque
+  }, [isHighlighted, isSelected, dimmed]);
+
   return (
     <mesh
       ref={meshRef}
@@ -88,7 +97,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
       <meshStandardMaterial
         color={displayColor}
         transparent
-        opacity={isHighlighted ? 1 : (dimmed ? 0.5 : 0.8)}
+        opacity={nodeOpacity}
         emissive={displayColor}
         emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
         roughness={0.3}

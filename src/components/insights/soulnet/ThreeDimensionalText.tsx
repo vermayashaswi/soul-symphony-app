@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -14,7 +13,9 @@ interface ThreeDimensionalTextProps {
   backgroundColor?: string;
   opacity?: number;
   visible?: boolean;
-  skipTranslation?: boolean; // New prop to skip translation
+  skipTranslation?: boolean;
+  outlineWidth?: number;  // New prop for outline width
+  outlineColor?: string;  // New prop for outline color
 }
 
 // Helper function to detect non-Latin script
@@ -51,7 +52,9 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   backgroundColor,
   opacity = 1,
   visible = true,
-  skipTranslation = false, // Default to false for backward compatibility
+  skipTranslation = false,
+  outlineWidth,  // New prop with default undefined
+  outlineColor = '#000000',  // New prop with default black
 }) => {
   const { translate, currentLanguage } = useTranslation();
   const [translatedText, setTranslatedText] = useState(text);
@@ -203,6 +206,11 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     return 0; // Default spacing for Latin scripts
   };
 
+  // Use provided outline width or default based on context
+  const finalOutlineWidth = outlineWidth !== undefined ? 
+    outlineWidth : 
+    (text.includes('%') ? 0.01 : 0.0056); // Percentage signs get slightly stronger outline
+  
   return (
     <group>
       <Text
@@ -213,8 +221,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         fontWeight={bold ? 700 : 400}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.0056} // Using 0.8 scaling from 0.007 (0.007 * 0.8 = 0.0056)
-        outlineColor="#000000"
+        outlineWidth={finalOutlineWidth}
+        outlineColor={outlineColor}
         maxWidth={getMaxWidth()}
         overflowWrap="normal" // Prevent syllable breaks
         whiteSpace="normal" // Allow wrapping for better display of non-Latin text
@@ -226,7 +234,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         // Reduce rendering artifacts
         clipRect={[-1000, -1000, 2000, 2000]}
         // Add throttling to prevent too many redraws
-        renderOrder={isDevanagari.current ? 5 : 1} // Higher render order for Hindi
+        renderOrder={isDevanagari.current ? 5 : (text.includes('%') ? 10 : 1)} // Higher render order for percentages
         // Add lineHeight for better vertical spacing
         lineHeight={isDevanagari.current ? 1.7 : (isNonLatinScript.current ? 1.5 : 1.2)}
         // Font subsetting optimization - more character support
