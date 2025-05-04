@@ -47,6 +47,17 @@ class TranslationCache {
       return undefined;
     }
   }
+  
+  // This is the method being used in the context
+  async getCachedTranslation(text: string, language: string): Promise<string | null> {
+    try {
+      const cached = await this.getTranslation(text, language);
+      return cached ? cached.translatedText : null;
+    } catch (error) {
+      console.error('TranslationCache: Error getting cached translation:', error);
+      return null;
+    }
+  }
 
   async setTranslation(entry: TranslationEntry): Promise<void> {
     try {

@@ -1,4 +1,3 @@
-
 import { TranslationService } from './translationService';
 
 export class StaticTranslationService {
@@ -33,6 +32,12 @@ export class StaticTranslationService {
       console.error('StaticTranslationService: Error translating text:', error);
       return text;
     }
+  }
+
+  get(key: string, language?: string): string {
+    // Simple implementation that just returns the key
+    // In a real implementation, this would look up translations from a dictionary
+    return key;
   }
 
   async preTranslate(texts: string[]): Promise<Map<string, string>> {
@@ -258,3 +263,8 @@ export class StaticTranslationService {
 }
 
 export const staticTranslationService = new StaticTranslationService();
+export const staticTranslation = {
+  get: (key: string, language?: string): string => {
+    return staticTranslationService.get(key, language);
+  }
+};

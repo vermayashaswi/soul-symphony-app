@@ -1,5 +1,5 @@
 
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { ChevronDown, ChevronUp, Play, Pause } from 'lucide-react';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
@@ -17,7 +17,26 @@ interface EntryContentProps {
 
 export function EntryContent({ content, audioUrl, isProcessing, isProcessed, language, entryId }: EntryContentProps) {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { isPlaying, play, pause, isLoaded, isError } = useAudioPlayback(audioUrl || '');
+  const { 
+    isPlaying, 
+    togglePlayback, 
+    audioRef, 
+    prepareAudio, 
+    playbackProgress 
+  } = useAudioPlayback({ audioUrl: audioUrl || '' });
+  
+  // Check if audio is ready
+  const [audioLoaded, setAudioLoaded] = React.useState(false);
+  const [audioError, setAudioError] = React.useState(false);
+  
+  // Load audio when component mounts or URL changes
+  React.useEffect(() => {
+    if (audioUrl) {
+      prepareAudio()
+        .then(() => setAudioLoaded(true))
+        .catch(() => setAudioError(true));
+    }
+  }, [audioUrl, prepareAudio]);
   
   // Toggle expanded state
   const toggleExpanded = () => {
@@ -62,8 +81,8 @@ export function EntryContent({ content, audioUrl, isProcessing, isProcessed, lan
                 variant="ghost"
                 size="sm"
                 className="text-xs px-2 py-1 h-8"
-                onClick={isPlaying ? pause : play}
-                disabled={!isLoaded || isError}
+                onClick={togglePlayback}
+                disabled={!audioLoaded || audioError}
               >
                 {isPlaying ? (
                   <>

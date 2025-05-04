@@ -11,7 +11,7 @@ export function TranslationLoadingOverlay() {
   
   try {
     const translationContext = useTranslation();
-    isTranslating = translationContext?.isTranslating || false;
+    isTranslating = translationContext?.loadingTranslation || false;
     translationProgress = translationContext?.translationProgress || 0;
   } catch (error) {
     console.error('TranslationLoadingOverlay: Error accessing translation context', error);
@@ -39,3 +39,5 @@ export function TranslationLoadingOverlay() {
     </AnimatePresence>
   );
 }
+
+export default TranslationLoadingOverlay;

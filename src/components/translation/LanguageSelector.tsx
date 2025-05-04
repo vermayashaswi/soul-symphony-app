@@ -11,7 +11,7 @@ import { Button } from '@/components/ui/button';
 import { Globe } from 'lucide-react';
 
 export function LanguageSelector() {
-  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
+  const { currentLanguage, setCurrentLanguage, loadingTranslation } = useTranslation();
 
   // Use locally defined languages to avoid circular imports
   const languages = [
@@ -31,7 +31,7 @@ export function LanguageSelector() {
   
   const handleLanguageChange = (code: string) => {
     console.log(`LanguageSelector: Language selected: ${code}`);
-    setLanguage(code);
+    setCurrentLanguage(code);
   };
 
   return (
@@ -41,9 +41,9 @@ export function LanguageSelector() {
           variant="ghost" 
           size="sm" 
           className="flex items-center gap-2"
-          disabled={isTranslating}
+          disabled={loadingTranslation}
         >
-          <Globe className={`h-4 w-4 ${isTranslating ? "animate-pulse" : ""}`} />
+          <Globe className={`h-4 w-4 ${loadingTranslation ? "animate-pulse" : ""}`} />
           <span>{currentLanguageLabel}</span>
         </Button>
       </DropdownMenuTrigger>
@@ -55,7 +55,7 @@ export function LanguageSelector() {
             className={`cursor-pointer ${
               currentLanguage === language.code ? "bg-secondary" : ""
             }`}
-            disabled={isTranslating}
+            disabled={loadingTranslation}
           >
             {language.label}
           </DropdownMenuItem>

@@ -11,7 +11,7 @@ import { useTranslation } from '@/contexts/TranslationContext';
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const location = useLocation();
-  const { prefetchTranslationsForRoute } = useTranslation();
+  const { translate } = useTranslation();
 
   const toggleMenu = () => {
     setIsMenuOpen(!isMenuOpen);
@@ -23,8 +23,13 @@ const Navbar = () => {
       'Home', 'Blog', 'FAQ', 'Download on App Store'
     ];
     
-    prefetchTranslationsForRoute(navbarTexts);
-  }, [location.pathname, prefetchTranslationsForRoute]);
+    // Batch translate the navbar texts to prefetch them
+    navbarTexts.forEach(text => {
+      translate(text).catch(err => {
+        console.error('Error prefetching translation:', err);
+      });
+    });
+  }, [location.pathname, translate]);
 
   return (
     <nav className="fixed top-0 left-0 right-0 z-50 bg-white/90 backdrop-blur-md border-b border-gray-100 px-4 py-3 shadow-sm">
