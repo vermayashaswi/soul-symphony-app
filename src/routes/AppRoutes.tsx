@@ -4,6 +4,7 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { OnboardingProvider } from '@/hooks/use-onboarding';
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { AuthProvider } from '@/contexts/AuthContext';
+import { ThemeProvider } from '@/hooks/use-theme';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { isNativeApp } from './RouteHelpers';
 import ViewportManager from './ViewportManager';

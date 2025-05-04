@@ -4,7 +4,6 @@ import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { JournalProcessingInitializer } from './app/journal-processing-init';
-import { ThemeProvider } from '@/hooks/use-theme';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -21,14 +20,12 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <ThemeProvider>
-      <>
-        <AppRoutes />
-        <Toaster />
-        <SonnerToaster position="top-right" />
-        <JournalProcessingInitializer />
-      </>
-    </ThemeProvider>
+    <>
+      <AppRoutes />
+      <Toaster />
+      <SonnerToaster position="top-right" />
+      <JournalProcessingInitializer />
+    </>
   );
 };
 
