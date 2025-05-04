@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -177,8 +176,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   if (!visible || !text) return null;
 
-  // Size is applied with a 4x multiplier in the final render (2x * 2x = 4x font size increase)
-  const effectiveSize = size * 4;
+  // Size is applied with a 3x multiplier (decreased from 4x) and then with 0.75x scaling factor
+  const effectiveSize = size * 3 * 0.75; // Decreased by 0.75x
   
   // Calculate appropriate max width based on script type and text length
   const getMaxWidth = () => {
@@ -209,11 +208,11 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         ref={textRef}
         position={position}
         color={color}
-        fontSize={effectiveSize} // Using the quadrupled font size
+        fontSize={effectiveSize} // Using the decreased font size
         fontWeight={bold ? 700 : 400}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.009} // Increased outline for better readability with larger font
+        outlineWidth={0.007} // Slightly decreased from 0.009 for better proportion
         outlineColor="#000000"
         maxWidth={getMaxWidth()}
         overflowWrap="normal" // Prevent syllable breaks

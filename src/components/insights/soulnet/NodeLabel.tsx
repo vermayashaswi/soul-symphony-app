@@ -130,30 +130,30 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Base size calculation adjusted by 30%
-    const baseSize = 0.26 + Math.max(0, (26 - z) * 0.0088);
+    // Base size calculation - decreased by 0.75x
+    const baseSize = (0.26 + Math.max(0, (26 - z) * 0.0088)) * 0.75;
     
     // Adjust size for non-Latin scripts - they often need slightly bigger font
     // Devanagari (Hindi) scripts need even larger adjustment
-    const sizeAdjustment = isDevanagari.current ? 0.06 : 
-                          isNonLatin.current ? 0.03 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.06 * 0.75 : 
+                          isNonLatin.current ? 0.03 * 0.75 : 0;
     
     // Ensure size stays within reasonable bounds
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.5), 0.23);
-  }, [cameraZoom, isNonLatin.current, isDevanagari.current]);
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.5), 0.18);
+  }, [cameraZoom]);
 
   // Don't render if not supposed to be shown
   if (!stableVisibilityRef.current) return null;
 
   // Adjust vertical positioning for different script types and node types
-  // Move the label position further out to accommodate the larger font size and multi-line text for entities
-  let verticalPosition = type === 'entity' ? 1.8 : 1.3; // Increased from 1.4 to 1.8 for entities to prevent overlap
+  // Also adjusted for smaller node sizes
+  let verticalPosition = type === 'entity' ? 1.45 : 1.1; // Decreased from 1.8/1.3 to account for smaller nodes
   
   // For Devanagari text, position slightly higher to accommodate taller characters
   if (isDevanagari.current) {
-    verticalPosition += 0.2; // Increased from 0.1 for larger font
+    verticalPosition += 0.15; // Decreased from 0.2
   } else if (isNonLatin.current) {
-    verticalPosition += 0.1; // Increased from 0.05 for larger font
+    verticalPosition += 0.08; // Decreased from 0.1
   }
   
   const labelPosition: [number, number, number] = [0, verticalPosition, 0];

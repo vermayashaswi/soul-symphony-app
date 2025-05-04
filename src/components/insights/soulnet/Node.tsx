@@ -113,7 +113,7 @@ export const Node: React.FC<NodeProps> = ({
   }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage, translatedText]);
   
   // Further increase the base scale for all nodes by 1.5x for nodes, as requested
-  const baseScale = node.type === 'entity' ? 0.75 : 0.6; // Already increased from previous changes
+  const baseScale = node.type === 'entity' ? 0.7 : 0.55; // Adjusted values for smaller nodes
   const scale = isHighlighted 
     ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
     : baseScale * (0.8 + node.value * 0.5);
@@ -213,7 +213,7 @@ export const Node: React.FC<NodeProps> = ({
         position={node.position}
         percentage={connectionPercentage}
         isVisible={shouldShowPercentage}
-        offsetY={node.type === 'entity' ? 2.4 : 2.0} // Increased from 1.8/1.6 to account for larger nodes
+        offsetY={node.type === 'entity' ? 1.8 : 1.5} // Decreased from 2.4/2.0 to adjust for smaller nodes
         nodeType={node.type}
       />
     </group>
