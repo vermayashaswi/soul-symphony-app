@@ -16,6 +16,7 @@ interface ThreeDimensionalTextProps {
   skipTranslation?: boolean;
   outlineWidth?: number;  // New prop for outline width
   outlineColor?: string;  // New prop for outline color
+  renderOrder?: number;   // New prop for render order
 }
 
 // Helper function to detect non-Latin script
@@ -55,6 +56,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   skipTranslation = false,
   outlineWidth,  // New prop with default undefined
   outlineColor = '#000000',  // New prop with default black
+  renderOrder, // New prop for render order
 }) => {
   const { translate, currentLanguage } = useTranslation();
   const [translatedText, setTranslatedText] = useState(text);
@@ -129,6 +131,11 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         }
         
         cameraUpdateThrottleRef.current = 0;
+      }
+      
+      // Apply renderOrder if provided
+      if (renderOrder !== undefined && textRef.current) {
+        textRef.current.renderOrder = renderOrder;
       }
     }
   });
@@ -234,7 +241,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         // Reduce rendering artifacts
         clipRect={[-1000, -1000, 2000, 2000]}
         // Add throttling to prevent too many redraws
-        renderOrder={isDevanagari.current ? 5 : (text.includes('%') ? 10 : 1)} // Higher render order for percentages
+        renderOrder={renderOrder !== undefined ? renderOrder : (isDevanagari.current ? 5 : (text.includes('%') ? 10 : 1))} // Higher render order for percentages
         // Add lineHeight for better vertical spacing
         lineHeight={isDevanagari.current ? 1.7 : (isNonLatinScript.current ? 1.5 : 1.2)}
         // Font subsetting optimization - more character support
