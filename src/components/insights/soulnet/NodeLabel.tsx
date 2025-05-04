@@ -1,6 +1,6 @@
-
 import React, { useMemo, useRef, useEffect } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
+import { useTheme } from '@/hooks/use-theme';
 
 // Helper function to detect non-Latin script
 const containsNonLatinScript = (text: string): boolean => {
@@ -48,6 +48,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   translatedText
 }) => {
+  const { theme } = useTheme();
   console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}, translatedText=${translatedText}`);
   const prevTranslatedText = useRef<string | undefined>(translatedText);
   const isNonLatin = useRef<boolean>(false);
@@ -109,22 +110,28 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   if (!stableVisibilityRef.current) return null;
 
   // Adjust vertical positioning for different script types
-  let verticalPosition = type === 'entity' ? 0.9 : 0.8;
+  // Move the label position further out to accommodate the larger font size
+  let verticalPosition = type === 'entity' ? 1.4 : 1.3; // Increased from 0.9/0.8 to account for larger font
   
   // For Devanagari text, position slightly higher to accommodate taller characters
   if (isDevanagari.current) {
-    verticalPosition += 0.1;
+    verticalPosition += 0.2; // Increased from 0.1 for larger font
   } else if (isNonLatin.current) {
-    verticalPosition += 0.05;
+    verticalPosition += 0.1; // Increased from 0.05 for larger font
   }
   
   const labelPosition: [number, number, number] = [0, verticalPosition, 0];
+
+  // Determine text color based on theme for entity nodes
+  const textColor = type === 'entity' 
+    ? (theme === 'light' ? '#000000' : '#ffffff')  // Black in light mode, white in dark mode
+    : themeHex;
 
   return (
     <ThreeDimensionalText
       text={translatedText || id}
       position={labelPosition}
-      color={type === 'entity' ? '#ffffff' : themeHex}
+      color={textColor}
       size={dynamicFontSize}
       bold={isHighlighted}
       visible={stableVisibilityRef.current}

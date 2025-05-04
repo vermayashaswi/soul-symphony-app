@@ -34,10 +34,11 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   
+  // Increase node geometry sizes by 1.5x
   const Geometry = useMemo(() => 
     type === 'entity'
-      ? <sphereGeometry args={[1, 32, 32]} />
-      : <boxGeometry args={[1.2, 1.2, 1.2]} />,
+      ? <sphereGeometry args={[1.5, 32, 32]} /> // Increased from 1 to 1.5
+      : <boxGeometry args={[1.8, 1.8, 1.8]} />, // Increased from 1.2 to 1.8
     [type]
   );
 

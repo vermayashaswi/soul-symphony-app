@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -175,17 +174,20 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   if (!visible || !text) return null;
 
+  // Size is applied with a 2x multiplier in the final render
+  const effectiveSize = size * 2;
+  
   // Calculate appropriate max width based on script type and text length
   const getMaxWidth = () => {
     if (isDevanagari.current) {
       // Much wider container for Devanagari specifically
-      return 35; // Further increased to accommodate Devanagari's wider character set
+      return 35 * 2; // Doubled the width to match font size increase
     } else if (isNonLatinScript.current) {
       // Wider container for other non-Latin scripts
-      return 25;
+      return 25 * 2; // Doubled the width to match font size increase
     }
     // Standard width for Latin scripts
-    return 10;
+    return 10 * 2; // Doubled the width to match font size increase
   };
 
   // Get letter spacing appropriate for the script
@@ -204,11 +206,11 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         ref={textRef}
         position={position}
         color={color}
-        fontSize={size}
+        fontSize={effectiveSize} // Using the doubled font size
         fontWeight={bold ? 700 : 400}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.0045} // Increased outline for better readability
+        outlineWidth={0.0045 * 1.5} // Increased outline for better readability with larger font
         outlineColor="#000000"
         maxWidth={getMaxWidth()}
         overflowWrap="normal" // Prevent syllable breaks
