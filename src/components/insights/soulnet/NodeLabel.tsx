@@ -78,11 +78,16 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const isDevanagari = useRef<boolean>(false);
   const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
   
-  // Format entity text for display
+  // Format entity text for display - always apply for entity type
   const formattedText = useMemo(() => {
-    if (type === 'entity' && translatedText) {
-      return formatEntityText(translatedText);
+    // Only format entity nodes - this ensures we get two lines for circular nodes
+    if (type === 'entity') {
+      // Use translated text if available, otherwise use id
+      const textToFormat = translatedText || id;
+      console.log(`Formatting entity text for ${id}: "${textToFormat}"`);
+      return formatEntityText(textToFormat);
     }
+    // For emotion nodes, just use the translated text or id directly
     return translatedText || id;
   }, [id, type, translatedText]);
   
@@ -131,7 +136,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     // Adjust size for non-Latin scripts - they often need slightly bigger font
     // Devanagari (Hindi) scripts need even larger adjustment
     const sizeAdjustment = isDevanagari.current ? 0.06 : 
-                           isNonLatin.current ? 0.03 : 0;
+                          isNonLatin.current ? 0.03 : 0;
     
     // Ensure size stays within reasonable bounds
     return Math.max(Math.min(baseSize + sizeAdjustment, 0.5), 0.23);
@@ -166,8 +171,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       size={dynamicFontSize}
       bold={isHighlighted}
       visible={stableVisibilityRef.current}
-      // Skip the translation in ThreeDimensionalText since we're using pre-translated text
-      skipTranslation={!!translatedText}
+      // We're still sending pre-translated text, but allow ThreeDimensionalText to handle fallback translation
+      skipTranslation={false}
     />
   );
 };

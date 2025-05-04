@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -144,7 +145,9 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       
       if (currentLanguage !== 'en' && text) {
         try {
+          console.log(`ThreeDimensionalText: Translating "${text}" to ${currentLanguage}`);
           const result = await translate(text);
+          console.log(`ThreeDimensionalText: Translation result: "${result}"`);
           if (result) {
             setTranslatedText(result);
             
