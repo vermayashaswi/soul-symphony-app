@@ -1,4 +1,3 @@
-
 import { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,7 +36,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Safe way to check if we're on an app route without useLocation
   const isOnAppRoute = isAppRoute(currentPath);
 
-  // Update path on navigation
+  // Update path on navigation without using useLocation
   useEffect(() => {
     const handleLocationChange = () => {
       setCurrentPath(window.location.pathname);

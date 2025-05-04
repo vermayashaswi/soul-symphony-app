@@ -40,17 +40,19 @@ const OnboardingCheck: React.FC = () => {
     );
   }
 
-  // Special handling for the root /app route
-  if (isRootAppRoute) {
-    console.log('Root app route detected, user:', !!user);
-    // If user is logged in, redirect to home
-    if (user) {
-      console.log('User is logged in, redirecting to /app/home');
-      return <Navigate to="/app/home" replace />;
-    } else {
-      // If user is not logged in, redirect to onboarding
+  // Special handling for the root /app route or if user navigates directly to /app/home without logging in
+  if (isRootAppRoute || (!user && isAppRoute(location.pathname))) {
+    console.log('App route detected, user:', !!user);
+    // If user is not logged in, redirect to onboarding
+    if (!user) {
       console.log('User not logged in, redirecting to /app/onboarding');
       return <Navigate to="/app/onboarding" replace />;
+    }
+    
+    // If user is logged in, redirect to home
+    if (isRootAppRoute) {
+      console.log('User is logged in, redirecting to /app/home');
+      return <Navigate to="/app/home" replace />;
     }
   }
   

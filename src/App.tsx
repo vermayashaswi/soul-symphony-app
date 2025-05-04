@@ -21,12 +21,10 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <ThemeProvider>
-      <AppRoutes />
-      <Toaster />
-      <SonnerToaster position="top-right" />
-      <JournalProcessingInitializer />
-    </ThemeProvider>
+    <AppRoutes />
+    <Toaster />
+    <SonnerToaster position="top-right" />
+    <JournalProcessingInitializer />
   );
 };
 
