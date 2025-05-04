@@ -239,10 +239,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               transition: 'all 0.3s ease-in-out',
             }}
             camera={{ 
-              position: [0, 0, isFullScreen ? 22 : 26], 
+              position: [0, 0, isFullScreen ? 44 : 52], // Doubled from 22 and 26 to zoom out 2x
               near: 1, 
               far: 1000,
-              fov: isFullScreen ? 60 : 50 // Adjust field of view for better fullscreen experience
+              fov: isFullScreen ? 60 : 50 // Maintained the same FOV
             }}
             onPointerMissed={() => setSelectedEntity(null)}
             gl={{ 
@@ -253,7 +253,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               depth: true,
               stencil: false,
               precision: isMobile ? 'mediump' : 'highp',
-              logarithmicDepthBuffer: true // Enable logarithmic depth buffer for better z-sorting
+              logarithmicDepthBuffer: true // Maintain logarithmic depth buffer for better z-sorting
             }}
           >
             <SoulNetVisualization

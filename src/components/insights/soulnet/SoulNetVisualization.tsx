@@ -122,7 +122,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
-  const [cameraZoom, setCameraZoom] = useState<number>(26);
+  const [cameraZoom, setCameraZoom] = useState<number>(52); // Doubled from 26 to zoom out 2x
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
   
@@ -194,7 +194,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       try {
         const centerX = centerPosition.x;
         const centerY = centerPosition.y;
-        camera.position.set(centerX, centerY, 26);
+        camera.position.set(centerX, centerY, 52); // Doubled from 26 to zoom out 2x
         camera.lookAt(centerX, centerY, 0);
         setIsInitialized(true);
       } catch (error) {
@@ -242,8 +242,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
       
       // Adjust limits for better fullscreen experience
-      controlsRef.current.minDistance = isFullScreen ? 4 : 5;
-      controlsRef.current.maxDistance = isFullScreen ? 40 : 30;
+      controlsRef.current.minDistance = isFullScreen ? 8 : 10; // Doubled from 4 and 5
+      controlsRef.current.maxDistance = isFullScreen ? 80 : 60; // Doubled from 40 and 30
     }
   }, [isFullScreen]);
 
@@ -275,8 +275,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         enableDamping
         dampingFactor={isFullScreen ? 0.08 : 0.05}
         rotateSpeed={0.5}
-        minDistance={isFullScreen ? 4 : 5}
-        maxDistance={isFullScreen ? 40 : 30}
+        minDistance={isFullScreen ? 8 : 10} // Doubled from 4 and 5
+        maxDistance={isFullScreen ? 80 : 60} // Doubled from 40 and 30
         target={centerPosition}
         onChange={() => {
           if (camera) {
