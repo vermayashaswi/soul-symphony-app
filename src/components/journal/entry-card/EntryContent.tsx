@@ -23,7 +23,7 @@ export function EntryContent({ content, audioUrl, isProcessing, isProcessed, lan
     audioRef, 
     prepareAudio, 
     playbackProgress 
-  } = useAudioPlayback(); // Initialize without props
+  } = useAudioPlayback({ audioUrl }); // Pass the audioUrl here
   
   // Check if audio is ready
   const [audioLoaded, setAudioLoaded] = useState(false);

@@ -13,7 +13,6 @@ const SentimentMeter: React.FC<SentimentMeterProps> = ({ sentiment, showText = f
   // Parse the sentiment to get a numeric value between -1 and 1
   const getSentimentValue = (sentiment: SentimentValue): number => {
     if (typeof sentiment === 'number') {
-      // Convert to string first to make TypeScript happy with the assignment
       return sentiment;
     } else if (typeof sentiment === 'string') {
       return parseFloat(sentiment);
@@ -38,11 +37,17 @@ const SentimentMeter: React.FC<SentimentMeterProps> = ({ sentiment, showText = f
 
   const sentimentText = getSentimentText(sentimentValue);
 
+  // Convert the sentiment value to the expected type format
+  const formattedSentiment: SentimentValue = {
+    sentiment: sentimentText.toLowerCase(),
+    score: sentimentValue
+  };
+
   return (
     <div className="mt-3">
       <div className="flex items-center justify-between mb-1">
         <div className="flex items-center">
-          <SentimentEmoji sentiment={sentimentValue} />
+          <SentimentEmoji sentiment={formattedSentiment} />
           {showText && <span className="text-xs ml-2 text-muted-foreground">{sentimentText}</span>}
         </div>
         <span className="text-xs text-muted-foreground">{percentage}%</span>

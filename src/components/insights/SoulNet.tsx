@@ -1,11 +1,18 @@
+
 import React from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardHeader, CardTitle, CardContent, CardFooter } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { staticTranslation } from '@/services/staticTranslationService';
+import { TimeRange } from '@/hooks/use-insights-data';
 
-const SoulNet = () => {
+interface SoulNetProps {
+  userId?: string;
+  timeRange?: TimeRange;
+}
+
+const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const { getStaticTranslation } = useTranslation();
   const navigate = useNavigate();
 
@@ -20,6 +27,7 @@ const SoulNet = () => {
       </CardHeader>
       <CardContent>
         <p>{getStaticTranslation('Connect with your inner self.')}</p>
+        {userId && <p className="text-sm text-muted-foreground mt-2">{getStaticTranslation('Analyzing data for deeper insights.')}</p>}
       </CardContent>
       <CardFooter>
         <Button onClick={handleExploreClick}>{getStaticTranslation('Explore')}</Button>
@@ -29,4 +37,3 @@ const SoulNet = () => {
 };
 
 export default SoulNet;
-
