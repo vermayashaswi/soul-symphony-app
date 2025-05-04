@@ -1,3 +1,4 @@
+
 // This is a placeholder for the actual implementation
 // The actual implementation would be imported from the service layer
 
@@ -24,7 +25,7 @@ class StaticTranslationService {
     return originals.every(text => translations.has(text));
   }
   
-  public async translateText(text: string): Promise<string> {
+  public async translateText(text: string, sourceLanguage?: string, entryId?: number): Promise<string> {
     // Check cache first
     const cached = this.getFromCache(text);
     if (cached) return cached;
