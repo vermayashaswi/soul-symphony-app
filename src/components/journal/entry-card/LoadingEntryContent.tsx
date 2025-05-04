@@ -53,9 +53,9 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   const forceRemoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const visibilityTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const isVisibleRef = useRef<boolean>(true);
-  // IMPORTANT: Track when this component was mounted to enforce minimum visibility time
   const mountTimeRef = useRef<number>(Date.now());
-  // Track visibility state
+  // Added a ref to track if content is ready state
+  const contentReadyRef = useRef<boolean>(false);
   const [visibilityState, setVisibilityState] = useState<string>('visible');
   
   // Broadcast that this component was mounted to help track processing entries
@@ -152,19 +152,23 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     isVisibleRef.current = false;
     setVisibilityState('removing');
     
-    // IMPORTANT: Check if we've been visible for at least 2 seconds
-    const timeVisible = Date.now() - mountTimeRef.current;
-    if (timeVisible < 2000) {
-      console.log(`[LoadingEntryContent] Not removing parent card yet, only visible for ${timeVisible}ms`);
-      
-      // Set a timeout to remove after we've been visible for at least 2 seconds
-      const remainingTime = 2000 - timeVisible;
-      setTimeout(() => {
-        console.log('[LoadingEntryContent] Now removing parent card after enforced minimum visibility');
-        actuallyRemoveCard();
-      }, remainingTime);
-      
-      return;
+    // For forced removals, enforce minimum visibility time
+    // For content ready events, don't enforce minimum time
+    if (!contentReadyRef.current) {
+      // IMPORTANT: Check if we've been visible for at least 2 seconds
+      const timeVisible = Date.now() - mountTimeRef.current;
+      if (timeVisible < 2000) {
+        console.log(`[LoadingEntryContent] Not removing parent card yet, only visible for ${timeVisible}ms`);
+        
+        // Set a timeout to remove after we've been visible for at least 2 seconds
+        const remainingTime = 2000 - timeVisible;
+        setTimeout(() => {
+          console.log('[LoadingEntryContent] Now removing parent card after enforced minimum visibility');
+          actuallyRemoveCard();
+        }, remainingTime);
+        
+        return;
+      }
     }
     
     actuallyRemoveCard();
@@ -285,28 +289,20 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       if (!unmountingRef.current) {
         console.log('[LoadingEntryContent] Content ready event received, removing card');
         unmountingRef.current = true;
+        contentReadyRef.current = true;  // Mark content as ready
         setVisibilityState('content-ready');
         
-        // IMPORTANT: Ensure we've been visible for at least 2 seconds before removing
-        const timeVisible = Date.now() - mountTimeRef.current;
-        if (timeVisible >= 2000) {
-          // Set a timeout to ensure this card is removed even if the animation doesn't complete
-          if (forceRemoveTimeoutRef.current) clearTimeout(forceRemoveTimeoutRef.current);
-          forceRemoveTimeoutRef.current = setTimeout(() => {
-            removeParentCard();
-          }, 300);
-        } else {
-          // Wait for the minimum visibility time
-          const remainingTime = 2000 - timeVisible;
-          console.log(`[LoadingEntryContent] Delaying removal for ${remainingTime}ms to ensure minimum visibility`);
-          
-          setTimeout(() => {
-            if (forceRemoveTimeoutRef.current) clearTimeout(forceRemoveTimeoutRef.current);
-            forceRemoveTimeoutRef.current = setTimeout(() => {
-              removeParentCard();
-            }, 300);
-          }, remainingTime);
+        // Start the fade-out animation immediately
+        const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
+        if (parentCard) {
+          parentCard.classList.add('processing-card-removing');
         }
+        
+        // Set a timeout to ensure this card is removed after animation completes
+        if (forceRemoveTimeoutRef.current) clearTimeout(forceRemoveTimeoutRef.current);
+        forceRemoveTimeoutRef.current = setTimeout(() => {
+          removeParentCard();
+        }, 300); // Just wait for the animation duration
       }
     };
     
@@ -362,9 +358,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           transition: all 0.3s ease-out;
         }
         .processing-card-removing {
-          opacity: 0.5;
+          opacity: 0;
           transform: translateY(-10px);
           pointer-events: none;
+          transition: opacity 0.3s ease-out, transform 0.3s ease-out;
         }
         .processing-active .journal-entry-card.processing-card {
           border-color: hsl(var(--primary)/0.5);
@@ -479,3 +476,4 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     </motion.div>
   );
 }
+
