@@ -1,6 +1,5 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { planQueryExecution, executeResearchStep, synthesizeResponses } from "./chat/queryPlannerService";
 
 export type ChatMessage = {
   role: string;
@@ -33,40 +32,6 @@ const logUserQuery = async (
   }
 };
 
-// Helper function to retrieve conversation history for context
-const getConversationContext = async (
-  threadId: string | null, 
-  limit: number = 5
-): Promise<{ role: string, content: string }[]> => {
-  if (!threadId) return [];
-  
-  try {
-    const { data: previousMessages, error } = await supabase
-      .from('chat_messages')
-      .select('content, sender, created_at')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: false })
-      .limit(limit * 2); // Get more messages to ensure we have enough pairs
-      
-    if (error || !previousMessages || previousMessages.length === 0) {
-      return [];
-    }
-    
-    // Process messages to create conversation context
-    // We reverse the messages to get them in chronological order
-    const chronologicalMessages = [...previousMessages].reverse();
-    
-    // Format as conversation context
-    return chronologicalMessages.map(msg => ({
-      role: msg.sender === 'user' ? 'user' : 'assistant',
-      content: msg.content
-    }));
-  } catch (error) {
-    console.error("Error retrieving conversation context:", error);
-    return [];
-  }
-};
-
 export const processChatMessage = async (
   message: string, 
   userId: string, 
@@ -77,390 +42,397 @@ export const processChatMessage = async (
   console.log("Processing chat message:", message.substring(0, 30) + "...");
   
   try {
-    // Initialize diagnostics with more detailed tracking
+    // Log the user query to the user_queries table
+    // We'll pass the message ID once we get it from the chat_messages table
+    await logUserQuery(userId, message, threadId);
+    
+    // Use fixed parameters for vector search - let the retriever handle the filtering
+    const matchThreshold = 0.5;
+    const matchCount = 10; // Fixed count, let the retriever determine the actual number
+    
+    console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
+    
+    // Extract time range if this is a temporal query and ensure it's not undefined
+    let timeRange = null;
+    if (queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion)) {
+      timeRange = queryTypes.timeRange || null;
+      console.log("Temporal query detected, using time range:", timeRange);
+    }
+    
+    // Safely check properties before passing them
+    const isEmotionQuery = queryTypes && queryTypes.isEmotionFocused ? true : false;
+    const isWhyEmotionQuery = queryTypes && queryTypes.isWhyQuestion && queryTypes.isEmotionFocused ? true : false;
+    const isTimePatternQuery = queryTypes && queryTypes.isTimePatternQuery ? true : false;
+    const isTemporalQuery = queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) ? true : false;
+    const requiresTimeAnalysis = queryTypes && queryTypes.requiresTimeAnalysis ? true : false;
+    
+    // Check if the query is complex and needs segmentation
+    const isComplexQuery = queryTypes && queryTypes.needsDataAggregation ? true : 
+                          message.includes(" and ") || message.includes("also") || 
+                          message.split("?").length > 2 || 
+                          message.length > 100;
+    
+    // Initialize diagnostics
     let diagnostics = enableDiagnostics ? {
       steps: [],
       references: [],
       similarityScores: [],
-      queryAnalysis: null,
-      researchPlan: null,
-      processingTime: {
-        start: Date.now(),
-        categorization: 0,
-        queryPlanning: 0,
-        execution: 0,
-        synthesis: 0,
-        total: 0
-      }
+      queryAnalysis: null
     } : undefined;
     
-    // Log the user query
-    await logUserQuery(userId, message, threadId);
-    
-    // Get conversation history for context
-    const conversationContext = await getConversationContext(threadId);
-    const hasConversationContext = conversationContext.length > 0;
-    
-    if (enableDiagnostics && hasConversationContext) {
-      diagnostics.steps.push({
-        name: "Conversation Context", 
-        status: "success",
-        details: `Retrieved ${conversationContext.length} previous messages for context`
-      });
-    }
-    
-    // First, categorize if this is a general question or a journal-specific question
-    const categorizationStartTime = Date.now();
+    // Add initial step
     if (enableDiagnostics) {
       diagnostics.steps.push({
-        name: "Question Categorization", 
-        status: "loading"
-      });
-    }
-    
-    console.log("Categorizing question type");
-    const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${process.env.OPENAI_API_KEY || ''}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
-            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
-            
-            Examples:
-            - "How are you doing?" -> "GENERAL"
-            - "What is journaling?" -> "GENERAL"
-            - "Who is the president of India?" -> "GENERAL"
-            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
-            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
-            - "Am I an introvert? Do I like people in general?" -> "JOURNAL_SPECIFIC"`
-          },
-          { role: 'user', content: message }
-        ],
-        temperature: 0.1,
-        max_tokens: 10
-      }),
-    });
-
-    if (!categorizationResponse.ok) {
-      const error = await categorizationResponse.text();
-      console.error('Failed to categorize question:', error);
-      if (enableDiagnostics) {
-        diagnostics.steps.push({
-          name: "Question Categorization", 
-          status: "error", 
-          details: error
-        });
-      }
-      throw new Error('Failed to categorize question');
-    }
-
-    const categorization = await categorizationResponse.json();
-    const questionType = categorization.choices[0]?.message?.content.trim();
-    console.log(`Question categorized as: ${questionType}`);
-    
-    if (enableDiagnostics) {
-      const categorizationTime = Date.now() - categorizationStartTime;
-      diagnostics.processingTime.categorization = categorizationTime;
-      diagnostics.steps.push({
-        name: "Question Categorization", 
+        name: "Query Analysis", 
         status: "success", 
-        details: `Classified as ${questionType} (${categorizationTime}ms)`
+        details: `Query identified as ${isComplexQuery ? 'complex' : 'simple'}`
       });
     }
-
-    // If it's a general question, respond directly without journal entry retrieval
-    if (questionType === "GENERAL") {
-      console.log("Processing as general question, skipping journal entry retrieval");
-      const generalStartTime = Date.now();
-      
+    
+    // If it's a complex query, use segmentation approach
+    if (isComplexQuery) {
       if (enableDiagnostics) {
         diagnostics.steps.push({
-          name: "General Question Processing", 
-          status: "loading"
+          name: "Query Segmentation",
+          status: "loading",
+          details: "Breaking down complex query into simpler segments"
         });
       }
       
-      // Enhanced general question handling with conversation context
-      const generalCompletionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${process.env.OPENAI_API_KEY || ''}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini', // Updated to modern model
-          messages: [
-            { 
-              role: 'system', 
-              content: `You are a mental health assistant of a voice journaling app called "SOULo". Here's a query from a user. Respond like a chatbot. If it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India", "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.
-
-              Be friendly, empathetic and helpful. If the question seems unclear or ambiguous, ask for clarification rather than saying you don't understand.`
-            },
-            ...(hasConversationContext ? conversationContext : []),
-            { role: 'user', content: message }
-          ],
-          temperature: 0.7,
-        }),
-      });
-
-      if (!generalCompletionResponse.ok) {
-        const error = await generalCompletionResponse.text();
-        console.error('Failed to get general completion:', error);
-        if (enableDiagnostics) {
+      try {
+        // Call the segment-complex-query edge function
+        const { data: segmentationData, error: segmentationError } = await supabase.functions.invoke('segment-complex-query', {
+          body: {
+            query: message,
+            userId,
+            timeRange,
+            threadId, // Pass threadId for context
+            vectorSearch: {
+              matchThreshold,
+              matchCount
+            }
+          }
+        });
+        
+        if (segmentationError) {
+          console.error("Error in query segmentation:", segmentationError);
+          if (enableDiagnostics) {
+            diagnostics.steps.push({
+              name: "Query Segmentation",
+              status: "error",
+              details: `Failed to segment query: ${segmentationError.message}`
+            });
+          }
+          throw new Error(`Segmentation failed: ${segmentationError.message}`);
+        }
+        
+        // Parse segmented queries from the response
+        let segmentedQueries;
+        try {
+          segmentedQueries = JSON.parse(segmentationData);
+          if (!Array.isArray(segmentedQueries)) {
+            throw new Error("Expected array of query segments");
+          }
+        } catch (parseError) {
+          console.error("Failed to parse segmented queries:", parseError);
+          segmentedQueries = [message]; // Fallback to original message
+          if (enableDiagnostics) {
+            diagnostics.steps.push({
+              name: "Query Segmentation",
+              status: "warning",
+              details: `Failed to parse segments, using original query: ${parseError.message}`
+            });
+          }
+        }
+        
+        if (enableDiagnostics && Array.isArray(segmentedQueries)) {
           diagnostics.steps.push({
-            name: "General Question Processing", 
-            status: "error", 
-            details: error
+            name: "Query Segmentation",
+            status: "success",
+            details: `Split into ${segmentedQueries.length} segments: ${segmentedQueries.map(q => `"${q}"`).join(", ")}`
           });
         }
-        throw new Error('Failed to generate response');
-      }
-
-      const generalCompletionData = await generalCompletionResponse.json();
-      const generalResponse = generalCompletionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-      console.log("General response generated successfully");
-      
-      if (enableDiagnostics) {
-        const generalTime = Date.now() - generalStartTime;
-        diagnostics.processingTime.total = Date.now() - diagnostics.processingTime.start;
-        diagnostics.steps.push({
-          name: "General Question Processing", 
-          status: "success",
-          details: `Generated in ${generalTime}ms`
-        });
-      }
-
-      return {
-        role: "assistant",
-        content: generalResponse,
-        diagnostics
-      };
-    }
-    
-    // For journal-specific questions, use our improved research planning approach
-    const planningStartTime = Date.now();
-    
-    if (enableDiagnostics) {
-      diagnostics.steps.push({
-        name: "Research Planning", 
-        status: "loading", 
-        details: "Generating research plan for the query"
-      });
-    }
-    
-    // Generate research plan with conversation context
-    const researchPlan = await planQueryExecution(message, conversationContext);
-    
-    if (enableDiagnostics) {
-      const planningTime = Date.now() - planningStartTime;
-      diagnostics.processingTime.queryPlanning = planningTime;
-      diagnostics.researchPlan = researchPlan;
-      diagnostics.steps.push({
-        name: "Research Planning", 
-        status: "success", 
-        details: `Generated plan with ${researchPlan.length} steps in ${planningTime}ms`
-      });
-      diagnostics.steps.push({
-        name: "Research Execution", 
-        status: "loading", 
-        details: "Executing research steps"
-      });
-    }
-    
-    // Enhanced execution with retries and error recovery
-    const executionStartTime = Date.now();
-    const researchResults = [];
-    const maxRetries = 2; // Allow up to 2 retries for failed steps
-    
-    for (let i = 0; i < researchPlan.length; i++) {
-      let attempts = 0;
-      let success = false;
-      let stepResult;
-      
-      while (attempts <= maxRetries && !success) {
-        try {
-          // If this is a retry, add retry information to diagnostics
-          if (attempts > 0 && enableDiagnostics) {
+        
+        // Process each segment
+        if (enableDiagnostics) {
+          diagnostics.steps.push({
+            name: "Segment Processing",
+            status: "loading",
+            details: `Processing ${segmentedQueries.length} query segments`
+          });
+        }
+        
+        const segmentResults = [];
+        
+        for (let i = 0; i < segmentedQueries.length; i++) {
+          const segment = segmentedQueries[i];
+          if (enableDiagnostics) {
             diagnostics.steps.push({
-              name: `Research Step ${i + 1} (Retry ${attempts})`, 
+              name: `Segment ${i+1}`,
               status: "loading",
-              details: "Retrying failed step"
+              details: `Processing: "${segment}"`
             });
           }
           
-          // Execute the research step
-          stepResult = await executeResearchStep(researchPlan[i], userId);
-          researchResults.push(stepResult);
-          success = true;
-          
-          if (enableDiagnostics) {
-            if (stepResult.type === "vector_search_results") {
-              diagnostics.references = [...(diagnostics.references || []), ...(stepResult.entries || [])];
-              
-              // Track similarity scores for analysis
-              stepResult.entries?.forEach(entry => {
-                if (entry.similarity) {
-                  diagnostics.similarityScores.push({
-                    id: entry.id,
-                    score: entry.similarity
-                  });
-                }
-              });
+          // Call the chat-with-rag function for each segment
+          const { data: segmentData, error: segmentError } = await supabase.functions.invoke('chat-with-rag', {
+            body: {
+              message: segment,
+              userId,
+              queryTypes: queryTypes || {},
+              threadId, // Pass threadId for context
+              includeDiagnostics: false,
+              vectorSearch: {
+                matchThreshold,
+                matchCount
+              },
+              isEmotionQuery,
+              isWhyEmotionQuery,
+              isTimePatternQuery,
+              isTemporalQuery,
+              requiresTimeAnalysis,
+              timeRange
             }
-            
-            // Update the diagnostics for successful step
-            diagnostics.steps.push({
-              name: `Research Step ${i + 1}${attempts > 0 ? ` (Retry ${attempts})` : ''}`, 
-              status: "success", 
-              details: `${stepResult.type}: ${stepResult.description || 'Completed'} (${stepResult.entries?.length || stepResult.data?.length || 0} results)`
-            });
-          }
-        } catch (stepError) {
-          attempts++;
-          console.error(`Error executing research step ${i} (attempt ${attempts}):`, stepError);
+          });
           
-          if (enableDiagnostics) {
-            diagnostics.steps.push({
-              name: `Research Step ${i + 1}${attempts > 0 ? ` (Retry ${attempts})` : ''}`, 
-              status: attempts >= maxRetries ? "error" : "warning", 
-              details: stepError.message
-            });
-          }
-          
-          // If we've reached max retries, add a fallback result
-          if (attempts > maxRetries) {
-            // Create a fallback result to prevent breaking the pipeline
-            const fallbackResult = {
-              type: "fallback",
-              description: `Failed step: ${JSON.parse(researchPlan[i]).description || 'Unknown step'}`,
-              error: stepError.message,
-              entries: [],
-              data: []
-            };
-            
-            researchResults.push(fallbackResult);
-            
+          if (segmentError) {
+            console.error(`Error processing segment ${i+1}:`, segmentError);
             if (enableDiagnostics) {
               diagnostics.steps.push({
-                name: `Research Step ${i + 1} (Fallback)`, 
-                status: "warning", 
-                details: `Using fallback result due to repeated failures`
+                name: `Segment ${i+1}`,
+                status: "error",
+                details: `Failed: ${segmentError.message}`
               });
             }
-            break;
+            continue;
           }
           
-          // Add a small delay before retrying
-          await new Promise(resolve => setTimeout(resolve, 500));
+          if (enableDiagnostics) {
+            diagnostics.steps.push({
+              name: `Segment ${i+1}`,
+              status: "success",
+              details: `Completed processing`
+            });
+          }
+          
+          segmentResults.push({
+            segment,
+            response: segmentData.response,
+            references: segmentData.references
+          });
+          
+          // Collect references for all segments
+          if (enableDiagnostics && segmentData.references) {
+            diagnostics.references = [...diagnostics.references, ...segmentData.references];
+          }
         }
+        
+        if (segmentResults.length === 0) {
+          throw new Error("Failed to process any query segments");
+        }
+        
+        // If we only have one segment result, use it directly
+        if (segmentResults.length === 1) {
+          if (enableDiagnostics) {
+            diagnostics.steps.push({
+              name: "Response Generation",
+              status: "success",
+              details: "Using single segment response directly"
+            });
+          }
+          
+          return {
+            role: "assistant",
+            content: segmentResults[0].response,
+            references: segmentResults[0].references,
+            diagnostics
+          };
+        }
+        
+        // Combine the results from all segments
+        if (enableDiagnostics) {
+          diagnostics.steps.push({
+            name: "Response Combination",
+            status: "loading",
+            details: `Combining results from ${segmentResults.length} segments`
+          });
+        }
+        
+        const { data: combinedData, error: combineError } = await supabase.functions.invoke('combine-segment-responses', {
+          body: {
+            originalQuery: message,
+            segmentResults,
+            userId,
+            threadId // Pass threadId for context
+          }
+        });
+        
+        if (combineError) {
+          console.error("Error combining segment responses:", combineError);
+          if (enableDiagnostics) {
+            diagnostics.steps.push({
+              name: "Response Combination",
+              status: "error",
+              details: `Failed: ${combineError.message}`
+            });
+          }
+          
+          // Fallback: Use the first segment result
+          return {
+            role: "assistant",
+            content: segmentResults[0].response + "\n\n(Note: There was an error combining all parts of your question. This is a partial answer.)",
+            references: segmentResults[0].references,
+            diagnostics
+          };
+        }
+        
+        if (enableDiagnostics) {
+          diagnostics.steps.push({
+            name: "Response Combination",
+            status: "success",
+            details: "Successfully combined segment responses"
+          });
+        }
+        
+        // Compile all unique references from all segments
+        const allReferences = [];
+        const referenceIds = new Set();
+        
+        segmentResults.forEach(result => {
+          if (result.references && Array.isArray(result.references)) {
+            result.references.forEach(ref => {
+              if (!referenceIds.has(ref.id)) {
+                referenceIds.add(ref.id);
+                allReferences.push(ref);
+              }
+            });
+          }
+        });
+        
+        return {
+          role: "assistant",
+          content: combinedData.response,
+          references: allReferences,
+          diagnostics
+        };
+      } catch (error) {
+        console.error("Error in segmented query processing:", error);
+        if (enableDiagnostics) {
+          diagnostics.steps.push({
+            name: "Segmented Processing",
+            status: "error",
+            details: `Error: ${error.message}`
+          });
+          diagnostics.steps.push({
+            name: "Fallback",
+            status: "loading",
+            details: "Falling back to standard processing"
+          });
+        }
+        // Fall through to standard processing if segmentation fails
       }
     }
     
+    // Standard processing (for simple queries or if segmentation failed)
     if (enableDiagnostics) {
-      const executionTime = Date.now() - executionStartTime;
-      diagnostics.processingTime.execution = executionTime;
       diagnostics.steps.push({
-        name: "Research Execution", 
-        status: "success", 
-        details: `Completed ${researchResults.length} research steps in ${executionTime}ms`
-      });
-      diagnostics.steps.push({
-        name: "Response Synthesis", 
-        status: "loading", 
-        details: "Generating final response"
+        name: "Knowledge Base Search",
+        status: "loading",
+        details: "Retrieving relevant journal entries"
       });
     }
     
-    // Extract references from research results for the response
-    const references = researchResults
-      .filter(result => result.type === "vector_search_results")
-      .flatMap(result => result.entries || [])
-      .map(entry => ({
-        id: entry.id,
-        content: entry.content,
-        date: entry.created_at,
-        snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
-        similarity: entry.similarity || 0
-      }));
-    
-    // Synthesize the final response with conversation context
-    const synthesisStartTime = Date.now();
-    const synthesizedResponse = await synthesizeResponses(
-      message, 
-      researchPlan, 
-      researchResults, 
-      conversationContext
-    );
-    
-    if (enableDiagnostics) {
-      const synthesisTime = Date.now() - synthesisStartTime;
-      diagnostics.processingTime.synthesis = synthesisTime;
-      diagnostics.processingTime.total = Date.now() - diagnostics.processingTime.start;
-      diagnostics.steps.push({
-        name: "Response Synthesis", 
-        status: "success",
-        details: `Generated in ${synthesisTime}ms`
-      });
+    // Call the Supabase Edge Function with fixed vector search parameters
+    const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+      body: {
+        message,
+        userId,
+        queryTypes: queryTypes || {},
+        threadId, // Ensure threadId is passed for maintaining conversational context
+        includeDiagnostics: enableDiagnostics,
+        vectorSearch: {
+          matchThreshold,
+          matchCount
+        },
+        isEmotionQuery,
+        isWhyEmotionQuery,
+        isTimePatternQuery,
+        isTemporalQuery,
+        requiresTimeAnalysis,
+        timeRange
+      }
+    });
+
+    if (error) {
+      console.error("Edge function error:", error);
+      return {
+        role: "error",
+        content: `I'm having trouble processing your request. Technical details: ${error.message}`,
+        diagnostics: enableDiagnostics ? { 
+          steps: [{ name: "Edge Function Error", status: "error", details: error.message }]
+        } : undefined
+      };
     }
 
-    return {
+    if (!data) {
+      console.error("No data returned from edge function");
+      return {
+        role: "error",
+        content: "I'm having trouble retrieving a response. Please try again in a moment.",
+        diagnostics: enableDiagnostics ? { 
+          steps: [{ name: "No Data Returned", status: "error", details: "Empty response from edge function" }]
+        } : undefined
+      };
+    }
+
+    // Handle error responses that come with status 200
+    if (data.error) {
+      console.error("Error in data:", data.error);
+      return {
+        role: "error",
+        content: data.response || `There was an issue retrieving information: ${data.error}`,
+        diagnostics: enableDiagnostics ? data.diagnostics || {
+          steps: [{ name: "Processing Error", status: "error", details: data.error }]
+        } : undefined
+      };
+    }
+
+    // Prepare the response
+    const chatResponse: ChatMessage = {
       role: "assistant",
-      content: synthesizedResponse,
-      references: references.length > 0 ? references : undefined,
-      diagnostics
+      content: data.response
     };
-  } catch (error) {
-    console.error("Error in processChatMessage:", error);
-    
-    // Enhanced error recovery and reporting
-    const errorMessage = error instanceof Error 
-      ? error.message 
-      : "An unexpected error occurred. Please try again with a simpler question.";
-    
-    const diagnosticsWithError = enableDiagnostics ? {
-      steps: [{ 
-        name: "Fatal Error", 
-        status: "error", 
-        details: errorMessage 
-      }],
-      processingTime: {
-        start: 0,
-        categorization: 0,
-        queryPlanning: 0,
-        execution: 0,
-        synthesis: 0,
-        total: 0
-      }
-    } : undefined;
-    
-    // Try to give a more helpful response based on the error type
-    let userFacingMessage = "I'm having trouble processing your question.";
-    
-    if (error instanceof Error) {
-      if (error.message.includes("API key")) {
-        userFacingMessage = "I'm having trouble connecting to my knowledge base. This might be due to a configuration issue. Please try again later.";
-      } else if (error.message.includes("categorize")) {
-        userFacingMessage = "I couldn't understand the type of question you're asking. Could you rephrase it more clearly?";
-      } else if (error.message.includes("embedding")) {
-        userFacingMessage = "I'm having trouble analyzing your question. Could you try asking it differently?";
-      } else {
-        userFacingMessage = `I encountered a problem while processing your question. ${error.message}`;
+
+    // Include references if available
+    if (data.references && data.references.length > 0) {
+      chatResponse.references = data.references;
+    }
+
+    // Include analysis if available
+    if (data.analysis) {
+      chatResponse.analysis = data.analysis;
+      if (data.analysis.type === 'quantitative_emotion' || 
+          data.analysis.type === 'top_emotions' ||
+          data.analysis.type === 'time_patterns' ||
+          data.analysis.type === 'combined_analysis') {
+        chatResponse.hasNumericResult = true;
       }
     }
     
+    // Include diagnostics if enabled
+    if (enableDiagnostics && data.diagnostics) {
+      chatResponse.diagnostics = data.diagnostics;
+    }
+
+    return chatResponse;
+  } catch (error) {
+    console.error("Error in processChatMessage:", error);
     return {
       role: "error",
-      content: userFacingMessage,
-      diagnostics: diagnosticsWithError
+      content: `I'm having trouble with the chat service. ${error instanceof Error ? error.message : "Please try again later."}`,
+      diagnostics: enableDiagnostics ? { 
+        steps: [{ name: "Chat Service Error", status: "error", details: error instanceof Error ? error.message : String(error) }]
+      } : undefined
     };
   }
 };
