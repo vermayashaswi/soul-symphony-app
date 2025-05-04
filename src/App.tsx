@@ -5,8 +5,6 @@ import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { ThemeProvider } from '@/hooks/use-theme';
-import { AuthProvider } from '@/contexts/AuthContext';
-import './styles/emoji.css';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -24,12 +22,10 @@ const App: React.FC = () => {
 
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <JournalProcessingInitializer />
-        <AppRoutes />
-        <Toaster />
-        <SonnerToaster position="top-right" />
-      </AuthProvider>
+      <AppRoutes />
+      <Toaster />
+      <SonnerToaster position="top-right" />
+      <JournalProcessingInitializer />
     </ThemeProvider>
   );
 };

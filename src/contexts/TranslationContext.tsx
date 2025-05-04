@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
@@ -39,6 +38,20 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const [isTranslating, setIsTranslating] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
+  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
+  
+  // Update path on navigation without using useLocation
+  useEffect(() => {
+    const handleLocationChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+
+    window.addEventListener('popstate', handleLocationChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handleLocationChange);
+    };
+  }, []);
   
   // Create a unique cache key
   const createCacheKey = (text: string, language: string): string => {
@@ -122,14 +135,14 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     }
   }, [currentLanguage, getCachedTranslation, cacheTranslation]);
 
-  // Listen for route changes within components, not here in the provider
+  // Listen for route changes
   useEffect(() => {
-    console.log('TranslationContext initialized');
+    console.log('TranslationContext detected path change:', currentPath);
     
     // When mounted, we can prefetch common UI elements
     const commonUIElements = ['Home', 'Blog', 'Settings', 'Profile', 'Logout', 'Download'];
     prefetchTranslationsForRoute(commonUIElements).catch(console.error);
-  }, [prefetchTranslationsForRoute]);
+  }, [currentPath, prefetchTranslationsForRoute]);
 
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
