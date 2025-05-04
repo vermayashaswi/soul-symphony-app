@@ -122,10 +122,8 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     }
   }, [currentLanguage, getCachedTranslation, cacheTranslation]);
 
-  // Listen for route changes to monitor the current location
+  // Listen for route changes within components, not here in the provider
   useEffect(() => {
-    // We'll handle route-specific translations inside components that have access to the Router
-    // instead of trying to access useLocation() here in the context
     console.log('TranslationContext initialized');
     
     // When mounted, we can prefetch common UI elements

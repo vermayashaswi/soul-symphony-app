@@ -4,6 +4,8 @@ import AppRoutes from './routes/AppRoutes';
 import { Toaster } from "@/components/ui/toaster";
 import { Toaster as SonnerToaster } from "sonner";
 import { JournalProcessingInitializer } from './app/journal-processing-init';
+import { ThemeProvider } from '@/hooks/use-theme';
+import { AuthProvider } from '@/contexts/AuthContext';
 import './styles/emoji.css';
 
 const App: React.FC = () => {
@@ -21,12 +23,14 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <>
-      <JournalProcessingInitializer />
-      <AppRoutes />
-      <Toaster />
-      <SonnerToaster position="top-right" />
-    </>
+    <ThemeProvider>
+      <AuthProvider>
+        <JournalProcessingInitializer />
+        <AppRoutes />
+        <Toaster />
+        <SonnerToaster position="top-right" />
+      </AuthProvider>
+    </ThemeProvider>
   );
 };
 
