@@ -15,7 +15,7 @@ interface TranslationContextType {
   loadingTranslation: boolean;
   isTranslating: boolean; // Added for compatibility
   translationProgress: number; // Added for progress indicator
-  getCachedTranslation: (text: string, language: string) => string | null;
+  getCachedTranslation: (text: string, language: string) => Promise<string | null>; // Changed return type to Promise
   prefetchTranslationsForRoute: (texts: string[]) => void; // For route-based translation prefetching
 }
 
@@ -82,11 +82,14 @@ export const TranslationProvider: React.FC<{ children: React.ReactNode }> = ({ c
     return staticTranslation.get(key, currentLanguage) || key;
   };
   
-  // Get cached translation if available
-  const getCachedTranslation = (text: string, language: string): string | null => {
-    return translationCache.getTranslation(text, language)
-      .then(cached => cached?.translatedText || null)
-      .catch(() => null);
+  // Get cached translation if available - fixed to return Promise
+  const getCachedTranslation = async (text: string, language: string): Promise<string | null> => {
+    try {
+      const cached = await translationCache.getTranslation(text, language);
+      return cached?.translatedText || null;
+    } catch {
+      return null;
+    }
   };
 
   // Prefetch translations for route change

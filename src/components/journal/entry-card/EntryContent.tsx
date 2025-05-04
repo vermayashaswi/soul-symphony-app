@@ -11,8 +11,8 @@ interface EntryContentProps {
   audioUrl?: string | null;
   isProcessing?: boolean;
   isProcessed?: boolean;
-  language?: string; // Add language prop
-  entryId?: number; // Add entryId prop
+  language?: string;
+  entryId?: number;
 }
 
 export function EntryContent({ content, audioUrl, isProcessing, isProcessed, language, entryId }: EntryContentProps) {
@@ -23,7 +23,7 @@ export function EntryContent({ content, audioUrl, isProcessing, isProcessed, lan
     audioRef, 
     prepareAudio, 
     playbackProgress 
-  } = useAudioPlayback({ audioUrl: audioUrl || '' });
+  } = useAudioPlayback({ audioBlob: null }); // Initialize with null audioBlob
   
   // Check if audio is ready
   const [audioLoaded, setAudioLoaded] = React.useState(false);
@@ -32,8 +32,13 @@ export function EntryContent({ content, audioUrl, isProcessing, isProcessed, lan
   // Load audio when component mounts or URL changes
   React.useEffect(() => {
     if (audioUrl) {
-      prepareAudio()
-        .then(() => setAudioLoaded(true))
+      fetch(audioUrl)
+        .then(response => response.blob())
+        .then(blob => {
+          return prepareAudio()
+            .then(() => setAudioLoaded(true))
+            .catch(() => setAudioError(true));
+        })
         .catch(() => setAudioError(true));
     }
   }, [audioUrl, prepareAudio]);
@@ -53,8 +58,8 @@ export function EntryContent({ content, audioUrl, isProcessing, isProcessed, lan
             <TranslatedContent 
               content={content} 
               isExpanded={isExpanded} 
-              language={language} // Pass the language
-              entryId={entryId} // Pass the entryId
+              language={language}
+              entryId={entryId}
             />
           </div>
 

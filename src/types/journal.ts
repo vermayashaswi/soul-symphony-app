@@ -14,8 +14,11 @@ export interface JournalEntry {
   master_themes?: string[];
   tempId?: string;
   is_chunked?: boolean;
-  original_language?: string; // Add original language field
+  original_language?: string;
 }
+
+// Adding Json type for EntityBubbles and EntityStrips components
+export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
 
 export interface JournalState {
   entries: JournalEntry[];
