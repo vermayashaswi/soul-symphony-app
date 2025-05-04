@@ -14,7 +14,7 @@ export type DebugStep = {
 interface DebugContextType {
   logs: any[];
   addLog: (...args: any[]) => void;
-  addEvent: (name: string, details?: string, type?: 'info' | 'error' | 'success' | 'warning') => void;
+  addEvent: (name: string, details?: string, type?: 'info' | 'error' | 'success' | 'warning', data?: any) => void;
   clearLogs: () => void;
   isEnabled: boolean;
   toggleEnabled: () => void;
@@ -63,7 +63,7 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
   }, [isEnabled]);
 
   // Add a structured event
-  const addEvent = useCallback((name: string, details?: string, type: 'info' | 'error' | 'success' | 'warning' = 'info') => {
+  const addEvent = useCallback((name: string, details?: string, type: 'info' | 'error' | 'success' | 'warning' = 'info', data?: any) => {
     if (!isEnabled) return;
     
     // Log to console with appropriate styling
@@ -74,7 +74,11 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
       warning: 'color: #f59e0b'
     };
     
-    console.log(`%c[${name}]`, styles[type], details || '');
+    if (data) {
+      console.log(`%c[${name}]`, styles[type], details || '', data);
+    } else {
+      console.log(`%c[${name}]`, styles[type], details || '');
+    }
     
     setLogs((currentLogs) => [
       ...currentLogs, 
@@ -82,7 +86,8 @@ export const DebugProvider: React.FC<{ children: React.ReactNode }> = ({ childre
         timestamp: new Date().toISOString(),
         type,
         name,
-        details
+        details,
+        data
       }
     ]);
   }, [isEnabled]);

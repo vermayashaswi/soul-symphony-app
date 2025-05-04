@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Loader2, Play, RotateCcw, Pause } from 'lucide-react';
@@ -46,12 +47,7 @@ export function PlaybackControls({
       setCurrentTime(timeInSeconds);
       setSliderValue(playbackProgress * 100);
       
-      addEvent('PlaybackControls', 'Progress update', 'info', {
-        progress: playbackProgress,
-        timeInSeconds,
-        audioDuration,
-        sliderValue: playbackProgress * 100
-      });
+      addEvent('PlaybackControls', `Progress update: ${playbackProgress.toFixed(2)}`, 'info');
     }
   }, [playbackProgress, audioDuration, isTouchActive, addEvent]);
   
@@ -65,9 +61,7 @@ export function PlaybackControls({
     if (isProcessing && processingStartTime > 0) {
       const processingTime = Date.now() - processingStartTime;
       if (processingTime > 45000) {
-        addEvent('PlaybackControls', 'Processing taking too long', 'warning', {
-          processingTime
-        });
+        addEvent('PlaybackControls', 'Processing taking too long', 'warning');
       }
     }
   }, [isProcessing, processingStartTime, addEvent]);
@@ -84,11 +78,7 @@ export function PlaybackControls({
     setSliderValue(value[0]);
     setCurrentTime(newPosition * audioDuration);
     
-    addEvent('PlaybackControls', 'Slider changed', 'info', {
-      value: value[0],
-      newPosition,
-      newTimeInSeconds: newPosition * audioDuration
-    });
+    addEvent('PlaybackControls', `Slider changed to ${value[0].toFixed(1)}%`, 'info');
     
     if (onSeek) {
       onSeek(newPosition);
@@ -113,9 +103,7 @@ export function PlaybackControls({
     addEvent('ProcessingFlow', 'Save entry initiated', 'info');
     
     if (!audioBlob || audioBlob.size < 100) {
-      addEvent('ProcessingFlow', 'Invalid audio blob for saving', 'error', { 
-        size: audioBlob?.size 
-      });
+      addEvent('ProcessingFlow', 'Invalid audio blob for saving', 'error');
       return;
     }
     
@@ -123,7 +111,7 @@ export function PlaybackControls({
     await clearAllToasts();
     
     const tempId = 'temp-' + Date.now();
-    addEvent('ProcessingFlow', 'Dispatching immediate processing event', 'info', { tempId });
+    addEvent('ProcessingFlow', `Dispatching immediate processing event: ${tempId}`, 'info');
     
     updateProcessingEntries(tempId, 'add');
     
@@ -137,7 +125,7 @@ export function PlaybackControls({
     }));
     
     setTimeout(() => {
-      addEvent('ProcessingFlow', 'Sending followup processing event', 'info', { tempId });
+      addEvent('ProcessingFlow', 'Sending followup processing event', 'info');
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { 
           entries: [tempId], 
@@ -149,7 +137,7 @@ export function PlaybackControls({
     }, 50);
     
     setTimeout(() => {
-      addEvent('ProcessingFlow', 'Sending third processing event', 'info', { tempId });
+      addEvent('ProcessingFlow', 'Sending third processing event', 'info');
       window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
         detail: { 
           entries: [tempId], 
@@ -161,7 +149,7 @@ export function PlaybackControls({
     }, 200);
     
     setTimeout(() => {
-      addEvent('ProcessingFlow', 'Sending journal refresh event', 'info', { tempId });
+      addEvent('ProcessingFlow', 'Sending journal refresh event', 'info');
       window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
         detail: { 
           tempId,
