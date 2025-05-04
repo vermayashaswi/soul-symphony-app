@@ -1,99 +1,71 @@
 
-import React, { useEffect } from 'react';
-import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
-import { OnboardingProvider } from '@/hooks/use-onboarding';
-import { TranslationProvider } from '@/contexts/TranslationContext';
-import { AuthProvider } from '@/contexts/AuthContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { isNativeApp } from './RouteHelpers';
-import ViewportManager from './ViewportManager';
-import ProtectedRoute from './ProtectedRoute';
-import OnboardingCheck from './OnboardingCheck';
-import Home from '@/pages/Home';
+import React from 'react';
+import { Routes, Route, Navigate, Outlet } from 'react-router-dom';
 import Index from '@/pages/Index';
-import AppDownload from '@/pages/AppDownload';
-import Auth from '@/pages/Auth';
-import Settings from '@/pages/Settings';
+import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
 import Insights from '@/pages/Insights';
-import Chat from '@/pages/Chat';
 import SmartChat from '@/pages/SmartChat';
+import Chat from '@/pages/Chat';
+import ProtectedRoute from './ProtectedRoute';
+import Auth from '@/pages/Auth';
+import Settings from '@/pages/Settings';
+import AppDownload from '@/pages/AppDownload';
 import NotFound from '@/pages/NotFound';
-import PrivacyPolicy from '@/pages/PrivacyPolicy';
-import HomePage from '@/pages/website/HomePage';
+import ViewportManager from './ViewportManager';
+import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
+import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
-import FAQPage from '@/pages/website/FAQPage';
-import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
-import ErrorBoundary from '@/components/insights/ErrorBoundary';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
 
-const AppRoutes: React.FC = () => {
-  // Add debugging to help identify route issues
-  useEffect(() => {
-    console.log('AppRoutes component mounted, setting up routes');
-  }, []);
-
+const AppRoutes = () => {
+  console.log('Rendering AppRoutes component');
   return (
-    <Router>
-      <AuthProvider>
-        <TranslationProvider>
-          <TranslationLoadingOverlay />
-          <OnboardingProvider>
-            <ErrorBoundary>
-              <Routes>
-                <Route element={<ViewportManager />}>
-                  {/* Website routes */}
-                  <Route path="/" element={<Index />} />
-                  <Route path="/blog" element={<BlogPage />} />
-                  <Route path="/blog/:slug" element={<BlogPostPage />} />
-                  <Route path="/faq" element={<FAQPage />} />
-                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                  <Route path="/download" element={<AppDownload />} />
-
-                  {/* App routes */}
-                  <Route path="/app" element={<ProtectedRoute />}>
-                    <Route index element={<Navigate to="/app/home" replace />} />
-                    <Route path="onboarding" element={<OnboardingScreen />} />
-                    <Route element={<OnboardingCheck />}>
-                      <Route path="home" element={<Home />} />
-                      <Route path="journal" element={<Journal />} />
-                      <Route path="insights" element={<Insights />} />
-                      <Route path="chat" element={<Chat />} />
-                      <Route path="smart-chat" element={<SmartChat />} />
-                      <Route path="settings" element={<Settings />} />
-                    </Route>
-                  </Route>
-
-                  {/* Auth routes */}
-                  <Route path="/app/auth" element={<Auth />} />
-                  <Route path="/login" element={<Auth />} />
-                  <Route path="/signup" element={<Auth />} />
-
-                  {/* Native app specific routes */}
-                  {isNativeApp() && (
-                    <Route path="/privacy" element={<PrivacyPolicy />} />
-                  )}
-
-                  {/* 404 route */}
-                  <Route path="*" element={<NotFound />} />
-                </Route>
-              </Routes>
-            </ErrorBoundary>
-            
-            {/* Toasters placed outside of routes but still inside providers */}
-            <ErrorBoundary fallback={<div>Toast error</div>}>
-              <Toaster />
-            </ErrorBoundary>
-            <ErrorBoundary fallback={<div>Sonner toast error</div>}>
-              <SonnerToaster position="top-right" />
-            </ErrorBoundary>
-          </OnboardingProvider>
-        </TranslationProvider>
-      </AuthProvider>
-    </Router>
+    <Routes>
+      {/* Wrap all routes that need ViewportManager in a parent Route */}
+      <Route element={<ViewportManager />}>
+        {/* Website Routes */}
+        <Route path="/" element={<Index />} />
+        <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+        <Route path="/faq" element={<FAQPage />} />
+        <Route path="/download" element={<AppDownload />} />
+        <Route path="/blog" element={<BlogPage />} />
+        <Route path="/blog/:slug" element={<BlogPostPage />} />
+        
+        {/* App Routes */}
+        <Route path="/app" element={<OnboardingScreen />} />
+        <Route path="/app/onboarding" element={<OnboardingScreen />} />
+        <Route path="/app/auth" element={<Auth />} />
+        
+        {/* Protected App Routes */}
+        <Route path="/app" element={<ProtectedRoute />}>
+          <Route path="home" element={<Home />} />
+          <Route path="journal" element={<Journal />} />
+          <Route path="insights" element={
+            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+              <Insights />
+            </React.Suspense>
+          } />
+          <Route path="chat" element={<Chat />} />
+          <Route path="smart-chat" element={<SmartChat />} />
+          <Route path="settings" element={<Settings />} />
+        </Route>
+        
+        {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
+        <Route path="/auth" element={<Navigate to="/app/auth" replace />} />
+        <Route path="/onboarding" element={<Navigate to="/app/onboarding" replace />} />
+        <Route path="/home" element={<Navigate to="/app/home" replace />} />
+        <Route path="/journal" element={<Navigate to="/app/journal" replace />} />
+        <Route path="/insights" element={<Navigate to="/app/insights" replace />} />
+        <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
+        <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
+        <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
+        
+        {/* Catch-all route */}
+        <Route path="*" element={<NotFound />} />
+      </Route>
+    </Routes>
   );
 };
 

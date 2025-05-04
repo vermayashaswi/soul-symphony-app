@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -23,12 +24,6 @@ export const isWebsiteRoute = (pathname: string): boolean => {
   if (isAppRoute(pathname)) {
     console.log(`${pathname} is an app route, so not a website route`);
     return false;
-  }
-  
-  // If it's the root route, it's definitely a website route
-  if (pathname === '/') {
-    console.log('Root path is a website route');
-    return true;
   }
   
   // Check for specific website routes
@@ -96,7 +91,6 @@ export const AppRouteWrapper = ({
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-        <div className="ml-3">Checking authentication...</div>
       </div>
     );
   }

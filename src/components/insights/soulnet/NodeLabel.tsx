@@ -1,8 +1,7 @@
 
-import React, { useMemo, useRef, useEffect, useState } from 'react';
+import React, { useMemo, useRef, useEffect } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 // Helper function to detect non-Latin script
 const containsNonLatinScript = (text: string): boolean => {
@@ -74,65 +73,23 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   translatedText
 }) => {
   const { theme } = useTheme();
-  const { currentLanguage, forceRetranslate } = useTranslation();
-  const [localTranslatedText, setLocalTranslatedText] = useState<string | undefined>(translatedText);
   const prevTranslatedText = useRef<string | undefined>(translatedText);
-  const prevLanguageRef = useRef<string>(currentLanguage);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
-  
-  // Effect to detect language changes and force retranslation if needed
-  useEffect(() => {
-    const handleLanguageChange = async (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      if (detail.language !== prevLanguageRef.current) {
-        console.log(`NodeLabel: Language changed to ${detail.language}, retranslating node "${id}"`);
-        prevLanguageRef.current = detail.language;
-        
-        // For Hindi specifically, we want to ensure translation happens
-        if (detail.language === 'hi' && id) {
-          try {
-            // Force retranslate this node label
-            const newTranslation = await forceRetranslate(id);
-            if (newTranslation && newTranslation !== id) {
-              console.log(`NodeLabel: Retranslated "${id}" to "${newTranslation}"`);
-              setLocalTranslatedText(newTranslation);
-            }
-          } catch (error) {
-            console.error(`NodeLabel: Failed to retranslate node "${id}"`, error);
-          }
-        }
-      }
-    };
-    
-    window.addEventListener('languageChange', handleLanguageChange as EventListener);
-    
-    return () => {
-      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
-    };
-  }, [id, forceRetranslate]);
-  
-  // Update local translated text when prop changes
-  useEffect(() => {
-    if (translatedText !== prevTranslatedText.current) {
-      setLocalTranslatedText(translatedText);
-      prevTranslatedText.current = translatedText;
-    }
-  }, [translatedText]);
   
   // Format entity text for display - always apply for entity type
   const formattedText = useMemo(() => {
     // Only format entity nodes - this ensures we get two lines for circular nodes
     if (type === 'entity') {
-      // Use translated text if available (either from props or local state), otherwise use id
-      const textToFormat = localTranslatedText || translatedText || id;
+      // Use translated text if available, otherwise use id
+      const textToFormat = translatedText || id;
       console.log(`Formatting entity text for ${id}: "${textToFormat}"`);
       return formatEntityText(textToFormat);
     }
     // For emotion nodes, just use the translated text or id directly
-    return localTranslatedText || translatedText || id;
-  }, [id, type, translatedText, localTranslatedText]);
+    return translatedText || id;
+  }, [id, type, translatedText]);
   
   // Stabilize visibility transitions to prevent flickering
   useEffect(() => {
@@ -157,19 +114,17 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   
   // Check if text contains non-Latin script and memoize the result
   useEffect(() => {
-    const textToCheck = localTranslatedText || translatedText;
-    
-    if (textToCheck && textToCheck !== prevTranslatedText.current) {
-      isNonLatin.current = containsNonLatinScript(textToCheck);
-      isDevanagari.current = containsDevanagari(textToCheck);
-      prevTranslatedText.current = textToCheck;
+    if (translatedText && translatedText !== prevTranslatedText.current) {
+      isNonLatin.current = containsNonLatinScript(translatedText);
+      isDevanagari.current = containsDevanagari(translatedText);
+      prevTranslatedText.current = translatedText;
       
       // Debug logging for Hindi text issues
       if (isDevanagari.current) {
-        console.log(`Hindi text detected in node "${id}": "${textToCheck}", applying special rendering`);
+        console.log(`Hindi text detected in node "${id}": "${translatedText}", applying special rendering`);
       }
     }
-  }, [id, localTranslatedText, translatedText]);
+  }, [translatedText, id]);
 
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
@@ -207,19 +162,16 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const textColor = type === 'entity' 
     ? (theme === 'light' ? '#000000' : '#ffffff')  // Black in light mode, white in dark mode
     : themeHex;
-    
-  // Use the most reliable translation source with fallbacks
-  const textToDisplay = formattedText || localTranslatedText || translatedText || id;
 
   return (
     <ThreeDimensionalText
-      text={textToDisplay}
+      text={formattedText}
       position={labelPosition}
       color={textColor}
       size={dynamicFontSize}
       bold={isHighlighted}
       visible={stableVisibilityRef.current}
-      // Set skipTranslation to true since we're already handling translation at this level
+      // Set skipTranslation to true since we're already passing translated text
       skipTranslation={true}
     />
   );

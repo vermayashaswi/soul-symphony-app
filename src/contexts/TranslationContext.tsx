@@ -1,9 +1,9 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
 import { staticTranslationService } from '@/services/staticTranslationService';
 import { preloadWebsiteTranslations } from '@/utils/website-translations';
+import { useLocation } from 'react-router-dom';
 
 // Define the language options
 export const languages = [
@@ -30,31 +30,15 @@ interface TranslationContextType {
   translate: (text: string, sourceLanguage?: string, entryId?: number) => Promise<string>;
   getCachedTranslation: (text: string, language: string) => string | null;
   prefetchTranslationsForRoute: (routeTexts: string[]) => Promise<void>;
-  forceRetranslate: (text: string) => Promise<string>; // New method for forced retranslation
 }
 
-// Create the context with undefined initial value
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
 
 export function TranslationProvider({ children }: { children: React.ReactNode }) {
   const [isTranslating, setIsTranslating] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
-  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
-  const [forceUpdateCounter, setForceUpdateCounter] = useState(0); // Added to force re-renders
-  
-  // Update path on navigation without using useLocation
-  useEffect(() => {
-    const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
-
-    window.addEventListener('popstate', handleLocationChange);
-    
-    return () => {
-      window.removeEventListener('popstate', handleLocationChange);
-    };
-  }, []);
+  const location = useLocation();
   
   // Create a unique cache key
   const createCacheKey = (text: string, language: string): string => {
@@ -101,7 +85,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       translatedText,
       language,
       timestamp: Date.now(),
-      version: 2,
+      version: 1,
     }).catch(err => console.error('Failed to cache translation:', err));
   }, []);
 
@@ -138,48 +122,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     }
   }, [currentLanguage, getCachedTranslation, cacheTranslation]);
 
-  // Force retranslate a specific text - useful for components to retry failed translations
-  const forceRetranslate = useCallback(async (text: string): Promise<string> => {
-    if (currentLanguage === 'en' || !text) return text;
-    
-    try {
-      console.log(`Force retranslating: "${text.substring(0, 30)}..."`);
-      
-      // Skip cache and directly call translation service
-      const translated = await staticTranslationService.translateText(text, 'en');
-      
-      // Cache the result
-      if (translated && translated !== text) {
-        cacheTranslation(text, translated, currentLanguage);
-        
-        // Force components to update by incrementing counter
-        setForceUpdateCounter(prev => prev + 1);
-        
-        // Dispatch an event that can be listened to by components
-        window.dispatchEvent(new CustomEvent('translationUpdated', { 
-          detail: { 
-            originalText: text,
-            translatedText: translated,
-            language: currentLanguage
-          }
-        }));
-      }
-      
-      return translated;
-    } catch (error) {
-      console.error('Force retranslation error:', error);
-      return text;
-    }
-  }, [currentLanguage, cacheTranslation]);
-
-  // Listen for route changes
+  // Monitor route changes to load route-specific translations
   useEffect(() => {
-    console.log('TranslationContext detected path change:', currentPath);
-    
-    // When mounted, we can prefetch common UI elements
-    const commonUIElements = ['Home', 'Blog', 'Settings', 'Profile', 'Logout', 'Download', 'Journal', 'Chat', 'Insights'];
+    // When the route changes, we can prefetch translations for common UI elements
+    const commonUIElements = ['Home', 'Blog', 'Settings', 'Profile', 'Logout', 'Download'];
     prefetchTranslationsForRoute(commonUIElements).catch(console.error);
-  }, [currentPath, prefetchTranslationsForRoute]);
+  }, [location.pathname, prefetchTranslationsForRoute]);
 
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
@@ -280,9 +228,6 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       setTimeout(() => {
         setTranslationProgress(100);
         setIsTranslating(false);
-        
-        // Force an update to ensure all components refresh
-        setForceUpdateCounter(prev => prev + 1);
       }, 300);
     } catch (error) {
       console.error('Language change error:', error);
@@ -305,32 +250,6 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     }
   }, []);
 
-  // Listen for translation success/failure events
-  useEffect(() => {
-    const handleTranslationSuccess = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      console.log(`Translation success: ${detail.text} in ${detail.language}`);
-    };
-    
-    const handleTranslationFailure = (e: Event) => {
-      const detail = (e as CustomEvent).detail;
-      console.error(`Translation failure: ${detail.text} in ${detail.language} - ${detail.error}`);
-      
-      // If we're on the Hindi language where issues are most common, show a toast
-      if (currentLanguage === 'hi') {
-        toast.error('Some translations failed. Retrying in background.');
-      }
-    };
-    
-    window.addEventListener('translationSuccess', handleTranslationSuccess);
-    window.addEventListener('translationFailure', handleTranslationFailure);
-    
-    return () => {
-      window.removeEventListener('translationSuccess', handleTranslationSuccess);
-      window.removeEventListener('translationFailure', handleTranslationFailure);
-    };
-  }, [currentLanguage]);
-
   return (
     <TranslationContext.Provider value={{ 
       isTranslating, 
@@ -339,8 +258,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       translationProgress,
       translate,
       getCachedTranslation,
-      prefetchTranslationsForRoute,
-      forceRetranslate // Added new method
+      prefetchTranslationsForRoute
     }}>
       {children}
     </TranslationContext.Provider>

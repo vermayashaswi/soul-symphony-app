@@ -7,28 +7,16 @@ export class StaticTranslationService {
   private batchTranslationQueue: Map<string, (result: string) => void> = new Map();
   private batchTranslationTimer: NodeJS.Timeout | null = null;
   private readonly BATCH_DELAY = 100; // ms to wait before sending batch
-  private translationFailures: Set<string> = new Set(); // Track failed translations
-  private retryTimer: NodeJS.Timeout | null = null;
 
   setLanguage(language: string): void {
     this.language = language;
     console.log(`StaticTranslationService: Language set to ${language}`);
-    
-    // Clear failed translations on language change to allow retries
-    this.translationFailures.clear();
   }
 
   async translateText(text: string, sourceLanguage?: string, entryId?: number): Promise<string> {
     // Skip translation for English, empty text, or null text
     if (this.language === 'en' || !text || text.trim() === '') {
       return text || '';
-    }
-
-    // Skip if we've already failed to translate this recently
-    const cacheKey = `${text.substring(0, 50)}_${this.language}`;
-    if (this.translationFailures.has(cacheKey)) {
-      console.log(`StaticTranslationService: Skipping previously failed translation: "${text.substring(0, 30)}..."`);
-      return text;
     }
 
     try {
@@ -40,76 +28,10 @@ export class StaticTranslationService {
         entryId,
       });
 
-      // If translation returned same as input for non-English target, it may have failed
-      if (result === text && this.language !== 'en') {
-        // Don't add to failures if it's a very short text that might legitimately be the same
-        if (text.length > 3) {
-          console.warn(`StaticTranslationService: Translation may have failed - same output as input: "${text}"`);
-          this.translationFailures.add(cacheKey);
-          this.scheduleRetryFailedTranslations();
-        }
-      }
-
       return result;
     } catch (error) {
       console.error('StaticTranslationService: Error translating text:', error);
-      this.translationFailures.add(cacheKey);
-      this.scheduleRetryFailedTranslations();
       return text;
-    }
-  }
-
-  // Schedule a retry for all failed translations
-  private scheduleRetryFailedTranslations(): void {
-    if (this.retryTimer) return; // Already scheduled
-    
-    this.retryTimer = setTimeout(() => {
-      this.retryFailedTranslations();
-    }, 60000); // Retry after 1 minute
-  }
-
-  // Retry all failed translations
-  private async retryFailedTranslations(): Promise<void> {
-    this.retryTimer = null;
-    
-    if (this.translationFailures.size === 0 || this.language === 'en') return;
-    
-    console.log(`StaticTranslationService: Retrying ${this.translationFailures.size} failed translations`);
-    
-    // Take only 10 failed translations at a time to avoid overwhelming the API
-    const failuresToRetry = Array.from(this.translationFailures).slice(0, 10);
-    
-    // Clear the ones we're going to retry
-    failuresToRetry.forEach(key => this.translationFailures.delete(key));
-    
-    // If there are still more failures, schedule another retry
-    if (this.translationFailures.size > 0) {
-      this.scheduleRetryFailedTranslations();
-    }
-    
-    // Extract the actual text from the cache keys
-    const textsToRetry = failuresToRetry.map(key => key.split('_')[0]);
-    
-    try {
-      // Batch translate them
-      await this.batchTranslateTexts(textsToRetry);
-      console.log(`StaticTranslationService: Successfully retried ${textsToRetry.length} translations`);
-      
-      // Dispatch event to notify components that translations have been updated
-      window.dispatchEvent(new CustomEvent('translationsUpdated', {
-        detail: {
-          count: textsToRetry.length,
-          language: this.language
-        }
-      }));
-    } catch (error) {
-      console.error('StaticTranslationService: Failed to retry translations:', error);
-      
-      // Put them back in the failure set
-      failuresToRetry.forEach(key => this.translationFailures.add(key));
-      
-      // Always ensure we schedule another retry
-      this.scheduleRetryFailedTranslations();
     }
   }
 

@@ -1,9 +1,12 @@
 
 import React, { useEffect } from 'react';
 import AppRoutes from './routes/AppRoutes';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "sonner";
+import { TranslationProvider } from '@/contexts/TranslationContext';
+import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
-import { ThemeProvider } from '@/hooks/use-theme';
-import ErrorBoundary from './components/insights/ErrorBoundary';
+import './styles/emoji.css';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -17,18 +20,16 @@ const App: React.FC = () => {
       console.log('Fixing malformed URL path:', currentPath);
       window.history.replaceState(null, '', '/');
     }
-
-    // Additional debugging
-    console.log('App initialization complete, ready to render routes');
   }, []);
 
   return (
-    <ErrorBoundary fallback={<div className="p-4">Something went wrong loading the application.</div>}>
-      <ThemeProvider>
-        <JournalProcessingInitializer />
-        <AppRoutes />
-      </ThemeProvider>
-    </ErrorBoundary>
+    <TranslationProvider>
+      <TranslationLoadingOverlay />
+      <JournalProcessingInitializer />
+      <AppRoutes />
+      <Toaster />
+      <SonnerToaster position="top-right" />
+    </TranslationProvider>
   );
 };
 

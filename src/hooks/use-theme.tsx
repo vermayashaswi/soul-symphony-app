@@ -1,3 +1,4 @@
+
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
 
 type Theme = 'light' | 'dark' | 'system';
@@ -17,74 +18,27 @@ interface ThemeContextType {
   systemTheme: 'light' | 'dark';
 }
 
-// Create context with default values to avoid issues when accessing before provider is ready
-const ThemeContext = createContext<ThemeContextType>({
-  theme: 'system',
-  setTheme: () => {},
-  colorTheme: 'Default',
-  setColorTheme: () => {},
-  customColor: '#3b82f6',
-  setCustomColor: () => {},
-  systemTheme: 'light',
-});
-
-// Initialize theme
-const initializeTheme = (): Theme => {
-  if (typeof window === 'undefined') return 'system';
-  try {
-    const savedTheme = localStorage.getItem('feelosophy-theme');
-    return (savedTheme as Theme) || 'system';
-  } catch (e) {
-    console.error('Failed to read theme from localStorage:', e);
-    return 'system';
-  }
-};
-
-// Initialize color theme
-const initializeColorTheme = (): ColorTheme => {
-  if (typeof window === 'undefined') return 'Default';
-  try {
-    const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
-    return (savedColorTheme as ColorTheme) || 'Calm';
-  } catch (e) {
-    console.error('Failed to read color theme from localStorage:', e);
-    return 'Calm';
-  }
-};
-
-// Initialize custom color
-const initializeCustomColor = (): string => {
-  if (typeof window === 'undefined') return '#3b82f6';
-  try {
-    const savedCustomColor = localStorage.getItem('feelosophy-custom-color');
-    return savedCustomColor || '#3b82f6';
-  } catch (e) {
-    console.error('Failed to read custom color from localStorage:', e);
-    return '#3b82f6';
-  }
-};
+const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 
 export function ThemeProvider({ children }: ThemeProviderProps) {
-  console.log('ThemeProvider rendering');
-  
-  const [theme, setTheme] = useState<Theme>(initializeTheme);
+  const [theme, setTheme] = useState<Theme>(() => {
+    const savedTheme = localStorage.getItem('feelosophy-theme');
+    return (savedTheme as Theme) || 'system';
+  });
   
   const [systemTheme, setSystemTheme] = useState<'light' | 'dark'>(
-    typeof window !== 'undefined' && window.matchMedia && window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
+    window.matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'
   );
   
-  const [colorTheme, setColorTheme] = useState<ColorTheme>(initializeColorTheme);
-  const [customColor, setCustomColor] = useState<string>(initializeCustomColor);
-  
-  // Log initialization to help with debugging
-  useEffect(() => {
-    console.log('ThemeProvider initialized with:', {
-      theme,
-      systemTheme,
-      colorTheme,
-      customColor
-    });
-  }, []);
+  const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
+    const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
+    return (savedColorTheme as ColorTheme) || 'Calm';
+  });
+
+  const [customColor, setCustomColor] = useState<string>(() => {
+    const savedCustomColor = localStorage.getItem('feelosophy-custom-color');
+    return savedCustomColor || '#3b82f6';
+  });
 
   useEffect(() => {
     const mediaQuery = window.matchMedia('(prefers-color-scheme: dark)');

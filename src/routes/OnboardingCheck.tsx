@@ -1,29 +1,34 @@
 
-import React, { useEffect } from 'react';
-import { Outlet, useLocation, Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
+import React from 'react';
+import { useLocation, Navigate } from 'react-router-dom';
+import { User } from '@supabase/supabase-js';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
-import { useOnboarding } from '@/hooks/use-onboarding';
 
-const OnboardingCheck: React.FC = () => {
+interface OnboardingCheckProps {
+  onboardingComplete: boolean | null;
+  onboardingLoading: boolean;
+  user: User | null;
+  children: React.ReactNode;
+}
+
+const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ 
+  onboardingComplete, 
+  onboardingLoading, 
+  user,
+  children 
+}) => {
   const location = useLocation();
-  const { user } = useAuth();
-  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
-  
-  useEffect(() => {
-    console.log('OnboardingCheck rendering at path:', location.pathname, {
-      user: user?.id || 'no user', 
-      onboardingComplete,
-      onboardingLoading,
-      isAppRoute: isAppRoute(location.pathname),
-      isWebsiteRoute: isWebsiteRoute(location.pathname)
-    });
-  }, [location.pathname, user, onboardingComplete, onboardingLoading]);
+  console.log('OnboardingCheck rendering at path:', location.pathname, {
+    user: !!user, 
+    onboardingComplete,
+    isAppRoute: isAppRoute(location.pathname),
+    isWebsiteRoute: isWebsiteRoute(location.pathname)
+  });
   
   // For website routes, no checks needed - just render children
   if (isWebsiteRoute(location.pathname)) {
     console.log('Website route detected, no onboarding check needed');
-    return <Outlet />;
+    return <>{children}</>;
   }
   
   const isAuthRoute = location.pathname === '/app/auth' || location.pathname === '/auth';
@@ -36,18 +41,16 @@ const OnboardingCheck: React.FC = () => {
     location.pathname.includes('admin');
     
   if (onboardingLoading) {
-    console.log('OnboardingCheck: Loading onboarding status...');
     return (
       <div className="flex items-center justify-center h-screen w-screen">
-        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
-        <div className="ml-3">Loading onboarding status...</div>
+        <div className="animate-spin w-8 h-8 border-4 border-theme border-t-transparent rounded-full"></div>
       </div>
     );
   }
 
   // Special handling for the root /app route
   if (isRootAppRoute) {
-    console.log('Root app route detected, redirecting appropriately');
+    console.log('Root app route detected, user:', !!user);
     // If user is logged in, redirect to home
     if (user) {
       console.log('User is logged in, redirecting to /app/home');
@@ -72,9 +75,7 @@ const OnboardingCheck: React.FC = () => {
     }
   }
   
-  // If all checks pass, render the child routes
-  console.log('All onboarding checks passed, rendering children for path:', location.pathname);
-  return <Outlet />;
+  return <>{children}</>;
 };
 
 export default OnboardingCheck;

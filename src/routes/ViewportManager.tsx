@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -13,6 +13,7 @@ const ViewportManager: React.FC = () => {
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
   
+  // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),

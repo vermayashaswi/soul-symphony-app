@@ -14,6 +14,7 @@ import {
 } from '@/services/authService';
 import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
 import { isAppRoute } from '@/routes/RouteHelpers';
+import { useLocation } from 'react-router-dom';
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
@@ -31,23 +32,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
-  
-  // Safe way to check if we're on an app route without useLocation
-  const isOnAppRoute = isAppRoute(currentPath);
-
-  // Update path on navigation without using useLocation
-  useEffect(() => {
-    const handleLocationChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
-
-    window.addEventListener('popstate', handleLocationChange);
-    
-    return () => {
-      window.removeEventListener('popstate', handleLocationChange);
-    };
-  }, []);
+  const location = useLocation();
 
   const createUserSession = async (userId: string) => {
     try {
@@ -414,7 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN') {
           logInfo('User signed in successfully', 'AuthContext');
-          if (isOnAppRoute) {
+          if (isAppRoute(location.pathname)) {
             toast.success('Signed in successfully');
           }
         } else if (event === 'SIGNED_OUT') {
@@ -428,7 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAutoRetryTimeoutId(null);
           }
           
-          if (isOnAppRoute) {
+          if (isAppRoute(location.pathname)) {
             toast.info('Signed out');
           }
         }
@@ -478,7 +463,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [isMobileDevice, isOnAppRoute]);
+  }, [isMobileDevice, location.pathname]);
 
   const value = {
     session,
