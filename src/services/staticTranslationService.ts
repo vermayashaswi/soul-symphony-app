@@ -1,3 +1,4 @@
+
 import { TranslationService } from './translationService';
 
 export class StaticTranslationService {
@@ -68,7 +69,7 @@ export class StaticTranslationService {
   }
 
   // Retry all failed translations
-  private async retryFailedTranslations(): void {
+  private async retryFailedTranslations(): Promise<void> {
     this.retryTimer = null;
     
     if (this.translationFailures.size === 0 || this.language === 'en') return;
