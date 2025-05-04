@@ -114,7 +114,7 @@ export function analyzeQueryTypes(query: string): QueryTypes {
                                 lowerQuery.includes('pattern') || 
                                 lowerQuery.includes('routine');
   
-  // Detect temporal queries (asking about a specific time period)
+  // Enhanced temporal queries detection to include month names
   result.isTemporalQuery = lowerQuery.includes('yesterday') ||
                           lowerQuery.includes('last week') ||
                           lowerQuery.includes('last month') ||
@@ -122,7 +122,9 @@ export function analyzeQueryTypes(query: string): QueryTypes {
                           lowerQuery.includes('past month') ||
                           lowerQuery.includes('this week') ||
                           lowerQuery.includes('this month') ||
-                          lowerQuery.includes('today');
+                          lowerQuery.includes('today') ||
+                          /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/.test(lowerQuery) ||
+                          /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/.test(lowerQuery);
   
   // Detect "when" questions
   result.isWhenQuestion = lowerQuery.startsWith('when') || 
@@ -170,54 +172,174 @@ function extractTimeRange(query: string): { startDate: string | null, endDate: s
   let endDate: Date | null = null;
   let periodName = "recently";
   
-  // Match common time expressions
-  if (query.includes('yesterday')) {
-    startDate = new Date(year, month, date - 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(year, month, date - 1);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = "yesterday";
-  } else if (query.includes('last week')) {
-    // Last week: Monday-Sunday of previous week
-    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const daysToLastMonday = dayOfWeek === 0 ? 7 : dayOfWeek;
-    startDate = new Date(year, month, date - daysToLastMonday - 6);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(year, month, date - daysToLastMonday);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = "last week";
-  } else if (query.includes('this week')) {
-    // This week: Monday-Today of current week
-    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
-    startDate = new Date(year, month, date - daysToMonday);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(year, month, date);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = "this week";
-  } else if (query.includes('last month')) {
-    startDate = new Date(year, month - 1, 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(year, month, 0);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = "last month";
-  } else if (query.includes('this month')) {
-    startDate = new Date(year, month, 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = now;
-    periodName = "this month";
-  } else if (query.includes('today')) {
-    startDate = new Date(year, month, date);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = now;
-    periodName = "today";
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for month name mentions first (new)
+  const fullMonthNames = [
+    'january', 'february', 'march', 'april', 'may', 'june',
+    'july', 'august', 'september', 'october', 'november', 'december'
+  ];
+  
+  const shortMonthNames = [
+    'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+    'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+  ];
+  
+  // First check for a year+month specification like "May 2023" or "2023 May"
+  const yearMonthRegex = /\b(\d{4})\s+(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/i;
+  const monthYearRegex = /\b(january|february|march|april|may|june|july|august|september|october|november|december|jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\s+(\d{4})\b/i;
+  
+  let yearMatch = yearMonthRegex.exec(lowerQuery);
+  let specifiedYear: number | null = null;
+  let specifiedMonth: number | null = null;
+  
+  if (yearMatch) {
+    specifiedYear = parseInt(yearMatch[1]);
+    const monthName = yearMatch[2].toLowerCase();
+    specifiedMonth = getMonthIndex(monthName);
   } else {
-    // Default to last 30 days
-    startDate = new Date(year, month, date - 30);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = now;
-    periodName = "the last 30 days";
+    yearMatch = monthYearRegex.exec(lowerQuery);
+    if (yearMatch) {
+      const monthName = yearMatch[1].toLowerCase();
+      specifiedYear = parseInt(yearMatch[2]);
+      specifiedMonth = getMonthIndex(monthName);
+    }
   }
+  
+  // If we found a year+month specification
+  if (specifiedYear !== null && specifiedMonth !== null) {
+    startDate = new Date(specifiedYear, specifiedMonth, 1);
+    startDate.setHours(0, 0, 0, 0);
+    
+    endDate = new Date(specifiedYear, specifiedMonth + 1, 0); // Last day of the month
+    endDate.setHours(23, 59, 59, 999);
+    
+    const monthName = fullMonthNames[specifiedMonth];
+    periodName = `${monthName} ${specifiedYear}`;
+  } 
+  // Check for just month name without year
+  else {
+    let foundMonthName = '';
+    let monthIndex = -1;
+    
+    for (let i = 0; i < fullMonthNames.length; i++) {
+      if (lowerQuery.includes(fullMonthNames[i])) {
+        foundMonthName = fullMonthNames[i];
+        monthIndex = i;
+        break;
+      }
+    }
+    
+    if (monthIndex === -1) {
+      for (let i = 0; i < shortMonthNames.length; i++) {
+        // Make sure "may" is treated as a month and not just the modal verb
+        if (shortMonthNames[i] === 'may') {
+          // Check for surrounding context that suggests it's used as a month name
+          const mayAsMonthRegex = /\b(in|during|for|about|of|this|last)\s+may\b|\bmay\s+(of|\d{4}|\d{1,2}(st|nd|rd|th))\b/i;
+          if (mayAsMonthRegex.test(lowerQuery)) {
+            foundMonthName = 'may';
+            monthIndex = 4; // May is the 5th month (0-indexed)
+            break;
+          }
+        } else if (lowerQuery.includes(shortMonthNames[i])) {
+          foundMonthName = shortMonthNames[i];
+          monthIndex = i;
+          break;
+        }
+      }
+    }
+    
+    if (monthIndex !== -1) {
+      // Determine which year to use for the month
+      // If the month is in the future, use last year
+      // If the month is in the past or current, use this year
+      let yearToUse = year;
+      if (monthIndex > month) {
+        yearToUse = year - 1; // Use last year
+      }
+      
+      startDate = new Date(yearToUse, monthIndex, 1);
+      startDate.setHours(0, 0, 0, 0);
+      
+      endDate = new Date(yearToUse, monthIndex + 1, 0); // Last day of the month
+      endDate.setHours(23, 59, 59, 999);
+      
+      periodName = foundMonthName;
+    }
+  }
+  
+  // If no month was found, match common time expressions
+  if (startDate === null) {
+    if (lowerQuery.includes('yesterday')) {
+      startDate = new Date(year, month, date - 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(year, month, date - 1);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = "yesterday";
+    } else if (lowerQuery.includes('last week')) {
+      // Last week: Monday-Sunday of previous week
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const daysToLastMonday = dayOfWeek === 0 ? 7 : dayOfWeek;
+      startDate = new Date(year, month, date - daysToLastMonday - 6);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(year, month, date - daysToLastMonday);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = "last week";
+    } else if (lowerQuery.includes('this week')) {
+      // This week: Monday-Today of current week
+      const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, etc.
+      const daysToMonday = dayOfWeek === 0 ? 6 : dayOfWeek - 1;
+      startDate = new Date(year, month, date - daysToMonday);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(year, month, date);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = "this week";
+    } else if (lowerQuery.includes('last month')) {
+      startDate = new Date(year, month - 1, 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(year, month, 0);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = "last month";
+    } else if (lowerQuery.includes('this month')) {
+      startDate = new Date(year, month, 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = now;
+      periodName = "this month";
+    } else if (lowerQuery.includes('today')) {
+      startDate = new Date(year, month, date);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = now;
+      periodName = "today";
+    } else {
+      // Default to last 30 days
+      startDate = new Date(year, month, date - 30);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = now;
+      periodName = "the last 30 days";
+    }
+  }
+  
+  // Helper function to get month index from month name
+  function getMonthIndex(monthName: string): number {
+    const fullNames = [
+      'january', 'february', 'march', 'april', 'may', 'june',
+      'july', 'august', 'september', 'october', 'november', 'december'
+    ];
+    
+    const shortNames = [
+      'jan', 'feb', 'mar', 'apr', 'may', 'jun',
+      'jul', 'aug', 'sep', 'oct', 'nov', 'dec'
+    ];
+    
+    let index = fullNames.indexOf(monthName);
+    if (index === -1) {
+      index = shortNames.indexOf(monthName);
+    }
+    
+    return index;
+  }
+  
+  console.log(`Time range extracted: ${startDate?.toISOString()} to ${endDate?.toISOString()} (${periodName})`);
   
   return {
     startDate: startDate ? startDate.toISOString() : null,
@@ -225,3 +347,4 @@ function extractTimeRange(query: string): { startDate: string | null, endDate: s
     periodName
   };
 }
+

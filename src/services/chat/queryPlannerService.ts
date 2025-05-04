@@ -3,6 +3,7 @@
  * Service for planning complex queries and synthesizing multiple sub-query responses
  */
 import { supabase } from "@/integrations/supabase/client";
+import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
 /**
  * Generates a plan for breaking down a complex query into sub-queries
@@ -10,6 +11,17 @@ import { supabase } from "@/integrations/supabase/client";
 export async function planQueryExecution(query: string): Promise<string[]> {
   try {
     console.log("Planning query execution for:", query);
+    
+    // First analyze the query to extract time ranges, emotion focus, etc.
+    const queryAnalysis = analyzeQueryTypes(query);
+    
+    // Add detailed time range information to planning context
+    let timeContext = '';
+    if (queryAnalysis.timeRange.startDate && queryAnalysis.timeRange.endDate) {
+      const startDate = new Date(queryAnalysis.timeRange.startDate);
+      const endDate = new Date(queryAnalysis.timeRange.endDate);
+      timeContext = `User is asking about the time period: ${queryAnalysis.timeRange.periodName} (${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}).\n`;
+    }
     
     // Get database schema information for context
     const tables = ['Journal Entries', 'chat_messages', 'chat_threads', 'emotions', 'journal_embeddings'];
@@ -65,6 +77,14 @@ Important rules:
 - Skip the plan if the user question is unrelated to journaling
 - Output ONLY the queries, one per line, with no extra text or explanation
 
+Query Analysis:
+${timeContext}
+${queryAnalysis.isEmotionFocused ? 'This query is focused on emotions.\n' : ''}
+${queryAnalysis.isTemporalQuery ? `This query has a temporal component focused on: ${queryAnalysis.timeRange.periodName}.\n` : ''}
+${queryAnalysis.isWhyQuestion ? 'This is a "why" question that needs deeper context.\n' : ''}
+${queryAnalysis.needsDataAggregation ? 'This query requires data aggregation across multiple entries.\n' : ''}
+${queryAnalysis.theme ? `This query is asking about the theme: ${queryAnalysis.theme}.\n` : ''}
+
 Database Schema:
 ${dbSchemaContext}
 
@@ -119,6 +139,17 @@ export async function synthesizeResponses(
 ): Promise<string> {
   try {
     console.log("Synthesizing responses for query:", originalQuery);
+
+    // Analyze the original query to get time context
+    const queryAnalysis = analyzeQueryTypes(originalQuery);
+    
+    // Format time range for the prompt
+    let timeContext = '';
+    if (queryAnalysis.isTemporalQuery && queryAnalysis.timeRange.startDate && queryAnalysis.timeRange.endDate) {
+      const startDate = new Date(queryAnalysis.timeRange.startDate);
+      const endDate = new Date(queryAnalysis.timeRange.endDate);
+      timeContext = `The user asked about the time period: ${queryAnalysis.timeRange.periodName} (${startDate.toLocaleDateString()} to ${endDate.toLocaleDateString()}).\n`;
+    }
     
     // Format the sub-query outputs for the prompt
     const subQueryOutputsText = subQueryResponses.map((sqr, index) => {
@@ -142,6 +173,8 @@ export async function synthesizeResponses(
 The user asked:
 "${originalQuery}"
 
+${timeContext ? `Time Context: ${timeContext}` : ''}
+
 We have analyzed this using multiple sub-queries, and here are their results:
 ${subQueryOutputsText}
 
@@ -154,6 +187,7 @@ Your task is to:
 6. Avoid repeating content or listing all journal entries unless explicitly asked
 7. Present a meaningful takeaway or reflection for the user
 8. Do not mention sub-queries or technical function names
+9. If the question asks about a specific time period (like "May" or "last week") but the results include entries from outside that time period, explicitly mention this to the user and clarify which time periods the entries are actually from
 
 Be concise and insightful. Keep the tone conversational, supportive, and emotionally intelligent.`
           }
