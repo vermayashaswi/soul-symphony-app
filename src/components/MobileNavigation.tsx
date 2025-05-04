@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react';
@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -17,6 +18,23 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const { currentLanguage } = useTranslation();
+  const translationCheckedRef = useRef<boolean>(false);
+  
+  // Effect to preload navigation item translations
+  useEffect(() => {
+    if (currentLanguage !== 'en' && !translationCheckedRef.current) {
+      translationCheckedRef.current = true;
+      
+      // Prefetch translations for navigation items
+      const navLabels = ['Home', 'Journal', 'Chat', 'Insights', 'Settings'];
+      const { prefetchTranslationsForRoute } = useTranslation();
+      
+      prefetchTranslationsForRoute(navLabels).catch(error => {
+        console.error('Failed to prefetch navigation translations:', error);
+      });
+    }
+  }, [currentLanguage]);
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
@@ -91,6 +109,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return location.pathname.startsWith(path);
   };
   
+  // Function to determine if we're in Hindi language mode
+  const isHindiLanguage = currentLanguage === 'hi';
+  
   return (
     <motion.div 
       className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted"
@@ -130,7 +151,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 )}
               </div>
               <span className="text-xs mt-0.5">
-                <TranslatableText text={item.label} />
+                <TranslatableText 
+                  text={item.label} 
+                  forceTranslate={true}
+                />
               </span>
             </Link>
           );
