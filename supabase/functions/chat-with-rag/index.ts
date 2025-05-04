@@ -42,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, queryTypes, threadId, includeDiagnostics, vectorSearch, isEmotionQuery, isWhyEmotionQuery, isTimePatternQuery, isTemporalQuery, requiresTimeAnalysis, timeRange } = await req.json();
+    const { message, userId, threadId, researchPlan, researchStep, includeDiagnostics } = await req.json();
 
     if (!message) {
       throw new Error('Message is required');
@@ -53,9 +53,8 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
-    console.log("Time range received:", timeRange);
-
-    // Add this where appropriate in the main request handler:
+    
+    // Initialize diagnostics
     const diagnostics = {
       steps: [],
       similarityScores: [],
@@ -63,73 +62,177 @@ serve(async (req) => {
       references: []
     };
     
-    // Safely check properties before using them
-    const safeQueryTypes = {
-      isEmotionQuery: isEmotionQuery || false,
-      isWhyEmotionQuery: isWhyEmotionQuery || false,
-      isTemporalQuery: isTemporalQuery || false,
-      timeRange: timeRange ? 
-        `${timeRange.startDate || 'unspecified'} to ${timeRange.endDate || 'unspecified'}` : 
-        "none"
-    };
+    diagnostics.steps.push(createDiagnosticStep("Request Received", "success", { message: message.substring(0, 50) + "..." }));
     
-    diagnostics.steps.push(createDiagnosticStep(
-      "Query Type Analysis", 
-      "success", 
-      JSON.stringify(safeQueryTypes)
-    ));
-    
-    // Fetch previous messages from this thread if a threadId is provided
-    let conversationContext = [];
-    if (threadId) {
-      diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "loading"));
+    // If researchPlan is provided, this is a request to execute a specific research step
+    if (researchPlan && researchStep) {
+      diagnostics.steps.push(createDiagnosticStep("Research Step Execution", "loading", { step: researchStep }));
+      
       try {
-        const { data: previousMessages, error } = await supabase
-          .from('chat_messages')
-          .select('content, sender, created_at')
-          .eq('thread_id', threadId)
-          .order('created_at', { ascending: false })
-          .limit(MAX_CONTEXT_MESSAGES * 2); // Get more messages than needed to ensure we have message pairs
+        const stepData = JSON.parse(researchStep);
         
-        if (error) {
-          console.error('Error fetching thread context:', error);
-          diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", error.message));
-        } else if (previousMessages && previousMessages.length > 0) {
-          // Process messages to create conversation context
-          // We need to reverse the messages to get them in chronological order
-          const chronologicalMessages = [...previousMessages].reverse();
+        if (stepData.type === "vector_search") {
+          // Extract parameters
+          const { timeRange, matchThreshold = 0.5, matchCount = 10, emotion, theme, query } = stepData.parameters || {};
           
-          // Format as conversation context
-          conversationContext = chronologicalMessages.map(msg => ({
-            role: msg.sender === 'user' ? 'user' : 'assistant',
-            content: msg.content
-          }));
-          
-          // Limit to the most recent messages to avoid context length issues
-          if (conversationContext.length > MAX_CONTEXT_MESSAGES) {
-            conversationContext = conversationContext.slice(-MAX_CONTEXT_MESSAGES);
+          // Generate embedding for the query if needed
+          let queryEmbedding;
+          if (query) {
+            const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${apiKey}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                model: 'text-embedding-ada-002',
+                input: query,
+              }),
+            });
+            
+            if (!embeddingResponse.ok) {
+              const error = await embeddingResponse.text();
+              diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "error", error));
+              throw new Error(`Failed to generate embedding: ${error}`);
+            }
+            
+            const embeddingData = await embeddingResponse.json();
+            queryEmbedding = embeddingData.data[0].embedding;
+            diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "success"));
           }
           
-          diagnostics.steps.push(createDiagnosticStep(
-            "Thread Context Retrieval", 
-            "success", 
-            `Retrieved ${conversationContext.length} messages for context`
-          ));
+          // Execute the vector search based on parameters
+          let entries = [];
           
-          console.log(`Added ${conversationContext.length} previous messages as context`);
+          if (emotion) {
+            diagnostics.steps.push(createDiagnosticStep("Emotion-Based Search", "loading", { emotion }));
+            const { data, error } = await supabase.rpc('match_journal_entries_by_emotion', {
+              emotion_name: emotion,
+              user_id_filter: userId,
+              min_score: 0.3,
+              start_date: timeRange?.startDate || null,
+              end_date: timeRange?.endDate || null,
+              limit_count: matchCount
+            });
+            
+            if (error) {
+              diagnostics.steps.push(createDiagnosticStep("Emotion-Based Search", "error", error.message));
+              throw error;
+            }
+            
+            entries = data;
+            diagnostics.steps.push(createDiagnosticStep("Emotion-Based Search", "success", { count: entries.length }));
+          } else if (theme) {
+            diagnostics.steps.push(createDiagnosticStep("Theme-Based Search", "loading", { theme }));
+            const { data, error } = await supabase.rpc('match_journal_entries_by_theme', {
+              theme_query: theme,
+              user_id_filter: userId,
+              match_threshold: matchThreshold,
+              match_count: matchCount,
+              start_date: timeRange?.startDate || null,
+              end_date: timeRange?.endDate || null
+            });
+            
+            if (error) {
+              diagnostics.steps.push(createDiagnosticStep("Theme-Based Search", "error", error.message));
+              throw error;
+            }
+            
+            entries = data;
+            diagnostics.steps.push(createDiagnosticStep("Theme-Based Search", "success", { count: entries.length }));
+          } else if (timeRange?.startDate || timeRange?.endDate) {
+            diagnostics.steps.push(createDiagnosticStep("Time-Filtered Search", "loading", { timeRange }));
+            const { data, error } = await supabase.rpc('match_journal_entries_with_date', {
+              query_embedding: queryEmbedding,
+              match_threshold: matchThreshold,
+              match_count: matchCount,
+              user_id_filter: userId,
+              start_date: timeRange?.startDate || null,
+              end_date: timeRange?.endDate || null
+            });
+            
+            if (error) {
+              diagnostics.steps.push(createDiagnosticStep("Time-Filtered Search", "error", error.message));
+              throw error;
+            }
+            
+            entries = data;
+            diagnostics.steps.push(createDiagnosticStep("Time-Filtered Search", "success", { count: entries.length }));
+          } else {
+            diagnostics.steps.push(createDiagnosticStep("Standard Vector Search", "loading"));
+            const { data, error } = await supabase.rpc('match_journal_entries_fixed', {
+              query_embedding: queryEmbedding,
+              match_threshold: matchThreshold,
+              match_count: matchCount,
+              user_id_filter: userId
+            });
+            
+            if (error) {
+              diagnostics.steps.push(createDiagnosticStep("Standard Vector Search", "error", error.message));
+              throw error;
+            }
+            
+            entries = data;
+            diagnostics.steps.push(createDiagnosticStep("Standard Vector Search", "success", { count: entries.length }));
+          }
+          
+          return new Response(
+            JSON.stringify({
+              type: "vector_search_results",
+              description: stepData.description,
+              entries,
+              diagnostics: includeDiagnostics ? diagnostics : undefined
+            }),
+            { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
+        } else if (stepData.type === "sql_query") {
+          diagnostics.steps.push(createDiagnosticStep("SQL Query Execution", "loading"));
+          const { query, parameters = [] } = stepData.parameters || {};
+          
+          if (!query) {
+            diagnostics.steps.push(createDiagnosticStep("SQL Query Execution", "error", "No query provided"));
+            throw new Error("SQL query not specified in step parameters");
+          }
+          
+          const { data, error } = await supabase.rpc('execute_dynamic_query', {
+            query_text: query,
+            param_values: parameters
+          });
+          
+          if (error) {
+            diagnostics.steps.push(createDiagnosticStep("SQL Query Execution", "error", error.message));
+            throw error;
+          }
+          
+          diagnostics.steps.push(createDiagnosticStep("SQL Query Execution", "success"));
+          
+          return new Response(
+            JSON.stringify({
+              type: "sql_query_results",
+              description: stepData.description,
+              data,
+              diagnostics: includeDiagnostics ? diagnostics : undefined
+            }),
+            { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+          );
         } else {
-          diagnostics.steps.push(createDiagnosticStep(
-            "Thread Context Retrieval", 
-            "success", 
-            "No previous messages found in thread"
-          ));
+          throw new Error(`Unknown research step type: ${stepData.type}`);
         }
-      } catch (contextError) {
-        console.error('Error processing thread context:', contextError);
-        diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", contextError.message));
+      } catch (error) {
+        console.error("Error executing research step:", error);
+        return new Response(
+          JSON.stringify({ 
+            error: error.message,
+            diagnostics: includeDiagnostics ? diagnostics : undefined
+          }),
+          { 
+            status: 500,
+            headers: { 'Content-Type': 'application/json', ...corsHeaders } 
+          }
+        );
       }
     }
-    
+
     // NEW: First categorize if this is a general question or a journal-specific question
     diagnostics.steps.push(createDiagnosticStep("Question Categorization", "loading"));
     console.log("Categorizing question type");
@@ -180,6 +283,57 @@ serve(async (req) => {
       console.log("Processing as general question, skipping journal entry retrieval");
       diagnostics.steps.push(createDiagnosticStep("General Question Processing", "loading"));
       
+      // Fetch previous messages from this thread if a threadId is provided
+      let conversationContext = [];
+      if (threadId) {
+        diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "loading"));
+        try {
+          const { data: previousMessages, error } = await supabase
+            .from('chat_messages')
+            .select('content, sender, created_at')
+            .eq('thread_id', threadId)
+            .order('created_at', { ascending: false })
+            .limit(MAX_CONTEXT_MESSAGES * 2); // Get more messages than needed to ensure we have message pairs
+          
+          if (error) {
+            console.error('Error fetching thread context:', error);
+            diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", error.message));
+          } else if (previousMessages && previousMessages.length > 0) {
+            // Process messages to create conversation context
+            // We need to reverse the messages to get them in chronological order
+            const chronologicalMessages = [...previousMessages].reverse();
+            
+            // Format as conversation context
+            conversationContext = chronologicalMessages.map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.content
+            }));
+            
+            // Limit to the most recent messages to avoid context length issues
+            if (conversationContext.length > MAX_CONTEXT_MESSAGES) {
+              conversationContext = conversationContext.slice(-MAX_CONTEXT_MESSAGES);
+            }
+            
+            diagnostics.steps.push(createDiagnosticStep(
+              "Thread Context Retrieval", 
+              "success", 
+              `Retrieved ${conversationContext.length} messages for context`
+            ));
+            
+            console.log(`Added ${conversationContext.length} previous messages as context`);
+          } else {
+            diagnostics.steps.push(createDiagnosticStep(
+              "Thread Context Retrieval", 
+              "success", 
+              "No previous messages found in thread"
+            ));
+          }
+        } catch (contextError) {
+          console.error('Error processing thread context:', contextError);
+          diagnostics.steps.push(createDiagnosticStep("Thread Context Retrieval", "error", contextError.message));
+        }
+      }
+      
       const generalCompletionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -218,7 +372,97 @@ serve(async (req) => {
       );
     }
     
-    // If it's a journal-specific question, continue with the existing RAG flow
+    // For journal-specific questions, continue with our existing RAG implementation
+    // But add a step to generate a research plan first
+    diagnostics.steps.push(createDiagnosticStep("Research Planning", "loading"));
+    
+    console.log("Generating research plan");
+    const researchPlanResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a research planner for a voice journaling app. A user has asked a question related to their journal entries. Your job is to create a comprehensive research plan to answer their question.
+
+Based on the user's question, create a research plan with specific steps to retrieve and analyze the relevant data.
+Your research plan should specify:
+   - What database functions or SQL queries to use
+   - What parameters to include (time ranges, emotions, themes, etc.)
+   - How to process and synthesize the information
+
+Database functions available:
+- match_journal_entries_fixed: Vector similarity search on journal entries
+- match_journal_entries_with_date: Vector similarity search with date filtering
+- match_journal_entries_by_emotion: Find entries with specific emotions
+- match_journal_entries_by_theme: Find entries with specific themes
+- get_top_emotions: Get most frequent emotions in a time period
+- get_top_emotions_with_entries: Get top emotions with sample journal entries
+- execute_dynamic_query: Execute custom SQL queries
+
+The user asked: "${message}"
+
+Output your research plan in JSON format following this structure:
+{
+  "strategy": "vector_search" or "sql_query" or "hybrid",
+  "steps": [
+    {
+      "type": "vector_search",
+      "description": "Description of what this step retrieves",
+      "parameters": {
+        // Parameters specific to this query type
+        "query": "search query",
+        "timeRange": {"startDate": "ISO date", "endDate": "ISO date"},
+        "matchThreshold": 0.5,
+        "matchCount": 10
+      }
+    }
+  ]
+}`
+          }
+        ],
+        temperature: 0.2
+      }),
+    });
+    
+    if (!researchPlanResponse.ok) {
+      const error = await researchPlanResponse.text();
+      console.error('Failed to generate research plan:', error);
+      diagnostics.steps.push(createDiagnosticStep("Research Planning", "error", error));
+      
+      // Fall back to standard vector search
+      diagnostics.steps.push(createDiagnosticStep("Fallback Vector Search", "loading"));
+    } else {
+      const researchPlanData = await researchPlanResponse.json();
+      const researchPlanText = researchPlanData.choices[0]?.message?.content || '';
+      
+      try {
+        const researchPlan = JSON.parse(researchPlanText);
+        diagnostics.steps.push(createDiagnosticStep(
+          "Research Planning", 
+          "success", 
+          `Generated plan with ${researchPlan.steps?.length || 0} steps`
+        ));
+        
+        // TODO: Implement the execution of the research plan
+        // This would involve executing each step and collecting the results
+        // We'll leave this for a future implementation
+      } catch (parseError) {
+        console.error('Failed to parse research plan:', parseError);
+        diagnostics.steps.push(createDiagnosticStep(
+          "Research Planning", 
+          "error", 
+          `Failed to parse plan: ${parseError.message}`
+        ));
+      }
+    }
+    
+    // For now, we'll continue with our existing implementation
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "loading"));
@@ -251,42 +495,16 @@ serve(async (req) => {
     console.log("Embedding generated successfully");
     diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "success"));
 
-    // 2. Search for relevant entries with proper temporal filtering
+    // 2. Search for relevant entries with time filtering if available
     console.log("Searching for relevant entries");
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "loading"));
     
-    // Use different search function based on whether we have a time range
+    // Extract time range from the query analysis if available
     let entries = [];
-    if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-      console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
-    } else {
-      console.log("Using standard vector search without time filtering");
-      entries = await searchEntriesWithVector(userId, queryEmbedding);
-    }
+    entries = await searchEntriesWithVector(userId, queryEmbedding);
     
     console.log(`Found ${entries.length} relevant entries`);
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "success", `Found ${entries.length} entries`));
-    
-    // Check if we found any entries for the requested time period when a time range was specified
-    if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
-      console.log("No entries found for the specified time range");
-      diagnostics.steps.push(createDiagnosticStep("Time Range Check", "warning", "No entries found in specified time range"));
-      
-      // Process empty entries to ensure valid dates for the response format
-      const processedEntries = [];
-      
-      // Return a response with no entries but proper message
-      return new Response(
-        JSON.stringify({ 
-          response: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
-          diagnostics: includeDiagnostics ? diagnostics : undefined,
-          references: processedEntries,
-          noEntriesForTimeRange: true
-        }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-      );
-    }
 
     // Format entries for the prompt with dates
     const entriesWithDates = entries.map(entry => {
@@ -350,23 +568,38 @@ Now generate your thoughtful, emotionally intelligent response:`;
     messages.push({ role: 'system', content: prompt });
     
     // Add conversation context if available
-    if (conversationContext.length > 0) {
-      // Log that we're using conversation context
-      console.log(`Including ${conversationContext.length} messages of conversation context`);
-      diagnostics.steps.push(createDiagnosticStep(
-        "Conversation Context", 
-        "success",
-        `Including ${conversationContext.length} previous messages for context`
-      ));
-      
-      // Add the conversation context messages
-      messages.push(...conversationContext);
-      
-      // Add the current user message
-      messages.push({ role: 'user', content: message });
-    } else {
-      // If no context, just use the system prompt
-      console.log("No conversation context available, using only system prompt");
+    let conversationContext = [];
+    if (threadId) {
+      try {
+        const { data: previousMessages, error } = await supabase
+          .from('chat_messages')
+          .select('content, sender, created_at')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(MAX_CONTEXT_MESSAGES * 2);
+        
+        if (!error && previousMessages && previousMessages.length > 0) {
+          conversationContext = [...previousMessages].reverse().map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          }));
+          
+          if (conversationContext.length > MAX_CONTEXT_MESSAGES) {
+            conversationContext = conversationContext.slice(-MAX_CONTEXT_MESSAGES);
+          }
+          
+          messages.push(...conversationContext);
+          messages.push({ role: 'user', content: message });
+          
+          diagnostics.steps.push(createDiagnosticStep(
+            "Conversation Context", 
+            "success",
+            `Including ${conversationContext.length} previous messages for context`
+          ));
+        }
+      } catch (contextError) {
+        console.error('Error processing thread context:', contextError);
+      }
     }
     
     const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -377,7 +610,10 @@ Now generate your thoughtful, emotionally intelligent response:`;
       },
       body: JSON.stringify({
         model: 'gpt-3.5-turbo',
-        messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: prompt }],
+        messages: conversationContext.length > 0 ? messages : [
+          { role: 'system', content: prompt },
+          { role: 'user', content: message }
+        ],
       }),
     });
 
@@ -467,7 +703,7 @@ async function searchEntriesWithVector(
   }
 }
 
-// Time-filtered vector search
+// Time-filtered vector search (keeping for compatibility)
 async function searchEntriesWithTimeRange(
   userId: string, 
   queryEmbedding: any[], 
