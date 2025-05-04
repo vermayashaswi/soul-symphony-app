@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -176,28 +177,28 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   if (!visible || !text) return null;
 
-  // Size is applied with a 3x multiplier (decreased from 4x) and then with 0.75x scaling factor
-  const effectiveSize = size * 3 * 0.75; // Decreased by 0.75x
+  // Size is applied with a 1.5x multiplier (reduced from 3x) to achieve half the size
+  const effectiveSize = size * 1.5;
   
   // Calculate appropriate max width based on script type and text length
   const getMaxWidth = () => {
     if (isDevanagari.current) {
       // Much wider container for Devanagari specifically
-      return 70; // Doubled to match font size increase (35 * 2)
+      return 35; // Halved from 70
     } else if (isNonLatinScript.current) {
       // Wider container for other non-Latin scripts
-      return 50; // Doubled to match font size increase (25 * 2)
+      return 25; // Halved from 50
     }
     // Standard width for Latin scripts
-    return 20; // Doubled to match font size increase (10 * 2)
+    return 10; // Halved from 20
   };
 
   // Get letter spacing appropriate for the script
   const getLetterSpacing = () => {
     if (isDevanagari.current) {
-      return 0.12; // Increased spacing for Devanagari
+      return 0.06; // Halved spacing for Devanagari
     } else if (isNonLatinScript.current) {
-      return 0.05; // Some spacing for other non-Latin scripts
+      return 0.025; // Halved spacing for other non-Latin scripts
     }
     return 0; // Default spacing for Latin scripts
   };
@@ -208,11 +209,11 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         ref={textRef}
         position={position}
         color={color}
-        fontSize={effectiveSize} // Using the decreased font size
+        fontSize={effectiveSize} // Using the reduced font size
         fontWeight={bold ? 700 : 400}
         anchorX="center"
         anchorY="middle"
-        outlineWidth={0.007} // Slightly decreased from 0.009 for better proportion
+        outlineWidth={0.0035} // Halved from 0.007 for better proportion
         outlineColor="#000000"
         maxWidth={getMaxWidth()}
         overflowWrap="normal" // Prevent syllable breaks
@@ -252,3 +253,4 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 };
 
 export default ThreeDimensionalText;
+

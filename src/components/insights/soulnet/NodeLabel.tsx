@@ -181,30 +181,30 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Base size calculation - decreased by 0.75x
-    const baseSize = (0.26 + Math.max(0, (26 - z) * 0.0088)) * 0.75;
+    // Base size calculation - decreased by 0.75x and then halved
+    const baseSize = (0.26 + Math.max(0, (26 - z) * 0.0088)) * 0.75 * 0.5; // Reduced by half
     
     // Adjust size for non-Latin scripts - they often need slightly bigger font
     // Devanagari (Hindi) scripts need even larger adjustment
-    const sizeAdjustment = isDevanagari.current ? 0.06 * 0.75 : 
-                          isNonLatin.current ? 0.03 * 0.75 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.06 * 0.75 * 0.5 : // Also reduced by half
+                          isNonLatin.current ? 0.03 * 0.75 * 0.5 : 0;
     
     // Ensure size stays within reasonable bounds
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.5), 0.18);
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.25), 0.09); // Adjusted bounds
   }, [cameraZoom]);
 
   // Don't render if not supposed to be shown
   if (!stableVisibilityRef.current) return null;
 
   // Adjust vertical positioning for different script types and node types
-  // Also adjusted for smaller node sizes
-  let verticalPosition = type === 'entity' ? 1.45 : 1.1; // Decreased from 1.8/1.3 to account for smaller nodes
+  // Increased distance for circular nodes (entity type) to 1.5r
+  let verticalPosition = type === 'entity' ? 2.2 : 1.1; // Increased from 1.45 to 2.2 for entity nodes
   
   // For Devanagari text, position slightly higher to accommodate taller characters
   if (isDevanagari.current) {
-    verticalPosition += 0.15; // Decreased from 0.2
+    verticalPosition += 0.15 * 0.5; // Adjusted for new scale
   } else if (isNonLatin.current) {
-    verticalPosition += 0.08; // Decreased from 0.1
+    verticalPosition += 0.08 * 0.5; // Adjusted for new scale
   }
   
   const labelPosition: [number, number, number] = [0, verticalPosition, 0];
@@ -229,3 +229,4 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 };
 
 export default NodeLabel;
+
