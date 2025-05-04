@@ -1,4 +1,3 @@
-
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -197,8 +196,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   if (!stableVisibilityRef.current) return null;
 
   // Adjust vertical positioning for different script types and node types
-  // Increased distance for circular nodes (entity type) to 1.5r
-  let verticalPosition = type === 'entity' ? 2.2 : 1.1; // Increased from 1.45 to 2.2 for entity nodes
+  // Increased distance for emotion nodes to 2.2 (was 1.1)
+  let verticalPosition = type === 'entity' ? 2.2 : 2.2; // Both entity and emotion nodes now use 2.2
   
   // For Devanagari text, position slightly higher to accommodate taller characters
   if (isDevanagari.current) {
