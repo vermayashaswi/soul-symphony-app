@@ -162,6 +162,13 @@ export const Node: React.FC<NodeProps> = ({
   // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
+  // Log when percentage should be displayed
+  useEffect(() => {
+    if (shouldShowPercentage) {
+      console.log(`Should show percentage for node ${node.id}: ${connectionPercentage}%`);
+    }
+  }, [shouldShowPercentage, node.id, connectionPercentage]);
+  
   return (
     <group position={node.position}>
       <NodeMesh
@@ -189,11 +196,12 @@ export const Node: React.FC<NodeProps> = ({
         themeHex={themeHex}
       />
 
+      {/* Place the percentage display in front of the node */}
       <ConnectionPercentage
         position={node.position}
         percentage={connectionPercentage}
         isVisible={shouldShowPercentage}
-        offsetY={0} // No offset needed since we're placing at center
+        offsetY={0} // No offset needed since we're using z-positioning
         nodeType={node.type}
       />
     </group>

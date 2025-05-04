@@ -28,15 +28,15 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     return null;
   }
 
-  // Position at the center of the node instead of above it
-  const labelPosition: [number, number, number] = [0, 0, 0]; // Center position
+  // Position in front of the node, not at the center
+  // Move the label forward in the z direction to ensure it's visible
+  const labelPosition: [number, number, number] = [0, 0, 1.5]; // Z offset of 1.5 to place in front
 
-  // Adjust font size for percentages - decreased by 30%
-  const fontSize = 0.2625; // Original 0.375 * 0.7 = 0.2625 (30% decrease)
+  // Increase font size slightly for better visibility
+  const fontSize = 0.3; // Increased from 0.2625 for better visibility
 
-  // Determine text color based on node type
-  // Use white for entity nodes, brighter blue for emotion nodes
-  const textColor = nodeType === 'entity' ? '#ffffff' : '#ffffff';
+  // Use bright white text for maximum contrast against any background
+  const textColor = '#ffffff';
 
   return (
     <ThreeDimensionalText
@@ -46,10 +46,11 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
       size={fontSize}
       bold={true}
       visible={isVisible}
-      opacity={0.95} // Slightly higher opacity for better readability
+      opacity={1.0} // Full opacity for maximum visibility
       skipTranslation={true} // Always skip translation for percentage values
-      outlineWidth={0.02} // Add outline to make text more visible
+      outlineWidth={0.04} // Increased outline width for better visibility
       outlineColor="#000000" // Black outline for contrast
+      renderOrder={10} // Higher render order to ensure it renders on top
     />
   );
 };

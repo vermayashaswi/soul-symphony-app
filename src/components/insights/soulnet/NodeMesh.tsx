@@ -1,3 +1,4 @@
+
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import { useFrame } from '@react-three/fiber';
@@ -92,16 +93,18 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
       onPointerUp={onPointerUp}
       onPointerOut={onPointerOut}
       onPointerLeave={onPointerLeave}
+      renderOrder={1} // Set a lower render order for the node mesh
     >
       {Geometry}
       <meshStandardMaterial
         color={displayColor}
-        transparent
+        transparent={true} // Explicitly enable transparency
         opacity={nodeOpacity}
         emissive={displayColor}
         emissiveIntensity={isHighlighted ? 1.2 : (dimmed ? 0 : 0.1)}
         roughness={0.3}
         metalness={0.4}
+        depthWrite={false} // Disable depth writing for proper transparency
       />
     </mesh>
   );
