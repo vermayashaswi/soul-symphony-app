@@ -1,6 +1,7 @@
 
 import React from 'react';
 import * as THREE from 'three';
+import { Line } from '@react-three/drei';
 
 interface NodeConnectionProps {
   source: [number, number, number];
@@ -24,11 +25,9 @@ const NodeConnection: React.FC<NodeConnectionProps> = ({
   ];
   
   // Create a curve from the points
-  const lineGeometry = React.useMemo(() => {
+  const linePoints = React.useMemo(() => {
     const curve = new THREE.CatmullRomCurve3(points);
-    return new THREE.BufferGeometry().setFromPoints(
-      curve.getPoints(50)
-    );
+    return curve.getPoints(50);
   }, [source, target]);
   
   // Convert hex to rgb
@@ -51,15 +50,13 @@ const NodeConnection: React.FC<NodeConnectionProps> = ({
   const lineWidth = isHighlighted ? Math.max(1, strength * 3) : Math.max(0.5, strength * 2);
   
   return (
-    <line geometry={lineGeometry}>
-      <lineBasicMaterial 
-        attach="material"
-        color={new THREE.Color(themeColor.r, themeColor.g, themeColor.b)}
-        linewidth={lineWidth}
-        opacity={lineOpacity}
-        transparent={true}
-      />
-    </line>
+    <Line
+      points={linePoints}
+      color={new THREE.Color(themeColor.r, themeColor.g, themeColor.b)}
+      lineWidth={lineWidth}
+      transparent
+      opacity={lineOpacity}
+    />
   );
 };
 

@@ -10,6 +10,7 @@ interface ThreeDimensionalTextProps {
   size?: number;
   bold?: boolean;
   visible?: boolean;
+  opacity?: number;
   skipTranslation?: boolean;
 }
 
@@ -20,6 +21,7 @@ const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   size = 0.3,
   bold = false,
   visible = true,
+  opacity = 1,
   skipTranslation = false,
 }) => {
   const textRef = useRef<any>(null);
@@ -33,7 +35,7 @@ const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const fontSize = size;
   const lineHeight = 1.2;
   const fontWeight = bold ? 'bold' : 'normal';
-  const opacity = visible ? 1 : 0;
+  const fillOpacity = visible ? opacity : 0;
   
   // Determine if text contains non-Latin scripts like Hindi
   const containsNonLatinScript = useMemo(() => {
@@ -83,7 +85,7 @@ const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
             fontWeight={fontWeight}
             outlineWidth={0.01}
             outlineColor="#00000080"
-            fillOpacity={opacity}
+            fillOpacity={fillOpacity}
             userData={{ skipTranslation }}
           >
             {line}
@@ -106,7 +108,7 @@ const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       fontWeight={fontWeight}
       outlineWidth={0.01}
       outlineColor="#00000080"
-      fillOpacity={opacity}
+      fillOpacity={fillOpacity}
       userData={{ skipTranslation }}
     >
       {text}
