@@ -1,185 +1,208 @@
 
+import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 
-// CORS headers for all responses
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Handler for CORS preflight requests
-function handleCors(req: Request) {
+serve(async (req) => {
+  // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: corsHeaders });
+    return new Response(null, { headers: corsHeaders });
   }
-}
 
-// Create Supabase client
-function createSupabaseClient() {
-  const supabaseUrl = Deno.env.get('SUPABASE_URL') as string;
-  const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') as string;
-  return createClient(supabaseUrl, supabaseKey);
-}
-
-// Main function handler
-serve(async (req: Request) => {
-  // Handle CORS preflight request
-  const corsResponse = handleCors(req);
-  if (corsResponse) return corsResponse;
-  
-  // Get the Google Translate API key
-  const apiKey = Deno.env.get('GOOGLE_API');
-  if (!apiKey) {
-    return new Response(
-      JSON.stringify({ error: 'Translation API key not configured' }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-    );
-  }
-  
   try {
-    const { text, texts, sourceLanguage, targetLanguage, entryId } = await req.json();
+    // Get the API key from environment variables
+    const GOOGLE_API_KEY = Deno.env.get('GOOGLE_API');
     
-    // Handle batch translation
-    if (texts) {
-      const translatedTexts = await Promise.all(
-        texts.map((t: string) => translateSingle(t, sourceLanguage || 'en', targetLanguage, apiKey))
-      );
-      
-      return new Response(
-        JSON.stringify({ translatedTexts }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
-    }
-    
-    // Handle single text translation
-    if (!text) {
-      return new Response(
-        JSON.stringify({ error: 'No text provided for translation' }),
-        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    if (!GOOGLE_API_KEY) {
+      console.error('Missing Google API key in environment variables');
+      throw new Error('Missing Google API key');
     }
 
-    // Don't translate if source and target languages are the same
-    if (sourceLanguage === targetLanguage) {
-      return new Response(
-        JSON.stringify({ translatedText: text }),
-        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
-      );
+    console.log('Starting translation with provided API key');
+    
+    // Parse request body
+    const { text, sourceLanguage, targetLanguage = 'hi', entryId, cleanResult = true } = await req.json();
+
+    if (!text) {
+      throw new Error('Missing required parameter: text is required');
+    }
+
+    console.log(`Translating text: "${text.substring(0, 50)}..." from ${sourceLanguage || 'auto-detect'} to ${targetLanguage}${entryId ? ` for entry ${entryId}` : ''}`);
+
+    // First detect the language if sourceLanguage is not provided
+    let detectedLanguage = sourceLanguage;
+    if (!sourceLanguage) {
+      const detectUrl = `https://translation.googleapis.com/language/translate/v2/detect?key=${GOOGLE_API_KEY}`;
+      console.log(`Detecting language with URL: ${detectUrl}`);
+      
+      const detectResponse = await fetch(detectUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ q: text })
+      });
+
+      if (!detectResponse.ok) {
+        const errorData = await detectResponse.text();
+        console.error(`Language detection failed with status ${detectResponse.status}: ${errorData}`);
+        throw new Error(`Language detection failed: ${detectResponse.statusText}`);
+      }
+
+      const detectData = await detectResponse.json();
+      console.log('Detect API response:', JSON.stringify(detectData));
+      
+      if (!detectData.data || !detectData.data.detections || !detectData.data.detections[0] || !detectData.data.detections[0][0]) {
+        console.error('Invalid detection response format:', JSON.stringify(detectData));
+        throw new Error('Invalid detection response format');
+      }
+      
+      detectedLanguage = detectData.data.detections[0][0].language;
+      console.log(`Detected language: ${detectedLanguage}`);
+    }
+
+    // Then translate the text
+    const translateUrl = `https://translation.googleapis.com/language/translate/v2?key=${GOOGLE_API_KEY}`;
+    console.log(`Sending translation request to: ${translateUrl}`);
+    console.log(`Request parameters: from ${detectedLanguage} to ${targetLanguage}`);
+    
+    const translateResponse = await fetch(translateUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        q: text,
+        source: detectedLanguage,
+        target: targetLanguage,
+        format: 'text' // Ensure we're using text format, not HTML
+      })
+    });
+
+    if (!translateResponse.ok) {
+      const errorData = await translateResponse.text();
+      console.error(`Translation failed with status ${translateResponse.status}: ${errorData}`);
+      throw new Error(`Translation failed: ${translateResponse.statusText}`);
+    }
+
+    const translateData = await translateResponse.json();
+    console.log('Translation API response:', JSON.stringify(translateData));
+    
+    // Check if the response has the expected structure
+    if (!translateData.data || !translateData.data.translations || !translateData.data.translations[0]) {
+      console.error('Invalid translation response format:', JSON.stringify(translateData));
+      throw new Error('Invalid translation response format');
     }
     
-    console.log(`Translating text: "${text.substring(0, 30)}..." from ${sourceLanguage || 'auto'} to ${targetLanguage}`);
+    let translatedText = translateData.data.translations[0].translatedText;
+    console.log(`Raw translated text: "${translatedText.substring(0, 50)}..."`);
     
-    // Translate the text
-    const translatedText = await translateSingle(text, sourceLanguage, targetLanguage, apiKey);
-    
-    // Only update database if entryId is provided
+    // Clean the translation result if requested
+    if (cleanResult) {
+      // Remove language code suffix like "(hi)" or "[hi]" that might be appended
+      const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
+      translatedText = translatedText.replace(languageCodeRegex, '').trim();
+      console.log(`Cleaned translated text: "${translatedText.substring(0, 50)}..."`);
+    }
+
+    // Update the database with the translation only if entryId is provided
     if (entryId) {
       try {
-        const supabase = createSupabaseClient();
-        
-        // Update translation in the database
-        const { error } = await supabase
+        const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+        const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+        const supabase = createClient(supabaseUrl, supabaseKey);
+    
+        console.log(`[translate-text] Updating entry ${entryId} with translation`);
+    
+        const updateFields = {
+          "original_language": detectedLanguage,
+          "translation_text": translatedText
+        };
+    
+        console.log('[translate-text] Update fields:', JSON.stringify(updateFields, null, 2));
+    
+        const { error: updateError } = await supabase
           .from('Journal Entries')
-          .update({ 
-            [`translated_${targetLanguage}`]: translatedText,
-            translation_status: 'completed'  
-          })
+          .update(updateFields)
           .eq('id', entryId);
-        
-        if (error) {
-          console.error('Error updating translation in database:', error);
+    
+        if (updateError) {
+          console.error(`[translate-text] Database update error:`, updateError);
+          // Don't throw here, just log the error and continue
+        } else {
+          console.log(`[translate-text] Successfully updated entry ${entryId}`);
+          
+          // Now trigger the post-processing functions for this entry
+          try {
+            console.log(`[translate-text] Triggering post-processing for entry ${entryId}`);
+            
+            // Trigger entity extraction
+            const entityPromise = supabase.functions.invoke('batch-extract-entities', {
+              body: {
+                entryIds: [entryId],
+                diagnosticMode: true
+              }
+            });
+            
+            // Trigger sentiment analysis
+            const sentimentPromise = supabase.functions.invoke('analyze-sentiment', {
+              body: { text: translatedText, entryId }
+            });
+            
+            // Trigger themes extraction
+            const themePromise = supabase.functions.invoke('generate-themes', {
+              body: { entryId, fromEdit: false }
+            });
+            
+            // Execute these in the background
+            if (typeof EdgeRuntime !== 'undefined' && 'waitUntil' in EdgeRuntime) {
+              EdgeRuntime.waitUntil(Promise.all([entityPromise, sentimentPromise, themePromise]));
+            } else {
+              Promise.all([entityPromise, sentimentPromise, themePromise]).catch(err => {
+                console.error(`[translate-text] Error in post-processing:`, err);
+              });
+            }
+            
+            console.log(`[translate-text] Post-processing successfully triggered`);
+          } catch (postError) {
+            console.error(`[translate-text] Error triggering post-processing:`, postError);
+            // Don't throw this error as it shouldn't affect the response
+          }
         }
       } catch (dbError) {
-        console.error('[translate-text] Database error:', dbError);
+        console.error(`[translate-text] Database operation error:`, dbError);
+        // Don't throw here, just log the error and continue
       }
     } else {
       console.log('[translate-text] No entryId provided, skipping database update');
     }
     
     return new Response(
-      JSON.stringify({ translatedText }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({
+        translatedText,
+        detectedLanguage,
+        success: true
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 200,
+      }
     );
+
   } catch (error) {
-    console.error('Error in translate-text function:', error);
+    console.error('[translate-text] Error:', error);
     return new Response(
-      JSON.stringify({ error: error.message }),
-      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      JSON.stringify({ 
+        error: error.message,
+        stack: error.stack,
+        name: error.name,
+        originalText: req.json?.text || null
+      }),
+      {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        status: 500,
+      }
     );
   }
 });
-
-// Function to translate a single text
-async function translateSingle(text: string, sourceLanguage: string | undefined, targetLanguage: string, apiKey: string): Promise<string> {
-  // Skip if source equals target language
-  if (sourceLanguage === targetLanguage) {
-    return text;
-  }
-
-  // Skip empty text
-  if (!text || text.trim() === '') {
-    return text;
-  }
-
-  console.log(`Translating text: "${text.substring(0, 30)}..." from ${sourceLanguage || 'en'} to ${targetLanguage}`);
-  console.log("Starting translation with provided API key");
-  
-  // Set up API URL
-  const url = `https://translation.googleapis.com/language/translate/v2?key=${apiKey}`;
-  console.log(`Sending translation request to: ${url}`);
-  
-  // Set up request
-  const requestBody: any = {
-    q: text,
-    target: targetLanguage,
-  };
-  
-  // Add source language if provided
-  if (sourceLanguage && sourceLanguage !== 'auto') {
-    requestBody.source = sourceLanguage;
-  }
-  
-  console.log(`Request parameters: from ${sourceLanguage || 'auto'} to ${targetLanguage}`);
-  
-  // Call Google Translate API
-  const response = await fetch(url, {
-    method: 'POST',
-    headers: {
-      'Content-Type': 'application/json',
-    },
-    body: JSON.stringify(requestBody),
-  });
-  
-  if (!response.ok) {
-    const errorText = await response.text();
-    throw new Error(`Translation API error (${response.status}): ${errorText}`);
-  }
-  
-  // Parse response
-  const data = await response.json();
-  console.log(`Translation API response: ${JSON.stringify(data)}`);
-  
-  if (!data.data || !data.data.translations || !data.data.translations[0]) {
-    throw new Error('Invalid translation API response');
-  }
-  
-  // Get translated text
-  const translatedText = data.data.translations[0].translatedText;
-  console.log(`Raw translated text: "${translatedText}"`);
-  
-  // Clean up the result - remove language tags that might be appended
-  const cleanedText = cleanTranslationResult(translatedText);
-  console.log(`Cleaned translated text: "${cleanedText}"`);
-  
-  return cleanedText;
-}
-
-// Helper function to clean translation results
-function cleanTranslationResult(result: string): string {
-  if (!result) return '';
-  
-  // Remove language code suffix like "(hi)" or "[hi]" that might be appended
-  const languageCodeRegex = /\s*[\(\[]([a-z]{2})[\)\]]\s*$/i;
-  return result.replace(languageCodeRegex, '');
-}

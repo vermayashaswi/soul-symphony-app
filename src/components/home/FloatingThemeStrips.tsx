@@ -1,9 +1,10 @@
+
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { staticTranslation } from '@/services/staticTranslationService';
+import { staticTranslationService } from '@/services/staticTranslationService';
 
 interface ThemeData {
   theme: string;
@@ -52,7 +53,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     console.log(`FloatingThemeStrips: Direct translating "${text}" to ${currentLanguage}`);
     try {
       if (currentLanguage === 'en' || !text) return text || '';
-      const result = await staticTranslation.translateText(text);
+      const result = await staticTranslationService.translateText(text);
       console.log(`FloatingThemeStrips: Direct translation result: "${result}"`);
       return result || text;
     } catch (error) {
@@ -200,7 +201,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       // Direct translation using static service - FORCE TRANSLATION REGARDLESS OF ROUTE
       const translations = await Promise.all(themeTexts.map(async (text) => {
         try {
-          const translated = await staticTranslation.translateText(text);
+          const translated = await staticTranslationService.translateText(text);
           console.log(`FloatingThemeStrips: Translated "${text}" → "${translated}"`);
           return { original: text, translated };
         } catch (e) {

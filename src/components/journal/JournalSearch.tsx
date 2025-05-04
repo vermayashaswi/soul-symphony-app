@@ -1,8 +1,7 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { JournalEntry } from '@/types/journal'; // Fixed import from types instead of JournalEntryCard
+import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';

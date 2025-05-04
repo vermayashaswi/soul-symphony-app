@@ -1,50 +1,40 @@
 
+import { Json } from '@/integrations/supabase/types';
+
 export interface JournalEntry {
   id: number;
   user_id?: string;
-  content: string;
-  refined_text?: string;
-  transcription_text?: string;
-  created_at?: string;
-  audio_url?: string | null;
+  created_at: string;
+  "transcription text"?: string;
+  "refined text"?: string;
+  audio_url?: string;
   duration?: number;
+  emotions?: Json;
   sentiment?: string;
-  emotions?: Record<string, number>;
-  entities?: any;
+  entities?: Array<{
+    type: string;
+    name: string;
+    text?: string;
+  }>;
+  "foreign key"?: string;
   master_themes?: string[];
-  themes?: string[]; // Add themes property
-  tempId?: string;
-  is_chunked?: boolean;
-  original_language?: string;
+  themes?: string[];
+  user_feedback?: string | null;
+  Edit_Status?: number | null;
+  content: string; // Changed from optional to required
+  original_language?: string; // Original language of the entry
+  translation_text?: string; // Translated text when available
+  tempId?: string; // Temporary ID for tracking processing entries
 }
 
-// Adding Json type for EntityBubbles and EntityStrips components
-export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
-
-export interface JournalState {
-  entries: JournalEntry[];
-  filteredEntries: JournalEntry[];
-  selectedDateRange: DateRange;
-  isLoading: boolean;
-  error: Error | null;
-  searchQuery: string;
+export interface JournalEntryFormData extends JournalEntry {
+  text?: string;
 }
 
-export interface DateRange {
-  from?: Date;
-  to?: Date;
+export interface MoodDataPoint {
+  date: Date;
+  sentiment: number;
+  category?: 'positive' | 'neutral' | 'negative';
 }
 
-export interface ProcessingEntry {
-  tempId: string;
-  startTime: number;
-  state: 'processing' | 'completed' | 'error' | 'canceled';
-  error?: string;
-  entryId?: number;
-  content?: string;
-}
-
-export interface ExtractThemesResponse {
-  themes: string[];
-  master_themes: string[];
-}
+export { type Json } from '@/integrations/supabase/types';

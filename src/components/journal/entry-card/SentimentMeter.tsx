@@ -1,69 +1,58 @@
 
 import React from 'react';
-import SentimentEmoji from './SentimentEmoji';
-
-type SentimentValue = number | string | { sentiment: string; score: number };
+import { Skeleton } from '@/components/ui/skeleton';
+import { Progress } from '@/components/ui/progress';
 
 interface SentimentMeterProps {
-  sentiment: SentimentValue;
-  showText?: boolean;
+  sentiment?: string | {
+    sentiment: string;
+    score: number;
+  };
+  isProcessing?: boolean;
 }
 
-const SentimentMeter: React.FC<SentimentMeterProps> = ({ sentiment, showText = false }) => {
-  // Parse the sentiment to get a numeric value between -1 and 1
-  const getSentimentValue = (sentiment: SentimentValue): number => {
-    if (typeof sentiment === 'number') {
-      return sentiment;
-    } else if (typeof sentiment === 'string') {
-      return parseFloat(sentiment);
-    } else {
-      return sentiment.score;
+export function SentimentMeter({ sentiment, isProcessing = false }: SentimentMeterProps) {
+  if (isProcessing) {
+    return <Skeleton className="h-2 w-24" />;
+  }
+
+  // If sentiment is missing or invalid, show a neutral meter
+  if (!sentiment) {
+    return <div className="h-2 w-24 bg-neutral-300 rounded-full"></div>;
+  }
+
+  const getSentimentScore = (): number => {
+    try {
+      if (typeof sentiment === 'string') {
+        return parseFloat(sentiment);
+      } else if (sentiment) {
+        return sentiment.score;
+      }
+      return 0;
+    } catch (error) {
+      console.error("[SentimentMeter] Error parsing sentiment score:", error);
+      return 0;
     }
   };
 
-  const sentimentValue = getSentimentValue(sentiment);
+  const score = getSentimentScore();
+  // Convert score from -1 to 1 range to 0 to 100 for the progress component
+  const normalizedScore = ((score + 1) / 2) * 100;
   
-  // Convert sentiment to a percentage (0-100 scale)
-  const percentage = Math.round((sentimentValue + 1) * 50);
-  
-  // Determine sentiment text
-  const getSentimentText = (value: number): string => {
-    if (value < -0.6) return "Very Negative";
-    if (value < -0.2) return "Negative";
-    if (value < 0.2) return "Neutral";
-    if (value < 0.6) return "Positive";
-    return "Very Positive";
-  };
-
-  const sentimentText = getSentimentText(sentimentValue);
-
-  // Convert the sentiment value to the expected type format
-  const formattedSentiment: SentimentValue = {
-    sentiment: sentimentText.toLowerCase(),
-    score: sentimentValue
+  // Create a gradient from red to green
+  const gradientStyle = {
+    background: 'linear-gradient(to right, #ea384c, #F2FCE2)'
   };
 
   return (
-    <div className="mt-3">
-      <div className="flex items-center justify-between mb-1">
-        <div className="flex items-center">
-          <SentimentEmoji sentiment={formattedSentiment} />
-          {showText && <span className="text-xs ml-2 text-muted-foreground">{sentimentText}</span>}
-        </div>
-        <span className="text-xs text-muted-foreground">{percentage}%</span>
-      </div>
-      <div className="w-full bg-muted rounded-full h-1.5">
-        <div 
-          className="h-1.5 rounded-full" 
-          style={{ 
-            width: `${percentage}%`,
-            backgroundColor: sentimentValue < -0.3 ? '#ef4444' : 
-                            sentimentValue < 0.3 ? '#f59e0b' : '#22c55e'
-          }}
-        ></div>
-      </div>
+    <div className="w-24 h-3 relative">
+      <div className="absolute inset-0 rounded-full" style={gradientStyle}></div>
+      <div 
+        className="absolute w-3 h-3 bg-white border border-gray-300 rounded-full transform -translate-y-1/4"
+        style={{ left: `calc(${normalizedScore}% - 4px)` }}
+      ></div>
     </div>
   );
-};
+}
 
 export default SentimentMeter;

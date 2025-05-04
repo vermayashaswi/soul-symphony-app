@@ -27,18 +27,14 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
   const handleTranslation = async () => {
     setIsLoading(true);
     try {
-      // Only translate if the UI language is different from the content language
-      // If content language is unknown, use English as a fallback assumption
-      const sourceLanguage = language || "en";
-      
-      // If the UI language matches the content language, don't translate
-      if (currentLanguage === sourceLanguage) {
+      if (currentLanguage === 'en') {
         setTranslatedContent(content);
       } else {
-        // Initially keep the original content
+        // Always keep the original content initially
         setTranslatedContent(content);
-        // Translate from the source language to the UI language
-        const translated = await translate(content, sourceLanguage, entryId);
+        // Pass the detected language and entryId to the translation service
+        // Use "en" as default source language when none is provided
+        const translated = await translate(content, language || "en", entryId);
         if (translated) {
           // Clean the translation result before setting it
           const cleanedResult = cleanTranslationResult(translated);

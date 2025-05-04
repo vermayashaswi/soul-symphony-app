@@ -1,114 +1,103 @@
 
-import React, { useState, useEffect } from 'react';
-import { Button } from '@/components/ui/button';
-import { ChevronDown, ChevronUp, Play, Pause } from 'lucide-react';
-import { useAudioPlayback } from '@/hooks/use-audio-playback';
+import React, { useEffect, useState } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
-import TranslatedContent from './TranslatedContent';
+import { TranslatedContent } from '../entry-card/TranslatedContent';
+import { supabase } from '@/integrations/supabase/client';
 
 interface EntryContentProps {
   content: string;
-  audioUrl?: string | null;
+  isExpanded: boolean;
   isProcessing?: boolean;
-  isProcessed?: boolean;
-  language?: string;
-  entryId?: number;
+  entryId: number;
+  onOverflowChange?: (hasOverflow: boolean) => void;
 }
 
-export function EntryContent({ content, audioUrl, isProcessing, isProcessed, language, entryId }: EntryContentProps) {
-  const [isExpanded, setIsExpanded] = useState(false);
-  const [audioBlob, setAudioBlob] = useState<Blob | null>(null);
-  const { 
-    isPlaying, 
-    togglePlayback, 
-    audioRef, 
-    prepareAudio, 
-    playbackProgress 
-  } = useAudioPlayback({ 
-    audioBlob,
-    onPlaybackStart: () => console.log('Audio playback started'),
-    onPlaybackEnd: () => console.log('Audio playback ended')
-  });
-  
-  // Check if audio is ready
-  const [audioLoaded, setAudioLoaded] = useState(false);
-  const [audioError, setAudioError] = useState(false);
-  
-  // Load audio when component mounts or URL changes
+// Define interface for the entry data from database
+interface EntryData {
+  id: number;
+  original_language?: string;
+  translation_text?: string;
+  // Other fields that might be returned
+  [key: string]: any;
+}
+
+export function EntryContent({ 
+  content, 
+  isExpanded, 
+  isProcessing = false,
+  entryId,
+  onOverflowChange
+}: EntryContentProps) {
+  const [isLoading, setIsLoading] = useState(isProcessing);
+  const [detectedLanguage, setDetectedLanguage] = useState<string | undefined>(undefined);
+  const contentRef = React.useRef<HTMLDivElement>(null);
+
+  // Function to check for long content that might benefit from expand/collapse functionality
   useEffect(() => {
-    if (audioUrl) {
-      fetch(audioUrl)
-        .then(response => response.blob())
-        .then(blob => {
-          setAudioBlob(blob);
-          return prepareAudio()
-            .then(() => setAudioLoaded(true))
-            .catch(() => setAudioError(true));
-        })
-        .catch(() => setAudioError(true));
-    }
-  }, [audioUrl, prepareAudio]);
-  
-  // Toggle expanded state
-  const toggleExpanded = () => {
-    setIsExpanded(!isExpanded);
-  };
-  
+    const checkForLongContent = () => {
+      if (!contentRef.current) return;
+      
+      // Consider content as "long" if it's more than a certain number of characters
+      // or has multiple paragraphs
+      const isLongContent = content.length > 280 || content.split('\n').length > 2;
+      onOverflowChange?.(isLongContent);
+    };
+
+    // Wait for any potential content changes to finish before checking
+    const timer = setTimeout(checkForLongContent, 100);
+    
+    return () => clearTimeout(timer);
+  }, [content, onOverflowChange]);
+
+  // Check for language information from the entry
+  useEffect(() => {
+    const fetchEntryLanguageInfo = async () => {
+      if (!entryId) return;
+      
+      try {
+        // Check if we have the entry in local storage cache
+        const cachedLang = localStorage.getItem(`entry_lang_${entryId}`);
+        if (cachedLang) {
+          setDetectedLanguage(cachedLang);
+          return;
+        }
+        
+        // Otherwise fetch it from Supabase
+        const { data, error } = await supabase
+          .from('Journal Entries')
+          .select('*')  // Select all columns to ensure we get what's available
+          .eq('id', entryId)
+          .single();
+          
+        if (!error && data) {
+          // Check if original_language field exists
+          const entryData = data as EntryData;
+          if (entryData.original_language) {
+            setDetectedLanguage(entryData.original_language);
+            // Cache the result
+            localStorage.setItem(`entry_lang_${entryId}`, entryData.original_language);
+          }
+        }
+      } catch (error) {
+        console.error('Error fetching entry language:', error);
+      }
+    };
+    
+    fetchEntryLanguageInfo();
+  }, [entryId]);
+
+  if (isLoading || isProcessing) {
+    return <LoadingEntryContent />;
+  }
+
   return (
-    <div>
-      {isProcessing ? (
-        <LoadingEntryContent />
-      ) : (
-        <div className="space-y-2">
-          <div className={`overflow-hidden ${isExpanded ? '' : 'max-h-24'} transition-all duration-300`}>
-            <TranslatedContent 
-              content={content} 
-              isExpanded={isExpanded} 
-              language={language}
-              entryId={entryId}
-            />
-          </div>
-
-          <div className="flex items-center mt-1 gap-2">
-            <Button 
-              variant="ghost" 
-              size="sm" 
-              className="text-xs px-2 py-1 h-8"
-              onClick={toggleExpanded}
-            >
-              {isExpanded ? (
-                <>
-                  <ChevronUp className="h-4 w-4 mr-1" /> Show Less
-                </>
-              ) : (
-                <>
-                  <ChevronDown className="h-4 w-4 mr-1" /> Show More
-                </>
-              )}
-            </Button>
-
-            {audioUrl && (
-              <Button
-                variant="ghost"
-                size="sm"
-                className="text-xs px-2 py-1 h-8"
-                onClick={togglePlayback}
-                disabled={!audioLoaded || audioError}
-              >
-                {isPlaying ? (
-                  <>
-                    <Pause className="h-4 w-4 mr-1" /> Pause Audio
-                  </>
-                ) : (
-                  <>
-                    <Play className="h-4 w-4 mr-1" /> Play Audio
-                  </>
-                )}
-              </Button>
-            )}
-          </div>
-        </div>
-      )}
+    <div ref={contentRef} className="w-full">
+      <TranslatedContent 
+        content={content} 
+        isExpanded={isExpanded} 
+        language={detectedLanguage || "en"} 
+        entryId={entryId} 
+      />
     </div>
   );
 }

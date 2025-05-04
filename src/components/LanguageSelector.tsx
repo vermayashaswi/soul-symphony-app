@@ -28,11 +28,11 @@ const languages = [
 ];
 
 const LanguageSelector = () => {
-  const { currentLanguage, setCurrentLanguage, loadingTranslation } = useTranslation();
+  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
 
   const handleLanguageChange = async (languageCode: string) => {
     debug.info('Language change requested:', languageCode);
-    await setCurrentLanguage(languageCode);
+    await setLanguage(languageCode);
   };
 
   return (
@@ -43,9 +43,9 @@ const LanguageSelector = () => {
           size="icon" 
           aria-label="Select language"
           title="Select language"
-          disabled={loadingTranslation}
+          disabled={isTranslating}
         >
-          <Globe className={`h-5 w-5 ${loadingTranslation ? 'animate-pulse' : ''}`} />
+          <Globe className={`h-5 w-5 ${isTranslating ? 'animate-pulse' : ''}`} />
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="end" className="max-h-[400px] overflow-y-auto bg-background border border-border">
@@ -58,7 +58,7 @@ const LanguageSelector = () => {
                 ? "bg-primary/10 text-primary font-medium"
                 : ""
             }`}
-            disabled={loadingTranslation}
+            disabled={isTranslating}
           >
             {language.label}
           </DropdownMenuItem>
