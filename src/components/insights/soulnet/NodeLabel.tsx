@@ -181,16 +181,16 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Base size calculation - decreased by 0.75x and then halved
-    const baseSize = (0.26 + Math.max(0, (26 - z) * 0.0088)) * 0.75 * 0.5; // Reduced by half
+    // Base size calculation - decreased by 0.75x and then multiplied by 0.8
+    const baseSize = (0.26 + Math.max(0, (26 - z) * 0.0088)) * 0.75 * 0.8; // Using 0.8 instead of 0.5
     
     // Adjust size for non-Latin scripts - they often need slightly bigger font
     // Devanagari (Hindi) scripts need even larger adjustment
-    const sizeAdjustment = isDevanagari.current ? 0.06 * 0.75 * 0.5 : // Also reduced by half
-                          isNonLatin.current ? 0.03 * 0.75 * 0.5 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.06 * 0.75 * 0.8 : // Also using 0.8 instead of 0.5
+                          isNonLatin.current ? 0.03 * 0.75 * 0.8 : 0;
     
     // Ensure size stays within reasonable bounds
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.25), 0.09); // Adjusted bounds
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.4), 0.15); // Adjusted bounds for 0.8 scale
   }, [cameraZoom]);
 
   // Don't render if not supposed to be shown
@@ -202,9 +202,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   
   // For Devanagari text, position slightly higher to accommodate taller characters
   if (isDevanagari.current) {
-    verticalPosition += 0.15 * 0.5; // Adjusted for new scale
+    verticalPosition += 0.15 * 0.8; // Adjusted for new scale
   } else if (isNonLatin.current) {
-    verticalPosition += 0.08 * 0.5; // Adjusted for new scale
+    verticalPosition += 0.08 * 0.8; // Adjusted for new scale
   }
   
   const labelPosition: [number, number, number] = [0, verticalPosition, 0];
@@ -229,4 +229,3 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 };
 
 export default NodeLabel;
-
