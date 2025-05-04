@@ -22,8 +22,8 @@ export interface JournalEntry {
   user_feedback?: string | null;
   Edit_Status?: number | null;
   content: string; // Changed from optional to required
-  original_language?: string; // Original language of the entry
-  translation_text?: string; // Translated text when available
+  original_language?: string; // Keep as optional
+  translation_text?: string; // Keep as optional
   tempId?: string; // Temporary ID for tracking processing entries
 }
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useLocation } from 'react-router-dom';
@@ -87,8 +86,8 @@ export function TranslatableText({
       
     try {
       console.log(`TranslatableText: Translating "${text.substring(0, 30)}..." to ${currentLanguage}`);
-      // Use "en" as default source language when none is provided
-      const result = await translate(text, sourceLanguage || "en", entryId);
+      // IMPORTANT CHANGE: Always use "en" as the default source language regardless of what was provided
+      const result = await translate(text, "en", entryId);
       
       // Only update if the component is still mounted, the language hasn't changed during translation
       // and the input text is still the same as when we started

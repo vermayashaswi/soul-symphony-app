@@ -2,7 +2,6 @@
 import React, { useEffect, useState } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
 import { TranslatedContent } from '../entry-card/TranslatedContent';
-import { supabase } from '@/integrations/supabase/client';
 
 interface EntryContentProps {
   content: string;
@@ -10,15 +9,6 @@ interface EntryContentProps {
   isProcessing?: boolean;
   entryId: number;
   onOverflowChange?: (hasOverflow: boolean) => void;
-}
-
-// Define interface for the entry data from database
-interface EntryData {
-  id: number;
-  original_language?: string;
-  translation_text?: string;
-  // Other fields that might be returned
-  [key: string]: any;
 }
 
 export function EntryContent({ 
@@ -29,7 +19,6 @@ export function EntryContent({
   onOverflowChange
 }: EntryContentProps) {
   const [isLoading, setIsLoading] = useState(isProcessing);
-  const [detectedLanguage, setDetectedLanguage] = useState<string | undefined>(undefined);
   const contentRef = React.useRef<HTMLDivElement>(null);
 
   // Function to check for long content that might benefit from expand/collapse functionality
@@ -49,43 +38,6 @@ export function EntryContent({
     return () => clearTimeout(timer);
   }, [content, onOverflowChange]);
 
-  // Check for language information from the entry
-  useEffect(() => {
-    const fetchEntryLanguageInfo = async () => {
-      if (!entryId) return;
-      
-      try {
-        // Check if we have the entry in local storage cache
-        const cachedLang = localStorage.getItem(`entry_lang_${entryId}`);
-        if (cachedLang) {
-          setDetectedLanguage(cachedLang);
-          return;
-        }
-        
-        // Otherwise fetch it from Supabase
-        const { data, error } = await supabase
-          .from('Journal Entries')
-          .select('*')  // Select all columns to ensure we get what's available
-          .eq('id', entryId)
-          .single();
-          
-        if (!error && data) {
-          // Check if original_language field exists
-          const entryData = data as EntryData;
-          if (entryData.original_language) {
-            setDetectedLanguage(entryData.original_language);
-            // Cache the result
-            localStorage.setItem(`entry_lang_${entryId}`, entryData.original_language);
-          }
-        }
-      } catch (error) {
-        console.error('Error fetching entry language:', error);
-      }
-    };
-    
-    fetchEntryLanguageInfo();
-  }, [entryId]);
-
   if (isLoading || isProcessing) {
     return <LoadingEntryContent />;
   }
@@ -95,7 +47,6 @@ export function EntryContent({
       <TranslatedContent 
         content={content} 
         isExpanded={isExpanded} 
-        language={detectedLanguage || "en"} 
         entryId={entryId} 
       />
     </div>

@@ -5,8 +5,8 @@ import { LoadingEntryContent } from './LoadingEntryContent';
 interface TranslatedContentProps {
   content: string;
   isExpanded: boolean;
-  language?: string; // The detected language of the content
-  entryId?: number; // Added entryId parameter
+  language?: string; // We'll keep this parameter but ignore it for translation source
+  entryId?: number;
 }
 
 export function TranslatedContent({ content, isExpanded, language, entryId }: TranslatedContentProps) {
@@ -32,9 +32,11 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
       } else {
         // Always keep the original content initially
         setTranslatedContent(content);
-        // Pass the detected language and entryId to the translation service
-        // Use "en" as default source language when none is provided
-        const translated = await translate(content, language || "en", entryId);
+        
+        // IMPORTANT: Always translate from English regardless of the detected language
+        // This is the key change - we always assume the refined text is in English
+        const translated = await translate(content, "en", entryId);
+        
         if (translated) {
           // Clean the translation result before setting it
           const cleanedResult = cleanTranslationResult(translated);
@@ -52,7 +54,7 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
   // Effect to translate content when it changes or language changes
   useEffect(() => {
     handleTranslation();
-  }, [content, currentLanguage, language, entryId]);
+  }, [content, currentLanguage, entryId]);
 
   // Listen for language change events
   useEffect(() => {
@@ -68,7 +70,7 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [content, language, entryId]);
+  }, [content, entryId]);
 
   return (
     <div>

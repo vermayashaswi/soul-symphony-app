@@ -67,6 +67,7 @@ export function TranslatableMarkdown({
     console.log(`TranslatableMarkdown: Translating markdown content to ${currentLanguage}`);
 
     try {
+      // IMPORTANT CHANGE: Always translate from English
       const result = await translate(children, "en");
       
       // Only update if the component is still mounted, language hasn't changed during translation
