@@ -4,7 +4,6 @@ import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-d
 import { OnboardingProvider } from '@/hooks/use-onboarding';
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { AuthProvider } from '@/contexts/AuthContext';
-import { ThemeProvider } from '@/hooks/use-theme';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { isNativeApp } from './RouteHelpers';
 import ViewportManager from './ViewportManager';
@@ -31,53 +30,51 @@ import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 const AppRoutes: React.FC = () => {
   return (
     <Router>
-      <ThemeProvider>
-        <AuthProvider>
-          <TranslationProvider>
-            <TranslationLoadingOverlay />
-            <OnboardingProvider>
-              <Routes>
-                <Route element={<ViewportManager />}>
-                  {/* Website routes */}
-                  <Route path="/" element={<Index />} />
-                  <Route path="/blog" element={<BlogPage />} />
-                  <Route path="/blog/:slug" element={<BlogPostPage />} />
-                  <Route path="/faq" element={<FAQPage />} />
-                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                  <Route path="/download" element={<AppDownload />} />
+      <AuthProvider>
+        <TranslationProvider>
+          <TranslationLoadingOverlay />
+          <OnboardingProvider>
+            <Routes>
+              <Route element={<ViewportManager />}>
+                {/* Website routes */}
+                <Route path="/" element={<Index />} />
+                <Route path="/blog" element={<BlogPage />} />
+                <Route path="/blog/:slug" element={<BlogPostPage />} />
+                <Route path="/faq" element={<FAQPage />} />
+                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                <Route path="/download" element={<AppDownload />} />
 
-                  {/* App routes */}
-                  <Route path="/app" element={<ProtectedRoute />}>
-                    <Route index element={<OnboardingCheck />} />
-                    <Route path="onboarding" element={<OnboardingScreen />} />
-                    <Route element={<OnboardingCheck />}>
-                      <Route path="home" element={<Home />} />
-                      <Route path="journal" element={<Journal />} />
-                      <Route path="insights" element={<Insights />} />
-                      <Route path="chat" element={<Chat />} />
-                      <Route path="smart-chat" element={<SmartChat />} />
-                      <Route path="settings" element={<Settings />} />
-                    </Route>
+                {/* App routes */}
+                <Route path="/app" element={<ProtectedRoute />}>
+                  <Route index element={<OnboardingCheck />} />
+                  <Route path="onboarding" element={<OnboardingScreen />} />
+                  <Route element={<OnboardingCheck />}>
+                    <Route path="home" element={<Home />} />
+                    <Route path="journal" element={<Journal />} />
+                    <Route path="insights" element={<Insights />} />
+                    <Route path="chat" element={<Chat />} />
+                    <Route path="smart-chat" element={<SmartChat />} />
+                    <Route path="settings" element={<Settings />} />
                   </Route>
-
-                  {/* Auth routes */}
-                  <Route path="/app/auth" element={<Auth />} />
-                  <Route path="/login" element={<Auth />} />
-                  <Route path="/signup" element={<Auth />} />
-
-                  {/* Native app specific routes */}
-                  {isNativeApp() && (
-                    <Route path="/privacy" element={<PrivacyPolicy />} />
-                  )}
-
-                  {/* 404 route */}
-                  <Route path="*" element={<NotFound />} />
                 </Route>
-              </Routes>
-            </OnboardingProvider>
-          </TranslationProvider>
-        </AuthProvider>
-      </ThemeProvider>
+
+                {/* Auth routes */}
+                <Route path="/app/auth" element={<Auth />} />
+                <Route path="/login" element={<Auth />} />
+                <Route path="/signup" element={<Auth />} />
+
+                {/* Native app specific routes */}
+                {isNativeApp() && (
+                  <Route path="/privacy" element={<PrivacyPolicy />} />
+                )}
+
+                {/* 404 route */}
+                <Route path="*" element={<NotFound />} />
+              </Route>
+            </Routes>
+          </OnboardingProvider>
+        </TranslationProvider>
+      </AuthProvider>
     </Router>
   );
 };
