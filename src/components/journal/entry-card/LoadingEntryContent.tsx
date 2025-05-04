@@ -178,6 +178,9 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     // Find the parent card using the component ID
     const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
     if (parentCard) {
+      // First make it absolutely positioned and invisible immediately
+      parentCard.classList.add('instant-hide-card');
+      
       // Add a transition class first
       parentCard.classList.add('processing-card-removing');
       
@@ -292,9 +295,12 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         contentReadyRef.current = true;  // Mark content as ready
         setVisibilityState('content-ready');
         
-        // Start the fade-out animation immediately
+        // Find the parent card and apply immediate hiding
         const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
         if (parentCard) {
+          // Make it absolutely positioned and transparent IMMEDIATELY
+          parentCard.classList.add('instant-hide-card');
+          // Still add the transition class for animation if needed
           parentCard.classList.add('processing-card-removing');
         }
         
@@ -357,15 +363,26 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         .processing-card {
           transition: all 0.3s ease-out;
         }
+        .instant-hide-card {
+          position: absolute !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          z-index: -1 !important;
+        }
         .processing-card-removing {
           opacity: 0;
           transform: translateY(-10px);
           pointer-events: none;
           transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+          z-index: -1;
         }
         .processing-active .journal-entry-card.processing-card {
           border-color: hsl(var(--primary)/0.5);
           border-width: 2px;
+        }
+        .journal-entry-card {
+          position: relative;
+          z-index: 10;
         }
       `;
       document.head.appendChild(style);
