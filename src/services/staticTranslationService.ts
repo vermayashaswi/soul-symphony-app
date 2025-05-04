@@ -8,6 +8,85 @@ import { translationCache } from './translationCache';
 class StaticTranslationService {
   private translationInProgress = new Map<string, Promise<string>>();
   private batchTranslationInProgress = false;
+  private currentLanguage: string = 'en';
+
+  // Set current language
+  setLanguage(lang: string) {
+    this.currentLanguage = lang;
+    console.log(`StaticTranslationService: language set to ${lang}`);
+  }
+
+  // Translate a single text
+  async translateText(text: string, sourceLanguage?: string, entryId?: number): Promise<string> {
+    try {
+      if (!text || text.trim().length === 0 || this.currentLanguage === 'en') {
+        return text;
+      }
+
+      // Check cache first
+      const cacheKey = `${this.currentLanguage}:${text.substring(0, 100)}`;
+      const cachedEntry = await translationCache.getTranslation(text, this.currentLanguage);
+      
+      if (cachedEntry) {
+        console.log(`Using cached translation for: ${text.substring(0, 20)}...`);
+        return cachedEntry.translatedText;
+      }
+
+      // If not in cache, translate it
+      console.log(`Translating text to ${this.currentLanguage}: "${text.substring(0, 30)}..."`);
+      
+      // Use the translation service
+      const translated = await TranslationService.translateText({
+        text,
+        sourceLanguage: sourceLanguage || 'en',
+        targetLanguage: this.currentLanguage,
+        entryId
+      });
+
+      // Clean up any language code that might have been appended
+      const cleanTranslation = translated.replace(/\s*[\(\[]([a-z]{2})[\)\]]\s*$/i, '');
+      
+      // Cache the translation for future use
+      await translationCache.setTranslation({
+        originalText: text,
+        translatedText: cleanTranslation,
+        language: this.currentLanguage,
+        timestamp: Date.now(),
+        version: 1
+      });
+
+      return cleanTranslation;
+    } catch (error) {
+      console.error('Static translation service error:', error);
+      return text; // Return original text on error
+    }
+  }
+
+  // Batch translate multiple texts
+  async batchTranslateTexts(texts: string[]): Promise<Map<string, string>> {
+    try {
+      if (!texts || texts.length === 0 || this.currentLanguage === 'en') {
+        const results = new Map<string, string>();
+        texts?.forEach(text => results.set(text, text));
+        return results;
+      }
+      
+      console.log(`Batch translating ${texts.length} texts to ${this.currentLanguage}`);
+      
+      // Use the translation service's batch method
+      return await TranslationService.batchTranslate({
+        texts,
+        targetLanguage: this.currentLanguage
+      });
+    } catch (error) {
+      console.error('Batch translation error:', error);
+      
+      // Return original texts on error
+      const fallbackMap = new Map<string, string>();
+      texts.forEach(text => fallbackMap.set(text, text));
+      return fallbackMap;
+    }
+  }
 
   // Pre-translate a batch of texts efficiently
   async preTranslate(texts: string[]): Promise<Map<string, string>> {
@@ -18,7 +97,7 @@ class StaticTranslationService {
       }
 
       // Get current language from localStorage as this service operates outside React
-      const currentLang = localStorage.getItem('i18nextLng')?.split('-')[0] || 'en';
+      const currentLang = this.currentLanguage || localStorage.getItem('i18nextLng')?.split('-')[0] || 'en';
       
       // Skip translation if language is English
       if (currentLang === 'en') {
