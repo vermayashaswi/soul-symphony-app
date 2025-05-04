@@ -18,6 +18,9 @@ const App: React.FC = () => {
       console.log('Fixing malformed URL path:', currentPath);
       window.history.replaceState(null, '', '/');
     }
+
+    // Additional debugging
+    console.log('App initialization complete, ready to render routes');
   }, []);
 
   return (

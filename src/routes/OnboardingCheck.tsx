@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
@@ -10,12 +10,15 @@ const OnboardingCheck: React.FC = () => {
   const { user } = useAuth();
   const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
   
-  console.log('OnboardingCheck rendering at path:', location.pathname, {
-    user: !!user, 
-    onboardingComplete,
-    isAppRoute: isAppRoute(location.pathname),
-    isWebsiteRoute: isWebsiteRoute(location.pathname)
-  });
+  useEffect(() => {
+    console.log('OnboardingCheck rendering at path:', location.pathname, {
+      user: !!user, 
+      onboardingComplete,
+      onboardingLoading,
+      isAppRoute: isAppRoute(location.pathname),
+      isWebsiteRoute: isWebsiteRoute(location.pathname)
+    });
+  }, [location.pathname, user, onboardingComplete, onboardingLoading]);
   
   // For website routes, no checks needed - just render children
   if (isWebsiteRoute(location.pathname)) {
@@ -35,24 +38,23 @@ const OnboardingCheck: React.FC = () => {
   if (onboardingLoading) {
     return (
       <div className="flex items-center justify-center h-screen w-screen">
-        <div className="animate-spin w-8 h-8 border-4 border-theme border-t-transparent rounded-full"></div>
+        <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>
+        <div className="ml-3">Loading onboarding status...</div>
       </div>
     );
   }
 
-  // Special handling for the root /app route or if user navigates directly to /app/home without logging in
-  if (isRootAppRoute || (!user && isAppRoute(location.pathname))) {
-    console.log('App route detected, user:', !!user);
-    // If user is not logged in, redirect to onboarding
-    if (!user) {
-      console.log('User not logged in, redirecting to /app/onboarding');
-      return <Navigate to="/app/onboarding" replace />;
-    }
-    
+  // Special handling for the root /app route
+  if (isRootAppRoute) {
+    console.log('Root app route detected, redirecting appropriately');
     // If user is logged in, redirect to home
-    if (isRootAppRoute) {
+    if (user) {
       console.log('User is logged in, redirecting to /app/home');
       return <Navigate to="/app/home" replace />;
+    } else {
+      // If user is not logged in, redirect to onboarding
+      console.log('User not logged in, redirecting to /app/onboarding');
+      return <Navigate to="/app/onboarding" replace />;
     }
   }
   

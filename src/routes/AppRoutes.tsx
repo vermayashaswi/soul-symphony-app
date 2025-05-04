@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter as Router, Routes, Route, Navigate } from 'react-router-dom';
 import { OnboardingProvider } from '@/hooks/use-onboarding';
 import { TranslationProvider } from '@/contexts/TranslationContext';
@@ -28,6 +28,11 @@ import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 
 const AppRoutes: React.FC = () => {
+  // Add debugging to help identify route issues
+  useEffect(() => {
+    console.log('AppRoutes component mounted, setting up routes');
+  }, []);
+
   return (
     <Router>
       <AuthProvider>
@@ -46,7 +51,7 @@ const AppRoutes: React.FC = () => {
 
                 {/* App routes */}
                 <Route path="/app" element={<ProtectedRoute />}>
-                  <Route index element={<OnboardingCheck />} />
+                  <Route index element={<Navigate to="/app/home" replace />} />
                   <Route path="onboarding" element={<OnboardingScreen />} />
                   <Route element={<OnboardingCheck />}>
                     <Route path="home" element={<Home />} />
