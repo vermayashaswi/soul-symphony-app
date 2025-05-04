@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
@@ -194,7 +193,7 @@ export const Node: React.FC<NodeProps> = ({
         position={node.position}
         percentage={connectionPercentage}
         isVisible={shouldShowPercentage}
-        offsetY={node.type === 'entity' ? 0 : 0} // Removed the offset since we're now handling it directly in ConnectionPercentage
+        offsetY={0} // No offset needed since we're placing at center
         nodeType={node.type}
       />
     </group>

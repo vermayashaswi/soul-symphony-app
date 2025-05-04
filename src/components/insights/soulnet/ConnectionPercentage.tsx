@@ -28,13 +28,8 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     return null;
   }
 
-  // Position above the node - increased distance from 2.6 to 3.5 for emotion nodes
-  // For entity (circular) nodes, use 4.1 units as requested
-  const labelPosition: [number, number, number] = [
-    0, 
-    offsetY + (nodeType === 'entity' ? 4.1 : 3.5), 
-    0
-  ];
+  // Position at the center of the node instead of above it
+  const labelPosition: [number, number, number] = [0, 0, 0]; // Center position
 
   // Adjust font size for percentages - decreased by 30%
   const fontSize = 0.2625; // Original 0.375 * 0.7 = 0.2625 (30% decrease)
