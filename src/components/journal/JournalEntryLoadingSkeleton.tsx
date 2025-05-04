@@ -158,9 +158,9 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
               <div className="h-3 w-3 rounded-full bg-primary/80"></div>
             </div>
             
-            {/* Add the tempId as a data attribute for debugging */}
+            {/* Add the tempId as a data attribute for debugging but make it invisible */}
             {tempId && (
-              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-50" 
+              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-0" 
                    data-temp-id={tempId}>
                 {tempId.substring(0, 8)}...
               </div>
