@@ -1,23 +1,15 @@
 
 import React from 'react';
-import { useLocation, Navigate } from 'react-router-dom';
-import { User } from '@supabase/supabase-js';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
+import { useAuth } from '@/contexts/AuthContext';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
+import { useOnboarding } from '@/contexts/OnboardingContext';
 
-interface OnboardingCheckProps {
-  onboardingComplete: boolean | null;
-  onboardingLoading: boolean;
-  user: User | null;
-  children: React.ReactNode;
-}
-
-const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ 
-  onboardingComplete, 
-  onboardingLoading, 
-  user,
-  children 
-}) => {
+const OnboardingCheck: React.FC = () => {
   const location = useLocation();
+  const { user } = useAuth();
+  const { onboardingComplete, loading: onboardingLoading } = useOnboarding();
+  
   console.log('OnboardingCheck rendering at path:', location.pathname, {
     user: !!user, 
     onboardingComplete,
@@ -28,7 +20,7 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   // For website routes, no checks needed - just render children
   if (isWebsiteRoute(location.pathname)) {
     console.log('Website route detected, no onboarding check needed');
-    return <>{children}</>;
+    return <Outlet />;
   }
   
   const isAuthRoute = location.pathname === '/app/auth' || location.pathname === '/auth';
@@ -75,7 +67,7 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
     }
   }
   
-  return <>{children}</>;
+  return <Outlet />;
 };
 
 export default OnboardingCheck;
