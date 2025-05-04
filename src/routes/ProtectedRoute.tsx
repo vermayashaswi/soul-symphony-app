@@ -11,7 +11,8 @@ const ProtectedRoute: React.FC = () => {
   const location = useLocation();
   
   useEffect(() => {
-    console.log('ProtectedRoute mounted, checking auth status');
+    console.log('ProtectedRoute mounted, checking auth status at path:', location.pathname);
+    
     const checkAuth = async () => {
       try {
         console.log('Fetching auth session');
@@ -24,7 +25,11 @@ const ProtectedRoute: React.FC = () => {
           return;
         }
         
-        console.log('Auth session result:', !!data.session);
+        console.log('Auth session result:', {
+          hasSession: !!data.session,
+          userId: data.session?.user?.id || 'none'
+        });
+        
         setUser(data.session?.user || null);
         setIsLoading(false);
       } catch (error: any) {
@@ -37,7 +42,10 @@ const ProtectedRoute: React.FC = () => {
     checkAuth();
     
     const { data: { subscription } } = supabase.auth.onAuthStateChange((event, session) => {
-      console.log('Auth state changed:', event, !!session);
+      console.log('Auth state changed:', event, {
+        hasSession: !!session,
+        userId: session?.user?.id || 'none'
+      });
       setUser(session?.user || null);
       setIsLoading(false);
     });
@@ -46,14 +54,20 @@ const ProtectedRoute: React.FC = () => {
       console.log('ProtectedRoute unmounting, cleaning up subscription');
       subscription.unsubscribe();
     };
-  }, []);
+  }, [location.pathname]);
   
   useEffect(() => {
     if (!isLoading) {
       if (authError) {
         toast.error(`Authentication error: ${authError}`);
+        console.error('Auth error in ProtectedRoute:', authError);
       } else if (!user) {
         console.log("Protected route: No user, redirecting to /app/auth", {
+          path: location.pathname
+        });
+      } else {
+        console.log("User authenticated in ProtectedRoute:", {
+          userId: user.id,
           path: location.pathname
         });
       }
@@ -61,6 +75,7 @@ const ProtectedRoute: React.FC = () => {
   }, [user, isLoading, authError, location]);
   
   if (isLoading) {
+    console.log('ProtectedRoute: Still loading authentication state...');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>

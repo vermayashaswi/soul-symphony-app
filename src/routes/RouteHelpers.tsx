@@ -25,6 +25,12 @@ export const isWebsiteRoute = (pathname: string): boolean => {
     return false;
   }
   
+  // If it's the root route, it's definitely a website route
+  if (pathname === '/') {
+    console.log('Root path is a website route');
+    return true;
+  }
+  
   // Check for specific website routes
   const isWebsite = websitePrefixes.some(prefix => 
     pathname === prefix || pathname.startsWith(`${prefix}/`)
@@ -90,6 +96,7 @@ export const AppRouteWrapper = ({
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+        <div className="ml-3">Checking authentication...</div>
       </div>
     );
   }

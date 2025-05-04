@@ -1,10 +1,9 @@
 
 import React, { useEffect } from 'react';
 import AppRoutes from './routes/AppRoutes';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { ThemeProvider } from '@/hooks/use-theme';
+import ErrorBoundary from './components/insights/ErrorBoundary';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -24,14 +23,12 @@ const App: React.FC = () => {
   }, []);
 
   return (
-    <ThemeProvider>
-      <>
-        <AppRoutes />
-        <Toaster />
-        <SonnerToaster position="top-right" />
+    <ErrorBoundary fallback={<div className="p-4">Something went wrong loading the application.</div>}>
+      <ThemeProvider>
         <JournalProcessingInitializer />
-      </>
-    </ThemeProvider>
+        <AppRoutes />
+      </ThemeProvider>
+    </ErrorBoundary>
   );
 };
 

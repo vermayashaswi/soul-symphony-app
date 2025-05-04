@@ -26,6 +26,9 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import FAQPage from '@/pages/website/FAQPage';
 import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import ErrorBoundary from '@/components/insights/ErrorBoundary';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "sonner";
 
 const AppRoutes: React.FC = () => {
   // Add debugging to help identify route issues
@@ -39,44 +42,54 @@ const AppRoutes: React.FC = () => {
         <TranslationProvider>
           <TranslationLoadingOverlay />
           <OnboardingProvider>
-            <Routes>
-              <Route element={<ViewportManager />}>
-                {/* Website routes */}
-                <Route path="/" element={<Index />} />
-                <Route path="/blog" element={<BlogPage />} />
-                <Route path="/blog/:slug" element={<BlogPostPage />} />
-                <Route path="/faq" element={<FAQPage />} />
-                <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
-                <Route path="/download" element={<AppDownload />} />
+            <ErrorBoundary>
+              <Routes>
+                <Route element={<ViewportManager />}>
+                  {/* Website routes */}
+                  <Route path="/" element={<Index />} />
+                  <Route path="/blog" element={<BlogPage />} />
+                  <Route path="/blog/:slug" element={<BlogPostPage />} />
+                  <Route path="/faq" element={<FAQPage />} />
+                  <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
+                  <Route path="/download" element={<AppDownload />} />
 
-                {/* App routes */}
-                <Route path="/app" element={<ProtectedRoute />}>
-                  <Route index element={<Navigate to="/app/home" replace />} />
-                  <Route path="onboarding" element={<OnboardingScreen />} />
-                  <Route element={<OnboardingCheck />}>
-                    <Route path="home" element={<Home />} />
-                    <Route path="journal" element={<Journal />} />
-                    <Route path="insights" element={<Insights />} />
-                    <Route path="chat" element={<Chat />} />
-                    <Route path="smart-chat" element={<SmartChat />} />
-                    <Route path="settings" element={<Settings />} />
+                  {/* App routes */}
+                  <Route path="/app" element={<ProtectedRoute />}>
+                    <Route index element={<Navigate to="/app/home" replace />} />
+                    <Route path="onboarding" element={<OnboardingScreen />} />
+                    <Route element={<OnboardingCheck />}>
+                      <Route path="home" element={<Home />} />
+                      <Route path="journal" element={<Journal />} />
+                      <Route path="insights" element={<Insights />} />
+                      <Route path="chat" element={<Chat />} />
+                      <Route path="smart-chat" element={<SmartChat />} />
+                      <Route path="settings" element={<Settings />} />
+                    </Route>
                   </Route>
+
+                  {/* Auth routes */}
+                  <Route path="/app/auth" element={<Auth />} />
+                  <Route path="/login" element={<Auth />} />
+                  <Route path="/signup" element={<Auth />} />
+
+                  {/* Native app specific routes */}
+                  {isNativeApp() && (
+                    <Route path="/privacy" element={<PrivacyPolicy />} />
+                  )}
+
+                  {/* 404 route */}
+                  <Route path="*" element={<NotFound />} />
                 </Route>
-
-                {/* Auth routes */}
-                <Route path="/app/auth" element={<Auth />} />
-                <Route path="/login" element={<Auth />} />
-                <Route path="/signup" element={<Auth />} />
-
-                {/* Native app specific routes */}
-                {isNativeApp() && (
-                  <Route path="/privacy" element={<PrivacyPolicy />} />
-                )}
-
-                {/* 404 route */}
-                <Route path="*" element={<NotFound />} />
-              </Route>
-            </Routes>
+              </Routes>
+            </ErrorBoundary>
+            
+            {/* Toasters placed outside of routes but still inside providers */}
+            <ErrorBoundary fallback={<div>Toast error</div>}>
+              <Toaster />
+            </ErrorBoundary>
+            <ErrorBoundary fallback={<div>Sonner toast error</div>}>
+              <SonnerToaster position="top-right" />
+            </ErrorBoundary>
           </OnboardingProvider>
         </TranslationProvider>
       </AuthProvider>

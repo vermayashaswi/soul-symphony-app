@@ -12,7 +12,7 @@ const OnboardingCheck: React.FC = () => {
   
   useEffect(() => {
     console.log('OnboardingCheck rendering at path:', location.pathname, {
-      user: !!user, 
+      user: user?.id || 'no user', 
       onboardingComplete,
       onboardingLoading,
       isAppRoute: isAppRoute(location.pathname),
@@ -36,6 +36,7 @@ const OnboardingCheck: React.FC = () => {
     location.pathname.includes('admin');
     
   if (onboardingLoading) {
+    console.log('OnboardingCheck: Loading onboarding status...');
     return (
       <div className="flex items-center justify-center h-screen w-screen">
         <div className="animate-spin w-8 h-8 border-4 border-primary border-t-transparent rounded-full"></div>

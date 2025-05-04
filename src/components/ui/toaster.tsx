@@ -8,13 +8,36 @@ import {
   ToastViewport,
 } from "@/components/ui/toast"
 import { useTheme } from "@/hooks/use-theme"
+import { useEffect, useState } from "react"
 
 export function Toaster() {
   const { toasts } = useToast()
-  const { theme, systemTheme } = useTheme()
+  const [isDarkMode, setIsDarkMode] = useState(false)
   
-  // Determine if we're in dark mode
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
+  // Try to safely use theme context
+  let themeContextAvailable = true
+  let themeData = { theme: 'light', systemTheme: 'light' }
+  
+  try {
+    themeData = useTheme()
+  } catch (error) {
+    console.error("Theme context not available yet:", error)
+    themeContextAvailable = false
+  }
+  
+  // Only access theme values if context is available
+  useEffect(() => {
+    if (themeContextAvailable) {
+      const { theme, systemTheme } = themeData
+      setIsDarkMode(theme === 'dark' || (theme === 'system' && systemTheme === 'dark'))
+    }
+  }, [themeContextAvailable, themeData])
+
+  // Don't render anything if theme context isn't available
+  if (!themeContextAvailable) {
+    console.log("Skipping Toaster render - theme context not available")
+    return null
+  }
 
   return (
     <ToastProvider>
