@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
@@ -189,16 +188,14 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       console.log(`[JournalEntriesList] Delete handler completed for entry: ${entryId}`);
       
       // Check if we still have entries after deletion
-      if (entries.filter(e => e.id !== entryId).length === 0) {
-        console.log('[JournalEntriesList] No entries left after deletion, showing empty state');
-        // Stay in recovering state until new entries come in
-      } else {
-        // Reset recovery state if we still have entries
-        setTimeout(() => {
-          setRecoveringFromDelete(false);
-          console.log('[JournalEntriesList] Reset recovery state after deletion - other entries exist');
-        }, 100);
-      }
+      const remainingEntries = entries.filter(e => e.id !== entryId);
+      
+      // Always reset the recovering state after a short delay, even if there are no entries left
+      // This ensures the EmptyJournalState will show properly when the last entry is deleted
+      setTimeout(() => {
+        console.log('[JournalEntriesList] Resetting recovery state after deletion');
+        setRecoveringFromDelete(false);
+      }, 300);
       
       // Force update any component that needs to know about deleted entries
       window.dispatchEvent(new CustomEvent('journalEntryDeleted', {
