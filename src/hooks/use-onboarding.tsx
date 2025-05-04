@@ -1,3 +1,4 @@
 
-// This file now re-exports from the OnboardingContext
-export { useOnboarding, OnboardingProvider } from '@/contexts/OnboardingContext';
+import { useOnboarding, OnboardingProvider } from '@/contexts/OnboardingContext';
+
+export { useOnboarding, OnboardingProvider };

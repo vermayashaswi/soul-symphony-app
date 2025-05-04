@@ -23,6 +23,7 @@ import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import FAQPage from '@/pages/website/FAQPage';
 import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
+import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 
 const AppRoutes: React.FC = () => {
   return (
@@ -41,6 +42,7 @@ const AppRoutes: React.FC = () => {
 
               {/* App routes */}
               <Route path="/app" element={<ProtectedRoute />}>
+                <Route path="onboarding" element={<OnboardingScreen />} />
                 <Route element={<OnboardingCheck />}>
                   <Route index element={<Navigate to="/app/home" replace />} />
                   <Route path="home" element={<Home />} />
@@ -53,6 +55,7 @@ const AppRoutes: React.FC = () => {
               </Route>
 
               {/* Auth routes */}
+              <Route path="/app/auth" element={<Auth />} />
               <Route path="/login" element={<Auth />} />
               <Route path="/signup" element={<Auth />} />
 

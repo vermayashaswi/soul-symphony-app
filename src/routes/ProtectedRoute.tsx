@@ -51,7 +51,8 @@ const ProtectedRoute: React.FC = () => {
     return <Navigate to={`/app/auth?redirectTo=${location.pathname}`} replace />;
   }
   
-  // Use Outlet to render child routes
+  // User is authenticated, render the child routes
+  console.log("User authenticated, rendering protected route children:", location.pathname);
   return <Outlet />;
 };
 

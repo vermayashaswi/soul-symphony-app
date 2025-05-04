@@ -67,6 +67,8 @@ const OnboardingCheck: React.FC = () => {
     }
   }
   
+  // If all checks pass, render the child routes
+  console.log('All onboarding checks passed, rendering children for path:', location.pathname);
   return <Outlet />;
 };
 
