@@ -140,7 +140,8 @@ export const processChatMessage = async (
             - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
             - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
             - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
+            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
+            - "Am I an introvert? Do I like people in general?" -> "JOURNAL_SPECIFIC"`
           },
           { role: 'user', content: message }
         ],
@@ -196,15 +197,18 @@ export const processChatMessage = async (
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
+          model: 'gpt-4o-mini', // Updated to modern model
           messages: [
             { 
               role: 'system', 
-              content: `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.` 
+              content: `You are a mental health assistant of a voice journaling app called "SOULo". Here's a query from a user. Respond like a chatbot. If it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India", "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.
+
+              Be friendly, empathetic and helpful. If the question seems unclear or ambiguous, ask for clarification rather than saying you don't understand.`
             },
             ...(hasConversationContext ? conversationContext : []),
             { role: 'user', content: message }
           ],
+          temperature: 0.7,
         }),
       });
 
@@ -445,7 +449,7 @@ export const processChatMessage = async (
       if (error.message.includes("API key")) {
         userFacingMessage = "I'm having trouble connecting to my knowledge base. This might be due to a configuration issue. Please try again later.";
       } else if (error.message.includes("categorize")) {
-        userFacingMessage = "I couldn't understand the type of question you're asking. Could you rephrase it?";
+        userFacingMessage = "I couldn't understand the type of question you're asking. Could you rephrase it more clearly?";
       } else if (error.message.includes("embedding")) {
         userFacingMessage = "I'm having trouble analyzing your question. Could you try asking it differently?";
       } else {

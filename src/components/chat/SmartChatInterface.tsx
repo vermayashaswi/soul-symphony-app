@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -8,7 +9,7 @@ import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
 import EmptyChatState from "./EmptyChatState";
 import VoiceRecordingButton from "./VoiceRecordingButton";
-import { Trash } from "lucide-react";
+import { Trash, Bug } from "lucide-react";
 import { supabase } from "@/integrations/supabase/client";
 import {
   AlertDialog,
@@ -25,6 +26,7 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useTranslation } from "@/contexts/TranslationContext";
+import ChatDiagnostics from "./ChatDiagnostics";
 
 const SmartChatInterface = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
@@ -35,6 +37,8 @@ const SmartChatInterface = () => {
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
+  const [debugDiagnostics, setDebugDiagnostics] = useState<any>(null);
+  const [lastQueryText, setLastQueryText] = useState<string>("");
   const { toast } = useToast();
   const { user } = useAuth();
   const { translate } = useTranslation();
@@ -172,6 +176,7 @@ const SmartChatInterface = () => {
       created_at: new Date().toISOString()
     };
     
+    setLastQueryText(message);
     debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
     setLoading(true);
@@ -227,12 +232,16 @@ const SmartChatInterface = () => {
       
       setProcessingStage("Searching for insights...");
       debugLog.addEvent("AI Processing", "Sending query to AI for processing", "info");
+      
+      // Enable diagnostics for debugging
+      const enableDetailedDiagnostics = true;
+      
       const response = await processChatMessage(
         message, 
         user.id, 
         queryTypes, 
         threadId,
-        false
+        enableDetailedDiagnostics
       );
       
       const responseInfo = {
@@ -243,6 +252,11 @@ const SmartChatInterface = () => {
         hasNumericResult: response.hasNumericResult,
         errorState: response.role === 'error'
       };
+      
+      // Store diagnostics for UI display if they exist
+      if (response.diagnostics) {
+        setDebugDiagnostics(response.diagnostics);
+      }
       
       debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
       console.log("Response received:", responseInfo);
@@ -440,6 +454,16 @@ const SmartChatInterface = () => {
     }
   };
 
+  const toggleDebugPanel = () => {
+    setShowDebugPanel(!showDebugPanel);
+  };
+  
+  // Extract debug steps from diagnostics if available
+  const ragSteps = debugDiagnostics?.steps || [];
+  const references = debugDiagnostics?.references || [];
+  const processingTime = debugDiagnostics?.processingTime;
+  const researchPlan = debugDiagnostics?.researchPlan || [];
+
   return (
     <div className="chat-interface flex flex-col h-full">
       <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
@@ -447,15 +471,26 @@ const SmartChatInterface = () => {
         
         <div className="flex items-center gap-2">
           {currentThreadId && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-9 w-9 text-muted-foreground hover:text-destructive" 
-              onClick={() => setShowDeleteDialog(true)}
-              title="Delete current conversation"
-            >
-              <Trash className="h-5 w-5" />
-            </Button>
+            <>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-9 w-9 text-muted-foreground hover:text-blue-500" 
+                onClick={toggleDebugPanel}
+                title="Toggle debug panel"
+              >
+                <Bug className="h-5 w-5" />
+              </Button>
+              <Button 
+                variant="ghost" 
+                size="icon" 
+                className="h-9 w-9 text-muted-foreground hover:text-destructive" 
+                onClick={() => setShowDeleteDialog(true)}
+                title="Delete current conversation"
+              >
+                <Trash className="h-5 w-5" />
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -476,6 +511,21 @@ const SmartChatInterface = () => {
             threadId={currentThreadId}
           />
         )}
+        
+        {showDebugPanel && debugDiagnostics && (
+          <div className="mx-4 mb-4">
+            <ChatDiagnostics
+              queryText={lastQueryText}
+              isVisible={showDebugPanel}
+              ragSteps={ragSteps}
+              references={references}
+              processingTime={processingTime}
+              researchPlan={researchPlan}
+            />
+          </div>
+        )}
+        
+        <div ref={chatBottomRef} />
       </div>
       
       <div className="chat-input-container bg-white border-t p-4">
