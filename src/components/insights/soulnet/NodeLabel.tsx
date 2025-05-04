@@ -77,18 +77,21 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
+  const textToDisplay = useRef<string>(translatedText || id);
   
   // Format entity text for display - always apply for entity type
   const formattedText = useMemo(() => {
+    // Always use the most recent translated text if available
+    const textToFormat = translatedText || id;
+    console.log(`Formatting ${type} text for ${id}: "${textToFormat}"`);
+    
     // Only format entity nodes - this ensures we get two lines for circular nodes
     if (type === 'entity') {
-      // Use translated text if available, otherwise use id
-      const textToFormat = translatedText || id;
-      console.log(`Formatting entity text for ${id}: "${textToFormat}"`);
       return formatEntityText(textToFormat);
     }
-    // For emotion nodes, just use the translated text or id directly
-    return translatedText || id;
+    
+    // For emotion nodes, just use the text directly
+    return textToFormat;
   }, [id, type, translatedText]);
   
   // Stabilize visibility transitions to prevent flickering
@@ -114,15 +117,30 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   
   // Check if text contains non-Latin script and memoize the result
   useEffect(() => {
+    // Update text display with new translations when they become available
     if (translatedText && translatedText !== prevTranslatedText.current) {
       isNonLatin.current = containsNonLatinScript(translatedText);
       isDevanagari.current = containsDevanagari(translatedText);
       prevTranslatedText.current = translatedText;
+      textToDisplay.current = translatedText;
       
       // Debug logging for Hindi text issues
       if (isDevanagari.current) {
         console.log(`Hindi text detected in node "${id}": "${translatedText}", applying special rendering`);
       }
+    }
+  }, [translatedText, id]);
+
+  // Use previous translation if current one is not available
+  useEffect(() => {
+    // If we don't have a translation yet, check if we had one before
+    if (!translatedText && prevTranslatedText.current) {
+      console.log(`Using previous translation for "${id}" while loading new one`);
+      textToDisplay.current = prevTranslatedText.current;
+    } else if (translatedText) {
+      textToDisplay.current = translatedText;
+    } else {
+      textToDisplay.current = id;
     }
   }, [translatedText, id]);
 
@@ -171,7 +189,6 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       size={dynamicFontSize}
       bold={isHighlighted}
       visible={stableVisibilityRef.current}
-      // Set skipTranslation to true since we're already passing translated text
       skipTranslation={true}
     />
   );

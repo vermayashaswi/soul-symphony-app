@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';
@@ -44,60 +44,82 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
   const [translatedLabels, setTranslatedLabels] = useState<Map<string, string>>(new Map());
-
-  console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
-
+  const [isTranslating, setIsTranslating] = useState(false);
+  const translationRetryCount = useRef<number>(0);
+  const prevLanguageRef = useRef<string>(currentLanguage);
+  const mountedRef = useRef<boolean>(true);
+  
+  // Initialize mount state
   useEffect(() => {
+    mountedRef.current = true;
     console.log("SoulNet mounted");
     return () => {
+      mountedRef.current = false;
       console.log("SoulNet unmounted");
     };
   }, []);
 
-  // Pre-translate all node labels
-  useEffect(() => {
-    if (!graphData.nodes.length || currentLanguage === 'en') {
-      return;
-    }
-
-    const translateLabels = async () => {
-      try {
-        console.log(`Pre-translating ${graphData.nodes.length} node labels to ${currentLanguage}`);
-        const nodeTexts = graphData.nodes.map(node => node.id);
-        
-        const translations = await staticTranslationService.preTranslate(nodeTexts);
-        setTranslatedLabels(translations);
-        
-        console.log(`Translated ${translations.size} node labels`);
-      } catch (error) {
-        console.error("Failed to pre-translate node labels:", error);
-      }
-    };
-
-    translateLabels();
-  }, [graphData.nodes, currentLanguage]);
-
-  // Re-translate when language changes
-  useEffect(() => {
-    if (graphData.nodes.length > 0 && currentLanguage !== 'en') {
-      console.log(`Language changed to ${currentLanguage}, re-translating node labels`);
-      // Clear current translations to avoid showing wrong language temporarily
-      setTranslatedLabels(new Map());
+  // Translate node labels with retry mechanism
+  const translateNodeLabels = useCallback(async (nodes: NodeData[]) => {
+    if (!nodes.length || currentLanguage === 'en' || !mountedRef.current) return;
+    
+    try {
+      setIsTranslating(true);
+      console.log(`Translating ${nodes.length} node labels to ${currentLanguage}`);
       
-      const translateLabels = async () => {
-        try {
-          const nodeTexts = graphData.nodes.map(node => node.id);
-          const translations = await staticTranslationService.preTranslate(nodeTexts);
-          setTranslatedLabels(translations);
-        } catch (error) {
-          console.error("Failed to translate node labels after language change:", error);
+      const nodeTexts = nodes.map(node => node.id);
+      
+      // Keep previous translations while loading new ones to prevent flickering
+      const newTranslations = await staticTranslationService.preTranslate(nodeTexts);
+      
+      // Only update if component still mounted
+      if (mountedRef.current) {
+        setTranslatedLabels(newTranslations);
+        console.log(`Received ${newTranslations.size} node label translations`);
+        
+        // Verify translations are complete
+        const verificationResult = staticTranslationService.verifyTranslations(nodeTexts, newTranslations);
+        
+        // If translations are incomplete, retry up to 2 times
+        if (!verificationResult && translationRetryCount.current < 2) {
+          translationRetryCount.current++;
+          console.warn(`Incomplete translations, retrying (${translationRetryCount.current}/2)...`);
+          
+          // Wait a moment before retrying
+          setTimeout(() => {
+            if (mountedRef.current) {
+              translateNodeLabels(nodes);
+            }
+          }, 800 * translationRetryCount.current); // Exponential backoff
+        } else {
+          translationRetryCount.current = 0;
         }
-      };
+      }
+    } catch (error) {
+      console.error("Failed to translate node labels:", error);
       
-      translateLabels();
+      // Retry on failure up to 2 times
+      if (translationRetryCount.current < 2 && mountedRef.current) {
+        translationRetryCount.current++;
+        console.warn(`Translation failed, retrying (${translationRetryCount.current}/2)...`);
+        
+        // Wait before retrying with exponential backoff
+        setTimeout(() => {
+          if (mountedRef.current) {
+            translateNodeLabels(nodes);
+          }
+        }, 1000 * translationRetryCount.current);
+      } else {
+        translationRetryCount.current = 0;
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsTranslating(false);
+      }
     }
   }, [currentLanguage]);
 
+  // Fetch data and initialize translations
   useEffect(() => {
     if (!userId) return;
 
@@ -132,27 +154,86 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         console.log("Processed graph data:", processedData);
         setGraphData(processedData);
         
+        // Reset translation retry counter
+        translationRetryCount.current = 0;
+        
         // Pre-translate node labels when data is loaded
-        if (processedData.nodes.length > 0 && currentLanguage !== 'en') {
-          try {
-            const nodeTexts = processedData.nodes.map(node => node.id);
-            const translations = await staticTranslationService.preTranslate(nodeTexts);
-            setTranslatedLabels(translations);
-            console.log(`Pre-translated ${translations.size} node labels`);
-          } catch (err) {
-            console.error("Initial translation failed:", err);
-          }
+        if (processedData.nodes.length > 0 && mountedRef.current) {
+          prevLanguageRef.current = currentLanguage;
+          translateNodeLabels(processedData.nodes);
         }
       } catch (error) {
         console.error('Error processing entity-emotion data:', error);
         setError(error instanceof Error ? error : new Error('Unknown error occurred'));
       } finally {
-        setLoading(false);
+        if (mountedRef.current) {
+          setLoading(false);
+        }
       }
     };
 
     fetchEntityEmotionData();
-  }, [userId, timeRange, currentLanguage]);
+  }, [userId, timeRange, translateNodeLabels]);
+
+  // Re-translate when language changes
+  useEffect(() => {
+    if (graphData.nodes.length > 0 && currentLanguage !== prevLanguageRef.current && mountedRef.current) {
+      console.log(`Language changed from ${prevLanguageRef.current} to ${currentLanguage}, re-translating node labels`);
+      
+      // Update language reference
+      prevLanguageRef.current = currentLanguage;
+      
+      // Skip if English - no translation needed
+      if (currentLanguage !== 'en') {
+        // Reset retry counter for new language
+        translationRetryCount.current = 0;
+        // Translate nodes in the new language
+        translateNodeLabels(graphData.nodes);
+      } else {
+        // For English, reset to original node IDs
+        const englishMap = new Map<string, string>();
+        graphData.nodes.forEach(node => {
+          englishMap.set(node.id, node.id);
+        });
+        setTranslatedLabels(englishMap);
+      }
+    }
+  }, [currentLanguage, graphData.nodes, translateNodeLabels]);
+
+  // Listen for language change events (for manual language changes)
+  useEffect(() => {
+    const handleLanguageChange = () => {
+      // Force re-translation
+      const updatedLang = localStorage.getItem('i18nextLng')?.split('-')[0] || 'en';
+      
+      if (updatedLang !== prevLanguageRef.current && graphData.nodes.length > 0) {
+        console.log(`Language change event detected: ${prevLanguageRef.current} -> ${updatedLang}`);
+        prevLanguageRef.current = updatedLang;
+        
+        if (updatedLang !== 'en') {
+          // Reset retry counter
+          translationRetryCount.current = 0;
+          // Translate with the new language
+          translateNodeLabels(graphData.nodes);
+        } else {
+          // For English, reset to original node IDs
+          const englishMap = new Map<string, string>();
+          graphData.nodes.forEach(node => {
+            englishMap.set(node.id, node.id);
+          });
+          setTranslatedLabels(englishMap);
+        }
+      }
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange);
+    document.addEventListener('languageChanged', handleLanguageChange);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange);
+      document.removeEventListener('languageChanged', handleLanguageChange);
+    };
+  }, [graphData.nodes, translateNodeLabels]);
 
   const handleNodeSelect = useCallback((id: string) => {
     console.log(`Node selected: ${id}`);
@@ -228,6 +309,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
             </div>
           </div>
         }>
+          {isTranslating && (
+            <div className="absolute top-2 right-2 bg-primary/20 text-foreground text-xs px-2 py-1 rounded-full z-10">
+              <TranslatableText text="Translating..." forceTranslate={true} />
+            </div>
+          )}
           <Canvas
             style={{
               width: '100%',
