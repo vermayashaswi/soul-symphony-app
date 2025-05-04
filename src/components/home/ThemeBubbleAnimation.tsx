@@ -3,7 +3,7 @@ import { motion, useAnimation } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { staticTranslationService } from '@/services/staticTranslationService';
+import { staticTranslation } from '@/services/staticTranslationService';
 
 interface ThemeData {
   theme: string;
@@ -188,7 +188,7 @@ const ThemeBubbleAnimation: React.FC<ThemeBubbleAnimationProps> = ({
       const themeTexts = themes.map(item => item.theme);
       
       // Pre-translate all at once
-      const translationsMap = await staticTranslationService.preTranslate(themeTexts);
+      const translationsMap = await staticTranslation.preTranslate(themeTexts);
       
       // Apply translations
       const translated = themes.map(item => ({

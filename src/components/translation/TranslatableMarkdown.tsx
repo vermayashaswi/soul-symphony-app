@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import ReactMarkdown from 'react-markdown';
 import { useTranslation } from '@/contexts/TranslationContext';
@@ -50,10 +51,14 @@ export function TranslatableMarkdown({
     }
     
     // Check for cached translation first
-    const cachedTranslation = getCachedTranslation(children, currentLanguage);
-    if (cachedTranslation) {
-      setTranslatedContent(cachedTranslation);
-      return;
+    try {
+      const cachedTranslation = await getCachedTranslation(children, currentLanguage);
+      if (cachedTranslation) {
+        setTranslatedContent(cachedTranslation);
+        return;
+      }
+    } catch (error) {
+      console.error("Error retrieving cached translation:", error);
     }
 
     // Only translate if not in English or if language has changed

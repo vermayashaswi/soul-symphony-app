@@ -23,11 +23,11 @@ export function EntryContent({ content, audioUrl, isProcessing, isProcessed, lan
     audioRef, 
     prepareAudio, 
     playbackProgress 
-  } = useAudioPlayback({ audioBlob: null }); // Initialize with null audioBlob
+  } = useAudioPlayback(); // Initialize without props
   
   // Check if audio is ready
-  const [audioLoaded, setAudioLoaded] = React.useState(false);
-  const [audioError, setAudioError] = React.useState(false);
+  const [audioLoaded, setAudioLoaded] = useState(false);
+  const [audioError, setAudioError] = useState(false);
   
   // Load audio when component mounts or URL changes
   React.useEffect(() => {

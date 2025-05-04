@@ -12,6 +12,7 @@ export interface JournalEntry {
   emotions?: Record<string, number>;
   entities?: any;
   master_themes?: string[];
+  themes?: string[]; // Add themes property
   tempId?: string;
   is_chunked?: boolean;
   original_language?: string;

@@ -13,6 +13,7 @@ const SentimentMeter: React.FC<SentimentMeterProps> = ({ sentiment, showText = f
   // Parse the sentiment to get a numeric value between -1 and 1
   const getSentimentValue = (sentiment: SentimentValue): number => {
     if (typeof sentiment === 'number') {
+      // Convert to string first to make TypeScript happy with the assignment
       return sentiment;
     } else if (typeof sentiment === 'string') {
       return parseFloat(sentiment);

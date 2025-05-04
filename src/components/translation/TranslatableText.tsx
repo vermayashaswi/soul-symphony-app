@@ -71,10 +71,14 @@ export function TranslatableText({
     }
     
     // Check for cached translation first to prevent flicker
-    const cachedResult = getCachedTranslation(text, currentLanguage);
-    if (cachedResult) {
-      setTranslatedText(cachedResult);
-      return;
+    try {
+      const cachedResult = await getCachedTranslation(text, currentLanguage);
+      if (cachedResult) {
+        setTranslatedText(cachedResult);
+        return;
+      }
+    } catch (error) {
+      console.error("Error retrieving cached translation:", error);
     }
     
     // Only initiate translation if not in English or if language has changed

@@ -1,5 +1,5 @@
 
-import { staticTranslationService } from '@/services/staticTranslationService';
+import { staticTranslation } from '@/services/staticTranslationService';
 
 // This utility helps preload common website translations
 export const preloadWebsiteTranslations = async (language: string) => {
@@ -39,7 +39,7 @@ export const preloadWebsiteTranslations = async (language: string) => {
   
   try {
     // Batch translate all common texts
-    const translations = await staticTranslationService.preTranslate(commonTexts);
+    const translations = await staticTranslation.preTranslate(commonTexts);
     console.log(`Preloaded ${translations.size} website translations`);
     return translations;
   } catch (error) {
@@ -52,7 +52,7 @@ export const translateWebsiteText = async (text: string): Promise<string> => {
   if (!text) return '';
   
   try {
-    return await staticTranslationService.translateText(text, 'en');
+    return await staticTranslation.translateText(text, 'en');
   } catch (error) {
     console.error(`Failed to translate website text: "${text}"`, error);
     return text;
