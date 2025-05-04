@@ -13,6 +13,7 @@ interface TranslationRequest {
 interface BatchTranslationRequest {
   texts: string[];
   targetLanguage: string;
+  sourceLanguage?: string;
 }
 
 export class TranslationService {
@@ -23,6 +24,11 @@ export class TranslationService {
     try {
       // Skip empty or whitespace-only strings
       if (!request.text || request.text.trim() === '') {
+        return request.text;
+      }
+      
+      // Skip translation if source and target languages are the same
+      if (request.sourceLanguage === request.targetLanguage) {
         return request.text;
       }
       
@@ -80,6 +86,12 @@ export class TranslationService {
     if (validTexts.length === 0) {
       return results;
     }
+    
+    // Skip translation if source and target languages are the same
+    if (request.sourceLanguage === request.targetLanguage) {
+      validTexts.forEach(text => results.set(text, text));
+      return results;
+    }
 
     // Check cache first for all texts
     for (const text of validTexts) {
@@ -98,6 +110,7 @@ export class TranslationService {
         const { data, error } = await supabase.functions.invoke('translate-text', {
           body: {
             texts: batch,
+            sourceLanguage: request.sourceLanguage,
             targetLanguage: request.targetLanguage,
           },
         });

@@ -188,11 +188,18 @@ serve(async (req) => {
         });
       }
       
-      // Process with GPT for translation and refinement with detected languages
+      // Save the original text and its detected language - don't translate to English automatically
+      const originalText = transcribedText;
+      const detectedLanguage = detectedLanguages && detectedLanguages.length > 0 ? detectedLanguages[0] : 'unknown';
+      
+      // Process with GPT for refinement (but not translation) to keep the original language
       console.log("Processing transcription with GPT for refinement...");
-      const { refinedText } = await translateAndRefineText(transcribedText, openAIApiKey, detectedLanguages);
-
-      // Get emotions from the refined text
+      
+      // IMPORTANT CHANGE: Only refine the text, don't translate it to English
+      // We'll store both the original text and refined text in the original language
+      const refinedText = originalText;  // For now, just use the original text
+      
+      // Get emotions from the refined text (in original language)
       let emotions = null;
       try {
         const { data: emotionsData, error: emotionsError } = await supabase
@@ -247,16 +254,18 @@ serve(async (req) => {
       console.log("Storing journal entry...");
       let entryId = null;
       try {
+        // IMPORTANT CHANGE: Store original transcription, detected language, and refined text
         entryId = await storeJournalEntry(
           supabase,
-          transcribedText,
-          refinedText,
+          transcribedText,   // Original transcription
+          refinedText,       // Refined text in original language
           audioUrl,
           userId,
           audioDuration,
           emotions,
           sentimentScore,
-          null  // Removed entities parameter
+          null,              // Removed entities parameter
+          detectedLanguage   // Add detected language
         );
         
         console.log("Journal entry stored with ID:", entryId);
@@ -346,7 +355,8 @@ serve(async (req) => {
         entryId: entryId,
         emotions: emotions,
         sentiment: sentimentScore,
-        detectedLanguages: detectedLanguages
+        detectedLanguages: detectedLanguages,
+        originalLanguage: detectedLanguage
       });
     } catch (error) {
       console.error("Error in transcribe-audio function:", error);
