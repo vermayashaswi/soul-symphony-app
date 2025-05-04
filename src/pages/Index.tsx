@@ -39,8 +39,8 @@ const Index = () => {
     }
   }, [user, navigate, urlParams]);
 
+  // Pre-translate common strings used on the index page
   useEffect(() => {
-    // Pre-translate common strings used on the index page
     const preTranslateCommonStrings = async () => {
       if (translate) {
         try {

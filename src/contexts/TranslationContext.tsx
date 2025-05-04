@@ -4,7 +4,6 @@ import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
 import { staticTranslationService } from '@/services/staticTranslationService';
 import { preloadWebsiteTranslations } from '@/utils/website-translations';
-import { useLocation } from 'react-router-dom';
 
 // Define the language options
 export const languages = [
@@ -40,7 +39,6 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const [isTranslating, setIsTranslating] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
-  const location = useLocation();
   
   // Create a unique cache key
   const createCacheKey = (text: string, language: string): string => {
@@ -124,12 +122,16 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     }
   }, [currentLanguage, getCachedTranslation, cacheTranslation]);
 
-  // Monitor route changes to load route-specific translations
+  // Listen for route changes to monitor the current location
   useEffect(() => {
-    // When the route changes, we can prefetch translations for common UI elements
+    // We'll handle route-specific translations inside components that have access to the Router
+    // instead of trying to access useLocation() here in the context
+    console.log('TranslationContext initialized');
+    
+    // When mounted, we can prefetch common UI elements
     const commonUIElements = ['Home', 'Blog', 'Settings', 'Profile', 'Logout', 'Download'];
     prefetchTranslationsForRoute(commonUIElements).catch(console.error);
-  }, [location.pathname, prefetchTranslationsForRoute]);
+  }, [prefetchTranslationsForRoute]);
 
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
