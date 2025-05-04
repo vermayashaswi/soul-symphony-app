@@ -28,12 +28,12 @@ export const ConnectionPercentage: React.FC<ConnectionPercentageProps> = ({
     return null;
   }
 
-  // Position above the node - adjusted for larger font size
-  // Add extra height for Hindi/non-Latin script compatibility
-  const labelPosition: [number, number, number] = [0, offsetY + 1.0, 0]; // Increased from offsetY + 0.2
+  // Position above the node - adjusted for larger font size and node size
+  // Add extra height for the increased node sizes
+  const labelPosition: [number, number, number] = [0, offsetY + 1.5, 0]; // Increased from offsetY + 1.0
 
-  // Stable font size for percentages - using a slightly smaller size since they're numeric
-  const fontSize = 0.25; // Will be doubled automatically in ThreeDimensionalText
+  // Double the font size for percentages and account for automatic doubling in ThreeDimensionalText
+  const fontSize = 0.5; // Doubled from 0.25
 
   return (
     <ThreeDimensionalText

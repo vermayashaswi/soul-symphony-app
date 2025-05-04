@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef, useEffect } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -27,6 +28,29 @@ const containsDevanagari = (text: string): boolean => {
   return devanagariPattern.test(text);
 };
 
+// Format entity node text to display on two lines
+const formatEntityText = (text: string): string => {
+  if (!text || text.length <= 3) return text;
+  
+  // Split text in approximately half to create two lines
+  const halfLength = Math.ceil(text.length / 2);
+  let splitIndex = halfLength;
+  
+  // Look for natural break points like spaces near the middle
+  const spaceIndices = [...text.matchAll(/\s/g)].map(match => match.index as number);
+  if (spaceIndices.length > 0) {
+    // Find the space closest to the middle
+    const nearestSpace = spaceIndices.reduce((closest, current) => {
+      return Math.abs(current - halfLength) < Math.abs(closest - halfLength) ? current : closest;
+    }, spaceIndices[0]);
+    
+    splitIndex = nearestSpace;
+  }
+  
+  // Create two-line text with line break
+  return text.substring(0, splitIndex) + '\n' + text.substring(splitIndex).trim();
+};
+
 interface NodeLabelProps {
   id: string;
   type: 'entity' | 'emotion';
@@ -49,11 +73,18 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   translatedText
 }) => {
   const { theme } = useTheme();
-  console.log(`NodeLabel for "${id}": isHighlighted=${isHighlighted}, shouldShowLabel=${shouldShowLabel}, type=${type}, translatedText=${translatedText}`);
   const prevTranslatedText = useRef<string | undefined>(translatedText);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   const stableVisibilityRef = useRef<boolean>(shouldShowLabel);
+  
+  // Format entity text for display
+  const formattedText = useMemo(() => {
+    if (type === 'entity' && translatedText) {
+      return formatEntityText(translatedText);
+    }
+    return translatedText || id;
+  }, [id, type, translatedText]);
   
   // Stabilize visibility transitions to prevent flickering
   useEffect(() => {
@@ -109,9 +140,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   // Don't render if not supposed to be shown
   if (!stableVisibilityRef.current) return null;
 
-  // Adjust vertical positioning for different script types
-  // Move the label position further out to accommodate the larger font size
-  let verticalPosition = type === 'entity' ? 1.4 : 1.3; // Increased from 0.9/0.8 to account for larger font
+  // Adjust vertical positioning for different script types and node types
+  // Move the label position further out to accommodate the larger font size and multi-line text for entities
+  let verticalPosition = type === 'entity' ? 1.8 : 1.3; // Increased from 1.4 to 1.8 for entities to prevent overlap
   
   // For Devanagari text, position slightly higher to accommodate taller characters
   if (isDevanagari.current) {
@@ -129,7 +160,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   return (
     <ThreeDimensionalText
-      text={translatedText || id}
+      text={formattedText}
       position={labelPosition}
       color={textColor}
       size={dynamicFontSize}
