@@ -45,11 +45,11 @@ const Index = () => {
       if (translate) {
         try {
           console.log('Index: Pre-translating common strings...');
-          await translate("Welcome to Soul Symphony", "en");
-          await translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.", "en");
-          await translate("Loading optimized content...", "en");
-          await translate("You're currently offline", "en");
-          await translate("Please check your connection to access all features. Some content may still be available from cache.", "en");
+          await translate("Welcome to Soul Symphony");
+          await translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.");
+          await translate("Loading optimized content...");
+          await translate("You're currently offline");
+          await translate("Please check your connection to access all features. Some content may still be available from cache.");
           console.log('Index: Pre-translation complete');
         } catch (error) {
           console.error("Error pre-translating index page strings:", error);

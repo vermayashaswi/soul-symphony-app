@@ -52,7 +52,7 @@ export const translateWebsiteText = async (text: string): Promise<string> => {
   if (!text) return '';
   
   try {
-    return await staticTranslationService.translateText(text, 'en');
+    return await staticTranslationService.translateText(text);
   } catch (error) {
     console.error(`Failed to translate website text: "${text}"`, error);
     return text;

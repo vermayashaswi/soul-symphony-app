@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { Text } from '@react-three/drei';
 import { useTranslation } from '@/contexts/TranslationContext';
