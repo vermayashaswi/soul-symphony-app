@@ -29,8 +29,8 @@ const AppRoutes: React.FC = () => {
     <Router>
       <ThemeProvider>
         <OnboardingProvider>
-          <ViewportManager>
-            <Routes>
+          <Routes>
+            <Route element={<ViewportManager />}>
               {/* Website routes */}
               <Route path="/" element={<Index />} />
               <Route path="/blog" element={<BlogPage />} />
@@ -63,8 +63,8 @@ const AppRoutes: React.FC = () => {
 
               {/* 404 route */}
               <Route path="*" element={<NotFound />} />
-            </Routes>
-          </ViewportManager>
+            </Route>
+          </Routes>
         </OnboardingProvider>
       </ThemeProvider>
     </Router>
