@@ -117,8 +117,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   selectedNode,
   onNodeClick,
   themeHex,
-  isFullScreen = false,
-  translatedLabels
+  isFullScreen = false
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
@@ -384,7 +383,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             connectionStrength={connectionStrength}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
-            translatedLabels={translatedLabels}
           />
         );
       })}

@@ -58,3 +58,42 @@ export const translateWebsiteText = async (text: string): Promise<string> => {
     return text;
   }
 };
+
+// Singleton for caching on-demand translations
+class TranslationCache {
+  private cache = new Map<string, Map<string, string>>();
+  
+  getTranslation(text: string, language: string): string | null {
+    if (language === 'en') return text;
+    
+    const languageCache = this.cache.get(language);
+    if (languageCache) {
+      return languageCache.get(text) || null;
+    }
+    return null;
+  }
+  
+  setTranslation(text: string, translatedText: string, language: string): void {
+    if (language === 'en' || !text || !translatedText) return;
+    
+    let languageCache = this.cache.get(language);
+    if (!languageCache) {
+      languageCache = new Map<string, string>();
+      this.cache.set(language, languageCache);
+    }
+    
+    languageCache.set(text, translatedText);
+  }
+  
+  // Clear all translations for a specific language
+  clearLanguage(language: string): void {
+    this.cache.delete(language);
+  }
+  
+  // Clear all translations
+  clearAll(): void {
+    this.cache.clear();
+  }
+}
+
+export const onDemandTranslationCache = new TranslationCache();

@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
@@ -27,7 +28,6 @@ interface NodeProps {
   connectionStrength?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
-  translatedLabels?: Map<string, string>;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -43,8 +43,7 @@ export const Node: React.FC<NodeProps> = ({
   isHighlighted = false,
   connectionStrength = 0.5,
   connectionPercentage = 0,
-  showPercentage = false,
-  translatedLabels
+  showPercentage = false
 }) => {
   const { theme } = useTheme();
   const [isTouching, setIsTouching] = useState(false);
@@ -52,7 +51,6 @@ export const Node: React.FC<NodeProps> = ({
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   const prevHighlightedRef = useRef<boolean>(isHighlighted);
   const prevSelectedRef = useRef<boolean>(isSelected);
-  const prevTranslatedTextRef = useRef<string | undefined>(undefined);
   const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
   const stableLabelVisibilityRef = useRef<boolean>(showLabel || isHighlighted || isSelected);
   
@@ -74,26 +72,10 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [showLabel, isHighlighted, isSelected]);
   
-  // Cache translated text to prevent flickering
-  const translatedText = useMemo(() => {
-    const text = translatedLabels?.get(node.id) || node.id;
-    
-    // Log translation lookup for debugging
-    if (prevTranslatedTextRef.current !== text) {
-      // Only log if there's an actual change
-      if (prevTranslatedTextRef.current) {
-        console.log(`Node ${node.id}: Translation updated from "${prevTranslatedTextRef.current}" to "${text}"`);
-      }
-      prevTranslatedTextRef.current = text;
-    }
-    
-    return text;
-  }, [node.id, translatedLabels]);
-  
   // Debug log for visibility with more informative details
   useEffect(() => {
     if (isHighlighted || isSelected) {
-      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}, translatedText=${translatedText}`);
+      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
     }
     
     // Track state changes that might cause flickering
@@ -110,7 +92,7 @@ export const Node: React.FC<NodeProps> = ({
         nodeRef.current.isAnimating = false;
       }, 300);
     }
-  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage, translatedText]);
+  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage]);
   
   // Further increase the base scale for all nodes by 1.5x for nodes, as requested
   const baseScale = node.type === 'entity' ? 0.7 : 0.55; // Adjusted values for smaller nodes
@@ -206,7 +188,6 @@ export const Node: React.FC<NodeProps> = ({
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
-        translatedText={translatedText}
       />
 
       <ConnectionPercentage
