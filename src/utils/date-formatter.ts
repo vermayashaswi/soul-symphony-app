@@ -194,13 +194,51 @@ export const validateDateRange = (startDate: string | Date, endDate: string | Da
     
     // Check for invalid dates
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      console.error('Invalid date in range check:', {
+        startInput: startDate,
+        endInput: endDate,
+        startParsed: start,
+        endParsed: end
+      });
       return false;
     }
     
     // Check that start is before end
-    return start <= end;
+    const isValid = start <= end;
+    
+    if (!isValid) {
+      console.error('Invalid date range: start date is after end date', {
+        start: start.toISOString(),
+        end: end.toISOString(),
+        diff: (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) + ' days'
+      });
+    }
+    
+    return isValid;
   } catch (error) {
     console.error('Error validating date range:', error);
+    return false;
+  }
+};
+
+/**
+ * Helper function to debug date-related issues
+ */
+export const debugDateInfo = (dateStr: string | Date, label: string = 'Date') => {
+  try {
+    const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
+    console.log(`${label} debug:`, {
+      input: dateStr,
+      parsed: date,
+      isValid: !isNaN(date.getTime()),
+      iso: date.toISOString(),
+      localTime: date.toString(),
+      timezoneOffset: date.getTimezoneOffset() + ' minutes',
+      timestamp: date.getTime()
+    });
+    return !isNaN(date.getTime());
+  } catch (error) {
+    console.error(`Error debugging ${label}:`, error);
     return false;
   }
 };

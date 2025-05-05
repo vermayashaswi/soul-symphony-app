@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -286,87 +285,98 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
   
   const lowerTimePeriod = timePeriod.toLowerCase();
   
-  if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
-    // Today: Start at midnight, end at 23:59:59
+  try {
+    if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
+      // Today: Start at midnight, end at 23:59:59
+      startDate = new Date(now);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(now);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'today';
+    } 
+    else if (lowerTimePeriod.includes('yesterday')) {
+      // Yesterday: Start at previous day midnight, end at previous day 23:59:59
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(startDate);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'yesterday';
+    } 
+    else if (lowerTimePeriod.includes('this week')) {
+      // This week: Start at current week Monday, end at Sunday 23:59:59
+      startDate = new Date(now);
+      const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7 to make Monday (1) the first day
+      startDate.setDate(now.getDate() - (dayOfWeek - 1)); // Go back to Monday
+      startDate.setHours(0, 0, 0, 0);
+      
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'this week';
+    } 
+    else if (lowerTimePeriod.includes('last week')) {
+      // Last week: Start at previous week Monday, end at previous week Sunday
+      startDate = new Date(now);
+      const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7
+      startDate.setDate(now.getDate() - (dayOfWeek - 1) - 7); // Go back to previous Monday
+      startDate.setHours(0, 0, 0, 0);
+      
+      endDate = new Date(startDate);
+      endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'last week';
+    } 
+    else if (lowerTimePeriod.includes('this month')) {
+      // This month: Start at 1st of current month, end at last day of month
+      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'this month';
+    } 
+    else if (lowerTimePeriod.includes('last month')) {
+      // Last month: Start at 1st of previous month, end at last day of previous month
+      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'last month';
+    } 
+    else if (lowerTimePeriod.includes('this year')) {
+      // This year: Start at January 1st, end at December 31st
+      startDate = new Date(now.getFullYear(), 0, 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(now.getFullYear(), 11, 31);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'this year';
+    } 
+    else if (lowerTimePeriod.includes('last year')) {
+      // Last year: Start at January 1st of previous year, end at December 31st of previous year
+      startDate = new Date(now.getFullYear() - 1, 0, 1);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(now.getFullYear() - 1, 11, 31);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'last year';
+    } 
+    else {
+      // Default to last 30 days if no specific period matched
+      startDate = new Date(now);
+      startDate.setDate(now.getDate() - 30);
+      startDate.setHours(0, 0, 0, 0);
+      endDate = new Date(now);
+      endDate.setHours(23, 59, 59, 999);
+      periodName = 'last 30 days';
+    }
+  } catch (calcError) {
+    console.error('Error in date calculation:', calcError);
+    // Fallback to a simple date range calculation
     startDate = new Date(now);
+    startDate.setDate(now.getDate() - 7);
     startDate.setHours(0, 0, 0, 0);
     endDate = new Date(now);
     endDate.setHours(23, 59, 59, 999);
-    periodName = 'today';
-  } 
-  else if (lowerTimePeriod.includes('yesterday')) {
-    // Yesterday: Start at previous day midnight, end at previous day 23:59:59
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(startDate);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'yesterday';
-  } 
-  else if (lowerTimePeriod.includes('this week')) {
-    // This week: Start at current week Monday, end at Sunday 23:59:59
-    startDate = new Date(now);
-    const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7 to make Monday (1) the first day
-    startDate.setDate(now.getDate() - (dayOfWeek - 1)); // Go back to Monday
-    startDate.setHours(0, 0, 0, 0);
-    
-    endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'this week';
-  } 
-  else if (lowerTimePeriod.includes('last week')) {
-    // Last week: Start at previous week Monday, end at previous week Sunday
-    startDate = new Date(now);
-    const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7
-    startDate.setDate(now.getDate() - (dayOfWeek - 1) - 7); // Go back to previous Monday
-    startDate.setHours(0, 0, 0, 0);
-    
-    endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'last week';
-  } 
-  else if (lowerTimePeriod.includes('this month')) {
-    // This month: Start at 1st of current month, end at last day of month
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'this month';
-  } 
-  else if (lowerTimePeriod.includes('last month')) {
-    // Last month: Start at 1st of previous month, end at last day of previous month
-    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'last month';
-  } 
-  else if (lowerTimePeriod.includes('this year')) {
-    // This year: Start at January 1st, end at December 31st
-    startDate = new Date(now.getFullYear(), 0, 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), 11, 31);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'this year';
-  } 
-  else if (lowerTimePeriod.includes('last year')) {
-    // Last year: Start at January 1st of previous year, end at December 31st of previous year
-    startDate = new Date(now.getFullYear() - 1, 0, 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now.getFullYear() - 1, 11, 31);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'last year';
-  } 
-  else {
-    // Default to last 30 days if no specific period matched
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 30);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'last 30 days';
+    periodName = 'last 7 days (error fallback)';
   }
 
   // Add back the timezone offset to convert to UTC for storage
