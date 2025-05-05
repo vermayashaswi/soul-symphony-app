@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -317,18 +318,18 @@ serve(async (req) => {
           
         case 'hybrid':
           // Combine vector search with SQL filtering
-          entries = await searchEntriesHybrid(userId, queryEmbedding, queryPlan.filters, matchCount);
+          entries = await searchEntriesHybrid(userId, queryEmbedding, queryPlan.filters, matchCount, timezoneOffset);
           break;
           
         case 'vector':
         default:
           // Use vector search with optional filters
-          entries = await searchEntriesWithVector(userId, queryEmbedding, queryPlan.filters, matchCount);
+          entries = await searchEntriesWithVector(userId, queryEmbedding, queryPlan.filters, matchCount, timezoneOffset);
           break;
       }
     } else {
       console.log("No query plan provided, using default vector search");
-      entries = await searchEntriesWithVector(userId, queryEmbedding, {}, 15);
+      entries = await searchEntriesWithVector(userId, queryEmbedding, {}, 15, timezoneOffset);
     }
 
     console.log(`Found ${entries.length} relevant entries`);
@@ -373,9 +374,12 @@ serve(async (req) => {
     
     console.log("Entry date range:", dateRangeInfo);
 
-    // Format entries for the prompt with dates
+    // Format entries for the prompt with dates - using user's timezone
     const entriesWithDates = entries.map(entry => {
-      const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
+      // Apply user's timezone offset to display dates in their local time
+      const localDate = new Date(new Date(entry.created_at).getTime() + (timezoneOffset || 0) * 60 * 1000);
+      
+      const formattedDate = localDate.toLocaleDateString('en-US', {
         month: 'long',
         day: 'numeric',
         year: 'numeric' // Added year to ensure precise dating
@@ -546,16 +550,22 @@ Now generate your thoughtful, emotionally intelligent response:`;
       JSON.stringify({ 
         response: responseContent, 
         diagnostics: includeDiagnostics ? diagnostics : undefined,
-        references: processedEntries.map(entry => ({
-          id: entry.id,
-          content: entry.content,
-          date: entry.created_at,
-          snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
-          similarity: entry.similarity,
-          themes: entry.themes || [],
-          sentiment: entry.sentiment,
-          emotions: entry.emotions
-        })),
+        references: processedEntries.map(entry => {
+          // Apply user's timezone offset for display
+          const localDate = new Date(new Date(entry.created_at).getTime() + (timezoneOffset || 0) * 60 * 1000);
+          
+          return {
+            id: entry.id,
+            content: entry.content,
+            date: entry.created_at,
+            localDate: localDate.toISOString(), // Add local date for client-side display
+            snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
+            similarity: entry.similarity,
+            themes: entry.themes || [],
+            sentiment: entry.sentiment,
+            emotions: entry.emotions
+          };
+        }),
         entryDateRange: dateRangeInfo
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -573,37 +583,65 @@ Now generate your thoughtful, emotionally intelligent response:`;
 });
 
 /**
- * Perform vector search with optional filters
+ * Perform vector search with optional filters using match_journal_entries_with_date
  */
 async function searchEntriesWithVector(
   userId: string, 
   queryEmbedding: any[],
   filters: any = {},
-  matchCount: number = 15
+  matchCount: number = 15,
+  timezoneOffset: number = 0
 ) {
   try {
     console.log(`Vector search with filters for userId: ${userId}`, filters);
     
-    // Start with the basic vector search
-    let query = supabase.rpc(
-      'match_journal_entries_fixed',
+    // Extract date range from filters if it exists
+    let startDate = null;
+    let endDate = null;
+    
+    if (filters.dateRange) {
+      startDate = filters.dateRange.startDate;
+      endDate = filters.dateRange.endDate;
+      
+      console.log(`Using date range: ${startDate} to ${endDate} (${filters.dateRange.periodName})`);
+    }
+    
+    // Use the match_journal_entries_with_date function for direct database filtering with date range
+    let { data, error } = await supabase.rpc(
+      'match_journal_entries_with_date',
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
         match_count: matchCount * 2, // Get more to allow for filtering
-        user_id_filter: userId
+        user_id_filter: userId,
+        start_date: startDate,
+        end_date: endDate
       }
     );
     
-    // Get the initial results
-    const { data, error } = await query;
-    
     if (error) {
-      console.error(`Error in vector search: ${error.message}`);
-      throw error;
+      console.error(`Error in vector search with date: ${error.message}`);
+      
+      // Fallback to regular vector search if the with_date function fails
+      console.log("Falling back to standard vector search without date parameters");
+      const fallbackResult = await supabase.rpc(
+        'match_journal_entries_fixed',
+        {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.5,
+          match_count: matchCount * 2,
+          user_id_filter: userId
+        }
+      );
+      
+      if (fallbackResult.error) {
+        console.error(`Error in fallback vector search: ${fallbackResult.error.message}`);
+        throw fallbackResult.error;
+      }
+      
+      data = fallbackResult.data || [];
     }
     
-    // Apply post-query filters
     let filteredData = data || [];
     
     // Log entry dates for debugging time range issues
@@ -615,117 +653,65 @@ async function searchEntriesWithVector(
       console.log("Initial entry dates before filtering:", entryDates);
     }
     
-    // Apply date range filter
-    if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
-      const startDate = filters.dateRange.startDate ? new Date(filters.dateRange.startDate) : null;
-      const endDate = filters.dateRange.endDate ? new Date(filters.dateRange.endDate) : null;
-      
-      console.log(`Applying date filter: ${startDate?.toISOString() || 'none'} to ${endDate?.toISOString() || 'none'}`);
-      
-      filteredData = filteredData.filter(entry => {
-        const entryDate = new Date(entry.created_at);
-        const startDateMatch = !startDate || entryDate >= startDate;
-        const endDateMatch = !endDate || entryDate <= endDate;
-        if (!startDateMatch || !endDateMatch) {
-          console.log(`Entry ${entry.id} date ${entryDate.toISOString()} outside filter range`);
-        }
-        return startDateMatch && endDateMatch;
-      });
-      
-      console.log(`After date filtering: ${filteredData.length} entries remain`);
-    }
-    
-    // Get additional data for each entry for further filtering
+    // Apply additional filters if the dateRange was already applied at the database level
     if (filteredData.length > 0) {
-      const entryIds = filteredData.map(entry => entry.id);
-      const { data: entriesWithData, error: entriesError } = await supabase
-        .from('Journal Entries')
-        .select('id, emotions, sentiment, master_themes, entities')
-        .in('id', entryIds);
+      // Apply emotions filter
+      if (filters.emotions && filters.emotions.length > 0) {
+        filteredData = filteredData.filter(entry => {
+          if (!entry.emotions) return false;
+          return filters.emotions.some((emotion: string) => 
+            entry.emotions && typeof entry.emotions === 'object' && 
+            Object.keys(entry.emotions).some(key => 
+              key.toLowerCase().includes(emotion.toLowerCase()) && 
+              entry.emotions[key] > 0.3
+            )
+          );
+        });
+      }
       
-      if (entriesError) {
-        console.error(`Error fetching additional entry data: ${entriesError.message}`);
-      } else if (entriesWithData) {
-        // Create a map for quick lookup
-        const entriesMap = new Map();
-        entriesWithData.forEach(entry => {
-          entriesMap.set(entry.id, entry);
+      // Apply sentiment filter
+      if (filters.sentiment && filters.sentiment.length > 0) {
+        filteredData = filteredData.filter(entry => {
+          if (!entry.sentiment) return false;
+          return filters.sentiment.some((sentiment: string) => 
+            entry.sentiment && entry.sentiment.toLowerCase().includes(sentiment.toLowerCase())
+          );
         });
-        
-        // Enrich the filtered data with additional fields
-        filteredData = filteredData.map(entry => {
-          const additionalData = entriesMap.get(entry.id) || {};
-          return {
-            ...entry,
-            emotions: additionalData.emotions,
-            sentiment: additionalData.sentiment,
-            master_themes: additionalData.master_themes,
-            entities: additionalData.entities
-          };
+      }
+      
+      // Apply themes filter
+      if (filters.themes && filters.themes.length > 0) {
+        filteredData = filteredData.filter(entry => {
+          if (!entry.themes || !Array.isArray(entry.themes)) return false;
+          return filters.themes.some((theme: string) => 
+            entry.themes.some((entryTheme: string) => 
+              entryTheme.toLowerCase().includes(theme.toLowerCase())
+            )
+          );
         });
-        
-        // Apply emotions filter
-        if (filters.emotions && filters.emotions.length > 0) {
-          filteredData = filteredData.filter(entry => {
-            if (!entry.emotions) return false;
-            return filters.emotions.some((emotion: string) => 
-              entry.emotions && typeof entry.emotions === 'object' && 
-              Object.keys(entry.emotions).some(key => 
-                key.toLowerCase().includes(emotion.toLowerCase()) && 
-                entry.emotions[key] > 0.3
-              )
-            );
-          });
-        }
-        
-        // Apply sentiment filter
-        if (filters.sentiment && filters.sentiment.length > 0) {
-          filteredData = filteredData.filter(entry => {
-            if (!entry.sentiment) return false;
-            return filters.sentiment.some((sentiment: string) => 
-              entry.sentiment && entry.sentiment.toLowerCase().includes(sentiment.toLowerCase())
-            );
-          });
-        }
-        
-        // Apply themes filter
-        if (filters.themes && filters.themes.length > 0) {
-          filteredData = filteredData.filter(entry => {
-            if (!entry.master_themes || !Array.isArray(entry.master_themes)) return false;
-            return filters.themes.some((theme: string) => 
-              entry.master_themes.some((entryTheme: string) => 
-                entryTheme.toLowerCase().includes(theme.toLowerCase())
-              )
-            );
-          });
-        }
-        
-        // Apply entities filter
-        if (filters.entities && filters.entities.length > 0) {
-          filteredData = filteredData.filter(entry => {
-            if (!entry.entities || !Array.isArray(entry.entities)) return false;
-            
-            return filters.entities.some((filterEntity: { type?: string, name?: string }) => {
-              if (!filterEntity) return false;
-              
-              return entry.entities.some((entryEntity: any) => {
-                if (!entryEntity) return false;
-                
-                const typeMatch = !filterEntity.type || 
-                  (entryEntity.type && entryEntity.type.toLowerCase().includes(filterEntity.type.toLowerCase()));
-                
-                const nameMatch = !filterEntity.name ||
-                  (entryEntity.name && entryEntity.name.toLowerCase().includes(filterEntity.name.toLowerCase()));
-                
-                return typeMatch && nameMatch;
-              });
-            });
-          });
-        }
       }
     }
     
-    // Return the final filtered results, limited to the requested count
+    // If no entries found and we have date filters, log a detailed message
+    if (filteredData.length === 0 && (startDate || endDate)) {
+      console.log(`No entries found for date range: ${startDate || 'any'} to ${endDate || 'any'}`);
+      
+      // Get a count of all entries for this user as a sanity check
+      const { count, error: countError } = await supabase
+        .from('Journal Entries')
+        .select('id', { count: 'exact', head: true })
+        .eq('user_id', userId);
+        
+      if (countError) {
+        console.error(`Error getting entry count: ${countError.message}`);
+      } else {
+        console.log(`User has ${count} total journal entries`);
+      }
+    }
+    
+    console.log(`Returning ${filteredData.length} entries after filtering`);
+    
+    // Return the filtered data, limited to the requested count
     return filteredData.slice(0, matchCount);
   } catch (error) {
     console.error('Error in searchEntriesWithVector:', error);
@@ -873,13 +859,14 @@ async function searchEntriesHybrid(
   userId: string,
   queryEmbedding: any[],
   filters: any = {},
-  matchCount: number = 15
+  matchCount: number = 15,
+  timezoneOffset: number = 0
 ) {
   try {
     console.log(`Hybrid search for userId: ${userId}`);
     
     // First get vector results
-    const vectorResults = await searchEntriesWithVector(userId, queryEmbedding, filters, Math.floor(matchCount * 0.7));
+    const vectorResults = await searchEntriesWithVector(userId, queryEmbedding, filters, Math.floor(matchCount * 0.7), timezoneOffset);
     
     // Then get SQL results - use fewer SQL results for hybrid approach
     const sqlResults = await searchEntriesWithSQL(userId, filters, Math.floor(matchCount * 0.5));

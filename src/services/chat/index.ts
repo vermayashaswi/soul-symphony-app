@@ -28,3 +28,8 @@ export { updateThreadTitle } from './threadService';
 
 // Add the missing supabase import for createChatThread function
 import { supabase } from '@/integrations/supabase/client';
+
+// Add utility function to get user's local timezone offset
+export const getUserTimezoneOffset = (): number => {
+  return new Date().getTimezoneOffset();
+};

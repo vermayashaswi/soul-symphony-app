@@ -218,6 +218,7 @@ export type Database = {
           journal_focus_areas: string[] | null
           onboarding_completed: boolean | null
           reminder_settings: Json | null
+          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -230,6 +231,7 @@ export type Database = {
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
+          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -242,6 +244,7 @@ export type Database = {
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
+          timezone?: string | null
           updated_at?: string
         }
         Relationships: []

@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
 import { createFallbackQueryPlan, convertGptPlanToQueryPlan } from "./chat/queryPlannerService";
+import { getUserTimezoneOffset } from "./chat";
 
 export type ChatMessage = {
   role: string;
@@ -19,13 +20,17 @@ const logUserQuery = async (
   messageId?: string
 ): Promise<void> => {
   try {
+    // Get user's timezone offset
+    const timezoneOffset = getUserTimezoneOffset();
+    
     // Use an edge function to log the query instead of direct table access
     await supabase.functions.invoke('ensure-chat-persistence', {
       body: {
         userId,
         queryText,
         threadId,
-        messageId
+        messageId,
+        timezoneOffset
       }
     });
   } catch (error) {
@@ -70,6 +75,10 @@ export const processChatMessage = async (
   console.log("Processing chat message:", message.substring(0, 30) + "...");
   
   try {
+    // Get user's timezone offset for accurate time-based queries
+    const timezoneOffset = getUserTimezoneOffset();
+    console.log(`User timezone offset: ${timezoneOffset} minutes`);
+    
     // Log the user query to the user_queries table
     // We'll pass the message ID once we get it from the chat_messages table
     await logUserQuery(userId, message, threadId);
@@ -87,6 +96,7 @@ export const processChatMessage = async (
           message,
           userId,
           threadId,
+          timezoneOffset,
           conversationContext: recentMessages.reverse() // Reverse to get chronological order
         }
       }
@@ -100,7 +110,7 @@ export const processChatMessage = async (
       console.log("Generated fallback query plan:", queryPlan);
       
       // Continue with the local query plan
-      return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics);
+      return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset);
     }
     
     console.log("Received response from smart-query-planner:", plannerData);
@@ -119,7 +129,7 @@ export const processChatMessage = async (
     console.log("Generated query plan:", queryPlan);
     
     // Process with the query plan
-    return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics);
+    return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset);
   } catch (error) {
     console.error("Error processing chat message:", error);
     return {
@@ -136,7 +146,8 @@ async function processWithQueryPlan(
   queryTypes: any, 
   threadId: string | null,
   queryPlan: any,
-  enableDiagnostics: boolean
+  enableDiagnostics: boolean,
+  timezoneOffset: number
 ): Promise<ChatMessage> {
   try {
     // Use fixed parameters for vector search - let the retriever handle the filtering
@@ -219,6 +230,7 @@ async function processWithQueryPlan(
             threadId, // Pass threadId for context
             includeDiagnostics: false,
             queryPlan, // Pass the overall query plan
+            timezoneOffset, // Pass timezone offset
             vectorSearch: {
               matchThreshold,
               matchCount
@@ -300,7 +312,8 @@ async function processWithQueryPlan(
           originalQuery: message,
           segmentResults,
           userId,
-          threadId // Pass threadId for context
+          threadId, // Pass threadId for context
+          timezoneOffset // Pass timezone offset
         }
       });
       
@@ -372,6 +385,7 @@ async function processWithQueryPlan(
         queryPlan, // Pass the query plan to the edge function
         threadId, // Ensure threadId is passed for maintaining conversational context
         includeDiagnostics: enableDiagnostics,
+        timezoneOffset, // Pass timezone offset
         vectorSearch: {
           matchThreshold,
           matchCount

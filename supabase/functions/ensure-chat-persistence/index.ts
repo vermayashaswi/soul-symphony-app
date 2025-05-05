@@ -20,7 +20,7 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, messageId, threadId, queryText } = await req.json();
+    const { userId, messageId, threadId, queryText, timezoneOffset } = await req.json();
 
     if (!userId) {
       throw new Error('User ID is required');
@@ -31,6 +31,7 @@ serve(async (req) => {
     }
 
     console.log(`Ensuring chat persistence for user ${userId}`);
+    console.log(`User timezone offset: ${timezoneOffset || 0} minutes`);
     
     // Insert the query into the user_queries table without generating embeddings
     const { data, error } = await supabase
@@ -39,7 +40,8 @@ serve(async (req) => {
         user_id: userId,
         query_text: queryText,
         thread_id: threadId,
-        message_id: messageId
+        message_id: messageId,
+        timezone_offset: timezoneOffset || 0
       })
       .select()
       .single();

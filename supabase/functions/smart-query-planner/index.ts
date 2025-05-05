@@ -36,6 +36,12 @@ serve(async (req) => {
     console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
     console.log(`User timezone offset: ${timezoneOffset} minutes`);
     
+    // Get the user's local time based on timezone offset
+    const userLocalTime = new Date(Date.now() - (timezoneOffset || 0) * 60 * 1000);
+    const formattedLocalTime = userLocalTime.toISOString();
+    
+    console.log(`User's local time: ${formattedLocalTime}`);
+    
     // Check message types and planQuery
     const messageTypesResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -152,33 +158,42 @@ Examples:
           messages: [
             {
               role: 'system',
-              content: `You are an AI query planner for a journaling application. Your task is to analyze user questions and create search plans that efficiently retrieve relevant journal entries. 
-              
-              For the following user query, create a JSON search plan with these components:
+              content: `You are an AI query planner for a journaling application. Your task is to analyze user questions and create search plans that efficiently retrieve relevant journal entries.
 
-              1. "strategy": Choose the most appropriate search method:
-                 - "vector" (semantic search, default for conceptual queries)
-                 - "sql" (direct filtering, best for time/attribute-based queries)
-                 - "hybrid" (combines both approaches)
-              
-              2. "filters": Add relevant filters based on the query:
-                 - "date_range": {startDate, endDate, periodName} (for time-based queries)
-                 - "emotions": [] (array of emotions to filter for)
-                 - "sentiment": [] (array of sentiments: "positive", "negative", "neutral")
-                 - "themes": [] (array of themes to filter for)
-                 - "entities": [{type, name}] (people, places, etc. mentioned)
-              
-              3. "match_count": Number of entries to retrieve (default 15, use 30+ for aggregations)
-              
-              4. "needs_data_aggregation": Boolean (true if statistical analysis needed)
-                 - IMPORTANT: Set this to true for ALL rating, scoring, or evaluation requests
-                 - Also set to true for any pattern analysis, trait assessment, or statistic requests
-              
-              5. "needs_more_context": Boolean (true if query relates to previous messages)
+IMPORTANT DATABASE INFORMATION:
+- All journal entries are stored with UTC timestamps in the database
+- The user's current local time is: ${formattedLocalTime} 
+- The user's timezone offset from UTC is: ${timezoneOffset || 0} minutes
+- When filtering by date ranges, you need to consider the user's timezone
 
-              Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
+For the following user query, create a JSON search plan with these components:
 
-              Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
+1. "strategy": Choose the most appropriate search method:
+   - "vector" (semantic search, default for conceptual queries)
+   - "sql" (direct filtering, best for time/attribute-based queries)
+   - "hybrid" (combines both approaches)
+
+2. "filters": Add relevant filters based on the query:
+   - "date_range": {startDate, endDate, periodName} (for time-based queries)
+     - IMPORTANT: Make sure these dates are in ISO format with timezone (UTC)
+     - For relative periods like "last week", compute actual date ranges
+     - Account for the user's timezone offset when calculating dates
+   - "emotions": [] (array of emotions to filter for)
+   - "sentiment": [] (array of sentiments: "positive", "negative", "neutral")
+   - "themes": [] (array of themes to filter for)
+   - "entities": [{type, name}] (people, places, etc. mentioned)
+
+3. "match_count": Number of entries to retrieve (default 15, use 30+ for aggregations)
+
+4. "needs_data_aggregation": Boolean (true if statistical analysis needed)
+   - IMPORTANT: Set this to true for ALL rating, scoring, or evaluation requests
+   - Also set to true for any pattern analysis, trait assessment, or statistic requests
+
+5. "needs_more_context": Boolean (true if query relates to previous messages)
+
+Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
+
+Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
               `
             },
             { role: 'user', content: message }
