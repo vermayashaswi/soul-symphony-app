@@ -1,7 +1,7 @@
 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 
-export type SearchStrategy = 'vector' | 'theme' | 'emotion' | 'time' | 'hybrid';
+export type SearchStrategy = 'vector' | 'theme' | 'emotion' | 'time' | 'hybrid' | 'sql';
 
 export interface QueryPlan {
   searchStrategy: SearchStrategy;
@@ -17,6 +17,8 @@ export interface QueryPlan {
   needsDataAggregation: boolean;
   needsMoreContext: boolean;
   matchCount: number;
+  isSegmented?: boolean;
+  subqueries?: string[];
 }
 
 const FITNESS_RELATED_TERMS = [
@@ -128,9 +130,90 @@ function extractEmotionTerms(query: string): string[] {
 }
 
 /**
- * Creates an intelligent query plan based on the user's question
+ * Converts a GPT-generated plan to our internal QueryPlan format
  */
-export function createQueryPlan(query: string): QueryPlan {
+export function convertGptPlanToQueryPlan(gptPlan: any): QueryPlan {
+  if (!gptPlan) {
+    return createLegacyQueryPlan(''); // Return default plan
+  }
+
+  try {
+    // Map GPT strategy to our SearchStrategy
+    let searchStrategy: SearchStrategy = 'vector';
+    if (gptPlan.strategy) {
+      switch(gptPlan.strategy.toLowerCase()) {
+        case 'vector': 
+          searchStrategy = 'vector'; 
+          break;
+        case 'sql': 
+          searchStrategy = 'vector'; // We don't have direct SQL yet, so map to vector
+          break;
+        case 'hybrid': 
+          searchStrategy = 'hybrid'; 
+          break;
+        case 'emotion': 
+          searchStrategy = 'emotion'; 
+          break;
+        case 'time': 
+          searchStrategy = 'time'; 
+          break;
+        case 'theme':
+          searchStrategy = 'theme';
+          break;
+      }
+    }
+
+    // Extract filters
+    const themeTerms = gptPlan.filters?.themes || [];
+    const emotionTerms = gptPlan.filters?.emotions || [];
+    
+    // Set up time range if provided
+    let timeRange = undefined;
+    if (gptPlan.filters?.date_range) {
+      timeRange = {
+        startDate: gptPlan.filters.date_range.startDate || null,
+        endDate: gptPlan.filters.date_range.endDate || null,
+        periodName: gptPlan.filters.date_range.periodName || ''
+      };
+    }
+    
+    // Create our query plan
+    const queryPlan: QueryPlan = {
+      searchStrategy,
+      needsDataAggregation: gptPlan.needs_data_aggregation || false,
+      needsMoreContext: gptPlan.needs_more_context || false,
+      matchCount: gptPlan.match_count || 15,
+      isSegmented: gptPlan.is_segmented || false,
+      subqueries: gptPlan.subqueries || []
+    };
+    
+    // Add theme terms and expanded terms if found
+    if (themeTerms.length > 0) {
+      queryPlan.themeTerms = themeTerms;
+      queryPlan.expandedThemes = expandThemeTerms(themeTerms);
+    }
+    
+    // Add emotion terms if found
+    if (emotionTerms.length > 0) {
+      queryPlan.emotionTerms = emotionTerms;
+    }
+    
+    // Add time range if found
+    if (timeRange) {
+      queryPlan.timeRange = timeRange;
+    }
+    
+    return queryPlan;
+  } catch (error) {
+    console.error("Error converting GPT plan to query plan:", error);
+    return createLegacyQueryPlan(''); // Return default plan
+  }
+}
+
+/**
+ * Creates a legacy query plan based on the user's question (used as fallback)
+ */
+export function createLegacyQueryPlan(query: string): QueryPlan {
   const queryTypes = analyzeQueryTypes(query);
   const themeTerms = extractThemeTerms(query);
   const emotionTerms = extractEmotionTerms(query);
@@ -182,4 +265,12 @@ export function createQueryPlan(query: string): QueryPlan {
   }
   
   return plan;
+}
+
+/**
+ * Creates an intelligent query plan based on the user's question
+ * This function is kept for backward compatibility
+ */
+export function createQueryPlan(query: string): QueryPlan {
+  return createLegacyQueryPlan(query);
 }
