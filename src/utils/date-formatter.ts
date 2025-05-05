@@ -1,5 +1,5 @@
 
-import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear } from 'date-fns';
+import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear, formatISO, parseISO } from 'date-fns';
 import { TimeRange } from '@/hooks/use-insights-data';
 
 /**
@@ -159,4 +159,48 @@ export const groupDataByFormattedDate = <T extends { date: Date | string; [key: 
       originalDate: group.originalDate
     }))
     .sort((a, b) => a.originalDate.getTime() - b.originalDate.getTime());
+};
+
+/**
+ * Formats ISO date string to a more readable format
+ */
+export const formatDateToReadable = (dateStr: string, includeYear = true): string => {
+  if (!dateStr) return 'Unknown date';
+  
+  try {
+    const date = parseISO(dateStr);
+    if (isNaN(date.getTime())) return 'Invalid date';
+    
+    if (isToday(date)) {
+      return `Today at ${format(date, 'h:mm a')}`;
+    } else if (isYesterday(date)) {
+      return `Yesterday at ${format(date, 'h:mm a')}`;
+    } else {
+      return format(date, includeYear ? 'MMM d, yyyy' : 'MMM d');
+    }
+  } catch (error) {
+    console.error('Error formatting date:', error);
+    return 'Unknown date';
+  }
+};
+
+/**
+ * Validates a date range to ensure it's not invalid
+ */
+export const validateDateRange = (startDate: string | Date, endDate: string | Date): boolean => {
+  try {
+    const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
+    const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
+    
+    // Check for invalid dates
+    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+      return false;
+    }
+    
+    // Check that start is before end
+    return start <= end;
+  } catch (error) {
+    console.error('Error validating date range:', error);
+    return false;
+  }
 };
