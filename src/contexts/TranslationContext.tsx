@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
@@ -42,6 +41,7 @@ interface TranslationContextType {
   translate: (text: string, sourceLanguage?: string, entryId?: number) => Promise<string>;
   getCachedTranslation: (text: string, language: string) => string | null;
   prefetchTranslationsForRoute: (routeTexts: string[]) => Promise<void>;
+  languages: { code: string; label: string }[]; // Add languages to the context type
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -270,7 +270,8 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       translationProgress,
       translate,
       getCachedTranslation,
-      prefetchTranslationsForRoute
+      prefetchTranslationsForRoute,
+      languages // Add languages to the context value
     }}>
       {children}
     </TranslationContext.Provider>
