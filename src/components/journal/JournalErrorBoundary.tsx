@@ -1,12 +1,10 @@
-
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { processingStateManager } from '@/utils/journal/processing-state-manager';
-import { resetProcessingState } from '@/utils/audio-processing';
+import { ArrowPathIcon } from 'lucide-react';
+import { resetProcessingState } from '@/utils/audio/processing-state';
 
 interface Props {
   children: ReactNode;
-  onReset?: () => void;
 }
 
 interface State {
@@ -15,66 +13,66 @@ interface State {
   errorInfo: ErrorInfo | null;
 }
 
-export class JournalErrorBoundary extends Component<Props, State> {
-  public state: State = {
-    hasError: false,
-    error: null,
-    errorInfo: null
+class JournalErrorBoundary extends Component<Props, State> {
+  constructor(props: Props) {
+    super(props);
+    this.state = { hasError: false, error: null, errorInfo: null };
+  }
+
+  static getDerivedStateFromError(error: Error) {
+    // Update state so the next render will show the fallback UI.
+    return { hasError: true, error: error, errorInfo: null };
+  }
+
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // You can also log the error to an error reporting service
+    console.error("Caught error in JournalErrorBoundary", error, errorInfo);
+    this.setState({ errorInfo: errorInfo });
+  }
+
+  handleRetry = () => {
+    // Reset the state to attempt re-rendering the component
+    this.setState({ hasError: false, error: null, errorInfo: null }, () => {
+      // Optionally, trigger a re-fetch of data or re-initialize the component
+      window.location.reload();
+    });
+  };
+  
+  handleResetProcessing = () => {
+    console.log('[JournalErrorBoundary] Resetting processing state due to error');
+    resetProcessingState();
+    this.setState({ hasError: false, error: null, errorInfo: null }, () => {
+      window.location.reload();
+    });
   };
 
-  public static getDerivedStateFromError(error: Error): State {
-    // Update state so the next render will show the fallback UI
-    return { hasError: true, error, errorInfo: null };
-  }
-
-  public componentDidCatch(error: Error, errorInfo: ErrorInfo): void {
-    console.error('Journal component error:', error, errorInfo);
-    this.setState({
-      error,
-      errorInfo
-    });
-  }
-  
-  private handleReset = (): void => {
-    // Reset all processing state to recover from errors
-    resetProcessingState();
-    processingStateManager.clearAll();
-    
-    // Call external reset handler if provided
-    if (this.props.onReset) {
-      this.props.onReset();
-    }
-    
-    // Reset the error state
-    this.setState({
-      hasError: false,
-      error: null,
-      errorInfo: null
-    });
-  }
-
-  public render(): ReactNode {
+  render() {
     if (this.state.hasError) {
+      // You can render any custom fallback UI
       return (
-        <div className="p-4 rounded-md bg-destructive/10 border border-destructive text-center">
-          <h2 className="text-lg font-semibold mb-2">Something went wrong</h2>
-          <p className="mb-4 text-muted-foreground">
-            There was an error displaying journal entries. Please try again.
+        <div className="flex flex-col items-center justify-center p-4">
+          <h2 className="text-xl font-semibold mb-4">Something went wrong in the Journal section.</h2>
+          <p className="text-gray-600 mb-4">
+            We've caught an error, and the Journal component could not be displayed properly.
           </p>
-          <Button 
-            variant="outline"
-            onClick={this.handleReset}
-            className="mx-auto"
-          >
-            Reset and try again
-          </Button>
-          <details className="mt-4 text-xs text-left">
-            <summary className="text-muted-foreground cursor-pointer">Error details</summary>
-            <pre className="p-2 bg-background/80 rounded mt-2 overflow-auto max-h-[200px]">
-              {this.state.error?.toString()}
-              {this.state.errorInfo?.componentStack}
-            </pre>
-          </details>
+          <div className="space-x-4">
+            <Button variant="outline" onClick={this.handleRetry}>
+              <ArrowPathIcon className="mr-2 h-4 w-4" />
+              Try to Reload
+            </Button>
+            <Button variant="destructive" onClick={this.handleResetProcessing}>
+              Reset Audio Processing
+            </Button>
+          </div>
+          {this.state.errorInfo && (
+            <details className="mt-4">
+              <summary>Error Details</summary>
+              <p className="text-sm text-red-500">{this.state.error?.message}</p>
+              <pre className="text-xs text-red-500 overflow-auto">
+                {this.state.errorInfo.componentStack}
+              </pre>
+            </details>
+          )}
         </div>
       );
     }
@@ -82,3 +80,5 @@ export class JournalErrorBoundary extends Component<Props, State> {
     return this.props.children;
   }
 }
+
+export default JournalErrorBoundary;

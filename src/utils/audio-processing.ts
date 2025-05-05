@@ -1,7 +1,12 @@
+
 import { v4 as uuidv4 } from 'uuid';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { createProcessingEntry, removeProcessingEntry } from './processing-state';
+import { 
+  createProcessingEntry, 
+  removeProcessingEntry, 
+  setEntryIdForProcessingId 
+} from './audio/processing-state';
 import { createLocalTimestamp, getCurrentTimezone } from '@/services/timezoneService';
 
 const PROCESSING_URL = process.env.NEXT_PUBLIC_EDGE_URL + '/process-audio';
@@ -65,7 +70,6 @@ export const processRecording = async (
     return { success: true, tempId };
   } catch (error: any) {
     console.error('[processRecording] Error during processing:', error);
-    removeProcessingEntry(tempId);
     return { success: false, error: error.message || 'An unexpected error occurred' };
   }
 };
