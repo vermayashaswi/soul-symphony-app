@@ -181,6 +181,8 @@ serve(async (req) => {
               
               IMPORTANT: If the query contains ANY request for ratings, scores, or evaluations (e.g., "Rate my anxiety", "Score my happiness", etc.), you MUST classify it as "JOURNAL_SPECIFIC".
               
+              If you remotely feel this question could be about the person's journal entries or an exploration of his/her specific mental health, classify it as "JOURNAL_SPECIFIC".
+              
               Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
               
               Examples:
