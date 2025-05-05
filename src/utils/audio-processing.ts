@@ -21,6 +21,14 @@ export const getEntryIdForProcessingId = (tempId: string): number | null => {
   }
 };
 
+export const setEntryIdForProcessingId = (tempId: string, entryId: number): void => {
+  try {
+    localStorage.setItem(`processingEntryId-${tempId}`, entryId.toString());
+  } catch (error) {
+    console.error('Error setting entry ID in local storage:', error);
+  }
+};
+
 export const removeProcessingEntryById = (entryId: number) => {
   try {
     localStorage.removeItem(`processingEntryId-${entryId}`);

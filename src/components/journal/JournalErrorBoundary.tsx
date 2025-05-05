@@ -1,6 +1,7 @@
+
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
-import { ArrowPathIcon } from 'lucide-react';
+import { RefreshCw } from 'lucide-react';
 import { resetProcessingState } from '@/utils/audio/processing-state';
 
 interface Props {
@@ -57,7 +58,7 @@ class JournalErrorBoundary extends Component<Props, State> {
           </p>
           <div className="space-x-4">
             <Button variant="outline" onClick={this.handleRetry}>
-              <ArrowPathIcon className="mr-2 h-4 w-4" />
+              <RefreshCw className="mr-2 h-4 w-4" />
               Try to Reload
             </Button>
             <Button variant="destructive" onClick={this.handleResetProcessing}>

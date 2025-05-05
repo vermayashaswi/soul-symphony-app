@@ -24,4 +24,4 @@ export {
 // Re-export from other audio-related utilities as needed
 export { validateAudioBlob } from './blob-utils';
 export { verifyUserAuthentication } from './auth-utils';
-export { getEntryIdForProcessingId } from '../audio-processing';
+export { getEntryIdForProcessingId, setEntryIdForProcessingId as updateEntryIdForProcessingId } from '../audio-processing';
