@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -37,6 +36,186 @@ async function countJournalEntries(userId: string): Promise<number> {
   }
 
   return count || 0;
+}
+
+// New function to get emotion data from the emotions table
+async function getEmotionsData(): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('emotions')
+      .select('name, description')
+      .order('name');
+      
+    if (error) {
+      console.error("Error fetching emotions data:", error);
+      return [];
+    }
+    
+    return data || [];
+  } catch (error) {
+    console.error("Error in getEmotionsData:", error);
+    return [];
+  }
+}
+
+// New function to get sample entity categories from journal entries
+async function getSampleEntityCategories(userId: string, limit = 10): Promise<any[]> {
+  try {
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('entities')
+      .eq('user_id', userId)
+      .not('entities', 'is', null)
+      .limit(limit);
+    
+    if (error) {
+      console.error("Error fetching entities data:", error);
+      return [];
+    }
+    
+    // Extract unique entity types
+    const entityTypes = new Set();
+    const entityExamples: Record<string, string[]> = {};
+    
+    data?.forEach(entry => {
+      if (entry.entities && Array.isArray(entry.entities)) {
+        entry.entities.forEach((entity: any) => {
+          if (entity && entity.type) {
+            entityTypes.add(entity.type);
+            
+            // Store examples for each entity type (up to 5)
+            if (!entityExamples[entity.type]) {
+              entityExamples[entity.type] = [];
+            }
+            
+            if (entity.name && entityExamples[entity.type].length < 5 && !entityExamples[entity.type].includes(entity.name)) {
+              entityExamples[entity.type].push(entity.name);
+            }
+          }
+        });
+      }
+    });
+    
+    // Format the entity categories and examples
+    return Array.from(entityTypes).map(type => ({
+      type,
+      examples: entityExamples[type as string] || []
+    }));
+    
+  } catch (error) {
+    console.error("Error in getSampleEntityCategories:", error);
+    return [];
+  }
+}
+
+// New function to get sample data structures
+async function getSampleDataStructures(userId: string): Promise<any> {
+  try {
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('emotions, entityemotion, master_themes, content')
+      .eq('user_id', userId)
+      .not('emotions', 'is', null)
+      .limit(3);
+    
+    if (error) {
+      console.error("Error fetching sample data structures:", error);
+      return {};
+    }
+    
+    // Process and clean up samples for inclusion in prompt
+    const samples: any = {
+      emotions: [],
+      entityemotion: [],
+      master_themes: [],
+      content_samples: []
+    };
+    
+    data?.forEach(entry => {
+      if (entry.emotions && !samples.emotions.length) {
+        samples.emotions.push(entry.emotions);
+      }
+      
+      if (entry.entityemotion && !samples.entityemotion.length) {
+        samples.entityemotion.push(entry.entityemotion);
+      }
+      
+      if (entry.master_themes && Array.isArray(entry.master_themes) && !samples.master_themes.length) {
+        samples.master_themes.push(entry.master_themes);
+      }
+      
+      if (entry.content && samples.content_samples.length < 2) {
+        // Truncate content for brevity
+        const truncated = entry.content.length > 200 
+          ? entry.content.substring(0, 200) + '...' 
+          : entry.content;
+        samples.content_samples.push(truncated);
+      }
+    });
+    
+    return samples;
+  } catch (error) {
+    console.error("Error in getSampleDataStructures:", error);
+    return {};
+  }
+}
+
+// Enhanced function to get detailed schema information
+async function getEnhancedSchemaInfo(): Promise<string> {
+  try {
+    const { data: columnData, error: columnError } = await supabase.rpc(
+      'check_table_columns',
+      { table_name: 'Journal Entries' }
+    );
+    
+    if (columnError) {
+      console.error("Error getting table schema:", columnError);
+      throw columnError;
+    }
+    
+    // Add column descriptions with detailed explanations
+    const columnDescriptions: Record<string, string> = {
+      'id': 'Primary key for the journal entry',
+      'user_id': 'UUID of the user who created the journal entry, references auth.users',
+      'created_at': 'Timestamp when the journal entry was created, supports time-based queries',
+      'transcription text': 'Original text from voice recording transcription',
+      'refined text': 'Processed version of the transcription with improvements',
+      'content': 'The main text content of the journal entry used for search and analysis',
+      'audio_url': 'URL to the audio recording if the entry was created via voice',
+      'duration': 'Length of the audio recording in seconds',
+      'emotions': 'JSONB array containing emotion analysis with scores (e.g. {"joy": 0.8, "calm": 0.6})',
+      'sentiment': 'Overall sentiment classification (positive, negative, neutral)',
+      'entities': 'JSONB array of entities detected in the text with their types and names',
+      'master_themes': 'Text array of high-level themes extracted from the entry',
+      'themes': 'Text array of more specific themes extracted from the entry',
+      'user_feedback': 'Optional feedback from the user about the entry',
+      'Edit_Status': 'Integer flag indicating if the entry has been edited (0=not edited)',
+      'entityemotion': 'JSONB mapping entities to associated emotions',
+      'original_language': 'The original language the entry was written in',
+      'translation_text': 'Translated version of the content if in a different language'
+    };
+    
+    // Format schema with descriptions
+    const enhancedSchema = columnData.map(col => 
+      `${col.column_name} (${col.data_type})${columnDescriptions[col.column_name] ? ' - ' + columnDescriptions[col.column_name] : ''}`
+    ).join('\n');
+    
+    // Additional table relationships and schema notes
+    const schemaExplanation = `
+Journal Entries Table Schema Notes:
+- The emotions field is a JSONB object mapping emotion names to intensity scores (0.0-1.0)
+- The entities field contains structured data about people, places, etc. mentioned in entries
+- The entityemotion field links entities to associated emotions
+- The master_themes field contains high-level categories for the entry content
+- Temporal queries can use the created_at field which is indexed
+- Sentiment values are typically "positive", "negative", or "neutral"
+    `;
+    
+    return enhancedSchema + '\n\n' + schemaExplanation;
+  } catch (error) {
+    console.error("Error getting enhanced schema info:", error);
+    return "Schema information unavailable";
+  }
 }
 
 // Utility function to get date range based on time range
@@ -206,45 +385,87 @@ async function createQueryPlan(query: string, userId: string, conversationContex
   try {
     const entryCount = await countJournalEntries(userId);
     
-    // Get journal schema
-    const { data: columnData, error: columnError } = await supabase.rpc(
-      'check_table_columns',
-      { table_name: 'Journal Entries' }
-    );
+    // Get enhanced schema information with column descriptions
+    const enhancedSchema = await getEnhancedSchemaInfo();
     
-    if (columnError) {
-      console.error("Error getting table schema:", columnError);
-      throw columnError;
+    // Get emotions data
+    const emotionsData = await getEmotionsData();
+    
+    // Get entity categories and examples
+    const entityCategories = await getSampleEntityCategories(userId);
+    
+    // Get sample data structures
+    const sampleStructures = await getSampleDataStructures(userId);
+    
+    // Format emotions data for inclusion in the prompt
+    const emotionsInfo = emotionsData.length > 0 
+      ? `Available emotions in the database:\n${emotionsData.map(e => `- ${e.name}${e.description ? ': ' + e.description : ''}`).join('\n')}`
+      : 'Emotions data unavailable';
+    
+    // Format entity categories for inclusion in the prompt
+    const entitiesInfo = entityCategories.length > 0
+      ? `Entity categories found in user's journal:\n${entityCategories.map(e => 
+          `- ${e.type}${e.examples.length > 0 ? ' (Examples: ' + e.examples.join(', ') + ')' : ''}`
+        ).join('\n')}`
+      : 'Entity categories unavailable';
+    
+    // Format sample data structures
+    let dataStructuresInfo = 'Sample data structures:';
+    
+    if (sampleStructures.emotions && sampleStructures.emotions.length) {
+      dataStructuresInfo += `\n\nSample emotions JSON structure:\n${JSON.stringify(sampleStructures.emotions[0], null, 2)}`;
     }
     
-    // Format table schema
-    const schema = columnData.map(col => `${col.column_name} (${col.data_type})`).join('\n');
+    if (sampleStructures.entityemotion && sampleStructures.entityemotion.length) {
+      dataStructuresInfo += `\n\nSample entityemotion JSON structure:\n${JSON.stringify(sampleStructures.entityemotion[0], null, 2)}`;
+    }
     
-    const prompt = `You are the query planning module for SOuLO's journal assistant. Your task is to analyze the user's query and design a step-by-step plan to retrieve relevant information from the user's journal.
-
-    Here is the user's query:
-    "${query}"
+    if (sampleStructures.master_themes && sampleStructures.master_themes.length) {
+      dataStructuresInfo += `\n\nSample master_themes array structure:\n${JSON.stringify(sampleStructures.master_themes[0], null, 2)}`;
+    }
     
-    Here is the full journal schema:
-    ${schema}
+    if (sampleStructures.content_samples && sampleStructures.content_samples.length) {
+      dataStructuresInfo += `\n\nSample entry content:\n${sampleStructures.content_samples.join('\n\n')}`;
+    }
     
-    The user has ${entryCount} journal entries.
-    
-    Your output should be a JSON object with:
-    - "is_segmented": true/false (whether query needs to be broken down)
-    - "subqueries": [array of sub-questions if segmented]
-    - "strategy": "vector", "sql", "hybrid", "emotion", or "time"
-    - "filters": { 
-        "date_range": { "startDate": ISO date or null, "endDate": ISO date or null, "periodName": string description },
-        "emotions": [array of emotions to filter by],
-        "themes": [array of themes to filter by]
-      }
-    - "match_count": number of matches to return (10-30 based on query complexity)
-    - "needs_data_aggregation": true/false (whether results need to be analyzed together)
-    - "needs_more_context": true/false (whether more entries than usual should be fetched)
-    - "reasoning": why this strategy works best
-    
-    Include only what's applicable to this specific query.`;
+    // Create an enhanced prompt with all the additional information
+    const prompt = `You are an expert query analyzer for a personal journal application. Your task is to analyze user queries and create a structured plan for retrieving relevant information from a database.
+      
+      Here is the full journal schema with detailed descriptions:
+      ${enhancedSchema}
+      
+      ${emotionsInfo}
+      
+      ${entitiesInfo}
+      
+      ${dataStructuresInfo}
+      
+      The user has ${entryCount} journal entries.
+      
+      Your output should be a JSON object with:
+      - "is_segmented": true/false (whether query needs to be broken down)
+      - "subqueries": [array of sub-questions if segmented]
+      - "strategy": "vector", "sql", "hybrid", "emotion", or "time"
+      - "filters": { 
+          "date_range": { "startDate": ISO date or null, "endDate": ISO date or null, "periodName": string description },
+          "emotions": [array of emotions to filter by],
+          "themes": [array of themes to filter by]
+        }
+      - "match_count": number of matches to return (10-30 based on query complexity)
+      - "needs_data_aggregation": true/false (whether results need to be analyzed together)
+      - "needs_more_context": true/false (whether more entries than usual should be fetched)
+      - "reasoning": why this strategy works best
+      
+      Include only what's applicable to this specific query.
+      
+      Query examples and recommended strategies:
+      1. "Show me entries about happiness" → Use emotion filter with "happiness" emotion
+      2. "What did I write about last Monday?" → Use time filter with specific date range
+      3. "How has my sleep been changing?" → Use theme filter with "sleep" and data aggregation
+      4. "What makes me anxious about work?" → Use emotion filter "anxiety" + theme filter "work"
+      5. "When was the last time I felt excited?" → Use emotion filter with "excited" + time sorting
+      
+      Generate precise, actionable query plans focused on retrieving the most relevant journal entries for the user's question.`;
 
     let messages = [{ role: "system", content: prompt }];
     
