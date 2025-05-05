@@ -19,31 +19,8 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { textWillOverflow } from '@/utils/textUtils';
 import { formatDateToReadable } from '@/utils/date-formatter';
 
-export interface JournalEntry {
-  id: number;
-  content: string;
-  created_at: string;
-  audio_url?: string;
-  sentiment?: string | null;
-  themes?: string[] | null;
-  master_themes?: string[];
-  entities?: Array<{
-    type: string;
-    name: string;
-    text?: string;
-  }>;
-  foreignKey?: string;
-  predictedLanguages?: {
-    [key: string]: number;
-  } | null;
-  Edit_Status?: number | null;
-  user_feedback?: string | null;
-  "transcription text"?: string;
-  "refined text"?: string;
-  translation_text?: string;
-  original_language?: string;
-  tempId?: string;
-}
+// Use the imported type rather than redefining it
+export type JournalEntry = JournalEntryType;
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -73,9 +50,11 @@ export function JournalEntryCard({
     themes: Array.isArray(entry?.themes) ? entry.themes : [],
     Edit_Status: entry?.Edit_Status || null,
     user_feedback: entry?.user_feedback || null,
-    translation_text: entry?.translation_text,
-    original_language: entry?.original_language,
-    tempId: entry?.tempId
+    "transcription text"?: string,
+    "refined text"?: string,
+    translation_text?: string,
+    original_language?: string,
+    tempId?: string
   };
 
   const [isExpanded, setIsExpanded] = useState(true); // Always expanded now
