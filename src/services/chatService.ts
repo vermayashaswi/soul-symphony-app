@@ -1,6 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
-import { createQueryPlan, convertGptPlanToQueryPlan } from "./chat/queryPlannerService";
+import { createFallbackQueryPlan, convertGptPlanToQueryPlan } from "./chat/queryPlannerService";
 
 export type ChatMessage = {
   role: string;
@@ -96,7 +95,7 @@ export const processChatMessage = async (
       console.error("Error from smart-query-planner:", plannerError);
       // Fall back to local query planning
       console.log("Falling back to local query planning");
-      const queryPlan = createQueryPlan(message);
+      const queryPlan = createFallbackQueryPlan(message);
       console.log("Generated fallback query plan:", queryPlan);
       
       // Continue with the local query plan
