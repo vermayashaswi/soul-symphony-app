@@ -125,9 +125,10 @@ async function getEntityData(userId: string, limit = 20): Promise<any> {
 // Get sample data structures
 async function getSampleDataStructures(userId: string): Promise<any> {
   try {
+    // Fix: Use quoted column names for columns with spaces
     const { data, error } = await supabase
       .from('Journal Entries')
-      .select('emotions, entityemotion, master_themes, content, sentiment')
+      .select('emotions, entityemotion, master_themes, "refined text", "transcription text", sentiment')
       .eq('user_id', userId)
       .not('emotions', 'is', null)
       .limit(3);
@@ -163,11 +164,13 @@ async function getSampleDataStructures(userId: string): Promise<any> {
         samples.sentiment.push(entry.sentiment);
       }
       
-      if (entry.content && samples.content_samples.length < 2) {
+      // Fix: Use correct column access with spaces
+      const content = entry["refined text"] || entry["transcription text"];
+      if (content && samples.content_samples.length < 2) {
         // Truncate content for brevity
-        const truncated = entry.content.length > 200 
-          ? entry.content.substring(0, 200) + '...' 
-          : entry.content;
+        const truncated = content.length > 200 
+          ? content.substring(0, 200) + '...' 
+          : content;
         samples.content_samples.push(truncated);
       }
     });
@@ -199,7 +202,6 @@ async function getEnhancedSchemaInfo(): Promise<string> {
       'created_at': 'Timestamp when the journal entry was created, supports time-based queries',
       'transcription text': 'Original text from voice recording transcription',
       'refined text': 'Processed version of the transcription with improvements',
-      'content': 'The main text content of the journal entry used for search and analysis',
       'audio_url': 'URL to the audio recording if the entry was created via voice',
       'duration': 'Length of the audio recording in seconds',
       'emotions': 'JSONB array containing emotion analysis with scores (e.g. {"joy": 0.8, "calm": 0.6})',
@@ -228,6 +230,7 @@ Journal Entries Table Schema Notes:
 - The master_themes field contains high-level categories for the entry content
 - Temporal queries can use the created_at field which is indexed
 - Sentiment values are typically "positive", "negative", or "neutral"
+- IMPORTANT: Column names with spaces like "refined text" and "transcription text" must be quoted in SQL queries
     `;
     
     return enhancedSchema + '\n\n' + schemaExplanation;
@@ -431,6 +434,9 @@ async function createQueryPlan(query: string, userId: string, conversationContex
       ${dataStructuresInfo}
       
       The user has ${entryCount} journal entries.
+      
+      IMPORTANT: The database has columns with spaces in their names, like "refined text" and "transcription text". 
+      These must be properly quoted in any SQL queries.
       
       Your output should be a JSON object with:
       - "is_segmented": true/false (whether query needs to be broken down)

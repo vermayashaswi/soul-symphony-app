@@ -617,10 +617,10 @@ async function searchEntriesWithSQL(
   try {
     console.log(`SQL search with filters for userId: ${userId}`, filters);
     
-    // Start building the query
+    // Start building the query - Fix: Use quoted column names for columns with spaces
     let query = supabase
       .from('Journal Entries')
-      .select('id, refined text, transcription text, created_at, emotions, sentiment, master_themes, entities')
+      .select('id, "refined text", "transcription text", created_at, emotions, sentiment, master_themes, entities')
       .eq('user_id', userId)
       .order('created_at', { ascending: false });
     
@@ -650,7 +650,7 @@ async function searchEntriesWithSQL(
     
     let results = data || [];
     
-    // Process the results
+    // Process the results - Fix: Use correct column access with spaces
     results = results.map(entry => ({
       id: entry.id,
       content: entry['refined text'] || entry['transcription text'] || '',
