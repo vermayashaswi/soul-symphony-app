@@ -1,18 +1,6 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { 
-  format, 
-  subDays, 
-  startOfDay, 
-  endOfDay, 
-  startOfWeek, 
-  endOfWeek, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfYear, 
-  endOfYear 
-} from 'date-fns';
+import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
 
 export type TimeRange = 'today' | 'week' | 'month' | 'year';
 
@@ -210,45 +198,27 @@ const getDateRange = (timeRange: TimeRange) => {
   const now = new Date();
   let startDate, endDate;
 
-  try {
-    switch (timeRange) {
-      case 'today':
-        startDate = startOfDay(now);
-        endDate = endOfDay(now);
-        break;
-      case 'week':
-        startDate = startOfWeek(now, { weekStartsOn: 1 }); // Monday as week start
-        endDate = endOfWeek(now, { weekStartsOn: 1 });
-        break;
-      case 'month':
-        startDate = startOfMonth(now);
-        endDate = endOfMonth(now);
-        break;
-      case 'year':
-        startDate = startOfYear(now);
-        endDate = endOfYear(now);
-        break;
-      default:
-        startDate = startOfWeek(now, { weekStartsOn: 1 });
-        endDate = endOfWeek(now, { weekStartsOn: 1 });
-    }
-  } catch (error) {
-    console.error(`Error calculating date range for ${timeRange}:`, error);
-    // Fallback to a sensible default
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 7);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
-    console.log("Using fallback date range due to error");
+  switch (timeRange) {
+    case 'today':
+      startDate = startOfDay(now);
+      endDate = endOfDay(now);
+      break;
+    case 'week':
+      startDate = startOfWeek(now, { weekStartsOn: 1 }); // Monday as week start
+      endDate = endOfWeek(now, { weekStartsOn: 1 });
+      break;
+    case 'month':
+      startDate = startOfMonth(now);
+      endDate = endOfMonth(now);
+      break;
+    case 'year':
+      startDate = startOfYear(now);
+      endDate = endOfYear(now);
+      break;
+    default:
+      startDate = startOfWeek(now, { weekStartsOn: 1 });
+      endDate = endOfWeek(now, { weekStartsOn: 1 });
   }
-
-  // Log the calculated dates for debugging
-  console.log(`Date range for ${timeRange}:`, {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    durationDays: Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))
-  });
 
   return { startDate, endDate };
 };

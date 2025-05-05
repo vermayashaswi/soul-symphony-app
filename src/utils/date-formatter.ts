@@ -1,27 +1,18 @@
+
 import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear, formatISO, parseISO } from 'date-fns';
 import { TimeRange } from '@/hooks/use-insights-data';
 
 /**
  * Formats a date based on the specified time range and language
  */
-export const formatDateForTimeRange = (
-  date: Date | string, 
-  range: TimeRange | 'day' | 'short' | 'month', 
-  language: string = 'en',
-  timezoneOffset?: number
-): string => {
+export const formatDateForTimeRange = (date: Date | string, range: TimeRange | 'day' | 'short' | 'month', language: string = 'en'): string => {
   if (!date) return '';
   
   // Ensure we have a valid Date object
   const d = date instanceof Date ? date : new Date(date);
   
-  // Apply timezone offset if provided
-  const adjustedDate = timezoneOffset !== undefined 
-    ? new Date(d.getTime() + (timezoneOffset * 60 * 1000)) 
-    : d;
-    
   // Return empty string for invalid dates
-  if (isNaN(adjustedDate.getTime())) return '';
+  if (isNaN(d.getTime())) return '';
   
   try {
     switch (range) {
@@ -31,7 +22,7 @@ export const formatDateForTimeRange = (
           hour: '2-digit', 
           minute: '2-digit',
           hour12: false 
-        }).format(adjustedDate);
+        }).format(d);
       }
       
       case 'day': {
@@ -40,13 +31,13 @@ export const formatDateForTimeRange = (
           year: 'numeric',
           month: 'long',
           day: 'numeric'
-        }).format(adjustedDate);
+        }).format(d);
       }
         
       case 'week': {
         // Format as "Mon 1" (Short weekday + day number)
-        const dayNum = adjustedDate.getDate();
-        const weekday = new Intl.DateTimeFormat(language, { weekday: 'short' }).format(adjustedDate);
+        const dayNum = d.getDate();
+        const weekday = new Intl.DateTimeFormat(language, { weekday: 'short' }).format(d);
         return `${weekday} ${dayNum}`;
       }
       
@@ -55,7 +46,7 @@ export const formatDateForTimeRange = (
         return new Intl.DateTimeFormat(language, {
           month: 'short',
           day: 'numeric'
-        }).format(adjustedDate);
+        }).format(d);
       }
         
       case 'month': {
@@ -63,12 +54,12 @@ export const formatDateForTimeRange = (
         return new Intl.DateTimeFormat(language, {
           year: 'numeric',
           month: 'long'
-        }).format(adjustedDate);
+        }).format(d);
       }
         
       case 'year': {
         // Short month name
-        return new Intl.DateTimeFormat(language, { month: 'short' }).format(adjustedDate);
+        return new Intl.DateTimeFormat(language, { month: 'short' }).format(d);
       }
         
       default:
@@ -76,14 +67,14 @@ export const formatDateForTimeRange = (
         return new Intl.DateTimeFormat(language, { 
           day: 'numeric', 
           month: 'short' 
-        }).format(adjustedDate);
+        }).format(d);
     }
   } catch (error) {
     console.error('Error formatting date:', error);
     
     // Fallback to a simple format
     try {
-      return adjustedDate.toLocaleDateString(language);
+      return d.toLocaleDateString(language);
     } catch {
       return 'Invalid date';
     }
@@ -95,46 +86,33 @@ export const formatDateForTimeRange = (
  */
 export const filterDataByTimeRange = <T extends { date: Date | string }>(
   data: T[], 
-  range: TimeRange,
-  timezoneOffset?: number
+  range: TimeRange
 ): T[] => {
   if (!data || !Array.isArray(data) || data.length === 0) return [];
   
   const now = new Date();
-  
-  // Apply timezone offset to "now" if provided
-  const adjustedNow = timezoneOffset !== undefined 
-    ? new Date(now.getTime() + (timezoneOffset * 60 * 1000)) 
-    : now;
-    
   let startDate: Date;
   
   switch (range) {
     case 'today':
-      startDate = startOfDay(adjustedNow);
+      startDate = startOfDay(now);
       break;
     case 'week':
-      startDate = startOfWeek(adjustedNow, { weekStartsOn: 1 }); // Start on Monday
+      startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
       break;
     case 'month':
-      startDate = startOfMonth(adjustedNow);
+      startDate = startOfMonth(now);
       break;
     case 'year':
-      startDate = startOfYear(adjustedNow);
+      startDate = startOfYear(now);
       break;
     default:
-      startDate = startOfWeek(adjustedNow, { weekStartsOn: 1 });
+      startDate = startOfWeek(now, { weekStartsOn: 1 });
   }
   
   return data.filter(item => {
     const itemDate = item.date instanceof Date ? item.date : new Date(item.date);
-    
-    // Apply timezone offset to item date if provided
-    const adjustedItemDate = timezoneOffset !== undefined 
-      ? new Date(itemDate.getTime() + (timezoneOffset * 60 * 1000)) 
-      : itemDate;
-      
-    return adjustedItemDate >= startDate;
+    return itemDate >= startDate;
   });
 };
 
@@ -186,35 +164,19 @@ export const groupDataByFormattedDate = <T extends { date: Date | string; [key: 
 /**
  * Formats ISO date string to a more readable format
  */
-export const formatDateToReadable = (
-  dateStr: string, 
-  includeYear = true,
-  timezoneOffset?: number
-): string => {
+export const formatDateToReadable = (dateStr: string, includeYear = true): string => {
   if (!dateStr) return 'Unknown date';
   
   try {
     const date = parseISO(dateStr);
     if (isNaN(date.getTime())) return 'Invalid date';
     
-    // Apply timezone offset if provided
-    const adjustedDate = timezoneOffset !== undefined 
-      ? new Date(date.getTime() + (timezoneOffset * 60 * 1000)) 
-      : date;
-    
-    const now = new Date();
-    
-    // Apply timezone offset to "now" if provided
-    const adjustedNow = timezoneOffset !== undefined 
-      ? new Date(now.getTime() + (timezoneOffset * 60 * 1000)) 
-      : now;
-    
-    if (isToday(adjustedDate)) {
-      return `Today at ${format(adjustedDate, 'h:mm a')}`;
-    } else if (isYesterday(adjustedDate)) {
-      return `Yesterday at ${format(adjustedDate, 'h:mm a')}`;
+    if (isToday(date)) {
+      return `Today at ${format(date, 'h:mm a')}`;
+    } else if (isYesterday(date)) {
+      return `Yesterday at ${format(date, 'h:mm a')}`;
     } else {
-      return format(adjustedDate, includeYear ? 'MMM d, yyyy' : 'MMM d');
+      return format(date, includeYear ? 'MMM d, yyyy' : 'MMM d');
     }
   } catch (error) {
     console.error('Error formatting date:', error);
@@ -232,51 +194,13 @@ export const validateDateRange = (startDate: string | Date, endDate: string | Da
     
     // Check for invalid dates
     if (isNaN(start.getTime()) || isNaN(end.getTime())) {
-      console.error('Invalid date in range check:', {
-        startInput: startDate,
-        endInput: endDate,
-        startParsed: start,
-        endParsed: end
-      });
       return false;
     }
     
     // Check that start is before end
-    const isValid = start <= end;
-    
-    if (!isValid) {
-      console.error('Invalid date range: start date is after end date', {
-        start: start.toISOString(),
-        end: end.toISOString(),
-        diff: (end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24) + ' days'
-      });
-    }
-    
-    return isValid;
+    return start <= end;
   } catch (error) {
     console.error('Error validating date range:', error);
-    return false;
-  }
-};
-
-/**
- * Helper function to debug date-related issues
- */
-export const debugDateInfo = (dateStr: string | Date, label: string = 'Date') => {
-  try {
-    const date = typeof dateStr === 'string' ? new Date(dateStr) : dateStr;
-    console.log(`${label} debug:`, {
-      input: dateStr,
-      parsed: date,
-      isValid: !isNaN(date.getTime()),
-      iso: date.toISOString(),
-      localTime: date.toString(),
-      timezoneOffset: date.getTimezoneOffset() + ' minutes',
-      timestamp: date.getTime()
-    });
-    return !isNaN(date.getTime());
-  } catch (error) {
-    console.error(`Error debugging ${label}:`, error);
     return false;
   }
 };

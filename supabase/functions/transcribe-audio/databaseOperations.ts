@@ -1,4 +1,3 @@
-
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -123,8 +122,6 @@ export async function storeJournalEntry(
   duration: number,
   emotions: any,
   sentimentScore: string,
-  timezoneName?: string,
-  timezoneOffset?: number,
 ) {
   try {
     console.log('[storeJournalEntry] Starting to store journal entry');
@@ -135,9 +132,7 @@ export async function storeJournalEntry(
       hasUserId: !!userId,
       duration,
       hasEmotions: !!emotions,
-      hasSentiment: !!sentimentScore,
-      timezoneName,
-      timezoneOffset
+      hasSentiment: !!sentimentScore
     });
 
     const entry = {
@@ -148,9 +143,7 @@ export async function storeJournalEntry(
       duration: duration,
       emotions: emotions,
       sentiment: sentimentScore,
-      created_at: new Date().toISOString(),
-      timezone_name: timezoneName || null,
-      timezone_offset: timezoneOffset || null
+      created_at: new Date().toISOString()
     };
 
     console.log('[storeJournalEntry] Attempting to insert entry:', JSON.stringify(entry, null, 2));

@@ -17,10 +17,32 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { textWillOverflow } from '@/utils/textUtils';
-import { formatDateToReadable } from '@/utils/date-formatter';
 
-// Use the imported type rather than redefining it
-export type JournalEntry = JournalEntryType;
+export interface JournalEntry {
+  id: number;
+  content: string;
+  created_at: string;
+  audio_url?: string;
+  sentiment?: string | null;
+  themes?: string[] | null;
+  master_themes?: string[];
+  entities?: Array<{
+    type: string;
+    name: string;
+    text?: string;
+  }>;
+  foreignKey?: string;
+  predictedLanguages?: {
+    [key: string]: number;
+  } | null;
+  Edit_Status?: number | null;
+  user_feedback?: string | null;
+  "transcription text"?: string;
+  "refined text"?: string;
+  translation_text?: string;
+  original_language?: string;
+  tempId?: string;
+}
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -50,11 +72,9 @@ export function JournalEntryCard({
     themes: Array.isArray(entry?.themes) ? entry.themes : [],
     Edit_Status: entry?.Edit_Status || null,
     user_feedback: entry?.user_feedback || null,
-    "transcription text": entry?.["transcription text"] || null,
-    "refined text": entry?.["refined text"] || null,
-    translation_text: entry?.translation_text || null,
-    original_language: entry?.original_language || null,
-    tempId: entry?.tempId || null
+    translation_text: entry?.translation_text,
+    original_language: entry?.original_language,
+    tempId: entry?.tempId
   };
 
   const [isExpanded, setIsExpanded] = useState(true); // Always expanded now
@@ -227,11 +247,7 @@ export function JournalEntryCard({
 
   const createdAtFormatted = (() => {
     try {
-      const formattedDate = entry.timezone_offset !== undefined
-        ? formatDateToReadable(entry.created_at, true, entry.timezone_offset)
-        : formatDateToReadable(entry.created_at, true);
-      
-      return formattedDate;
+      return formatShortDate(safeEntry.created_at);
     } catch (error) {
       console.error('[JournalEntryCard] Error formatting date:', error);
       return 'Recently';
@@ -422,7 +438,7 @@ export function JournalEntryCard({
               <div className="flex items-center space-x-3">
                 <div className="flex flex-col">
                   <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
-                    {createdAtFormatted}
+                    {formatShortDate(safeEntry.created_at)}
                   </h3>
                 </div>
               </div>

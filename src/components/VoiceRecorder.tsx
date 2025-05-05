@@ -12,7 +12,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import FloatingLanguages from '@/components/voice-recorder/FloatingLanguages';
 import { RecordingButton } from '@/components/voice-recorder/RecordingButton';
 import { RecordingStatus } from '@/components/voice-recorder/RecordingStatus';
-import PlaybackControls from '@/components/voice-recorder/PlaybackControls';
+import { PlaybackControls } from '@/components/voice-recorder/PlaybackControls';
 import { AnimatedPrompt } from '@/components/voice-recorder/AnimatedPrompt';
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
 
@@ -408,7 +408,6 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
             ) : audioBlob ? (
               <div className="flex flex-col items-center w-full relative z-10 mt-auto mb-8">
                 <PlaybackControls
-                  audioUrl={null}
                   audioBlob={audioBlob}
                   isPlaying={isPlaying}
                   isProcessing={isProcessing || waitingForClear}

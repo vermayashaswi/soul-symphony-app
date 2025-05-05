@@ -4,16 +4,14 @@
  */
 import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
 import { verifyUserAuthentication } from './auth-utils';
-import { validateAudioBlob } from './blob-utils';
 import { 
   setProcessingLock, 
   setIsEntryBeingProcessed, 
   setProcessingTimeoutId,
   getProcessingTimeoutId,
-  getProcessingLock,
-  getProcessingEntries,
   updateProcessingEntries
 } from './processing-state';
+import { validateAudioBlob } from './blob-utils';
 
 /**
  * Validates the initial state before audio processing
@@ -82,13 +80,17 @@ export function setupProcessingTimeout(): void {
     setIsEntryBeingProcessed(false);
     
     // Clean up any lingering entries after timeout
-    const entries = getProcessingEntries();
+    const entries = import('./processing-state').then(({ getProcessingEntries }) => {
+      return getProcessingEntries();
+    });
     
-    if (entries.length > 0) {
-      entries.forEach(entry => {
-        updateProcessingEntries(entry, 'remove');
-      });
-    }
+    entries.then(entries => {
+      if (entries.length > 0) {
+        entries.forEach(entry => {
+          updateProcessingEntries(entry, 'remove');
+        });
+      }
+    });
   }, 30000); // 30 second maximum lock time
   
   setProcessingTimeoutId(timeoutId);
@@ -98,5 +100,6 @@ export function setupProcessingTimeout(): void {
  * Checks if the processing lock is active
  */
 async function isProcessingLockActive(): Promise<boolean> {
+  const { getProcessingLock } = await import('./processing-state');
   return getProcessingLock();
 }

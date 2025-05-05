@@ -245,43 +245,39 @@ serve(async (req) => {
 
       // Store journal entry in database
       console.log("Storing journal entry...");
-      const formDataObj = new FormData(req);
-      const timezoneName = formDataObj.get('timezoneName') as string || null;
-      const timezoneOffsetStr = formDataObj.get('timezoneOffset') as string || null;
-      const timezoneOffset = timezoneOffsetStr ? parseInt(timezoneOffsetStr, 10) : null;
-      
-      const transcriptionText = transcribedText;
-      const refinedText = refinedText;
-      const duration = audioDuration;
-      
-      const entryId = await storeJournalEntry(
-        supabaseAdmin,
-        transcriptionText,
-        refinedText,
-        audioUrl,
-        userId,
-        duration,
-        emotions,
-        sentimentScore,
-        timezoneName,
-        timezoneOffset
-      );
-
-      console.log("Journal entry stored with ID:", entryId);
-      
-      // After successful store, verify the entry exists
-      const { data: verifiedEntry, error: verificationError } = await supabase
-        .from('Journal Entries')
-        .select('id')
-        .eq('id', entryId)
-        .single();
+      let entryId = null;
+      try {
+        entryId = await storeJournalEntry(
+          supabase,
+          transcribedText,
+          refinedText,
+          audioUrl,
+          userId,
+          audioDuration,
+          emotions,
+          sentimentScore,
+          null  // Removed entities parameter
+        );
         
-      if (verificationError) {
-        console.warn("Entry verification warning:", verificationError);
-      } else {
-        console.log("Entry verified in database:", verifiedEntry?.id);
+        console.log("Journal entry stored with ID:", entryId);
+        
+        // After successful store, verify the entry exists
+        const { data: verifiedEntry, error: verificationError } = await supabase
+          .from('Journal Entries')
+          .select('id')
+          .eq('id', entryId)
+          .single();
+          
+        if (verificationError) {
+          console.warn("Entry verification warning:", verificationError);
+        } else {
+          console.log("Entry verified in database:", verifiedEntry?.id);
+        }
+      } catch (dbErr) {
+        console.error("Error storing journal entry:", dbErr);
+        throw new Error(`Failed to store journal entry: ${dbErr.message}`);
       }
-      
+
       // Start background tasks for post-processing
       if (entryId) {        
         try {

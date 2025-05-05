@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -19,341 +20,6 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Function to calculate date ranges based on time expressions using provided timestamp
-function calculateDateRange(timePeriod: string, clientTimestamp: string): { startDate: string, endDate: string, periodName: string } {
-  console.log(`Calculating date range for "${timePeriod}" based on client timestamp: ${clientTimestamp}`);
-  
-  // Parse the client timestamp
-  const now = new Date(clientTimestamp);
-  let startDate: Date;
-  let endDate: Date;
-  let periodName = timePeriod;
-  
-  if (!isValidDate(now)) {
-    console.error(`Invalid client timestamp: ${clientTimestamp}, using current time instead`);
-    // Fallback to current time if client timestamp is invalid
-    const fallbackNow = new Date();
-    return calculateDateRange(timePeriod, fallbackNow.toISOString());
-  }
-  
-  console.log(`Reference time for calculations: ${now.toISOString()} (${now.toLocaleDateString()})`);
-  
-  const lowerTimePeriod = timePeriod.toLowerCase();
-  
-  // Helper functions for date calculations
-  const startOfDay = (date: Date): Date => {
-    const result = new Date(date);
-    result.setHours(0, 0, 0, 0);
-    return result;
-  };
-  
-  const endOfDay = (date: Date): Date => {
-    const result = new Date(date);
-    result.setHours(23, 59, 59, 999);
-    return result;
-  };
-  
-  const startOfWeek = (date: Date): Date => {
-    const result = new Date(date);
-    const day = result.getDay();
-    const diff = result.getDate() - day + (day === 0 ? -6 : 1); // Adjust for Sunday
-    result.setDate(diff);
-    result.setHours(0, 0, 0, 0);
-    return result;
-  };
-  
-  const endOfWeek = (date: Date): Date => {
-    const result = startOfWeek(date);
-    result.setDate(result.getDate() + 6);
-    result.setHours(23, 59, 59, 999);
-    return result;
-  };
-  
-  const startOfMonth = (date: Date): Date => {
-    const result = new Date(date);
-    result.setDate(1);
-    result.setHours(0, 0, 0, 0);
-    return result;
-  };
-  
-  const endOfMonth = (date: Date): Date => {
-    const result = new Date(date);
-    result.setMonth(result.getMonth() + 1);
-    result.setDate(0);
-    result.setHours(23, 59, 59, 999);
-    return result;
-  };
-  
-  const startOfYear = (date: Date): Date => {
-    const result = new Date(date);
-    result.setMonth(0, 1);
-    result.setHours(0, 0, 0, 0);
-    return result;
-  };
-  
-  const endOfYear = (date: Date): Date => {
-    const result = new Date(date);
-    result.setMonth(11, 31);
-    result.setHours(23, 59, 59, 999);
-    return result;
-  };
-  
-  const subtractDays = (date: Date, days: number): Date => {
-    const result = new Date(date);
-    result.setDate(result.getDate() - days);
-    return result;
-  };
-  
-  const subtractMonths = (date: Date, months: number): Date => {
-    const result = new Date(date);
-    result.setMonth(result.getMonth() - months);
-    return result;
-  };
-  
-  const subtractYears = (date: Date, years: number): Date => {
-    const result = new Date(date);
-    result.setFullYear(result.getFullYear() - years);
-    return result;
-  };
-  
-  try {
-    if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
-      // Today
-      startDate = startOfDay(now);
-      endDate = endOfDay(now);
-      periodName = 'today';
-    } 
-    else if (lowerTimePeriod.includes('yesterday')) {
-      // Yesterday
-      const yesterday = subtractDays(now, 1);
-      startDate = startOfDay(yesterday);
-      endDate = endOfDay(yesterday);
-      periodName = 'yesterday';
-    } 
-    else if (lowerTimePeriod.includes('this week')) {
-      // This week
-      startDate = startOfWeek(now);
-      endDate = endOfWeek(now);
-      periodName = 'this week';
-    } 
-    else if (lowerTimePeriod.includes('last week')) {
-      // Last week
-      const lastWeek = subtractDays(now, 7);
-      startDate = startOfWeek(lastWeek);
-      endDate = endOfWeek(lastWeek);
-      periodName = 'last week';
-    } 
-    else if (lowerTimePeriod.includes('this month')) {
-      // This month
-      startDate = startOfMonth(now);
-      endDate = endOfMonth(now);
-      periodName = 'this month';
-    } 
-    else if (lowerTimePeriod.includes('last month')) {
-      // Last month
-      const lastMonth = subtractMonths(now, 1);
-      startDate = startOfMonth(lastMonth);
-      endDate = endOfMonth(lastMonth);
-      periodName = 'last month';
-    } 
-    else if (lowerTimePeriod.includes('this year')) {
-      // This year
-      startDate = startOfYear(now);
-      endDate = endOfYear(now);
-      periodName = 'this year';
-    } 
-    else if (lowerTimePeriod.includes('last year')) {
-      // Last year
-      const lastYear = subtractYears(now, 1);
-      startDate = startOfYear(lastYear);
-      endDate = endOfYear(lastYear);
-      periodName = 'last year';
-    } 
-    else if (lowerTimePeriod.includes('last 7 days') || lowerTimePeriod.includes('past week')) {
-      // Last 7 days
-      startDate = startOfDay(subtractDays(now, 7));
-      endDate = endOfDay(now);
-      periodName = 'last 7 days';
-    }
-    else if (lowerTimePeriod.includes('last 30 days') || lowerTimePeriod.includes('past month')) {
-      // Last 30 days
-      startDate = startOfDay(subtractDays(now, 30));
-      endDate = endOfDay(now);
-      periodName = 'last 30 days';
-    }
-    else if (lowerTimePeriod.includes('last 90 days') || lowerTimePeriod.includes('past 3 months')) {
-      // Last 90 days
-      startDate = startOfDay(subtractDays(now, 90));
-      endDate = endOfDay(now);
-      periodName = 'last 90 days';
-    }
-    else if (lowerTimePeriod.includes('last 365 days') || lowerTimePeriod.includes('past year')) {
-      // Last 365 days
-      startDate = startOfDay(subtractDays(now, 365));
-      endDate = endOfDay(now);
-      periodName = 'last 365 days';
-    }
-    else {
-      // Default to last 30 days if no specific period matched
-      startDate = startOfDay(subtractDays(now, 30));
-      endDate = endOfDay(now);
-      periodName = 'last 30 days';
-    }
-  } catch (calcError) {
-    console.error('Error in date calculation:', calcError);
-    // Fallback to a simple date range calculation
-    startDate = startOfDay(subtractDays(now, 7));
-    endDate = endOfDay(now);
-    periodName = 'last 7 days (error fallback)';
-  }
-
-  // Format dates as ISO strings
-  const isoStartDate = startDate.toISOString();
-  const isoEndDate = endDate.toISOString();
-  
-  // Log the calculated dates for debugging
-  console.log(`Date range calculated: 
-    Start: ${isoStartDate} (${startDate.toLocaleDateString()})
-    End: ${isoEndDate} (${endDate.toLocaleDateString()})
-    Period: ${periodName}
-    Duration in days: ${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))}`);
-  
-  return {
-    startDate: isoStartDate,
-    endDate: isoEndDate,
-    periodName
-  };
-}
-
-// Helper function to check if a date is valid
-function isValidDate(date: Date): boolean {
-  return !isNaN(date.getTime());
-}
-
-// Function to detect time expressions in a query and calculate a date range
-function detectTimeExpressionAndCalculateRange(query: string, clientTimestamp: string): { startDate: string, endDate: string, periodName: string } | null {
-  // List of common time expressions to detect
-  const timeExpressions = [
-    'today', 'yesterday', 
-    'this week', 'last week', 
-    'this month', 'last month', 
-    'this year', 'last year',
-    'past week', 'past month', 'past year',
-    'previous week', 'previous month', 'previous year',
-    'recent', 'lately', 'last 7 days', 'last 30 days',
-    'last 90 days', 'last 365 days', 'past 3 months'
-  ];
-  
-  const lowerQuery = query.toLowerCase();
-  
-  // Check for date expressions
-  for (const expression of timeExpressions) {
-    if (lowerQuery.includes(expression)) {
-      console.log(`Detected time expression "${expression}" in query: "${query}"`);
-      return calculateDateRange(expression, clientTimestamp);
-    }
-  }
-  
-  // Check for "last X days/weeks/months/years" pattern
-  const lastNPattern = /last\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)/i;
-  const lastNMatch = lowerQuery.match(lastNPattern);
-  
-  if (lastNMatch) {
-    const amount = parseInt(lastNMatch[1], 10);
-    const unit = lastNMatch[2].toLowerCase();
-    console.log(`Detected "last ${amount} ${unit}" in query`);
-    
-    // Parse the client timestamp
-    const now = new Date(clientTimestamp);
-    if (!isValidDate(now)) {
-      console.error(`Invalid client timestamp: ${clientTimestamp}, using current time instead`);
-      return null;
-    }
-    
-    let startDate: Date;
-    let endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
-    
-    if (unit.startsWith('day')) {
-      startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - amount);
-      startDate.setHours(0, 0, 0, 0);
-    } else if (unit.startsWith('week')) {
-      startDate = new Date(now);
-      startDate.setDate(startDate.getDate() - (amount * 7));
-      startDate.setHours(0, 0, 0, 0);
-    } else if (unit.startsWith('month')) {
-      startDate = new Date(now);
-      startDate.setMonth(startDate.getMonth() - amount);
-      startDate.setHours(0, 0, 0, 0);
-    } else if (unit.startsWith('year')) {
-      startDate = new Date(now);
-      startDate.setFullYear(startDate.getFullYear() - amount);
-      startDate.setHours(0, 0, 0, 0);
-    } else {
-      return null;
-    }
-    
-    return {
-      startDate: startDate.toISOString(),
-      endDate: endDate.toISOString(),
-      periodName: `last ${amount} ${unit}`
-    };
-  }
-  
-  // Handle specific date
-  const specificDatePattern = /(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{4}|\d{2}))?/;
-  const dateMatch = lowerQuery.match(specificDatePattern);
-  
-  if (dateMatch) {
-    try {
-      // Try to parse the date, considering ambiguities in dd/mm vs mm/dd formats
-      // Default to current year if not specified
-      const now = new Date(clientTimestamp);
-      if (!isValidDate(now)) {
-        console.error(`Invalid client timestamp: ${clientTimestamp}, using current time instead`);
-        return null;
-      }
-      
-      let day = parseInt(dateMatch[1], 10);
-      let month = parseInt(dateMatch[2], 10) - 1; // JS months are 0-indexed
-      let year = dateMatch[3] ? parseInt(dateMatch[3], 10) : now.getFullYear();
-      
-      // Handle 2-digit years
-      if (year < 100) {
-        year += year < 50 ? 2000 : 1900;
-      }
-      
-      // Try to create a valid date object
-      const specificDate = new Date(year, month, day);
-      
-      // Check if the date is valid
-      if (isNaN(specificDate.getTime())) {
-        console.error('Invalid date detected:', dateMatch[0]);
-        return null;
-      }
-      
-      // Set to start and end of the specific date
-      const startOfSpecificDate = new Date(specificDate);
-      startOfSpecificDate.setHours(0, 0, 0, 0);
-      
-      const endOfSpecificDate = new Date(specificDate);
-      endOfSpecificDate.setHours(23, 59, 59, 999);
-      
-      return {
-        startDate: startOfSpecificDate.toISOString(),
-        endDate: endOfSpecificDate.toISOString(),
-        periodName: `on ${specificDate.toLocaleDateString()}`
-      };
-    } catch (error) {
-      console.error('Error parsing specific date:', error);
-      return null;
-    }
-  }
-  
-  return null;
-}
-
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -361,34 +27,16 @@ serve(async (req) => {
   }
 
   try {
-    const { 
-      message, 
-      userId, 
-      conversationContext = [], 
-      clientTimestamp = null  // Accept client timestamp
-    } = await req.json();
+    const { message, userId, conversationContext = [], timezoneOffset } = await req.json();
     
     if (!message) {
       throw new Error('Message is required');
     }
 
     console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
+    console.log(`User timezone offset: ${timezoneOffset} minutes`);
     
-    // Log the client timestamp for reference
-    if (clientTimestamp) {
-      console.log(`Client timestamp: ${clientTimestamp}`);
-    } else {
-      console.log("No client timestamp provided, will use server time");
-    }
-    
-    // If clientTimestamp isn't provided, use current server time
-    const effectiveTimestamp = clientTimestamp || new Date().toISOString();
-    
-    // Process time-based queries using the client timestamp
-    const detectedDateRange = detectTimeExpressionAndCalculateRange(message, effectiveTimestamp);
-    console.log("Detected date range:", detectedDateRange);
-    
-    // Check message types and plan the query
+    // Check message types and planQuery
     const messageTypesResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -436,6 +84,41 @@ Examples:
     }
 
     const response = await messageTypesResponse.json();
+
+    // Process time-based queries more accurately
+    let hasTimeFilter = false;
+    let timeRangeMentioned = null;
+
+    // Enhanced time detection - look for time expressions in the query
+    const timeKeywords = [
+      'today', 'yesterday', 'this week', 'last week', 
+      'this month', 'last month', 'this year', 'last year',
+      'recent', 'latest', 'current', 'past'
+    ];
+    
+    const lowerMessage = message.toLowerCase();
+    
+    for (const keyword of timeKeywords) {
+      if (lowerMessage.includes(keyword)) {
+        console.log(`Detected time keyword: ${keyword}`);
+        timeRangeMentioned = keyword;
+        hasTimeFilter = true;
+        break;
+      }
+    }
+
+    // If the user is asking about a specific date, extract it
+    let specificDate = null;
+    const dateRegex = /(\d{4}[-./]\d{2}[-./]\d{2})|(\d{2}[-./]\d{2}[-./]\d{4})/;
+    const dateMatch = message.match(dateRegex);
+    if (dateMatch) {
+      try {
+        specificDate = new Date(dateMatch[0]).toISOString().split('T')[0];
+        console.log(`Detected specific date: ${specificDate}`);
+      } catch (error) {
+        console.error("Error parsing specific date:", error);
+      }
+    }
 
     // Determine the queryType (mental_health_general or journal_specific)
     const queryType = response.choices[0]?.message?.content?.trim() || 'journal_specific';
@@ -493,6 +176,8 @@ Examples:
               
               5. "needs_more_context": Boolean (true if query relates to previous messages)
 
+              Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
+
               Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
               `
             },
@@ -517,16 +202,20 @@ Examples:
         console.log("Generated raw plan:", jsonStr);
         
         // Handle special case for time-based queries
-        const tempPlan = JSON.parse(jsonStr);
-        
-        // Add the detected date range to the plan if available
-        if (detectedDateRange && !tempPlan.filters?.date_range) {
-          console.log("Adding detected time range to plan");
+        if (timeRangeMentioned && !jsonStr.includes('"date_range"')) {
+          // Add time range to the plan
+          const tempPlan = JSON.parse(jsonStr);
+          console.log("Adding time range to plan for:", timeRangeMentioned);
           tempPlan.filters = tempPlan.filters || {};
-          tempPlan.filters.date_range = detectedDateRange;
+          
+          // Use our service to calculate the proper date range based on timezone
+          const dateRange = calculateRelativeDateRange(timeRangeMentioned, timezoneOffset);
+          tempPlan.filters.date_range = dateRange;
+          
+          plan = tempPlan;
+        } else {
+          plan = JSON.parse(jsonStr);
         }
-        
-        plan = tempPlan;
         
         // Force data aggregation for rating/analysis requests
         if (isRatingOrAnalysisRequest && !plan.needs_data_aggregation) {
@@ -537,37 +226,33 @@ Examples:
       } catch (e) {
         console.error('Error parsing plan JSON:', e);
         console.error('Raw plan text:', planText);
-        
-        // Create a fallback plan
         plan = {
           strategy: 'vector',
-          filters: {},
+          filters: hasTimeFilter ? { date_range: calculateRelativeDateRange(timeRangeMentioned || 'recent', timezoneOffset) } : {},
           match_count: isRatingOrAnalysisRequest ? 30 : 15,
           needs_data_aggregation: isRatingOrAnalysisRequest || message.includes('how many') || message.includes('count') || message.includes('statistics'),
           needs_more_context: false
         };
-        
-        // Add detected date range if available
-        if (detectedDateRange) {
-          plan.filters.date_range = detectedDateRange;
-        }
       }
     }
 
-    // Add the detected date range to the plan if available
-    if (detectedDateRange && plan && (!plan.filters?.date_range)) {
-      console.log("Adding detected time range to plan");
+    // If a specific date was detected, ensure it's used in the plan
+    if (specificDate && plan) {
       plan.filters = plan.filters || {};
-      plan.filters.date_range = detectedDateRange;
+      plan.filters.date_range = {
+        startDate: specificDate,
+        endDate: specificDate,
+        periodName: 'specific date'
+      };
+      console.log("Forcing date range in plan to:", specificDate);
     }
-    
+
     // Return the plan
     return new Response(
       JSON.stringify({ 
         plan, 
         queryType: isRatingOrAnalysisRequest ? 'journal_specific' : queryType,
-        directResponse,
-        clientTimestamp: effectiveTimestamp // Echo back the timestamp for reference
+        directResponse 
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
@@ -579,3 +264,143 @@ Examples:
     );
   }
 });
+
+/**
+ * Calculates relative date ranges based on time expressions
+ * @param timePeriod - The time period expression (e.g., "this month", "last week")
+ * @param timezoneOffset - User's timezone offset in minutes
+ * @returns Date range with start and end dates
+ */
+function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number = 0): { startDate: string, endDate: string, periodName: string } {
+  // Convert timezone offset to milliseconds
+  const offsetMs = timezoneOffset * 60 * 1000;
+  
+  // Get current date in user's timezone
+  const now = new Date(Date.now() - offsetMs);
+  let startDate: Date;
+  let endDate: Date;
+  let periodName = timePeriod;
+  
+  console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
+  console.log(`User's local time: ${now.toISOString()}`);
+  
+  const lowerTimePeriod = timePeriod.toLowerCase();
+  
+  if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
+    // Today: Start at midnight, end at 23:59:59
+    startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'today';
+  } 
+  else if (lowerTimePeriod.includes('yesterday')) {
+    // Yesterday: Start at previous day midnight, end at previous day 23:59:59
+    startDate = new Date(now);
+    startDate.setDate(now.getDate() - 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(startDate);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'yesterday';
+  } 
+  else if (lowerTimePeriod.includes('this week')) {
+    // This week: Start at current week Monday, end at Sunday 23:59:59
+    startDate = new Date(now);
+    const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7 to make Monday (1) the first day
+    startDate.setDate(now.getDate() - (dayOfWeek - 1)); // Go back to Monday
+    startDate.setHours(0, 0, 0, 0);
+    
+    endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'this week';
+  } 
+  else if (lowerTimePeriod.includes('last week')) {
+    // Last week: Start at previous week Monday, end at previous week Sunday
+    startDate = new Date(now);
+    const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7
+    startDate.setDate(now.getDate() - (dayOfWeek - 1) - 7); // Go back to previous Monday
+    startDate.setHours(0, 0, 0, 0);
+    
+    endDate = new Date(startDate);
+    endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'last week';
+  } 
+  else if (lowerTimePeriod.includes('this month')) {
+    // This month: Start at 1st of current month, end at last day of month
+    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'this month';
+  } 
+  else if (lowerTimePeriod.includes('last month')) {
+    // Last month: Start at 1st of previous month, end at last day of previous month
+    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'last month';
+  } 
+  else if (lowerTimePeriod.includes('this year')) {
+    // This year: Start at January 1st, end at December 31st
+    startDate = new Date(now.getFullYear(), 0, 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(now.getFullYear(), 11, 31);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'this year';
+  } 
+  else if (lowerTimePeriod.includes('last year')) {
+    // Last year: Start at January 1st of previous year, end at December 31st of previous year
+    startDate = new Date(now.getFullYear() - 1, 0, 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(now.getFullYear() - 1, 11, 31);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'last year';
+  } 
+  else {
+    // Default to last 30 days if no specific period matched
+    startDate = new Date(now);
+    startDate.setDate(now.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'last 30 days';
+  }
+
+  // Add back the timezone offset to convert to UTC for storage
+  const utcStartDate = new Date(startDate.getTime() + offsetMs);
+  const utcEndDate = new Date(endDate.getTime() + offsetMs);
+  
+  // Validate the date range
+  if (utcEndDate < utcStartDate) {
+    console.error("Invalid date range calculated: end date is before start date");
+    // Fallback to last 7 days as a safe default
+    const fallbackStart = new Date(now);
+    fallbackStart.setDate(now.getDate() - 7);
+    fallbackStart.setHours(0, 0, 0, 0);
+    
+    const fallbackEnd = new Date(now);
+    fallbackEnd.setHours(23, 59, 59, 999);
+    
+    return {
+      startDate: new Date(fallbackStart.getTime() + offsetMs).toISOString(),
+      endDate: new Date(fallbackEnd.getTime() + offsetMs).toISOString(),
+      periodName: 'last 7 days (fallback)'
+    };
+  }
+  
+  // Log the calculated dates for debugging
+  console.log(`Date range calculated: 
+    Start: ${utcStartDate.toISOString()} (${utcStartDate.toLocaleDateString()})
+    End: ${utcEndDate.toISOString()} (${utcEndDate.toLocaleDateString()})
+    Period: ${periodName}
+    Duration in days: ${Math.round((utcEndDate.getTime() - utcStartDate.getTime()) / (1000 * 60 * 60 * 24))}`);
+  
+  return {
+    startDate: utcStartDate.toISOString(),
+    endDate: utcEndDate.toISOString(),
+    periodName
+  };
+}

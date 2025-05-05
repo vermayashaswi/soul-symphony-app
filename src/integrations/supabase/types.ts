@@ -124,8 +124,6 @@ export type Database = {
           master_themes: string[] | null
           "refined text": string | null
           sentiment: string | null
-          timezone_name: string | null
-          timezone_offset: number | null
           "transcription text": string | null
           translation_status: string | null
           user_feedback: string | null
@@ -144,8 +142,6 @@ export type Database = {
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
-          timezone_name?: string | null
-          timezone_offset?: number | null
           "transcription text"?: string | null
           translation_status?: string | null
           user_feedback?: string | null
@@ -164,8 +160,6 @@ export type Database = {
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
-          timezone_name?: string | null
-          timezone_offset?: number | null
           "transcription text"?: string | null
           translation_status?: string | null
           user_feedback?: string | null
@@ -224,7 +218,6 @@ export type Database = {
           journal_focus_areas: string[] | null
           onboarding_completed: boolean | null
           reminder_settings: Json | null
-          timezone: string | null
           updated_at: string
         }
         Insert: {
@@ -237,7 +230,6 @@ export type Database = {
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
-          timezone?: string | null
           updated_at?: string
         }
         Update: {
@@ -250,7 +242,6 @@ export type Database = {
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
-          timezone?: string | null
           updated_at?: string
         }
         Relationships: []

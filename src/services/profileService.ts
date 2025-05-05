@@ -1,8 +1,8 @@
+
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { logInfo, logError, logProfile, logAuthError } from '@/components/debug/DebugPanel';
-import { getCurrentTimezone } from '@/services/timezoneService';
 
 /**
  * Maximum number of automatic retries for profile creation
@@ -45,23 +45,9 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         return false;
       }
       
-      // If profile already exists, update timezone and return true
+      // If profile already exists, return true immediately
       if (data) {
         logProfile(`Profile already exists: ${data.id}`, 'ProfileService');
-        
-        // Update the user's timezone
-        const { name: timezone } = getCurrentTimezone();
-        const { error: updateError } = await supabase
-          .from('profiles')
-          .update({ timezone, updated_at: new Date().toISOString() })
-          .eq('id', user.id);
-          
-        if (updateError) {
-          logError(`Error updating timezone: ${updateError.message}`, 'ProfileService', updateError);
-        } else {
-          logProfile(`Updated timezone for user: ${user.id}`, 'ProfileService');
-        }
-        
         return true;
       }
       
@@ -103,9 +89,6 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         logProfile('Extracted default metadata', 'ProfileService', { fullName, avatarUrl });
       }
       
-      // Get timezone information
-      const { name: timezone } = getCurrentTimezone();
-      
       // Explicit profile data preparation - ensure field names match exactly with the database schema
       const profileData = {
         id: user.id,
@@ -113,8 +96,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         full_name: fullName,
         avatar_url: avatarUrl, 
         onboarding_completed: false,
-        updated_at: new Date().toISOString(),
-        timezone: timezone
+        updated_at: new Date().toISOString()
       };
       
       logProfile(`Creating profile with data (attempt ${attempt})`, 'ProfileService', profileData);

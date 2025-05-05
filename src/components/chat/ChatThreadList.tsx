@@ -8,7 +8,6 @@ import { Input } from "@/components/ui/input";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { fetchChatThreads, updateThreadTitle } from "@/services/chat/threadService";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChatThread } from "@/services/chat/types";
 
 interface ChatThreadListProps {
   activeThreadId: string | null;
@@ -29,7 +28,7 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
   onCreateThread,
   showHeader = true,
 }) => {
-  const [threads, setThreads] = useState<ChatThread[]>([]);
+  const [threads, setThreads] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");

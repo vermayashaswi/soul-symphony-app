@@ -7,7 +7,7 @@ export * from './useChatPersistence';
 export * from './queryPlannerService';
 
 // Explicitly re-export functions needed by chatPersistenceService.ts
-export { fetchChatThreads as getUserChatThreads } from './threadService';
+export { getUserChatThreads } from './threadService';
 export { getThreadMessages } from './messageService';
 export { saveMessage } from './messageService';
 export const createChatThread = async (userId: string, title: string = 'New Conversation') => {

@@ -8,7 +8,6 @@ import { generateThreadTitle } from '@/utils/chat/threadUtils';
 import { getPlanForQuery } from './threadService';
 import { convertGptPlanToQueryPlan } from './queryPlannerService';
 import { Json } from '@/integrations/supabase/types';
-import { createLocalTimestamp } from '@/services/timezoneService';
 
 export interface ChatMessageType {
   id: string;
@@ -16,7 +15,7 @@ export interface ChatMessageType {
   content: string;
   sender: 'user' | 'assistant';
   createdAt: string;
-  references?: any[] | Json | null;
+  references?: any[] | Json | null;  // Updated to accept Json type as well
   isLoading?: boolean;
   isError?: boolean;
 }
@@ -229,19 +228,16 @@ export function useChatPersistence(queryClient: QueryClient) {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
 
-      // Get a JavaScript Date object and timezone info for the user's local timezone
-      const { isoString: clientTimestamp, timezoneName, timezoneOffset } = createLocalTimestamp();
-      console.log(`Client timestamp: ${clientTimestamp}, Timezone: ${timezoneName}, Offset: ${timezoneOffset}`);
-      
-      // Call edge function to ensure persistence and include the client's timezone information
+      // Call edge function to ensure persistence and get user's timezone offset
+      const timezoneOffset = new Date().getTimezoneOffset();
+      console.log(`Local timezone offset: ${timezoneOffset} minutes`);
+
       const { data: persistenceData, error: persistenceError } = await supabase.functions.invoke('ensure-chat-persistence', {
         body: {
           userId: user.id,
           threadId,
           messageId: userMessageId,
           content,
-          clientTimestamp,
-          timezoneName,
           timezoneOffset
         }
       });
@@ -250,19 +246,13 @@ export function useChatPersistence(queryClient: QueryClient) {
         console.error("Error ensuring persistence:", persistenceError);
       }
 
-      // Get the conversation context for query planning
+      // Get query plan based on user's message and pass it along with the conversation context
       const contextMessages = messages.map(msg => ({
         content: msg.content,
         sender: msg.sender
       }));
 
-      // Get query plan based on user's message and include the client timestamp and timezone
-      const { plan, queryType, directResponse } = await getPlanForQuery(
-        content, 
-        user.id, 
-        contextMessages,
-        clientTimestamp
-      );
+      const { plan, queryType, directResponse } = await getPlanForQuery(content, user.id, contextMessages, timezoneOffset);
       
       let apiResponse: any = null;
       let references: any[] = [];
@@ -277,7 +267,8 @@ export function useChatPersistence(queryClient: QueryClient) {
             userId: user.id,
             message: content,
             threadId,
-            clientTimestamp // Send client timestamp as source of truth
+            timeRange: plan?.filters?.dateRange,
+            timezoneOffset
           }
         });
         
@@ -294,7 +285,7 @@ export function useChatPersistence(queryClient: QueryClient) {
             conversationContext: contextMessages,
             queryPlan,
             includeDiagnostics: false,
-            clientTimestamp // Send client timestamp as source of truth
+            timezoneOffset
           }
         });
         

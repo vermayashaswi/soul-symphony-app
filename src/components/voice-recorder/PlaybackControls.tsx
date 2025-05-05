@@ -1,194 +1,253 @@
-
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useState } from 'react';
+import { motion } from 'framer-motion';
+import { Loader2, Play, RotateCcw, Pause } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { PlayIcon, PauseIcon, DownloadIcon } from 'lucide-react';
-import { formatTime } from '@/utils/format-time';
-import { updateProcessingEntry } from '@/utils/audio/processing-state';
+import { Slider } from '@/components/ui/slider';
 import { cn } from '@/lib/utils';
+import { clearAllToasts } from '@/services/notificationService';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { useDebugLog } from '@/utils/debug/DebugContext';
+import { updateProcessingEntries } from '@/utils/audio/processing-state';
 
 interface PlaybackControlsProps {
-  audioUrl?: string | null;
-  audioBlob?: Blob | null;
-  isPlaying?: boolean;
-  isProcessing?: boolean;
-  playbackProgress?: number;
+  audioBlob: Blob | null;
+  isPlaying: boolean;
+  isProcessing: boolean;
+  playbackProgress: number;
   audioDuration: number;
-  tempId?: string;
-  onTogglePlayback?: () => void;
-  onSaveEntry?: () => void;
-  onRestart?: () => void;
+  onTogglePlayback: () => void;
+  onSaveEntry: () => void;
+  onRestart: () => void;
   onSeek?: (position: number) => void;
 }
 
-const PlaybackControls: React.FC<PlaybackControlsProps> = ({ 
-  audioUrl, 
+export function PlaybackControls({
   audioBlob,
-  isPlaying = false,
-  isProcessing = false,
-  playbackProgress = 0,
-  audioDuration, 
-  tempId,
+  isPlaying,
+  isProcessing,
+  playbackProgress,
+  audioDuration,
   onTogglePlayback,
   onSaveEntry,
   onRestart,
   onSeek
-}) => {
-  const [isPlayingInternal, setIsPlayingInternal] = useState(false);
-  const audioRef = useRef<HTMLAudioElement>(null);
-
+}: PlaybackControlsProps) {
+  const [currentTime, setCurrentTime] = useState(0);
+  const [isClearingToasts, setIsClearingToasts] = useState(false);
+  const [sliderValue, setSliderValue] = useState(0);
+  const [isTouchActive, setIsTouchActive] = useState(false);
+  const [processingStartTime, setProcessingStartTime] = useState(0);
+  const { isMobile } = useIsMobile();
+  const { addEvent } = useDebugLog();
+  
   useEffect(() => {
-    const audio = audioRef.current;
-
-    const handleTimeUpdate = () => {
-      // No need to update state here
-    };
-
-    const handleEnded = () => {
-      setIsPlayingInternal(false);
-    };
-
-    if (audio) {
-      audio.addEventListener('timeupdate', handleTimeUpdate);
-      audio.addEventListener('ended', handleEnded);
+    if (!isTouchActive && playbackProgress !== undefined) {
+      const timeInSeconds = (playbackProgress * audioDuration);
+      setCurrentTime(timeInSeconds);
+      setSliderValue(playbackProgress * 100);
+      
+      addEvent('PlaybackControls', 'Progress update', 'info', {
+        progress: playbackProgress,
+        timeInSeconds,
+        audioDuration,
+        sliderValue: playbackProgress * 100
+      });
     }
-
-    return () => {
-      if (audio) {
-        audio.removeEventListener('timeupdate', handleTimeUpdate);
-        audio.removeEventListener('ended', handleEnded);
+  }, [playbackProgress, audioDuration, isTouchActive, addEvent]);
+  
+  useEffect(() => {
+    if (isProcessing && processingStartTime === 0) {
+      setProcessingStartTime(Date.now());
+    } else if (!isProcessing && processingStartTime !== 0) {
+      setProcessingStartTime(0);
+    }
+    
+    if (isProcessing && processingStartTime > 0) {
+      const processingTime = Date.now() - processingStartTime;
+      if (processingTime > 45000) {
+        addEvent('PlaybackControls', 'Processing taking too long', 'warning', {
+          processingTime
+        });
       }
-    };
-  }, [audioUrl]);
-
-  // Update local state when prop changes
-  useEffect(() => {
-    setIsPlayingInternal(isPlaying);
-  }, [isPlaying]);
-
-  const togglePlayback = () => {
-    if (onTogglePlayback) {
-      onTogglePlayback();
-      return;
     }
-
-    if (!audioUrl && !audioBlob) return;
-
-    const audio = audioRef.current;
-    if (!audio) return;
-
-    if (isPlayingInternal) {
-      audio.pause();
-    } else {
-      audio.play();
-    }
-    setIsPlayingInternal(!isPlayingInternal);
+  }, [isProcessing, processingStartTime, addEvent]);
+  
+  const formatTime = (seconds: number): string => {
+    if (isNaN(seconds) || seconds < 0) return '00:00';
+    const mins = Math.floor(seconds / 60);
+    const secs = Math.floor(seconds % 60);
+    return `${mins.toString().padStart(2, '0')}:${secs.toString().padStart(2, '0')}`;
   };
-
-  const handleDownload = () => {
-    if (!audioUrl && !audioBlob) return;
-
-    const link = document.createElement('a');
+  
+  const handleSliderChange = (value: number[]) => {
+    const newPosition = value[0] / 100;
+    setSliderValue(value[0]);
+    setCurrentTime(newPosition * audioDuration);
     
-    if (audioUrl) {
-      link.href = audioUrl;
-    } else if (audioBlob) {
-      link.href = URL.createObjectURL(audioBlob);
-    } else {
-      return;
-    }
+    addEvent('PlaybackControls', 'Slider changed', 'info', {
+      value: value[0],
+      newPosition,
+      newTimeInSeconds: newPosition * audioDuration
+    });
     
-    link.download = 'recording.wav';
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
-    
-    if (audioBlob) {
-      URL.revokeObjectURL(link.href);
+    if (onSeek) {
+      onSeek(newPosition);
     }
   };
-
-  const handleSave = () => {
-    if (onSaveEntry) {
+  
+  const handleTouchStart = () => {
+    setIsTouchActive(true);
+  };
+  
+  const handleTouchEnd = () => {
+    if (onSeek && sliderValue !== undefined) {
+      onSeek(sliderValue / 100);
+    }
+    
+    setTimeout(() => {
+      setIsTouchActive(false);
+    }, 100);
+  };
+  
+  const handleSaveEntry = async () => {
+    addEvent('ProcessingFlow', 'Save entry initiated', 'info');
+    
+    if (!audioBlob || audioBlob.size < 100) {
+      addEvent('ProcessingFlow', 'Invalid audio blob for saving', 'error', { 
+        size: audioBlob?.size 
+      });
+      return;
+    }
+    
+    setIsClearingToasts(true);
+    await clearAllToasts();
+    
+    const tempId = 'temp-' + Date.now();
+    addEvent('ProcessingFlow', 'Dispatching immediate processing event', 'info', { tempId });
+    
+    updateProcessingEntries(tempId, 'add');
+    
+    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+      detail: { 
+        entries: [tempId], 
+        lastUpdate: Date.now(),
+        forceUpdate: true,
+        showLoader: true
+      }
+    }));
+    
+    setTimeout(() => {
+      addEvent('ProcessingFlow', 'Sending followup processing event', 'info', { tempId });
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { 
+          entries: [tempId], 
+          lastUpdate: Date.now(),
+          forceUpdate: true,
+          showLoader: true
+        }
+      }));
+    }, 50);
+    
+    setTimeout(() => {
+      addEvent('ProcessingFlow', 'Sending third processing event', 'info', { tempId });
+      window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+        detail: { 
+          entries: [tempId], 
+          lastUpdate: Date.now(),
+          forceUpdate: true,
+          showLoader: true
+        }
+      }));
+    }, 200);
+    
+    setTimeout(() => {
+      addEvent('ProcessingFlow', 'Sending journal refresh event', 'info', { tempId });
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { 
+          tempId,
+          timestamp: Date.now(),
+          forceRefresh: true
+        }
+      }));
+    }, 300);
+    
+    setTimeout(() => {
+      setIsClearingToasts(false);
+      addEvent('ProcessingFlow', 'Calling onSaveEntry callback', 'info');
       onSaveEntry();
-    }
+    }, 150);
   };
-
-  const handleRestart = () => {
-    if (onRestart) {
-      onRestart();
-    }
-  };
-
-  // Render appropriate controls based on available props
-  const renderControls = () => {
-    if (onSaveEntry && onRestart) {
-      return (
-        <div className="flex space-x-2 mt-2">
+  
+  return (
+    <div className="w-full px-4 py-2">
+      <div className="flex flex-col w-full gap-3">
+        <div className="flex items-center gap-3 mb-1 w-full">
+          <div className="relative w-full flex items-center">
+            <Slider
+              value={[sliderValue]}
+              min={0}
+              max={100}
+              step={0.1}
+              className={cn(
+                "w-full transition-opacity", 
+                (isProcessing) ? "opacity-60 cursor-not-allowed" : ""
+              )}
+              onValueChange={handleSliderChange}
+              onTouchStart={handleTouchStart}
+              onTouchEnd={handleTouchEnd}
+              onMouseDown={handleTouchStart}
+              onMouseUp={handleTouchEnd}
+              disabled={isProcessing}
+            />
+          </div>
+          
+          <div className="text-sm text-muted-foreground w-[60px] text-right">
+            {formatTime(currentTime)}/{formatTime(audioDuration)}
+          </div>
+        </div>
+        
+        <div className="flex justify-center items-center gap-4">
           <Button 
-            variant="default" 
-            size="sm" 
-            onClick={handleSave}
+            variant="ghost" 
+            size="icon"
+            className="rounded-full w-10 h-10"
+            onClick={onTogglePlayback}
             disabled={isProcessing}
           >
-            {isProcessing ? "Processing..." : "Save"}
+            {isPlaying ? (
+              <Pause className="h-5 w-5" />
+            ) : (
+              <Play className="h-5 w-5 ml-0.5" />
+            )}
           </Button>
+          
           <Button 
-            variant="outline" 
-            size="sm" 
-            onClick={handleRestart}
+            variant="ghost" 
+            size="icon"
+            className="rounded-full w-10 h-10"
+            onClick={onRestart}
+            disabled={isProcessing}
           >
-            New Recording
+            <RotateCcw className="h-5 w-5" />
+          </Button>
+          
+          <Button 
+            variant="default" 
+            className="rounded-full px-4 bg-green-600 hover:bg-green-700 ml-2"
+            onClick={handleSaveEntry}
+            disabled={isProcessing || isClearingToasts || !audioBlob || audioBlob.size < 100}
+          >
+            {isProcessing || isClearingToasts ? (
+              <>
+                <Loader2 className="h-4 w-4 mr-2 animate-spin" /> 
+                {isClearingToasts ? 'Preparing...' : 'Processing...'}
+              </>
+            ) : (
+              'Save Entry'
+            )}
           </Button>
         </div>
-      );
-    }
-    return null;
-  };
-
-  return (
-    <div className="flex flex-col items-center space-y-2">
-      <audio ref={audioRef} src={audioUrl || (audioBlob ? URL.createObjectURL(audioBlob) : undefined)} preload="metadata" />
-      
-      <div className="flex items-center space-x-2">
-        <Button
-          variant="outline"
-          size="icon"
-          onClick={togglePlayback}
-          aria-label={isPlayingInternal ? "Pause" : "Play"}
-          disabled={!audioUrl && !audioBlob}
-        >
-          {isPlayingInternal ? <PauseIcon className="h-4 w-4" /> : <PlayIcon className="h-4 w-4" />}
-        </Button>
-        <span className="text-sm">{formatTime(audioDuration * 1000)}</span>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={handleDownload}
-          aria-label="Download"
-          disabled={!audioUrl && !audioBlob}
-        >
-          <DownloadIcon className="h-4 w-4" />
-        </Button>
       </div>
-      
-      {renderControls()}
-      
-      {playbackProgress > 0 && onSeek && (
-        <div className="w-full max-w-xs mt-2">
-          <input 
-            type="range" 
-            min="0" 
-            max="100" 
-            value={playbackProgress * 100} 
-            onChange={(e) => {
-              if (onSeek) onSeek(Number(e.target.value) / 100);
-            }}
-            className="w-full"
-          />
-        </div>
-      )}
     </div>
   );
-};
-
-export default PlaybackControls;
+}
