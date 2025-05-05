@@ -6,7 +6,7 @@ import { Separator } from "@/components/ui/separator";
 import { Pencil, Check, X, Plus, Loader2 } from "lucide-react";
 import { Input } from "@/components/ui/input";
 import { TranslatableText } from "@/components/translation/TranslatableText";
-import { getUserChatThreads, updateThreadTitle } from "@/services/chat/threadService";
+import { fetchChatThreads, updateThreadTitle } from "@/services/chat/threadService";
 import { useAuth } from "@/contexts/AuthContext";
 
 interface ChatThreadListProps {
@@ -45,7 +45,7 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
       
       setIsLoading(true);
       try {
-        const threadsData = await getUserChatThreads(user.id);
+        const threadsData = await fetchChatThreads(user.id);
         setThreads(threadsData);
       } catch (error) {
         console.error("Error loading threads:", error);

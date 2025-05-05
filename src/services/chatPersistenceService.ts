@@ -7,10 +7,9 @@ import {
   saveMessage as saveMsg,
   createChatThread as createThread,
   updateThreadTitle as updateTitle,
-  useChatPersistence as usePersistence,
-  ChatThread as Thread,
-  ChatMessage as Message
+  useChatPersistence as usePersistence
 } from './chat';
+import { ChatThread as Thread, ChatMessage as Message } from './chat/types';
 
 // Re-export everything for backward compatibility
 export type ChatThread = Thread;

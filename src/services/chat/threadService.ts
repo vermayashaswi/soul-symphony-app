@@ -1,5 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
+import { ChatThread } from './types';
 
 export async function fetchChatThreads(userId: string | undefined) {
   if (!userId) {
@@ -23,6 +24,9 @@ export async function fetchChatThreads(userId: string | undefined) {
     return [];
   }
 }
+
+// Add this function to fix the getUserChatThreads import error
+export const getUserChatThreads = fetchChatThreads;
 
 export async function deleteThread(threadId: string) {
   try {
@@ -53,7 +57,7 @@ export async function deleteThread(threadId: string) {
   }
 }
 
-export async function generateThreadTitle(threadId: string, userId: string | undefined) {
+export async function generateThreadTitle(threadId: string, userId: string | undefined): Promise<string | null> {
   if (!threadId || !userId) {
     return null;
   }
@@ -104,6 +108,26 @@ export async function generateThreadTitle(threadId: string, userId: string | und
   } catch (error) {
     console.error('Error generating thread title:', error);
     return 'New Conversation';
+  }
+}
+
+// Add this function to fix the updateThreadTitle import error
+export async function updateThreadTitle(threadId: string, title: string): Promise<boolean> {
+  try {
+    const { error } = await supabase
+      .from('chat_threads')
+      .update({ title })
+      .eq('id', threadId);
+
+    if (error) {
+      console.error('Error updating thread title:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in updateThreadTitle:', error);
+    return false;
   }
 }
 

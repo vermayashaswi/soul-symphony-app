@@ -8,6 +8,7 @@ import { toast } from '@/hooks/use-toast';
 import { generateThreadTitle } from '@/utils/chat/threadUtils';
 import { getPlanForQuery } from './threadService';
 import { convertGptPlanToQueryPlan } from './queryPlannerService';
+import { Json } from '@/integrations/supabase/types';
 
 export interface ChatMessageType {
   id: string;
@@ -73,8 +74,8 @@ export function useChatPersistence(queryClient: QueryClient) {
       setActiveThread(newThread);
       setMessages([]);
       
-      // Invalidate threads cache
-      queryClient.invalidateQueries(['chatThreads']);
+      // Fix the InvalidateQueryFilters error by using the correct format
+      queryClient.invalidateQueries({ queryKey: ['chatThreads'] });
       
       return threadId;
     } catch (error) {
@@ -135,12 +136,12 @@ export function useChatPersistence(queryClient: QueryClient) {
 
       if (messagesError) throw messagesError;
 
-      // Transform to our message format
+      // Fix the type error by ensuring sender is correctly typed
       const formattedMessages: ChatMessageType[] = (messagesData || []).map(msg => ({
         id: msg.id,
         threadId: msg.thread_id,
         content: msg.content,
-        sender: msg.sender,
+        sender: (msg.sender === 'user' || msg.sender === 'assistant') ? msg.sender : 'assistant',
         createdAt: msg.created_at,
         references: msg.reference_entries
       }));
@@ -333,8 +334,8 @@ export function useChatPersistence(queryClient: QueryClient) {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
       
-      // Invalidate threads cache
-      queryClient.invalidateQueries(['chatThreads']);
+      // Fix the InvalidateQueryFilters error by using the correct format
+      queryClient.invalidateQueries({ queryKey: ['chatThreads'] });
       
       return {
         userMessageId,
@@ -395,8 +396,8 @@ export function useChatPersistence(queryClient: QueryClient) {
         setActiveThread(prev => prev ? { ...prev, title } : null);
       }
       
-      // Invalidate threads cache
-      queryClient.invalidateQueries(['chatThreads']);
+      // Fix the InvalidateQueryFilters error by using the correct format
+      queryClient.invalidateQueries({ queryKey: ['chatThreads'] });
       
       // Dispatch event that thread title was updated
       window.dispatchEvent(
@@ -410,7 +411,7 @@ export function useChatPersistence(queryClient: QueryClient) {
       console.error("Error updating thread title:", error);
       return null;
     }
-  }, [user, activeThread]);
+  }, [user, activeThread, queryClient]);
 
   return {
     messages,
