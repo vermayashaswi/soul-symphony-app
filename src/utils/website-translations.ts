@@ -48,7 +48,7 @@ export const preloadWebsiteTranslations = async (language: string) => {
     'Mood Trends',
     'Jan', 'Mar', 'Now',
     'How have I been feeling lately?',
-    'Based on your recent entries, you've been feeling more positive and energetic this week...',
+    "Based on your recent entries, you've been feeling more positive and energetic this week...",
     
     // Footer
     'Download on App Store',
