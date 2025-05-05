@@ -25,8 +25,8 @@ export interface JournalEntry {
   original_language?: string; // Keep as optional
   translation_text?: string; // Keep as optional
   tempId?: string; // Temporary ID for tracking processing entries
-  timezone_name?: string; // Added timezone name
-  timezone_offset?: number; // Added timezone offset
+  timezone_name?: string; // Timezone name property
+  timezone_offset?: number; // Timezone offset property in minutes
 }
 
 export interface JournalEntryFormData extends JournalEntry {
