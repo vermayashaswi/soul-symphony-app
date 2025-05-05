@@ -2,7 +2,7 @@
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage, ChatThread } from './types';
 
-// Get all chat threads for a user (renamed from getUserChatThreads to fetchChatThreads)
+// Get all chat threads for a user
 export async function fetchChatThreads(userId: string): Promise<ChatThread[]> {
   try {
     const { data, error } = await supabase
@@ -97,18 +97,15 @@ export async function getPlanForQuery(
   query: string, 
   userId: string, 
   conversationContext: { content: string; sender: string }[] = [],
-  clientDetectedTimeRange?: { startDate: string; endDate: string; periodName: string } | null
+  clientTimestamp?: string // Modified to only accept timestamp
 ) {
   try {
-    const clientTime = new Date().toISOString();
-    
     const { data, error } = await supabase.functions.invoke('smart-query-planner', {
       body: {
         message: query,
         userId,
         conversationContext,
-        clientDetectedTimeRange, // Pass the complete client-detected time range object
-        clientTime // Add current client time as the source of truth
+        clientTimestamp // Pass only the client timestamp
       }
     });
     

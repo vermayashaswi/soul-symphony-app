@@ -58,7 +58,7 @@ serve(async (req) => {
       threadId, 
       includeDiagnostics, 
       queryPlan,
-      timezoneOffset 
+      clientTimestamp // Accept client timestamp instead of timezone offset
     } = await req.json();
 
     if (!message) {
@@ -70,7 +70,11 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
-    console.log(`Local timezone offset: ${timezoneOffset || 0} minutes`);
+    if (clientTimestamp) {
+      console.log(`Client timestamp: ${clientTimestamp}`);
+    } else {
+      console.log("No client timestamp provided, using server time");
+    }
     
     // Add this where appropriate in the main request handler:
     const diagnostics = {
