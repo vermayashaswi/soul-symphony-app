@@ -296,7 +296,8 @@ export function useChatPersistence(queryClient: QueryClient) {
         apiResponse = { 
           data: data?.response || data?.data, 
           error,
-          noEntriesForTimeRange: data?.noEntriesForTimeRange
+          noEntriesForTimeRange: data?.noEntriesForTimeRange,
+          entryDateRange: data?.entryDateRange
         };
       }
 
@@ -307,6 +308,11 @@ export function useChatPersistence(queryClient: QueryClient) {
       // If we get a warning about no entries for a time range
       if (apiResponse.noEntriesForTimeRange) {
         console.log("No entries for specified time range");
+      }
+      
+      // If we have entry date range info, log it
+      if (apiResponse.entryDateRange) {
+        console.log("Entry date range:", apiResponse.entryDateRange);
       }
 
       // Save assistant response to database

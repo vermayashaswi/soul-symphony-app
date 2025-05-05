@@ -163,6 +163,9 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
   let endDate = new Date(now);
   let periodName = timePeriod;
   
+  console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
+  console.log(`User's local time: ${now.toISOString()}`);
+  
   const lowerTimePeriod = timePeriod.toLowerCase();
   
   if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
@@ -235,6 +238,11 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
   // Add back the timezone offset to convert to UTC for storage
   startDate = new Date(startDate.getTime() + offsetMs);
   endDate = new Date(endDate.getTime() + offsetMs);
+  
+  console.log(`Date range calculated: 
+    Start: ${startDate.toISOString()} (${startDate.toLocaleDateString()})
+    End: ${endDate.toISOString()} (${endDate.toLocaleDateString()})
+    Period: ${periodName}`);
   
   return {
     startDate: startDate.toISOString(),

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -47,7 +48,8 @@ serve(async (req) => {
       userId, 
       threadId, 
       includeDiagnostics, 
-      queryPlan 
+      queryPlan,
+      timezoneOffset 
     } = await req.json();
 
     if (!message) {
@@ -59,6 +61,7 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
+    console.log(`Local timezone offset: ${timezoneOffset || 0} minutes`);
     
     // Add this where appropriate in the main request handler:
     const diagnostics = {
@@ -307,12 +310,35 @@ serve(async (req) => {
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
     }
+    
+    // Extract available dates for later validation
+    const availableDates = entries.map(entry => {
+      return new Date(entry.created_at).toLocaleDateString('en-US', {
+        year: 'numeric',
+        month: 'long',
+        day: 'numeric'
+      });
+    });
+    
+    console.log("Available journal entry dates:", availableDates);
+    
+    // Get the date range for the entries
+    const entryDates = entries.map(entry => new Date(entry.created_at));
+    const oldestDate = entryDates.length > 0 ? new Date(Math.min(...entryDates.map(d => d.getTime()))) : null;
+    const newestDate = entryDates.length > 0 ? new Date(Math.max(...entryDates.map(d => d.getTime()))) : null;
+    
+    const dateRangeInfo = oldestDate && newestDate ? 
+      `Your journal entries span from ${oldestDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })} to ${newestDate.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}. ` : 
+      '';
+    
+    console.log("Entry date range:", dateRangeInfo);
 
     // Format entries for the prompt with dates
     const entriesWithDates = entries.map(entry => {
       const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
-        month: 'short',
-        day: 'numeric'
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric' // Added year to ensure precise dating
       });
       return `- Entry from ${formattedDate}: ${entry.content}`;
     }).join('\n\n');
@@ -323,39 +349,48 @@ serve(async (req) => {
 Below are excerpts from the user's journal entries, along with dates:
 ${entriesWithDates}
 
+${dateRangeInfo}
+
+CRITICAL INSTRUCTION: ONLY reference dates and events that appear explicitly in the user's journal entries listed above. NEVER invent, hallucinate or make up dates, events, or journal content that is not present in the provided entries. If asked about a specific time period that isn't covered in the entries above, clearly state that there are no entries for that period.
+
 The user has now asked:
 "${message}"
 
 Please respond with the following guidelines:
 
-1. **Tone & Purpose**
+1. **Factual Accuracy**
+   - ONLY mention dates, events, and emotions that are explicitly present in the journal entries provided.
+   - If you're unsure if something happened on a specific date, DO NOT mention it.
+   - NEVER invent or hallucinate events, dates, or journal content.
+
+2. **Tone & Purpose**
    - Be emotionally supportive, non-judgmental, and concise.
    - Avoid generic advice—make your response feel personal, grounded in the user's own journal reflections.
 
-2. **Data Grounding**
+3. **Data Grounding**
    - Use the user's past entries as the primary source of truth.
-   - Reference journal entries with specific bullet points that include dates.
+   - Reference journal entries with specific bullet points that include accurate dates.
    - Do not make assumptions or speculate beyond what the user has written.
 
-3. **Handling Ambiguity**
+4. **Handling Ambiguity**
    - If the user's question is broad, philosophical, or ambiguous (e.g., "Am I introverted?"), respond with thoughtful reflection:
      - Acknowledge the ambiguity or complexity of the question.
      - Offer the most likely patterns or insights based on journal entries.
      - Clearly state when there isn't enough information to give a definitive answer, and gently suggest what the user could explore further in their journaling.
    - If user asks you to rate them, do it! 
 
-4. **Insight & Structure**
+5. **Insight & Structure**
    - Highlight recurring patterns, emotional trends, or changes over time.
    - Suggest gentle, practical self-reflections or actions, only if relevant.
    - Keep responses between 120–180 words, formatted for easy reading.
    - Always use bulleted pointers wherever necessary!!
 
 Example format (only to be used when you feel the need to) :
-- "On Mar 18 and Mar 20, you mentioned feeling drained after social interactions."
-- "Your entry on Apr 2 reflects a desire for deeper connection with others."
+- "On March 18, 2025, you mentioned feeling drained after social interactions."
+- "Your entry on April 2, 2025, reflects a desire for deeper connection with others."
 - "Based on these entries, it seems you may lean toward introversion, but more context would help."
 
-**MAKE SURE YOUR RESPONES ARE STRUCTURED WITH BULLETS, POINTERS, BOLD HEADERS, and other boldened information that's important. Don't need lengthy paragraphs that are difficult to read. Use headers and sub headers wisely**
+**MAKE SURE YOUR RESPONSES ARE STRUCTURED WITH BULLETS, POINTERS, BOLD HEADERS, and other boldened information that's important. Don't need lengthy paragraphs that are difficult to read. Use headers and sub headers wisely**
 
 Now generate your thoughtful, emotionally intelligent response:`;
 
@@ -409,9 +444,43 @@ Now generate your thoughtful, emotionally intelligent response:`;
     }
 
     const completionData = await completionResponse.json();
-    const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+    let responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
     console.log("Response generated successfully");
     diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "success"));
+    
+    // Validate response for hallucinated dates
+    diagnostics.steps.push(createDiagnosticStep("Response Validation", "loading"));
+    
+    // Extract dates from the response using a regex pattern for dates
+    const dateRegex = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b/gi;
+    const mentionedDates = responseContent.match(dateRegex) || [];
+    
+    // Check if any mentioned dates are not in the available dates
+    const invalidDates = mentionedDates.filter(mentionedDate => {
+      // Normalize date formats for comparison (remove ordinal suffixes)
+      const normalizedDate = mentionedDate.replace(/(st|nd|rd|th)/g, '').trim();
+      // Check if this normalized date exists in availableDates
+      return !availableDates.some(availableDate => {
+        return normalizedDate.includes(availableDate.replace(/(\d+)(st|nd|rd|th)/, '$1')) || 
+               availableDate.includes(normalizedDate.replace(/(\d+)(st|nd|rd|th)/, '$1'));
+      });
+    });
+    
+    // Log any invalid dates found
+    if (invalidDates.length > 0) {
+      console.log("Found potentially hallucinated dates in response:", invalidDates);
+      diagnostics.steps.push(createDiagnosticStep(
+        "Response Validation", 
+        "warning", 
+        `Found ${invalidDates.length} potentially hallucinated dates: ${invalidDates.join(', ')}`
+      ));
+      
+      // Add a disclaimer to the response
+      responseContent += `\n\n**Note:** This response may contain inaccuracies in the dates referenced. Please refer to your actual journal entries for precise dates.`;
+    } else {
+      console.log("No hallucinated dates detected in response");
+      diagnostics.steps.push(createDiagnosticStep("Response Validation", "success", "No date hallucinations detected"));
+    }
 
     // Process entries to ensure valid dates
     const processedEntries = entries.map(entry => {
@@ -446,7 +515,8 @@ Now generate your thoughtful, emotionally intelligent response:`;
           themes: entry.themes || [],
           sentiment: entry.sentiment,
           emotions: entry.emotions
-        }))
+        })),
+        entryDateRange: dateRangeInfo
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
@@ -496,6 +566,15 @@ async function searchEntriesWithVector(
     // Apply post-query filters
     let filteredData = data || [];
     
+    // Log entry dates for debugging time range issues
+    if (filteredData.length > 0) {
+      const entryDates = filteredData.map(entry => {
+        const date = new Date(entry.created_at);
+        return `${date.toISOString()} (${date.toLocaleDateString()})`;
+      });
+      console.log("Initial entry dates before filtering:", entryDates);
+    }
+    
     // Apply date range filter
     if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
       const startDate = filters.dateRange.startDate ? new Date(filters.dateRange.startDate) : null;
@@ -507,6 +586,9 @@ async function searchEntriesWithVector(
         const entryDate = new Date(entry.created_at);
         const startDateMatch = !startDate || entryDate >= startDate;
         const endDateMatch = !endDate || entryDate <= endDate;
+        if (!startDateMatch || !endDateMatch) {
+          console.log(`Entry ${entry.id} date ${entryDate.toISOString()} outside filter range`);
+        }
         return startDateMatch && endDateMatch;
       });
       

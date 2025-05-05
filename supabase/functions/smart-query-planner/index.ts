@@ -1,123 +1,23 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
+// Define Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const openaiApiKey = Deno.env.get('OPENAI_API_KEY') || '';
+const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
-// Define CORS headers
+// Get OpenAI API key from environment variable
+const apiKey = Deno.env.get('OPENAI_API_KEY');
+if (!apiKey) {
+  console.error('OPENAI_API_KEY is not set');
+  Deno.exit(1);
+}
+
+// Define CORS headers directly in the function
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-// Helper function to calculate relative date range based on query and timezone
-function calculateDateRange(timeExpression: string, timezoneOffset: number = 0): { startDate: string, endDate: string, periodName: string } | null {
-  // Convert timezone offset to milliseconds
-  const offsetMs = timezoneOffset * 60 * 1000;
-  
-  // Get current date in user's timezone
-  const now = new Date(Date.now() - offsetMs);
-  let startDate = new Date(now);
-  let endDate = new Date(now);
-  let periodName = timeExpression;
-  
-  const lowerTimeExpression = timeExpression.toLowerCase();
-  
-  // Handle different time expressions
-  if (lowerTimeExpression.includes('today')) {
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'today';
-  } 
-  else if (lowerTimeExpression.includes('yesterday')) {
-    startDate.setDate(startDate.getDate() - 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setDate(endDate.getDate() - 1);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'yesterday';
-  } 
-  else if (lowerTimeExpression.includes('this week')) {
-    const dayOfWeek = startDate.getDay();
-    startDate.setDate(startDate.getDate() - dayOfWeek);
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setDate(endDate.getDate() + (6 - dayOfWeek));
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'this week';
-  } 
-  else if (lowerTimeExpression.includes('last week')) {
-    const dayOfWeek = startDate.getDay();
-    startDate.setDate(startDate.getDate() - dayOfWeek - 7);
-    startDate.setHours(0, 0, 0, 0);
-    endDate.setDate(startDate.getDate() + 6);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'last week';
-  } 
-  else if (lowerTimeExpression.includes('this month')) {
-    startDate.setDate(1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
-    periodName = 'this month';
-  } 
-  else if (lowerTimeExpression.includes('last month')) {
-    startDate.setMonth(startDate.getMonth() - 1);
-    startDate.setDate(1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
-    periodName = 'last month';
-  } 
-  else if (lowerTimeExpression.match(/october\s+2023/i)) {
-    startDate = new Date(2023, 9, 1, 0, 0, 0, 0); // October is month 9 (0-based)
-    endDate = new Date(2023, 9, 31, 23, 59, 59, 999);
-    periodName = 'October 2023';
-  }
-  else if (lowerTimeExpression.includes('this year')) {
-    startDate = new Date(startDate.getFullYear(), 0, 1, 0, 0, 0, 0);
-    endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59, 999);
-    periodName = 'this year';
-  }
-  else if (lowerTimeExpression.includes('last year')) {
-    startDate = new Date(startDate.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
-    endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59, 999);
-    periodName = 'last year';
-  }
-  else {
-    return null;
-  }
-
-  // Add back the timezone offset to convert to UTC for storage
-  startDate = new Date(startDate.getTime() + offsetMs);
-  endDate = new Date(endDate.getTime() + offsetMs);
-  
-  return {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    periodName
-  };
-}
-
-function detectTimeRange(query: string, timezoneOffset: number = 0): any {
-  const timeExpressions = [
-    'today', 'yesterday', 
-    'this week', 'last week', 
-    'this month', 'last month',
-    'this year', 'last year',
-    'october 2023' // Add support for specific month/year combinations
-  ];
-  
-  const lowerQuery = query.toLowerCase();
-  
-  for (const expr of timeExpressions) {
-    if (lowerQuery.includes(expr)) {
-      return calculateDateRange(expr, timezoneOffset);
-    }
-  }
-  
-  return null;
-}
 
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -126,301 +26,309 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, conversationContext = [], timezoneOffset = 0 } = await req.json();
+    const { message, userId, conversationContext = [], timezoneOffset } = await req.json();
     
-    // Log the timezone offset from client
-    console.log(`User timezone offset: ${timezoneOffset} minutes`);
-    
-    if (!message || !userId) {
-      throw new Error("Message and userId are required");
+    if (!message) {
+      throw new Error('Message is required');
     }
 
     console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
-
-    // First check if this is a journal-specific query or not
-    const isJournalQuery = await checkIfJournalQuery(message);
-    console.log(`Query classified as: ${isJournalQuery}`);
+    console.log(`User timezone offset: ${timezoneOffset} minutes`);
     
-    // If it's not a journal query, just return a null plan
-    if (isJournalQuery !== 'journal_specific') {
-      return new Response(
-        JSON.stringify({
-          queryType: isJournalQuery,
-          plan: null,
-          directResponse: isJournalQuery === 'general' 
-            ? "I can help answer that, but I won't need to search through your journal entries for this type of question."
-            : null
-        }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-      );
-    }
-    
-    // Manually handle time range detection for queries about emotions in specific time periods
-    const lowerMessage = message.toLowerCase();
-    const emotionTimeQuery = lowerMessage.match(/top emotions|emotions (?:this|last|in) (?:week|month|year)|emotions (?:today|yesterday)/i);
-    
-    if (emotionTimeQuery) {
-      // This is a query about emotions over time, so extract the time period
-      const timeRange = detectTimeRange(lowerMessage, timezoneOffset);
-      
-      if (timeRange) {
-        console.log(`Generated query plan for emotion time query with date range: ${timeRange.periodName}`);
-        
-        // Build a custom plan for this emotion analysis query
-        const plan = {
-          is_segmented: false,
-          subqueries: [],
-          strategy: "hybrid",
-          filters: {
-            date_range: timeRange,
-            emotions: [],
-            sentiment: [],
-            themes: [],
-            entities: []
+    // Check message types and planQuery
+    const messageTypesResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a classification tool that determines if a user's query is a general question about mental health (respond with "mental_health_general") OR if it's a question seeking insights from the user's journal entries (respond with "journal_specific"). Respond with ONLY "mental_health_general" or "journal_specific".`
           },
-          match_count: 14,
-          needs_data_aggregation: true,
-          needs_more_context: false,
-          reasoning: `The hybrid strategy is suitable as it allows for filtering entries from the specified ${timeRange.periodName} and aggregating the emotional data to determine the top emotions.`
-        };
-        
-        console.log(`Generated query plan: ${JSON.stringify(plan)}`);
-        
-        return new Response(
-          JSON.stringify({
-            queryType: isJournalQuery,
-            plan,
-            directResponse: null
-          }),
-          { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-        );
+          { role: 'user', content: message }
+        ],
+        temperature: 0.1,
+        max_tokens: 10
+      }),
+    });
+
+    if (!messageTypesResponse.ok) {
+      console.error('Failed to get message types:', await messageTypesResponse.text());
+      throw new Error('Failed to classify message type');
+    }
+
+    const response = await messageTypesResponse.json();
+
+    // Process time-based queries more accurately
+    let hasTimeFilter = false;
+    let timeRangeMentioned = null;
+
+    // Enhanced time detection - look for time expressions in the query
+    const timeKeywords = [
+      'today', 'yesterday', 'this week', 'last week', 
+      'this month', 'last month', 'this year', 'last year',
+      'recent', 'latest', 'current', 'past'
+    ];
+    
+    const lowerMessage = message.toLowerCase();
+    
+    for (const keyword of timeKeywords) {
+      if (lowerMessage.includes(keyword)) {
+        console.log(`Detected time keyword: ${keyword}`);
+        timeRangeMentioned = keyword;
+        hasTimeFilter = true;
+        break;
       }
     }
+
+    // If the user is asking about a specific date, extract it
+    let specificDate = null;
+    const dateRegex = /(\d{4}[-./]\d{2}[-./]\d{2})|(\d{2}[-./]\d{2}[-./]\d{4})/;
+    const dateMatch = message.match(dateRegex);
+    if (dateMatch) {
+      try {
+        specificDate = new Date(dateMatch[0]).toISOString().split('T')[0];
+        console.log(`Detected specific date: ${specificDate}`);
+      } catch (error) {
+        console.error("Error parsing specific date:", error);
+      }
+    }
+
+    // Determine the queryType (mental_health_general or journal_specific)
+    const queryType = response.data;
     
-    // For other types of journal queries, use the AI to generate a query plan
-    const planResult = await generateQueryPlan(message, conversationContext, timezoneOffset);
-    
+    // Build the search plan
+    let plan = null;
+    let directResponse = null;
+
+    if (queryType === 'mental_health_general') {
+      console.log("Query classified as:", queryType);
+      directResponse = null; // Process general queries with our standard chat flow
+    } else if (queryType === 'journal_specific') {
+      console.log("Query classified as:", queryType);
+      
+      // Build a plan for journal-specific queries
+      const planResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `You are an AI query planner for a journaling application. Your task is to analyze user questions and create search plans that efficiently retrieve relevant journal entries. 
+              
+              For the following user query, create a JSON search plan with these components:
+
+              1. "strategy": Choose the most appropriate search method:
+                 - "vector" (semantic search, default for conceptual queries)
+                 - "sql" (direct filtering, best for time/attribute-based queries)
+                 - "hybrid" (combines both approaches)
+              
+              2. "filters": Add relevant filters based on the query:
+                 - "date_range": {startDate, endDate, periodName} (for time-based queries)
+                 - "emotions": [] (array of emotions to filter for)
+                 - "sentiment": [] (array of sentiments: "positive", "negative", "neutral")
+                 - "themes": [] (array of themes to filter for)
+                 - "entities": [{type, name}] (people, places, etc. mentioned)
+              
+              3. "match_count": Number of entries to retrieve (default 15, use 30+ for aggregations)
+              
+              4. "needs_data_aggregation": Boolean (true if statistical analysis needed)
+              
+              5. "needs_more_context": Boolean (true if query relates to previous messages)
+
+              Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
+
+              Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
+              `
+            },
+            { role: 'user', content: message }
+          ],
+          temperature: 0.3,
+        }),
+      });
+
+      if (!planResponse.ok) {
+        console.error('Failed to get query plan:', await planResponse.text());
+        throw new Error('Failed to generate query plan');
+      }
+
+      const planData = await planResponse.json();
+      const planText = planData.choices[0]?.message?.content || '';
+      
+      try {
+        // Extract just the JSON part if there's any explanatory text
+        const jsonMatch = planText.match(/```json\s*([\s\S]*?)\s*```/) || planText.match(/\{[\s\S]*\}/);
+        const jsonStr = jsonMatch ? jsonMatch[0] : planText;
+        console.log("Generated raw plan:", jsonStr);
+        
+        // Handle special case for time-based queries
+        if (timeRangeMentioned && !jsonStr.includes('"date_range"')) {
+          // Add time range to the plan
+          const tempPlan = JSON.parse(jsonStr);
+          console.log("Adding time range to plan for:", timeRangeMentioned);
+          tempPlan.filters = tempPlan.filters || {};
+          
+          // Use our service to calculate the proper date range based on timezone
+          const dateRange = calculateRelativeDateRange(timeRangeMentioned, timezoneOffset);
+          tempPlan.filters.date_range = dateRange;
+          
+          plan = tempPlan;
+        } else {
+          plan = JSON.parse(jsonStr);
+        }
+      } catch (e) {
+        console.error('Error parsing plan JSON:', e);
+        console.error('Raw plan text:', planText);
+        plan = {
+          strategy: 'vector',
+          filters: hasTimeFilter ? { date_range: calculateRelativeDateRange(timeRangeMentioned || 'recent', timezoneOffset) } : {},
+          match_count: 15,
+          needs_data_aggregation: message.includes('how many') || message.includes('count') || message.includes('statistics'),
+          needs_more_context: false
+        };
+      }
+    } else {
+      console.error("Unknown query type:", queryType);
+    }
+
+    // If a specific date was detected, ensure it's used in the plan
+    if (specificDate && plan) {
+      plan.filters = plan.filters || {};
+      plan.filters.date_range = {
+        startDate: specificDate,
+        endDate: specificDate,
+        periodName: 'specific date'
+      };
+      console.log("Forcing date range in plan to:", specificDate);
+    }
+
+    // Return the plan
     return new Response(
-      JSON.stringify({
-        queryType: isJournalQuery,
-        plan: planResult,
-        directResponse: null
+      JSON.stringify({ 
+        plan, 
+        queryType,
+        directResponse 
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   } catch (error) {
-    console.error(`Error in query planner: ${error.message}`);
+    console.error('Error in query planner:', error);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { 
-        status: 500, 
-        headers: { 'Content-Type': 'application/json', ...corsHeaders } 
-      }
+      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
   }
 });
 
-async function checkIfJournalQuery(query: string): Promise<string> {
-  if (!query) return 'general';
+/**
+ * Calculates relative date ranges based on time expressions
+ * @param timePeriod - The time period expression (e.g., "this month", "last week")
+ * @param timezoneOffset - User's timezone offset in minutes
+ * @returns Date range with start and end dates
+ */
+function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number = 0): { startDate: string, endDate: string, periodName: string } {
+  // Convert timezone offset to milliseconds
+  const offsetMs = timezoneOffset * 60 * 1000;
   
-  if (!openaiApiKey) {
-    // Simple fallback classification for common patterns when API key is missing
-    const lowercaseQuery = query.toLowerCase();
-    
-    if (lowercaseQuery.includes('journal') || 
-        lowercaseQuery.includes('emotion') ||
-        lowercaseQuery.includes('feeling') ||
-        lowercaseQuery.includes('mood') ||
-        lowercaseQuery.includes('entry') ||
-        lowercaseQuery.includes('wrote') ||
-        lowercaseQuery.includes('theme') ||
-        lowercaseQuery.includes('sentiment')) {
-      return 'journal_specific';
-    }
-    
-    return 'general';
-  }
+  // Get current date in user's timezone
+  const now = new Date(Date.now() - offsetMs);
+  let startDate = new Date(now);
+  let endDate = new Date(now);
+  let periodName = timePeriod;
   
-  try {
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
-        messages: [
-          {
-            role: 'system',
-            content: 'You are classifying user queries for a journaling app. Determine if this query requires accessing the user\'s journal entries (JOURNAL_SPECIFIC), is a general question about mental health or the app (GENERAL), or is not related to either (OTHER). Respond with only "JOURNAL_SPECIFIC", "GENERAL", or "OTHER".'
-          },
-          {
-            role: 'user',
-            content: query
-          }
-        ],
-        temperature: 0.1,
-        max_tokens: 20
-      })
-    });
-    
-    const data = await response.json();
-    const classification = data.choices[0].message.content.trim();
-    
-    if (classification === 'JOURNAL_SPECIFIC') {
-      return 'journal_specific';
-    } else if (classification === 'GENERAL') {
-      return 'general';
-    } else {
-      return 'other';
-    }
-  } catch (error) {
-    console.error(`Error classifying query: ${error.message}`);
-    return 'journal_specific'; // Default to journal-specific on error
-  }
-}
-
-async function generateQueryPlan(query: string, conversationContext: any[] = [], timezoneOffset: number = 0): Promise<any> {
-  if (!openaiApiKey) {
-    console.log("No OpenAI API key found. Using basic query plan.");
-    // Return a basic query plan with any detected time range
-    const timeRange = detectTimeRange(query.toLowerCase(), timezoneOffset);
-    return {
-      strategy: "vector",
-      filters: {
-        date_range: timeRange,
-        emotions: [],
-        themes: [],
-        entities: []
-      },
-      match_count: 10,
-      needs_data_aggregation: false,
-      needs_more_context: false,
-      reasoning: "Basic query plan created without OpenAI."
-    };
-  }
+  console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
+  console.log(`User's local time: ${now.toISOString()}`);
   
-  try {
-    const systemPrompt = `
-You are an AI query planner for a personal journaling application. Your task is to analyze a user's query about their journal entries
-and create a structured query plan.
-
-CONTEXT:
-- The application stores journal entries with emotions, themes, and entities.
-- For each entry, we have text content, time created, emotion data, and thematic analysis.
-
-OUTPUT FORMAT:
-Return a JSON object with the following structure:
-{
-  "strategy": "vector" | "sql" | "hybrid",
-  "filters": {
-    "date_range": { "startDate": "ISO string or null", "endDate": "ISO string or null", "periodName": "string" },
-    "emotions": ["emotion1", "emotion2"],
-    "sentiment": ["positive", "negative", "neutral"],
-    "themes": ["theme1", "theme2"],
-    "entities": [{"type": "person", "name": "John"}]
-  },
-  "match_count": number,
-  "needs_data_aggregation": boolean,
-  "needs_more_context": boolean,
-  "is_segmented": boolean,
-  "subqueries": ["subquery1", "subquery2"],
-  "reasoning": "string explaining your choices"
-}
-
-STRATEGY TYPES:
-- "vector": Use semantic search for finding relevant entries (best for conceptual/thematic questions)
-- "sql": Use direct database queries (best for specific attributes, time ranges, counting)
-- "hybrid": Combine both approaches (good for complex queries with both semantic and structured elements)
-
-The user's timezone offset is ${timezoneOffset} minutes from UTC.
-`;
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Content-Type': 'application/json',
-        'Authorization': `Bearer ${openaiApiKey}`
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          {
-            role: 'system',
-            content: systemPrompt
-          },
-          {
-            role: 'user',
-            content: query
-          }
-        ],
-        temperature: 0.1
-      })
-    });
-    
-    const data = await response.json();
-    
-    if (!data.choices || data.choices.length === 0) {
-      throw new Error("No response from OpenAI API");
-    }
-    
-    let planText = data.choices[0].message.content;
-    let plan;
-    
-    try {
-      // Extract JSON if the response includes additional text
-      const jsonMatch = planText.match(/\{[\s\S]*\}/);
-      if (jsonMatch) {
-        planText = jsonMatch[0];
-      }
-      
-      plan = JSON.parse(planText);
-      
-      // Apply manual time range detection if not present in the AI's plan
-      if (!plan.filters?.date_range) {
-        const timeRange = detectTimeRange(query.toLowerCase(), timezoneOffset);
-        if (timeRange) {
-          if (!plan.filters) plan.filters = {};
-          plan.filters.date_range = timeRange;
-        }
-      }
-      
-      // Ensure other required fields are present
-      if (!plan.strategy) plan.strategy = "vector";
-      if (!plan.match_count) plan.match_count = 10;
-      if (plan.needs_data_aggregation === undefined) plan.needs_data_aggregation = false;
-      if (plan.needs_more_context === undefined) plan.needs_more_context = false;
-      
-      // Check for time-based emotion queries and optimize
-      if (query.toLowerCase().match(/top emotions|emotions (?:this|last|in) (?:week|month|year)|emotions (?:today|yesterday)/i)) {
-        plan.needs_data_aggregation = true;
-        plan.strategy = "hybrid";
-        plan.match_count = 14; // Increase match count for aggregation
-      }
-      
-      return plan;
-    } catch (parseError) {
-      console.error(`Error parsing plan: ${parseError.message}`);
-      console.log(`Raw plan text: ${planText}`);
-      
-      // Return a basic fallback plan
-      return {
-        strategy: "vector",
-        filters: {
-          date_range: detectTimeRange(query.toLowerCase(), timezoneOffset),
-          emotions: [],
-          themes: [],
-          entities: []
-        },
-        match_count: 10,
-        needs_data_aggregation: false,
-        needs_more_context: false,
-        reasoning: "Fallback plan due to parsing error."
-      };
-    }
-  } catch (error) {
-    console.error(`Error generating query plan: ${error.message}`);
-    return null;
+  const lowerTimePeriod = timePeriod.toLowerCase();
+  
+  if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
+    // Today: Start at midnight, end at 23:59:59
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'today';
+  } 
+  else if (lowerTimePeriod.includes('yesterday')) {
+    // Yesterday: Start at previous day midnight, end at previous day 23:59:59
+    startDate.setDate(startDate.getDate() - 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setDate(endDate.getDate() - 1);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'yesterday';
+  } 
+  else if (lowerTimePeriod.includes('this week')) {
+    // This week: Start at current week Sunday, end at Saturday 23:59:59
+    const dayOfWeek = startDate.getDay();
+    startDate.setDate(startDate.getDate() - dayOfWeek);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setDate(endDate.getDate() + (6 - dayOfWeek));
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'this week';
+  } 
+  else if (lowerTimePeriod.includes('last week')) {
+    // Last week: Start at previous week Sunday, end at previous week Saturday 23:59:59
+    const dayOfWeek = startDate.getDay();
+    startDate.setDate(startDate.getDate() - dayOfWeek - 7);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'last week';
+  } 
+  else if (lowerTimePeriod.includes('this month')) {
+    // This month: Start at 1st of current month, end at last day of month 23:59:59
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    periodName = 'this month';
+  } 
+  else if (lowerTimePeriod.includes('last month')) {
+    // Last month: Start at 1st of previous month, end at last day of previous month 23:59:59
+    startDate.setMonth(startDate.getMonth() - 1);
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    periodName = 'last month';
+  } 
+  else if (lowerTimePeriod.includes('this year')) {
+    // This year: Start at January 1st, end at December 31st 23:59:59
+    startDate = new Date(startDate.getFullYear(), 0, 1, 0, 0, 0, 0);
+    endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+    periodName = 'this year';
+  } 
+  else if (lowerTimePeriod.includes('last year')) {
+    // Last year: Start at January 1st of previous year, end at December 31st of previous year 23:59:59
+    startDate = new Date(startDate.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
+    endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+    periodName = 'last year';
+  } 
+  else {
+    // Default to last 30 days if no specific period matched
+    startDate.setDate(startDate.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'last 30 days';
   }
+
+  // Add back the timezone offset to convert to UTC for storage
+  startDate = new Date(startDate.getTime() + offsetMs);
+  endDate = new Date(endDate.getTime() + offsetMs);
+  
+  console.log(`Date range calculated: 
+    Start: ${startDate.toISOString()} (${startDate.toLocaleDateString()})
+    End: ${endDate.toISOString()} (${endDate.toLocaleDateString()})
+    Period: ${periodName}`);
+  
+  return {
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+    periodName
+  };
 }
