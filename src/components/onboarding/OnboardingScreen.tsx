@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { staticTranslationService } from '@/services/staticTranslationService';
@@ -332,7 +331,7 @@ export const OnboardingScreen: React.FC = () => {
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 className="w-full p-3 border rounded-md mb-2"
-                placeholder={staticTranslationService.translateText("Enter your name")}
+                placeholder="Enter your name"
               />
               <p className="text-sm text-muted-foreground mb-8">
                 <TranslatableText 
@@ -510,4 +509,5 @@ export const OnboardingScreen: React.FC = () => {
   );
 };
 
+// Add default export to fix the import issue
 export default OnboardingScreen;
