@@ -29,7 +29,7 @@ export interface QueryPlan {
  */
 export function convertGptPlanToQueryPlan(gptPlan: any): QueryPlan {
   if (!gptPlan) {
-    return createDefaultQueryPlan(); // Return default plan
+    return createDefaultQueryPlan();
   }
 
   try {
@@ -99,7 +99,7 @@ export function convertGptPlanToQueryPlan(gptPlan: any): QueryPlan {
     return queryPlan;
   } catch (error) {
     console.error("Error converting GPT plan to query plan:", error);
-    return createDefaultQueryPlan(); // Return default plan
+    return createDefaultQueryPlan();
   }
 }
 
