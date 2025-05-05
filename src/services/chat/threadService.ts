@@ -97,7 +97,7 @@ export async function getPlanForQuery(
   query: string, 
   userId: string, 
   conversationContext: { content: string; sender: string }[] = [],
-  clientTimestamp?: string // Modified to only accept timestamp
+  clientTimestamp?: string // Only accept the timestamp, no other time-related params
 ) {
   try {
     const { data, error } = await supabase.functions.invoke('smart-query-planner', {

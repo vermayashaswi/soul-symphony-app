@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -555,6 +554,13 @@ Examples:
       }
     }
 
+    // Add the detected date range to the plan if available
+    if (detectedDateRange && plan && (!plan.filters?.date_range)) {
+      console.log("Adding detected time range to plan");
+      plan.filters = plan.filters || {};
+      plan.filters.date_range = detectedDateRange;
+    }
+    
     // Return the plan
     return new Response(
       JSON.stringify({ 
