@@ -50,11 +50,11 @@ export function JournalEntryCard({
     themes: Array.isArray(entry?.themes) ? entry.themes : [],
     Edit_Status: entry?.Edit_Status || null,
     user_feedback: entry?.user_feedback || null,
-    "transcription text"?: string,
-    "refined text"?: string,
-    translation_text?: string,
-    original_language?: string,
-    tempId?: string
+    "transcription text": entry?.["transcription text"] || null,
+    "refined text": entry?.["refined text"] || null,
+    translation_text: entry?.translation_text || null,
+    original_language: entry?.original_language || null,
+    tempId: entry?.tempId || null
   };
 
   const [isExpanded, setIsExpanded] = useState(true); // Always expanded now
