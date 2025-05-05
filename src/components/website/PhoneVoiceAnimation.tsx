@@ -51,7 +51,7 @@ export const PhoneVoiceAnimation = () => {
               >
                 <div className="text-white text-center mb-6">
                   <span className="text-sm mb-2">
-                    <TranslatableText text="Recording your journal..." forceTranslate={true} />
+                    <TranslatableText text="Recording your journal..." />
                   </span>
                 </div>
                 <div className="w-full h-24 flex items-center justify-center gap-1 mb-8">
@@ -95,7 +95,7 @@ export const PhoneVoiceAnimation = () => {
               >
                 <div className="text-white text-center mb-8">
                   <span className="text-sm mb-2">
-                    <TranslatableText text="Processing your entry..." forceTranslate={true} />
+                    <TranslatableText text="Processing your entry..." />
                   </span>
                 </div>
                 <motion.div 
@@ -155,7 +155,7 @@ export const PhoneVoiceAnimation = () => {
                 className="flex-1 flex flex-col"
               >
                 <h3 className="text-white text-center mb-3 text-sm">
-                  <TranslatableText text="Your Journal Insights" forceTranslate={true} />
+                  <TranslatableText text="Your Journal Insights" />
                 </h3>
                 
                 {/* Enhanced Insights with Visualizations */}
@@ -172,7 +172,7 @@ export const PhoneVoiceAnimation = () => {
                         <LineChart className="h-3 w-3 text-primary" />
                       </div>
                       <p className="text-white text-xs">
-                        <TranslatableText text="Emotional patterns" forceTranslate={true} />
+                        <TranslatableText text="Emotional patterns" />
                       </p>
                     </div>
                     <div className="h-[60px] mt-2">
@@ -192,7 +192,7 @@ export const PhoneVoiceAnimation = () => {
                         <TrendingUp className="h-3 w-3 text-primary" />
                       </div>
                       <p className="text-white text-xs">
-                        <TranslatableText text="Sentiment trending up" forceTranslate={true} />
+                        <TranslatableText text="Sentiment trending up" />
                       </p>
                     </div>
                     <div className="h-[60px] mt-1">
@@ -212,7 +212,7 @@ export const PhoneVoiceAnimation = () => {
                         <LineChart className="h-3 w-3 text-primary" />
                       </div>
                       <p className="text-white text-xs">
-                        <TranslatableText text="Sleep pattern improving since last week" forceTranslate={true} />
+                        <TranslatableText text="Sleep pattern improving since last week" />
                       </p>
                     </div>
                   </motion.div>
@@ -225,7 +225,7 @@ export const PhoneVoiceAnimation = () => {
                   transition={{ delay: 0.8 }}
                 >
                   <span className="text-primary text-xs">
-                    <TranslatableText text="View full analysis" forceTranslate={true} />
+                    <TranslatableText text="View full analysis" />
                   </span>
                   <ArrowRight className="h-4 w-4 text-primary" />
                 </motion.div>

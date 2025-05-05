@@ -7,7 +7,7 @@ export function useOnboarding() {
   const [onboardingComplete, setOnboardingComplete] = useState<boolean | null>(null);
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
-  const { currentLanguage, setLanguage } = useTranslation();
+  const { currentLanguage } = useTranslation();
 
   useEffect(() => {
     // Check if onboarding is complete
@@ -20,15 +20,8 @@ export function useOnboarding() {
       setDisplayName(name);
     }
     
-    // Also check if a language preference was set during onboarding
-    const languagePref = localStorage.getItem('preferred_language');
-    if (languagePref && currentLanguage !== languagePref) {
-      console.log(`Setting language from onboarding preference: ${languagePref}`);
-      setLanguage(languagePref);
-    }
-    
     setLoading(false);
-  }, [currentLanguage, setLanguage]);
+  }, []);
 
   const completeOnboarding = () => {
     localStorage.setItem('onboardingComplete', 'true');

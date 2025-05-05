@@ -44,7 +44,7 @@ const SentimentChartDemo: React.FC<SentimentChartDemoProps> = ({ isPhonePreview 
                 }}
               />
               <span className={`${textSize} text-foreground/70 mt-1`}>
-                <TranslatableText text={point.day} forceTranslate={true} />
+                <TranslatableText text={point.day} />
               </span>
             </div>
           );

@@ -1,507 +1,823 @@
-import React, { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
-import { staticTranslationService } from '@/services/staticTranslationService';
-import { motion } from 'framer-motion';
-import { Button } from '@/components/ui/button';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import { preloadWebsiteTranslations } from '@/utils/website-translations';
-import LanguageSelector from '@/components/LanguageSelector';
-import EmotionBubblesDemo from '@/components/website/EmotionBubblesDemo';
-import SentimentChartDemo from '@/components/website/SentimentChartDemo';
+import React, { useState, useEffect, useRef } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import { Button } from "@/components/ui/button";
+import { Input } from "@/components/ui/input";
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User, Languages } from "lucide-react";
+import SouloLogo from "@/components/SouloLogo";
+import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
+import { RecordingVisualizer } from "@/components/voice-recorder/RecordingVisualizer";
+import { toast } from "sonner";
+import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
+import { useTranslation } from "@/contexts/TranslationContext";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
-// Define the onboarding steps
-const ONBOARDING_STEPS = [
+interface OnboardingScreenProps {
+  onComplete?: () => void;
+}
+
+interface NameStepProps {
+  name: string;
+  setName: React.Dispatch<React.SetStateAction<string>>;
+}
+
+const createWavePath = (
+  width: number, 
+  height: number, 
+  amplitude: number, 
+  frequency: number, 
+  phase: number
+): string => {
+  let path = `M 0 ${height / 2}`;
+  const segments = 30;
+  
+  for (let i = 0; i <= segments; i++) {
+    const x = (i / segments) * width;
+    const y = (height / 2) + Math.sin(((i / segments) * Math.PI * 2 * frequency) + phase) * amplitude;
+    path += ` L ${x} ${y}`;
+  }
+  
+  return path;
+};
+
+// Add languages array
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'zh', label: '中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'pt', label: 'Português' },
+];
+
+interface StepIllustration {
+  title: string;
+  subtitle: string;
+  description: string;
+  illustration: React.FC<any>;
+  buttonText: string;
+}
+
+const ONBOARDING_STEPS: StepIllustration[] = [
   {
-    id: 'welcome',
-    title: 'Welcome to SOuLO',
-    description: 'Your journey to self-awareness begins here'
+    title: "Welcome to SOuLO",
+    subtitle: "",
+    description: "Welcome to Voice Journaling - Just speak and we'll do the rest",
+    illustration: (props: {}) => (
+      <div className="flex flex-col justify-center items-center my-2">
+        <motion.div 
+          className="relative w-full h-64"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="absolute inset-0 flex items-center justify-center z-10 mb-20">
+            <div className="relative z-20">
+              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={false} textClassName="font-bold text-white" />
+            </div>
+          </div>
+          
+          <div className="absolute inset-0 flex items-center justify-center z-5 mt-20">
+            <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
+              <RecordingVisualizer 
+                isRecording={false} 
+                audioLevel={0.5} 
+                ripples={[]} 
+                fullWidth={true} 
+              />
+            </div>
+          </div>
+        </motion.div>
+        
+        <motion.h1 
+          className="text-2xl font-bold mb-3 mt-8 text-foreground"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <TranslatableText text="Welcome to SOuLO" forceTranslate={true} />
+        </motion.h1>
+        
+        <motion.p 
+          className="text-muted-foreground mb-6 max-w-xs font-medium text-theme animate-pulse"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ 
+            opacity: 1, 
+            y: 0,
+            scale: [1, 1.05, 1]
+          }}
+          transition={{ 
+            delay: 0.4,
+            scale: {
+              repeat: Infinity,
+              duration: 2,
+              ease: "easeInOut"
+            }
+          }}
+        >
+          <TranslatableText text="Express your thoughts and feelings with voice notes - we'll do the rest." forceTranslate={true} />
+        </motion.p>
+        
+        {/* Language selector */}
+        <motion.div
+          className="mt-4 w-full max-w-xs"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="flex flex-col gap-2 bg-background/90 p-4 rounded-lg border border-theme/20">
+            <label className="text-sm font-medium text-foreground">
+              <TranslatableText text="Preferred Language" forceTranslate={true} />
+            </label>
+            <LanguageSelector />
+          </div>
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Get Started"
   },
   {
-    id: 'privacy',
-    title: 'Your Data is Private',
-    description: 'We prioritize your privacy and security'
+    title: "Your Data is Private",
+    subtitle: "",
+    description: "Your journal entries are securely stored and only accessible to you. We take your privacy seriously.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <motion.div 
+          className="relative w-64 h-64 flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div 
+            className="relative z-10 bg-white/90 dark:bg-gray-800/90 rounded-xl p-5 shadow-lg border border-theme-light"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <div className="w-44 h-44 flex flex-col items-center justify-center">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", delay: 0.5 }}
+                className="w-20 h-20 bg-theme-light rounded-full flex items-center justify-center mb-4"
+              >
+                <motion.div className="relative w-10 h-10">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ 
+                      opacity: [0, 1, 1, 0],
+                    }}
+                    transition={{ 
+                      times: [0, 0.2, 0.8, 1],
+                      duration: 2.5,
+                      repeat: Infinity,
+                      repeatDelay: 1.5
+                    }}
+                    className="absolute inset-0 flex justify-center items-center z-20"
+                  >
+                    <LockOpen className="w-10 h-10 text-theme" />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ 
+                      opacity: [0, 0, 1, 1],
+                    }}
+                    transition={{ 
+                      times: [0, 0.8, 0.9, 1],
+                      duration: 2.5,
+                      repeat: Infinity,
+                      repeatDelay: 1.5
+                    }}
+                    className="absolute inset-0 flex justify-center items-center z-10"
+                  >
+                    <Lock className="w-10 h-10 text-theme" />
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="absolute top-0 left-0 w-full h-full overflow-hidden"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    {[...Array(12)].map((_, i) => (
+                      <motion.div
+                        key={`data-particle-${i}`}
+                        className="absolute w-1.5 h-1.5 rounded-full bg-theme"
+                        style={{
+                          left: `${40 + (Math.random() * 20)}%`,
+                          top: i % 2 === 0 ? '-20%' : '-30%',
+                        }}
+                        initial={{ opacity: 0 }}
+                        animate={{ 
+                          y: [0, 55],
+                          opacity: [0, 1, 0],
+                        }}
+                        transition={{
+                          y: { duration: 1 },
+                          opacity: { duration: 1, times: [0, 0.3, 1] },
+                          delay: i * 0.1,
+                          repeat: Infinity,
+                          repeatDelay: 2
+                        }}
+                      />
+                    ))}
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                    animate={{ 
+                      scale: [1, 1.3, 1],
+                      opacity: [0, 0.7, 0] 
+                    }}
+                    transition={{ 
+                      duration: 0.8,
+                      delay: 2,
+                      repeat: Infinity,
+                      repeatDelay: 2.2
+                    }}
+                  >
+                    <div className="w-full h-full rounded-full border-2 border-theme"></div>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+              
+              <motion.div 
+                className="w-full h-2 bg-muted rounded-full overflow-hidden mt-2"
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+                transition={{ delay: 0.7, duration: 0.5 }}
+              >
+                <motion.div 
+                  className="h-full bg-theme"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ delay: 0.9, duration: 0.7 }}
+                />
+              </motion.div>
+              
+              <motion.div 
+                className="mt-4 flex space-x-1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.2 }}
+              >
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="w-2 h-2 rounded-full bg-theme-light" />
+                ))}
+              </motion.div>
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Next"
   },
   {
-    id: 'voice-journaling',
-    title: 'Voice Journaling',
-    description: 'Speak your thoughts and feelings freely'
+    title: "Voice Journaling",
+    subtitle: "",
+    description: "Record your thoughts with voice notes that are automatically transcribed and analyzed for emotional patterns.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
+          {[45, 60, 80, 100].map((size, index) => (
+            <motion.div
+              key={`circle-${index}`}
+              className={`absolute rounded-full ${index % 2 === 0 ? 'bg-theme/30 dark:bg-theme/30' : 'bg-theme-light/30 dark:bg-theme-light/30'}`}
+              style={{ width: size, height: size }}
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.15, 0.25, 0.15]
+              }}
+              transition={{
+                duration: 2 + index * 0.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: index * 0.2
+              }}
+            />
+          ))}
+          
+          <motion.div
+            className="relative w-28 h-28 rounded-full bg-theme-light flex items-center justify-center"
+            animate={{
+              scale: [1, 1.1, 1],
+              boxShadow: [
+                "0 0 0 0 rgba(var(--color-theme), 0.7)",
+                "0 0 0 15px rgba(var(--color-theme), 0)",
+                "0 0 0 0 rgba(var(--color-theme), 0)"
+              ]
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            <div className="w-20 h-20 rounded-full bg-theme flex items-center justify-center text-white">
+              <Mic className="w-10 h-10 animate-pulse" />
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    ),
+    buttonText: "Next"
   },
   {
-    id: 'ai-analysis',
-    title: 'AI Analysis',
-    description: 'Discover patterns in your emotional journey'
+    title: "AI Analysis",
+    subtitle: "",
+    description: "Get insights into your emotional patterns and growth through advanced AI analysis.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <div className="relative w-64 h-64 flex flex-col items-center justify-center overflow-hidden p-4">
+          <motion.div
+            className="relative z-10 mb-3"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", delay: 0.2 }}
+          >
+            <Brain className="w-12 h-12 text-theme" />
+          </motion.div>
+          
+          <motion.div 
+            className="flex flex-wrap gap-2 max-w-[200px] justify-center relative z-10"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            {["Joy", "Growth", "Progress", "Health", "Focus", "Connection", "Creativity"].map((theme, index) => (
+              <motion.div
+                key={theme}
+                className="px-3 py-1 bg-theme/20 rounded-full text-sm font-medium text-theme"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ 
+                  scale: 1, 
+                  opacity: 1,
+                  y: [0, index % 2 === 0 ? -5 : 5, 0]
+                }}
+                transition={{ 
+                  delay: index * 0.1 + 0.5,
+                  y: {
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatType: "reverse",
+                    ease: "easeInOut",
+                    delay: index * 0.2
+                  }
+                }}
+              >
+                {theme}
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+    ),
+    buttonText: "Next"
   },
   {
-    id: 'chat',
-    title: 'Chat with Your Journal',
-    description: 'Have meaningful conversations with your past insights'
+    title: "Chat with Your Journal",
+    subtitle: "",
+    description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2 w-full">
+        <div className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex items-center justify-center overflow-hidden p-4">
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-b from-transparent to-theme/10"
+            animate={{ opacity: [0.3, 0.5, 0.3] }}
+            transition={{ 
+              duration: 3, 
+              repeat: Infinity,
+              ease: "easeInOut" 
+            }}
+          />
+          
+          <div className="relative z-10 flex flex-col gap-3 w-full mt-4 mb-2">
+            <motion.div 
+              className="self-start max-w-[90%] bg-white dark:bg-white p-2.5 rounded-2xl rounded-bl-none text-sm text-gray-800"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              How have I been feeling lately?
+            </motion.div>
+            
+            <motion.div 
+              className="self-end max-w-[90%] bg-theme text-white p-2.5 rounded-2xl rounded-br-none text-sm"
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.9 }}
+            >
+              Based on your recent entries, you've been feeling more positive and energetic this week...
+            </motion.div>
+            
+            <motion.div
+              className="self-start flex items-center justify-center w-10 h-10 bg-muted rounded-full mt-1.5"
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 1.5, type: "spring" }}
+            >
+              <MessageSquare className="w-5 h-5 text-primary" />
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    ),
+    buttonText: "Next"
   },
   {
-    id: 'track-journey',
-    title: 'Track Your Emotional Journey',
-    description: 'Visualize your growth over time'
+    title: "Track Your Emotional Journey",
+    subtitle: "",
+    description: "See your emotional patterns and growth over time with beautiful visualizations.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-b from-theme/10 to-theme/30 dark:from-theme/10 dark:to-theme/30"
+            animate={{ 
+              opacity: [0.3, 0.5, 0.3],
+              rotate: [0, 5, 0, -5, 0]
+            }}
+            transition={{ 
+              opacity: { duration: 3, repeat: Infinity, ease: "easeInOut" },
+              rotate: { duration: 10, repeat: Infinity, ease: "easeInOut" }
+            }}
+          />
+          
+          <div className="relative z-10 w-48 h-48 flex items-center justify-center">
+            <motion.div
+              className="w-44 h-32 bg-white/90 dark:bg-gray-800/90 rounded-xl p-3 shadow-lg"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-medium text-theme">Mood Trends</div>
+                <LineChart className="w-4 h-4 text-theme" />
+              </div>
+              
+              <svg viewBox="0 0 100 50" className="w-full h-16">
+                <defs>
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="var(--color-theme)" stopOpacity="0.5" />
+                    <stop offset="100%" stopColor="var(--color-theme)" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                
+                <motion.path
+                  d="M0,40 C10,35 20,25 30,30 C40,35 50,20 60,15 C70,10 80,5 100,10"
+                  fill="none"
+                  stroke="var(--color-theme)"
+                  strokeWidth="2"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 2, delay: 0.5 }}
+                />
+                
+                <motion.path
+                  d="M0,40 C10,35 20,25 30,30 C40,35 50,20 60,15 C70,10 80,5 100,10 V50 H0 Z"
+                  fill="url(#gradient)"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 1, delay: 2 }}
+                />
+                
+                {[
+                  { x: 30, y: 30, delay: 1.5 },
+                  { x: 60, y: 15, delay: 1.8 },
+                  { x: 80, y: 5, delay: 2.1 }
+                ].map((point, i) => (
+                  <motion.circle
+                    key={`point-${i}`}
+                    cx={point.x}
+                    cy={point.y}
+                    r="3"
+                    fill="var(--color-theme)"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: point.delay }}
+                  />
+                ))}
+              </svg>
+              
+              <motion.div
+                className="flex justify-between text-xs text-muted-foreground mt-1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 2.2 }}
+              >
+                <span>Jan</span>
+                <span>Mar</span>
+                <span>Now</span>
+              </motion.div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    ),
+    buttonText: "Next"
   },
   {
-    id: 'name',
-    title: 'What Should We Call You?',
-    description: 'Personalize your experience'
+    title: "What Should We Call You?",
+    subtitle: "",
+    description: "Your name helps us make your journey more personal.",
+    illustration: (props: NameStepProps) => (
+      <div className="flex flex-col justify-center items-center my-2 w-full">
+        <motion.div 
+          className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex flex-col items-center justify-center overflow-hidden p-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div
+            className="w-20 h-20 bg-theme/20 rounded-full flex items-center justify-center mb-6"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", delay: 0.3 }}
+          >
+            <User className="w-10 h-10 text-theme" />
+          </motion.div>
+          
+          <motion.div 
+            className="w-full space-y-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Input
+              placeholder="Enter your name"
+              value={props.name}
+              onChange={(e) => props.setName(e.target.value)}
+              className="bg-background/80 border-theme/20 focus:border-theme text-white"
+              autoFocus
+            />
+            
+            <div className="text-sm text-muted-foreground text-center">
+              This is how SOuLO will address you
+            </div>
+          </motion.div>
+          
+          <motion.div 
+            className="absolute -z-10 inset-0 opacity-20"
+            animate={{ 
+              background: [
+                "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)",
+                "radial-gradient(circle at 80% 80%, var(--color-theme-dark) 0%, transparent 70%)",
+                "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)"
+              ]
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Continue"
   },
   {
-    id: 'language',
-    title: 'Preferred Language',
-    description: 'Select your language for a personalized experience'
-  },
-  {
-    id: 'ready',
-    title: 'Ready to Start Your Journey?',
-    description: 'Begin your path to self-discovery'
+    title: "Ready to Start Your Journey?",
+    subtitle: "",
+    description: "",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <motion.div 
+          className="relative w-64 h-64 rounded-xl flex items-center justify-center overflow-hidden"
+          animate={{ 
+            boxShadow: ["0 0 0 0px rgba(var(--color-theme), 0.2)", "0 0 0 20px rgba(var(--color-theme), 0)", "0 0 0 0px rgba(var(--color-theme), 0.2)"]
+          }}
+          transition={{ 
+            repeat: Infinity, 
+            duration: 2.5,
+            ease: "easeInOut" 
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
+          >
+            <SouloLogo size="large" className="scale-[2.5]" useColorTheme={false} animate={true} textClassName="font-bold text-white" />
+          </motion.div>
+          
+          <motion.div
+            className="absolute bottom-5 w-full flex justify-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1 }}
+          >
+            <div className="text-theme text-sm font-medium text-center">
+              Emotional wellness through voice
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Sign In"
   }
 ];
 
-export const OnboardingScreen: React.FC = () => {
-  const [step, setStep] = useState(0);
-  const [name, setName] = useState('');
-  const navigate = useNavigate();
-  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
-  const [hasPreloadedTranslations, setHasPreloadedTranslations] = useState(false);
+// Simple Language Selector component for onboarding
+const LanguageSelector = () => {
+  const { currentLanguage, setLanguage } = useTranslation();
 
-  // Preload translations when language changes
-  useEffect(() => {
-    if (currentLanguage !== 'en' && !hasPreloadedTranslations) {
-      const preloadTranslations = async () => {
-        console.log(`Preloading onboarding translations for ${currentLanguage}`);
-        await preloadWebsiteTranslations(currentLanguage);
-        setHasPreloadedTranslations(true);
-      };
-      
-      preloadTranslations();
-    }
-  }, [currentLanguage, hasPreloadedTranslations]);
-
-  const handleLanguageSelect = async (languageCode: string) => {
-    console.log(`Language selected in onboarding: ${languageCode}`);
-    
-    // First set the language to update the UI
-    await setLanguage(languageCode);
-    
-    // Store in localStorage
-    localStorage.setItem('preferred_language', languageCode);
-    
-    // Preload translations for smoother experience
-    if (languageCode !== 'en') {
-      await preloadWebsiteTranslations(languageCode);
-      setHasPreloadedTranslations(true);
-    }
-    
-    // Move to next step
-    goToNextStep();
-  };
-
-  const saveName = () => {
-    if (name.trim()) {
-      localStorage.setItem('user_display_name', name.trim());
-    }
-    goToNextStep();
-  };
-
-  const completeOnboarding = () => {
-    localStorage.setItem('onboardingComplete', 'true');
-    navigate('/app/home');
-  };
-
-  const goToNextStep = () => {
-    if (step < ONBOARDING_STEPS.length - 1) {
-      setStep(step + 1);
-    } else {
-      completeOnboarding();
-    }
-  };
-
-  const goToPrevStep = () => {
-    if (step > 0) {
-      setStep(step - 1);
-    }
-  };
-
-  const skipOnboarding = () => {
-    completeOnboarding();
-  };
-
-  const renderStepContent = () => {
-    const currentStep = ONBOARDING_STEPS[step];
-    
-    switch (currentStep.id) {
-      case 'welcome':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-8">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="rounded-full w-32 h-32 bg-primary/20 mx-auto mb-8 flex items-center justify-center"
-            >
-              <div className="text-5xl">🌱</div>
-            </motion.div>
-          </div>
-        );
-        
-      case 'privacy':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-8">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="rounded-full w-32 h-32 bg-primary/20 mx-auto mb-8 flex items-center justify-center"
-            >
-              <div className="text-5xl">🔒</div>
-            </motion.div>
-            <p className="text-sm text-muted-foreground">
-              <TranslatableText 
-                text="Your data is encrypted and never shared with third parties. You control what's in your journal." 
-                forceTranslate={true}
-              />
-            </p>
-          </div>
-        );
-        
-      case 'voice-journaling':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-8">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <motion.div 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="max-w-sm mx-auto mb-8 p-4 bg-card rounded-lg shadow-lg"
-            >
-              <div className="w-full h-16 bg-primary/10 rounded-full mb-4 flex items-center justify-center">
-                <div className="w-12 h-12 rounded-full bg-primary/20 flex items-center justify-center">
-                  <span className="text-2xl">🎤</span>
-                </div>
-              </div>
-              <p className="text-sm text-muted-foreground">
-                <TranslatableText 
-                  text="Record voice entries anytime, anywhere. Speak naturally in your preferred language." 
-                  forceTranslate={true}
-                />
-              </p>
-            </motion.div>
-          </div>
-        );
-        
-      case 'ai-analysis':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-6">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.6 }}
-              className="relative max-w-sm mx-auto mb-8"
-            >
-              <div className="w-24 h-24 bg-primary/10 rounded-full mx-auto mb-6 flex items-center justify-center">
-                <span className="text-3xl">🧠</span>
-              </div>
-              
-              <EmotionBubblesDemo />
-              
-              <p className="text-sm text-muted-foreground mt-4">
-                <TranslatableText 
-                  text="AI identifies emotions, themes, and patterns in your journal entries, helping you gain deeper insights." 
-                  forceTranslate={true}
-                />
-              </p>
-            </motion.div>
-          </div>
-        );
-        
-      case 'chat':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-6">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <motion.div 
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="max-w-sm mx-auto mb-6 bg-card rounded-lg shadow-lg overflow-hidden"
-            >
-              <div className="p-3 bg-primary/10 text-center">
-                <TranslatableText text="SOuLO Chat" forceTranslate={true} />
-              </div>
-              <div className="p-4 space-y-4">
-                <div className="flex justify-start">
-                  <div className="bg-muted p-3 rounded-lg max-w-[85%]">
-                    <TranslatableText 
-                      text="How have I been feeling lately?" 
-                      forceTranslate={true}
-                    />
-                  </div>
-                </div>
-                <div className="flex justify-end">
-                  <div className="bg-primary/20 p-3 rounded-lg max-w-[85%]">
-                    <TranslatableText 
-                      text="Based on your recent entries, you've been feeling more positive and energetic this week..." 
-                      forceTranslate={true}
-                    />
-                  </div>
-                </div>
-              </div>
-            </motion.div>
-            <p className="text-sm text-muted-foreground">
-              <TranslatableText 
-                text="Ask questions about your journal entries and get personalized insights based on your own experiences." 
-                forceTranslate={true}
-              />
-            </p>
-          </div>
-        );
-        
-      case 'track-journey':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-6">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <motion.div 
-              initial={{ scale: 0.9, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="max-w-sm mx-auto mb-6 bg-card rounded-lg shadow-lg p-4"
-            >
-              <div className="text-sm font-medium mb-2 text-left">
-                <TranslatableText text="Mood Trends" forceTranslate={true} />
-              </div>
-              
-              <SentimentChartDemo />
-              
-            </motion.div>
-            <p className="text-sm text-muted-foreground">
-              <TranslatableText 
-                text="Visualize how your emotions and energy levels change over time to identify patterns and growth." 
-                forceTranslate={true}
-              />
-            </p>
-          </div>
-        );
-        
-      case 'name':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-8">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <div className="max-w-sm mx-auto">
-              <input
-                type="text"
-                value={name}
-                onChange={(e) => setName(e.target.value)}
-                className="w-full p-3 border rounded-md mb-2"
-                placeholder="Enter your name"
-              />
-              <p className="text-sm text-muted-foreground mb-8">
-                <TranslatableText 
-                  text="This is how SOuLO will address you" 
-                  forceTranslate={true}
-                />
-              </p>
-            </div>
-          </div>
-        );
-        
-      case 'language':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-8">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <div className="grid grid-cols-2 gap-4 max-w-sm mx-auto">
-              <Button 
-                variant="outline" 
-                className={`p-4 h-auto ${currentLanguage === 'en' ? 'bg-primary/10 border-primary' : ''}`}
-                onClick={() => handleLanguageSelect('en')}
-                disabled={isTranslating}
-              >
-                <div className="text-center">
-                  <div className="font-medium">English</div>
-                </div>
-              </Button>
-              <Button 
-                variant="outline" 
-                className={`p-4 h-auto ${currentLanguage === 'es' ? 'bg-primary/10 border-primary' : ''}`}
-                onClick={() => handleLanguageSelect('es')}
-                disabled={isTranslating}
-              >
-                <div className="text-center">
-                  <div className="font-medium">Español</div>
-                </div>
-              </Button>
-              <Button 
-                variant="outline" 
-                className={`p-4 h-auto ${currentLanguage === 'fr' ? 'bg-primary/10 border-primary' : ''}`}
-                onClick={() => handleLanguageSelect('fr')}
-                disabled={isTranslating}
-              >
-                <div className="text-center">
-                  <div className="font-medium">Français</div>
-                </div>
-              </Button>
-              <Button 
-                variant="outline" 
-                className={`p-4 h-auto ${currentLanguage === 'de' ? 'bg-primary/10 border-primary' : ''}`}
-                onClick={() => handleLanguageSelect('de')}
-                disabled={isTranslating}
-              >
-                <div className="text-center">
-                  <div className="font-medium">Deutsch</div>
-                </div>
-              </Button>
-              <Button 
-                variant="outline" 
-                className={`p-4 h-auto ${currentLanguage === 'zh' ? 'bg-primary/10 border-primary' : ''}`}
-                onClick={() => handleLanguageSelect('zh')}
-                disabled={isTranslating}
-              >
-                <div className="text-center">
-                  <div className="font-medium">中文</div>
-                </div>
-              </Button>
-              <Button 
-                variant="outline" 
-                className={`p-4 h-auto ${currentLanguage === 'hi' ? 'bg-primary/10 border-primary' : ''}`}
-                onClick={() => handleLanguageSelect('hi')}
-                disabled={isTranslating}
-              >
-                <div className="text-center">
-                  <div className="font-medium">हिन्दी</div>
-                </div>
-              </Button>
-            </div>
-          </div>
-        );
-        
-      case 'ready':
-        return (
-          <div className="text-center p-6">
-            <h2 className="text-2xl font-bold mb-4">
-              <TranslatableText text={currentStep.title} forceTranslate={true} />
-            </h2>
-            <p className="mb-8">
-              <TranslatableText text={currentStep.description} forceTranslate={true} />
-            </p>
-            <motion.div 
-              initial={{ scale: 0.8, opacity: 0 }}
-              animate={{ scale: 1, opacity: 1 }}
-              transition={{ duration: 0.5 }}
-              className="rounded-full w-32 h-32 bg-primary/20 mx-auto mb-8 flex items-center justify-center"
-            >
-              <div className="text-5xl">✨</div>
-            </motion.div>
-            <p className="text-sm text-muted-foreground mb-4">
-              <TranslatableText 
-                text="Your journey to self-discovery and mindfulness begins now." 
-                forceTranslate={true}
-              />
-            </p>
-          </div>
-        );
-        
-      default:
-        return null;
-    }
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value);
   };
 
   return (
-    <div className="min-h-screen flex flex-col bg-background">
-      {/* Language selector in top right corner */}
-      <div className="absolute top-4 right-4 z-10">
-        <LanguageSelector />
-      </div>
+    <Select value={currentLanguage} onValueChange={handleLanguageChange}>
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Select a language" />
+      </SelectTrigger>
+      <SelectContent>
+        {LANGUAGES.map((language) => (
+          <SelectItem key={language.code} value={language.code}>
+            {language.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+};
+
+const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [name, setName] = useState('');
+  const navigate = useNavigate();
+  const { setColorTheme } = useTheme();
+  const contentRef = useRef<HTMLDivElement>(null);
+  
+  useEffect(() => {
+    setColorTheme('Calm');
+  }, [setColorTheme]);
+  
+  const handleNext = () => {
+    if (currentStep < ONBOARDING_STEPS.length - 1) {
+      if (currentStep === 6 && !name.trim()) {
+        toast.error("Please enter your name to continue");
+        return;
+      }
       
-      {/* Main content */}
-      <div className="flex-1 flex flex-col items-center justify-center p-4">
-        <div className="w-full max-w-md bg-card rounded-lg shadow-lg overflow-hidden">
-          {/* Step content */}
-          <div className="min-h-[400px] flex flex-col justify-between">
-            <div className="flex-1">
-              {renderStepContent()}
-            </div>
-            
-            {/* Navigation buttons */}
-            <div className="p-4 border-t flex justify-between">
-              {step === 0 ? (
-                <Button variant="ghost" onClick={skipOnboarding}>
-                  <TranslatableText text="Skip" forceTranslate={true} />
-                </Button>
-              ) : (
-                <Button variant="ghost" onClick={goToPrevStep}>
-                  <TranslatableText text="Back" forceTranslate={true} />
-                </Button>
-              )}
-              
-              {step === ONBOARDING_STEPS.length - 1 ? (
-                <Button onClick={completeOnboarding}>
-                  <TranslatableText text="Get Started" forceTranslate={true} />
-                </Button>
-              ) : step === 6 ? ( // Name input step
-                <Button onClick={saveName} disabled={!name.trim()}>
-                  <TranslatableText text="Continue" forceTranslate={true} />
-                </Button>
-              ) : step === 7 ? ( // Language selection step
-                <Button variant="ghost" className="opacity-0">
-                  <TranslatableText text="Next" forceTranslate={true} />
-                </Button>
-              ) : (
-                <Button onClick={goToNextStep}>
-                  <TranslatableText text="Next" forceTranslate={true} />
-                </Button>
-              )}
-            </div>
-            
-            {/* Progress indicator */}
-            <div className="bg-muted h-1 w-full">
-              <div 
-                className="bg-primary h-full transition-all duration-300"
-                style={{ width: `${(step / (ONBOARDING_STEPS.length - 1)) * 100}%` }}
+      setCurrentStep(prev => prev + 1);
+    } else {
+      if (name) {
+        localStorage.setItem("user_display_name", name.trim());
+      }
+      
+      localStorage.setItem("onboardingComplete", "true");
+      
+      if (onComplete) {
+        onComplete();
+      } else {
+        navigate("/app/auth");
+      }
+    }
+  };
+  
+  const handlePrevious = () => {
+    if (currentStep > 0) {
+      setCurrentStep(prev => prev - 1);
+    }
+  };
+  
+  const handleSkip = () => {
+    if (name) {
+      localStorage.setItem("user_display_name", name.trim());
+    }
+    
+    localStorage.setItem("onboardingComplete", "true");
+    if (onComplete) {
+      onComplete();
+    } else {
+      navigate("/app/auth");
+    }
+  };
+
+  useSwipeGesture(contentRef, {
+    onSwipeLeft: () => {
+      if (currentStep < ONBOARDING_STEPS.length - 1) {
+        handleNext();
+      }
+    },
+    onSwipeRight: () => {
+      if (currentStep > 0) {
+        handlePrevious();
+      }
+    },
+    minDistance: 50
+  });
+
+  const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
+  const currentStepData = ONBOARDING_STEPS[currentStep];
+  
+  const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
+  const isNameStep = currentStep === 6;
+  const isFirstStep = currentStep === 0;
+
+  return (
+    <div className="flex flex-col h-[100dvh] bg-background dark">
+      <div 
+        ref={contentRef}
+        className="flex-1 flex flex-col overflow-hidden relative"
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-background to-theme/5 pointer-events-none" />
+        
+        <div className="absolute top-4 left-0 right-0 z-10 flex justify-center">
+          <div className="flex space-x-2">
+            {ONBOARDING_STEPS.map((_, index) => (
+              <motion.div 
+                key={index} 
+                className={cn(
+                  "w-2 h-2 rounded-full transition-all duration-300",
+                  currentStep === index ? "bg-theme w-6" : "bg-muted"
+                )}
+                animate={currentStep === index ? { scale: [1, 1.2, 1] } : {}}
+                transition={{ duration: 0.5, repeat: currentStep === index ? Infinity : 0, repeatDelay: 1.5 }}
               />
-            </div>
+            ))}
+          </div>
+        </div>
+        
+        <div className="absolute top-4 right-4 z-10">
+          <Button variant="ghost" size="sm" onClick={handleSkip} className="text-foreground hover:text-theme">
+            <TranslatableText text="Skip" forceTranslate={true} />
+          </Button>
+        </div>
+
+        <div className="flex-1 relative pt-12">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 flex flex-col justify-center items-center px-6 text-center"
+            >
+              {currentStep === 0 ? (
+                <CurrentIllustration />
+              ) : isNameStep ? (
+                <>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">
+                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                  </h2>
+                  {currentStepData.description && (
+                    <p className="mb-8 text-muted-foreground max-w-xs">
+                      <TranslatableText text={currentStepData.description} forceTranslate={true} />
+                    </p>
+                  )}
+                  <CurrentIllustration name={name} setName={setName} />
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">
+                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                  </h2>
+                  {currentStepData.description && (
+                    <p className="mb-8 text-muted-foreground max-w-xs">
+                      <TranslatableText text={currentStepData.description} forceTranslate={true} />
+                    </p>
+                  )}
+                  <CurrentIllustration />
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        
+        <div className="pb-12 pt-4 px-6 relative z-10">
+          <div className="flex justify-between items-center">
+            {currentStep > 0 ? (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handlePrevious}
+                className="bg-background/50 dark:bg-muted/20 border-muted hover:bg-muted/30 h-10 w-10"
+              >
+                <ChevronLeft className="w-5 h-5 text-foreground" />
+              </Button>
+            ) : (
+              <div className="w-10"></div>
+            )}
+            
+            <Button 
+              size="lg" 
+              onClick={handleNext} 
+              className="bg-theme hover:bg-theme-dark text-white"
+            >
+              <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
+              {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
+            </Button>
           </div>
         </div>
       </div>
@@ -509,5 +825,4 @@ export const OnboardingScreen: React.FC = () => {
   );
 };
 
-// Add default export to fix the import issue
 export default OnboardingScreen;

@@ -57,7 +57,7 @@ const EmotionBubblesDemo: React.FC<EmotionBubblesProps> = ({ isPhonePreview = fa
             }}
           >
             <span className={`${textSize} font-medium`}>
-              <TranslatableText text={emotion.name} forceTranslate={true} />
+              <TranslatableText text={emotion.name} />
             </span>
           </motion.div>
         );
