@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -26,48 +25,24 @@ const MAX_CONTEXT_MESSAGES = 10;
 // Define the general question prompt
 const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
 
-// Define the journal-specific prompt
-const JOURNAL_SPECIFIC_PROMPT = `You are **SOuLO**, a personal mental well-being assistant. You help users reflect on emotions, uncover thought patterns, and gain self-insight from their journaling. You're emotionally supportive, grounded in data, and write in a clear, structured tone—like a thoughtful coach or guide.
+// Define the journal-specific prompt with new format
+const JOURNAL_SPECIFIC_PROMPT = `You are SOuLO — a voice journaling assistant that helps users reflect, find patterns, and grow emotionally. Use only the journal entries below to inform your response. Do not invent or infer beyond them.
 
-Here's the user's past journaling data, which includes dates, emotions, sentiment scores, and key entities (like people, places, or themes):
+Journal excerpts:
 {journalData}
+(Spanning from {startDate} to {endDate})
 
-The user has now asked:
-"{userMessage}"
+User's question: "{userMessage}"
 
----
+Guidelines:
+1. **Only use facts** from journal entries — no assumptions, no hallucinations.
+2. **Tone**: Supportive, clear, and emotionally aware. Avoid generic advice.
+3. **Data-grounded**: Back insights with bullet points referencing specific dates/events.
+4. **Insightful & Brief**: Spot emotional patterns or changes over time.
+5. **Structure**: Use bullets, bold headers, and short sections for easy reading.
+6. **When data is insufficient**, say so clearly and gently suggest journaling directions.
 
-**How to respond:**
-
-1. **Tone & Personality**
-   - Be emotionally warm, grounded, and calm.
-   - Write clearly and concisely—just like a thoughtful conversation.
-   - Don't over-explain unless the user explicitly asks for detail or a breakdown.
-
-2. **Balance of Insight**
-   - Combine **quantitative** analysis (sentiment scores, frequency, patterns) and **qualitative** observations (emotions, shifts, associations).
-   - If the question allows, use a data-backed tone ("You've mentioned X 4 times, each with high positive sentiment.")
-
-3. **Structure & Clarity**
-   - Respond in short paragraphs or **bullet points** where useful—keep it skimmable and clean.
-   - Include only relevant journal entry references—not all entries—unless the user specifically asks for a full breakdown.
-   - Aim for **80–150 words**, unless the user requests more detail.
-
-4. **Patterns & Personalization**
-   - Surface recurring emotional patterns or shifts (e.g. "You've felt anxious when [Person] is mentioned lately").
-   - Mention specific dates or events **only when meaningful** to the query.
-   - Avoid speculation—only speak from the journal data.
-   - If the user's question is broad or abstract, reflect thoughtfully and suggest journal prompts or reflections.
-
-5. **If rating is requested**
-   - Offer a grounded score or metric based on past entries, and explain briefly.
-
-6. **Finish Strong**
-   - End with a supportive, encouraging line if it fits—gently empowering, not preachy.
-
----
-
-Now, generate a smart, structured, emotionally intelligent response grounded in the user's journaling:`;
+Keep response concise (max ~150 words), personalized, and well-structured.`;
 
 // New function for query planning
 async function planQuery(query) {
@@ -611,11 +586,26 @@ serve(async (req) => {
         );
       }
 
+      // Get earliest and latest entry dates
+      let earliestDate = null;
+      let latestDate = null;
+      
       // Format entries for the prompt with dates
       const entriesWithDates = entries.map(entry => {
-        const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
+        const entryDate = new Date(entry.created_at);
+        
+        // Track earliest and latest dates
+        if (!earliestDate || entryDate < earliestDate) {
+          earliestDate = entryDate;
+        }
+        if (!latestDate || entryDate > latestDate) {
+          latestDate = entryDate;
+        }
+        
+        const formattedDate = entryDate.toLocaleDateString('en-US', {
           month: 'short',
-          day: 'numeric'
+          day: 'numeric',
+          year: 'numeric'
         });
         
         // Format entities for display if they exist
@@ -650,10 +640,39 @@ serve(async (req) => {
         return `- Entry from ${formattedDate}: ${entry.content}${entityInfo}${sentimentInfo}`;
       }).join('\n\n');
 
+      // Get all the dates of entries as an array
+      const entryDates = entries.map(entry => {
+        return new Date(entry.created_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      });
+      
+      console.log("Available journal entry dates:", JSON.stringify(entryDates, null, 2));
+      
+      // Format date range for the prompt
+      const startDateFormatted = earliestDate ? earliestDate.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      }) : 'unknown date';
+      
+      const endDateFormatted = latestDate ? latestDate.toLocaleDateString('en-US', {
+        month: 'long',
+        day: 'numeric',
+        year: 'numeric'
+      }) : 'unknown date';
+      
+      const entryDateRange = `Your journal entries span from ${startDateFormatted} to ${endDateFormatted}.`;
+      console.log("Entry date range:", entryDateRange);
+
       // 4. Prepare prompt with updated instructions
       const promptFormatted = JOURNAL_SPECIFIC_PROMPT
         .replace('{journalData}', entriesWithDates)
-        .replace('{userMessage}', message);
+        .replace('{userMessage}', message)
+        .replace('{startDate}', startDateFormatted)
+        .replace('{endDate}', endDateFormatted);
         
       // 5. Call OpenAI
       console.log("Calling OpenAI for completion");
@@ -700,6 +719,19 @@ serve(async (req) => {
       const completionData = await completionResponse.json();
       const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
       console.log("Response generated successfully");
+
+      // Validate response for hallucinated dates
+      const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+      console.log("Response generated successfully");
+      
+      // Check for hallucinated dates in the response
+      const containsHallucinatedDates = checkForHallucinatedDates(responseContent, entries);
+      if (containsHallucinatedDates) {
+        console.warn("WARNING: Response contains potentially hallucinated dates!");
+        // In a production system, you might want to regenerate or post-process the response
+      } else {
+        console.log("No hallucinated dates detected in response");
+      }
 
       // Save the sub-queries even for standard processing (where there's only one)
       if (threadId) {
@@ -834,6 +866,58 @@ serve(async (req) => {
     );
   }
 });
+
+// Function to check for potentially hallucinated dates in the response
+function checkForHallucinatedDates(response, entries) {
+  try {
+    // Extract all potential dates from the response using regex
+    const months = ['January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'];
+    const monthRegex = new RegExp(`\\b(${months.join('|')})\\s+\\d{1,2}(?:st|nd|rd|th)?(?:\\s*,?\\s*\\d{4})?\\b`, 'gi');
+    const foundDates = response.match(monthRegex) || [];
+    
+    // Create a set of actual dates from entries
+    const actualDates = new Set();
+    entries.forEach(entry => {
+      const date = new Date(entry.created_at);
+      months.forEach(month => {
+        // Add various formats of the same date
+        const monthName = date.toLocaleDateString('en-US', { month: 'long' });
+        const day = date.getDate();
+        const year = date.getFullYear();
+        
+        actualDates.add(`${monthName} ${day}`);
+        actualDates.add(`${monthName} ${day}, ${year}`);
+        actualDates.add(`${monthName} ${day}th`);
+        actualDates.add(`${monthName} ${day}st`);
+        actualDates.add(`${monthName} ${day}nd`);
+        actualDates.add(`${monthName} ${day}rd`);
+      });
+    });
+    
+    // Check if any found dates are not in the actual dates set
+    for (const foundDate of foundDates) {
+      // Normalize the found date for comparison
+      const normalizedDate = foundDate.replace(/(?:st|nd|rd|th)/, '').replace(/\s+/g, ' ').trim();
+      
+      // Extract just month and day for partial matching
+      const parts = normalizedDate.split(' ');
+      if (parts.length >= 2) {
+        const monthDay = `${parts[0]} ${parts[1].replace(',', '')}`;
+        
+        // Check if either the full date or the month+day exists in actual dates
+        if (!actualDates.has(normalizedDate) && !actualDates.has(monthDay)) {
+          console.warn(`Potential hallucinated date found: ${foundDate}`);
+          return true;
+        }
+      }
+    }
+    
+    return false;
+  } catch (error) {
+    console.error("Error checking for hallucinated dates:", error);
+    return false; // Default to not blocking the response
+  }
+}
 
 // Standard vector search without time filtering
 async function searchEntriesWithVector(
