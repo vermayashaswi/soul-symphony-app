@@ -486,7 +486,7 @@ export function useChatPersistence(queryClient: QueryClient) {
         content, 
         user.id, 
         contextMessages, 
-        detectedDateRange // Pass the client-calculated date range instead of timezone offset
+        detectedDateRange // Fixed: Passing the object directly as expected by getPlanForQuery
       );
       
       let apiResponse: any = null;

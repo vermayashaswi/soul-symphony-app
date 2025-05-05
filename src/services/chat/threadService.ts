@@ -1,129 +1,49 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { ChatThread } from './types';
+import { ChatMessage, ChatThread } from './types';
 
-export async function fetchChatThreads(userId: string | undefined) {
-  if (!userId) {
-    return [];
-  }
-
+// Get all chat threads for a user
+export async function getUserChatThreads(userId: string): Promise<ChatThread[]> {
   try {
     const { data, error } = await supabase
       .from('chat_threads')
       .select('*')
       .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
+      .order('created_at', { ascending: false });
 
     if (error) {
-      throw error;
+      console.error('Error fetching chat threads:', error);
+      return [];
     }
 
-    return data || [];
+    // Map the data to the ChatThread type
+    const chatThreads: ChatThread[] = data.map(thread => ({
+      id: thread.id,
+      userId: thread.user_id,
+      title: thread.title,
+      createdAt: thread.created_at,
+      updatedAt: thread.updated_at
+    }));
+
+    return chatThreads;
   } catch (error) {
-    console.error('Error fetching chat threads:', error);
+    console.error('Error in getUserChatThreads:', error);
     return [];
   }
 }
 
-// Add this function to fix the getUserChatThreads import error
-export const getUserChatThreads = fetchChatThreads;
-
-export async function deleteThread(threadId: string) {
-  try {
-    // First delete all messages in the thread
-    const { error: messagesError } = await supabase
-      .from('chat_messages')
-      .delete()
-      .eq('thread_id', threadId);
-
-    if (messagesError) {
-      throw messagesError;
-    }
-
-    // Then delete the thread itself
-    const { error: threadError } = await supabase
-      .from('chat_threads')
-      .delete()
-      .eq('id', threadId);
-
-    if (threadError) {
-      throw threadError;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error deleting thread:', error);
-    return false;
-  }
-}
-
-export async function generateThreadTitle(threadId: string, userId: string | undefined): Promise<string | null> {
-  if (!threadId || !userId) {
-    return null;
-  }
-
-  try {
-    // Get the first few messages from the thread
-    const { data: messages, error: messagesError } = await supabase
-      .from('chat_messages')
-      .select('content, sender, created_at')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: true })
-      .limit(3);
-
-    if (messagesError) {
-      throw messagesError;
-    }
-
-    if (!messages || messages.length === 0) {
-      return 'New Conversation';
-    }
-
-    // Format messages for the AI
-    const formattedMessages = messages.map(msg => ({
-      role: msg.sender === 'user' ? 'user' : 'assistant',
-      content: msg.content
-    }));
-
-    // Add system prompt for title generation
-    formattedMessages.unshift({
-      role: 'system',
-      content: `You are helping to generate a short, concise title (maximum 5-6 words) for a conversation thread. Based on the following conversation, provide ONLY the title with no additional text, quotes or explanation. The title should capture the main topic or question the user was asking about. It should be very concise, like a headline.`
-    });
-
-    // Call the smart-chat function to generate a title
-    const { data, error } = await supabase.functions.invoke('smart-chat', {
-      body: {
-        userId,
-        generateTitleOnly: true,
-        messages: formattedMessages
-      }
-    });
-
-    if (error) {
-      throw error;
-    }
-
-    return data?.title || 'New Conversation';
-  } catch (error) {
-    console.error('Error generating thread title:', error);
-    return 'New Conversation';
-  }
-}
-
-// Add this function to fix the updateThreadTitle import error
+// Update a thread's title
 export async function updateThreadTitle(threadId: string, title: string): Promise<boolean> {
   try {
     const { error } = await supabase
       .from('chat_threads')
       .update({ title })
       .eq('id', threadId);
-
+    
     if (error) {
       console.error('Error updating thread title:', error);
       return false;
     }
-
+    
     return true;
   } catch (error) {
     console.error('Error in updateThreadTitle:', error);
@@ -131,33 +51,78 @@ export async function updateThreadTitle(threadId: string, title: string): Promis
   }
 }
 
-export async function getPlanForQuery(query: string, userId: string, conversationContext: any[] = [], timezoneOffset: number = 0) {
-  if (!query || !userId) {
-    return { plan: null, queryType: null, directResponse: null };
-  }
-
+// Generate a title for a thread based on its content
+export async function generateThreadTitle(threadId: string, userId: string): Promise<string | null> {
   try {
+    // Fetch the messages for the thread
+    const { data: messages, error: messagesError } = await supabase
+      .from('chat_messages')
+      .select('content')
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: true })
+      .limit(3); // Consider only the first 3 messages
+
+    if (messagesError) {
+      console.error('Error fetching messages for title generation:', messagesError);
+      return null;
+    }
+
+    // Extract the content of the messages
+    const messageContents = messages.map(msg => msg.content).join('\n');
+
+    // Call the Edge Function to generate the title
+    const { data, error } = await supabase.functions.invoke('generate-chat-title', {
+      body: {
+        userId: userId,
+        message: messageContents,
+      },
+    });
+
+    if (error) {
+      console.error('Error generating title:', error);
+      return null;
+    }
+
+    // Return the generated title
+    return data?.title || null;
+  } catch (error) {
+    console.error('Error in generateThreadTitle:', error);
+    return null;
+  }
+}
+
+// Get a query plan from the smart-query-planner function
+export async function getPlanForQuery(
+  query: string, 
+  userId: string, 
+  conversationContext: { content: string; sender: string }[] = [],
+  clientDetectedTimeRange?: { startDate: string; endDate: string; periodName: string } | null
+) {
+  try {
+    const clientTime = new Date().toISOString();
+    
     const { data, error } = await supabase.functions.invoke('smart-query-planner', {
       body: {
         message: query,
         userId,
         conversationContext,
-        timezoneOffset
+        clientDetectedTimeRange, // Pass the complete client-detected time range object
+        clientTime // Add current client time as the source of truth
       }
     });
-
+    
     if (error) {
-      console.error('Error planning query:', error);
-      throw error;
+      console.error('Error getting query plan:', error);
+      return { plan: null, queryType: 'journal_specific', directResponse: null };
     }
-
+    
     return {
       plan: data?.plan || null,
-      queryType: data?.queryType || null,
+      queryType: data?.queryType || 'journal_specific',
       directResponse: data?.directResponse || null
     };
   } catch (error) {
-    console.error('Error planning query:', error);
+    console.error('Error in getPlanForQuery:', error);
     return { plan: null, queryType: 'journal_specific', directResponse: null };
   }
 }
