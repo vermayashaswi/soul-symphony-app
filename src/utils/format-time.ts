@@ -1,4 +1,3 @@
-
 import { formatRelative, format, differenceInSeconds, differenceInMinutes, differenceInHours, differenceInDays } from 'date-fns';
 import { enUS } from 'date-fns/locale/en-US';
 import { es } from 'date-fns/locale/es';
@@ -28,10 +27,16 @@ const getLocale = (lang: string) => {
 };
 
 // Format a timestamp to a relative time string (e.g., "2 hours ago")
-export const formatRelativeTime = (timestamp: string | number | Date): string => {
+export const formatRelativeTime = (timestamp: string | number | Date, timezoneOffset?: number): string => {
   const date = new Date(timestamp);
+  
+  // Adjust for timezone if provided
+  const adjustedDate = timezoneOffset !== undefined 
+    ? new Date(date.getTime() + (timezoneOffset * 60 * 1000)) 
+    : date;
+    
   const now = new Date();
-  const diffInSeconds = Math.floor((now.getTime() - date.getTime()) / 1000);
+  const diffInSeconds = Math.floor((now.getTime() - adjustedDate.getTime()) / 1000);
 
   if (diffInSeconds < 60) {
     return 'just now';
@@ -72,10 +77,16 @@ export const formatRelativeTime = (timestamp: string | number | Date): string =>
 };
 
 // Format a timestamp to a short date format (e.g., "Jan 5" or "Jan 5, 2024")
-export const formatShortDate = (timestamp: string | number | Date): string => {
+export const formatShortDate = (timestamp: string | number | Date, timezoneOffset?: number): string => {
   const date = new Date(timestamp);
+  
+  // Adjust for timezone if provided
+  const adjustedDate = timezoneOffset !== undefined 
+    ? new Date(date.getTime() + (timezoneOffset * 60 * 1000)) 
+    : date;
+    
   const now = new Date();
-  const isCurrentYear = date.getFullYear() === now.getFullYear();
+  const isCurrentYear = adjustedDate.getFullYear() === now.getFullYear();
   
   // Get the language from the HTML document
   // This will use whatever language the TranslationContext has set on the document

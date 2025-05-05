@@ -17,6 +17,7 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { textWillOverflow } from '@/utils/textUtils';
+import { formatDateToReadable } from '@/utils/date-formatter';
 
 export interface JournalEntry {
   id: number;
@@ -247,7 +248,11 @@ export function JournalEntryCard({
 
   const createdAtFormatted = (() => {
     try {
-      return formatShortDate(safeEntry.created_at);
+      const formattedDate = entry.timezone_offset !== undefined
+        ? formatDateToReadable(entry.created_at, true, entry.timezone_offset)
+        : formatDateToReadable(entry.created_at, true);
+      
+      return formattedDate;
     } catch (error) {
       console.error('[JournalEntryCard] Error formatting date:', error);
       return 'Recently';
@@ -438,7 +443,7 @@ export function JournalEntryCard({
               <div className="flex items-center space-x-3">
                 <div className="flex flex-col">
                   <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
-                    {formatShortDate(safeEntry.created_at)}
+                    {createdAtFormatted}
                   </h3>
                 </div>
               </div>

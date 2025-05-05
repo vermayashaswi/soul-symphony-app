@@ -8,6 +8,7 @@ import { generateThreadTitle } from '@/utils/chat/threadUtils';
 import { getPlanForQuery } from './threadService';
 import { convertGptPlanToQueryPlan } from './queryPlannerService';
 import { Json } from '@/integrations/supabase/types';
+import { createLocalTimestamp } from '@/services/timezoneService';
 
 export interface ChatMessageType {
   id: string;
@@ -228,18 +229,20 @@ export function useChatPersistence(queryClient: QueryClient) {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
 
-      // Get a JavaScript Date object for the user's local timezone
-      const clientTimestamp = new Date().toISOString();
-      console.log(`Client timestamp: ${clientTimestamp}`);
+      // Get a JavaScript Date object and timezone info for the user's local timezone
+      const { isoString: clientTimestamp, timezoneName, timezoneOffset } = createLocalTimestamp();
+      console.log(`Client timestamp: ${clientTimestamp}, Timezone: ${timezoneName}, Offset: ${timezoneOffset}`);
       
-      // Call edge function to ensure persistence and include the client's current timestamp
+      // Call edge function to ensure persistence and include the client's timezone information
       const { data: persistenceData, error: persistenceError } = await supabase.functions.invoke('ensure-chat-persistence', {
         body: {
           userId: user.id,
           threadId,
           messageId: userMessageId,
           content,
-          clientTimestamp // Send the client's current timestamp
+          clientTimestamp,
+          timezoneName,
+          timezoneOffset
         }
       });
 
@@ -253,12 +256,12 @@ export function useChatPersistence(queryClient: QueryClient) {
         sender: msg.sender
       }));
 
-      // Get query plan based on user's message and include the client timestamp
+      // Get query plan based on user's message and include the client timestamp and timezone
       const { plan, queryType, directResponse } = await getPlanForQuery(
         content, 
         user.id, 
         contextMessages,
-        clientTimestamp // Pass only the timestamp
+        clientTimestamp
       );
       
       let apiResponse: any = null;
