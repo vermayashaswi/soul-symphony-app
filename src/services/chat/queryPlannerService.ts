@@ -1,20 +1,5 @@
 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { 
-  addDays, 
-  endOfDay, 
-  endOfMonth, 
-  endOfWeek, 
-  endOfYear, 
-  startOfDay, 
-  startOfMonth, 
-  startOfWeek, 
-  startOfYear, 
-  subDays, 
-  subMonths, 
-  subWeeks, 
-  subYears 
-} from "date-fns";
 
 export type SearchStrategy = 'vector' | 'sql' | 'hybrid';
 
@@ -176,6 +161,3 @@ export function createFallbackQueryPlan(query: string): QueryPlan {
   
   return plan;
 }
-
-// Function removed: calculateRelativeDateRange - date calculation now happens on the client side
-
