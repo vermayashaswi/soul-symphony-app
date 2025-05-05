@@ -42,7 +42,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, conversationContext = [], timezoneOffset } = await req.json();
+    const { message, userId, conversationContext = [], timezoneOffset = 0 } = await req.json();
     
     if (!message) {
       throw new Error('Message is required');
@@ -303,7 +303,7 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
   const offsetMs = timezoneOffset * 60 * 1000;
   
   // Get current date in user's timezone
-  const now = new Date(Date.now() - offsetMs);
+  const now = new Date(Date.now() + offsetMs);
   let startDate: Date;
   let endDate: Date;
   let periodName = timePeriod;
@@ -380,10 +380,10 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
     periodName = 'last 7 days (error fallback)';
   }
 
-  // Add back the timezone offset to convert to UTC for storage
-  // Create new Date objects to avoid modifying the originals
-  const utcStartDate = new Date(startDate.getTime() + offsetMs);
-  const utcEndDate = new Date(endDate.getTime() + offsetMs);
+  // Adjust the dates to UTC for storage
+  // When we apply the timezone offset, we need to subtract it to get UTC time (not add it)
+  const utcStartDate = new Date(startDate.getTime() - offsetMs);
+  const utcEndDate = new Date(endDate.getTime() - offsetMs);
   
   // Validate the date range
   if (utcEndDate < utcStartDate) {
@@ -395,8 +395,8 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
     const fallbackEnd = endOfDay(now);
     
     return {
-      startDate: new Date(fallbackStart.getTime() + offsetMs).toISOString(),
-      endDate: new Date(fallbackEnd.getTime() + offsetMs).toISOString(),
+      startDate: new Date(fallbackStart.getTime() - offsetMs).toISOString(),
+      endDate: new Date(fallbackEnd.getTime() - offsetMs).toISOString(),
       periodName: 'last 7 days (fallback)'
     };
   }

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -720,10 +721,6 @@ serve(async (req) => {
       const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
       console.log("Response generated successfully");
 
-      // Validate response for hallucinated dates
-      const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-      console.log("Response generated successfully");
-      
       // Check for hallucinated dates in the response
       const containsHallucinatedDates = checkForHallucinatedDates(responseContent, entries);
       if (containsHallucinatedDates) {
