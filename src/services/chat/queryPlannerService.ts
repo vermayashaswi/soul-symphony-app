@@ -1,6 +1,20 @@
 
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
+import { 
+  addDays, 
+  endOfDay, 
+  endOfMonth, 
+  endOfWeek, 
+  endOfYear, 
+  startOfDay, 
+  startOfMonth, 
+  startOfWeek, 
+  startOfYear, 
+  subDays, 
+  subMonths, 
+  subWeeks, 
+  subYears 
+} from "date-fns";
 
 export type SearchStrategy = 'vector' | 'sql' | 'hybrid';
 
@@ -170,6 +184,18 @@ export function createFallbackQueryPlan(query: string): QueryPlan {
  * @returns Date range with start and end dates
  */
 export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number = 0): { startDate: string, endDate: string, periodName: string } {
+  // Validate the timezone offset
+  if (typeof timezoneOffset !== 'number') {
+    console.error(`Invalid timezone offset: ${timezoneOffset}, using default 0`);
+    timezoneOffset = 0;
+  }
+  
+  // Enforce timezone offset limits (-12:00 to +14:00)
+  if (timezoneOffset < -720 || timezoneOffset > 840) {
+    console.error(`Timezone offset out of range: ${timezoneOffset}, clamping to valid range`);
+    timezoneOffset = Math.max(-720, Math.min(840, timezoneOffset));
+  }
+  
   // Convert timezone offset to milliseconds
   const offsetMs = timezoneOffset * 60 * 1000;
   
@@ -180,79 +206,91 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
   let periodName = timePeriod;
   
   console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
-  console.log(`User's local time: ${now.toISOString()}`);
+  console.log(`User's local time: ${now.toISOString()} (${now.toLocaleDateString()})`);
   
   const lowerTimePeriod = timePeriod.toLowerCase();
   
-  if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
-    // Today: Start at midnight, end at 23:59:59
-    startDate = startOfDay(now);
+  try {
+    if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
+      // Today
+      startDate = startOfDay(now);
+      endDate = endOfDay(now);
+      periodName = 'today';
+    } 
+    else if (lowerTimePeriod.includes('yesterday')) {
+      // Yesterday
+      const yesterday = subDays(now, 1);
+      startDate = startOfDay(yesterday);
+      endDate = endOfDay(yesterday);
+      periodName = 'yesterday';
+    } 
+    else if (lowerTimePeriod.includes('this week')) {
+      // This week (Monday to Sunday)
+      startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
+      endDate = endOfWeek(now, { weekStartsOn: 1 }); // End on Sunday
+      periodName = 'this week';
+    } 
+    else if (lowerTimePeriod.includes('last week')) {
+      // Last week (previous Monday to Sunday)
+      const lastWeek = subWeeks(now, 1);
+      startDate = startOfWeek(lastWeek, { weekStartsOn: 1 }); // Start on last Monday
+      endDate = endOfWeek(lastWeek, { weekStartsOn: 1 }); // End on last Sunday
+      periodName = 'last week';
+    } 
+    else if (lowerTimePeriod.includes('this month')) {
+      // This month
+      startDate = startOfMonth(now);
+      endDate = endOfMonth(now);
+      periodName = 'this month';
+    } 
+    else if (lowerTimePeriod.includes('last month')) {
+      // Last month
+      const lastMonth = subMonths(now, 1);
+      startDate = startOfMonth(lastMonth);
+      endDate = endOfMonth(lastMonth);
+      periodName = 'last month';
+    } 
+    else if (lowerTimePeriod.includes('this year')) {
+      // This year
+      startDate = startOfYear(now);
+      endDate = endOfYear(now);
+      periodName = 'this year';
+    } 
+    else if (lowerTimePeriod.includes('last year')) {
+      // Last year
+      const lastYear = subYears(now, 1);
+      startDate = startOfYear(lastYear);
+      endDate = endOfYear(lastYear);
+      periodName = 'last year';
+    } 
+    else {
+      // Default to last 30 days if no specific period matched
+      startDate = startOfDay(subDays(now, 30));
+      endDate = endOfDay(now);
+      periodName = 'last 30 days';
+    }
+  } catch (calcError) {
+    console.error('Error in date calculation:', calcError);
+    // Fallback to a simple date range calculation
+    startDate = startOfDay(subDays(now, 7));
     endDate = endOfDay(now);
-    periodName = 'today';
-  } 
-  else if (lowerTimePeriod.includes('yesterday')) {
-    // Yesterday: Start at previous day midnight, end at previous day 23:59:59
-    startDate = startOfDay(subDays(now, 1));
-    endDate = endOfDay(subDays(now, 1));
-    periodName = 'yesterday';
-  } 
-  else if (lowerTimePeriod.includes('this week')) {
-    // This week: Start at current week Monday, end at Sunday 23:59:59
-    startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
-    endDate = endOfWeek(now, { weekStartsOn: 1 }); // End on Sunday
-    periodName = 'this week';
-  } 
-  else if (lowerTimePeriod.includes('last week')) {
-    // Last week: Start at previous week Monday, end at previous week Sunday 23:59:59
-    const prevWeek = subWeeks(now, 1);
-    startDate = startOfWeek(prevWeek, { weekStartsOn: 1 }); // Start on Monday
-    endDate = endOfWeek(prevWeek, { weekStartsOn: 1 }); // End on Sunday
-    periodName = 'last week';
-  } 
-  else if (lowerTimePeriod.includes('this month')) {
-    // This month: Start at 1st of current month, end at last day of month 23:59:59
-    startDate = startOfMonth(now);
-    endDate = endOfMonth(now);
-    periodName = 'this month';
-  } 
-  else if (lowerTimePeriod.includes('last month')) {
-    // Last month: Start at 1st of previous month, end at last day of previous month 23:59:59
-    const prevMonth = subMonths(now, 1);
-    startDate = startOfMonth(prevMonth);
-    endDate = endOfMonth(prevMonth);
-    periodName = 'last month';
-  } 
-  else if (lowerTimePeriod.includes('this year')) {
-    // This year: Start at January 1st, end at December 31st 23:59:59
-    startDate = startOfYear(now);
-    endDate = endOfYear(now);
-    periodName = 'this year';
-  } 
-  else if (lowerTimePeriod.includes('last year')) {
-    // Last year: Start at January 1st of previous year, end at December 31st of previous year 23:59:59
-    const prevYear = subYears(now, 1);
-    startDate = startOfYear(prevYear);
-    endDate = endOfYear(prevYear);
-    periodName = 'last year';
-  } 
-  else {
-    // Default to last 30 days if no specific period matched
-    startDate = startOfDay(subDays(now, 30));
-    endDate = endOfDay(now);
-    periodName = 'last 30 days';
+    periodName = 'last 7 days (error fallback)';
   }
 
   // Add back the timezone offset to convert to UTC for storage
-  // We need to explicitly create new Date objects to avoid modifying the originals
+  // Create new Date objects to avoid modifying the originals
   const utcStartDate = new Date(startDate.getTime() + offsetMs);
   const utcEndDate = new Date(endDate.getTime() + offsetMs);
   
   // Validate the date range
   if (utcEndDate < utcStartDate) {
     console.error("Invalid date range calculated: end date is before start date");
+    console.error(`Start: ${utcStartDate.toISOString()}, End: ${utcEndDate.toISOString()}`);
+    
     // Fallback to last 7 days as a safe default
     const fallbackStart = startOfDay(subDays(now, 7));
     const fallbackEnd = endOfDay(now);
+    
     return {
       startDate: new Date(fallbackStart.getTime() + offsetMs).toISOString(),
       endDate: new Date(fallbackEnd.getTime() + offsetMs).toISOString(),

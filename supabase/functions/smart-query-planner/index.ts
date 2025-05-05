@@ -1,5 +1,21 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import {
+  addDays,
+  endOfDay, 
+  endOfMonth, 
+  endOfWeek, 
+  endOfYear, 
+  startOfDay, 
+  startOfMonth, 
+  startOfWeek, 
+  startOfYear, 
+  subDays, 
+  subMonths, 
+  subWeeks, 
+  subYears
+} from "https://esm.sh/date-fns@2.30.0";
 
 // Define Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -271,6 +287,18 @@ Examples:
  * @returns Date range with start and end dates
  */
 function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number = 0): { startDate: string, endDate: string, periodName: string } {
+  // Validate the timezone offset
+  if (typeof timezoneOffset !== 'number') {
+    console.error(`Invalid timezone offset: ${timezoneOffset}, using default 0`);
+    timezoneOffset = 0;
+  }
+  
+  // Enforce timezone offset limits (-12:00 to +14:00)
+  if (timezoneOffset < -720 || timezoneOffset > 840) {
+    console.error(`Timezone offset out of range: ${timezoneOffset}, clamping to valid range`);
+    timezoneOffset = Math.max(-720, Math.min(840, timezoneOffset));
+  }
+  
   // Convert timezone offset to milliseconds
   const offsetMs = timezoneOffset * 60 * 1000;
   
@@ -281,118 +309,90 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
   let periodName = timePeriod;
   
   console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
-  console.log(`User's local time: ${now.toISOString()}`);
+  console.log(`User's local time: ${now.toISOString()} (${now.toLocaleDateString()})`);
   
   const lowerTimePeriod = timePeriod.toLowerCase();
   
   try {
     if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
-      // Today: Start at midnight, end at 23:59:59
-      startDate = new Date(now);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
+      // Today
+      startDate = startOfDay(now);
+      endDate = endOfDay(now);
       periodName = 'today';
     } 
     else if (lowerTimePeriod.includes('yesterday')) {
-      // Yesterday: Start at previous day midnight, end at previous day 23:59:59
-      startDate = new Date(now);
-      startDate.setDate(now.getDate() - 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(startDate);
-      endDate.setHours(23, 59, 59, 999);
+      // Yesterday
+      const yesterday = subDays(now, 1);
+      startDate = startOfDay(yesterday);
+      endDate = endOfDay(yesterday);
       periodName = 'yesterday';
     } 
     else if (lowerTimePeriod.includes('this week')) {
-      // This week: Start at current week Monday, end at Sunday 23:59:59
-      startDate = new Date(now);
-      const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7 to make Monday (1) the first day
-      startDate.setDate(now.getDate() - (dayOfWeek - 1)); // Go back to Monday
-      startDate.setHours(0, 0, 0, 0);
-      
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
-      endDate.setHours(23, 59, 59, 999);
+      // This week (Monday to Sunday)
+      startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
+      endDate = endOfWeek(now, { weekStartsOn: 1 }); // End on Sunday
       periodName = 'this week';
     } 
     else if (lowerTimePeriod.includes('last week')) {
-      // Last week: Start at previous week Monday, end at previous week Sunday
-      startDate = new Date(now);
-      const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7
-      startDate.setDate(now.getDate() - (dayOfWeek - 1) - 7); // Go back to previous Monday
-      startDate.setHours(0, 0, 0, 0);
-      
-      endDate = new Date(startDate);
-      endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
-      endDate.setHours(23, 59, 59, 999);
+      // Last week (previous Monday to Sunday)
+      const lastWeek = subWeeks(now, 1);
+      startDate = startOfWeek(lastWeek, { weekStartsOn: 1 }); // Start on last Monday
+      endDate = endOfWeek(lastWeek, { weekStartsOn: 1 }); // End on last Sunday
       periodName = 'last week';
     } 
     else if (lowerTimePeriod.includes('this month')) {
-      // This month: Start at 1st of current month, end at last day of month
-      startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-      endDate.setHours(23, 59, 59, 999);
+      // This month
+      startDate = startOfMonth(now);
+      endDate = endOfMonth(now);
       periodName = 'this month';
     } 
     else if (lowerTimePeriod.includes('last month')) {
-      // Last month: Start at 1st of previous month, end at last day of previous month
-      startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
-      endDate.setHours(23, 59, 59, 999);
+      // Last month
+      const lastMonth = subMonths(now, 1);
+      startDate = startOfMonth(lastMonth);
+      endDate = endOfMonth(lastMonth);
       periodName = 'last month';
     } 
     else if (lowerTimePeriod.includes('this year')) {
-      // This year: Start at January 1st, end at December 31st
-      startDate = new Date(now.getFullYear(), 0, 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now.getFullYear(), 11, 31);
-      endDate.setHours(23, 59, 59, 999);
+      // This year
+      startDate = startOfYear(now);
+      endDate = endOfYear(now);
       periodName = 'this year';
     } 
     else if (lowerTimePeriod.includes('last year')) {
-      // Last year: Start at January 1st of previous year, end at December 31st of previous year
-      startDate = new Date(now.getFullYear() - 1, 0, 1);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now.getFullYear() - 1, 11, 31);
-      endDate.setHours(23, 59, 59, 999);
+      // Last year
+      const lastYear = subYears(now, 1);
+      startDate = startOfYear(lastYear);
+      endDate = endOfYear(lastYear);
       periodName = 'last year';
     } 
     else {
       // Default to last 30 days if no specific period matched
-      startDate = new Date(now);
-      startDate.setDate(now.getDate() - 30);
-      startDate.setHours(0, 0, 0, 0);
-      endDate = new Date(now);
-      endDate.setHours(23, 59, 59, 999);
+      startDate = startOfDay(subDays(now, 30));
+      endDate = endOfDay(now);
       periodName = 'last 30 days';
     }
   } catch (calcError) {
     console.error('Error in date calculation:', calcError);
     // Fallback to a simple date range calculation
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 7);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
+    startDate = startOfDay(subDays(now, 7));
+    endDate = endOfDay(now);
     periodName = 'last 7 days (error fallback)';
   }
 
   // Add back the timezone offset to convert to UTC for storage
+  // Create new Date objects to avoid modifying the originals
   const utcStartDate = new Date(startDate.getTime() + offsetMs);
   const utcEndDate = new Date(endDate.getTime() + offsetMs);
   
   // Validate the date range
   if (utcEndDate < utcStartDate) {
     console.error("Invalid date range calculated: end date is before start date");
-    // Fallback to last 7 days as a safe default
-    const fallbackStart = new Date(now);
-    fallbackStart.setDate(now.getDate() - 7);
-    fallbackStart.setHours(0, 0, 0, 0);
+    console.error(`Start: ${utcStartDate.toISOString()}, End: ${utcEndDate.toISOString()}`);
     
-    const fallbackEnd = new Date(now);
-    fallbackEnd.setHours(23, 59, 59, 999);
+    // Fallback to last 7 days as a safe default
+    const fallbackStart = startOfDay(subDays(now, 7));
+    const fallbackEnd = endOfDay(now);
     
     return {
       startDate: new Date(fallbackStart.getTime() + offsetMs).toISOString(),

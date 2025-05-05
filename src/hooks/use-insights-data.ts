@@ -1,7 +1,18 @@
 
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { format, subDays, startOfDay, endOfDay, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfYear, endOfYear } from 'date-fns';
+import { 
+  format, 
+  subDays, 
+  startOfDay, 
+  endOfDay, 
+  startOfWeek, 
+  endOfWeek, 
+  startOfMonth, 
+  endOfMonth, 
+  startOfYear, 
+  endOfYear 
+} from 'date-fns';
 
 export type TimeRange = 'today' | 'week' | 'month' | 'year';
 
