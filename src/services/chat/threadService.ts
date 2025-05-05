@@ -1,8 +1,9 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage, ChatThread } from './types';
 
-// Get all chat threads for a user
-export async function getUserChatThreads(userId: string): Promise<ChatThread[]> {
+// Get all chat threads for a user (renamed from getUserChatThreads to fetchChatThreads)
+export async function fetchChatThreads(userId: string): Promise<ChatThread[]> {
   try {
     const { data, error } = await supabase
       .from('chat_threads')
@@ -15,18 +16,18 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[]> 
       return [];
     }
 
-    // Map the data to the ChatThread type
+    // Map the data to the ChatThread type with correct property names
     const chatThreads: ChatThread[] = data.map(thread => ({
       id: thread.id,
-      userId: thread.user_id,
+      user_id: thread.user_id,
       title: thread.title,
-      createdAt: thread.created_at,
-      updatedAt: thread.updated_at
+      created_at: thread.created_at,
+      updated_at: thread.updated_at
     }));
 
     return chatThreads;
   } catch (error) {
-    console.error('Error in getUserChatThreads:', error);
+    console.error('Error in fetchChatThreads:', error);
     return [];
   }
 }
