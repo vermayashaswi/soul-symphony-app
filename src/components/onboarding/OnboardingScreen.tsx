@@ -3,13 +3,22 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User, Languages } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
 import { RecordingVisualizer } from "@/components/voice-recorder/RecordingVisualizer";
 import { toast } from "sonner";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
+import { useTranslation } from "@/contexts/TranslationContext";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -38,6 +47,20 @@ const createWavePath = (
   
   return path;
 };
+
+// Add languages array
+const LANGUAGES = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'zh', label: '中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'pt', label: 'Português' },
+];
 
 interface StepIllustration {
   title: string;
@@ -84,11 +107,11 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          Welcome to SOuLO
+          <TranslatableText text="Welcome to SOuLO" forceTranslate={true} />
         </motion.h1>
         
         <motion.p 
-          className="text-muted-foreground mb-10 max-w-xs font-medium text-theme animate-pulse"
+          className="text-muted-foreground mb-6 max-w-xs font-medium text-theme animate-pulse"
           initial={{ opacity: 0, y: 20 }}
           animate={{ 
             opacity: 1, 
@@ -104,8 +127,23 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             }
           }}
         >
-          Express your thoughts and feelings with voice notes - we'll do the rest.
+          <TranslatableText text="Express your thoughts and feelings with voice notes - we'll do the rest." forceTranslate={true} />
         </motion.p>
+        
+        {/* Language selector */}
+        <motion.div
+          className="mt-4 w-full max-w-xs"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="flex flex-col gap-2 bg-background/90 p-4 rounded-lg border border-theme/20">
+            <label className="text-sm font-medium text-foreground">
+              <TranslatableText text="Preferred Language" forceTranslate={true} />
+            </label>
+            <LanguageSelector />
+          </div>
+        </motion.div>
       </div>
     ),
     buttonText: "Get Started"
@@ -588,6 +626,30 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   }
 ];
 
+// Simple Language Selector component for onboarding
+const LanguageSelector = () => {
+  const { currentLanguage, setLanguage } = useTranslation();
+
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value);
+  };
+
+  return (
+    <Select value={currentLanguage} onValueChange={handleLanguageChange}>
+      <SelectTrigger className="w-full">
+        <SelectValue placeholder="Select a language" />
+      </SelectTrigger>
+      <SelectContent>
+        {LANGUAGES.map((language) => (
+          <SelectItem key={language.code} value={language.code}>
+            {language.label}
+          </SelectItem>
+        ))}
+      </SelectContent>
+    </Select>
+  );
+};
+
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [name, setName] = useState('');
@@ -688,7 +750,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         
         <div className="absolute top-4 right-4 z-10">
           <Button variant="ghost" size="sm" onClick={handleSkip} className="text-foreground hover:text-theme">
-            Skip
+            <TranslatableText text="Skip" forceTranslate={true} />
           </Button>
         </div>
 
@@ -706,17 +768,25 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 <CurrentIllustration />
               ) : isNameStep ? (
                 <>
-                  <h2 className="text-2xl font-bold mb-2 text-theme">{currentStepData.title}</h2>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">
+                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                  </h2>
                   {currentStepData.description && (
-                    <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
+                    <p className="mb-8 text-muted-foreground max-w-xs">
+                      <TranslatableText text={currentStepData.description} forceTranslate={true} />
+                    </p>
                   )}
                   <CurrentIllustration name={name} setName={setName} />
                 </>
               ) : (
                 <>
-                  <h2 className="text-2xl font-bold mb-2 text-theme">{currentStepData.title}</h2>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">
+                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                  </h2>
                   {currentStepData.description && (
-                    <p className="mb-8 text-muted-foreground max-w-xs">{currentStepData.description}</p>
+                    <p className="mb-8 text-muted-foreground max-w-xs">
+                      <TranslatableText text={currentStepData.description} forceTranslate={true} />
+                    </p>
                   )}
                   <CurrentIllustration />
                 </>
@@ -745,7 +815,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               onClick={handleNext} 
               className="bg-theme hover:bg-theme-dark text-white"
             >
-              {currentStepData.buttonText}
+              <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
               {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
             </Button>
           </div>

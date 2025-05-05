@@ -3,6 +3,7 @@ import React from 'react';
 import { useLocation, Navigate } from 'react-router-dom';
 import { User } from '@supabase/supabase-js';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface OnboardingCheckProps {
   onboardingComplete: boolean | null;
@@ -18,11 +19,14 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   children 
 }) => {
   const location = useLocation();
+  const { currentLanguage } = useTranslation();
+  
   console.log('OnboardingCheck rendering at path:', location.pathname, {
     user: !!user, 
     onboardingComplete,
     isAppRoute: isAppRoute(location.pathname),
-    isWebsiteRoute: isWebsiteRoute(location.pathname)
+    isWebsiteRoute: isWebsiteRoute(location.pathname),
+    language: currentLanguage
   });
   
   // For website routes, no checks needed - just render children
