@@ -29,6 +29,6 @@ export type ChatMessage = {
 export type SubQueryResponse = {
   query: string;
   response: string;
-  references?: any[];
+  references?: any[] | Json;  // Updated to accept Json type as well
   analysis_data?: any;
 };

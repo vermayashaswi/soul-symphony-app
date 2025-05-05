@@ -16,7 +16,7 @@ export interface ChatMessageType {
   content: string;
   sender: 'user' | 'assistant';
   createdAt: string;
-  references?: any[];
+  references?: any[] | Json | null;  // Updated to accept Json type as well
   isLoading?: boolean;
   isError?: boolean;
 }
@@ -136,14 +136,14 @@ export function useChatPersistence(queryClient: QueryClient) {
 
       if (messagesError) throw messagesError;
 
-      // Fix the type error by ensuring sender is correctly typed
+      // Fixed: Properly type the message data and handle references safely
       const formattedMessages: ChatMessageType[] = (messagesData || []).map(msg => ({
         id: msg.id,
         threadId: msg.thread_id,
         content: msg.content,
         sender: (msg.sender === 'user' || msg.sender === 'assistant') ? msg.sender : 'assistant',
         createdAt: msg.created_at,
-        references: msg.reference_entries
+        references: msg.reference_entries  // This can be any[] | Json | null
       }));
 
       setMessages(formattedMessages);
