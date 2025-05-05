@@ -17,11 +17,15 @@ export {
   getIsEntryBeingProcessed,
   setProcessingTimeoutId,
   getProcessingTimeoutId,
-  resetProcessingState,
-  setEntryIdForProcessingId
+  resetProcessingState
 } from './processing-state';
 
 // Re-export from other audio-related utilities as needed
 export { validateAudioBlob } from './blob-utils';
 export { verifyUserAuthentication } from './auth-utils';
-export { getEntryIdForProcessingId, setEntryIdForProcessingId as updateEntryIdForProcessingId } from '../audio-processing';
+export { 
+  getEntryIdForProcessingId, 
+  setEntryIdForProcessingId,
+  removeProcessingEntryById,
+  processRecording
+} from '../audio-processing';

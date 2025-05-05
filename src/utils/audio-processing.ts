@@ -4,8 +4,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { 
   createProcessingEntry, 
-  removeProcessingEntry, 
-  setEntryIdForProcessingId 
+  removeProcessingEntry 
 } from './audio/processing-state';
 import { createLocalTimestamp, getCurrentTimezone } from '@/services/timezoneService';
 

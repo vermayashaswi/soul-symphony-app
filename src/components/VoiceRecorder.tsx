@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -409,6 +408,7 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
             ) : audioBlob ? (
               <div className="flex flex-col items-center w-full relative z-10 mt-auto mb-8">
                 <PlaybackControls
+                  audioUrl={null}
                   audioBlob={audioBlob}
                   isPlaying={isPlaying}
                   isProcessing={isProcessing || waitingForClear}
