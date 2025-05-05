@@ -1,21 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import {
-  addDays,
-  endOfDay, 
-  endOfMonth, 
-  endOfWeek, 
-  endOfYear, 
-  startOfDay, 
-  startOfMonth, 
-  startOfWeek, 
-  startOfYear, 
-  subDays, 
-  subMonths, 
-  subWeeks, 
-  subYears
-} from "https://esm.sh/date-fns@2.30.0";
 
 // Define Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -42,14 +27,25 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, conversationContext = [], timezoneOffset = 0 } = await req.json();
+    const { 
+      message, 
+      userId, 
+      conversationContext = [], 
+      clientDetectedTimeRange = null,  // Accept client-detected time range
+      clientTime = null                // Accept client's current time
+    } = await req.json();
     
     if (!message) {
       throw new Error('Message is required');
     }
 
     console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
-    console.log(`User timezone offset: ${timezoneOffset} minutes`);
+    if (clientTime) {
+      console.log(`Client-side time: ${clientTime}`);
+    }
+    if (clientDetectedTimeRange) {
+      console.log(`Client-detected time range: ${JSON.stringify(clientDetectedTimeRange)}`);
+    }
     
     // Check message types and planQuery
     const messageTypesResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -100,38 +96,32 @@ Examples:
 
     const response = await messageTypesResponse.json();
 
-    // Process time-based queries more accurately
+    // Process time-based queries - use client-detected time range if available
     let hasTimeFilter = false;
     let timeRangeMentioned = null;
 
-    // Enhanced time detection - look for time expressions in the query
-    const timeKeywords = [
-      'today', 'yesterday', 'this week', 'last week', 
-      'this month', 'last month', 'this year', 'last year',
-      'recent', 'latest', 'current', 'past'
-    ];
-    
-    const lowerMessage = message.toLowerCase();
-    
-    for (const keyword of timeKeywords) {
-      if (lowerMessage.includes(keyword)) {
-        console.log(`Detected time keyword: ${keyword}`);
-        timeRangeMentioned = keyword;
-        hasTimeFilter = true;
-        break;
-      }
-    }
-
-    // If the user is asking about a specific date, extract it
-    let specificDate = null;
-    const dateRegex = /(\d{4}[-./]\d{2}[-./]\d{2})|(\d{2}[-./]\d{2}[-./]\d{4})/;
-    const dateMatch = message.match(dateRegex);
-    if (dateMatch) {
-      try {
-        specificDate = new Date(dateMatch[0]).toISOString().split('T')[0];
-        console.log(`Detected specific date: ${specificDate}`);
-      } catch (error) {
-        console.error("Error parsing specific date:", error);
+    // If client has already detected a time range, use it
+    if (clientDetectedTimeRange) {
+      hasTimeFilter = true;
+      timeRangeMentioned = clientDetectedTimeRange.periodName;
+      console.log(`Using client-detected time range: ${timeRangeMentioned}`);
+    } else {
+      // Enhanced time detection as backup - look for time expressions in the query
+      const timeKeywords = [
+        'today', 'yesterday', 'this week', 'last week', 
+        'this month', 'last month', 'this year', 'last year',
+        'recent', 'latest', 'current', 'past'
+      ];
+      
+      const lowerMessage = message.toLowerCase();
+      
+      for (const keyword of timeKeywords) {
+        if (lowerMessage.includes(keyword)) {
+          console.log(`Detected time keyword: ${keyword}`);
+          timeRangeMentioned = keyword;
+          hasTimeFilter = true;
+          break;
+        }
       }
     }
 
@@ -191,8 +181,6 @@ Examples:
               
               5. "needs_more_context": Boolean (true if query relates to previous messages)
 
-              Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
-
               Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
               `
             },
@@ -216,21 +204,22 @@ Examples:
         const jsonStr = jsonMatch ? jsonMatch[0] : planText;
         console.log("Generated raw plan:", jsonStr);
         
-        // Handle special case for time-based queries
-        if (timeRangeMentioned && !jsonStr.includes('"date_range"')) {
-          // Add time range to the plan
-          const tempPlan = JSON.parse(jsonStr);
-          console.log("Adding time range to plan for:", timeRangeMentioned);
+        // Handle special case for time-based queries - use client date range if available
+        const tempPlan = JSON.parse(jsonStr);
+        
+        if (clientDetectedTimeRange && !tempPlan.filters?.date_range) {
+          // Add client-detected time range to the plan
+          console.log("Adding client-detected time range to plan");
           tempPlan.filters = tempPlan.filters || {};
-          
-          // Use our service to calculate the proper date range based on timezone
-          const dateRange = calculateRelativeDateRange(timeRangeMentioned, timezoneOffset);
-          tempPlan.filters.date_range = dateRange;
-          
-          plan = tempPlan;
-        } else {
-          plan = JSON.parse(jsonStr);
+          tempPlan.filters.date_range = clientDetectedTimeRange;
+        } else if (timeRangeMentioned && !tempPlan.filters?.date_range && !clientDetectedTimeRange) {
+          // If GPT did not provide a date range but we detected a time keyword, note this for the client to handle
+          console.log("Time keyword detected but no date range provided in plan");
+          tempPlan.filters = tempPlan.filters || {};
+          tempPlan.filters.detected_time_keyword = timeRangeMentioned;
         }
+        
+        plan = tempPlan;
         
         // Force data aggregation for rating/analysis requests
         if (isRatingOrAnalysisRequest && !plan.needs_data_aggregation) {
@@ -241,25 +230,23 @@ Examples:
       } catch (e) {
         console.error('Error parsing plan JSON:', e);
         console.error('Raw plan text:', planText);
+        
+        // Create a fallback plan
         plan = {
           strategy: 'vector',
-          filters: hasTimeFilter ? { date_range: calculateRelativeDateRange(timeRangeMentioned || 'recent', timezoneOffset) } : {},
+          filters: {},
           match_count: isRatingOrAnalysisRequest ? 30 : 15,
           needs_data_aggregation: isRatingOrAnalysisRequest || message.includes('how many') || message.includes('count') || message.includes('statistics'),
           needs_more_context: false
         };
+        
+        // Add client-detected time range if available
+        if (clientDetectedTimeRange) {
+          plan.filters.date_range = clientDetectedTimeRange;
+        } else if (hasTimeFilter) {
+          plan.filters.detected_time_keyword = timeRangeMentioned;
+        }
       }
-    }
-
-    // If a specific date was detected, ensure it's used in the plan
-    if (specificDate && plan) {
-      plan.filters = plan.filters || {};
-      plan.filters.date_range = {
-        startDate: specificDate,
-        endDate: specificDate,
-        periodName: 'specific date'
-      };
-      console.log("Forcing date range in plan to:", specificDate);
     }
 
     // Return the plan
@@ -267,7 +254,8 @@ Examples:
       JSON.stringify({ 
         plan, 
         queryType: isRatingOrAnalysisRequest ? 'journal_specific' : queryType,
-        directResponse 
+        directResponse,
+        clientTime: clientTime // Echo back the client time for reference
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
@@ -279,138 +267,3 @@ Examples:
     );
   }
 });
-
-/**
- * Calculates relative date ranges based on time expressions
- * @param timePeriod - The time period expression (e.g., "this month", "last week")
- * @param timezoneOffset - User's timezone offset in minutes
- * @returns Date range with start and end dates
- */
-function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number = 0): { startDate: string, endDate: string, periodName: string } {
-  // Validate the timezone offset
-  if (typeof timezoneOffset !== 'number') {
-    console.error(`Invalid timezone offset: ${timezoneOffset}, using default 0`);
-    timezoneOffset = 0;
-  }
-  
-  // Enforce timezone offset limits (-12:00 to +14:00)
-  if (timezoneOffset < -720 || timezoneOffset > 840) {
-    console.error(`Timezone offset out of range: ${timezoneOffset}, clamping to valid range`);
-    timezoneOffset = Math.max(-720, Math.min(840, timezoneOffset));
-  }
-  
-  // Convert timezone offset to milliseconds
-  const offsetMs = timezoneOffset * 60 * 1000;
-  
-  // Get current date in user's timezone
-  const now = new Date(Date.now() + offsetMs);
-  let startDate: Date;
-  let endDate: Date;
-  let periodName = timePeriod;
-  
-  console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
-  console.log(`User's local time: ${now.toISOString()} (${now.toLocaleDateString()})`);
-  
-  const lowerTimePeriod = timePeriod.toLowerCase();
-  
-  try {
-    if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
-      // Today
-      startDate = startOfDay(now);
-      endDate = endOfDay(now);
-      periodName = 'today';
-    } 
-    else if (lowerTimePeriod.includes('yesterday')) {
-      // Yesterday
-      const yesterday = subDays(now, 1);
-      startDate = startOfDay(yesterday);
-      endDate = endOfDay(yesterday);
-      periodName = 'yesterday';
-    } 
-    else if (lowerTimePeriod.includes('this week')) {
-      // This week (Monday to Sunday)
-      startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
-      endDate = endOfWeek(now, { weekStartsOn: 1 }); // End on Sunday
-      periodName = 'this week';
-    } 
-    else if (lowerTimePeriod.includes('last week')) {
-      // Last week (previous Monday to Sunday)
-      const lastWeek = subWeeks(now, 1);
-      startDate = startOfWeek(lastWeek, { weekStartsOn: 1 }); // Start on last Monday
-      endDate = endOfWeek(lastWeek, { weekStartsOn: 1 }); // End on last Sunday
-      periodName = 'last week';
-    } 
-    else if (lowerTimePeriod.includes('this month')) {
-      // This month
-      startDate = startOfMonth(now);
-      endDate = endOfMonth(now);
-      periodName = 'this month';
-    } 
-    else if (lowerTimePeriod.includes('last month')) {
-      // Last month
-      const lastMonth = subMonths(now, 1);
-      startDate = startOfMonth(lastMonth);
-      endDate = endOfMonth(lastMonth);
-      periodName = 'last month';
-    } 
-    else if (lowerTimePeriod.includes('this year')) {
-      // This year
-      startDate = startOfYear(now);
-      endDate = endOfYear(now);
-      periodName = 'this year';
-    } 
-    else if (lowerTimePeriod.includes('last year')) {
-      // Last year
-      const lastYear = subYears(now, 1);
-      startDate = startOfYear(lastYear);
-      endDate = endOfYear(lastYear);
-      periodName = 'last year';
-    } 
-    else {
-      // Default to last 30 days if no specific period matched
-      startDate = startOfDay(subDays(now, 30));
-      endDate = endOfDay(now);
-      periodName = 'last 30 days';
-    }
-  } catch (calcError) {
-    console.error('Error in date calculation:', calcError);
-    // Fallback to a simple date range calculation
-    startDate = startOfDay(subDays(now, 7));
-    endDate = endOfDay(now);
-    periodName = 'last 7 days (error fallback)';
-  }
-
-  // Adjust the dates to UTC for storage
-  // When we apply the timezone offset, we need to subtract it to get UTC time (not add it)
-  const utcStartDate = new Date(startDate.getTime() - offsetMs);
-  const utcEndDate = new Date(endDate.getTime() - offsetMs);
-  
-  // Validate the date range
-  if (utcEndDate < utcStartDate) {
-    console.error("Invalid date range calculated: end date is before start date");
-    console.error(`Start: ${utcStartDate.toISOString()}, End: ${utcEndDate.toISOString()}`);
-    
-    // Fallback to last 7 days as a safe default
-    const fallbackStart = startOfDay(subDays(now, 7));
-    const fallbackEnd = endOfDay(now);
-    
-    return {
-      startDate: new Date(fallbackStart.getTime() - offsetMs).toISOString(),
-      endDate: new Date(fallbackEnd.getTime() - offsetMs).toISOString(),
-      periodName: 'last 7 days (fallback)'
-    };
-  }
-  
-  // Log the calculated dates for debugging
-  console.log(`Date range calculated: 
-    Start: ${utcStartDate.toISOString()} (${utcStartDate.toLocaleDateString()})
-    End: ${utcEndDate.toISOString()} (${utcEndDate.toLocaleDateString()})
-    Period: ${periodName}
-    Duration in days: ${Math.round((utcEndDate.getTime() - utcStartDate.getTime()) / (1000 * 60 * 60 * 24))}`);
-  
-  return {
-    startDate: utcStartDate.toISOString(),
-    endDate: utcEndDate.toISOString(),
-    periodName
-  };
-}

@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -373,7 +372,13 @@ serve(async (req) => {
     }
     
     // Normal chat processing flow
-    const { message, userId, timeRange, threadId } = reqBody;
+    const { 
+      message, 
+      userId, 
+      threadId, 
+      clientDetectedTimeRange, // Accept client-detected time range 
+      clientTime              // Accept client's current time
+    } = reqBody;
 
     if (!message) {
       throw new Error('Message is required');
@@ -384,7 +389,14 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
-    console.log("Time range received:", timeRange);
+    
+    if (clientTime) {
+      console.log(`Client time: ${clientTime}`);
+    }
+    
+    if (clientDetectedTimeRange) {
+      console.log("Using client-detected time range:", clientDetectedTimeRange);
+    }
     
     // Send an immediate response with processing status for long-running requests
     if (reqBody.acknowledgeRequest) {
@@ -563,9 +575,9 @@ serve(async (req) => {
       
       // Use different search function based on whether we have a time range
       let entries = [];
-      if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-        console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-        entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+      if (clientDetectedTimeRange) {
+        console.log(`Using time-filtered search with client-detected range: ${JSON.stringify(clientDetectedTimeRange)}`);
+        entries = await searchEntriesWithTimeRange(userId, queryEmbedding, clientDetectedTimeRange);
       } else {
         console.log("Using standard vector search without time filtering");
         entries = await searchEntriesWithVector(userId, queryEmbedding);
@@ -574,7 +586,7 @@ serve(async (req) => {
       console.log(`Found ${entries.length} relevant entries`);
 
       // Check if we found any entries for the requested time period
-      if (timeRange && (timeRange.startDate || timeRange.endDate) && entries.length === 0) {
+      if (clientDetectedTimeRange && entries.length === 0) {
         console.log("No entries found for the specified time range");
         
         // Return a friendly message indicating no entries were found
@@ -948,15 +960,15 @@ async function searchEntriesWithVector(
   }
 }
 
-// Time-filtered vector search
+// Time-filtered vector search - using client-provided time range
 async function searchEntriesWithTimeRange(
   userId: string, 
   queryEmbedding: any[], 
-  timeRange: { startDate?: string; endDate?: string }
+  timeRange: { startDate?: string; endDate?: string, periodName?: string }
 ) {
   try {
     console.log(`Searching entries with time range for userId: ${userId}`);
-    console.log(`Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'}`);
+    console.log(`Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'} (${timeRange.periodName || 'unspecified'})`);
     
     const { data, error } = await supabase.rpc(
       'match_journal_entries_with_date',

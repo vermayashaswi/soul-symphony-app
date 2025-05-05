@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/contexts/AuthContext';
@@ -8,6 +9,21 @@ import { generateThreadTitle } from '@/utils/chat/threadUtils';
 import { getPlanForQuery } from './threadService';
 import { convertGptPlanToQueryPlan } from './queryPlannerService';
 import { Json } from '@/integrations/supabase/types';
+import { 
+  addDays, 
+  endOfDay, 
+  endOfMonth, 
+  endOfWeek, 
+  endOfYear, 
+  startOfDay, 
+  startOfMonth, 
+  startOfWeek, 
+  startOfYear, 
+  subDays, 
+  subMonths, 
+  subWeeks, 
+  subYears 
+} from "date-fns";
 
 export interface ChatMessageType {
   id: string;
@@ -26,6 +42,212 @@ export interface ChatThreadType {
   title: string;
   createdAt: string;
   updatedAt: string;
+}
+
+/**
+ * Calculates relative date ranges based on time expressions, using the client's local time
+ * @param timePeriod - The time period expression (e.g., "this month", "last week")
+ * @returns Date range with start and end dates in ISO format
+ */
+export function calculateClientDateRange(timePeriod: string): { startDate: string, endDate: string, periodName: string } {
+  console.log(`Calculating client-side date range for "${timePeriod}"`);
+  
+  // Use the client's device time as the source of truth
+  const now = new Date(); 
+  let startDate: Date;
+  let endDate: Date;
+  let periodName = timePeriod;
+  
+  console.log(`Client local time: ${now.toISOString()} (${now.toLocaleDateString()})`);
+  
+  const lowerTimePeriod = timePeriod.toLowerCase();
+  
+  try {
+    if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
+      // Today
+      startDate = startOfDay(now);
+      endDate = endOfDay(now);
+      periodName = 'today';
+    } 
+    else if (lowerTimePeriod.includes('yesterday')) {
+      // Yesterday
+      const yesterday = subDays(now, 1);
+      startDate = startOfDay(yesterday);
+      endDate = endOfDay(yesterday);
+      periodName = 'yesterday';
+    } 
+    else if (lowerTimePeriod.includes('this week')) {
+      // This week (Monday to Sunday)
+      startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
+      endDate = endOfWeek(now, { weekStartsOn: 1 }); // End on Sunday
+      periodName = 'this week';
+    } 
+    else if (lowerTimePeriod.includes('last week')) {
+      // Last week (previous Monday to Sunday)
+      const lastWeek = subWeeks(now, 1);
+      startDate = startOfWeek(lastWeek, { weekStartsOn: 1 }); // Start on last Monday
+      endDate = endOfWeek(lastWeek, { weekStartsOn: 1 }); // End on last Sunday
+      periodName = 'last week';
+    } 
+    else if (lowerTimePeriod.includes('this month')) {
+      // This month
+      startDate = startOfMonth(now);
+      endDate = endOfMonth(now);
+      periodName = 'this month';
+    } 
+    else if (lowerTimePeriod.includes('last month')) {
+      // Last month
+      const lastMonth = subMonths(now, 1);
+      startDate = startOfMonth(lastMonth);
+      endDate = endOfMonth(lastMonth);
+      periodName = 'last month';
+    } 
+    else if (lowerTimePeriod.includes('this year')) {
+      // This year
+      startDate = startOfYear(now);
+      endDate = endOfYear(now);
+      periodName = 'this year';
+    } 
+    else if (lowerTimePeriod.includes('last year')) {
+      // Last year
+      const lastYear = subYears(now, 1);
+      startDate = startOfYear(lastYear);
+      endDate = endOfYear(lastYear);
+      periodName = 'last year';
+    } 
+    else {
+      // Default to last 30 days if no specific period matched
+      startDate = startOfDay(subDays(now, 30));
+      endDate = endOfDay(now);
+      periodName = 'last 30 days';
+    }
+  } catch (calcError) {
+    console.error('Error in date calculation:', calcError);
+    // Fallback to a simple date range calculation
+    startDate = startOfDay(subDays(now, 7));
+    endDate = endOfDay(now);
+    periodName = 'last 7 days (error fallback)';
+  }
+
+  // Convert to ISO format for consistent storage
+  const isoStartDate = startDate.toISOString();
+  const isoEndDate = endDate.toISOString();
+  
+  // Log the calculated dates for debugging
+  console.log(`Client date range calculated: 
+    Start: ${isoStartDate} (${startDate.toLocaleDateString()})
+    End: ${isoEndDate} (${endDate.toLocaleDateString()})
+    Period: ${periodName}
+    Duration in days: ${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))}`);
+  
+  return {
+    startDate: isoStartDate,
+    endDate: isoEndDate,
+    periodName
+  };
+}
+
+/**
+ * Detects time-related expressions in a query and calculates a date range
+ * @param query - The user's query text
+ * @returns A date range object if a time expression is found, null otherwise
+ */
+export function detectTimeExpressionAndCalculateRange(query: string): { startDate: string, endDate: string, periodName: string } | null {
+  // List of common time expressions to detect
+  const timeExpressions = [
+    'today', 'yesterday', 
+    'this week', 'last week', 
+    'this month', 'last month', 
+    'this year', 'last year',
+    'past week', 'past month', 'past year',
+    'previous week', 'previous month', 'previous year',
+    'recent', 'lately'
+  ];
+  
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for date expressions
+  for (const expression of timeExpressions) {
+    if (lowerQuery.includes(expression)) {
+      console.log(`Detected time expression "${expression}" in query: "${query}"`);
+      return calculateClientDateRange(expression);
+    }
+  }
+  
+  // Check for "last X days/weeks/months/years" pattern
+  const lastNPattern = /last\s+(\d+)\s+(day|days|week|weeks|month|months|year|years)/i;
+  const lastNMatch = lowerQuery.match(lastNPattern);
+  
+  if (lastNMatch) {
+    const amount = parseInt(lastNMatch[1], 10);
+    const unit = lastNMatch[2].toLowerCase();
+    console.log(`Detected "last ${amount} ${unit}" in query`);
+    
+    const now = new Date();
+    let startDate: Date;
+    let endDate = endOfDay(now);
+    
+    if (unit.startsWith('day')) {
+      startDate = startOfDay(subDays(now, amount));
+    } else if (unit.startsWith('week')) {
+      startDate = startOfDay(subWeeks(now, amount));
+    } else if (unit.startsWith('month')) {
+      startDate = startOfDay(subMonths(now, amount));
+    } else if (unit.startsWith('year')) {
+      startDate = startOfDay(subYears(now, amount));
+    } else {
+      return null;
+    }
+    
+    return {
+      startDate: startDate.toISOString(),
+      endDate: endDate.toISOString(),
+      periodName: `last ${amount} ${unit}`
+    };
+  }
+  
+  // Handle specific date
+  const specificDatePattern = /(\d{1,2})[\/-](\d{1,2})(?:[\/-](\d{4}|\d{2}))?/;
+  const dateMatch = lowerQuery.match(specificDatePattern);
+  
+  if (dateMatch) {
+    try {
+      // Try to parse the date, considering ambiguities in dd/mm vs mm/dd formats
+      // Default to current year if not specified
+      const now = new Date();
+      let day = parseInt(dateMatch[1], 10);
+      let month = parseInt(dateMatch[2], 10) - 1; // JS months are 0-indexed
+      let year = dateMatch[3] ? parseInt(dateMatch[3], 10) : now.getFullYear();
+      
+      // Handle 2-digit years
+      if (year < 100) {
+        year += year < 50 ? 2000 : 1900;
+      }
+      
+      // Try to create a valid date object
+      const specificDate = new Date(year, month, day);
+      
+      // Check if the date is valid
+      if (isNaN(specificDate.getTime())) {
+        console.error('Invalid date detected:', dateMatch[0]);
+        return null;
+      }
+      
+      const startOfSpecificDate = startOfDay(specificDate);
+      const endOfSpecificDate = endOfDay(specificDate);
+      
+      return {
+        startDate: startOfSpecificDate.toISOString(),
+        endDate: endOfSpecificDate.toISOString(),
+        periodName: `on ${specificDate.toLocaleDateString()}`
+      };
+    } catch (error) {
+      console.error('Error parsing specific date:', error);
+      return null;
+    }
+  }
+  
+  return null;
 }
 
 export function useChatPersistence(queryClient: QueryClient) {
@@ -228,17 +450,24 @@ export function useChatPersistence(queryClient: QueryClient) {
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
 
-      // Call edge function to ensure persistence and get user's timezone offset
-      const timezoneOffset = new Date().getTimezoneOffset();
-      console.log(`Local timezone offset: ${timezoneOffset} minutes`);
-
+      // CLIENT-SIDE DATE RANGE CALCULATION
+      // Check if the query contains time-related expressions and calculate date range
+      const detectedDateRange = detectTimeExpressionAndCalculateRange(content);
+      console.log("Detected date range from client:", detectedDateRange);
+      
+      // Get a JavaScript Date object for the user's local timezone
+      const clientTime = new Date();
+      console.log(`Client local time: ${clientTime.toISOString()} (${clientTime.toLocaleDateString()})`);
+      
+      // Call edge function to ensure persistence and include the client's current timestamp
       const { data: persistenceData, error: persistenceError } = await supabase.functions.invoke('ensure-chat-persistence', {
         body: {
           userId: user.id,
           threadId,
           messageId: userMessageId,
           content,
-          timezoneOffset
+          clientTime: clientTime.toISOString(), // Send the client's current time as the source of truth
+          clientTimezone: Intl.DateTimeFormat().resolvedOptions().timeZone // Send the timezone name
         }
       });
 
@@ -246,13 +475,19 @@ export function useChatPersistence(queryClient: QueryClient) {
         console.error("Error ensuring persistence:", persistenceError);
       }
 
-      // Get query plan based on user's message and pass it along with the conversation context
+      // Get the conversation context for query planning
       const contextMessages = messages.map(msg => ({
         content: msg.content,
         sender: msg.sender
       }));
 
-      const { plan, queryType, directResponse } = await getPlanForQuery(content, user.id, contextMessages, timezoneOffset);
+      // Get query plan based on user's message and include the client-detected date range
+      const { plan, queryType, directResponse } = await getPlanForQuery(
+        content, 
+        user.id, 
+        contextMessages, 
+        detectedDateRange // Pass the client-calculated date range instead of timezone offset
+      );
       
       let apiResponse: any = null;
       let references: any[] = [];
@@ -267,8 +502,8 @@ export function useChatPersistence(queryClient: QueryClient) {
             userId: user.id,
             message: content,
             threadId,
-            timeRange: plan?.filters?.dateRange,
-            timezoneOffset
+            clientDetectedTimeRange: detectedDateRange, // Use client-detected time range instead of server calculation
+            clientTime: clientTime.toISOString() // Send client time as source of truth
           }
         });
         
@@ -276,6 +511,11 @@ export function useChatPersistence(queryClient: QueryClient) {
       } else {
         // For journal queries with a plan, use the chat-with-rag endpoint
         const queryPlan = convertGptPlanToQueryPlan(plan);
+        
+        // If the plan doesn't already have a date range but we detected one, add it
+        if (!queryPlan.filters.dateRange && detectedDateRange) {
+          queryPlan.filters.dateRange = detectedDateRange;
+        }
         
         const { data, error } = await supabase.functions.invoke('chat-with-rag', {
           body: {
@@ -285,7 +525,7 @@ export function useChatPersistence(queryClient: QueryClient) {
             conversationContext: contextMessages,
             queryPlan,
             includeDiagnostics: false,
-            timezoneOffset
+            clientTime: clientTime.toISOString() // Send client time as source of truth
           }
         });
         
