@@ -57,6 +57,7 @@ export function convertGptPlanToQueryPlan(gptPlan: any): QueryPlan {
     
     // Add date range if provided
     if (gptPlan.filters?.date_range) {
+      // Ensure dates are properly formatted with timezone consideration
       filters.dateRange = {
         startDate: gptPlan.filters.date_range.startDate || null,
         endDate: gptPlan.filters.date_range.endDate || null,
@@ -144,4 +145,100 @@ export function createFallbackQueryPlan(query: string): QueryPlan {
   }
   
   return plan;
+}
+
+/**
+ * Calculates relative date ranges based on time expressions
+ * @param timePeriod - The time period expression (e.g., "this month", "last week")
+ * @param timezoneOffset - User's timezone offset in minutes
+ * @returns Date range with start and end dates
+ */
+export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number = 0): { startDate: string, endDate: string, periodName: string } {
+  // Convert timezone offset to milliseconds
+  const offsetMs = timezoneOffset * 60 * 1000;
+  
+  // Get current date in user's timezone
+  const now = new Date(Date.now() - offsetMs);
+  let startDate = new Date(now);
+  let endDate = new Date(now);
+  let periodName = timePeriod;
+  
+  const lowerTimePeriod = timePeriod.toLowerCase();
+  
+  if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
+    // Today: Start at midnight, end at 23:59:59
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'today';
+  } 
+  else if (lowerTimePeriod.includes('yesterday')) {
+    // Yesterday: Start at previous day midnight, end at previous day 23:59:59
+    startDate.setDate(startDate.getDate() - 1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setDate(endDate.getDate() - 1);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'yesterday';
+  } 
+  else if (lowerTimePeriod.includes('this week')) {
+    // This week: Start at current week Sunday, end at Saturday 23:59:59
+    const dayOfWeek = startDate.getDay();
+    startDate.setDate(startDate.getDate() - dayOfWeek);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setDate(endDate.getDate() + (6 - dayOfWeek));
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'this week';
+  } 
+  else if (lowerTimePeriod.includes('last week')) {
+    // Last week: Start at previous week Sunday, end at previous week Saturday 23:59:59
+    const dayOfWeek = startDate.getDay();
+    startDate.setDate(startDate.getDate() - dayOfWeek - 7);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setDate(startDate.getDate() + 6);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'last week';
+  } 
+  else if (lowerTimePeriod.includes('this month')) {
+    // This month: Start at 1st of current month, end at last day of month 23:59:59
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    periodName = 'this month';
+  } 
+  else if (lowerTimePeriod.includes('last month')) {
+    // Last month: Start at 1st of previous month, end at last day of previous month 23:59:59
+    startDate.setMonth(startDate.getMonth() - 1);
+    startDate.setDate(1);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(startDate.getFullYear(), startDate.getMonth() + 1, 0, 23, 59, 59, 999);
+    periodName = 'last month';
+  } 
+  else if (lowerTimePeriod.includes('this year')) {
+    // This year: Start at January 1st, end at December 31st 23:59:59
+    startDate = new Date(startDate.getFullYear(), 0, 1, 0, 0, 0, 0);
+    endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+    periodName = 'this year';
+  } 
+  else if (lowerTimePeriod.includes('last year')) {
+    // Last year: Start at January 1st of previous year, end at December 31st of previous year 23:59:59
+    startDate = new Date(startDate.getFullYear() - 1, 0, 1, 0, 0, 0, 0);
+    endDate = new Date(startDate.getFullYear(), 11, 31, 23, 59, 59, 999);
+    periodName = 'last year';
+  } 
+  else {
+    // Default to last 30 days if no specific period matched
+    startDate.setDate(startDate.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'last 30 days';
+  }
+
+  // Add back the timezone offset to convert to UTC for storage
+  startDate = new Date(startDate.getTime() + offsetMs);
+  endDate = new Date(endDate.getTime() + offsetMs);
+  
+  return {
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+    periodName
+  };
 }

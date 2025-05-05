@@ -626,10 +626,9 @@ async function searchEntriesWithSQL(
     let query = supabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text", created_at, emotions, sentiment, master_themes, entities')
-      .eq('user_id', userId)
-      .order('created_at', { ascending: false });
+      .eq('user_id', userId);
     
-    // Apply date range filter
+    // Apply date range filter with clear logging
     if (filters.dateRange) {
       if (filters.dateRange.startDate) {
         console.log(`Adding start date filter: ${filters.dateRange.startDate}`);
@@ -647,12 +646,22 @@ async function searchEntriesWithSQL(
       query = query.in('sentiment', filters.sentiment);
     }
     
+    // Order by most recent for time-based queries
+    query = query.order('created_at', { ascending: false });
+    
     // Execute the query
     const { data, error } = await query.limit(matchCount * 3); // Get more to allow for post-filtering
     
     if (error) {
       console.error(`Error in SQL search: ${error.message}`);
       throw error;
+    }
+    
+    // Log result count for debugging
+    if (data) {
+      console.log(`SQL search returned ${data.length} results`);
+    } else {
+      console.log(`SQL search returned no results`);
     }
     
     let results = data || [];
@@ -717,6 +726,14 @@ async function searchEntriesWithSQL(
           });
         });
       });
+    }
+    
+    // Log filtered result count for debugging
+    console.log(`Found ${results.length} relevant entries`);
+    
+    // If no results but we have a date range filter, clearly indicate this
+    if (results.length === 0 && filters.dateRange) {
+      console.log("No entries found for the specified time range");
     }
     
     // Return the final filtered results, limited to the requested count

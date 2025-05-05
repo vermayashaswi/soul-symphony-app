@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/contexts/AuthContext';
@@ -206,7 +205,8 @@ export function useChatPersistence(queryClient: QueryClient) {
         id: userMessageId,
         thread_id: threadId,
         content,
-        sender: 'user'
+        sender: 'user',
+        role: 'user' // Make sure role is set correctly
       });
 
       if (saveError) throw saveError;
@@ -267,7 +267,8 @@ export function useChatPersistence(queryClient: QueryClient) {
             userId: user.id,
             message: content,
             threadId,
-            timeRange: plan?.filters?.dateRange
+            timeRange: plan?.filters?.dateRange,
+            timezoneOffset
           }
         });
         
@@ -316,6 +317,7 @@ export function useChatPersistence(queryClient: QueryClient) {
         thread_id: threadId,
         content: assistantContent,
         sender: 'assistant',
+        role: 'assistant', // Make sure role is set correctly
         reference_entries: references.length > 0 ? references : null
       });
 
@@ -368,7 +370,7 @@ export function useChatPersistence(queryClient: QueryClient) {
     } finally {
       setIsSaving(false);
     }
-  }, [user, activeThread, messages, createThread]);
+  }, [user, activeThread, messages, createThread, queryClient]);
 
   // Function to generate or update thread title
   const updateThreadTitle = useCallback(async (threadId: string, newTitle?: string) => {
