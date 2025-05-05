@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
@@ -38,7 +39,7 @@ async function countJournalEntries(userId: string): Promise<number> {
   return count || 0;
 }
 
-// New function to get emotion data from the emotions table
+// Enhanced function to get emotions data from the emotions table
 async function getEmotionsData(): Promise<any[]> {
   try {
     const { data, error } = await supabase
@@ -58,9 +59,10 @@ async function getEmotionsData(): Promise<any[]> {
   }
 }
 
-// New function to get sample entity categories from journal entries
-async function getSampleEntityCategories(userId: string, limit = 10): Promise<any[]> {
+// Enhanced function to get comprehensive entity data
+async function getEntityData(userId: string, limit = 20): Promise<any> {
   try {
+    // Get entity categories and examples
     const { data, error } = await supabase
       .from('Journal Entries')
       .select('entities')
@@ -70,50 +72,62 @@ async function getSampleEntityCategories(userId: string, limit = 10): Promise<an
     
     if (error) {
       console.error("Error fetching entities data:", error);
-      return [];
+      return { types: [], examples: {}, recent: [] };
     }
     
-    // Extract unique entity types
+    // Extract unique entity types and examples
     const entityTypes = new Set();
-    const entityExamples: Record<string, string[]> = {};
+    const entityExamples: Record<string, Set<string>> = {};
+    const recentEntities: Array<{type: string, name: string}> = [];
     
     data?.forEach(entry => {
       if (entry.entities && Array.isArray(entry.entities)) {
         entry.entities.forEach((entity: any) => {
-          if (entity && entity.type) {
+          if (entity && entity.type && entity.name) {
+            // Add to types
             entityTypes.add(entity.type);
             
-            // Store examples for each entity type (up to 5)
+            // Add to examples
             if (!entityExamples[entity.type]) {
-              entityExamples[entity.type] = [];
+              entityExamples[entity.type] = new Set();
             }
             
-            if (entity.name && entityExamples[entity.type].length < 5 && !entityExamples[entity.type].includes(entity.name)) {
-              entityExamples[entity.type].push(entity.name);
+            entityExamples[entity.type].add(entity.name);
+            
+            // Add to recent entities (limited number)
+            if (recentEntities.length < 50) {
+              recentEntities.push({
+                type: entity.type,
+                name: entity.name
+              });
             }
           }
         });
       }
     });
     
-    // Format the entity categories and examples
-    return Array.from(entityTypes).map(type => ({
-      type,
-      examples: entityExamples[type as string] || []
-    }));
+    // Format the entity data
+    const entityData = {
+      types: Array.from(entityTypes),
+      examples: Object.fromEntries(
+        Object.entries(entityExamples).map(([type, names]) => [type, Array.from(names).slice(0, 10)])
+      ),
+      recent: recentEntities
+    };
     
+    return entityData;
   } catch (error) {
-    console.error("Error in getSampleEntityCategories:", error);
-    return [];
+    console.error("Error in getEntityData:", error);
+    return { types: [], examples: {}, recent: [] };
   }
 }
 
-// New function to get sample data structures
+// Get sample data structures
 async function getSampleDataStructures(userId: string): Promise<any> {
   try {
     const { data, error } = await supabase
       .from('Journal Entries')
-      .select('emotions, entityemotion, master_themes, content')
+      .select('emotions, entityemotion, master_themes, content, sentiment')
       .eq('user_id', userId)
       .not('emotions', 'is', null)
       .limit(3);
@@ -128,6 +142,7 @@ async function getSampleDataStructures(userId: string): Promise<any> {
       emotions: [],
       entityemotion: [],
       master_themes: [],
+      sentiment: [],
       content_samples: []
     };
     
@@ -142,6 +157,10 @@ async function getSampleDataStructures(userId: string): Promise<any> {
       
       if (entry.master_themes && Array.isArray(entry.master_themes) && !samples.master_themes.length) {
         samples.master_themes.push(entry.master_themes);
+      }
+      
+      if (entry.sentiment && samples.sentiment.length < 2) {
+        samples.sentiment.push(entry.sentiment);
       }
       
       if (entry.content && samples.content_samples.length < 2) {
@@ -286,45 +305,6 @@ function getDateRangeForTimeframe(timeframe: string): { startDate: string, endDa
   };
 }
 
-// Utility function to analyze the query using OpenAI
-async function generateQueryAnalysis(message: string, entryCount: number) {
-  try {
-    const prompt = `You are an expert query analyzer for a personal journal application. Your task is to analyze user queries and create a structured plan for retrieving relevant information from a database.
-      
-      Here's how you should respond:
-      - goal: A concise statement of what the user is trying to find out.
-      - context: Important background information or entities mentioned in the query.
-      - intent: The specific action or information the user is seeking (e.g., "find entries about a specific emotion", "analyze patterns", etc.).
-      - query_type: One of: "time-based", "theme-based", "emotion-based", "reflection", "insight-seeking", "specific-memory", "pattern-recognition".
-      - time_period: Any timeframes mentioned or implied in the query.
-      - themes_to_search: An array of themes or topics mentioned that should be searched.
-      - emotions_to_search: An array of emotions mentioned that should be searched.
-      - requires_aggregation: Whether the query requires gathering and analyzing multiple entries rather than just retrieving them.
-      - search_strategy: Recommended approach: "vector", "keyword", "hybrid", "emotion", "time" - based on the nature of the query.
-      - query_plan: A step-by-step plan for how to retrieve and process the information.
-      
-      Format your response as JSON.`;
-
-    const response = await openai.chat.completions.create({
-      model: "gpt-4o-mini",
-      messages: [
-        { role: "system", content: prompt },
-        { role: "user", content: `User query: "${message}"\nNumber of journal entries: ${entryCount}` }
-      ],
-      temperature: 0.2,
-      response_format: { type: "json_object" }
-    });
-
-    return response.choices[0].message.content || "";
-  } catch (error) {
-    console.error("Error generating query analysis:", error);
-    return JSON.stringify({
-      error: "Failed to analyze query",
-      search_strategy: "vector" // Default fallback
-    });
-  }
-}
-
 // Step 1: Query Classification with GPT
 async function classifyQuery(query: string, conversationContext: any[] = []) {
   try {
@@ -380,7 +360,7 @@ async function classifyQuery(query: string, conversationContext: any[] = []) {
   }
 }
 
-// Step 2: Query Planning with GPT
+// Step 2: Query Planning with GPT - Updated for simplified strategies and flexible filters
 async function createQueryPlan(query: string, userId: string, conversationContext: any[] = []) {
   try {
     const entryCount = await countJournalEntries(userId);
@@ -388,11 +368,11 @@ async function createQueryPlan(query: string, userId: string, conversationContex
     // Get enhanced schema information with column descriptions
     const enhancedSchema = await getEnhancedSchemaInfo();
     
-    // Get emotions data
+    // Get comprehensive emotions data
     const emotionsData = await getEmotionsData();
     
-    // Get entity categories and examples
-    const entityCategories = await getSampleEntityCategories(userId);
+    // Get comprehensive entity data
+    const entityData = await getEntityData(userId);
     
     // Get sample data structures
     const sampleStructures = await getSampleDataStructures(userId);
@@ -402,10 +382,10 @@ async function createQueryPlan(query: string, userId: string, conversationContex
       ? `Available emotions in the database:\n${emotionsData.map(e => `- ${e.name}${e.description ? ': ' + e.description : ''}`).join('\n')}`
       : 'Emotions data unavailable';
     
-    // Format entity categories for inclusion in the prompt
-    const entitiesInfo = entityCategories.length > 0
-      ? `Entity categories found in user's journal:\n${entityCategories.map(e => 
-          `- ${e.type}${e.examples.length > 0 ? ' (Examples: ' + e.examples.join(', ') + ')' : ''}`
+    // Format entity data for inclusion in the prompt
+    const entitiesInfo = entityData.types.length > 0
+      ? `Entity types found in user's journal:\n${entityData.types.map(type => 
+          `- ${type}${entityData.examples[type]?.length > 0 ? ' (Examples: ' + entityData.examples[type].join(', ') + ')' : ''}`
         ).join('\n')}`
       : 'Entity categories unavailable';
     
@@ -424,9 +404,18 @@ async function createQueryPlan(query: string, userId: string, conversationContex
       dataStructuresInfo += `\n\nSample master_themes array structure:\n${JSON.stringify(sampleStructures.master_themes[0], null, 2)}`;
     }
     
+    if (sampleStructures.sentiment && sampleStructures.sentiment.length) {
+      dataStructuresInfo += `\n\nSample sentiment values:\n${JSON.stringify(sampleStructures.sentiment, null, 2)}`;
+    }
+    
     if (sampleStructures.content_samples && sampleStructures.content_samples.length) {
       dataStructuresInfo += `\n\nSample entry content:\n${sampleStructures.content_samples.join('\n\n')}`;
     }
+    
+    // Add recent entities for better context
+    const recentEntitiesInfo = entityData.recent.length > 0
+      ? `\n\nRecent entities mentioned in journal:\n${JSON.stringify(entityData.recent.slice(0, 20), null, 2)}`
+      : '';
     
     // Create an enhanced prompt with all the additional information
     const prompt = `You are an expert query analyzer for a personal journal application. Your task is to analyze user queries and create a structured plan for retrieving relevant information from a database.
@@ -437,6 +426,7 @@ async function createQueryPlan(query: string, userId: string, conversationContex
       ${emotionsInfo}
       
       ${entitiesInfo}
+      ${recentEntitiesInfo}
       
       ${dataStructuresInfo}
       
@@ -445,25 +435,27 @@ async function createQueryPlan(query: string, userId: string, conversationContex
       Your output should be a JSON object with:
       - "is_segmented": true/false (whether query needs to be broken down)
       - "subqueries": [array of sub-questions if segmented]
-      - "strategy": "vector", "sql", "hybrid", "emotion", or "time"
+      - "strategy": "vector", "sql", or "hybrid" 
       - "filters": { 
           "date_range": { "startDate": ISO date or null, "endDate": ISO date or null, "periodName": string description },
           "emotions": [array of emotions to filter by],
-          "themes": [array of themes to filter by]
+          "sentiment": [array of sentiment values to filter by],
+          "themes": [array of themes to filter by],
+          "entities": [array of entity objects with type and name]
         }
       - "match_count": number of matches to return (10-30 based on query complexity)
       - "needs_data_aggregation": true/false (whether results need to be analyzed together)
       - "needs_more_context": true/false (whether more entries than usual should be fetched)
       - "reasoning": why this strategy works best
       
-      Include only what's applicable to this specific query.
+      Include only what's applicable to this specific query. Filters are flexible and will be applied based on the selected strategy.
       
       Query examples and recommended strategies:
-      1. "Show me entries about happiness" → Use emotion filter with "happiness" emotion
-      2. "What did I write about last Monday?" → Use time filter with specific date range
-      3. "How has my sleep been changing?" → Use theme filter with "sleep" and data aggregation
-      4. "What makes me anxious about work?" → Use emotion filter "anxiety" + theme filter "work"
-      5. "When was the last time I felt excited?" → Use emotion filter with "excited" + time sorting
+      1. "Show me entries about happiness" → Use "vector" strategy with emotion filters
+      2. "What did I write about last Monday?" → Use "vector" strategy with date_range filter
+      3. "How has my sleep been changing?" → Use "hybrid" strategy with theme filters and data aggregation
+      4. "What makes me anxious about work?" → Use "hybrid" strategy with emotion and theme filters
+      5. "When was the last time I felt excited?" → Use "sql" strategy with emotion filter and sorting
       
       Generate precise, actionable query plans focused on retrieving the most relevant journal entries for the user's question.`;
 
@@ -519,9 +511,6 @@ async function createQueryPlan(query: string, userId: string, conversationContex
     };
   }
 }
-
-// Step 3: Response Synthesis with GPT (will be done after retrieval)
-// This function is implemented in chat-with-rag after entries are retrieved
 
 // Main handler function
 serve(async (req) => {
