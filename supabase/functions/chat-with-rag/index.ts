@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -31,7 +30,17 @@ function createDiagnosticStep(name: string, status: string, details: any = null)
 }
 
 // Define the general question prompt
-const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
+const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. 
+
+IF the query concerns introductory messages or greetings, respond accordingly. 
+
+If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly.
+
+IMPORTANT: If the user explicitly asks for a rating, score, or evaluation of any kind (e.g., "Rate my anxiety", "Score my happiness", etc.), you MUST provide a numerical rating on a scale of 1-10 along with an explanation. Even though you don't have access to their journal entries in this context, provide a hypothetical rating and clearly state that it's based on the limited context, for example:
+
+"Based on our limited interaction, I'd rate your [trait] as a 7/10. However, for a more accurate assessment, I'd need to analyze your journal entries in detail. Would you like me to do that? If so, please rephrase your question to specifically ask about your journal entries."
+
+If it contains any abstract question unrelated to mental health or the app's purpose, feel free to deny politely.`;
 
 // Maximum number of previous messages to include for context
 const MAX_CONTEXT_MESSAGES = 10;
@@ -71,6 +80,13 @@ serve(async (req) => {
       references: []
     };
     
+    // Check if this is a rating request
+    const isRatingRequest = /rate|score|analyze|evaluate|assess|rank|review/i.test(message.toLowerCase());
+    if (isRatingRequest) {
+      console.log("Detected rating/evaluation request");
+      diagnostics.steps.push(createDiagnosticStep("Request Analysis", "success", "Detected rating/evaluation request"));
+    }
+    
     // Log the query plan if provided
     if (queryPlan) {
       console.log("Using provided query plan:", queryPlan);
@@ -79,6 +95,12 @@ serve(async (req) => {
         "success", 
         JSON.stringify(queryPlan)
       ));
+      
+      // If this is a rating request, force journal_specific handling
+      if (isRatingRequest && !queryPlan.needs_data_aggregation) {
+        console.log("Rating request detected - forcing data aggregation");
+        queryPlan.needs_data_aggregation = true;
+      }
     }
     
     // Fetch previous messages from this thread if a threadId is provided
@@ -135,50 +157,66 @@ serve(async (req) => {
     // First categorize if this is a general question or a journal-specific question
     diagnostics.steps.push(createDiagnosticStep("Question Categorization", "loading"));
     console.log("Categorizing question type");
-    const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
-            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
-            
-            Examples:
-            - "How are you doing?" -> "GENERAL"
-            - "What is journaling?" -> "GENERAL"
-            - "Who is the president of India?" -> "GENERAL"
-            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
-            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
-          },
-          { role: 'user', content: message }
-        ],
-        temperature: 0.1,
-        max_tokens: 10
-      }),
-    });
+    
+    // Force journal_specific for rating requests
+    let questionType = "GENERAL";
+    
+    if (isRatingRequest) {
+      console.log("Rating request detected - forcing journal_specific classification");
+      questionType = "JOURNAL_SPECIFIC";
+      diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", "Rating request detected: JOURNAL_SPECIFIC"));
+    } else {
+      const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
+            {
+              role: 'system',
+              content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
+              
+              IMPORTANT: If the query contains ANY request for ratings, scores, or evaluations (e.g., "Rate my anxiety", "Score my happiness", etc.), you MUST classify it as "JOURNAL_SPECIFIC".
+              
+              Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
+              
+              Examples:
+              - "How are you doing?" -> "GENERAL"
+              - "What is journaling?" -> "GENERAL"
+              - "Who is the president of India?" -> "GENERAL"
+              - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
+              - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
+              - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
+              - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
+              - "Rate my happiness level" -> "JOURNAL_SPECIFIC"
+              - "Score my productivity" -> "JOURNAL_SPECIFIC"
+              - "Analyze my emotional patterns" -> "JOURNAL_SPECIFIC"`
+            },
+            { role: 'user', content: message }
+          ],
+          temperature: 0.1,
+          max_tokens: 10
+        }),
+      });
 
-    if (!categorizationResponse.ok) {
-      const error = await categorizationResponse.text();
-      console.error('Failed to categorize question:', error);
-      diagnostics.steps.push(createDiagnosticStep("Question Categorization", "error", error));
-      throw new Error('Failed to categorize question');
+      if (!categorizationResponse.ok) {
+        const error = await categorizationResponse.text();
+        console.error('Failed to categorize question:', error);
+        diagnostics.steps.push(createDiagnosticStep("Question Categorization", "error", error));
+        throw new Error('Failed to categorize question');
+      }
+
+      const categorization = await categorizationResponse.json();
+      questionType = categorization.choices[0]?.message?.content.trim();
+      console.log(`Question categorized as: ${questionType}`);
+      diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", `Classified as ${questionType}`));
     }
 
-    const categorization = await categorizationResponse.json();
-    const questionType = categorization.choices[0]?.message?.content.trim();
-    console.log(`Question categorized as: ${questionType}`);
-    diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", `Classified as ${questionType}`));
-
     // If it's a general question, respond directly without journal entry retrieval
-    if (questionType === "GENERAL") {
+    if (questionType === "GENERAL" && !isRatingRequest) {
       console.log("Processing as general question, skipping journal entry retrieval");
       diagnostics.steps.push(createDiagnosticStep("General Question Processing", "loading"));
       

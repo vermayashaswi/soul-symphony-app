@@ -97,6 +97,17 @@ export function convertGptPlanToQueryPlan(gptPlan: any): QueryPlan {
       subqueries: gptPlan.subqueries || [],
       reasoning: gptPlan.reasoning || ''
     };
+
+    // For rating or analysis requests, ensure we need data aggregation
+    const hasRatingKeywords = gptPlan.reasoning?.toLowerCase().includes('rate') || 
+                            gptPlan.reasoning?.toLowerCase().includes('score') ||
+                            gptPlan.reasoning?.toLowerCase().includes('analyze') ||
+                            gptPlan.reasoning?.toLowerCase().includes('evaluate');
+                            
+    if (hasRatingKeywords && !queryPlan.needsDataAggregation) {
+      queryPlan.needsDataAggregation = true;
+      queryPlan.matchCount = Math.max(queryPlan.matchCount, 30); // Ensure we get enough data
+    }
     
     return queryPlan;
   } catch (error) {
@@ -124,11 +135,14 @@ export function createDefaultQueryPlan(): QueryPlan {
 export function createFallbackQueryPlan(query: string): QueryPlan {
   const queryTypes = analyzeQueryTypes(query);
   
+  // Check if this is a rating or evaluation request
+  const isRatingRequest = /rate|score|analyze|evaluate|assess|rank/i.test(query);
+  
   // Default plan uses vector search
   const plan: QueryPlan = {
     searchStrategy: 'vector',
     filters: {},
-    needsDataAggregation: queryTypes.needsDataAggregation,
+    needsDataAggregation: queryTypes.needsDataAggregation || isRatingRequest,
     needsMoreContext: queryTypes.needsMoreContext,
     matchCount: 15
   };
@@ -138,8 +152,9 @@ export function createFallbackQueryPlan(query: string): QueryPlan {
     plan.filters.dateRange = queryTypes.timeRange;
   }
   
-  // Adjust match count for aggregation queries
+  // Adjust match count for aggregation queries or rating requests
   if (queryTypes.needsDataAggregation || 
+      isRatingRequest ||
       query.toLowerCase().includes('all') || 
       query.toLowerCase().includes('every')) {
     plan.matchCount = 30; // Return more entries for comprehensive analysis

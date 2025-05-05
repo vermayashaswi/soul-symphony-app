@@ -14,6 +14,7 @@ type QueryTypes = {
   isSpecificQuery: boolean;
   isThemeFocused: boolean;
   requiresTimeAnalysis: boolean;
+  isRatingRequest: boolean;  // New field to track rating requests
   emotion?: string;
   theme?: string;
   timeRange: {
@@ -45,6 +46,7 @@ export function analyzeQueryTypes(query: string): QueryTypes {
     isSpecificQuery: false,
     isThemeFocused: false,
     requiresTimeAnalysis: false,
+    isRatingRequest: false,  // Initialize the new field
     timeRange: {
       startDate: null,
       endDate: null,
@@ -79,6 +81,14 @@ export function analyzeQueryTypes(query: string): QueryTypes {
                          lowerQuery.includes('average') ||
                          lowerQuery.includes('top') ||
                          /\d+/.test(lowerQuery); // Contains numbers
+                         
+  // Detect if this is a rating request - NEW check                     
+  result.isRatingRequest = /\brate\b|\bscore\b|\bevaluate\b|\bassess\b|\banalyze\b|\breview\b|\brank\b/i.test(lowerQuery);
+  
+  // If this is a rating request, ensure we flag it as needing data aggregation
+  if (result.isRatingRequest) {
+    result.needsDataAggregation = true;
+  }
   
   // Enhanced theme detection
   // First check for explicit theme words
@@ -150,7 +160,6 @@ export function analyzeQueryTypes(query: string): QueryTypes {
   // Enhanced temporal queries detection to include month names
   result.isTemporalQuery = lowerQuery.includes('yesterday') ||
                           lowerQuery.includes('last week') ||
-                          lowerQuery.includes('last month') ||
                           lowerQuery.includes('past week') ||
                           lowerQuery.includes('past month') ||
                           lowerQuery.includes('this week') ||
@@ -186,6 +195,7 @@ export function analyzeQueryTypes(query: string): QueryTypes {
   
   // Detect if we need to aggregate data from multiple entries
   result.needsDataAggregation = result.isQuantitative || 
+                               result.isRatingRequest ||  // Add this check
                                lowerQuery.includes('pattern') ||
                                lowerQuery.includes('usually') ||
                                lowerQuery.includes('typically') ||

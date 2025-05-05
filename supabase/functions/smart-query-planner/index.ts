@@ -48,7 +48,28 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are a classification tool that determines if a user's query is a general question about mental health (respond with "mental_health_general") OR if it's a question seeking insights from the user's journal entries (respond with "journal_specific"). Respond with ONLY "mental_health_general" or "journal_specific".`
+            content: `You are a classification tool that determines if a user's query is a general question about mental health (respond with "mental_health_general") OR if it's a question seeking insights from the user's journal entries (respond with "journal_specific"). 
+
+Specifically, if the user is asking for ANY of the following, classify as "journal_specific":
+- Personal ratings, scores, or evaluations based on their journal entries
+- Analysis of their traits, behaviors, or patterns
+- Reviews or assessments of their personal characteristics
+- Any query asking to "rate me", "analyze me", "evaluate me", or similar
+- Questions seeking quantitative or qualitative assessment of the user
+- Any request for statistics or metrics about their journaling data
+- Analysis of specific emotions or sentiment patterns in their entries
+
+Respond with ONLY "mental_health_general" or "journal_specific".
+
+Examples:
+- "How are you doing?" -> "mental_health_general"
+- "What is journaling?" -> "mental_health_general"
+- "Rate my productivity" -> "journal_specific"
+- "What are my top 3 negative traits?" -> "journal_specific"
+- "Analyze my emotional patterns" -> "journal_specific"
+- "Score my happiness level" -> "journal_specific"
+- "How was I feeling last week?" -> "journal_specific"
+- "What patterns do you see in my anxiety?" -> "journal_specific"`
           },
           { role: 'user', content: message }
         ],
@@ -100,17 +121,24 @@ serve(async (req) => {
     }
 
     // Determine the queryType (mental_health_general or journal_specific)
-    const queryType = response.data;
+    const queryType = response.choices[0]?.message?.content?.trim() || 'journal_specific';
+    console.log("Query classified as:", queryType);
+    
+    // Check for rating/analysis requests specifically
+    const isRatingOrAnalysisRequest = /rate|analyze|evaluate|assess|score|rank|review/i.test(message);
+    if (isRatingOrAnalysisRequest) {
+      console.log("Detected rating or analysis request, ensuring journal_specific classification");
+    }
     
     // Build the search plan
     let plan = null;
     let directResponse = null;
 
-    if (queryType === 'mental_health_general') {
-      console.log("Query classified as:", queryType);
+    if (queryType === 'mental_health_general' && !isRatingOrAnalysisRequest) {
+      console.log("Query classified as general mental health question");
       directResponse = null; // Process general queries with our standard chat flow
-    } else if (queryType === 'journal_specific') {
-      console.log("Query classified as:", queryType);
+    } else {
+      console.log("Query classified as journal-specific or rating request");
       
       // Build a plan for journal-specific queries
       const planResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -143,6 +171,8 @@ serve(async (req) => {
               3. "match_count": Number of entries to retrieve (default 15, use 30+ for aggregations)
               
               4. "needs_data_aggregation": Boolean (true if statistical analysis needed)
+                 - IMPORTANT: Set this to true for ALL rating, scoring, or evaluation requests
+                 - Also set to true for any pattern analysis, trait assessment, or statistic requests
               
               5. "needs_more_context": Boolean (true if query relates to previous messages)
 
@@ -186,19 +216,24 @@ serve(async (req) => {
         } else {
           plan = JSON.parse(jsonStr);
         }
+        
+        // Force data aggregation for rating/analysis requests
+        if (isRatingOrAnalysisRequest && !plan.needs_data_aggregation) {
+          console.log("Forcing data aggregation for rating/analysis request");
+          plan.needs_data_aggregation = true;
+          plan.match_count = Math.max(plan.match_count || 15, 30); // Ensure we get enough data
+        }
       } catch (e) {
         console.error('Error parsing plan JSON:', e);
         console.error('Raw plan text:', planText);
         plan = {
           strategy: 'vector',
           filters: hasTimeFilter ? { date_range: calculateRelativeDateRange(timeRangeMentioned || 'recent', timezoneOffset) } : {},
-          match_count: 15,
-          needs_data_aggregation: message.includes('how many') || message.includes('count') || message.includes('statistics'),
+          match_count: isRatingOrAnalysisRequest ? 30 : 15,
+          needs_data_aggregation: isRatingOrAnalysisRequest || message.includes('how many') || message.includes('count') || message.includes('statistics'),
           needs_more_context: false
         };
       }
-    } else {
-      console.error("Unknown query type:", queryType);
     }
 
     // If a specific date was detected, ensure it's used in the plan
@@ -216,7 +251,7 @@ serve(async (req) => {
     return new Response(
       JSON.stringify({ 
         plan, 
-        queryType,
+        queryType: isRatingOrAnalysisRequest ? 'journal_specific' : queryType,
         directResponse 
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
