@@ -1,275 +1,426 @@
 
-import { useEffect, useState } from "react";
-import { supabase } from "@/integrations/supabase/client";
-import { ChatMessage, ChatThread, SubQueryResponse } from "./types";
+import { useState, useEffect, useCallback } from 'react';
+import { v4 as uuidv4 } from 'uuid';
+import { useAuth } from '@/contexts/AuthContext';
+import { supabase } from '@/integrations/supabase/client';
+import { QueryClient } from '@tanstack/react-query';
+import { toast } from '@/hooks/use-toast';
+import { generateThreadTitle } from '@/utils/chat/threadUtils';
+import { getPlanForQuery } from './threadService';
+import { convertGptPlanToQueryPlan } from './queryPlannerService';
 
-/**
- * Custom hook to manage chat persistence with Supabase
- */
-export function useChatPersistence(userId?: string | null) {
-  const [threads, setThreads] = useState<ChatThread[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  
-  // Load user's chat threads
+export interface ChatMessageType {
+  id: string;
+  threadId: string;
+  content: string;
+  sender: 'user' | 'assistant';
+  createdAt: string;
+  references?: any[];
+  isLoading?: boolean;
+  isError?: boolean;
+}
+
+export interface ChatThreadType {
+  id: string;
+  userId: string;
+  title: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function useChatPersistence(queryClient: QueryClient) {
+  const { user } = useAuth();
+  const [messages, setMessages] = useState<ChatMessageType[]>([]);
+  const [activeThread, setActiveThread] = useState<ChatThreadType | null>(null);
+  const [loading, setLoading] = useState<boolean>(true);
+  const [isSaving, setIsSaving] = useState<boolean>(false);
+
   useEffect(() => {
-    if (!userId) {
-      setThreads([]);
-      setIsLoading(false);
-      return;
+    // Reset state when user changes
+    if (!user) {
+      setMessages([]);
+      setActiveThread(null);
+      setLoading(false);
     }
-    
-    const loadThreads = async () => {
-      try {
-        setIsLoading(true);
-        setError(null);
-        
-        const { data, error } = await supabase
-          .from('chat_threads')
-          .select('*')
-          .eq('user_id', userId)
-          .order('updated_at', { ascending: false });
-          
-        if (error) {
-          console.error("Error loading chat threads:", error);
-          setError(error.message);
-        } else {
-          setThreads(data || []);
-        }
-      } catch (err: any) {
-        console.error("Exception loading chat threads:", err);
-        setError(err.message || 'An error occurred while loading conversations');
-      } finally {
-        setIsLoading(false);
-      }
-    };
-    
-    loadThreads();
-    
-    // Set up real-time subscription for thread updates
-    const subscription = supabase
-      .channel(`threads_for_${userId}`)
-      .on('postgres_changes', {
-        event: '*',
-        schema: 'public',
-        table: 'chat_threads',
-        filter: `user_id=eq.${userId}`
-      }, () => {
-        loadThreads();
-      })
-      .subscribe();
-      
-    return () => {
-      subscription.unsubscribe();
-    };
-  }, [userId]);
-  
+  }, [user]);
+
   // Function to create a new thread
-  const createThread = async (title: string = "New Conversation"): Promise<ChatThread | null> => {
-    try {
-      if (!userId) {
-        setError('You must be logged in to create a conversation');
-        return null;
-      }
-      
-      const { data, error } = await supabase
-        .from('chat_threads')
-        .insert({
-          title,
-          user_id: userId,
-          created_at: new Date().toISOString(),
-          updated_at: new Date().toISOString()
-        })
-        .select()
-        .single();
-        
-      if (error) {
-        console.error("Error creating chat thread:", error);
-        setError(error.message);
-        return null;
-      }
-      
-      // Update local state
-      setThreads(prevThreads => [data, ...prevThreads]);
-      return data;
-    } catch (err: any) {
-      console.error("Exception creating chat thread:", err);
-      setError(err.message || 'An error occurred while creating the conversation');
+  const createThread = useCallback(async () => {
+    if (!user) {
+      console.error("User must be authenticated to create a thread");
       return null;
     }
-  };
-  
-  // Function to delete a thread
-  const deleteThread = async (threadId: string): Promise<boolean> => {
+
+    setLoading(true);
     try {
-      // First delete all messages in the thread
-      const { error: messagesError } = await supabase
-        .from('chat_messages')
-        .delete()
-        .eq('thread_id', threadId);
-        
-      if (messagesError) {
-        console.error("Error deleting messages:", messagesError);
-        setError(messagesError.message);
-        return false;
-      }
+      const threadId = uuidv4();
+      const { error } = await supabase.from('chat_threads').insert({
+        id: threadId,
+        user_id: user.id,
+        title: 'New Conversation'
+      });
+
+      if (error) throw error;
+
+      const newThread: ChatThreadType = {
+        id: threadId,
+        userId: user.id,
+        title: 'New Conversation',
+        createdAt: new Date().toISOString(),
+        updatedAt: new Date().toISOString()
+      };
+
+      setActiveThread(newThread);
+      setMessages([]);
       
-      // Then delete the thread
-      const { error: threadError } = await supabase
-        .from('chat_threads')
-        .delete()
-        .eq('id', threadId);
-        
-      if (threadError) {
-        console.error("Error deleting thread:", threadError);
-        setError(threadError.message);
-        return false;
-      }
+      // Invalidate threads cache
+      queryClient.invalidateQueries(['chatThreads']);
       
-      // Update local state
-      setThreads(prevThreads => prevThreads.filter(thread => thread.id !== threadId));
-      return true;
-    } catch (err: any) {
-      console.error("Exception deleting chat thread:", err);
-      setError(err.message || 'An error occurred while deleting the conversation');
-      return false;
+      return threadId;
+    } catch (error) {
+      console.error("Error creating thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to create a new conversation thread.",
+        variant: "destructive"
+      });
+      return null;
+    } finally {
+      setLoading(false);
     }
-  };
-  
-  // Function to get messages for a thread
-  const getMessages = async (threadId: string): Promise<ChatMessage[]> => {
+  }, [user, queryClient]);
+
+  // Function to load a thread by ID
+  const loadThread = useCallback(async (threadId: string) => {
+    if (!user || !threadId) {
+      return;
+    }
+
+    setLoading(true);
     try {
-      const { data, error } = await supabase
+      // First fetch thread metadata
+      const { data: threadData, error: threadError } = await supabase
+        .from('chat_threads')
+        .select('*')
+        .eq('id', threadId)
+        .eq('user_id', user.id)
+        .single();
+
+      if (threadError) throw threadError;
+      
+      if (!threadData) {
+        console.error("Thread not found");
+        setActiveThread(null);
+        setMessages([]);
+        return;
+      }
+
+      // Set active thread
+      const thread: ChatThreadType = {
+        id: threadData.id,
+        userId: threadData.user_id,
+        title: threadData.title,
+        createdAt: threadData.created_at,
+        updatedAt: threadData.updated_at
+      };
+      
+      setActiveThread(thread);
+      
+      // Then fetch messages for this thread
+      const { data: messagesData, error: messagesError } = await supabase
         .from('chat_messages')
         .select('*')
         .eq('thread_id', threadId)
         .order('created_at', { ascending: true });
-        
-      if (error) {
-        console.error("Error loading chat messages:", error);
-        setError(error.message);
-        return [];
-      }
-      
-      // Add the role property based on sender if needed
-      const messagesWithRole = data?.map(msg => ({
-        ...msg,
-        role: msg.role || msg.sender,
-        // Ensure sender is either 'user' or 'assistant'
-        sender: (msg.sender === 'user' || msg.sender === 'assistant') ? msg.sender : 'assistant'
-      })) || [];
-      
-      return messagesWithRole as ChatMessage[];
-    } catch (err: any) {
-      console.error("Exception loading chat messages:", err);
-      setError(err.message || 'An error occurred while loading messages');
-      return [];
+
+      if (messagesError) throw messagesError;
+
+      // Transform to our message format
+      const formattedMessages: ChatMessageType[] = (messagesData || []).map(msg => ({
+        id: msg.id,
+        threadId: msg.thread_id,
+        content: msg.content,
+        sender: msg.sender,
+        createdAt: msg.created_at,
+        references: msg.reference_entries
+      }));
+
+      setMessages(formattedMessages);
+    } catch (error) {
+      console.error("Error loading thread:", error);
+      toast({
+        title: "Error",
+        description: "Failed to load conversation thread.",
+        variant: "destructive"
+      });
+    } finally {
+      setLoading(false);
     }
-  };
-  
-  // Function to save a message
-  const saveMessage = async (
-    threadId: string,
-    content: string,
-    sender: 'user' | 'assistant',
-    references?: any[],
-    analysisData?: any,
-    hasNumericResult?: boolean,
-    subQueries?: string[],
-    subQueryResponses?: SubQueryResponse[]
-  ): Promise<ChatMessage | null> => {
+  }, [user]);
+
+  // Function to add a user message and get a response
+  const sendMessage = useCallback(async (content: string) => {
+    if (!user) {
+      console.error("User must be authenticated to send messages");
+      return;
+    }
+
+    // Create a new thread if needed
+    let threadId = activeThread?.id;
+    let isFirstMessage = false;
+    
+    if (!threadId) {
+      threadId = await createThread();
+      if (!threadId) return;
+      isFirstMessage = true;
+    }
+
+    setIsSaving(true);
+
     try {
-      // Create the base message data with required fields
-      const messageData: {
-        thread_id: string;
-        content: string;
-        sender: 'user' | 'assistant';
-        role: 'user' | 'assistant';
-        created_at: string;
-        reference_entries?: any;
-        analysis_data?: any;
-        has_numeric_result?: boolean;
-        sub_query1?: string;
-        sub_query2?: string;
-        sub_query3?: string;
-        sub_query_responses?: any;
-      } = {
+      // Add user message to UI immediately with loading state
+      const userMessageId = uuidv4();
+      const userMessage: ChatMessageType = {
+        id: userMessageId,
+        threadId,
+        content,
+        sender: 'user',
+        createdAt: new Date().toISOString(),
+      };
+
+      const assistantMessageId = uuidv4();
+      const assistantMessage: ChatMessageType = {
+        id: assistantMessageId,
+        threadId,
+        content: '',
+        sender: 'assistant',
+        createdAt: new Date().toISOString(),
+        isLoading: true
+      };
+
+      setMessages(prev => [...prev, userMessage, assistantMessage]);
+
+      // Save user message to database
+      const { error: saveError } = await supabase.from('chat_messages').insert({
+        id: userMessageId,
         thread_id: threadId,
         content,
-        sender,
-        role: sender,
-        created_at: new Date().toISOString()
-      };
+        sender: 'user'
+      });
+
+      if (saveError) throw saveError;
       
-      // Add optional fields if provided
-      if (references) {
-        messageData.reference_entries = references;
-      }
+      // Dispatch event that message was created
+      window.dispatchEvent(
+        new CustomEvent('messageCreated', { 
+          detail: { 
+            threadId, 
+            messageId: userMessageId,
+            isFirstMessage
+          } 
+        })
+      );
       
-      if (analysisData) {
-        messageData.analysis_data = analysisData;
-      }
-      
-      if (hasNumericResult !== undefined) {
-        messageData.has_numeric_result = hasNumericResult;
-      }
-      
-      // Add sub-queries if provided
-      if (subQueries && subQueries.length > 0) {
-        if (subQueries[0]) messageData.sub_query1 = subQueries[0];
-        if (subQueries[1]) messageData.sub_query2 = subQueries[1];
-        if (subQueries[2]) messageData.sub_query3 = subQueries[2];
-      }
-      
-      // Add sub-query responses if provided
-      if (subQueryResponses && subQueryResponses.length > 0) {
-        messageData.sub_query_responses = subQueryResponses;
-      }
-      
-      // Ensure all required fields are present before insertion
-      if (!messageData.thread_id || !messageData.content || !messageData.sender) {
-        throw new Error("Missing required fields for message insertion");
-      }
-      
-      const { data, error } = await supabase
-        .from('chat_messages')
-        .insert(messageData)
-        .select()
-        .single();
-        
-      if (error) {
-        console.error("Error saving chat message:", error);
-        setError(error.message);
-        return null;
-      }
-      
-      // Update thread's updated_at timestamp
+      // Update the thread's updated_at timestamp
       await supabase
         .from('chat_threads')
         .update({ updated_at: new Date().toISOString() })
         .eq('id', threadId);
+
+      // Call edge function to ensure persistence and get user's timezone offset
+      const timezoneOffset = new Date().getTimezoneOffset();
+      console.log(`Local timezone offset: ${timezoneOffset} minutes`);
+
+      const { data: persistenceData, error: persistenceError } = await supabase.functions.invoke('ensure-chat-persistence', {
+        body: {
+          userId: user.id,
+          threadId,
+          messageId: userMessageId,
+          content,
+          timezoneOffset
+        }
+      });
+
+      if (persistenceError) {
+        console.error("Error ensuring persistence:", persistenceError);
+      }
+
+      // Get query plan based on user's message and pass it along with the conversation context
+      const contextMessages = messages.map(msg => ({
+        content: msg.content,
+        sender: msg.sender
+      }));
+
+      const { plan, queryType, directResponse } = await getPlanForQuery(content, user.id, contextMessages, timezoneOffset);
+      
+      let apiResponse: any = null;
+      let references: any[] = [];
+
+      if (directResponse) {
+        // If we got a direct response, use it
+        apiResponse = { data: directResponse };
+      } else if (queryType !== 'journal_specific' || !plan) {
+        // If not a journal query or no plan, use the smart-chat endpoint
+        const { data, error } = await supabase.functions.invoke('smart-chat', {
+          body: {
+            userId: user.id,
+            message: content,
+            threadId,
+            timeRange: plan?.filters?.dateRange
+          }
+        });
         
+        apiResponse = { data, error };
+      } else {
+        // For journal queries with a plan, use the chat-with-rag endpoint
+        const queryPlan = convertGptPlanToQueryPlan(plan);
+        
+        const { data, error } = await supabase.functions.invoke('chat-with-rag', {
+          body: {
+            userId: user.id,
+            message: content,
+            threadId,
+            conversationContext: contextMessages,
+            queryPlan,
+            includeDiagnostics: false,
+            timezoneOffset
+          }
+        });
+        
+        if (data?.references) {
+          references = data.references;
+        }
+        
+        apiResponse = { 
+          data: data?.response || data?.data, 
+          error,
+          noEntriesForTimeRange: data?.noEntriesForTimeRange
+        };
+      }
+
+      if (apiResponse.error) {
+        throw apiResponse.error;
+      }
+
+      // If we get a warning about no entries for a time range
+      if (apiResponse.noEntriesForTimeRange) {
+        console.log("No entries for specified time range");
+      }
+
+      // Save assistant response to database
+      const assistantContent = apiResponse.data || "I'm sorry, I couldn't generate a response.";
+      
+      const { error: assistantSaveError } = await supabase.from('chat_messages').insert({
+        id: assistantMessageId,
+        thread_id: threadId,
+        content: assistantContent,
+        sender: 'assistant',
+        reference_entries: references.length > 0 ? references : null
+      });
+
+      if (assistantSaveError) throw assistantSaveError;
+
+      // Update assistant message in UI
+      setMessages(prev => prev.map(msg => 
+        msg.id === assistantMessageId 
+          ? { ...msg, content: assistantContent, isLoading: false, references }
+          : msg
+      ));
+
+      // Update thread timestamp again after assistant response
+      await supabase
+        .from('chat_threads')
+        .update({ updated_at: new Date().toISOString() })
+        .eq('id', threadId);
+      
+      // Invalidate threads cache
+      queryClient.invalidateQueries(['chatThreads']);
+      
       return {
-        ...data,
-        sender: data.sender as 'user' | 'assistant',
-        role: data.role as 'user' | 'assistant'
-      } as ChatMessage;
-    } catch (err: any) {
-      console.error("Exception saving chat message:", err);
-      setError(err.message || 'An error occurred while saving the message');
+        userMessageId,
+        assistantMessageId,
+        threadId,
+        response: assistantContent
+      };
+    } catch (error) {
+      console.error("Error sending message:", error);
+      
+      // Update assistant message with error
+      setMessages(prev => prev.map(msg => 
+        msg.sender === 'assistant' && msg.isLoading 
+          ? { 
+              ...msg, 
+              content: "I'm sorry, I encountered an error while processing your request. Please try again.", 
+              isLoading: false,
+              isError: true
+            }
+          : msg
+      ));
+      
+      toast({
+        title: "Error",
+        description: "Failed to get a response. Please try again.",
+        variant: "destructive"
+      });
+      
+      return null;
+    } finally {
+      setIsSaving(false);
+    }
+  }, [user, activeThread, messages, createThread]);
+
+  // Function to generate or update thread title
+  const updateThreadTitle = useCallback(async (threadId: string, newTitle?: string) => {
+    if (!user || !threadId) return;
+    
+    try {
+      let title = newTitle;
+      
+      // If no title provided, generate one
+      if (!title) {
+        title = await generateThreadTitle(threadId, user.id);
+        if (!title) return;
+      }
+      
+      // Update in database
+      const { error } = await supabase
+        .from('chat_threads')
+        .update({ title })
+        .eq('id', threadId);
+      
+      if (error) throw error;
+      
+      // Update local state if this is the active thread
+      if (activeThread?.id === threadId) {
+        setActiveThread(prev => prev ? { ...prev, title } : null);
+      }
+      
+      // Invalidate threads cache
+      queryClient.invalidateQueries(['chatThreads']);
+      
+      // Dispatch event that thread title was updated
+      window.dispatchEvent(
+        new CustomEvent('threadTitleUpdated', { 
+          detail: { threadId, title } 
+        })
+      );
+      
+      return title;
+    } catch (error) {
+      console.error("Error updating thread title:", error);
       return null;
     }
-  };
-  
+  }, [user, activeThread]);
+
   return {
-    threads,
-    isLoading,
-    error,
+    messages,
+    activeThread,
+    loading,
+    isSaving,
     createThread,
-    deleteThread,
-    getMessages,
-    saveMessage
+    loadThread,
+    sendMessage,
+    updateThreadTitle,
+    setActiveThread
   };
 }
-
-export default useChatPersistence;

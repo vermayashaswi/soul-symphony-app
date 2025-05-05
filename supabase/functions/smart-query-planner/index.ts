@@ -240,71 +240,87 @@ Journal Entries Table Schema Notes:
   }
 }
 
-// Utility function to get date range based on time range
-function getDateRangeForTimeframe(timeframe: string): { startDate: string, endDate: string } {
+// Updated utility function to get date range based on time range with timezone support
+function getDateRangeForTimeframe(timeframe: string, timezoneOffsetMinutes: number = 0): { startDate: string, endDate: string, periodName: string } {
+  // Get the current time in UTC
   const now = new Date();
-  let startDate = new Date();
-  let endDate = new Date();
+  
+  // Apply timezone offset to get the user's local time
+  const userLocalTime = new Date(now.getTime() - (timezoneOffsetMinutes * 60 * 1000));
+  console.log(`Using user's local time: ${userLocalTime.toISOString()} (offset: ${timezoneOffsetMinutes} minutes)`);
+  
+  let startDate = new Date(userLocalTime);
+  let endDate = new Date(userLocalTime);
+  let periodName = timeframe;
 
-  // Set end date to current time
-  endDate = now;
-
-  // Calculate start date based on timeframe
+  // Calculate start date and end date based on timeframe in user's local time
   if (timeframe === 'last month' || timeframe === 'previous month') {
     // First day of previous month
-    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+    startDate = new Date(userLocalTime.getFullYear(), userLocalTime.getMonth() - 1, 1);
     // Last day of previous month
-    endDate = new Date(now.getFullYear(), now.getMonth(), 0, 23, 59, 59, 999);
+    endDate = new Date(userLocalTime.getFullYear(), userLocalTime.getMonth(), 0, 23, 59, 59, 999);
+    periodName = 'last month';
   } else if (timeframe === 'this month' || timeframe === 'current month') {
     // First day of current month
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+    startDate = new Date(userLocalTime.getFullYear(), userLocalTime.getMonth(), 1);
     // Current day
-    endDate = now;
+    endDate = userLocalTime;
+    periodName = 'this month';
   } else if (timeframe === 'last week' || timeframe === 'previous week') {
     // Start of previous week (Monday)
-    const dayOfWeek = now.getDay();
-    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) - 7;
-    startDate = new Date(now.getFullYear(), now.getMonth(), diff);
+    const dayOfWeek = userLocalTime.getDay();
+    const diff = userLocalTime.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1) - 7;
+    startDate = new Date(userLocalTime.getFullYear(), userLocalTime.getMonth(), diff);
     // End of previous week (Sunday)
     endDate = new Date(startDate);
     endDate.setDate(startDate.getDate() + 6);
     endDate.setHours(23, 59, 59, 999);
+    periodName = 'last week';
   } else if (timeframe === 'this week' || timeframe === 'current week') {
     // Start of current week (Monday)
-    const dayOfWeek = now.getDay();
-    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
-    startDate = new Date(now.getFullYear(), now.getMonth(), diff);
+    const dayOfWeek = userLocalTime.getDay();
+    const diff = userLocalTime.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1);
+    startDate = new Date(userLocalTime.getFullYear(), userLocalTime.getMonth(), diff);
     // Current day
-    endDate = now;
+    endDate = userLocalTime;
+    periodName = 'this week';
   } else if (timeframe === 'yesterday') {
     // Yesterday
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 1);
+    startDate = new Date(userLocalTime);
+    startDate.setDate(userLocalTime.getDate() - 1);
     startDate.setHours(0, 0, 0, 0);
     endDate = new Date(startDate);
     endDate.setHours(23, 59, 59, 999);
+    periodName = 'yesterday';
   } else if (timeframe === 'today') {
     // Today
-    startDate = new Date(now);
+    startDate = new Date(userLocalTime);
     startDate.setHours(0, 0, 0, 0);
-    endDate = now;
+    endDate = userLocalTime;
+    periodName = 'today';
   } else if (timeframe === 'last year' || timeframe === 'previous year') {
     // Last year
-    startDate = new Date(now.getFullYear() - 1, 0, 1);
-    endDate = new Date(now.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+    startDate = new Date(userLocalTime.getFullYear() - 1, 0, 1);
+    endDate = new Date(userLocalTime.getFullYear() - 1, 11, 31, 23, 59, 59, 999);
+    periodName = 'last year';
   } else if (timeframe === 'this year' || timeframe === 'current year') {
     // This year
-    startDate = new Date(now.getFullYear(), 0, 1);
-    endDate = now;
+    startDate = new Date(userLocalTime.getFullYear(), 0, 1);
+    endDate = userLocalTime;
+    periodName = 'this year';
   } else {
     // Default to last 30 days if timeframe not recognized
-    startDate = new Date();
-    startDate.setDate(now.getDate() - 30);
+    startDate = new Date(userLocalTime);
+    startDate.setDate(userLocalTime.getDate() - 30);
+    periodName = 'last 30 days';
   }
 
+  console.log(`Date range for "${timeframe}" calculated as: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+  
   return {
     startDate: startDate.toISOString(),
-    endDate: endDate.toISOString()
+    endDate: endDate.toISOString(),
+    periodName
   };
 }
 
@@ -364,7 +380,7 @@ async function classifyQuery(query: string, conversationContext: any[] = []) {
 }
 
 // Step 2: Query Planning with GPT - Updated for simplified strategies and flexible filters
-async function createQueryPlan(query: string, userId: string, conversationContext: any[] = []) {
+async function createQueryPlan(query: string, userId: string, conversationContext: any[] = [], timezoneOffsetMinutes: number = 0) {
   try {
     const entryCount = await countJournalEntries(userId);
     
@@ -420,6 +436,12 @@ async function createQueryPlan(query: string, userId: string, conversationContex
       ? `\n\nRecent entities mentioned in journal:\n${JSON.stringify(entityData.recent.slice(0, 20), null, 2)}`
       : '';
     
+    // Add information about timezone handling
+    const timezoneInfo = `
+    IMPORTANT: The user's timezone offset is ${timezoneOffsetMinutes} minutes from UTC.
+    All time-based references (like "last week", "yesterday", etc.) should be calculated in the user's local time.
+    `;
+    
     // Create an enhanced prompt with all the additional information
     const prompt = `You are an expert query analyzer for a personal journal application. Your task is to analyze user queries and create a structured plan for retrieving relevant information from a database.
       
@@ -432,6 +454,8 @@ async function createQueryPlan(query: string, userId: string, conversationContex
       ${recentEntitiesInfo}
       
       ${dataStructuresInfo}
+      
+      ${timezoneInfo}
       
       The user has ${entryCount} journal entries.
       
@@ -493,6 +517,34 @@ async function createQueryPlan(query: string, userId: string, conversationContex
     // Try to parse the response as JSON
     try {
       const plan = JSON.parse(planText);
+      
+      // If the plan contains time references but no date_range, add it based on the timeframe in the query
+      if (!plan.filters?.date_range && /last week|this week|yesterday|today|last month|this month|last year|this year/i.test(query)) {
+        // Extract the timeframe from the query
+        const timeframes = ['last week', 'this week', 'yesterday', 'today', 'last month', 'this month', 'last year', 'this year'];
+        let detectedTimeframe = null;
+        
+        for (const timeframe of timeframes) {
+          if (query.toLowerCase().includes(timeframe)) {
+            detectedTimeframe = timeframe;
+            break;
+          }
+        }
+        
+        if (detectedTimeframe) {
+          if (!plan.filters) plan.filters = {};
+          plan.filters.date_range = getDateRangeForTimeframe(detectedTimeframe, timezoneOffsetMinutes);
+          console.log(`Added date_range filter for detected timeframe "${detectedTimeframe}": `, plan.filters.date_range);
+        }
+      }
+      
+      // Ensure that any date_range timeframes are converted to actual date ranges
+      if (plan.filters?.date_range?.periodName && !plan.filters.date_range.startDate) {
+        const timeframe = plan.filters.date_range.periodName;
+        plan.filters.date_range = getDateRangeForTimeframe(timeframe, timezoneOffsetMinutes);
+        console.log(`Converted timeframe "${timeframe}" to date range:`, plan.filters.date_range);
+      }
+      
       return plan;
     } catch (parseError) {
       console.error("Error parsing query plan:", parseError);
@@ -526,7 +578,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, threadId, conversationContext } = await req.json();
+    const { message, userId, threadId, conversationContext, timezoneOffset } = await req.json();
     
     if (!message) {
       throw new Error("Message is required");
@@ -537,6 +589,12 @@ serve(async (req) => {
     }
     
     console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
+    console.log(`User timezone offset: ${timezoneOffset} minutes`);
+    
+    // Convert timezoneOffset from string to number if needed
+    const timezoneOffsetMinutes = typeof timezoneOffset === 'string' 
+      ? parseInt(timezoneOffset, 10) 
+      : (typeof timezoneOffset === 'number' ? timezoneOffset : 0);
     
     // Step 1: Classify the query
     const queryType = await classifyQuery(message, conversationContext);
@@ -556,7 +614,7 @@ serve(async (req) => {
     }
     
     // Step 2: Create a query plan for journal-specific queries
-    const queryPlan = await createQueryPlan(message, userId, conversationContext);
+    const queryPlan = await createQueryPlan(message, userId, conversationContext, timezoneOffsetMinutes);
     
     // Return the plan
     return new Response(

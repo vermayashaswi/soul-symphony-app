@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -254,10 +253,10 @@ serve(async (req) => {
     // 2. Search for relevant entries based on the query plan
     console.log("Searching for relevant entries");
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "loading"));
-    
+
     let entries = [];
     const matchCount = queryPlan?.matchCount || 15;
-    
+
     // Handle the search strategy from the query plan
     if (queryPlan) {
       console.log(`Using search strategy: ${queryPlan.searchStrategy}`);
@@ -288,10 +287,10 @@ serve(async (req) => {
       console.log("No query plan provided, using default vector search");
       entries = await searchEntriesWithVector(userId, queryEmbedding, {}, 15);
     }
-    
+
     console.log(`Found ${entries.length} relevant entries`);
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "success", `Found ${entries.length} entries`));
-    
+
     // Check if we found any entries when using date filters
     if (queryPlan?.filters?.dateRange && entries.length === 0) {
       console.log("No entries found for the specified time range");
@@ -502,10 +501,16 @@ async function searchEntriesWithVector(
       const startDate = filters.dateRange.startDate ? new Date(filters.dateRange.startDate) : null;
       const endDate = filters.dateRange.endDate ? new Date(filters.dateRange.endDate) : null;
       
+      console.log(`Applying date filter: ${startDate?.toISOString() || 'none'} to ${endDate?.toISOString() || 'none'}`);
+      
       filteredData = filteredData.filter(entry => {
         const entryDate = new Date(entry.created_at);
-        return (!startDate || entryDate >= startDate) && (!endDate || entryDate <= endDate);
+        const startDateMatch = !startDate || entryDate >= startDate;
+        const endDateMatch = !endDate || entryDate <= endDate;
+        return startDateMatch && endDateMatch;
       });
+      
+      console.log(`After date filtering: ${filteredData.length} entries remain`);
     }
     
     // Get additional data for each entry for further filtering
@@ -627,10 +632,12 @@ async function searchEntriesWithSQL(
     // Apply date range filter
     if (filters.dateRange) {
       if (filters.dateRange.startDate) {
+        console.log(`Adding start date filter: ${filters.dateRange.startDate}`);
         query = query.gte('created_at', filters.dateRange.startDate);
       }
       
       if (filters.dateRange.endDate) {
+        console.log(`Adding end date filter: ${filters.dateRange.endDate}`);
         query = query.lte('created_at', filters.dateRange.endDate);
       }
     }
