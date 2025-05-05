@@ -80,9 +80,41 @@ export function analyzeQueryTypes(query: string): QueryTypes {
                          lowerQuery.includes('top') ||
                          /\d+/.test(lowerQuery); // Contains numbers
   
-  // Detect theme-focused queries
-  const themeWords = ['theme', 'themes', 'topic', 'topics', 'about', 'regarding', 'related to', 'concerning'];
+  // Enhanced theme detection
+  // First check for explicit theme words
+  const themeWords = [
+    'theme', 'themes', 'topic', 'topics', 'about', 'regarding', 'related to', 'concerning',
+    'fitness', 'health', 'exercise', 'workout', 'physical', 'training', 'active', 'fit'
+  ];
   result.isThemeFocused = themeWords.some(word => lowerQuery.includes(word));
+  
+  // Then check for patterns that imply theme focus
+  if (!result.isThemeFocused) {
+    // "Have I been X lately/recently" pattern strongly indicates theme focus
+    const themePatterns = [
+      /have i been (\w+) (lately|recently)/i,
+      /am i (\w+)/i, 
+      /do i (\w+)/i,
+      /how (\w+) (am|are) (i|we|my)/i,
+      /how (is|was) my (\w+)/i,
+      /my (\w+) (is|are|has been)/i
+    ];
+    
+    for (const pattern of themePatterns) {
+      const match = lowerQuery.match(pattern);
+      if (match) {
+        result.isThemeFocused = true;
+        // In some patterns, the theme is captured in the second group
+        if (pattern.toString().includes('how (is|was) my')) {
+          result.theme = match[2];
+        } else {
+          // For other patterns, theme is in the first group
+          result.theme = match[1];
+        }
+        break;
+      }
+    }
+  }
   
   // Identify specific emotions being asked about
   const specificEmotions = ['happy', 'sad', 'angry', 'anxious', 'joy', 'fear', 'happiness', 'excitement', 'boredom', 'frustration', 'hope'];
@@ -93,11 +125,12 @@ export function analyzeQueryTypes(query: string): QueryTypes {
     }
   }
   
-  // Identify specific themes being asked about
-  if (result.isThemeFocused) {
+  // Identify specific themes being asked about if not already found
+  if (!result.theme && result.isThemeFocused) {
     const themeMatches = lowerQuery.match(/about\s+(\w+)/i) || 
                          lowerQuery.match(/regarding\s+(\w+)/i) ||
-                         lowerQuery.match(/related to\s+(\w+)/i);
+                         lowerQuery.match(/related to\s+(\w+)/i) ||
+                         lowerQuery.match(/my\s+(\w+)/i);
     if (themeMatches && themeMatches[1]) {
       result.theme = themeMatches[1];
     }
@@ -123,6 +156,9 @@ export function analyzeQueryTypes(query: string): QueryTypes {
                           lowerQuery.includes('this week') ||
                           lowerQuery.includes('this month') ||
                           lowerQuery.includes('today') ||
+                          lowerQuery.includes('lately') ||
+                          lowerQuery.includes('recently') ||
+                          lowerQuery.includes('of late') ||
                           /\b(january|february|march|april|may|june|july|august|september|october|november|december)\b/.test(lowerQuery) ||
                           /\b(jan|feb|mar|apr|may|jun|jul|aug|sep|sept|oct|nov|dec)\b/.test(lowerQuery);
   
@@ -154,7 +190,10 @@ export function analyzeQueryTypes(query: string): QueryTypes {
                                lowerQuery.includes('usually') ||
                                lowerQuery.includes('typically') ||
                                lowerQuery.includes('often') ||
-                               lowerQuery.includes('most of the time');
+                               lowerQuery.includes('most of the time') ||
+                               lowerQuery.includes('lately') ||
+                               lowerQuery.includes('of late') ||
+                               lowerQuery.includes('recently');
   
   return result;
 }

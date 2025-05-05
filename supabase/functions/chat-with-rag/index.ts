@@ -42,7 +42,14 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, queryTypes, threadId, includeDiagnostics, vectorSearch, isEmotionQuery, isWhyEmotionQuery, isTimePatternQuery, isTemporalQuery, requiresTimeAnalysis, timeRange } = await req.json();
+    const { 
+      message, 
+      userId, 
+      queryTypes, 
+      threadId, 
+      includeDiagnostics, 
+      queryPlan 
+    } = await req.json();
 
     if (!message) {
       throw new Error('Message is required');
@@ -53,8 +60,7 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
-    console.log("Time range received:", timeRange);
-
+    
     // Add this where appropriate in the main request handler:
     const diagnostics = {
       steps: [],
@@ -63,13 +69,23 @@ serve(async (req) => {
       references: []
     };
     
+    // Log the query plan if provided
+    if (queryPlan) {
+      console.log("Using provided query plan:", queryPlan);
+      diagnostics.steps.push(createDiagnosticStep(
+        "Query Plan", 
+        "success", 
+        JSON.stringify(queryPlan)
+      ));
+    }
+    
     // Safely check properties before using them
     const safeQueryTypes = {
-      isEmotionQuery: isEmotionQuery || false,
-      isWhyEmotionQuery: isWhyEmotionQuery || false,
-      isTemporalQuery: isTemporalQuery || false,
-      timeRange: timeRange ? 
-        `${timeRange.startDate || 'unspecified'} to ${timeRange.endDate || 'unspecified'}` : 
+      isEmotionQuery: queryTypes?.isEmotionFocused || false,
+      isWhyEmotionQuery: queryTypes?.isWhyQuestion && queryTypes?.isEmotionFocused || false,
+      isTemporalQuery: queryTypes?.isTemporalQuery || false,
+      timeRange: queryTypes?.timeRange ? 
+        `${queryTypes.timeRange.startDate || 'unspecified'} to ${queryTypes.timeRange.endDate || 'unspecified'}` : 
         "none"
     };
     
@@ -218,7 +234,7 @@ serve(async (req) => {
       );
     }
     
-    // If it's a journal-specific question, continue with the existing RAG flow
+    // If it's a journal-specific question, continue with the enhanced RAG flow
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "loading"));
@@ -251,18 +267,120 @@ serve(async (req) => {
     console.log("Embedding generated successfully");
     diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "success"));
 
-    // 2. Search for relevant entries with proper temporal filtering
+    // 2. Search for relevant entries based on the query plan or types
     console.log("Searching for relevant entries");
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "loading"));
     
-    // Use different search function based on whether we have a time range
     let entries = [];
-    if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-      console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
-      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+    const timeRange = queryTypes?.timeRange;
+    const matchCount = queryPlan?.matchCount || 10;
+    
+    // NEW: Choose search strategy based on query plan
+    if (queryPlan) {
+      console.log(`Using search strategy: ${queryPlan.searchStrategy}`);
+      diagnostics.steps.push(createDiagnosticStep(
+        "Search Strategy", 
+        "success", 
+        `Using ${queryPlan.searchStrategy} strategy`
+      ));
+      
+      switch(queryPlan.searchStrategy) {
+        case 'theme':
+          if (queryPlan.themeTerms && queryPlan.themeTerms.length > 0) {
+            console.log(`Searching by theme terms: ${queryPlan.themeTerms.join(', ')}`);
+            // Use the first theme term for the search
+            const searchResults = await searchEntriesByTheme(
+              userId, 
+              queryPlan.themeTerms[0], 
+              queryEmbedding,
+              timeRange
+            );
+            entries = searchResults;
+          } else {
+            console.log("Falling back to vector search (no theme terms)");
+            entries = await searchEntriesWithVector(userId, queryEmbedding);
+          }
+          break;
+          
+        case 'emotion':
+          if (queryPlan.emotionTerms && queryPlan.emotionTerms.length > 0) {
+            console.log(`Searching by emotion terms: ${queryPlan.emotionTerms.join(', ')}`);
+            // Use the first emotion term for the search
+            const searchResults = await searchEntriesByEmotion(
+              userId, 
+              queryPlan.emotionTerms[0]
+            );
+            entries = searchResults;
+          } else {
+            console.log("Falling back to vector search (no emotion terms)");
+            entries = await searchEntriesWithVector(userId, queryEmbedding);
+          }
+          break;
+          
+        case 'hybrid':
+          console.log("Using hybrid search combining multiple strategies");
+          let allEntries = [];
+          
+          // Get theme-based entries
+          if (queryPlan.themeTerms && queryPlan.themeTerms.length > 0) {
+            for (const theme of queryPlan.themeTerms.slice(0, 2)) { // Limit to top 2 themes
+              const themeEntries = await searchEntriesByTheme(userId, theme, queryEmbedding, timeRange);
+              allEntries = [...allEntries, ...themeEntries];
+            }
+          }
+          
+          // Get emotion-based entries
+          if (queryPlan.emotionTerms && queryPlan.emotionTerms.length > 0) {
+            for (const emotion of queryPlan.emotionTerms.slice(0, 2)) { // Limit to top 2 emotions
+              const emotionEntries = await searchEntriesByEmotion(userId, emotion);
+              allEntries = [...allEntries, ...emotionEntries];
+            }
+          }
+          
+          // Add some vector search results
+          const vectorEntries = timeRange?.startDate || timeRange?.endDate
+            ? await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange)
+            : await searchEntriesWithVector(userId, queryEmbedding);
+          
+          allEntries = [...allEntries, ...vectorEntries];
+          
+          // De-duplicate entries by ID
+          const uniqueIds = new Set();
+          entries = allEntries.filter(entry => {
+            if (uniqueIds.has(entry.id)) return false;
+            uniqueIds.add(entry.id);
+            return true;
+          });
+          
+          // Limit to the requested count
+          entries = entries.slice(0, matchCount);
+          break;
+          
+        case 'time':
+          if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+            console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
+            entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+          } else {
+            console.log("Falling back to standard vector search (no valid time range)");
+            entries = await searchEntriesWithVector(userId, queryEmbedding);
+          }
+          break;
+          
+        case 'vector':
+        default:
+          console.log("Using standard vector search");
+          entries = await searchEntriesWithVector(userId, queryEmbedding);
+          break;
+      }
     } else {
-      console.log("Using standard vector search without time filtering");
-      entries = await searchEntriesWithVector(userId, queryEmbedding);
+      // Legacy behavior - use time-filtered or standard vector search
+      if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+        console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
+        entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+      } else {
+        console.log("Using standard vector search without time filtering");
+        entries = await searchEntriesWithVector(userId, queryEmbedding);
+      }
     }
     
     console.log(`Found ${entries.length} relevant entries`);
@@ -419,7 +537,8 @@ Now generate your thoughtful, emotionally intelligent response:`;
           content: entry.content,
           date: entry.created_at,
           snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
-          similarity: entry.similarity
+          similarity: entry.similarity,
+          themes: entry.master_themes || []
         }))
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -499,5 +618,137 @@ async function searchEntriesWithTimeRange(
   } catch (error) {
     console.error('Error searching entries with time range:', error);
     throw error;
+  }
+}
+
+/**
+ * Search entries by theme with fallback to vector similarity
+ */
+async function searchEntriesByTheme(
+  userId: string,
+  theme: string,
+  queryEmbedding: any[],
+  timeRange?: { startDate?: string; endDate?: string }
+) {
+  try {
+    console.log(`Searching entries by theme "${theme}" for userId: ${userId}`);
+    
+    // First try the theme-specific search function
+    const { data: themeData, error: themeError } = await supabase.rpc(
+      'match_journal_entries_by_theme',
+      {
+        theme_query: theme,
+        user_id_filter: userId,
+        match_threshold: 0.5,
+        match_count: 20,
+        start_date: timeRange?.startDate || null,
+        end_date: timeRange?.endDate || null
+      }
+    );
+    
+    if (themeError) {
+      console.error(`Error in theme search: ${themeError.message}`);
+      throw themeError;
+    }
+    
+    console.log(`Found ${themeData?.length || 0} entries with theme search`);
+    
+    // If theme search returned results, use them
+    if (themeData && themeData.length > 0) {
+      return themeData.map(entry => ({
+        id: entry.id,
+        content: entry.content,
+        created_at: entry.created_at,
+        similarity: entry.similarity,
+        themes: entry.themes
+      }));
+    }
+    
+    // Fallback: try a direct search for the theme in content using the standard vector search
+    console.log(`No theme results, falling back to vector search with theme: ${theme}`);
+    
+    let entries;
+    if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+      entries = await searchEntriesWithTimeRange(userId, queryEmbedding, timeRange);
+    } else {
+      entries = await searchEntriesWithVector(userId, queryEmbedding);
+    }
+    
+    // Filter entries that might contain the theme
+    const themeRegex = new RegExp(`\\b${theme}\\b`, 'i');
+    const filteredEntries = entries.filter(entry => 
+      (entry.content && themeRegex.test(entry.content)) || 
+      (entry.themes && Array.isArray(entry.themes) && entry.themes.some(t => t.toLowerCase().includes(theme.toLowerCase())))
+    );
+    
+    console.log(`Found ${filteredEntries.length} entries with theme in content/themes`);
+    
+    // If we have matches, return them, otherwise return all entries
+    return filteredEntries.length > 0 ? filteredEntries : entries;
+  } catch (error) {
+    console.error('Error searching entries by theme:', error);
+    return [];
+  }
+}
+
+/**
+ * Search entries by emotion
+ */
+async function searchEntriesByEmotion(
+  userId: string,
+  emotion: string
+) {
+  try {
+    console.log(`Searching entries by emotion "${emotion}" for userId: ${userId}`);
+    
+    const { data: emotionData, error: emotionError } = await supabase.rpc(
+      'match_journal_entries_by_emotion',
+      {
+        emotion_name: emotion,
+        user_id_filter: userId,
+        min_score: 0.3,
+        limit_count: 15
+      }
+    );
+    
+    if (emotionError) {
+      console.error(`Error in emotion search: ${emotionError.message}`);
+      
+      // Try alternate emotion search function
+      const { data: altData, error: altError } = await supabase.rpc(
+        'get_entries_by_emotion_term',
+        {
+          emotion_term: emotion,
+          user_id_filter: userId,
+          limit_count: 15
+        }
+      );
+      
+      if (altError) {
+        console.error(`Error in alternate emotion search: ${altError.message}`);
+        return [];
+      }
+      
+      console.log(`Found ${altData?.length || 0} entries with alternate emotion search`);
+      
+      return altData.map(entry => ({
+        id: entry.id,
+        content: entry.content,
+        created_at: entry.created_at,
+        similarity: 1.0 // Default high similarity
+      }));
+    }
+    
+    console.log(`Found ${emotionData?.length || 0} entries with emotion search`);
+    
+    return emotionData.map(entry => ({
+      id: entry.id,
+      content: entry.content,
+      created_at: entry.created_at,
+      similarity: entry.emotion_score || 1.0
+    }));
+  } catch (error) {
+    console.error('Error searching entries by emotion:', error);
+    return [];
   }
 }

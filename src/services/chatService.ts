@@ -1,5 +1,5 @@
-
 import { supabase } from "@/integrations/supabase/client";
+import { createQueryPlan } from "./chat/queryPlannerService";
 
 export type ChatMessage = {
   role: string;
@@ -46,9 +46,13 @@ export const processChatMessage = async (
     // We'll pass the message ID once we get it from the chat_messages table
     await logUserQuery(userId, message, threadId);
     
+    // Use the new query planner to determine the best search strategy
+    const queryPlan = createQueryPlan(message);
+    console.log("Generated query plan:", queryPlan);
+    
     // Use fixed parameters for vector search - let the retriever handle the filtering
     const matchThreshold = 0.5;
-    const matchCount = 10; // Fixed count, let the retriever determine the actual number
+    const matchCount = queryPlan.matchCount || 10;
     
     console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
     
@@ -342,12 +346,13 @@ export const processChatMessage = async (
       });
     }
     
-    // Call the Supabase Edge Function with fixed vector search parameters
+    // Call the Supabase Edge Function with the query plan
     const { data, error } = await supabase.functions.invoke('chat-with-rag', {
       body: {
         message,
         userId,
         queryTypes: queryTypes || {},
+        queryPlan, // Pass the query plan to the edge function
         threadId, // Ensure threadId is passed for maintaining conversational context
         includeDiagnostics: enableDiagnostics,
         vectorSearch: {
@@ -426,13 +431,10 @@ export const processChatMessage = async (
 
     return chatResponse;
   } catch (error) {
-    console.error("Error in processChatMessage:", error);
+    console.error("Error processing chat message:", error);
     return {
       role: "error",
-      content: `I'm having trouble with the chat service. ${error instanceof Error ? error.message : "Please try again later."}`,
-      diagnostics: enableDiagnostics ? { 
-        steps: [{ name: "Chat Service Error", status: "error", details: error instanceof Error ? error.message : String(error) }]
-      } : undefined
+      content: `I encountered an unexpected error. Please try again or rephrase your question. Technical details: ${error.message}`
     };
   }
 };
