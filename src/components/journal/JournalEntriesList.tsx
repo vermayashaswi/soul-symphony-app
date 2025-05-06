@@ -7,10 +7,6 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import EmptyJournalState from './EmptyJournalState';
 
-interface EmptyJournalStateProps {
-  onStartRecording: () => void;
-}
-
 interface JournalEntriesListProps {
   entries: JournalEntry[];
   loading: boolean;
@@ -22,6 +18,7 @@ interface JournalEntriesListProps {
   processingEntries?: any[];
   processedEntryIds?: number[];
   onStartRecording?: () => void;
+  isProcessingFirstEntry?: boolean;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
@@ -34,7 +31,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   onDeleteEntry,
   onStartRecording = () => {},
   processingEntries = [],
-  processedEntryIds = []
+  processedEntryIds = [],
+  isProcessingFirstEntry = false
 }) => {
   if (loading && entries.length === 0) {
     return (
@@ -47,7 +45,10 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   }
 
   if (!loading && entries.length === 0) {
-    return <EmptyJournalState onStartRecording={onStartRecording} />;
+    return <EmptyJournalState 
+      onStartRecording={onStartRecording}
+      isProcessingFirstEntry={isProcessingFirstEntry} 
+    />;
   }
 
   const handleDeleteEntry = async (id: number) => {

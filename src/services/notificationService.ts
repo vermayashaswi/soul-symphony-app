@@ -20,6 +20,9 @@ let toastCleanupInProgress = false;
 let cleanupAttempts = 0;
 const MAX_CLEANUP_ATTEMPTS = 3;
 
+// Track special states like first-time user journaling
+let globalToastLockState = false;
+
 // Clear all toast timeouts when needed
 const clearToastTimeouts = () => {
   try {
@@ -38,6 +41,12 @@ export const showToast = (
   type: "default" | "success" | "error" | "info" | "warning" = "default",
   isActiveJob = false
 ) => {
+  // Skip if there's an active global lock
+  if (globalToastLockState) {
+    console.log(`[NotificationService] Toast operations locked globally, skipping toast: ${type}-${message}`);
+    return;
+  }
+
   // Deduplicate identical messages that might be in flight
   const messageKey = `${type}-${message}`;
   if (activeToasts.has(messageKey)) {
@@ -136,6 +145,11 @@ export const showToast = (
 
 // Clear a specific toast
 export const clearToast = (toastId: string | number) => {
+  if (globalToastLockState) {
+    console.log(`[NotificationService] Toast operations locked globally, skipping clear for: ${toastId}`);
+    return;
+  }
+  
   if (toastId) {
     console.log(`[NotificationService] Clearing toast: ${toastId}`);
     try {
@@ -144,6 +158,17 @@ export const clearToast = (toastId: string | number) => {
       console.warn(`[NotificationService] Error dismissing toast ${toastId}:`, e);
     }
   }
+};
+
+// Set global toast lock state
+export const setGlobalToastLock = (locked: boolean) => {
+  console.log(`[NotificationService] Setting global toast lock to: ${locked}`);
+  globalToastLockState = locked;
+};
+
+// Get current global toast lock state
+export const getGlobalToastLock = (): boolean => {
+  return globalToastLockState;
 };
 
 // Safe DOM element removal with thorough checks
@@ -185,6 +210,12 @@ const findToastContainers = (): Element[] => {
 
 // Enhanced aggressive toast clearing function with DOM node existence checks
 export const clearAllToasts = (): Promise<boolean> => {
+  // Skip if there's a global lock active
+  if (globalToastLockState) {
+    console.log('[NotificationService] Toast operations locked globally, skipping clearAllToasts');
+    return Promise.resolve(false);
+  }
+
   // If a cleanup is already in progress, return the existing promise
   if (toastCleanupInProgress) {
     console.log('[NotificationService] Toast cleanup already in progress, deferring request');
@@ -289,6 +320,12 @@ export const clearAllToasts = (): Promise<boolean> => {
 
 // Function to ensure toasts are completely cleared through multiple attempts
 export const ensureAllToastsCleared = async (): Promise<boolean> => {
+  // Skip if there's a global lock active
+  if (globalToastLockState) {
+    console.log('[NotificationService] Toast operations locked globally, skipping ensureAllToastsCleared');
+    return Promise.resolve(false);
+  }
+  
   console.log('[NotificationService] Ensuring all toasts are completely cleared');
   
   // Reset cleanup attempts counter
@@ -500,7 +537,9 @@ export const initializeCapacitorNotifications = async (): Promise<void> => {
 // Clean up function to be called when components unmount
 export const cleanupNotifications = () => {
   console.log('[NotificationService] Cleaning up notifications');
-  clearAllToasts();
+  if (!globalToastLockState) {
+    clearAllToasts();
+  }
   clearToastTimeouts();
   activeToasts.clear();
   toastCleanupInProgress = false;
