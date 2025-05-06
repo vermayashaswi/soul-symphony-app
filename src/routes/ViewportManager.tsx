@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
-import MobileNavigation from '@/components/MobileNavigation';
+import MobileNavigationWrapper from '@/components/tutorial/MobileNavigationWrapper';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
 
@@ -29,7 +29,7 @@ const ViewportManager: React.FC = () => {
       
       {/* Display mobile navigation ONLY on actual app routes AND when user is logged in */}
       {isAppRoute(location.pathname) && user && (
-        <MobileNavigation onboardingComplete={onboardingComplete} />
+        <MobileNavigationWrapper onboardingComplete={onboardingComplete} />
       )}
     </>
   );

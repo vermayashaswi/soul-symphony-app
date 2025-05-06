@@ -217,7 +217,9 @@ const Home = () => {
                 </div>
               </motion.div>
               <div className="ml-2 relative z-[1000] pointer-events-auto">
-                <LanguageSelector />
+                <div id="language-selector">
+                  <LanguageSelector />
+                </div>
               </div>
             </div>
           </div>
@@ -246,6 +248,7 @@ const Home = () => {
           }}
         />
         <motion.button
+          id="home-journal-arrow" // Add this ID for the tutorial
           onClick={navigateToJournal}
           className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20"
           whileHover={{ scale: 1.1 }}
