@@ -10,29 +10,23 @@ import { LanguageBackground } from "@/components/voice-recorder/MultilingualText
 import { getAudioConfig, getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
 
 interface VoiceRecordingButtonProps {
-  isLoading?: boolean;
-  isRecording?: boolean;
-  recordingTime?: number;
-  onStartRecording?: () => void;
-  onStopRecording?: (blob: Blob) => void;
-  onTranscriptionComplete?: (transcription: string) => void;
+  isLoading: boolean;
+  isRecording: boolean;
+  recordingTime: number;
+  onStartRecording: () => void;
+  onStopRecording: (blob: Blob) => void;
   size?: "default" | "sm" | "lg" | "icon";
-  variant?: string;
   className?: string;
-  disabled?: boolean;
 }
 
 const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
-  isLoading = false,
-  isRecording = false,
-  recordingTime = 0,
-  onStartRecording = () => {},
-  onStopRecording = () => {},
-  onTranscriptionComplete,
+  isLoading,
+  isRecording,
+  recordingTime,
+  onStartRecording,
+  onStopRecording,
   size = "icon",
-  variant = "default",
-  className,
-  disabled = false
+  className
 }) => {
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
@@ -122,42 +116,24 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   
   const handleVoiceRecording = () => {
     if (isRecording && recorder) {
+      console.log("[VoiceRecordingButton] Stopping recording");
       recorder.stopRecording(() => {
-        try {
-          const blob = recorder.getBlob();
-          console.log("[VoiceRecordingButton] Recording stopped, blob created:", {
-            size: blob.size,
-            type: blob.type,
-            duration: (blob as any).duration || 'unknown'
-          });
-          
-          // Verify the blob is valid
-          if (blob.size < 100) {
-            throw new Error("Recording produced an empty or invalid audio file");
-          }
-          
-          // Add duration property to blob if missing
-          if (!('duration' in blob)) {
-            try {
-              Object.defineProperty(blob, 'duration', {
-                value: recordingTime / 1000, // Convert ms to seconds
-                writable: false
-              });
-              console.log("[VoiceRecordingButton] Added duration property to blob:", recordingTime / 1000);
-            } catch (err) {
-              console.warn("[VoiceRecordingButton] Could not add duration to blob:", err);
-            }
-          }
-          
-          onStopRecording(blob);
-        } catch (error) {
-          console.error("[VoiceRecordingButton] Error getting blob:", error);
-          toast({
-            title: "Recording error",
-            description: "Could not process the recording. Please try again.",
-            variant: "destructive"
-          });
+        const blob = recorder.getBlob();
+        console.log("[VoiceRecordingButton] Recording stopped, blob size:", blob.size);
+        
+        // Add duration to blob for better processing
+        Object.defineProperty(blob, 'duration', {
+          value: recordingTime
+        });
+        
+        onStopRecording(blob);
+        
+        if (stream) {
+          stream.getTracks().forEach(track => track.stop());
+          setStream(null);
         }
+        
+        setRecorder(null);
       });
     } else {
       console.log("[VoiceRecordingButton] Starting recording");

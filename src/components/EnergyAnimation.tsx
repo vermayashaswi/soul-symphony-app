@@ -20,7 +20,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
   // Determine the base color to use based on the user's selected theme
   const getThemeColors = () => {
     switch(colorTheme) {
-      case 'purple':
+      case 'Calm':
         return {
           main: 'rgba(139,92,246,0.6)',
           secondary: 'rgba(124,58,237,0.4)',
@@ -28,7 +28,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           pulse: 'rgba(139,92,246,0.8)',
           light: 'rgba(186,230,253,0.5)'
         };
-      case 'orange':
+      case 'Energy':
         return {
           main: 'rgba(245,158,11,0.6)',
           secondary: 'rgba(234,88,12,0.4)',
@@ -36,7 +36,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           pulse: 'rgba(245,158,11,0.8)',
           light: 'rgba(254,240,138,0.5)'
         };
-      case 'pink':
+      case 'Soothing':
         return {
           main: 'rgba(255,222,226,0.6)',
           secondary: 'rgba(248,180,184,0.4)',
@@ -44,7 +44,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           pulse: 'rgba(244,114,182,0.8)',
           light: 'rgba(253,242,248,0.5)'
         };
-      case 'green':
+      case 'Focus':
         return {
           main: 'rgba(16,185,129,0.6)',
           secondary: 'rgba(5,150,105,0.4)',
@@ -52,7 +52,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           pulse: 'rgba(16,185,129,0.8)',
           light: 'rgba(209,250,229,0.5)'
         };
-      case 'teal':
+      case 'Custom':
         // For custom color, we need to convert hex to rgba
         const hexToRgba = (hex: string, alpha: number): string => {
           const r = parseInt(hex.slice(1, 3), 16);
@@ -68,7 +68,7 @@ const EnergyAnimation: React.FC<EnergyAnimationProps> = ({
           pulse: hexToRgba(customColor, 0.8),
           light: 'rgba(255,255,255,0.5)' // Default light for custom
         };
-      default: // Default case - blue theme
+      default: // Default case - including the 'Default' theme which is blue
         return {
           main: 'rgba(59,130,246,0.6)',
           secondary: 'rgba(37,99,235,0.4)',

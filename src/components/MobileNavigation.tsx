@@ -80,11 +80,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }
   
   const navItems = [
-    { path: '/app/home', icon: Home, label: 'Home', id: 'nav-home' },
-    { path: '/app/journal', icon: BookOpen, label: 'Journal', id: 'nav-journal' },
-    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat', id: 'nav-chat' },
-    { path: '/app/insights', icon: BarChart2, label: 'Insights', id: 'nav-insights' },
-    { path: '/app/settings', icon: Settings, label: 'Settings', id: 'nav-settings' },
+    { path: '/app/home', icon: Home, label: 'Home' },
+    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
+    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
+    { path: '/app/insights', icon: BarChart2, label: 'Insights' },
+    { path: '/app/settings', icon: Settings, label: 'Settings' },
   ];
 
   const getActiveStatus = (path: string) => {
@@ -94,8 +94,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   return (
     <motion.div 
       className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted"
-      id="mobile-navigation"
-      data-tutorial="mobile-navigation"
       style={{
         zIndex: 9999, // Increased z-index to ensure it stays above other elements
         paddingTop: '0.40rem',
@@ -114,8 +112,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
             <Link
               key={item.path}
               to={item.path}
-              id={item.id}
-              data-tutorial={item.id}
               className={cn(
                 "flex flex-col items-center py-1 transition-colors",
                 isActive 

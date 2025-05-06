@@ -30,22 +30,18 @@ const JournalSummaryCard: React.FC = () => {
 
   const getThemeColorHex = (): string => {
     switch (colorTheme) {
-      case 'blue':
+      case 'Default':
         return '#3b82f6';
-      case 'purple':
+      case 'Calm':
         return '#8b5cf6';
-      case 'pink':
+      case 'Soothing':
         return '#FFDEE2';
-      case 'orange':
+      case 'Energy':
         return '#f59e0b';
-      case 'green':
+      case 'Focus':
         return '#10b981';
-      case 'teal':
+      case 'Custom':
         return customColor;
-      case 'red':
-        return '#ef4444';
-      case 'indigo':
-        return '#6366f1';
       default:
         return '#3b82f6';
     }
