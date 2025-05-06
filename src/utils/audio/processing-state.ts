@@ -11,6 +11,56 @@ let lastUpdate: number = 0;
 let lastDispatchTime: number = 0;
 const MIN_DISPATCH_INTERVAL = 50; // minimum ms between dispatches
 
+// Additional state variables
+let processingLock = false;
+let isEntryBeingProcessed = false;
+let processingTimeoutId: NodeJS.Timeout | null = null;
+let hasPreviousEntries = false;
+
+// Processing lock state management
+export function setProcessingLock(value: boolean): void {
+  processingLock = value;
+}
+
+export function getProcessingLock(): boolean {
+  return processingLock;
+}
+
+// Entry processing state management
+export function setIsEntryBeingProcessed(value: boolean): void {
+  isEntryBeingProcessed = value;
+}
+
+export function getIsEntryBeingProcessed(): boolean {
+  return isEntryBeingProcessed;
+}
+
+// Previous entries state management
+export function setHasPreviousEntries(value: boolean): void {
+  hasPreviousEntries = value;
+}
+
+export function getHasPreviousEntries(): boolean {
+  return hasPreviousEntries;
+}
+
+// Timeout management
+export function setProcessingTimeoutId(timeoutId: NodeJS.Timeout | null): void {
+  if (processingTimeoutId) {
+    clearTimeout(processingTimeoutId);
+  }
+  processingTimeoutId = timeoutId;
+}
+
+export function getProcessingTimeoutId(): NodeJS.Timeout | null {
+  return processingTimeoutId;
+}
+
+// Processing entries state management
+export function getProcessingEntries(): string[] {
+  return [...processingEntries];
+}
+
 // Add or remove an entry from processing state
 export function updateProcessingEntries(
   entryId: string | number,

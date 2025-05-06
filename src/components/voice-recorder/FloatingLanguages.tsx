@@ -1,12 +1,40 @@
 
 import React, { useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { MultilingualTextProps, getLanguageSettings } from './MultilingualTextAnimation';
 
 interface FloatingLanguagesProps {
   size?: 'sm' | 'md' | 'lg';
   contained?: boolean;
 }
+
+// Define the languages array directly here instead of importing
+const languages = [
+  "Speak in any language!!",
+  "¡Habla en cualquier idioma!",
+  "Parlez dans n'importe quelle langue !",
+  "Sprechen Sie in jeder Sprache!",
+  "Parli in qualsiasi lingua!",
+  "Fale em qualquer idioma!",
+  "किसी भी भाषा में बोलें!",
+  "أتحدث بأي لغة!",
+  "Praat in enige taal!",
+  "Tala på valfritt språk!",
+  "Snakk på hvilket som helst språk!",
+  "Puhu millä tahansa kielellä!",
+  "Tal på hvilket som helst sprog!",
+  "Berbicara dalam bahasa apa pun!",
+  "任何言語で話してください！",
+  "任何语言都可以说！",
+  "어떤 언어로든 말하세요!",
+  "Mówić w dowolnym języku!",
+  "Mluvte v jakémkoli jazyce!",
+  "พูดได้ทุกภาษา!",
+  "Konuş herhangi bir dilde!",
+  "Beszélj bármilyen nyelven!",
+  "Vorbește în orice limbă!",
+  "Μιλήστε σε οποιαδήποτε γλώσσα!",
+  "Говорите на любом языке!",
+];
 
 export default function FloatingLanguages({ size = 'md', contained = false }: FloatingLanguagesProps) {
   const containerRef = useRef<HTMLDivElement>(null);
@@ -18,7 +46,7 @@ export default function FloatingLanguages({ size = 'md', contained = false }: Fl
   const languageCount = size === 'sm' ? 10 : size === 'md' ? 16 : 24;
   
   // Get language settings
-  const languages = getLanguageSettings().slice(0, languageCount);
+  const visibleLanguages = languages.slice(0, languageCount);
   
   // Cleanup function to prevent memory leaks and DOM errors
   const cleanup = () => {
@@ -73,7 +101,7 @@ export default function FloatingLanguages({ size = 'md', contained = false }: Fl
   };
   
   // Create an animation variant for each language
-  const languageItems = languages.map((lang, i) => {
+  const languageItems = visibleLanguages.map((lang, i) => {
     const position = getRandomPosition(i);
     const scale = 0.6 + Math.random() * 0.4; // Random size between 0.6 and 1.0
     const opacity = 0.7 + Math.random() * 0.3; // Random opacity between 0.7 and 1.0

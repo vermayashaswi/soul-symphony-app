@@ -3,6 +3,7 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
 
+// Define the languages array that will be used throughout the app
 const languages = [
   "Speak in any language!!",
   "¡Habla en cualquier idioma!",
@@ -30,6 +31,17 @@ const languages = [
   "Μιλήστε σε οποιαδήποτε γλώσσα!",
   "Говорите на любом языке!",
 ];
+
+// Export the interface that was missing
+export interface MultilingualTextProps {
+  text?: string;
+  languages?: string[];
+}
+
+// Export the function to get language settings
+export function getLanguageSettings(): string[] {
+  return languages;
+}
 
 export function LanguageBackground({ contained = false }: { contained?: boolean }) {
   const { theme } = useTheme();

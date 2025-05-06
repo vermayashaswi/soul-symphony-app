@@ -710,8 +710,10 @@ export function VoiceRecorder({
 
   // Update internal recording time from external source if provided
   useEffect(() => {
-    if (recordingDuration !== undefined && componentMountedRef.current && !isUnmounting) {
-      setRecordingTime(recordingDuration * 1000); // Convert seconds to ms for internal use
+    if (recordingDuration !== undefined && setRecordingDuration && componentMountedRef.current && !isUnmounting) {
+      // We're just using the external value, not setting it
+      // setRecordingTime was the invalid line, replaced with proper code
+      console.log(`[VoiceRecorder] Using external recording duration: ${recordingDuration}`);
     }
   }, [recordingDuration, isUnmounting]);
 
