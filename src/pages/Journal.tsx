@@ -104,7 +104,7 @@ const Journal = () => {
       
       // Ensure we check frequently for the first entry
       const checkInterval = setInterval(() => {
-        if (firstTimeProcessingRef.current) {
+        if (firstTimeProcessingRef.current && componentMounted.current) {
           console.log('[Journal] Checking for first entry completion');
           fetchEntries();
           setRefreshKey(prev => prev + 1);
@@ -126,16 +126,26 @@ const Journal = () => {
       const lockTimer = setTimeout(() => {
         console.log('[Journal] Clearing toast lock after processing');
         setToastLockActive(false);
-      }, 500);
+      }, 1000); // Increased from 500 to 1000 to ensure proper cleanup
       
       return () => clearTimeout(lockTimer);
     }
   }, [isProcessingFirstEntry, toastLockActive]);
-
+  
+  // Update entries management with improved error handling
   useEffect(() => {
     if (entries && entries.length > 0 && !hasLocalChanges) {
       setLocalEntries(entries);
       lastSuccessfulEntriesRef.current = entries;
+      
+      // If we were processing first entry, update state
+      if (isProcessingFirstEntry && entries.length > 0) {
+        console.log('[Journal] First entry processing appears to be complete');
+        setTimeout(() => {
+          setIsProcessingFirstEntry(false);
+          firstTimeProcessingRef.current = false;
+        }, 500);
+      }
     } else if (entries && entries.length > 0) {
       const deletedIds = new Set([...pendingDeletionIds]);
       
@@ -144,9 +154,18 @@ const Journal = () => {
       if (mergedEntries.length > 0) {
         setLocalEntries(mergedEntries);
         lastSuccessfulEntriesRef.current = mergedEntries;
+        
+        // Also check for first entry completion
+        if (isProcessingFirstEntry && mergedEntries.length > 0) {
+          console.log('[Journal] First entry processing appears to be complete (merged entries)');
+          setTimeout(() => {
+            setIsProcessingFirstEntry(false);
+            firstTimeProcessingRef.current = false;
+          }, 500);
+        }
       }
     }
-  }, [entries, hasLocalChanges, pendingDeletionIds]);
+  }, [entries, hasLocalChanges, pendingDeletionIds, isProcessingFirstEntry]);
 
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -661,7 +680,7 @@ const Journal = () => {
       if (!isFirstTimeUser) {
         setTimeout(() => {
           setActiveTab('entries');
-        }, 50);
+        }, 300); // Increased from 50 to 300ms for more reliable tab switch
       } else {
         console.log('[Journal] First-time user recording complete, not switching tabs');
       }
@@ -714,13 +733,17 @@ const Journal = () => {
           }
         }));
         
-        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 10000, 15000];
+        // More frequent polling for the first minute of processing
+        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 10000, 15000, 20000, 30000];
         
+        // Create multiple scheduled fetches to ensure we get updates
         pollIntervals.forEach(interval => {
           setTimeout(() => {
-            console.log(`[Journal] Polling for entry data at ${interval}ms interval`);
-            fetchEntries();
-            setRefreshKey(prev => prev + 1);
+            if (componentMounted.current) {
+              console.log(`[Journal] Polling for entry data at ${interval}ms interval`);
+              fetchEntries();
+              setRefreshKey(prev => prev + 1);
+            }
           }, interval);
         });
         
@@ -762,16 +785,25 @@ const Journal = () => {
               if (firstTimeProcessingRef.current) {
                 setIsProcessingFirstEntry(false);
                 firstTimeProcessingRef.current = false;
+                
+                // For first-time users, switch to entries tab after processing completes
+                if (isFirstTimeUser && activeTab === 'record') {
+                  setTimeout(() => {
+                    setActiveTab('entries');
+                  }, 500);
+                }
               }
               
               // Release toast lock
-              setToastLockActive(false);
+              setTimeout(() => {
+                setToastLockActive(false);
+              }, 500);
               
               return prev.filter(id => id !== tempId);
             }
             return prev;
           });
-        }, 20000);
+        }, 30000); // Increased from 20s to 30s for more reliable handling
       } else {
         console.error('[Journal] Processing failed:', error);
         setProcessingError(error || 'Unknown error occurred');
