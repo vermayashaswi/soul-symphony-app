@@ -1,10 +1,10 @@
+
 import React from 'react';
 import { JournalEntry } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
 import { Loader2 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { EmptyState as SoulnetEmptyState } from '@/components/insights/soulnet/EmptyState';
 import EmptyJournalState from '@/components/journal/EmptyJournalState';
 
 interface JournalEntriesListProps {

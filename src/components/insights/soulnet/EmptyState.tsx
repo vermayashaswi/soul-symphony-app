@@ -4,7 +4,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
 
 interface EmptyStateProps {
-  onStartRecording: () => void; // Make this required since it's being used
+  onStartRecording: () => void;
 }
 
 export const EmptyState = ({ onStartRecording }: EmptyStateProps) => {
