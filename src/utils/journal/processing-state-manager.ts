@@ -1,3 +1,4 @@
+
 import { Subject } from 'rxjs';
 
 export enum EntryProcessingState {
@@ -19,12 +20,13 @@ class ProcessingStateManager {
   private entries: ProcessingEntry[] = [];
   private entriesSubject = new Subject<ProcessingEntry[]>();
   private localStorageKey = 'journal_processing_entries';
+  private cleanupInterval: ReturnType<typeof setInterval> | null = null;
   
   constructor() {
     this.restoreFromLocalStorage();
     
     // Add cleanup interval to prevent stale entries
-    setInterval(() => this.cleanupStaleEntries(), 60000); // Run every minute
+    this.cleanupInterval = setInterval(() => this.cleanupStaleEntries(), 60000); // Run every minute
   }
   
   // Get all processing entries
@@ -231,6 +233,17 @@ class ProcessingStateManager {
     this.notifySubscribers();
     this.saveToLocalStorage();
     console.log('[ProcessingStateManager] Cleared all entries');
+  }
+
+  // Add dispose method to clean up resources
+  dispose(): void {
+    if (this.cleanupInterval) {
+      clearInterval(this.cleanupInterval);
+      this.cleanupInterval = null;
+    }
+    
+    this.entriesSubject.complete();
+    console.log('[ProcessingStateManager] Disposed resources');
   }
 }
 

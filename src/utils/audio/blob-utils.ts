@@ -49,3 +49,28 @@ export const formatBlobSize = (blob: Blob): string => {
   if (size < 1024 * 1024) return `${(size / 1024).toFixed(1)} KB`;
   return `${(size / (1024 * 1024)).toFixed(1)} MB`;
 };
+
+// Validate an audio blob
+export const validateAudioBlob = (blob: Blob | null): { isValid: boolean; errorMessage?: string } => {
+  if (!blob) {
+    return { isValid: false, errorMessage: 'No audio data available' };
+  }
+  
+  if (blob.size < 100) {
+    return { isValid: false, errorMessage: 'Audio data is too small or empty' };
+  }
+  
+  return { isValid: true };
+};
+
+// Normalize an audio blob (ensure consistent format and properties)
+export const normalizeAudioBlob = async (blob: Blob): Promise<Blob> => {
+  if (!blob) {
+    throw new Error('No audio blob to normalize');
+  }
+  
+  // For now, we just return the same blob
+  // In a real implementation, you might convert to a standard format
+  
+  return blob;
+};

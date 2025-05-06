@@ -1,4 +1,3 @@
-
 /**
  * Audio recording validation utilities
  */
@@ -11,7 +10,7 @@ import {
   getProcessingTimeoutId,
   updateProcessingEntries
 } from './processing-state';
-import { validateAudioBlob } from './blob-utils';
+import { validateAudioBlob } from '@/utils/audio/blob-utils';
 
 /**
  * Validates the initial state before audio processing

@@ -104,7 +104,7 @@ const Journal = () => {
       
       // Ensure we check frequently for the first entry
       const checkInterval = setInterval(() => {
-        if (firstTimeProcessingRef.current && componentMounted.current) {
+        if (firstTimeProcessingRef.current && componentMountedRef.current) {
           console.log('[Journal] Checking for first entry completion');
           fetchEntries();
           setRefreshKey(prev => prev + 1);
@@ -257,7 +257,7 @@ const Journal = () => {
           const fetchIntervals = [500, 1500, 3000];
           fetchIntervals.forEach(interval => {
             setTimeout(() => {
-              if (componentMounted.current) {
+              if (componentMountedRef.current) {
                 console.log(`[Journal] Scheduled fetch at ${interval}ms after mapping`);
                 fetchEntries();
                 setRefreshKey(prev => prev + 1);
@@ -268,13 +268,13 @@ const Journal = () => {
       }
     };
     
-    const componentMounted = { current: true };
+    const componentMountedRef = useRef(true);
     
     window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
     window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     
     return () => {
-      componentMounted.current = false;
+      componentMountedRef.current = false;
       window.removeEventListener('error', handleError);
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
@@ -739,7 +739,7 @@ const Journal = () => {
         // Create multiple scheduled fetches to ensure we get updates
         pollIntervals.forEach(interval => {
           setTimeout(() => {
-            if (componentMounted.current) {
+            if (componentMountedRef.current) {
               console.log(`[Journal] Polling for entry data at ${interval}ms interval`);
               fetchEntries();
               setRefreshKey(prev => prev + 1);
