@@ -327,9 +327,10 @@ export const ensureAllToastsCleared = async (): Promise<boolean> => {
             // One final attempt with very conservative approach
             for (const toast of remainingToasts) {
               try {
-                // Add animation to fade out
-                toast.style.opacity = '0';
-                toast.style.transition = 'opacity 0.3s ease';
+                // Add animation to fade out - with proper type casting
+                const toastElement = toast as HTMLElement;
+                toastElement.style.opacity = '0';
+                toastElement.style.transition = 'opacity 0.3s ease';
                 
                 // Remove after animation
                 setTimeout(() => {

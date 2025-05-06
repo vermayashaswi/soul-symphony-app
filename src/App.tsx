@@ -8,6 +8,16 @@ import { TranslationLoadingOverlay } from '@/components/translation/TranslationL
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import './styles/emoji.css';
 
+// Add type declaration for the toast property on Window
+declare global {
+  interface Window {
+    toast?: {
+      dismiss: (...args: any[]) => any;
+      [key: string]: any;
+    };
+  }
+}
+
 // Add a global error boundary for toast operations
 if (typeof window !== 'undefined') {
   // Override toast dismiss method with error handling
