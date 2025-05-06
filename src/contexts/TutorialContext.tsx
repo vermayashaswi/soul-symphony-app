@@ -1,3 +1,4 @@
+
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -194,7 +195,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       isAppRoute(location.pathname) && // Must be on an app route
       !isTutorialCompleted && // Tutorial not completed
       !isActive && // Tutorial not already active
-      location.pathname === '/app' || location.pathname === '/app/home' // We're on the main app route or home
+      (location.pathname === '/app' || location.pathname === '/app/home') // We're on the main app route or home
     ) {
       // Start tutorial with slight delay to ensure the UI is ready
       setTimeout(() => {

@@ -15,6 +15,7 @@ import { toast } from 'sonner';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import WelcomeElement from '@/components/tutorial/WelcomeElement';
+import FloatingThemeStrips from '@/components/home/FloatingThemeStrips';
 
 const Home = () => {
   const { user } = useAuth();
@@ -24,6 +25,7 @@ const Home = () => {
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [journalLabel, setJournalLabel] = useState("Journal");
   const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
+  const [themesData, setThemesData] = useState<any[]>([]);
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
@@ -65,6 +67,27 @@ const Home = () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
   }, [translate]);
+
+  // Fetch sample themes data for demo
+  useEffect(() => {
+    const fetchThemes = async () => {
+      try {
+        // Sample themes data for FloatingThemeStrips
+        setThemesData([
+          { theme: "Personal Growth", sentiment: 0.8 },
+          { theme: "Relaxation", sentiment: 0.6 },
+          { theme: "Mindfulness", sentiment: 0.7 },
+          { theme: "Productivity", sentiment: 0.5 },
+          { theme: "Creativity", sentiment: 0.9 },
+          { theme: "Balance", sentiment: 0.7 }
+        ]);
+      } catch (error) {
+        console.error("Error fetching themes data:", error);
+      }
+    };
+    
+    fetchThemes();
+  }, []);
 
   useEffect(() => {
     const preloadImage = new Image();
@@ -182,6 +205,11 @@ const Home = () => {
       {/* Background Animation */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
+      </div>
+
+      {/* Floating Theme Strips */}
+      <div className="absolute inset-0 z-10 pointer-events-none">
+        <FloatingThemeStrips themesData={themesData} themeColor={colorTheme} />
       </div>
 
       {/* Preload Image */}
