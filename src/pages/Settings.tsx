@@ -46,7 +46,7 @@ const Settings = () => {
       try {
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, avatar_url, settings')
+          .select('*')
           .eq('id', user.id)
           .single();
           
@@ -56,13 +56,14 @@ const Settings = () => {
         }
         
         if (data) {
-          setUsername(data.display_name || '');
-          setProfileImageUrl(data.avatar_url);
+          // Safely access properties using optional chaining
+          setUsername(data.display_name || data.full_name || '');
+          setProfileImageUrl(data.avatar_url || null);
           
-          // Load settings
+          // Check if settings property exists before accessing its properties
           if (data.settings) {
-            if (data.settings.batch_size) {
-              setBatchSize(data.settings.batch_size);
+            if (typeof data.settings === 'object' && data.settings !== null) {
+              setBatchSize(data.settings.batch_size || 10);
             }
           }
         }
@@ -92,14 +93,30 @@ const Settings = () => {
     try {
       setIsLoading(true);
       
+      // First check if 'settings' column exists in profiles table
+      const { data: columnCheck, error: columnError } = await supabase
+        .rpc('check_table_columns', { table_name: 'profiles' });
+      
+      if (columnError) {
+        console.error('Error checking columns:', columnError);
+        throw columnError;
+      }
+      
+      // Find if settings column exists
+      const hasSettingsColumn = columnCheck.some(col => col.column_name === 'settings');
+      
+      let updateData: Record<string, any> = {
+        updated_at: new Date().toISOString()
+      };
+      
+      // Only include settings if the column exists
+      if (hasSettingsColumn) {
+        updateData.settings = { batch_size: batchSize };
+      }
+      
       const { error } = await supabase
         .from('profiles')
-        .update({
-          settings: { 
-            batch_size: batchSize
-          },
-          updated_at: new Date().toISOString()
-        })
+        .update(updateData)
         .eq('id', user.id);
         
       if (error) throw error;

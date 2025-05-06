@@ -32,7 +32,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   isLoadingMore,
   onEntryDeleted,
   onDeleteEntry,
-  onStartRecording = () => {}
+  onStartRecording = () => {},
+  processingEntries = [],
+  processedEntryIds = []
 }) => {
   if (loading && entries.length === 0) {
     return (
@@ -48,14 +50,14 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 
-  const handleDeleteEntry = (id: number) => {
+  const handleDeleteEntry = async (id: number) => {
     if (onEntryDeleted) {
       onEntryDeleted(id);
       return;
     }
     
     if (onDeleteEntry) {
-      onDeleteEntry(id);
+      await onDeleteEntry(id);
     }
   };
 
