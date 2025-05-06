@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -914,8 +913,9 @@ const Journal = () => {
         setDeletingEntryId(null);
       }
       
+      // Fix: Use "Journal Entries" instead of "journal_entries" as the table name
       const { error } = await supabase
-        .from('journal_entries')
+        .from('Journal Entries')
         .delete()
         .eq('id', entryId);
       
@@ -960,8 +960,8 @@ const Journal = () => {
     }
   }, [user?.id, isDeletingEntry, processingEntries, toastIds, fetchEntries, filteredEntries.length]);
 
-  // Define the function to handle searching
-  const handleSearch = useCallback((searchResults: JournalEntry[]) => {
+  // Define the function to handle search results
+  const handleSearchResults = useCallback((searchResults: JournalEntry[]) => {
     setFilteredEntries(searchResults);
   }, []);
 
@@ -1057,7 +1057,6 @@ const Journal = () => {
           <TabsContent value="record" className="mt-2">
             <VoiceRecorder 
               onRecordingComplete={handleRecordingComplete}
-              isRecording={false}
               audioStatus={audioStatus}
               recordingDuration={recordingDuration}
               setRecordingDuration={setRecordingDuration}
@@ -1067,7 +1066,10 @@ const Journal = () => {
           
           <TabsContent value="entries" className="mt-0">
             <div className="mb-4">
-              <JournalSearch onSearch={handleSearch} onClearSearch={clearSearchResults} />
+              <JournalSearch 
+                entries={localEntries} 
+                onSearchResults={handleSearchResults}
+              />
             </div>
             
             <div ref={entriesListRef}>
