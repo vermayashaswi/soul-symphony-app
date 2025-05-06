@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Mic, Loader2 } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { cn } from '@/lib/utils';
-// Import the SoulnetEmptyState component
+// Import the SoulnetEmptyState component but rename it to avoid confusion
 import { EmptyState as SoulnetEmptyState } from '@/components/insights/soulnet/EmptyState';
 
 interface EmptyJournalStateProps {

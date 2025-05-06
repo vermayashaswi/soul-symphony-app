@@ -30,6 +30,12 @@ export const GenericEmptyState: React.FC<GenericEmptyStateProps> = ({
           {buttonText}
         </Button>
       )}
+      
+      {onStartRecording && !onAction && !buttonText && (
+        <Button onClick={onStartRecording}>
+          Start Recording
+        </Button>
+      )}
     </div>
   );
 };
