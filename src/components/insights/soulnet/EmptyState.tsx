@@ -1,12 +1,13 @@
 
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { Button } from '@/components/ui/button';
 
 interface EmptyStateProps {
-  onStartRecording?: () => void; // Add this prop to fix the type error
+  onStartRecording?: () => void; // Make sure this is defined and optional
 }
 
-export const EmptyState = ({ onStartRecording }: EmptyStateProps = {}) => {
+export const EmptyState = ({ onStartRecording }: EmptyStateProps) => {
   return (
     <div className={cn(
       "bg-background rounded-xl shadow-sm border w-full p-6 md:p-8",
@@ -21,6 +22,16 @@ export const EmptyState = ({ onStartRecording }: EmptyStateProps = {}) => {
       <p className="text-muted-foreground text-center max-w-md">
         <TranslatableText text="Add more journal entries to visualize connections between entities and emotions in your journaling." />
       </p>
+      
+      {onStartRecording && (
+        <Button 
+          onClick={onStartRecording}
+          variant="default"
+          className="mt-6"
+        >
+          <TranslatableText text="Start Recording" />
+        </Button>
+      )}
     </div>
   );
 };
