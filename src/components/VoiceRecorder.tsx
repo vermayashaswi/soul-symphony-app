@@ -406,9 +406,9 @@ export function VoiceRecorder({
       }
       
       // Add a small delay to ensure UI has updated
-      await new Promise(resolve => {
+      await new Promise<void>(resolve => {
         const timeoutId = setTimeout(() => {
-          resolve(true);
+          resolve();
           // Remove this timeout from our tracking array when it completes
           timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
         }, 100);
