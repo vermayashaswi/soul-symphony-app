@@ -1,129 +1,118 @@
-import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { Button } from "@/components/ui/button";
+
+import React, { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
+import { useIsMobile } from "@/hooks/use-mobile";
 import { motion } from "framer-motion";
-import { useTranslation } from '@/contexts/TranslationContext';
-import VoiceRecordingButton from './VoiceRecordingButton';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
-  disabled?: boolean;
-  isSending?: boolean;
-  isLoading?: boolean;
-  autoFocus?: boolean;
-  placeholder?: string;
-  className?: string;
+  isLoading: boolean;
   userId?: string;
 }
 
-const ChatInput: React.FC<ChatInputProps> = ({
-  onSendMessage,
-  disabled = false,
-  isSending = false,
-  isLoading = false,
-  autoFocus = false,
-  placeholder = "Your message...",
-  className = "",
+const ChatInput: React.FC<ChatInputProps> = ({ 
+  onSendMessage, 
+  isLoading,
   userId
 }) => {
-  const [message, setMessage] = useState('');
+  const [message, setMessage] = useState("");
+  const isMobile = useIsMobile();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
-  const { translate } = useTranslation();
-  const [translatedPlaceholder, setTranslatedPlaceholder] = useState(placeholder);
-  
+  const inputContainerRef = useRef<HTMLDivElement>(null);
+
+  // Effect to ensure input stays visible
   useEffect(() => {
-    const updatePlaceholder = async () => {
-      if (translate) {
-        try {
-          const result = await translate(placeholder, "en");
-          if (result) {
-            setTranslatedPlaceholder(result);
-          }
-        } catch (err) {
-          console.error("Error translating placeholder:", err);
-        }
+    const ensureInputVisibility = () => {
+      if (inputContainerRef.current) {
+        inputContainerRef.current.style.visibility = 'visible';
+        inputContainerRef.current.style.opacity = '1';
       }
     };
+
+    // Run on initial render and whenever isLoading changes
+    ensureInputVisibility();
+
+    // Also set up an interval to periodically check visibility
+    const visibilityInterval = setInterval(ensureInputVisibility, 500);
     
-    updatePlaceholder();
-  }, [placeholder, translate]);
-  
-  const handleMessageChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
+    return () => {
+      clearInterval(visibilityInterval);
+    };
+  }, [isLoading]);
+
+  const handleSubmit = (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!message.trim()) return;
+    
+    onSendMessage(message);
+    setMessage("");
+
+    // Reset textarea height
+    if (textareaRef.current) {
+      textareaRef.current.style.height = 'auto';
+    }
+  };
+
+  const adjustTextareaHeight = (textarea: HTMLTextAreaElement) => {
+    textarea.style.height = 'auto';
+    textarea.style.height = `${Math.min(textarea.scrollHeight, 120)}px`;
+  };
+
+  const handleTextareaChange = (e: React.ChangeEvent<HTMLTextAreaElement>) => {
     setMessage(e.target.value);
-  };
-
-  const handleSendMessage = useCallback(() => {
-    if (message.trim() && !disabled && !isSending) {
-      onSendMessage(message);
-      setMessage('');
-    }
-  }, [message, disabled, isSending, onSendMessage]);
-
-  const handleKeyDown = (e: React.KeyboardEvent<HTMLTextAreaElement>) => {
-    if (e.key === 'Enter' && !e.shiftKey) {
-      e.preventDefault();
-      handleSendMessage();
-    }
-  };
-
-  useEffect(() => {
-    if (autoFocus && textareaRef.current) {
-      textareaRef.current.focus();
-    }
-  }, [autoFocus]);
-
-  // Add this function to match the component usage in ChatInput
-  const handleVoiceInput = (transcription: string) => {
-    if (transcription && transcription.trim()) {
-      onSendMessage(transcription.trim());
-    }
+    adjustTextareaHeight(e.target);
   };
 
   return (
-    <div className={`flex items-end gap-2 ${className}`} id="chat-input" data-tutorial="chat-input">
-      <div className="flex-grow relative">
-        <Textarea
-          ref={textareaRef}
-          value={message}
-          onChange={handleMessageChange}
-          onKeyDown={handleKeyDown}
-          placeholder={translatedPlaceholder}
-          disabled={disabled || isSending || isLoading}
-          className="min-h-[60px] resize-none pr-10"
-          rows={1}
-        />
-        
-        {/* Voice input button floating inside textarea */}
-        <div className="absolute right-2 bottom-2">
-          <VoiceRecordingButton
-            onTranscriptionComplete={handleVoiceInput}
-            size="sm"
-            variant="ghost"
-            disabled={disabled || isSending || isLoading}
+    <div 
+      className="w-full" 
+      style={{ marginBottom: '5px', position: 'relative', zIndex: 20 }}
+      ref={inputContainerRef}
+    >
+      <form onSubmit={handleSubmit} className="relative flex items-center w-full">
+        <div className="flex items-center w-full relative">
+          <Textarea
+            ref={textareaRef}
+            value={message}
+            onChange={handleTextareaChange}
+            placeholder="Type your message..."
+            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background overflow-hidden"
+            disabled={isLoading}
+            onKeyDown={(e) => {
+              if (e.key === 'Enter' && !e.shiftKey) {
+                e.preventDefault();
+                handleSubmit(e);
+              }
+            }}
+            onFocus={() => {
+              // Only for mobile, ensure the textarea is visible when focused
+              if (isMobile) {
+                setTimeout(() => {
+                  window.scrollTo({
+                    top: document.body.scrollHeight,
+                    behavior: 'smooth'
+                  });
+                  textareaRef.current?.scrollIntoView({ behavior: 'smooth' });
+                }, 300);
+              }
+            }}
           />
         </div>
-      </div>
-      
-      <div>
-        <motion.div
-          whileTap={{ scale: 0.9 }}
-        >
+        
+        <div className="absolute right-2 top-1/2 transform -translate-y-1/2 flex items-center">
           <Button 
-            onClick={handleSendMessage}
-            disabled={!message.trim() || disabled || isSending || isLoading}
-            size="icon"
-            className="h-[60px] w-[60px] rounded-full"
+            type="submit" 
+            size={isMobile ? "sm" : "default"}
+            className="rounded-full h-7 w-7 p-0 bg-primary text-primary-foreground"
+            disabled={isLoading}
           >
-            {isSending || isLoading ? (
-              <div className="h-5 w-5 border-t-2 border-primary-foreground rounded-full animate-spin" />
-            ) : (
-              <Send className="h-5 w-5" />
-            )}
+            <Send className="h-3 w-3" />
           </Button>
-        </motion.div>
-      </div>
+        </div>
+      </form>
     </div>
   );
 };

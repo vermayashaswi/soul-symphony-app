@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -137,7 +138,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.6 }}
         >
-          <div className="flex flex-col gap-2 bg-background/90 p-4 rounded-lg border border-theme-light">
+          <div className="flex flex-col gap-2 bg-background/90 p-4 rounded-lg border border-theme/20">
             <label className="text-sm font-medium text-foreground">
               <TranslatableText text="Preferred Language" forceTranslate={true} />
             </label>
@@ -658,7 +659,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const contentRef = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
-    setColorTheme('purple');
+    setColorTheme('Calm');
   }, [setColorTheme]);
   
   const handleNext = () => {
