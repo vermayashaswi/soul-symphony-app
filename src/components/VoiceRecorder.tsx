@@ -408,11 +408,12 @@ export function VoiceRecorder({
       // Add a small delay to ensure UI has updated
       await new Promise<void>((resolve) => {
         const timeoutId = setTimeout(() => {
-          resolve(); // Fixed: TypeScript requires a void function without arguments
+          resolve();
           
           // Remove this timeout from our tracking array when it completes
           timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
         }, 100);
+        
         // Add to our tracking array for cleanup
         timeoutsRef.current.push(timeoutId);
       });
@@ -680,10 +681,11 @@ export function VoiceRecorder({
     
     await new Promise<void>((resolve) => {
       const timeoutId = setTimeout(() => {
-        resolve(); // Fixed: TypeScript requires a void function without arguments
+        resolve();
         
         timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
       }, 300);
+      
       timeoutsRef.current.push(timeoutId);
     });
     
