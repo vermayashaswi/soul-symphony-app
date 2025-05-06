@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Input } from "@/components/ui/input";
 import { Card, CardContent } from "@/components/ui/card";
-import { JournalEntry } from '@/types/journal';
+import { JournalEntry } from './JournalEntryCard';
 import { Search } from 'lucide-react';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -9,7 +9,7 @@ import { useTranslation } from '@/contexts/TranslationContext';
 
 interface JournalSearchProps {
   entries: JournalEntry[];
-  onSelectEntry?: (entry: JournalEntry) => void; // Made optional
+  onSelectEntry: (entry: JournalEntry) => void;
   onSearchResults: (filteredEntries: JournalEntry[]) => void;
 }
 
@@ -187,9 +187,7 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   };
 
   const handleEntrySelect = (entry: JournalEntry) => {
-    if (onSelectEntry) {
-      onSelectEntry(entry);
-    }
+    onSelectEntry(entry);
   };
 
   const handleFocus = () => {

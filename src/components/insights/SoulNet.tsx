@@ -122,13 +122,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     });
   }, []);
 
-  const handleStartRecording = useCallback(() => {
-    // Navigate to journal recording page or trigger recording functionality
-    console.log('Start recording from SoulNet component');
-    // You can dispatch an event or use a router to navigate to the recording page
-    window.dispatchEvent(new CustomEvent('startRecording', { detail: { source: 'soulnet' } }));
-  }, []);
-
   if (loading) return <LoadingState />;
   if (error) return (
     <div className="bg-background rounded-xl shadow-sm border w-full p-6">
@@ -144,7 +137,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       </button>
     </div>
   );
-  if (graphData.nodes.length === 0) return <EmptyState onStartRecording={handleStartRecording} />;
+  if (graphData.nodes.length === 0) return <EmptyState />;
 
   // Get appropriate instructions based on device type
   const getInstructions = () => {

@@ -9,14 +9,12 @@ import { toast } from 'sonner';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { clearAllToasts, ensureAllToastsCleared } from '@/services/notificationService';
+import { clearAllToasts } from '@/services/notificationService';
 import ErrorBoundary from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
-import { EmptyState } from '@/components/insights/soulnet/EmptyState';
-import PlaceholderEntryManager from '@/components/journal/PlaceholderEntryManager';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -63,13 +61,6 @@ const Journal = () => {
   const lastSuccessfulEntriesRef = useRef<JournalEntry[]>([]);
   const forceUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
-  // New state for first-time users
-  const [isProcessingFirstEntry, setIsProcessingFirstEntry] = useState(false);
-  const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
-  const [toastLockActive, setToastLockActive] = useState(false);
-  const firstTimeProcessingRef = useRef(false);
-  // Add componentMountedRef to fix errors
-  const componentMountedRef = useRef(true);
 
   const { 
     entries, 
@@ -83,83 +74,10 @@ const Journal = () => {
     isProfileChecked
   );
 
-  // Update useEffect to set componentMountedRef to false when unmounting
-  useEffect(() => {
-    // Set to true when mounting
-    componentMountedRef.current = true;
-    
-    return () => {
-      // Set to false when unmounting
-      componentMountedRef.current = false;
-    };
-  }, []);
-
-  // Detect if this is a first-time user (no entries)
-  useEffect(() => {
-    if (!loading && entries.length === 0 && !isFirstTimeUser && user?.id) {
-      console.log('[Journal] First-time user detected (no entries)');
-      setIsFirstTimeUser(true);
-    } else if (entries.length > 0 && isFirstTimeUser) {
-      console.log('[Journal] User now has entries, no longer a first-time user');
-      setIsFirstTimeUser(false);
-      setIsProcessingFirstEntry(false);
-    }
-  }, [loading, entries.length, isFirstTimeUser, user?.id]);
-
-  // Special coordination for first-time users processing their first entry
-  useEffect(() => {
-    if (isFirstTimeUser && processingEntries.length > 0 && !isProcessingFirstEntry) {
-      console.log('[Journal] First-time user is processing first entry');
-      setIsProcessingFirstEntry(true);
-      firstTimeProcessingRef.current = true;
-      
-      // Lock toast operations during first entry processing
-      setToastLockActive(true);
-      
-      // Ensure we check frequently for the first entry
-      const checkInterval = setInterval(() => {
-        if (firstTimeProcessingRef.current && componentMountedRef.current) {
-          console.log('[Journal] Checking for first entry completion');
-          fetchEntries();
-          setRefreshKey(prev => prev + 1);
-        } else {
-          clearInterval(checkInterval);
-        }
-      }, 2000);
-      
-      return () => {
-        clearInterval(checkInterval);
-      };
-    }
-  }, [isFirstTimeUser, processingEntries.length, isProcessingFirstEntry, fetchEntries]);
-
-  // Clear toast lock after processing completes
-  useEffect(() => {
-    if (!isProcessingFirstEntry && toastLockActive) {
-      // Add some delay before clearing the lock
-      const lockTimer = setTimeout(() => {
-        console.log('[Journal] Clearing toast lock after processing');
-        setToastLockActive(false);
-      }, 1000); // Increased from 500 to 1000 to ensure proper cleanup
-      
-      return () => clearTimeout(lockTimer);
-    }
-  }, [isProcessingFirstEntry, toastLockActive]);
-  
-  // Update entries management with improved error handling
   useEffect(() => {
     if (entries && entries.length > 0 && !hasLocalChanges) {
       setLocalEntries(entries);
       lastSuccessfulEntriesRef.current = entries;
-      
-      // If we were processing first entry, update state
-      if (isProcessingFirstEntry && entries.length > 0) {
-        console.log('[Journal] First entry processing appears to be complete');
-        setTimeout(() => {
-          setIsProcessingFirstEntry(false);
-          firstTimeProcessingRef.current = false;
-        }, 500);
-      }
     } else if (entries && entries.length > 0) {
       const deletedIds = new Set([...pendingDeletionIds]);
       
@@ -168,18 +86,9 @@ const Journal = () => {
       if (mergedEntries.length > 0) {
         setLocalEntries(mergedEntries);
         lastSuccessfulEntriesRef.current = mergedEntries;
-        
-        // Also check for first entry completion
-        if (isProcessingFirstEntry && mergedEntries.length > 0) {
-          console.log('[Journal] First entry processing appears to be complete (merged entries)');
-          setTimeout(() => {
-            setIsProcessingFirstEntry(false);
-            firstTimeProcessingRef.current = false;
-          }, 500);
-        }
       }
     }
-  }, [entries, hasLocalChanges, pendingDeletionIds, isProcessingFirstEntry]);
+  }, [entries, hasLocalChanges, pendingDeletionIds]);
 
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -221,11 +130,7 @@ const Journal = () => {
             setProcessingEntries(prev => prev.filter(id => id !== event.detail.tempId));
             
             if (toastIds[event.detail.tempId]) {
-              try {
-                toast.dismiss(toastIds[event.detail.tempId]);
-              } catch (e) {
-                console.warn('[Journal] Error dismissing toast:', e);
-              }
+              toast.dismiss(toastIds[event.detail.tempId]);
               
               setToastIds(prev => {
                 const newToastIds = { ...prev };
@@ -233,45 +138,18 @@ const Journal = () => {
                 return newToastIds;
               });
             }
-            
-            // If this was the first entry for a first-time user
-            if (firstTimeProcessingRef.current) {
-              console.log('[Journal] First entry processing completed');
-              firstTimeProcessingRef.current = false;
-              setIsProcessingFirstEntry(false);
-              
-              // Show success notification after a short delay
-              setTimeout(() => {
-                try {
-                  toast.success('Your first journal entry has been created!', {
-                    duration: 4000,
-                    id: 'first-entry-success-toast',
-                    closeButton: false
-                  });
-                } catch (e) {
-                  console.warn('[Journal] Error showing first entry success toast:', e);
-                }
-              }, 500);
-            }
-          }, 1000);
+          }, 3000);
           
-          // Show success toast unless this is a first-time user (they get a special message)
-          if (!firstTimeProcessingRef.current) {
-            try {
-              toast.success('Journal entry analyzed and saved', {
-                duration: 3000,
-                id: 'journal-success-toast',
-                closeButton: false
-              });
-            } catch (e) {
-              console.warn('[Journal] Error showing success toast:', e);
-            }
-          }
+          toast.success('Journal entry analyzed and saved', {
+            duration: 3000,
+            id: 'journal-success-toast',
+            closeButton: false
+          });
           
           const fetchIntervals = [500, 1500, 3000];
           fetchIntervals.forEach(interval => {
             setTimeout(() => {
-              if (componentMountedRef.current) {
+              if (componentMounted.current) {
                 console.log(`[Journal] Scheduled fetch at ${interval}ms after mapping`);
                 fetchEntries();
                 setRefreshKey(prev => prev + 1);
@@ -282,12 +160,13 @@ const Journal = () => {
       }
     };
     
-    // Using componentMountedRef
+    const componentMounted = { current: true };
+    
     window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
     window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     
     return () => {
-      componentMountedRef.current = false;
+      componentMounted.current = false;
       window.removeEventListener('error', handleError);
       window.removeEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
       window.removeEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
@@ -298,31 +177,19 @@ const Journal = () => {
         clearTimeout(forceUpdateTimerRef.current);
       }
       
-      if (!toastLockActive) {
-        clearAllToasts();
-      }
+      clearAllToasts();
     };
-  }, [processingEntries, toastIds, fetchEntries, deletedProcessingIds, toastLockActive]);
+  }, [processingEntries, toastIds, fetchEntries, deletedProcessingIds]);
 
   useEffect(() => {
-    if (!toastLockActive) {
-      clearAllToasts();
-    } else {
-      console.log('[Journal] Toast clear operation skipped due to active lock');
-    }
+    clearAllToasts();
     
     return () => {
-      if (!toastLockActive) {
-        clearAllToasts();
+      clearAllToasts();
       
-        Object.values(toastIds).forEach(id => {
-          try {
-            if (id) toast.dismiss(id);
-          } catch (e) {
-            console.warn('[Journal] Error dismissing toast during cleanup:', e);
-          }
-        });
-      }
+      Object.values(toastIds).forEach(id => {
+        if (id) toast.dismiss(id);
+      });
       
       if (profileCheckTimeoutId) {
         clearTimeout(profileCheckTimeoutId);
@@ -332,7 +199,7 @@ const Journal = () => {
         clearTimeout(autoRetryTimeoutRef.current);
       }
     };
-  }, [toastLockActive]);
+  }, []);
 
   useEffect(() => {
     if (!loading && entries.length > 0 && isSavingRecording) {
@@ -371,16 +238,12 @@ const Journal = () => {
           
           setProcessedEntryIds(prev => [...prev, ...newEntryIds]);
           
-          if (!newEntryIds.some(id => notifiedEntryIds.has(id)) && !isProcessingFirstEntry) {
-            try {
-              toast.success('Journal entry analyzed and saved', {
-                duration: 3000,
-                id: 'journal-success-toast',
-                closeButton: false
-              });
-            } catch (e) {
-              console.warn('[Journal] Error showing new entries success toast:', e);
-            }
+          if (!newEntryIds.some(id => notifiedEntryIds.has(id))) {
+            toast.success('Journal entry analyzed and saved', {
+              duration: 3000,
+              id: 'journal-success-toast',
+              closeButton: false
+            });
             
             setNotifiedEntryIds(prev => {
               const newSet = new Set(prev);
@@ -394,11 +257,7 @@ const Journal = () => {
             
             connectedProcessingEntries.forEach(tempId => {
               if (toastIds[tempId]) {
-                try {
-                  toast.dismiss(toastIds[tempId]);
-                } catch (e) {
-                  console.warn('[Journal] Error dismissing toast for connected entry:', e);
-                }
+                toast.dismiss(toastIds[tempId]);
               }
             });
             
@@ -423,19 +282,12 @@ const Journal = () => {
           setIsSavingRecording(false);
           setSafeToSwitchTab(true);
           
-          // Switch to entries tab only if not a first-time user
-          if (activeTab === 'record' && !firstTimeProcessingRef.current) {
+          if (activeTab === 'record') {
             setActiveTab('entries');
           }
         }
         
         setEntriesReady(true);
-        
-        // If we were processing first entry, update state
-        if (isProcessingFirstEntry && entries.length > 0) {
-          setIsProcessingFirstEntry(false);
-          firstTimeProcessingRef.current = false;
-        }
       }
       
       previousEntriesRef.current = currentEntryIds;
@@ -444,16 +296,12 @@ const Journal = () => {
         setEntriesReady(true);
       }
     }
-  }, [entries, processingEntries, toastIds, entriesReady, activeTab, fetchEntries, notifiedEntryIds, isProcessingFirstEntry]);
+  }, [entries, processingEntries, toastIds, entriesReady, activeTab, fetchEntries, notifiedEntryIds]);
 
   useEffect(() => {
     return () => {
       Object.values(toastIds).forEach(id => {
-        try {
-          if (id) toast.dismiss(id);
-        } catch (e) {
-          console.warn('[Journal] Error dismissing toast in cleanup:', e);
-        }
+        if (id) toast.dismiss(id);
       });
       
       if (profileCheckTimeoutId) {
@@ -602,7 +450,7 @@ const Journal = () => {
   };
 
   const handleStartRecording = () => {
-    console.log('[Journal] Starting new recording, first-time user:', isFirstTimeUser);
+    console.log('Starting new recording');
     setActiveTab('record');
     setLastAction('Start Recording Tab');
     setProcessingError(null);
@@ -614,14 +462,10 @@ const Journal = () => {
     if (value === 'entries' && !safeToSwitchTab) {
       console.log('[Journal] User attempting to switch to entries while processing');
       
-      try {
-        toast.info('Processing in progress...', { 
-          duration: 2000,
-          closeButton: false
-        });
-      } catch (e) {
-        console.warn('[Journal] Error showing tab change toast:', e);
-      }
+      toast.info('Processing in progress...', { 
+        duration: 2000,
+        closeButton: false
+      });
     }
     
     setTabChangeInProgress(true);
@@ -630,14 +474,10 @@ const Journal = () => {
       if (value === 'entries' && !safeToSwitchTab) {
         console.log('[Journal] User attempting to switch to entries while processing');
         
-        try {
-          toast.info('Processing in progress...', { 
-            duration: 2000,
-            closeButton: false
-          });
-        } catch (e) {
-          console.warn('[Journal] Error showing tab change toast (delayed):', e);
-        }
+        toast.info('Processing in progress...', { 
+          duration: 2000,
+          closeButton: false
+        });
       }
       
       setActiveTab(value);
@@ -661,24 +501,12 @@ const Journal = () => {
     }
     
     try {
-      // Lock toast operations while processing recording
-      setToastLockActive(true);
-      
       await new Promise<void>((resolve) => {
-        try {
+        clearAllToasts();
+        setTimeout(() => {
           clearAllToasts();
-          setTimeout(() => {
-            try {
-              clearAllToasts();
-            } catch(e) {
-              console.warn('[Journal] Error clearing toasts during recording complete:', e);
-            }
-            setTimeout(() => resolve(), 150);
-          }, 50);
-        } catch(e) {
-          console.warn('[Journal] Error in toast clearing sequence:', e);
-          resolve();
-        }
+          setTimeout(() => resolve(), 150);
+        }, 50);
       });
       
       setIsRecordingComplete(true);
@@ -689,38 +517,33 @@ const Journal = () => {
       setSafeToSwitchTab(false);
       setEntriesReady(false);
       
-      // For first-time users, we don't switch tabs immediately
-      if (!isFirstTimeUser) {
-        setTimeout(() => {
-          setActiveTab('entries');
-        }, 300); // Increased from 50 to 300ms for more reliable tab switch
-      } else {
-        console.log('[Journal] First-time user recording complete, not switching tabs');
-      }
+      setTimeout(() => {
+        setActiveTab('entries');
+      }, 50);
       
-      // Create a loading toast with error handling
-      let toastId;
+      const toastId = toast.loading('Processing your journal entry with AI...', {
+        duration: 15000,
+        closeButton: false,
+        onAutoClose: () => {
+          if (toastId) {
+            const updatedToastIds = { ...toastIds };
+            Object.keys(updatedToastIds).forEach(key => {
+              if (updatedToastIds[key] === String(toastId)) {
+                delete updatedToastIds[key];
+              }
+            });
+            setToastIds(updatedToastIds);
+          }
+        }
+      });
       
-      try {
-        toastId = toast.loading('Processing your journal entry with AI...', {
-          duration: 15000,
-          closeButton: false
-        });
-      } catch (e) {
-        console.warn('[Journal] Error showing loading toast:', e);
-      }
-      
-      console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes', 'First time user:', isFirstTimeUser);
+      console.log('[Journal] Starting processing for audio file:', audioBlob.size, 'bytes');
       const { success, tempId, error } = await processRecording(audioBlob, user.id);
       
       if (success && tempId) {
         console.log('[Journal] Processing started with tempId:', tempId);
         setProcessingEntries(prev => [...prev, tempId]);
-        
-        if (toastId) {
-          setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
-        }
-        
+        setToastIds(prev => ({ ...prev, [tempId]: String(toastId) }));
         setLastAction(`Processing Started (${tempId})`);
         
         // Create a temporary processing entry to be displayed while the real one is being processed
@@ -746,17 +569,13 @@ const Journal = () => {
           }
         }));
         
-        // More frequent polling for the first minute of processing
-        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 10000, 15000, 20000, 30000];
+        const pollIntervals = [1000, 2000, 3000, 5000, 8000, 10000, 15000];
         
-        // Create multiple scheduled fetches to ensure we get updates
         pollIntervals.forEach(interval => {
           setTimeout(() => {
-            if (componentMountedRef.current) {
-              console.log(`[Journal] Polling for entry data at ${interval}ms interval`);
-              fetchEntries();
-              setRefreshKey(prev => prev + 1);
-            }
+            console.log(`[Journal] Polling for entry data at ${interval}ms interval`);
+            fetchEntries();
+            setRefreshKey(prev => prev + 1);
           }, interval);
         });
         
@@ -768,16 +587,12 @@ const Journal = () => {
               setLastAction(`Max Processing Time Reached (${tempId})`);
               
               if (toastIds[tempId]) {
-                try {
-                  toast.dismiss(toastIds[tempId]);
-                  
-                  toast.success('Journal entry processed', { 
-                    duration: 3000,
-                    closeButton: false
-                  });
-                } catch (e) {
-                  console.warn('[Journal] Error showing timeout success toast:', e);
-                }
+                toast.dismiss(toastIds[tempId]);
+                
+                toast.success('Journal entry processed', { 
+                  duration: 3000,
+                  closeButton: false
+                });
                 
                 setToastIds(prev => {
                   const newToastIds = { ...prev };
@@ -794,104 +609,50 @@ const Journal = () => {
               setIsSavingRecording(false);
               setSafeToSwitchTab(true);
               
-              // Clear first-time processing state if applicable
-              if (firstTimeProcessingRef.current) {
-                setIsProcessingFirstEntry(false);
-                firstTimeProcessingRef.current = false;
-                
-                // For first-time users, switch to entries tab after processing completes
-                if (isFirstTimeUser && activeTab === 'record') {
-                  setTimeout(() => {
-                    setActiveTab('entries');
-                  }, 500);
-                }
-              }
-              
-              // Release toast lock
-              setTimeout(() => {
-                setToastLockActive(false);
-              }, 500);
-              
               return prev.filter(id => id !== tempId);
             }
             return prev;
           });
-        }, 30000); // Increased from 20s to 30s for more reliable handling
+        }, 20000);
       } else {
         console.error('[Journal] Processing failed:', error);
         setProcessingError(error || 'Unknown error occurred');
         setLastAction(`Processing Failed: ${error || 'Unknown'}`);
         
-        try {
-          if (toastId) {
-            toast.dismiss(toastId);
-          }
-        } catch (e) {
-          console.warn('[Journal] Error dismissing toast after fail:', e);
-        }
+        toast.dismiss(toastId);
         
         await new Promise(resolve => setTimeout(resolve, 150));
         
-        try {
-          toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
-            duration: 3000,
-            closeButton: false
-          });
-        } catch (e) {
-          console.warn('[Journal] Error showing error toast:', e);
-        }
+        toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
+          duration: 3000,
+          closeButton: false
+        });
         
         setIsRecordingComplete(false);
         setIsSavingRecording(false);
         setSafeToSwitchTab(true);
-        
-        // Clear first-time processing state if applicable
-        if (firstTimeProcessingRef.current) {
-          setIsProcessingFirstEntry(false);
-          firstTimeProcessingRef.current = false;
-        }
-        
-        // Release toast lock
-        setToastLockActive(false);
         
         setTimeout(() => {
           setActiveTab('record');
         }, 100);
       }
     } catch (error: any) {
-      console.error('[Journal] Error processing recording:', error);
+      console.error('Error processing recording:', error);
       setProcessingError(error?.message || 'Unknown error occurred');
       setLastAction(`Exception: ${error?.message || 'Unknown'}`);
       
-      try {
-        clearAllToasts();
-      } catch (e) {
-        console.warn('[Journal] Error clearing toasts after exception:', e);
-      }
+      clearAllToasts();
       
       await new Promise(resolve => setTimeout(resolve, 150));
       
-      try {
-        toast.error('Error processing your recording', { 
-          duration: 3000,
-          closeButton: false
-        });
-      } catch (e) {
-        console.warn('[Journal] Error showing exception toast:', e);
-      }
+      toast.error('Error processing your recording', { 
+        duration: 3000,
+        closeButton: false
+      });
       
       setIsRecordingComplete(false);
       setIsSavingRecording(false);
       setSafeToSwitchTab(true);
-      
-      // Clear first-time processing state if applicable
-      if (firstTimeProcessingRef.current) {
-        setIsProcessingFirstEntry(false);
-        firstTimeProcessingRef.current = false;
-      }
-      
-      // Release toast lock
-      setToastLockActive(false);
       
       setTimeout(() => {
         setActiveTab('record');
@@ -945,79 +706,115 @@ const Journal = () => {
       );
       setProcessingEntries(updatedProcessingEntries);
       
-      // Apply local changes to entries before database changes are reflected
-      setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
+      const updatedToastIds = { ...toastIds };
+      Object.keys(updatedToastIds).forEach(key => {
+        if (key.includes(String(entryId)) || tempIdsToDelete.includes(key)) {
+          delete updatedToastIds[key];
+        }
+      });
+      setToastIds(updatedToastIds);
+      
+      setNotifiedEntryIds(prev => {
+        const updated = new Set(prev);
+        updated.delete(entryId);
+        return updated;
+      });
+      
+      setLocalEntries(prevEntries => {
+        const filteredEntries = prevEntries.filter(entry => entry.id !== entryId);
+        console.log(`[Journal] Locally filtered entries: ${filteredEntries.length} (removed entry ${entryId})`);
+        return filteredEntries;
+      });
+      
       setPendingDeletionIds(prev => {
         const newSet = new Set(prev);
         newSet.add(entryId);
         return newSet;
       });
+      
       setHasLocalChanges(true);
       
-      if (deletingEntryId === entryId) {
-        setDeletingEntryId(null);
-      }
-      
-      // Fix: Use "Journal Entries" instead of "journal_entries" as the table name
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
         .eq('id', entryId);
-      
+        
       if (error) {
-        console.error(`[Journal] Error deleting entry ${entryId}:`, error);
-        throw new Error(error.message);
+        console.error('[Journal] Database error while deleting entry:', error);
+        throw new Error(`Database error: ${error.message}`);
       }
       
-      console.log(`[Journal] Entry ${entryId} successfully deleted`);
+      console.log(`[Journal] Entry ${entryId} successfully deleted from database`);
       
-      setRefreshKey(prev => prev + 1);
-      fetchEntries();
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { 
+          action: 'delete',
+          entryId: entryId,
+          timestamp: Date.now()
+        }
+      }));
       
-      toast.success('Entry deleted successfully', {
+      const refreshIntervals = [300, 1000, 2500];
+      refreshIntervals.forEach((interval, index) => {
+        setTimeout(() => {
+          if (index === refreshIntervals.length - 1) {
+            setPendingDeletionIds(prev => {
+              const newSet = new Set(prev);
+              newSet.delete(entryId);
+              return newSet;
+            });
+            setHasLocalChanges(false);
+          }
+          
+          setRefreshKey(prev => prev + 1);
+          if (index === 0) {
+            fetchEntries();
+          }
+        }, interval);
+      });
+      
+      toast.success('Entry successfully deleted', {
         duration: 3000,
+        id: 'delete-success-toast',
         closeButton: false
       });
       
-      // Update search results if active
-      if (filteredEntries.length > 0) {
-        setFilteredEntries(prev => prev.filter(entry => entry.id !== entryId));
-      }
     } catch (error) {
       console.error('[Journal] Error deleting entry:', error);
+      setLastAction(`Delete Entry Error (${entryId})`);
+      toast.error('Failed to delete entry');
       
-      // Revert local changes
-      setPendingDeletionIds(prev => {
-        const newSet = new Set(prev);
-        newSet.delete(entryId);
-        return newSet;
-      });
+      if (hasLocalChanges) {
+        setLocalEntries(entries);
+        setPendingDeletionIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(entryId);
+          return newSet;
+        });
+        setHasLocalChanges(false);
+      }
       
-      setLocalEntries(lastSuccessfulEntriesRef.current);
-      setHasLocalChanges(false);
-      
-      toast.error('Failed to delete entry', {
-        duration: 3000,
-        closeButton: false
-      });
+      throw error;
     } finally {
       setIsDeletingEntry(false);
+      setDeletingEntryId(null);
     }
-  }, [user?.id, isDeletingEntry, processingEntries, toastIds, fetchEntries, filteredEntries.length]);
+  }, [user?.id, processingEntries, toastIds, fetchEntries, entries, hasLocalChanges, isDeletingEntry]);
 
-  // Define the function to handle search results
-  const handleSearchResults = useCallback((searchResults: JournalEntry[]) => {
-    setFilteredEntries(searchResults);
-  }, []);
+  const resetError = useCallback(() => {
+    setHasRenderError(false);
+    setProcessingError(null);
+    setActiveTab('entries');
+    setRefreshKey(Date.now());
+    setLastAction('Reset Error State');
+    setSafeToSwitchTab(true);
+    setTimeout(() => {
+      fetchEntries();
+    }, 100);
+  }, [fetchEntries]);
 
-  // Define function to clear search results
-  const clearSearchResults = useCallback(() => {
-    setFilteredEntries([]);
-  }, []);
-
-  // Format bytes to human-readable string
   const formatBytes = (bytes: number, decimals = 2) => {
-    if (!bytes) return '0 Bytes';
+    if (bytes === 0) return '0 Bytes';
     
     const k = 1024;
     const dm = decimals < 0 ? 0 : decimals;
@@ -1025,129 +822,193 @@ const Journal = () => {
     
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     
-    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+    return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
   };
 
-  const handlePlaceholderEntryCreated = useCallback(() => {
-    console.log('[Journal] Placeholder entry created, refreshing entries');
-    fetchEntries();
-    setRefreshKey(prev => prev + 1);
+  const updateDebugInfo = (info: {status: string, duration?: number}) => {
+    setAudioStatus(info.status);
+    if (info.duration !== undefined) {
+      setRecordingDuration(info.duration);
+    }
+    setLastAction(`Recorder: ${info.status}`);
+  };
+
+  useEffect(() => {
+    const handleJournalEntryUpdated = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId) {
+        console.log(`[Journal] Entry updated event detected for ID: ${event.detail.entryId}, refreshing data`);
+        setRefreshKey(prev => prev + 1);
+        fetchEntries();
+      }
+    };
+    
+    window.addEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
+    
+    return () => {
+      window.removeEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
+    };
   }, [fetchEntries]);
 
+  // Update the handleSearchResults function to ensure type compatibility
+  const handleSearchResults = (filtered: JournalEntry[]) => {
+    setFilteredEntries(filtered);
+  };
+
+  // Update the entries handling to ensure types are compatible
+  const displayEntries = hasLocalChanges ? localEntries : 
+                        (entries && entries.length > 0) ? entries : 
+                        (lastSuccessfulEntriesRef.current.length > 0) ? lastSuccessfulEntriesRef.current : [];
+  
+  // Define the missing showLoading variable
+  const isReallyEmpty = displayEntries.length === 0 && 
+                        lastSuccessfulEntriesRef.current.length === 0 && 
+                        !loading;
+                        
+  const showLoading = loading && displayEntries.length === 0 && !hasLocalChanges;
+
+  // Convert entries to ensure they have the required content field
+  const entriesToDisplay = (filteredEntries.length > 0 && displayEntries.length > 0) ? 
+    filteredEntries.map(entry => ({
+      ...entry,
+      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+    })) : 
+    displayEntries.map(entry => ({
+      ...entry,
+      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+    }));
+
   if (hasRenderError) {
-    return (
-      <div className="p-4 border border-red-500 rounded-md">
-        <div className="flex items-center mb-2">
-          <AlertCircle className="text-red-500 mr-2 h-5 w-5" />
-          <h3 className="text-lg font-semibold">Rendering Error</h3>
-        </div>
-        <p className="mb-4">There was a problem rendering the journal.</p>
-        <Button 
-          onClick={() => {
-            setHasRenderError(false);
-            setRefreshKey(prev => prev + 1);
-            window.location.reload();
-          }}
-          className="flex items-center gap-2"
-        >
-          <RefreshCw className="h-4 w-4" />
-          <span>Try Again</span>
-        </Button>
-      </div>
-    );
-  }
-
-  if (!isProfileChecked || isCheckingProfile) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh]">
-        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
-        <p className="text-lg text-center">
-          <TranslatableText text="Loading your journal..." />
-        </p>
-      </div>
-    );
-  }
-
-  if (showRetryButton) {
-    return (
-      <div className="flex flex-col items-center justify-center h-[50vh]">
-        <div className="flex items-center mb-4 text-amber-500">
-          <AlertCircle className="h-8 w-8 mr-2" />
-        </div>
-        <p className="text-lg text-center mb-4">
-          <TranslatableText text="There was a problem loading your journal profile." />
-        </p>
-        <Button onClick={handleRetryProfileCreation} className="flex items-center gap-2">
-          <RefreshCw className="h-4 w-4" />
-          <TranslatableText text="Retry" />
-        </Button>
-      </div>
-    );
+    console.error('[Journal] Recovering from render error');
+    setHasRenderError(false);
+    setLastAction('Recovering from Render Error');
   }
 
   return (
-    <ErrorBoundary>
-      <div className="container max-w-4xl mx-auto pb-20">
+    <ErrorBoundary onReset={resetError}>
+      <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
         
-        {/* PlaceholderEntryManager with the proper callback */}
-        {user?.id && !loading && entries.length === 0 && !isFirstTimeUser && (
-          <PlaceholderEntryManager 
-            onEntryCreated={handlePlaceholderEntryCreated}
-            hasEntries={entries.length > 0}
-            isProcessingFirstEntry={isProcessingFirstEntry}
-          />
-        )}
-        
-        <Tabs 
-          value={activeTab} 
-          onValueChange={handleTabChange}
-          className="mt-6"
-          defaultValue="record"
-        >
-          <TabsList className="grid w-full grid-cols-2 mb-4 bg-background border">
-            <TabsTrigger value="record">
-              <TranslatableText text="Record" />
-            </TabsTrigger>
-            <TabsTrigger value="entries">
-              <TranslatableText text="Entries" />
-            </TabsTrigger>
-          </TabsList>
-          
-          <TabsContent value="record" className="mt-2">
-            <VoiceRecorder 
-              onRecordingComplete={handleRecordingComplete}
-              audioStatus={audioStatus}
-              recordingDuration={recordingDuration}
-              setRecordingDuration={setRecordingDuration}
-              processingError={processingError}
-            />
-          </TabsContent>
-          
-          <TabsContent value="entries" className="mt-0">
-            <div className="mb-4">
-              <JournalSearch 
-                entries={localEntries} 
-                onSearchResults={handleSearchResults}
-              />
+        {isCheckingProfile ? (
+          <div className="min-h-screen flex items-center justify-center">
+            <div className="flex flex-col items-center gap-3">
+              <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary mb-4"></div>
+              <p className="text-muted-foreground">Setting up your profile...</p>
             </div>
+          </div>
+        ) : entriesError && !loading ? (
+          <>
+            <div className="mt-8 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+              <div className="flex flex-col gap-3">
+                <div className="flex items-start gap-2">
+                  <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                  <p className="text-red-800 dark:text-red-200">
+                    Error loading your journal entries: {entriesError}
+                  </p>
+                </div>
+                <Button 
+                  variant="outline" 
+                  className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                  onClick={() => {
+                    setRefreshKey(prev => prev + 1);
+                    fetchEntries();
+                  }}
+                >
+                  <RefreshCw className="w-4 h-4 mr-2" /> 
+                  Retry Loading
+                </Button>
+              </div>
+            </div>
+          </>
+        ) : (
+          <>
+            {showRetryButton && (
+              <div className="mb-6 p-4 border border-amber-200 bg-amber-50 dark:bg-amber-900/20 dark:border-amber-800 rounded-lg">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-amber-600 shrink-0 mt-0.5" />
+                    <p className="text-amber-800 dark:text-amber-200">
+                      We're having trouble setting up your profile. Your entries may not be saved correctly.
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-amber-500 text-amber-700 hover:bg-amber-100 dark:text-amber-300 dark:hover:bg-amber-900/40"
+                    onClick={handleRetryProfileCreation}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> 
+                    Retry Profile Setup
+                  </Button>
+                </div>
+              </div>
+            )}
             
-            <div ref={entriesListRef}>
-              <JournalEntriesList
-                entries={filteredEntries.length > 0 ? filteredEntries : localEntries}
-                loading={loading && !hasLocalChanges}
-                loadMore={() => {}} // Placeholder for pagination
-                hasMoreEntries={false} // Placeholder for pagination
-                isLoadingMore={false} // Placeholder for pagination
-                onDeleteEntry={handleDeleteEntry}
-                processingEntries={processingEntries}
-                processedEntryIds={processedEntryIds}
-                onStartRecording={handleStartRecording}
-                isProcessingFirstEntry={isProcessingFirstEntry}
-              />
-            </div>
-          </TabsContent>
-        </Tabs>
+            {processingError && (
+              <div className="mb-6 p-4 border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800 rounded-lg">
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-2">
+                    <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
+                    <p className="text-red-800 dark:text-red-200">
+                      Error processing your recording: {processingError}
+                    </p>
+                  </div>
+                  <Button 
+                    variant="outline" 
+                    className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
+                    onClick={() => {
+                      setProcessingError(null);
+                      setActiveTab('record');
+                    }}
+                  >
+                    <RefreshCw className="w-4 h-4 mr-2" /> 
+                    Try Again
+                  </Button>
+                </div>
+              </div>
+            )}
+            
+            <Tabs 
+              defaultValue={activeTab} 
+              value={activeTab} 
+              onValueChange={handleTabChange} 
+              className="mt-6"
+            >
+              <TabsList className="grid w-full grid-cols-2 mb-6">
+                <TabsTrigger value="record"><TranslatableText text="Record Entry" /></TabsTrigger>
+                <TabsTrigger value="entries"><TranslatableText text="Past Entries" /></TabsTrigger>
+              </TabsList>
+              
+              <TabsContent value="record" className="mt-0">
+                <div className="mb-4">
+                  <VoiceRecorder 
+                    onRecordingComplete={handleRecordingComplete}
+                    updateDebugInfo={updateDebugInfo}
+                  />
+                </div>
+              </TabsContent>
+              
+              <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
+                <ErrorBoundary>
+                  <JournalSearch
+                    entries={displayEntries}
+                    onSelectEntry={() => {}}
+                    onSearchResults={handleSearchResults}
+                  />
+                  <JournalEntriesList
+                    entries={entriesToDisplay}
+                    loading={showLoading}
+                    processingEntries={processingEntries}
+                    processedEntryIds={processedEntryIds}
+                    onStartRecording={handleStartRecording}
+                    onDeleteEntry={handleDeleteEntry}
+                    loadMore={() => fetchEntries()}
+                    hasMoreEntries={false}
+                    isLoadingMore={loading && displayEntries.length > 0}
+                  />
+                </ErrorBoundary>
+              </TabsContent>
+            </Tabs>
+          </>
+        )}
       </div>
     </ErrorBoundary>
   );

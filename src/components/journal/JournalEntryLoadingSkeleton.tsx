@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef } from 'react';
 import { LoadingEntryContent } from './entry-card/LoadingEntryContent';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
@@ -16,8 +17,6 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
   const isVisibleRef = useRef(false);
   const mountTimeRef = useRef(Date.now());
   const forceRemoveTimeoutRef = useRef<NodeJS.Timeout | null>(null);
-  const cardRefsMap = useRef<Map<number, HTMLElement | null>>(new Map());
-  const isMountedRef = useRef(true);
   
   useEffect(() => {
     if (tempId) {
@@ -38,30 +37,6 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       }
     }
     
-    return () => {
-      isMountedRef.current = false;
-      
-      // Clean up timeouts
-      if (forceRemoveTimeoutRef.current) {
-        clearTimeout(forceRemoveTimeoutRef.current);
-        forceRemoveTimeoutRef.current = null;
-      }
-      
-      // Notify when skeleton is unmounted
-      if (tempId) {
-        const visibleDuration = Date.now() - mountTimeRef.current;
-        
-        console.log(`[JournalEntryLoadingSkeleton] Unmounting skeleton with tempId ${tempId}. Was visible for ${visibleDuration}ms`);
-        isVisibleRef.current = false;
-        
-        window.dispatchEvent(new CustomEvent('processingCardRemoved', {
-          detail: { tempId, timestamp: Date.now(), visibleDuration }
-        }));
-      }
-    };
-  }, [tempId, addEvent]);
-  
-  useEffect(() => {
     // Add listener for force remove events
     const handleForceRemove = (event: CustomEvent<any>) => {
       if (!event.detail) return;
@@ -80,6 +55,9 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       }
     };
     
+    window.addEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
+    window.addEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
+    
     // Add a delayed visibility notification to help with tracking
     const visibilityTimeout = setTimeout(() => {
       if (isVisibleRef.current && tempId) {
@@ -94,7 +72,7 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
     // Add a safety timeout to force remove this skeleton after 15 seconds
     // This prevents skeletons from getting "stuck" in the UI
     forceRemoveTimeoutRef.current = setTimeout(() => {
-      if (tempId && isMountedRef.current) {
+      if (tempId) {
         console.log(`[JournalEntryLoadingSkeleton] Force removing skeleton ${tempId} after timeout`);
         isVisibleRef.current = false;
         processingStateManager.removeEntry(tempId);
@@ -110,10 +88,19 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       }
     }, 15000);
     
-    window.addEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
-    window.addEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
-    
     return () => {
+      // Notify when skeleton is unmounted
+      if (tempId) {
+        const visibleDuration = Date.now() - mountTimeRef.current;
+        
+        console.log(`[JournalEntryLoadingSkeleton] Unmounting skeleton with tempId ${tempId}. Was visible for ${visibleDuration}ms`);
+        isVisibleRef.current = false;
+        
+        window.dispatchEvent(new CustomEvent('processingCardRemoved', {
+          detail: { tempId, timestamp: Date.now(), visibleDuration }
+        }));
+      }
+      
       // Clean up all timeouts and event listeners
       clearTimeout(visibilityTimeout);
       if (forceRemoveTimeoutRef.current) {
@@ -122,7 +109,7 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       window.removeEventListener('forceRemoveProcessingCard', handleForceRemove as EventListener);
       window.removeEventListener('forceRemoveAllProcessingCards', handleForceRemove as EventListener);
     };
-  }, [count, tempId]);
+  }, [count, addEvent, tempId]);
   
   const handleAnimationComplete = () => {
     if (tempId) {
@@ -132,49 +119,6 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       window.dispatchEvent(new CustomEvent('loadingSkeletonAnimated', {
         detail: { tempId, timestamp: Date.now() }
       }));
-    }
-  };
-  
-  // Safe DOM removal function
-  const removeCardSafely = (cardElement: HTMLElement | null) => {
-    try {
-      if (!cardElement || !cardElement.parentNode || !isMountedRef.current) {
-        return;
-      }
-      
-      // First make it invisible but keep in DOM
-      cardElement.classList.add('instant-hide-card');
-      cardElement.classList.add('processing-card-removing');
-      
-      // Then safely remove it after animation
-      setTimeout(() => {
-        try {
-          if (cardElement && cardElement.parentNode && isMountedRef.current) {
-            cardElement.parentNode.removeChild(cardElement);
-            console.log('[JournalEntryLoadingSkeleton] Parent card removed from DOM');
-            
-            // Notify that this card has been removed
-            if (tempId) {
-              window.dispatchEvent(new CustomEvent('processingCardRemoved', {
-                detail: { 
-                  tempId, 
-                  timestamp: Date.now() 
-                }
-              }));
-            }
-          }
-        } catch (e) {
-          console.error('[JournalEntryLoadingSkeleton] Error safely removing card from DOM:', e);
-        }
-      }, 300);
-    } catch (e) {
-      console.error('[JournalEntryLoadingSkeleton] Error in removeCardSafely:', e);
-    }
-  };
-  
-  const saveCardRef = (index: number) => (el: HTMLDivElement | null) => {
-    if (el) {
-      cardRefsMap.current.set(index, el);
     }
   };
   
@@ -191,7 +135,6 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
           data-loading-skeleton={true}
           data-temp-id={tempId}
           onAnimationComplete={handleAnimationComplete}
-          ref={saveCardRef(index)}
         >
           <Card className="p-4 bg-card border-2 border-primary/20 shadow-md relative journal-entry-card processing-card highlight-processing">
             <div className="flex justify-between items-start mb-4">
@@ -207,7 +150,7 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
               </div>
             </div>
             
-            <LoadingEntryContent tempId={tempId} />
+            <LoadingEntryContent />
             
             {/* Add a processing indicator that's always visible */}
             <div className="absolute top-2 right-2 flex items-center justify-center h-6 w-6 bg-primary/20 rounded-full pulsing-indicator">
@@ -258,31 +201,6 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
           0% { opacity: 0.6; }
           50% { opacity: 1; }
           100% { opacity: 0.6; }
-        }
-        
-        .instant-hide-card {
-          position: absolute !important;
-          opacity: 0 !important;
-          pointer-events: none !important;
-          z-index: -1 !important;
-        }
-        
-        .processing-card-removing {
-          opacity: 0;
-          transform: translateY(-10px);
-          pointer-events: none;
-          transition: opacity 0.3s ease-out, transform 0.3s ease-out;
-          z-index: -1;
-        }
-        
-        .processing-active .journal-entry-card.processing-card {
-          border-color: hsl(var(--primary)/0.5);
-          border-width: 2px;
-        }
-        
-        .journal-entry-card {
-          position: relative;
-          z-index: 10;
         }
       `}</style>
     </div>

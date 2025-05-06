@@ -1,46 +1,53 @@
 
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
+import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface AnimatedPromptProps {
   show: boolean;
 }
 
-export function AnimatedPrompt({ show }: AnimatedPromptProps) {
-  const componentMountedRef = useRef(true);
+export const AnimatedPrompt: React.FC<AnimatedPromptProps> = ({ show }) => {
+  const [isVisible, setIsVisible] = useState(false);
+  const { theme } = useTheme();
   
-  // Track component mount state for animation safety
   useEffect(() => {
-    componentMountedRef.current = true;
-    return () => {
-      componentMountedRef.current = false;
-    };
-  }, []);
+    // Small delay to make sure the animation runs properly
+    if (show) {
+      const timer = setTimeout(() => setIsVisible(true), 100);
+      return () => clearTimeout(timer);
+    } else {
+      setIsVisible(false);
+    }
+  }, [show]);
   
   return (
     <AnimatePresence>
-      {show && (
-        <motion.div
-          key="prompt"
-          initial={{ opacity: 0, y: 20 }}
+      {isVisible && (
+        <motion.div 
+          className="w-full flex justify-center mt-4 mb-2 text-center"
+          initial={{ opacity: 0, y: -20 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -20 }}
-          transition={{ duration: 0.3 }}
-          className="absolute top-6 left-0 right-0 mx-auto text-center px-4 z-10 max-w-md"
-          onAnimationComplete={() => {
-            // Safety check to prevent errors during unmount
-            if (!componentMountedRef.current) return;
-          }}
+          exit={{ opacity: 0, y: 20 }}
+          transition={{ duration: 0.5, ease: "easeInOut" }}
         >
-          <h3 className="text-xl font-semibold mb-2">
-            <TranslatableText text="Record Your Journal Entry" />
-          </h3>
-          <p className="text-muted-foreground">
-            <TranslatableText text="Press the microphone button to start recording your thoughts." />
-          </p>
+          <motion.div 
+            className={`px-4 py-2 flex flex-col text-lg font-medium text-white`}
+            animate={{ 
+              scale: [1, 1.03, 1],
+            }}
+            transition={{
+              duration: 2,
+              repeat: Infinity,
+              repeatType: "reverse"
+            }}
+          >
+            <TranslatableText text="Speak in any language," />
+            <TranslatableText text="I'll understand you!" />
+          </motion.div>
         </motion.div>
       )}
     </AnimatePresence>
   );
-}
+};

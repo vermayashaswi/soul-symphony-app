@@ -2,21 +2,18 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 
-interface GenericEmptyStateProps {
+interface EmptyStateProps {
   title: React.ReactNode;
   description: React.ReactNode;
   buttonText?: React.ReactNode;
   onAction?: () => void;
-  onStartRecording?: () => void;
 }
 
-// Renamed from EmptyState to GenericEmptyState to avoid confusion
-export const GenericEmptyState: React.FC<GenericEmptyStateProps> = ({
+export const EmptyState: React.FC<EmptyStateProps> = ({
   title,
   description,
   buttonText,
   onAction,
-  onStartRecording,
 }) => {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -30,15 +27,6 @@ export const GenericEmptyState: React.FC<GenericEmptyStateProps> = ({
           {buttonText}
         </Button>
       )}
-      
-      {onStartRecording && !onAction && !buttonText && (
-        <Button onClick={onStartRecording}>
-          Start Recording
-        </Button>
-      )}
     </div>
   );
 };
-
-// For backward compatibility, we'll export the same component as EmptyState
-export const EmptyState = GenericEmptyState;

@@ -42,7 +42,7 @@ const processingSteps = [
   }
 ];
 
-export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?: string }) {
+export function LoadingEntryContent({ error }: { error?: string }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [processingTakingTooLong, setProcesssingTakingTooLong] = useState(false);
   const mountedRef = useRef(true);
@@ -61,14 +61,13 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
   
   // Broadcast that this component was mounted to help track processing entries
   useEffect(() => {
-    console.log('[LoadingEntryContent] Component mounted:', componentId.current, 'for tempId:', tempId || 'none');
+    console.log('[LoadingEntryContent] Component mounted:', componentId.current);
     
     // Notify that we're now visible
     window.dispatchEvent(new CustomEvent('loadingContentMounted', {
       detail: { 
         timestamp: Date.now(),
         componentId: componentId.current,
-        tempId: tempId,
         visible: true
       }
     }));
@@ -85,8 +84,7 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
       window.dispatchEvent(new CustomEvent('loadingContentMinTimeElapsed', {
         detail: { 
           timestamp: Date.now(),
-          componentId: componentId.current,
-          tempId: tempId
+          componentId: componentId.current
         }
       }));
     }, 2000); // Ensure loading is visible for at least 2 seconds
@@ -96,15 +94,10 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
         clearTimeout(visibilityTimeoutRef.current);
       }
       
-      // Only remove the processing class if no other processing components exist
-      const otherProcessingElements = document.querySelectorAll('[data-loading-skeleton="true"]');
-      if (otherProcessingElements.length <= 1) {
-        document.documentElement.classList.remove('processing-active');
-      }
-      
-      console.log('[LoadingEntryContent] Component unmounted:', componentId.current, 'for tempId:', tempId || 'none');
+      // Remove the processing class when unmounted
+      document.documentElement.classList.remove('processing-active');
     };
-  }, [tempId]);
+  }, []);
   
   // Self cleanup safety - if this component exists for too long (15 seconds), automatically trigger cleanup
   useEffect(() => {
@@ -118,7 +111,6 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
         window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
           detail: { 
             componentId: componentId.current,
-            tempId: tempId,
             timestamp: Date.now(),
             forceCleanup: true,
             reason: 'safety-timeout'
@@ -129,12 +121,21 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
         window.dispatchEvent(new CustomEvent('processingEntryCompleted', {
           detail: { 
             componentId: componentId.current,
-            tempId: tempId,
             timestamp: Date.now(), 
             forceClearProcessingCard: true,
             reason: 'safety-timeout'
           }
         }));
+        
+        // Force immediate parent card removal but only if we've been visible for at least 3 seconds
+        const timeSinceMounted = Date.now() - mountTimeRef.current;
+        if (timeSinceMounted > 3000) {
+          removeParentCard();
+        } else {
+          // If we haven't been visible long enough, set a timeout to remove after minimum time
+          const remainingTime = Math.max(0, 3000 - timeSinceMounted);
+          setTimeout(() => removeParentCard(), remainingTime);
+        }
       }
     }, 15000); // 15 seconds max lifetime
     
@@ -143,100 +144,64 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
     return () => {
       clearTimeout(safetyTimeout);
     };
-  }, [tempId]);
+  }, []);
   
-  // Function to safely find and remove the parent card
+  // Function to remove the parent card - called in multiple places for reliability
   const removeParentCard = () => {
     if (!isVisibleRef.current) return; // Skip if already removed
     
     isVisibleRef.current = false;
     setVisibilityState('removing');
     
-    try {
-      // For forced removals, enforce minimum visibility time
-      // For content ready events, don't enforce minimum time
-      if (!contentReadyRef.current) {
-        // IMPORTANT: Check if we've been visible for at least 2 seconds
-        const timeVisible = Date.now() - mountTimeRef.current;
-        if (timeVisible < 2000) {
-          console.log(`[LoadingEntryContent] Not removing parent card yet, only visible for ${timeVisible}ms`);
-          
-          // Set a timeout to remove after we've been visible for at least 2 seconds
-          const remainingTime = 2000 - timeVisible;
-          setTimeout(() => {
-            console.log('[LoadingEntryContent] Now removing parent card after enforced minimum visibility');
-            safeFindAndRemoveCard();
-          }, remainingTime);
-          
-          return;
-        }
+    // For forced removals, enforce minimum visibility time
+    // For content ready events, don't enforce minimum time
+    if (!contentReadyRef.current) {
+      // IMPORTANT: Check if we've been visible for at least 2 seconds
+      const timeVisible = Date.now() - mountTimeRef.current;
+      if (timeVisible < 2000) {
+        console.log(`[LoadingEntryContent] Not removing parent card yet, only visible for ${timeVisible}ms`);
+        
+        // Set a timeout to remove after we've been visible for at least 2 seconds
+        const remainingTime = 2000 - timeVisible;
+        setTimeout(() => {
+          console.log('[LoadingEntryContent] Now removing parent card after enforced minimum visibility');
+          actuallyRemoveCard();
+        }, remainingTime);
+        
+        return;
       }
-      
-      safeFindAndRemoveCard();
-    } catch (e) {
-      console.error('[LoadingEntryContent] Error in removeParentCard:', e);
     }
+    
+    actuallyRemoveCard();
   };
   
-  // Safely find and remove the card from DOM with error handling
-  const safeFindAndRemoveCard = () => {
-    try {
-      // Find the parent card using multiple strategies for reliability
-      let parentCard = null;
+  const actuallyRemoveCard = () => {
+    // Find the parent card using the component ID
+    const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
+    if (parentCard) {
+      // First make it absolutely positioned and invisible immediately
+      parentCard.classList.add('instant-hide-card');
       
-      // Strategy 1: Using component ID attribute
-      parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
+      // Add a transition class first
+      parentCard.classList.add('processing-card-removing');
       
-      // Strategy 2: Using tempId if available
-      if (!parentCard && tempId) {
-        parentCard = document.querySelector(`[data-temp-id="${tempId}"]`)?.closest('.journal-entry-card');
-      }
-      
-      // Strategy 3: Try to find any processing card if this is a force removal
-      if (!parentCard && unmountingRef.current) {
-        const allProcessingCards = document.querySelectorAll('.processing-card');
-        if (allProcessingCards.length > 0) {
-          parentCard = allProcessingCards[0] as HTMLElement;
+      // Then actually remove after a short transition
+      setTimeout(() => {
+        if (parentCard.parentNode) {
+          parentCard.parentNode.removeChild(parentCard);
+          console.log('[LoadingEntryContent] Parent card removed from DOM');
+          
+          // Notify that this card has been removed
+          window.dispatchEvent(new CustomEvent('processingCardRemoved', {
+            detail: { 
+              componentId: componentId.current,
+              timestamp: Date.now()
+            }
+          }));
         }
-      }
-      
-      if (parentCard) {
-        // First add transition classes
-        parentCard.classList.add('instant-hide-card');
-        parentCard.classList.add('processing-card-removing');
-        
-        // Then actually remove after a short transition
-        setTimeout(() => {
-          try {
-            if (parentCard && parentCard.parentNode) {
-              parentCard.parentNode.removeChild(parentCard);
-              console.log('[LoadingEntryContent] Parent card removed from DOM');
-              
-              // Notify that this card has been removed
-              window.dispatchEvent(new CustomEvent('processingCardRemoved', {
-                detail: { 
-                  componentId: componentId.current,
-                  tempId: tempId,
-                  timestamp: Date.now()
-                }
-              }));
-            }
-          } catch (removeError) {
-            console.error('[LoadingEntryContent] Error removing parent from DOM:', removeError);
-            // Just hide it if we can't remove it
-            if (parentCard) {
-              parentCard.style.display = 'none';
-              parentCard.style.visibility = 'hidden';
-              parentCard.style.position = 'absolute';
-              parentCard.style.pointerEvents = 'none';
-            }
-          }
-        }, 300);
-      } else {
-        console.log('[LoadingEntryContent] Could not find parent card to remove');
-      }
-    } catch (e) {
-      console.error('[LoadingEntryContent] Error in safeFindAndRemoveCard:', e);
+      }, 300);
+    } else {
+      console.log('[LoadingEntryContent] Could not find parent card to remove');
     }
   };
   
@@ -252,8 +217,7 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
         detail: { 
           step: currentStep.id, 
           text: currentStep.text,
-          componentId: componentId.current,
-          tempId: tempId
+          componentId: componentId.current
         }
       }));
       
@@ -270,8 +234,7 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
         window.dispatchEvent(new CustomEvent('processingTakingLong', {
           detail: { 
             timestamp: Date.now(),
-            componentId: componentId.current,
-            tempId: tempId
+            componentId: componentId.current
           }
         }));
       }
@@ -279,16 +242,15 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
-    // Listen for forced removal events
+    // Listen for forces removal events targeted at this component
     const handleForceRemoval = (event: CustomEvent) => {
       // Check if this is targeted at our component or a broadcast
-      const isTargetedRemoval = 
-        (event.detail?.componentId === componentId.current) || 
-        (event.detail?.tempId === tempId);
-      const isBroadcastRemoval = !event.detail?.componentId && !event.detail?.tempId && event.detail?.forceCleanup;
+      const isTargetedRemoval = event.detail?.componentId === componentId.current;
+      const isBroadcastRemoval = !event.detail?.componentId && event.detail?.forceCleanup;
+      const tempId = event.detail?.tempId;
       
       if ((isTargetedRemoval || isBroadcastRemoval) && !unmountingRef.current) {
-        console.log('[LoadingEntryContent] Forced removal event received for', componentId.current, 'tempId:', tempId || 'none');
+        console.log('[LoadingEntryContent] Forced removal event received for', componentId.current);
         unmountingRef.current = true;
         setVisibilityState('force-removed');
         
@@ -325,19 +287,23 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
     
     window.addEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
     window.addEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
-    window.addEventListener('forceRemoveAllProcessingCards', handleForceRemoval as EventListener);
     
     // Also listen for content ready events which should remove this component
     const handleContentReady = (event: CustomEvent) => {
-      const isTargetedReady = 
-        (event.detail?.componentId === componentId.current) || 
-        (event.detail?.tempId === tempId);
-      
-      if (isTargetedReady && !unmountingRef.current) {
+      if (!unmountingRef.current) {
         console.log('[LoadingEntryContent] Content ready event received, removing card');
         unmountingRef.current = true;
         contentReadyRef.current = true;  // Mark content as ready
         setVisibilityState('content-ready');
+        
+        // Find the parent card and apply immediate hiding
+        const parentCard = document.querySelector(`[data-component-id="${componentId.current}"]`)?.closest('.journal-entry-card');
+        if (parentCard) {
+          // Make it absolutely positioned and transparent IMMEDIATELY
+          parentCard.classList.add('instant-hide-card');
+          // Still add the transition class for animation if needed
+          parentCard.classList.add('processing-card-removing');
+        }
         
         // Set a timeout to ensure this card is removed after animation completes
         if (forceRemoveTimeoutRef.current) clearTimeout(forceRemoveTimeoutRef.current);
@@ -368,7 +334,6 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
       
       window.removeEventListener('forceRemoveLoadingContent', handleForceRemoval as EventListener);
       window.removeEventListener('forceRemoveProcessingCard', handleForceRemoval as EventListener);
-      window.removeEventListener('forceRemoveAllProcessingCards', handleForceRemoval as EventListener);
       window.removeEventListener('entryContentReady', handleContentReady as EventListener);
       
       // Notify when loading content is unmounted
@@ -376,14 +341,64 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
         detail: { 
           timestamp: Date.now(),
           componentId: componentId.current,
-          tempId: tempId,
           visibilityState
         }
       }));
     };
-  }, [currentStepIndex, tempId]);
+  }, [currentStepIndex]);
   
   const currentStep = processingSteps[currentStepIndex];
+  
+  // Add CSS to handle forced hiding and transitions
+  useEffect(() => {
+    // Add styles for forced hiding and transitions if not already present
+    if (!document.getElementById('processing-card-styles')) {
+      const style = document.createElement('style');
+      style.id = 'processing-card-styles';
+      style.textContent = `
+        .force-hidden { 
+          display: none !important; 
+          opacity: 0 !important; 
+          pointer-events: none !important; 
+        }
+        .processing-card {
+          transition: all 0.3s ease-out;
+        }
+        .instant-hide-card {
+          position: absolute !important;
+          opacity: 0 !important;
+          pointer-events: none !important;
+          z-index: -1 !important;
+        }
+        .processing-card-removing {
+          opacity: 0;
+          transform: translateY(-10px);
+          pointer-events: none;
+          transition: opacity 0.3s ease-out, transform 0.3s ease-out;
+          z-index: -1;
+        }
+        .processing-active .journal-entry-card.processing-card {
+          border-color: hsl(var(--primary)/0.5);
+          border-width: 2px;
+        }
+        .journal-entry-card {
+          position: relative;
+          z-index: 10;
+        }
+      `;
+      document.head.appendChild(style);
+    }
+    
+    return () => {
+      // Cleanup only if no other instances are active
+      if (!document.querySelector('.journal-entry-card:not(.force-hidden)')) {
+        const style = document.getElementById('processing-card-styles');
+        if (style && !document.querySelector('.processing-active')) {
+          document.head.removeChild(style);
+        }
+      }
+    };
+  }, []);
   
   return (
     <motion.div 
@@ -393,14 +408,12 @@ export function LoadingEntryContent({ error, tempId }: { error?: string; tempId?
       exit={{ opacity: 0.7 }}
       transition={{ duration: 0.5 }}
       data-component-id={componentId.current}
-      data-temp-id={tempId}
       data-visibility-state={visibilityState}
       onAnimationComplete={() => {
         // Broadcast that this component has finished animating in
         window.dispatchEvent(new CustomEvent('loadingContentAnimated', {
           detail: { 
             componentId: componentId.current,
-            tempId: tempId,
             timestamp: Date.now()
           }
         }));

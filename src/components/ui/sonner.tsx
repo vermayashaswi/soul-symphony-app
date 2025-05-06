@@ -1,5 +1,4 @@
 
-import React from "react";
 import { useTheme } from "@/hooks/use-theme"
 import { Toaster as Sonner } from "sonner"
 
@@ -14,23 +13,16 @@ function Toaster({ ...props }: ToasterProps) {
   return (
     <Sonner
       theme={isDarkMode ? "dark" : "light"}
-      className="toaster group sonner-wrapper"
-      closeButton
-      richColors
+      className="toaster group"
       toastOptions={{
-        duration: 3000, // Shorter duration to reduce toast collisions
         classNames: {
           toast: isDarkMode
-            ? "group bg-theme text-black font-medium border border-white/10 sonner-toast-element" 
-            : "group bg-theme text-black font-medium border border-black/10 sonner-toast-element",
+            ? "group bg-theme text-black font-medium border border-white/10" 
+            : "group bg-theme text-black font-medium border border-black/10",
           title: "text-black font-semibold",
           description: "text-black font-normal",
           actionButton: "bg-primary text-primary-foreground font-medium",
           closeButton: "text-black/50 hover:text-black"
-        },
-        style: {
-          zIndex: 1000, // Ensure consistent z-index
-          position: 'relative' // Ensure position is set
         }
       }}
       {...props}

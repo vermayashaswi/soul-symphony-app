@@ -1,3 +1,4 @@
+
 import { useState, useRef, useEffect } from "react";
 import { recordAudio } from "@/utils/audioRecorder";
 import { validateAudioBlob } from "@/utils/audio/blob-utils";
@@ -13,7 +14,6 @@ export function useVoiceRecorder({
   onError,
   maxDuration = 300 // 5 minutes default
 }: UseVoiceRecorderProps) {
-  
   const [status, setStatus] = useState<
     "idle" | "acquiring_media" | "recording" | "stopping"
   >("idle");

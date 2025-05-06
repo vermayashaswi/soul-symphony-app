@@ -1,11 +1,15 @@
 
 import React from 'react';
+import JournalEntryCard from './JournalEntryCard';
 import { JournalEntry } from '@/types/journal';
-import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
-import { Loader2, Info } from 'lucide-react';
-import { cn } from '@/lib/utils';
-import EmptyJournalState from '@/components/journal/EmptyJournalState';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
+import EmptyJournalState from './EmptyJournalState';
+
+interface EmptyJournalStateProps {
+  onStartRecording: () => void;
+}
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -13,11 +17,11 @@ interface JournalEntriesListProps {
   loadMore: () => void;
   hasMoreEntries: boolean;
   isLoadingMore: boolean;
-  onDeleteEntry: (id: number) => void;
-  processingEntries: string[];
-  processedEntryIds: number[];
-  onStartRecording: () => void;
-  isProcessingFirstEntry?: boolean;
+  onEntryDeleted?: (id: number) => void;
+  onDeleteEntry?: (id: number) => Promise<void>;
+  processingEntries?: any[];
+  processedEntryIds?: number[];
+  onStartRecording?: () => void;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
@@ -26,89 +30,67 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   loadMore,
   hasMoreEntries,
   isLoadingMore,
+  onEntryDeleted,
   onDeleteEntry,
-  processingEntries,
-  processedEntryIds,
-  onStartRecording,
-  isProcessingFirstEntry = false
+  onStartRecording = () => {},
+  processingEntries = [],
+  processedEntryIds = []
 }) => {
-  if (loading) {
+  if (loading && entries.length === 0) {
     return (
-      <div className="flex items-center justify-center py-8">
-        <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+      <div className="space-y-4">
+        {[1, 2, 3].map(i => (
+          <JournalEntryLoadingSkeleton key={i} />
+        ))}
       </div>
     );
   }
 
   if (!loading && entries.length === 0) {
-    return (
-      <EmptyJournalState 
-        onStartRecording={onStartRecording}
-        isProcessingFirstEntry={isProcessingFirstEntry}
-      />
-    );
+    return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
 
-  // Helper function to identify placeholder entries
-  const isPlaceholderEntry = (entry: JournalEntry) => {
-    return entry.content?.includes('Welcome to SOULo Journal!') && 
-           entry.content?.includes('This is an example entry');
+  const handleDeleteEntry = async (id: number) => {
+    if (onEntryDeleted) {
+      onEntryDeleted(id);
+      return;
+    }
+    
+    if (onDeleteEntry) {
+      await onDeleteEntry(id);
+    }
   };
 
   return (
-    <div>
-      {entries.map((entry) => {
-        const isPlaceholder = isPlaceholderEntry(entry);
-        
-        return (
-          <div 
-            key={entry.id} 
-            className={cn(
-              "mb-4 p-4 bg-white rounded-md shadow-sm border",
-              isPlaceholder && "border-blue-300 bg-blue-50"
-            )}
-          >
-            {isPlaceholder && (
-              <div className="flex items-center mb-2 text-blue-600 text-sm font-medium">
-                <Info className="h-4 w-4 mr-1" />
-                <TranslatableText text="Example Entry" />
-              </div>
-            )}
-            
-            <div className="text-sm text-muted-foreground mb-1">
-              {new Date(entry.created_at).toLocaleDateString()}
+    <div className="space-y-4" id="journal-entries-list" data-tutorial="journal-entries-list">
+      {entries.map((entry) => (
+        <JournalEntryCard 
+          key={entry.id} 
+          entry={entry} 
+          onDelete={() => handleDeleteEntry(entry.id)}
+          showDate={true}
+        />
+      ))}
+      
+      {(isLoadingMore || hasMoreEntries) && (
+        <div className="py-4 flex justify-center">
+          {isLoadingMore ? (
+            <div className="animate-pulse flex items-center">
+              <div className="h-4 w-4 bg-primary rounded-full mr-2"></div>
+              <span className="text-sm text-muted-foreground">
+                <TranslatableText text="Loading..." />
+              </span>
             </div>
-            
-            <p>{entry.content}</p>
-            
-            <div className="mt-2">
-              {processingEntries.length > 0 && (
-                <p className="text-sm text-orange-500">
-                  <TranslatableText text="Processing..." />
-                </p>
-              )}
-              <Button 
-                variant="outline" 
-                size="sm"
-                onClick={() => onDeleteEntry(entry.id)}
-                disabled={processingEntries.length > 0}
-                className={cn(processingEntries.length > 0 && "cursor-not-allowed opacity-75")}
-              >
-                <TranslatableText text="Delete" />
-              </Button>
-            </div>
-          </div>
-        );
-      })}
-      {isLoadingMore && (
-        <div className="flex items-center justify-center py-4">
-          <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+          ) : (
+            <Button 
+              onClick={loadMore} 
+              variant="outline"
+              disabled={!hasMoreEntries}
+            >
+              <TranslatableText text="Load More" />
+            </Button>
+          )}
         </div>
-      )}
-      {hasMoreEntries && (
-        <Button variant="outline" onClick={loadMore}>
-          <TranslatableText text="Load More" />
-        </Button>
       )}
     </div>
   );

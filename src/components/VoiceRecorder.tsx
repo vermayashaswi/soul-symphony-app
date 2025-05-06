@@ -21,22 +21,9 @@ interface VoiceRecorderProps {
   onCancel?: () => void;
   className?: string;
   updateDebugInfo?: (info: {status: string, duration?: number}) => void;
-  audioStatus?: string;
-  recordingDuration?: number;
-  setRecordingDuration?: React.Dispatch<React.SetStateAction<number>>;
-  processingError?: string | null;
 }
 
-export function VoiceRecorder({ 
-  onRecordingComplete, 
-  onCancel, 
-  className, 
-  updateDebugInfo, 
-  audioStatus, 
-  recordingDuration, 
-  setRecordingDuration, 
-  processingError 
-}: VoiceRecorderProps) {
+export function VoiceRecorder({ onRecordingComplete, onCancel, className, updateDebugInfo }: VoiceRecorderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
@@ -45,18 +32,10 @@ export function VoiceRecorder({
   const [audioPrepared, setAudioPrepared] = useState(false);
   const [waitingForClear, setWaitingForClear] = useState(false);
   const [toastsCleared, setToastsCleared] = useState(false);
-  const [toastOperationsLocked, setToastOperationsLocked] = useState(false);
-  const [isUnmounting, setIsUnmounting] = useState(false);
   
-  // Refs to track processing state and prevent race conditions
   const saveCompleteRef = useRef(false);
   const savingInProgressRef = useRef(false);
   const domClearAttemptedRef = useRef(false);
-  const saveStartTimeRef = useRef<number | null>(null);
-  const isFirstSaveAttemptRef = useRef(true);
-  const componentMountedRef = useRef(true);
-  const animationFramesRef = useRef<number[]>([]);
-  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
   
   const { user } = useAuth();
   const { isMobile } = useIsMobile();
@@ -89,192 +68,63 @@ export function VoiceRecorder({
   } = useAudioPlayback({ 
     audioBlob,
     onPlaybackStart: () => {
-      if (!componentMountedRef.current) return;
       console.log('[VoiceRecorder] Playback started');
       setHasPlayedOnce(true);
     },
     onPlaybackEnd: () => {
-      if (!componentMountedRef.current) return;
       console.log('[VoiceRecorder] Playback ended');
     }
   });
-  
-  // Use effect to track component mounting state
+
   useEffect(() => {
-    componentMountedRef.current = true;
+    const clearToastsOnMount = async () => {
+      await ensureAllToastsCleared();
+      setToastsCleared(true);
+    };
     
-    // Enhanced cleanup on unmount
+    clearToastsOnMount();
+    
     return () => {
-      // Mark component as unmounting to prevent further state updates
-      setIsUnmounting(true);
-      componentMountedRef.current = false;
-      
-      // Clear all animation frames
-      animationFramesRef.current.forEach(frameId => {
-        cancelAnimationFrame(frameId);
-      });
-      animationFramesRef.current = [];
-      
-      // Clear all timeouts
-      timeoutsRef.current.forEach(timeout => {
-        clearTimeout(timeout);
-      });
-      timeoutsRef.current = [];
-      
-      // Stop any ongoing audio playback
-      if (audioRef.current) {
-        try {
-          audioRef.current.pause();
-          audioRef.current.src = '';
-          audioRef.current.load();
-        } catch (e) {
-          console.warn('[VoiceRecorder] Error cleaning up audio:', e);
-        }
-      }
-      
-      // Clear any toasts if we're allowed to
-      if (!toastOperationsLocked) {
-        try {
-          clearAllToasts().catch(e => console.warn('[VoiceRecorder] Cleanup error:', e));
-        } catch (err) {
-          console.error('[VoiceRecorder] Error in unmount cleanup:', err);
-        }
-      }
+      clearAllToasts();
     };
   }, []);
 
-  // Helper function to safely create timeouts that won't fire after unmount
-  const safeTimeout = (callback: () => void, delay: number): NodeJS.Timeout => {
-    const timeoutId = setTimeout(() => {
-      if (!componentMountedRef.current) return;
-      callback();
-      // Remove this timeout from our tracking array
-      timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
-    }, delay);
-    
-    // Add to our tracking array for cleanup
-    timeoutsRef.current.push(timeoutId);
-    return timeoutId;
-  };
-  
-  // Helper function for safe state updates
-  const safeSetState = <T,>(setState: React.Dispatch<React.SetStateAction<T>>, value: T | ((prev: T) => T)): void => {
-    if (!componentMountedRef.current || isUnmounting) return;
-    setState(value);
-  };
-
-  // Check if this is likely to be a first-time user (attempt 1)
-  useEffect(() => {
-    const checkForFirstTimeUser = async () => {
-      try {
-        if (user?.id) {
-          // Check localStorage for a marker
-          const hasRecordedBefore = localStorage.getItem(`hasRecorded_${user.id}`);
-          if (!hasRecordedBefore) {
-            console.log('[VoiceRecorder] This appears to be a first-time recorder');
-            isFirstSaveAttemptRef.current = true;
-            
-            // More careful toast handling for first-time users
-            safeSetState(setToastOperationsLocked, true);
-          } else {
-            console.log('[VoiceRecorder] User has recorded before');
-            isFirstSaveAttemptRef.current = false;
-          }
-        }
-      } catch (err) {
-        console.warn('[VoiceRecorder] Error checking first-time user status:', err);
-      }
-    };
-    
-    checkForFirstTimeUser();
-  }, [user?.id]);
-
-  // Clear toasts on component mount with retry mechanism
-  useEffect(() => {
-    // Helper function to clear toasts with retries
-    const clearToastsWithRetry = async (retryCount = 0): Promise<void> => {
-      if (!componentMountedRef.current) return;
-      
-      if (toastOperationsLocked) {
-        console.log('[VoiceRecorder] Toast operations locked, skipping clear');
-        safeSetState(setToastsCleared, true);
-        return;
-      }
-      
-      try {
-        console.log(`[VoiceRecorder] Clearing toasts attempt ${retryCount + 1}`);
-        await ensureAllToastsCleared();
-        safeSetState(setToastsCleared, true);
-      } catch (err) {
-        if (!componentMountedRef.current) return;
-        console.error(`[VoiceRecorder] Error clearing toasts on attempt ${retryCount + 1}:`, err);
-        if (retryCount < 2) {
-          console.log(`[VoiceRecorder] Retrying toast clear in 100ms...`);
-          timeoutsRef.current.push(setTimeout(() => clearToastsWithRetry(retryCount + 1), 100));
-        } else {
-          console.log(`[VoiceRecorder] Max toast clear attempts reached, continuing anyway`);
-          safeSetState(setToastsCleared, true);
-        }
-      }
-    };
-    
-    // Attempt to clear toasts
-    clearToastsWithRetry();
-  }, [toastOperationsLocked]);
-
-  // Reset recording error when recording starts
   useEffect(() => {
     if (isRecording) {
-      safeSetState(setRecordingError, null);
+      setRecordingError(null);
     }
   }, [isRecording]);
   
-  // Show warning for long recordings
   useEffect(() => {
-    if (isRecording && recordingTime >= 120000 && !toastOperationsLocked) {
-      try {
-        toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
-          duration: 3000,
-        });
-      } catch (e) {
-        console.warn('[VoiceRecorder] Error showing warning toast:', e);
-      }
+    if (isRecording && recordingTime >= 120000) {
+      toast.warning("Your recording is quite long. Consider stopping now for better processing.", {
+        duration: 3000,
+      });
     }
-  }, [isRecording, recordingTime, toastOperationsLocked]);
+  }, [isRecording, recordingTime]);
   
-  // Control animation visibility
   useEffect(() => {
-    if (!componentMountedRef.current) return;
-    
     if (isRecording) {
-      safeSetState(setShowAnimation, true);
+      setShowAnimation(true);
     } else if (audioBlob) {
-      safeSetState(setShowAnimation, false);
+      setShowAnimation(false);
     }
   }, [isRecording, audioBlob]);
   
-  // Prepare audio for playback when a new blob is available
   useEffect(() => {
-    if (!componentMountedRef.current) return;
-    
     if (audioBlob && !audioPrepared) {
       console.log('[VoiceRecorder] New audio blob detected, preparing audio...');
       
       prepareAudio().then(duration => {
-        if (!componentMountedRef.current) return;
         console.log('[VoiceRecorder] Audio prepared with duration:', duration);
-        safeSetState(setAudioPrepared, true);
+        setAudioPrepared(true);
       }).catch(error => {
-        if (!componentMountedRef.current) return;
         console.error('[VoiceRecorder] Error preparing audio:', error);
       });
     }
   }, [audioBlob, audioPrepared, prepareAudio]);
   
-  // Debug logging for component state
   useEffect(() => {
-    if (!componentMountedRef.current) return;
-    
     console.log('[VoiceRecorder] State update:', {
       isProcessing,
       hasAudioBlob: !!audioBlob,
@@ -286,81 +136,35 @@ export function VoiceRecorder({
       hasPlayedOnce,
       audioPrepared,
       waitingForClear,
-      toastsCleared,
-      toastOperationsLocked,
-      saveInProgress: savingInProgressRef.current,
-      saveComplete: saveCompleteRef.current,
-      isFirstSaveAttempt: isFirstSaveAttemptRef.current,
-      saveStartTime: saveStartTimeRef.current ? new Date(saveStartTimeRef.current).toISOString() : null,
-      saveElapsedTime: saveStartTimeRef.current ? Date.now() - saveStartTimeRef.current : null
+      toastsCleared
     });
     
-    if (updateDebugInfo && !isUnmounting) {
+    if (updateDebugInfo) {
       updateDebugInfo({
         status: isRecording 
           ? 'Recording' 
-          : (audioBlob ? (isProcessing ? 'Processing' : 'Recorded') : 'No Recording'),
+          : (audioBlob ? 'Recorded' : 'No Recording'),
         duration: audioDuration || (recordingTime / 1000)
       });
     }
   }, [isProcessing, audioBlob, isRecording, hasPermission, audioDuration, hasSaved, hasPlayedOnce, recordingTime, 
-       audioPrepared, waitingForClear, toastsCleared, toastOperationsLocked, updateDebugInfo, isUnmounting]);
+       audioPrepared, waitingForClear, toastsCleared, updateDebugInfo]);
   
-  // Add a recovery mechanism for stuck processing states
   useEffect(() => {
-    // If processing has been going on for more than 30 seconds, it's probably stuck
-    if (isProcessing && saveStartTimeRef.current) {
-      const processingTime = Date.now() - saveStartTimeRef.current;
-      if (processingTime > 30000) { // 30 seconds timeout
-        console.warn('[VoiceRecorder] Processing appears stuck for over 30 seconds. Attempting recovery...');
-        
-        // Only try recovery if we haven't completed the save and component is still mounted
-        if (!saveCompleteRef.current && componentMountedRef.current) {
-          console.log('[VoiceRecorder] Recovery: Re-attempting save completion...');
-          if (audioBlob && onRecordingComplete) {
-            try {
-              console.log('[VoiceRecorder] Recovery: Calling onRecordingComplete directly...');
-              onRecordingComplete(audioBlob);
-              saveCompleteRef.current = true;
-              console.log('[VoiceRecorder] Recovery: Backup save attempt completed');
-              
-              // If this was a first-time user, mark as recorded
-              if (isFirstSaveAttemptRef.current && user?.id) {
-                try {
-                  localStorage.setItem(`hasRecorded_${user.id}`, 'true');
-                  console.log('[VoiceRecorder] Marked user as having recorded before');
-                } catch (err) {
-                  console.warn('[VoiceRecorder] Error saving recording status to localStorage:', err);
-                }
-              }
-            } catch (err) {
-              console.error('[VoiceRecorder] Recovery: Backup save attempt failed:', err);
-            }
-          }
-        }
-        
-        // Regardless, reset UI state to prevent being stuck if component is still mounted
-        if (componentMountedRef.current && !isUnmounting) {
-          safeSetState(setIsProcessing, false);
-          savingInProgressRef.current = false;
-          safeSetState(setToastOperationsLocked, false);
-          
-          console.log('[VoiceRecorder] Recovery: Processing state reset');
-        }
-      }
-    }
-    
     return () => {
+      console.log('[VoiceRecorder] Component unmounting, resetting state');
+      
       if (isProcessing && !saveCompleteRef.current) {
-        console.warn('[VoiceRecorder] Component unmounting during processing - potential source of UI errors');
+        console.warn('[VoiceRecorder] Component unmounted during processing - potential source of UI errors');
       }
+      
+      clearAllToasts();
     };
-  }, [isProcessing, audioBlob, onRecordingComplete, user?.id, isUnmounting]);
+  }, [isProcessing]);
   
-  // The save entry handler with improved robustness
   const handleSaveEntry = async () => {
     if (!audioBlob) {
-      safeSetState(setRecordingError, "No audio recording available");
+      setRecordingError("No audio recording available");
       return;
     }
     
@@ -370,94 +174,59 @@ export function VoiceRecorder({
     }
     
     try {
-      console.log('[VoiceRecorder] Starting save process, first save attempt:', isFirstSaveAttemptRef.current);
+      console.log('[VoiceRecorder] Starting save process');
       savingInProgressRef.current = true;
-      saveStartTimeRef.current = Date.now();
-      
-      // For first-time recorders, we'll be extra careful with toast operations
-      if (isFirstSaveAttemptRef.current) {
-        console.log('[VoiceRecorder] This is a first-time save, using safer approach');
-        safeSetState(setToastOperationsLocked, true);
-      }
       
       // Set processing state IMMEDIATELY before any other operations
-      safeSetState(setIsProcessing, true);
-      safeSetState(setRecordingError, null);
-      safeSetState(setHasSaved, true);
+      setIsProcessing(true);
+      setRecordingError(null);
+      setHasSaved(true);
       
-      // Clear toasts with explicit error handling and retries
-      safeSetState(setWaitingForClear, true);
-      try {
-        if (!toastOperationsLocked && componentMountedRef.current) {
-          console.log('[VoiceRecorder] Clearing toasts before processing');
-          await ensureAllToastsCleared();
-          console.log('[VoiceRecorder] Toasts cleared successfully');
-        } else {
-          console.log('[VoiceRecorder] Toast operations locked, skipping clear');
-        }
-      } catch (err) {
-        console.error('[VoiceRecorder] Error clearing toasts before save, continuing anyway:', err);
-      } finally {
-        // Continue even if toast clearing failed
-        if (componentMountedRef.current && !isUnmounting) {
-          safeSetState(setWaitingForClear, false);
-          safeSetState(setToastsCleared, true);
+      setWaitingForClear(true);
+      
+      await ensureAllToastsCleared();
+      
+      if (!domClearAttemptedRef.current) {
+        domClearAttemptedRef.current = true;
+        try {
+          const toastElements = document.querySelectorAll('[data-sonner-toast]');
+          if (toastElements.length > 0) {
+            console.log(`[VoiceRecorder] Found ${toastElements.length} lingering toasts, removing manually`);
+            toastElements.forEach(el => {
+              if (el.parentNode) {
+                el.parentNode.removeChild(el);
+              }
+            });
+          }
+        } catch (e) {
+          console.error('[VoiceRecorder] Error in manual DOM cleanup:', e);
         }
       }
       
-      // Add a small delay to ensure UI has updated
-      await new Promise<void>((resolve) => {
-        const timeoutId = setTimeout(() => {
-          // Explicitly declare resolve with no parameters to match Promise<void>
-          resolve();
-          
-          // Remove this timeout from our tracking array when it completes
-          timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
-        }, 100);
-        
-        // Add to our tracking array for cleanup
-        timeoutsRef.current.push(timeoutId);
-      });
+      await new Promise(resolve => setTimeout(resolve, 100));
       
-      // Safety check - don't continue if component unmounted during the delay
-      if (!componentMountedRef.current || isUnmounting) {
-        console.log('[VoiceRecorder] Component unmounted during save delay, aborting save');
-        return;
-      }
+      setWaitingForClear(false);
+      setToastsCleared(true);
       
-      // Validate audio duration
       if (!hasPlayedOnce || audioDuration === 0) {
         console.log('[VoiceRecorder] Recording not played yet, preparing audio...');
         
-        try {
-          const duration = await prepareAudio();
-          if (!componentMountedRef.current || isUnmounting) return;
-          
-          console.log('[VoiceRecorder] Audio prepared with duration:', duration);
-          safeSetState(setAudioPrepared, true);
-          
-          if (duration < 0.5) {
-            safeSetState(setRecordingError, "Recording is too short. Please try again.");
-            safeSetState(setIsProcessing, false);
-            safeSetState(setHasSaved, false);
-            savingInProgressRef.current = false;
-            saveStartTimeRef.current = null;
-            safeSetState(setToastOperationsLocked, false);
-            return;
-          }
-        } catch (prepareError) {
-          if (!componentMountedRef.current || isUnmounting) return;
-          
-          console.error('[VoiceRecorder] Error preparing audio:', prepareError);
-          // Continue anyway with duration estimation
+        const duration = await prepareAudio();
+        console.log('[VoiceRecorder] Audio prepared with duration:', duration);
+        setAudioPrepared(true);
+        
+        if (duration < 0.5) {
+          setRecordingError("Recording is too short. Please try again.");
+          setIsProcessing(false);
+          setHasSaved(false);
+          savingInProgressRef.current = false;
+          return;
         }
       } else if (audioDuration < 0.5) {
-        safeSetState(setRecordingError, "Recording is too short. Please try again.");
-        safeSetState(setIsProcessing, false);
-        safeSetState(setHasSaved, false);
+        setRecordingError("Recording is too short. Please try again.");
+        setIsProcessing(false);
+        setHasSaved(false);
         savingInProgressRef.current = false;
-        saveStartTimeRef.current = null;
-        safeSetState(setToastOperationsLocked, false);
         return;
       }
       
@@ -466,11 +235,6 @@ export function VoiceRecorder({
       let normalizedBlob: Blob;
       try {
         normalizedBlob = await normalizeAudioBlob(audioBlob);
-        if (!componentMountedRef.current || isUnmounting) {
-          console.log('[VoiceRecorder] Component unmounted during normalization, aborting');
-          return;
-        }
-        
         console.log('[VoiceRecorder] Blob normalized successfully:', {
           type: normalizedBlob.type,
           size: normalizedBlob.size,
@@ -483,15 +247,11 @@ export function VoiceRecorder({
           throw new Error(validation.errorMessage || "Invalid audio data after normalization");
         }
       } catch (error) {
-        if (!componentMountedRef.current || isUnmounting) return;
-        
         console.error('[VoiceRecorder] Error normalizing audio blob:', error);
-        safeSetState(setRecordingError, "Error processing audio. Please try again.");
-        safeSetState(setIsProcessing, false);
-        safeSetState(setHasSaved, false);
+        setRecordingError("Error processing audio. Please try again.");
+        setIsProcessing(false);
+        setHasSaved(false);
         savingInProgressRef.current = false;
-        saveStartTimeRef.current = null;
-        safeSetState(setToastOperationsLocked, false);
         return;
       }
       
@@ -505,227 +265,97 @@ export function VoiceRecorder({
         blobHasDuration: 'duration' in normalizedBlob
       });
       
-      // Ensure the blob has a duration property
-      if (!('duration' in normalizedBlob)) {
+      if (!hasPlayedOnce && audioDuration === 0 && recordingTime > 0) {
         const estimatedDuration = recordingTime / 1000;
-        console.log(`[VoiceRecorder] Adding estimated duration to blob: ${estimatedDuration}s`);
+        console.log(`[VoiceRecorder] Recording not played yet, estimating duration as ${estimatedDuration}s`);
         
-        try {
-          Object.defineProperty(normalizedBlob, 'duration', {
-            value: estimatedDuration > 0 ? estimatedDuration : 1, // Fallback to 1s if no duration
-            writable: false
-          });
-        } catch (err) {
-          console.warn("[VoiceRecorder] Could not add duration to blob:", err);
+        if (!('duration' in normalizedBlob)) {
+          try {
+            Object.defineProperty(normalizedBlob, 'duration', {
+              value: estimatedDuration,
+              writable: false
+            });
+          } catch (err) {
+            console.warn("[VoiceRecorder] Could not add duration to blob:", err);
+          }
         }
       }
-      
-      // Generate a unique temp ID to track this entry through the processing pipeline
-      const tempId = `temp-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
       
       if (onRecordingComplete) {
         try {
-          console.log(`[VoiceRecorder] Calling recording completion callback with tempId: ${tempId}`);
+          console.log('[VoiceRecorder] Calling recording completion callback');
           saveCompleteRef.current = false;
           
-          // Test base64 conversion first to catch any conversion errors early
-          try {
-            const base64Test = await blobToBase64(normalizedBlob);
-            if (!componentMountedRef.current || isUnmounting) return;
-            
-            console.log('[VoiceRecorder] Base64 test conversion successful, length:', base64Test.length);
-            
-            if (base64Test.length < 50) {
-              throw new Error('Audio data appears too short or invalid');
-            }
-          } catch (base64Error) {
-            if (!componentMountedRef.current || isUnmounting) return;
-            
-            console.error('[VoiceRecorder] Base64 conversion test failed:', base64Error);
+          const base64Test = await blobToBase64(normalizedBlob).catch(err => {
+            console.error('[VoiceRecorder] Base64 conversion test failed:', err);
             throw new Error('Error preparing audio for processing');
-          }
+          });
           
-          // If this is a first-time user, mark as recorded before processing
-          // to help with state tracking in case of errors
-          if (isFirstSaveAttemptRef.current && user?.id) {
-            try {
-              localStorage.setItem(`hasRecorded_${user.id}`, 'true');
-              console.log('[VoiceRecorder] Marked user as having recorded before');
-            } catch (err) {
-              console.warn('[VoiceRecorder] Error saving recording status to localStorage:', err);
-            }
-          }
+          console.log('[VoiceRecorder] Base64 test conversion successful, length:', base64Test.length);
+          console.log('[VoiceRecorder] Directly calling onRecordingComplete with blob');
           
-          // Dispatch events for tracking processing status
-          try {
-            // Pre-announce the entry to help the UI prepare
-            window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
-              detail: { 
-                entries: [tempId], 
-                lastUpdate: Date.now(),
-                forceUpdate: true,
-                showLoader: true
-              }
-            }));
-            
-            // Small delay to ensure event is processed
-            await new Promise<void>((resolve) => {
-              safeTimeout(() => resolve(), 50);
-            });
-          } catch (eventError) {
-            console.warn('[VoiceRecorder] Error dispatching processing event:', eventError);
-          }
-          
-          console.log('[VoiceRecorder] Directly calling onRecordingComplete with blob and tempId:', tempId);
-          await onRecordingComplete(normalizedBlob, tempId);
-          
-          if (!componentMountedRef.current || isUnmounting) {
-            console.log('[VoiceRecorder] Component unmounted during callback, cannot update UI');
-            return;
-          }
+          await onRecordingComplete(normalizedBlob);
           
           saveCompleteRef.current = true;
-          console.log('[VoiceRecorder] Recording callback completed successfully');
-          
-          // Keep toast lock active for first-time users, let the Journal component handle it
-          if (!isFirstSaveAttemptRef.current) {
-            safeSetState(setToastOperationsLocked, false);
-          }
-          
-          isFirstSaveAttemptRef.current = false;
-          
-          // Dispatch an event to inform other components that this entry was saved
-          try {
-            window.dispatchEvent(new CustomEvent('journalEntrySaved', {
-              detail: {
-                tempId,
-                timestamp: Date.now(),
-                status: 'processing'
-              }
-            }));
-          } catch (eventError) {
-            console.warn('[VoiceRecorder] Error dispatching entry saved event:', eventError);
-          }
-        } catch (error: any) {
-          if (!componentMountedRef.current || isUnmounting) return;
-          
-          console.error('[VoiceRecorder] Error in recording callback:', error);
-          safeSetState(setRecordingError, error?.message || "An unexpected error occurred");
-          
-          if (!toastOperationsLocked && componentMountedRef.current) {
-            try {
-              toast.error("Error saving recording", {
-                id: 'error-toast',
-                duration: 3000
-              });
-            } catch (toastError) {
-              console.error('[VoiceRecorder] Error showing error toast:', toastError);
-            }
-          }
-          
-          safeSetState(setIsProcessing, false);
-          safeSetState(setHasSaved, false);
-          safeSetState(setToastOperationsLocked, false);
-        } finally {
-          // Always clean up state
           savingInProgressRef.current = false;
-          saveStartTimeRef.current = null;
+          
+          console.log('[VoiceRecorder] Recording callback completed successfully');
+        } catch (error: any) {
+          console.error('[VoiceRecorder] Error in recording callback:', error);
+          setRecordingError(error?.message || "An unexpected error occurred");
+          
+          setTimeout(() => {
+            toast.error("Error saving recording", {
+              id: 'error-toast',
+              duration: 3000
+            });
+          }, 300);
+          
+          setIsProcessing(false);
+          setHasSaved(false);
+          savingInProgressRef.current = false;
         }
       }
     } catch (error: any) {
-      if (!componentMountedRef.current || isUnmounting) return;
-      
       console.error('[VoiceRecorder] Error in save entry:', error);
-      safeSetState(setRecordingError, error?.message || "An unexpected error occurred");
+      setRecordingError(error?.message || "An unexpected error occurred");
       
-      if (!toastOperationsLocked && componentMountedRef.current) {
-        try {
-          toast.error("Error saving recording", {
-            id: 'error-toast',
-            duration: 3000
-          });
-        } catch (toastError) {
-          console.error('[VoiceRecorder] Error showing error toast:', toastError);
-        }
-      }
+      setTimeout(() => {
+        toast.error("Error saving recording", {
+          id: 'error-toast',
+          duration: 3000
+        });
+      }, 300);
       
-      safeSetState(setIsProcessing, false);
-      safeSetState(setHasSaved, false);
+      setIsProcessing(false);
+      setHasSaved(false);
       savingInProgressRef.current = false;
-      saveStartTimeRef.current = null;
-      safeSetState(setToastOperationsLocked, false);
     }
   };
 
-  // Reset recorder for a new recording
   const handleRestart = async () => {
-    try {
-      if (!toastOperationsLocked && componentMountedRef.current) {
-        await ensureAllToastsCleared();
-      }
-    } catch (err) {
-      console.error('[VoiceRecorder] Error clearing toasts during restart:', err);
-    }
-    
-    if (!componentMountedRef.current) return;
+    await ensureAllToastsCleared();
     
     resetRecording();
     resetPlayback();
-    safeSetState(setRecordingError, null);
-    safeSetState(setShowAnimation, true);
-    safeSetState(setIsProcessing, false);
-    safeSetState(setHasSaved, false);
-    safeSetState(setHasPlayedOnce, false);
-    safeSetState(setAudioPrepared, false);
+    setRecordingError(null);
+    setShowAnimation(true);
+    setIsProcessing(false);
+    setHasSaved(false);
+    setHasPlayedOnce(false);
+    setAudioPrepared(false);
     saveCompleteRef.current = false;
     savingInProgressRef.current = false;
     domClearAttemptedRef.current = false;
-    saveStartTimeRef.current = null;
     
-    await new Promise<void>((resolve) => {
-      const timeoutId = setTimeout(() => {
-        resolve();
-        
-        timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
-      }, 300);
-      
-      timeoutsRef.current.push(timeoutId);
+    await new Promise(resolve => setTimeout(resolve, 300));
+    
+    toast.info("Starting a new recording", {
+      duration: 2000
     });
-    
-    if (!componentMountedRef.current || isUnmounting) return;
-    
-    if (!toastOperationsLocked && componentMountedRef.current) {
-      try {
-        toast.info("Starting a new recording", {
-          duration: 2000
-        });
-      } catch (toastError) {
-        console.error('[VoiceRecorder] Error showing info toast during restart:', toastError);
-      }
-    }
   };
 
   const shouldShowPrompt = !isRecording && !audioBlob;
-
-  // Check for external error and display it
-  useEffect(() => {
-    if (processingError && componentMountedRef.current && !isUnmounting) {
-      safeSetState(setRecordingError, processingError);
-    }
-  }, [processingError, isUnmounting]);
-
-  // Update internal recording time from external source if provided
-  useEffect(() => {
-    if (recordingDuration !== undefined && setRecordingDuration && componentMountedRef.current && !isUnmounting) {
-      // We're just using the external value, not setting it
-      console.log(`[VoiceRecorder] Using external recording duration: ${recordingDuration}`);
-    }
-  }, [recordingDuration, isUnmounting]);
-
-  // Don't render anything if component is unmounting
-  if (isUnmounting) {
-    return null;
-  }
 
   return (
     <div className={cn("flex flex-col items-center relative z-10 w-full mb-[1rem]", className)}>
@@ -736,7 +366,7 @@ export function VoiceRecorder({
         isMobile ? "min-h-[calc(80vh-160px)]" : "min-h-[500px]"
       )}>
         {showAnimation && (
-          <div className="absolute inset-0 w-full h-full flex items-center justify-center pointer-events-none">
+          <div className="absolute inset-0 w-full h-full flex items-center justify-center">
             <FloatingLanguages size="md" />
           </div>
         )}
@@ -750,29 +380,18 @@ export function VoiceRecorder({
               isProcessing={isProcessing}
               hasPermission={hasPermission}
               onRecordingStart={async () => {
-                if (!componentMountedRef.current) return;
-                
                 console.log('[VoiceRecorder] Starting new recording');
-                try {
-                  if (!toastOperationsLocked && componentMountedRef.current) {
-                    await ensureAllToastsCleared();
-                  }
-                } catch (err) {
-                  console.error('[VoiceRecorder] Error clearing toasts before recording:', err);
-                }
+                await ensureAllToastsCleared();
                 startRecording();
               }}
               onRecordingStop={() => {
-                if (!componentMountedRef.current) return;
-                
                 console.log('[VoiceRecorder] Stopping recording');
                 stopRecording();
               }}
               onPermissionRequest={() => {
-                if (!componentMountedRef.current) return;
-                
                 console.log('[VoiceRecorder] Requesting permissions');
-                requestPermissions();
+                requestPermissions().then(granted => {
+                });
               }}
               audioLevel={audioLevel}
               showAnimation={false}
@@ -795,16 +414,8 @@ export function VoiceRecorder({
                   playbackProgress={playbackProgress}
                   audioDuration={audioDuration}
                   onTogglePlayback={async () => {
-                    if (!componentMountedRef.current) return;
-                    
                     console.log('[VoiceRecorder] Toggle playback clicked');
-                    try {
-                      if (!toastOperationsLocked && componentMountedRef.current) {
-                        await ensureAllToastsCleared();
-                      }
-                    } catch (err) {
-                      console.error('[VoiceRecorder] Error clearing toasts before playback:', err);
-                    }
+                    await ensureAllToastsCleared();
                     togglePlayback();
                   }}
                   onSaveEntry={handleSaveEntry}
