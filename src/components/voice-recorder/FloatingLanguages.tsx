@@ -1,131 +1,127 @@
 
-import React from "react";
-import { cn } from "@/lib/utils";
-import { motion } from "framer-motion";
+import React, { useEffect, useRef } from 'react';
+import { motion } from 'framer-motion';
+import { MultilingualTextProps, getLanguageSettings } from './MultilingualTextAnimation';
 
 interface FloatingLanguagesProps {
-  size: "sm" | "md";
+  size?: 'sm' | 'md' | 'lg';
+  contained?: boolean;
 }
 
-const FloatingLanguages: React.FC<FloatingLanguagesProps> = ({ size }) => {
-  const languageWords = [
-    "नमस्ते", "你好", "Hola", "Bonjour", "Ciao", "こんにちは",
-    "Guten Tag", "Olá", "Привет", "Merhaba", "أهلاً", "Shalom",
-    "வணக்கம்", "Ayubowan", "ਸਤਿ ਸ਼੍ਰੀ ਅਕਾਲ", "Kem Chho", "நமஸ்காரம்",
-    "স্বাগতম", "Namaste", "Hello", "Hi", "Hey", "Svenska", "Lietuvių",
-    "Română", "Беларуская", "Gaeilge", "বাংলা", "فارسی", "Русский", "Shqip"
-  ];
-
-  // Generate positions that radiate outward from the center
-  const generateRadialPositions = () => {
-    return languageWords.map((_, i) => {
-      // Calculate angle around the circle (divide the full circle by number of words)
-      const angle = (i / languageWords.length) * 2 * Math.PI;
-      
-      // Calculate distances from center (random within a range)
-      // Initial positions closer to center, animation moves outward
-      const initialDistance = 10 + Math.random() * 20; // Start closer to center
-      const animateDistance = 120 + Math.random() * 150; // Move farther out
-      
-      // Convert polar coordinates to cartesian
-      const initialX = Math.cos(angle) * initialDistance;
-      const initialY = Math.sin(angle) * initialDistance;
-      
-      return {
-        angle,
-        // Initial positions - closer to center
-        initialX,
-        initialY,
-        
-        // Target animation positions - farther from center in same angle
-        targetX: Math.cos(angle) * animateDistance,
-        targetY: Math.sin(angle) * animateDistance,
-        
-        // Visual properties
-        scale: 0.7 + Math.random() * 0.6, // Range from 0.7 to 1.3
-        opacity: 0.3 + Math.random() * 0.4, // Range from 0.3 to 0.7
-        
-        // Timing properties
-        duration: 15 + Math.random() * 25, // Longer durations (15-40s) for smoother motion
-        delay: Math.random() * 5, // Varied delay for more natural start
-      };
+export default function FloatingLanguages({ size = 'md', contained = false }: FloatingLanguagesProps) {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const animationFramesRef = useRef<number[]>([]);
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const mountedRef = useRef(true);
+  
+  // Map size to number of languages
+  const languageCount = size === 'sm' ? 10 : size === 'md' ? 16 : 24;
+  
+  // Get language settings
+  const languages = getLanguageSettings().slice(0, languageCount);
+  
+  // Cleanup function to prevent memory leaks and DOM errors
+  const cleanup = () => {
+    // Cancel all animation frames
+    animationFramesRef.current.forEach(id => {
+      cancelAnimationFrame(id);
     });
+    animationFramesRef.current = [];
+    
+    // Clear all timeouts
+    timeoutsRef.current.forEach(id => {
+      clearTimeout(id);
+    });
+    timeoutsRef.current = [];
   };
-
-  const positions = React.useMemo(() => generateRadialPositions(), []);
-
+  
+  // Set up mount tracking and cleanup
+  useEffect(() => {
+    mountedRef.current = true;
+    
+    return () => {
+      mountedRef.current = false;
+      cleanup();
+    };
+  }, []);
+  
+  // Generate random position within container
+  const getRandomPosition = (i: number): { x: number, y: number } => {
+    if (!containerRef.current) {
+      return { x: 0, y: 0 };
+    }
+    
+    const containerWidth = contained ? containerRef.current.offsetWidth : window.innerWidth;
+    const containerHeight = contained ? containerRef.current.offsetHeight : window.innerHeight;
+    
+    // Generate a spiraling outward pattern to reduce overlap
+    const angle = i * 0.6;
+    const radius = Math.sqrt(i) * 30;
+    
+    const centerX = containerWidth / 2;
+    const centerY = containerHeight / 2;
+    
+    let x = centerX + radius * Math.cos(angle);
+    let y = centerY + radius * Math.sin(angle);
+    
+    // Constrain within boundaries
+    const padding = 20;
+    x = Math.max(padding, Math.min(containerWidth - padding, x));
+    y = Math.max(padding, Math.min(containerHeight - padding, y));
+    
+    return { x, y };
+  };
+  
+  // Create an animation variant for each language
+  const languageItems = languages.map((lang, i) => {
+    const position = getRandomPosition(i);
+    const scale = 0.6 + Math.random() * 0.4; // Random size between 0.6 and 1.0
+    const opacity = 0.7 + Math.random() * 0.3; // Random opacity between 0.7 and 1.0
+    
+    return (
+      <motion.div
+        key={`lang-${i}-${lang}`}
+        className="absolute text-muted-foreground pointer-events-none"
+        initial={{ 
+          opacity: 0,
+          x: position.x,
+          y: position.y,
+          scale: scale * 0.5
+        }}
+        animate={{ 
+          opacity,
+          x: position.x,
+          y: position.y,
+          scale
+        }}
+        transition={{ 
+          duration: 1.5 + Math.random() * 1.0,
+          delay: i * 0.1,
+          ease: "easeOut"
+        }}
+        style={{
+          fontSize: size === 'sm' ? '16px' : size === 'md' ? '24px' : '32px',
+          fontWeight: 500
+        }}
+        // Add safety check for animations
+        onAnimationStart={() => {
+          // Safety check to prevent errors during unmount
+          if (!mountedRef.current) {
+            cleanup();
+          }
+        }}
+      >
+        {lang}
+      </motion.div>
+    );
+  });
+  
   return (
-    <div
-      className={cn(
-        "absolute -z-10 overflow-hidden",
-        size === "sm" ? "text-[0.5rem]" : "text-xs",
-        "will-change-transform"
-      )}
-      style={{
-        width: "100%",
-        height: "100%",
-        left: "40.5%", // Shifted left by 12% from the original position (52.5%)
-        top: "65%", // Keeping the vertical position the same
-        transform: "translate(-50%, -50%)",
-        opacity: 0.8,
-      }}
+    <div 
+      ref={containerRef}
+      className="w-full h-full relative overflow-hidden"
     >
-      <div className="relative h-full w-full">
-        {languageWords.map((word, index) => {
-          const position = positions[index];
-          
-          return (
-            <motion.span
-              key={index}
-              className="absolute whitespace-nowrap transform-gpu"
-              style={{
-                left: "50%", 
-                top: "50%",
-              }}
-              initial={{
-                x: position.initialX,
-                y: position.initialY,
-                scale: 0,
-                opacity: 0
-              }}
-              animate={{
-                x: position.targetX,
-                y: position.targetY,
-                scale: position.scale,
-                opacity: position.opacity
-              }}
-              transition={{
-                x: {
-                  duration: position.duration,
-                  repeat: Infinity,
-                  repeatType: "mirror",
-                  ease: "easeOut",
-                  delay: position.delay,
-                },
-                y: {
-                  duration: position.duration,
-                  repeat: Infinity,
-                  repeatType: "mirror",
-                  ease: "easeOut", 
-                  delay: position.delay,
-                },
-                opacity: {
-                  duration: 2,
-                  delay: position.delay
-                },
-                scale: {
-                  duration: 1.5,
-                  delay: position.delay
-                }
-              }}
-            >
-              {word}
-            </motion.span>
-          );
-        })}
-      </div>
+      {languageItems}
     </div>
   );
 }
-
-export default FloatingLanguages;

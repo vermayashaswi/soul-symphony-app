@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useEffect, useRef } from 'react';
 import { Button } from '@/components/ui/button';
 import { Mic, Loader2 } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -16,6 +16,16 @@ const EmptyJournalState: React.FC<EmptyJournalStateProps> = ({
   onStartRecording,
   isProcessingFirstEntry = false
 }) => {
+  const componentMountedRef = useRef(true);
+  
+  // Track component mount state
+  useEffect(() => {
+    componentMountedRef.current = true;
+    return () => {
+      componentMountedRef.current = false;
+    };
+  }, []);
+  
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
       {isProcessingFirstEntry ? (
@@ -40,7 +50,12 @@ const EmptyJournalState: React.FC<EmptyJournalStateProps> = ({
             <TranslatableText text="Start recording your thoughts and feelings to begin your journaling journey." />
           </p>
           <Button 
-            onClick={onStartRecording} 
+            onClick={() => {
+              // Only proceed if component is still mounted
+              if (componentMountedRef.current && !isProcessingFirstEntry) {
+                onStartRecording();
+              }
+            }} 
             className={cn("flex items-center gap-2", 
               isProcessingFirstEntry && "pointer-events-none opacity-50")}
             disabled={isProcessingFirstEntry}

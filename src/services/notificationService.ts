@@ -1,546 +1,256 @@
 
-import { toast } from "sonner";
+import { toast } from 'sonner';
 
-// Duration constants
-const STANDARD_DURATION = 1000; // 1 second for regular toasts (updated from 5 seconds)
-const ACTIVE_JOB_DURATION = 8000; // 8 seconds for active jobs (unchanged)
-const ERROR_DURATION = 6000; // 6 seconds for errors (unchanged)
+/**
+ * Wait for a specified duration
+ */
+function wait(ms: number): Promise<void> {
+  return new Promise(resolve => setTimeout(resolve, ms));
+}
 
-// Check if we're in a browser environment
-const isBrowser = (): boolean => {
-  return typeof window !== 'undefined';
-};
-
-// Store active toast IDs to prevent duplicates and ensure cleanup
-const activeToasts = new Set<string | number>();
-const toastTimeouts = new Map<string | number, NodeJS.Timeout>();
-
-// Global lock to prevent concurrent toast cleanup operations
-let toastCleanupInProgress = false;
-let cleanupAttempts = 0;
-const MAX_CLEANUP_ATTEMPTS = 3;
-
-// Track special states like first-time user journaling
-let globalToastLockState = false;
-
-// Clear all toast timeouts when needed
-const clearToastTimeouts = () => {
-  try {
-    toastTimeouts.forEach(timeout => {
-      clearTimeout(timeout);
-    });
-    toastTimeouts.clear();
-  } catch (e) {
-    console.warn('[NotificationService] Error clearing toast timeouts:', e);
-  }
-};
-
-// Enhanced toast functions for different types of notifications
-export const showToast = (
-  message: string, 
-  type: "default" | "success" | "error" | "info" | "warning" = "default",
-  isActiveJob = false
-) => {
-  // Skip if there's an active global lock
-  if (globalToastLockState) {
-    console.log(`[NotificationService] Toast operations locked globally, skipping toast: ${type}-${message}`);
-    return;
-  }
-
-  // Deduplicate identical messages that might be in flight
-  const messageKey = `${type}-${message}`;
-  if (activeToasts.has(messageKey)) {
-    console.log(`[NotificationService] Skipping duplicate toast: ${messageKey}`);
-    return;
-  }
+/**
+ * Clear all toasts with retry mechanism
+ * This helps prevent race conditions with toast creation/dismissal
+ */
+export async function clearAllToasts(maxRetries = 3): Promise<void> {
+  let retryCount = 0;
   
-  const duration = isActiveJob ? ACTIVE_JOB_DURATION : 
-                  (type === "error" ? ERROR_DURATION : STANDARD_DURATION);
-  
-  console.log(`[NotificationService] Showing toast: ${message} (${type})`);
-  
-  let toastId;
-  switch (type) {
-    case "success":
-      toastId = toast.success(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-      break;
-    case "error":
-      toastId = toast.error(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-      break;
-    case "info":
-      toastId = toast.info(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-      break;
-    case "warning":
-      toastId = toast.warning(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-      break;
-    default:
-      toastId = toast(message, { 
-        duration, 
-        id: messageKey,
-        onDismiss: () => {
-          activeToasts.delete(messageKey);
-          if (toastTimeouts.has(messageKey)) {
-            clearTimeout(toastTimeouts.get(messageKey)!);
-            toastTimeouts.delete(messageKey);
-          }
-        }
-      });
-  }
-  
-  activeToasts.add(messageKey);
-  
-  // Ensure toasts are cleared after their duration
-  if (duration !== null) {
-    const timeoutId = setTimeout(() => {
-      clearToast(toastId);
-      activeToasts.delete(messageKey);
-      toastTimeouts.delete(messageKey);
-    }, duration + 500); // Add a buffer to ensure toast removal
-    
-    toastTimeouts.set(messageKey, timeoutId);
-  }
-  
-  return toastId;
-};
-
-// Clear a specific toast
-export const clearToast = (toastId: string | number) => {
-  if (globalToastLockState) {
-    console.log(`[NotificationService] Toast operations locked globally, skipping clear for: ${toastId}`);
-    return;
-  }
-  
-  if (toastId) {
-    console.log(`[NotificationService] Clearing toast: ${toastId}`);
+  const attemptClear = async (): Promise<void> => {
     try {
-      toast.dismiss(toastId);
-    } catch (e) {
-      console.warn(`[NotificationService] Error dismissing toast ${toastId}:`, e);
-    }
-  }
-};
-
-// Set global toast lock state
-export const setGlobalToastLock = (locked: boolean) => {
-  console.log(`[NotificationService] Setting global toast lock to: ${locked}`);
-  globalToastLockState = locked;
-};
-
-// Get current global toast lock state
-export const getGlobalToastLock = (): boolean => {
-  return globalToastLockState;
-};
-
-// Safe DOM element removal with thorough checks
-const safeRemoveElement = (element: Element): boolean => {
-  try {
-    // Triple-check that the element exists and has a parent
-    if (!element) return false;
-    if (!element.parentNode) return false;
-    if (!document.body.contains(element)) return false;
-    
-    // Remove the element safely
-    element.parentNode.removeChild(element);
-    return true;
-  } catch (e) {
-    console.warn('[NotificationService] Safe element removal failed:', e);
-    return false;
-  }
-};
-
-// Find and return all toast elements with proper error handling
-const findToastElements = (): Element[] => {
-  try {
-    return Array.from(document.querySelectorAll('[data-sonner-toast]'));
-  } catch (e) {
-    console.warn('[NotificationService] Error finding toast elements:', e);
-    return [];
-  }
-};
-
-// Find and return all toast container elements
-const findToastContainers = (): Element[] => {
-  try {
-    return Array.from(document.querySelectorAll('[data-sonner-toaster]'));
-  } catch (e) {
-    console.warn('[NotificationService] Error finding toast containers:', e);
-    return [];
-  }
-};
-
-// Enhanced aggressive toast clearing function with DOM node existence checks
-export const clearAllToasts = (): Promise<boolean> => {
-  // Skip if there's a global lock active
-  if (globalToastLockState) {
-    console.log('[NotificationService] Toast operations locked globally, skipping clearAllToasts');
-    return Promise.resolve(false);
-  }
-
-  // If a cleanup is already in progress, return the existing promise
-  if (toastCleanupInProgress) {
-    console.log('[NotificationService] Toast cleanup already in progress, deferring request');
-    return new Promise((resolve) => setTimeout(() => resolve(true), 100));
-  }
-
-  console.log('[NotificationService] Clearing all toasts');
-  toastCleanupInProgress = true;
-  cleanupAttempts++;
-  
-  return new Promise((resolve) => {
-    try {
-      // First use the standard dismiss method with try-catch
+      // Dismiss all toasts
+      toast.dismiss();
+      
+      // Wait a bit to ensure they're dismissed
+      await wait(50);
+      
+      // Check if there are any toast elements still in the DOM
+      // This requires DOM access, so we wrap in try/catch
       try {
-        toast.dismiss();
-      } catch (e) {
-        console.warn('[NotificationService] Error in toast.dismiss():', e);
+        const toastElements = document.querySelectorAll('[data-sonner-toast]');
+        if (toastElements.length > 0) {
+          console.log(`[clearAllToasts] ${toastElements.length} toasts still present after dismiss, retrying...`);
+          
+          // Try again with higher retry count
+          if (retryCount < maxRetries) {
+            retryCount++;
+            await wait(100 * retryCount); // Increasing backoff
+            return attemptClear();
+          } else {
+            console.warn(`[clearAllToasts] Failed to clear all toasts after ${maxRetries} attempts`);
+          }
+        } else {
+          console.log('[clearAllToasts] All toasts successfully cleared');
+        }
+      } catch (domError) {
+        // If we can't access DOM, just assume it worked
+        console.warn('[clearAllToasts] Could not verify toast removal from DOM:', domError);
       }
+    } catch (error) {
+      console.error('[clearAllToasts] Error clearing toasts:', error);
       
-      // Clear all timeouts
-      clearToastTimeouts();
-      
-      // Then clear our tracking set
-      activeToasts.clear();
-      
-      setTimeout(() => {
-        // If we're in a browser environment, perform DOM cleanup
-        if (isBrowser()) {
-          try {
-            // Find all toast elements with proper error handling
-            const toastElements = findToastElements();
-            console.log(`[NotificationService] Found ${toastElements.length} toast elements to remove`);
-            
-            // Remove toast elements one by one with safety checks
-            let removedCount = 0;
-            for (const element of toastElements) {
-              if (safeRemoveElement(element)) {
-                removedCount++;
-              }
-            }
-            console.log(`[NotificationService] Successfully removed ${removedCount}/${toastElements.length} toast elements`);
-            
-            // Find toast container elements
-            const containerElements = findToastContainers();
-            console.log(`[NotificationService] Found ${containerElements.length} toast containers`);
-            
-            // Clear children from containers
-            for (const container of containerElements) {
-              try {
-                // Check if container is valid
-                if (!container || !document.body.contains(container)) continue;
-                
-                // Clear all children safely
-                while (container.firstChild) {
-                  try {
-                    if (container.firstChild && container.contains(container.firstChild)) {
-                      container.removeChild(container.firstChild);
-                    } else {
-                      break;
-                    }
-                  } catch (err) {
-                    console.warn('[NotificationService] Error removing container child:', err);
-                    break;
-                  }
-                }
-              } catch (e) {
-                console.warn('[NotificationService] Error clearing container children:', e);
-              }
-            }
-          } catch (e) {
-            console.error('[NotificationService] Error in DOM cleanup:', e);
-          }
-        }
-      }, 50);
-      
-      // Final cleanup after a delay to allow animations to complete
-      setTimeout(() => {
-        try {
-          // Call toast.dismiss() one more time as a final measure
-          try {
-            toast.dismiss();
-          } catch (e) {
-            console.warn('[NotificationService] Error in final toast dismiss:', e);
-          }
-          
-          toastCleanupInProgress = false;
-          console.log('[NotificationService] Toast cleanup completed');
-          resolve(true);
-        } catch (e) {
-          console.error('[NotificationService] Error in final cleanup:', e);
-          toastCleanupInProgress = false;
-          resolve(true);
-        }
-      }, 100);
-    } catch (e) {
-      console.error('[NotificationService] Error in main cleanup flow:', e);
-      toastCleanupInProgress = false;
-      resolve(true);
-    }
-  });
-};
-
-// Function to ensure toasts are completely cleared through multiple attempts
-export const ensureAllToastsCleared = async (): Promise<boolean> => {
-  // Skip if there's a global lock active
-  if (globalToastLockState) {
-    console.log('[NotificationService] Toast operations locked globally, skipping ensureAllToastsCleared');
-    return Promise.resolve(false);
-  }
-  
-  console.log('[NotificationService] Ensuring all toasts are completely cleared');
-  
-  // Reset cleanup attempts counter
-  cleanupAttempts = 0;
-  
-  try {
-    // First attempt
-    await clearAllToasts();
-    
-    // If we've already tried too many times, just return
-    if (cleanupAttempts >= MAX_CLEANUP_ATTEMPTS) {
-      console.log(`[NotificationService] Max cleanup attempts (${MAX_CLEANUP_ATTEMPTS}) reached`);
-      return true;
-    }
-    
-    // Wait a bit and check if any toasts remain
-    await new Promise(resolve => setTimeout(resolve, 100));
-    
-    if (isBrowser()) {
-      try {
-        let remainingToasts = findToastElements();
-        if (remainingToasts.length > 0) {
-          console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after first cleanup`);
-          
-          // Second attempt with more gradual approach
-          await clearAllToasts();
-          
-          // Wait again and check
-          await new Promise(resolve => setTimeout(resolve, 150));
-          
-          // Final check and cleanup
-          remainingToasts = findToastElements();
-          if (remainingToasts.length > 0) {
-            console.log(`[NotificationService] Still found ${remainingToasts.length} toasts, performing final cleanup`);
-            
-            // One final attempt with very conservative approach
-            for (const toast of remainingToasts) {
-              try {
-                // Add animation to fade out - with proper type casting
-                const toastElement = toast as HTMLElement;
-                toastElement.style.opacity = '0';
-                toastElement.style.transition = 'opacity 0.3s ease';
-                
-                // Remove after animation
-                setTimeout(() => {
-                  try {
-                    if (toast.parentNode && document.body.contains(toast)) {
-                      safeRemoveElement(toast);
-                    }
-                  } catch (err) {
-                    // Ignore errors in final cleanup
-                  }
-                }, 300);
-              } catch (e) {
-                // Ignore errors in animation setup
-              }
-            }
-          }
-        }
-      } catch (e) {
-        console.error('[NotificationService] Error checking remaining toasts:', e);
-      }
-    }
-    
-    return true;
-  } catch (e) {
-    console.error('[NotificationService] Error in ensureAllToastsCleared:', e);
-    return true; // Still return true to not block the flow
-  }
-};
-
-// Function to request notification permissions (web only for now)
-export const requestNotificationPermission = async (): Promise<boolean> => {
-  try {
-    // For web browsers
-    if (isBrowser() && 'Notification' in window) {
-      const permission = await Notification.requestPermission();
-      return permission === 'granted';
-    }
-    
-    return false;
-  } catch (error) {
-    console.error('[NotificationService] Error requesting notification permission:', error);
-    return false;
-  }
-};
-
-// Schedule a notification (for reminders) - web only for now
-export const scheduleNotification = async (
-  title: string, 
-  body: string, 
-  hours: number = 24
-): Promise<boolean> => {
-  try {
-    // For web testing - immediate notification if hours is 0, otherwise mock scheduling
-    if (isBrowser() && 'Notification' in window && Notification.permission === 'granted') {
-      if (hours === 0) {
-        // Immediate notification
-        new Notification(title, { body });
-        console.log(`[NotificationService] Sent immediate notification: "${title}"`);
+      // Try again with higher retry count
+      if (retryCount < maxRetries) {
+        retryCount++;
+        await wait(100 * retryCount); // Increasing backoff
+        return attemptClear();
       } else {
-        // This is just a mock for web - on real mobile we would use actual scheduling
-        console.log(`[NotificationService] Scheduled notification: "${title}" for ${hours} hours from now`);
+        throw new Error(`Failed to clear toasts after ${maxRetries} attempts`);
       }
-      
-      return true;
     }
-    return false;
-  } catch (error) {
-    console.error('[NotificationService] Error scheduling notification:', error);
-    return false;
-  }
-};
-
-// New type definitions for notification frequency and time
-export type NotificationFrequency = 'once' | 'twice' | 'thrice';
-export type NotificationTime = 'morning' | 'afternoon' | 'evening' | 'night';
-
-// Get notification times based on selected time preferences
-const getNotificationTimeHours = (timePreferences: NotificationTime[]): number[] => {
-  const times: Record<NotificationTime, number> = {
-    'morning': 8,     // 8:00 AM
-    'afternoon': 14,  // 2:00 PM
-    'evening': 19,    // 7:00 PM
-    'night': 22       // 10:00 PM
   };
   
-  return timePreferences.map(time => times[time]);
-};
+  return attemptClear();
+}
 
-// Get notification days based on frequency
-const getNotificationDays = (frequency: NotificationFrequency): number => {
-  switch (frequency) {
-    case 'once': return 1;  // Once a day
-    case 'twice': return 2; // Twice a day
-    case 'thrice': return 3; // Three times a day
-    default: return 1;
-  }
-};
-
-// Set up journal reminder with frequency and time preferences
-export const setupJournalReminder = async (
-  enabled: boolean,
-  frequency: NotificationFrequency = 'once',
-  timePreferences: NotificationTime[] = ['evening']
-): Promise<void> => {
-  if (!enabled) return;
-  
+/**
+ * Ensure all toasts are cleared, with a DOM check
+ * This uses a more aggressive approach for critical cases
+ */
+export async function ensureAllToastsCleared(): Promise<void> {
   try {
-    const hasPermission = await requestNotificationPermission();
+    // Try normal clear first
+    await clearAllToasts();
     
-    if (hasPermission) {
-      const timeHours = getNotificationTimeHours(timePreferences);
-      const notificationDays = getNotificationDays(frequency);
-      
-      // Limit the notifications per day based on frequency
-      const scheduledTimes = timeHours.slice(0, notificationDays);
-      
-      console.log(`[NotificationService] Setting up ${notificationDays} notifications per day at times:`, scheduledTimes);
-      
-      // Schedule notifications for each selected time
-      for (const hour of scheduledTimes) {
-        // Calculate hours until next notification time
-        const now = new Date();
-        const notificationTime = new Date();
-        notificationTime.setHours(hour, 0, 0, 0);
+    // For good measure, try one more time after a short delay
+    await wait(50);
+    toast.dismiss();
+    
+    // Now check if there are any toast elements in the DOM
+    try {
+      const toastContainer = document.querySelector('[data-sonner-toaster]');
+      if (toastContainer) {
+        const toastElements = toastContainer.querySelectorAll('[data-sonner-toast]');
         
-        // If notification time has passed today, schedule for tomorrow
-        if (now > notificationTime) {
-          notificationTime.setDate(notificationTime.getDate() + 1);
+        if (toastElements.length > 0) {
+          console.warn(`[ensureAllToastsCleared] Found ${toastElements.length} toast elements still in DOM after clearing`);
+          
+          // Try to programmatically click each dismiss button
+          toastElements.forEach((element) => {
+            try {
+              const dismissButton = element.querySelector('[data-dismiss]');
+              if (dismissButton && dismissButton instanceof HTMLElement) {
+                dismissButton.click();
+              }
+            } catch (e) {
+              console.warn('[ensureAllToastsCleared] Error clicking dismiss button:', e);
+            }
+          });
+          
+          // Fallback: Try to remove the entire toast container from the DOM
+          // This is a LAST RESORT approach
+          try {
+            const parent = toastContainer.parentElement;
+            if (parent) {
+              // Instead of removing, hide it
+              (toastContainer as HTMLElement).style.opacity = '0';
+              (toastContainer as HTMLElement).style.pointerEvents = 'none';
+              
+              // And then dismiss again
+              toast.dismiss();
+            }
+          } catch (domError) {
+            console.error('[ensureAllToastsCleared] Error hiding toast container:', domError);
+          }
+        } else {
+          console.log('[ensureAllToastsCleared] All toasts successfully cleared');
         }
-        
-        // Calculate hours difference
-        const hoursDiff = Math.round((notificationTime.getTime() - now.getTime()) / (1000 * 60 * 60));
-        
-        await scheduleNotification(
-          "Journal Reminder",
-          "It's time to check in with yourself. Take a moment to record your thoughts.",
-          hoursDiff
-        );
-        
-        console.log(`[NotificationService] Journal reminder scheduled for ${hour}:00`);
       }
-      
-      // Save notification preferences to localStorage for persistence
-      if (isBrowser()) {
-        localStorage.setItem('notification_enabled', 'true');
-        localStorage.setItem('notification_frequency', frequency);
-        localStorage.setItem('notification_times', JSON.stringify(timePreferences));
-      }
-      
-    } else {
-      showToast("Could not enable notifications. Please check your browser settings.", "error");
+    } catch (domError) {
+      console.warn('[ensureAllToastsCleared] Could not verify toast removal from DOM:', domError);
     }
   } catch (error) {
-    console.error("[NotificationService] Error setting up journal reminder:", error);
-    showToast("Failed to set up notification", "error");
+    console.error('[ensureAllToastsCleared] Error ensuring toasts are cleared:', error);
+    throw error;
   }
-};
+}
 
-// Initialize Capacitor notifications if available
-export const initializeCapacitorNotifications = async (): Promise<void> => {
-  // This is a stub function for the Settings page
-  // In a real implementation, this would initialize Capacitor notifications
-  // But since we're focused on web right now, it's just a placeholder
-  console.log("[NotificationService] Capacitor notifications initialization stub called");
-};
+/**
+ * Create a toast that automatically clears previous toasts
+ */
+export function clearAndToast(
+  message: string, 
+  type: 'success' | 'error' | 'info' | 'warning' = 'info',
+  options?: { id?: string; duration?: number }
+): void {
+  clearAllToasts()
+    .then(() => {
+      switch (type) {
+        case 'success':
+          toast.success(message, options);
+          break;
+        case 'error':
+          toast.error(message, options);
+          break;
+        case 'warning':
+          toast.warning(message, options);
+          break;
+        default:
+          toast(message, options);
+      }
+    })
+    .catch(error => {
+      console.error('[clearAndToast] Error clearing toasts before showing new toast:', error);
+      // Show the toast anyway
+      switch (type) {
+        case 'success':
+          toast.success(message, options);
+          break;
+        case 'error':
+          toast.error(message, options);
+          break;
+        case 'warning':
+          toast.warning(message, options);
+          break;
+        default:
+          toast(message, options);
+      }
+    });
+}
 
-// Clean up function to be called when components unmount
-export const cleanupNotifications = () => {
-  console.log('[NotificationService] Cleaning up notifications');
-  if (!globalToastLockState) {
-    clearAllToasts();
-  }
-  clearToastTimeouts();
-  activeToasts.clear();
-  toastCleanupInProgress = false;
+/**
+ * Create a utility for processing status updates
+ */
+export function createProcessingToast(
+  initialMessage: string,
+  id: string = 'processing-toast'
+): {
+  update: (message: string) => void;
+  success: (message: string) => void;
+  error: (message: string) => void;
+  dismiss: () => void;
+} {
+  // Show the initial toast
+  toast.loading(initialMessage, { id, duration: Infinity });
+  
+  return {
+    update: (message: string) => {
+      toast.loading(message, { id });
+    },
+    success: (message: string) => {
+      toast.success(message, { id, duration: 3000 });
+    },
+    error: (message: string) => {
+      toast.error(message, { id, duration: 5000 });
+    },
+    dismiss: () => {
+      toast.dismiss(id);
+    }
+  };
+}
+
+/**
+ * Utility to add DOM event listeners for toast debugging
+ */
+export function setupToastDebugListeners(): () => void {
+  const handleToastAdded = () => {
+    console.log('[ToastDebug] Toast added to DOM');
+  };
+  
+  const handleToastRemoved = () => {
+    console.log('[ToastDebug] Toast removed from DOM');
+  };
+  
+  const observer = new MutationObserver((mutations) => {
+    mutations.forEach((mutation) => {
+      if (mutation.type === 'childList') {
+        mutation.addedNodes.forEach((node) => {
+          if (node instanceof HTMLElement && node.hasAttribute('data-sonner-toast')) {
+            handleToastAdded();
+          }
+        });
+        
+        mutation.removedNodes.forEach((node) => {
+          if (node instanceof HTMLElement && node.hasAttribute('data-sonner-toast')) {
+            handleToastRemoved();
+          }
+        });
+      }
+    });
+  });
+  
+  // Try to observe the toast container
+  setTimeout(() => {
+    try {
+      const toastContainer = document.querySelector('[data-sonner-toaster]');
+      if (toastContainer) {
+        observer.observe(toastContainer, { childList: true, subtree: true });
+      }
+    } catch (e) {
+      console.error('[setupToastDebugListeners] Error setting up observers:', e);
+    }
+  }, 1000);
+  
+  // Return a cleanup function
+  return () => {
+    observer.disconnect();
+  };
+}
+
+/**
+ * Export utilities for testing
+ */
+export const notificationTestUtils = {
+  wait,
+  clearAllToasts,
+  ensureAllToastsCleared
 };

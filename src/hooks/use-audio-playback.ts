@@ -1,7 +1,6 @@
-
 import { useState, useEffect, useRef, useCallback } from 'react';
 
-interface UseAudioPlaybackProps {
+interface UseAudioPlaybackOptions {
   audioBlob: Blob | null;
   onPlaybackStart?: () => void;
   onPlaybackEnd?: () => void;
@@ -11,296 +10,379 @@ export function useAudioPlayback({
   audioBlob, 
   onPlaybackStart, 
   onPlaybackEnd 
-}: UseAudioPlaybackProps) {
+}: UseAudioPlaybackOptions) {
   const [isPlaying, setIsPlaying] = useState(false);
   const [playbackProgress, setPlaybackProgress] = useState(0);
   const [audioDuration, setAudioDuration] = useState(0);
+  const [audioUrl, setAudioUrl] = useState<string | null>(null);
+  const [audioLoaded, setAudioLoaded] = useState(false);
+  
   const audioRef = useRef<HTMLAudioElement | null>(null);
-  const audioUrlRef = useRef<string | null>(null);
-  const progressIntervalRef = useRef<NodeJS.Timeout | null>(null);
-  const hasLoadedMetadata = useRef(false);
-
-  // Clean up function to stop intervals and revoke URL
-  const cleanup = useCallback(() => {
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
+  const animationFrameRef = useRef<number | null>(null);
+  const componentMountedRef = useRef(true);
+  const timeoutsRef = useRef<NodeJS.Timeout[]>([]);
+  const blobUrlRef = useRef<string | null>(null);
+  
+  // Helper function to safely set state only if component is mounted
+  const safeSetState = <T,>(setter: React.Dispatch<React.SetStateAction<T>>, value: T) => {
+    if (componentMountedRef.current) {
+      setter(value);
+    }
+  };
+  
+  // Clean up function for resources
+  const cleanupResources = useCallback(() => {
+    // Cancel animation frame if active
+    if (animationFrameRef.current !== null) {
+      cancelAnimationFrame(animationFrameRef.current);
+      animationFrameRef.current = null;
     }
     
-    if (audioUrlRef.current) {
-      URL.revokeObjectURL(audioUrlRef.current);
-      audioUrlRef.current = null;
+    // Clear all timeouts
+    timeoutsRef.current.forEach(timeoutId => {
+      clearTimeout(timeoutId);
+    });
+    timeoutsRef.current = [];
+    
+    // Revoke any object URLs
+    if (blobUrlRef.current) {
+      try {
+        URL.revokeObjectURL(blobUrlRef.current);
+      } catch (e) {
+        console.warn('[useAudioPlayback] Error revoking URL:', e);
+      }
+      blobUrlRef.current = null;
     }
   }, []);
-
-  // Effect to handle audio blob changes
+  
+  // Set up mount/unmount tracking
   useEffect(() => {
-    // Reset state when audio changes
-    setIsPlaying(false);
-    setPlaybackProgress(0);
-    hasLoadedMetadata.current = false;
-    
-    // Clean up previous resources
-    cleanup();
-    
-    // Return early if no blob or audio element
-    if (!audioBlob || !audioRef.current) {
-      setAudioDuration(0);
-      return;
-    }
-    
-    console.log('[useAudioPlayback] Creating new URL for audio blob');
-    try {
-      // Create and set new audio URL
-      const url = URL.createObjectURL(audioBlob);
-      audioUrlRef.current = url;
-      audioRef.current.src = url;
-      audioRef.current.load();
-      
-      // Check if blob has duration property we can use immediately
-      if ('duration' in audioBlob && typeof (audioBlob as any).duration === 'number') {
-        const blobDuration = (audioBlob as any).duration;
-        console.log('[useAudioPlayback] Using duration from blob:', blobDuration);
-        setAudioDuration(blobDuration);
-      } else {
-        console.log('[useAudioPlayback] No duration in blob, waiting for loadedmetadata event');
-      }
-    } catch (error) {
-      console.error('[useAudioPlayback] Error setting up audio:', error);
-    }
-    
-    return cleanup;
-  }, [audioBlob, cleanup]);
-
-  // Effect to handle audio element event listeners
-  useEffect(() => {
-    if (!audioRef.current) return;
-    
-    const audio = audioRef.current;
-    
-    const handleLoadedMetadata = () => {
-      console.log('[useAudioPlayback] Audio metadata loaded, duration:', audio.duration);
-      
-      if (isFinite(audio.duration) && audio.duration > 0) {
-        setAudioDuration(audio.duration);
-        hasLoadedMetadata.current = true;
-      } else {
-        console.log('[useAudioPlayback] Invalid duration from metadata:', audio.duration);
-        // Try to use duration from blob if metadata fails
-        if (audioBlob && 'duration' in audioBlob && typeof (audioBlob as any).duration === 'number') {
-          setAudioDuration((audioBlob as any).duration);
-        }
-      }
-    };
-    
-    const handleTimeUpdate = () => {
-      if (audio.duration > 0) {
-        const progress = audio.currentTime / audio.duration;
-        setPlaybackProgress(progress);
-      }
-    };
-    
-    const handleEnded = () => {
-      console.log('[useAudioPlayback] Playback ended');
-      setIsPlaying(false);
-      setPlaybackProgress(1); // Ensure we show 100% complete
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-      if (onPlaybackEnd) onPlaybackEnd();
-    };
-    
-    const handleError = (e: ErrorEvent) => {
-      console.error('[useAudioPlayback] Audio error:', e);
-      setIsPlaying(false);
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-    };
-    
-    // Add event listeners
-    audio.addEventListener('loadedmetadata', handleLoadedMetadata);
-    audio.addEventListener('timeupdate', handleTimeUpdate);
-    audio.addEventListener('ended', handleEnded);
-    audio.addEventListener('error', handleError as EventListener);
+    componentMountedRef.current = true;
     
     return () => {
-      // Remove event listeners
-      audio.removeEventListener('loadedmetadata', handleLoadedMetadata);
-      audio.removeEventListener('timeupdate', handleTimeUpdate);
-      audio.removeEventListener('ended', handleEnded);
-      audio.removeEventListener('error', handleError as EventListener);
+      componentMountedRef.current = false;
+      cleanupResources();
+      
+      // Additional cleanup for audio element
+      if (audioRef.current) {
+        try {
+          audioRef.current.pause();
+          audioRef.current.src = '';
+          audioRef.current.load();
+        } catch (e) {
+          console.warn('[useAudioPlayback] Error cleaning up audio:', e);
+        }
+      }
     };
-  }, [audioBlob, onPlaybackEnd]);
+  }, [cleanupResources]);
 
-  // Handle toggling playback
-  const togglePlayback = useCallback(() => {
-    if (!audioRef.current || !audioBlob) return;
+  // Create and load audio when blob changes
+  useEffect(() => {
+    // Reset state for new blob
+    safeSetState(setIsPlaying, false);
+    safeSetState(setPlaybackProgress, 0);
+    safeSetState(setAudioDuration, 0);
+    safeSetState(setAudioUrl, null);
+    safeSetState(setAudioLoaded, false);
     
-    const audio = audioRef.current;
+    // Clean up previous resources
+    cleanupResources();
     
-    if (isPlaying) {
-      console.log('[useAudioPlayback] Pausing playback');
-      audio.pause();
-      setIsPlaying(false);
-      if (progressIntervalRef.current) {
-        clearInterval(progressIntervalRef.current);
-        progressIntervalRef.current = null;
-      }
-    } else {
-      console.log('[useAudioPlayback] Starting playback');
+    // Only proceed if we have a blob
+    if (!audioBlob) return;
+    
+    // Create a new URL for the blob
+    try {
+      const url = URL.createObjectURL(audioBlob);
+      blobUrlRef.current = url;
+      safeSetState(setAudioUrl, url);
       
-      // If we're at the end, restart from beginning
-      if (audio.currentTime >= audio.duration - 0.1) {
-        audio.currentTime = 0;
-        setPlaybackProgress(0);
-      }
-      
-      // Start playback
-      const playPromise = audio.play();
-      if (playPromise !== undefined) {
-        playPromise
-          .then(() => {
-            setIsPlaying(true);
+      // Wait for next tick to create audio element
+      const timeoutId = setTimeout(() => {
+        if (!componentMountedRef.current) return;
+        
+        // Create audio element if needed
+        if (!audioRef.current) {
+          audioRef.current = new Audio();
+        }
+        
+        // Set up event listeners
+        const audio = audioRef.current;
+        
+        const handleCanPlay = () => {
+          if (!componentMountedRef.current) return;
+          
+          try {
+            safeSetState(setAudioLoaded, true);
+            safeSetState(setAudioDuration, audio.duration || 0);
+            console.log('[useAudioPlayback] Audio loaded, duration:', audio.duration);
+          } catch (e) {
+            console.warn('[useAudioPlayback] Error in canplay handler:', e);
+          }
+        };
+        
+        const handlePlay = () => {
+          if (!componentMountedRef.current) return;
+          try {
+            safeSetState(setIsPlaying, true);
             if (onPlaybackStart) onPlaybackStart();
+            console.log('[useAudioPlayback] Audio playing');
             
-            // Use an interval as a backup to update progress more smoothly
-            // and in case timeupdate events are not firing frequently enough
-            if (!progressIntervalRef.current) {
-              progressIntervalRef.current = setInterval(() => {
-                if (audio.duration > 0) {
-                  const progress = audio.currentTime / audio.duration;
-                  setPlaybackProgress(progress);
+            // Start updating progress
+            const updateProgress = () => {
+              if (!componentMountedRef.current) return;
+              if (!audio) return;
+              
+              try {
+                if (!audio.paused) {
+                  const progress = audio.currentTime / (audio.duration || 1);
+                  safeSetState(setPlaybackProgress, progress);
+                  animationFrameRef.current = requestAnimationFrame(updateProgress);
                 }
-              }, 50); // Update every 50ms for smoother progress
+              } catch (e) {
+                console.warn('[useAudioPlayback] Error updating progress:', e);
+              }
+            };
+            
+            // Start progress updates
+            if (animationFrameRef.current !== null) {
+              cancelAnimationFrame(animationFrameRef.current);
             }
-          })
-          .catch(error => {
-            console.error('[useAudioPlayback] Error playing audio:', error);
-          });
-      }
+            animationFrameRef.current = requestAnimationFrame(updateProgress);
+          } catch (e) {
+            console.warn('[useAudioPlayback] Error in play handler:', e);
+          }
+        };
+        
+        const handlePause = () => {
+          if (!componentMountedRef.current) return;
+          try {
+            safeSetState(setIsPlaying, false);
+            
+            // Stop progress updates
+            if (animationFrameRef.current !== null) {
+              cancelAnimationFrame(animationFrameRef.current);
+              animationFrameRef.current = null;
+            }
+          } catch (e) {
+            console.warn('[useAudioPlayback] Error in pause handler:', e);
+          }
+        };
+        
+        const handleEnded = () => {
+          if (!componentMountedRef.current) return;
+          try {
+            safeSetState(setIsPlaying, false);
+            safeSetState(setPlaybackProgress, 0);
+            
+            if (audio) {
+              audio.currentTime = 0;
+            }
+            
+            if (onPlaybackEnd) onPlaybackEnd();
+            
+            // Stop progress updates
+            if (animationFrameRef.current !== null) {
+              cancelAnimationFrame(animationFrameRef.current);
+              animationFrameRef.current = null;
+            }
+          } catch (e) {
+            console.warn('[useAudioPlayback] Error in ended handler:', e);
+          }
+        };
+        
+        const handleError = (e: ErrorEvent) => {
+          if (!componentMountedRef.current) return;
+          console.error('[useAudioPlayback] Audio error:', e);
+          safeSetState(setIsPlaying, false);
+          safeSetState(setAudioLoaded, false);
+        };
+        
+        // Set up event listeners
+        audio.addEventListener('canplay', handleCanPlay);
+        audio.addEventListener('play', handlePlay);
+        audio.addEventListener('pause', handlePause);
+        audio.addEventListener('ended', handleEnded);
+        audio.addEventListener('error', handleError as EventListener);
+        
+        // Load audio
+        audio.src = url;
+        audio.preload = 'metadata';
+        audio.load();
+        
+        // Clean up on unmount or when audio blob changes
+        return () => {
+          try {
+            audio.removeEventListener('canplay', handleCanPlay);
+            audio.removeEventListener('play', handlePlay);
+            audio.removeEventListener('pause', handlePause);
+            audio.removeEventListener('ended', handleEnded);
+            audio.removeEventListener('error', handleError as EventListener);
+            
+            audio.pause();
+            audio.src = '';
+          } catch (e) {
+            console.warn('[useAudioPlayback] Error removing event listeners:', e);
+          }
+        };
+      }, 10);
+      
+      timeoutsRef.current.push(timeoutId);
+    } catch (e) {
+      console.error('[useAudioPlayback] Error creating audio URL:', e);
     }
-  }, [isPlaying, audioBlob, onPlaybackStart]);
+  }, [audioBlob, onPlaybackStart, onPlaybackEnd, cleanupResources]);
 
-  // Seek to a specific position in the audio
-  const seekTo = useCallback((position: number) => {
-    if (!audioRef.current || !audioBlob) return;
+  // Toggle playback
+  const togglePlayback = useCallback(() => {
+    if (!audioRef.current || !audioLoaded) return;
     
     try {
-      const audio = audioRef.current;
-      const newTime = position * audio.duration;
-      
-      console.log(`[useAudioPlayback] Seeking to position ${position} (${newTime}s)`);
-      
-      if (newTime >= 0 && newTime <= audio.duration) {
-        audio.currentTime = newTime;
-        setPlaybackProgress(position);
+      if (isPlaying) {
+        audioRef.current.pause();
+      } else {
+        audioRef.current.play().catch(e => {
+          console.error('[useAudioPlayback] Error playing audio:', e);
+        });
       }
-    } catch (error) {
-      console.error('[useAudioPlayback] Error seeking:', error);
+    } catch (e) {
+      console.error('[useAudioPlayback] Error toggling playback:', e);
     }
-  }, [audioBlob]);
+  }, [isPlaying, audioLoaded]);
 
-  // Prepare audio for playback (useful to ensure duration is loaded)
-  const prepareAudio = useCallback(async (): Promise<number> => {
-    return new Promise((resolve) => {
-      if (!audioRef.current || !audioBlob) {
-        resolve(0);
-        return;
-      }
-      
-      const audio = audioRef.current;
-      
-      if (hasLoadedMetadata.current && audioDuration > 0) {
-        // Already loaded, return current duration
-        resolve(audioDuration);
-        return;
-      }
-      
-      // Check if blob has duration property
-      if (audioBlob && 'duration' in audioBlob && typeof (audioBlob as any).duration === 'number') {
-        const blobDuration = (audioBlob as any).duration;
-        console.log('[useAudioPlayback] Using duration from blob:', blobDuration);
-        setAudioDuration(blobDuration);
-        resolve(blobDuration);
-        return;
-      }
-      
-      // Try to load metadata if not already loaded
-      const handleLoad = () => {
-        console.log('[useAudioPlayback] Audio loaded, duration:', audio.duration);
-        if (isFinite(audio.duration) && audio.duration > 0) {
-          setAudioDuration(audio.duration);
-          resolve(audio.duration);
-        } else {
-          // Fallback: estimate duration from blob size
-          const estimatedDuration = audioBlob.size / 16000; // ~128kbps
-          console.log('[useAudioPlayback] Using estimated duration:', estimatedDuration);
-          setAudioDuration(estimatedDuration);
-          resolve(estimatedDuration);
-        }
-        audio.removeEventListener('loadedmetadata', handleLoad);
-      };
-      
-      const handleError = () => {
-        console.error('[useAudioPlayback] Error loading audio metadata');
-        // Fallback: estimate duration from blob size
-        const estimatedDuration = audioBlob.size / 16000; // ~128kbps
-        console.log('[useAudioPlayback] Using estimated duration after error:', estimatedDuration);
-        setAudioDuration(estimatedDuration);
-        resolve(estimatedDuration);
-        audio.removeEventListener('loadedmetadata', handleLoad);
-        audio.removeEventListener('error', handleError);
-      };
-      
-      audio.addEventListener('loadedmetadata', handleLoad);
-      audio.addEventListener('error', handleError);
-      
-      // Force load if needed
-      if (!audio.src && audioUrlRef.current) {
-        audio.src = audioUrlRef.current;
-        audio.load();
-      }
-      
-      // Add timeout in case events never fire
-      setTimeout(() => {
-        if (!hasLoadedMetadata.current) {
-          audio.removeEventListener('loadedmetadata', handleLoad);
-          audio.removeEventListener('error', handleError);
-          
-          // Fallback: estimate duration from blob size
-          const estimatedDuration = audioBlob.size / 16000; // ~128kbps
-          console.log('[useAudioPlayback] Timeout - using estimated duration:', estimatedDuration);
-          setAudioDuration(estimatedDuration);
-          resolve(estimatedDuration);
-        }
-      }, 3000);
-    });
-  }, [audioBlob, audioDuration]);
+  // Seek to position
+  const seekTo = useCallback((position: number) => {
+    if (!audioRef.current || !audioLoaded) return;
+    
+    try {
+      const targetTime = position * audioRef.current.duration;
+      audioRef.current.currentTime = targetTime;
+      safeSetState(setPlaybackProgress, position);
+    } catch (e) {
+      console.error('[useAudioPlayback] Error seeking:', e);
+    }
+  }, [audioLoaded]);
 
-  // Reset playback state
+  // Reset playback
   const reset = useCallback(() => {
+    // Clean up resources
+    cleanupResources();
+    
+    // Reset state
+    safeSetState(setIsPlaying, false);
+    safeSetState(setPlaybackProgress, 0);
+    safeSetState(setAudioDuration, 0);
+    safeSetState(setAudioUrl, null);
+    safeSetState(setAudioLoaded, false);
+    
+    // Reset audio element
     if (audioRef.current) {
-      audioRef.current.pause();
-      audioRef.current.currentTime = 0;
+      try {
+        audioRef.current.pause();
+        audioRef.current.src = '';
+        audioRef.current.load();
+      } catch (e) {
+        console.warn('[useAudioPlayback] Error resetting audio:', e);
+      }
+    }
+  }, [cleanupResources]);
+
+  // Prepare audio (ensure it's loaded) and return duration
+  const prepareAudio = useCallback(async (): Promise<number> => {
+    if (!audioBlob) return 0;
+    
+    // If audio is already loaded, return duration
+    if (audioLoaded && audioRef.current) {
+      return audioRef.current.duration;
     }
     
-    setIsPlaying(false);
-    setPlaybackProgress(0);
-    
-    if (progressIntervalRef.current) {
-      clearInterval(progressIntervalRef.current);
-      progressIntervalRef.current = null;
-    }
-  }, []);
+    // Otherwise, prepare it
+    return new Promise((resolve, reject) => {
+      try {
+        // Clean up previous URL
+        if (blobUrlRef.current) {
+          URL.revokeObjectURL(blobUrlRef.current);
+        }
+        
+        // Create new URL
+        const url = URL.createObjectURL(audioBlob);
+        blobUrlRef.current = url;
+        safeSetState(setAudioUrl, url);
+        
+        // Create audio element if needed
+        if (!audioRef.current) {
+          audioRef.current = new Audio();
+        }
+        
+        const audio = audioRef.current;
+        
+        // Set up handlers
+        const handleCanPlay = () => {
+          try {
+            safeSetState(setAudioLoaded, true);
+            safeSetState(setAudioDuration, audio.duration || 0);
+            
+            console.log('[useAudioPlayback] Audio prepared, duration:', audio.duration);
+            resolve(audio.duration || 0);
+          } catch (e) {
+            console.warn('[useAudioPlayback] Error in canplay handler:', e);
+            reject(e);
+          }
+        };
+        
+        const handleError = (e: ErrorEvent) => {
+          console.error('[useAudioPlayback] Audio preparation error:', e);
+          safeSetState(setAudioLoaded, false);
+          reject(new Error('Failed to load audio'));
+        };
+        
+        // Set up event listeners
+        audio.addEventListener('canplay', handleCanPlay, { once: true });
+        audio.addEventListener('error', handleError as EventListener, { once: true });
+        
+        // Set timeout for loading
+        const timeoutId = setTimeout(() => {
+          try {
+            audio.removeEventListener('canplay', handleCanPlay);
+            audio.removeEventListener('error', handleError as EventListener);
+            
+            // Try to get duration anyway, or use the blob duration property
+            const estimatedDuration = 
+              audio.duration || 
+              ('duration' in audioBlob ? (audioBlob as any).duration : 0) || 
+              0;
+            
+            console.warn('[useAudioPlayback] Audio load timed out, using estimated duration:', estimatedDuration);
+            safeSetState(setAudioDuration, estimatedDuration);
+            safeSetState(setAudioLoaded, true);
+            
+            resolve(estimatedDuration);
+          } catch (e) {
+            console.error('[useAudioPlayback] Error in timeout handler:', e);
+            reject(e);
+          }
+        }, 3000);
+        
+        timeoutsRef.current.push(timeoutId);
+        
+        // Load audio
+        audio.src = url;
+        audio.preload = 'metadata';
+        audio.load();
+      } catch (e) {
+        console.error('[useAudioPlayback] Error preparing audio:', e);
+        reject(e);
+      }
+    });
+  }, [audioBlob, audioLoaded]);
 
   return {
     isPlaying,
     playbackProgress,
     audioDuration,
+    audioUrl,
     audioRef,
+    audioLoaded,
     togglePlayback,
     seekTo,
     reset,

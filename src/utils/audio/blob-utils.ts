@@ -1,112 +1,122 @@
 
 /**
- * Converts a Blob to a Base64 string
- * @param blob The audio blob to convert
- * @returns A Promise that resolves to a Base64 string
+ * Utilities for working with audio Blobs
  */
+
+// Convert blob to base64 string
 export async function blobToBase64(blob: Blob): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise<string>((resolve, reject) => {
     try {
       const reader = new FileReader();
-      reader.onloadend = () => {
-        // FileReader result is a string or ArrayBuffer
-        const base64String = reader.result as string;
-        
-        // If the result contains a data URL prefix, extract just the Base64 part
-        const base64Data = base64String.indexOf('base64,') !== -1 
-          ? base64String.split('base64,')[1]
-          : base64String;
-          
-        resolve(base64Data);
+      reader.onload = () => {
+        const dataUrl = reader.result as string;
+        const base64 = dataUrl.split(',')[1];
+        resolve(base64);
       };
-      reader.onerror = reject;
+      reader.onerror = (error) => {
+        console.error('Error converting blob to base64:', error);
+        reject(error);
+      };
       reader.readAsDataURL(blob);
     } catch (error) {
+      console.error('Error in blobToBase64:', error);
       reject(error);
     }
   });
 }
 
-/**
- * Validates an audio blob to ensure it's usable
- * @param blob The audio blob to validate
- * @returns An object with validation results
- */
-export function validateAudioBlob(blob: Blob | null): { 
-  isValid: boolean; 
-  errorMessage?: string 
-} {
-  // Basic validation
+// Basic validation for audio blobs
+export function validateAudioBlob(blob: Blob): { isValid: boolean; errorMessage?: string } {
   if (!blob) {
-    return { isValid: false, errorMessage: "No audio data provided" };
+    return { isValid: false, errorMessage: 'No audio data provided' };
   }
-  
+
   if (blob.size === 0) {
-    return { isValid: false, errorMessage: "Audio file is empty" };
+    return { isValid: false, errorMessage: 'Audio data is empty' };
   }
-  
-  if (blob.size > 25 * 1024 * 1024) {
-    return { isValid: false, errorMessage: "Audio file is too large (> 25MB)" };
+
+  if (!blob.type.startsWith('audio/')) {
+    console.warn(`[validateAudioBlob] Unusual blob type: ${blob.type}. Will try to process anyway.`);
   }
-  
-  // Check for valid audio mime type
-  const validAudioTypes = [
-    'audio/webm', 'audio/mp4', 'audio/mp3', 'audio/mpeg', 
-    'audio/wav', 'audio/wave', 'audio/x-wav', 'audio/ogg',
-    'video/webm', 'video/mp4' // Some recorders use video containers
-  ];
-  
-  if (!validAudioTypes.includes(blob.type)) {
-    console.warn(`[Validation] Unusual audio MIME type: ${blob.type}`);
-    // Continue anyway, as some browsers return non-standard types
-  }
-  
+
   return { isValid: true };
 }
 
-/**
- * Normalizes audio blob by ensuring it has the right format and properties
- * @param blob Original audio blob 
- * @returns Normalized blob with corrected metadata
- */
+// Normalize audio blob with improved error handling
 export async function normalizeAudioBlob(blob: Blob): Promise<Blob> {
-  // If blob already has valid properties, just return it
-  if (blob.type === 'audio/wav' || blob.type === 'audio/webm') {
-    console.log('[BlobUtils] Audio blob already in supported format:', blob.type);
+  // First validate the blob
+  const validation = validateAudioBlob(blob);
+  if (!validation.isValid) {
+    throw new Error(validation.errorMessage || 'Invalid audio blob');
+  }
+  
+  try {
+    // Create safe copies of relevant properties
+    let blobDuration: number | undefined;
+    if ('duration' in blob) {
+      blobDuration = (blob as any).duration;
+    }
+    
+    // For small blobs or when normalization is not needed, just enhance the blob
+    if (blob.size < 10000) {
+      // For small blobs, just add metadata if missing
+      const enhancedBlob = new Blob([blob], { type: blob.type || 'audio/webm;codecs=opus' });
+      
+      // Add duration if it exists in the original
+      if (blobDuration !== undefined) {
+        try {
+          Object.defineProperty(enhancedBlob, 'duration', {
+            value: blobDuration,
+            writable: false
+          });
+        } catch (err) {
+          console.warn("[normalizeAudioBlob] Could not copy duration to blob:", err);
+        }
+      }
+      
+      return enhancedBlob;
+    }
+    
+    // For larger blobs, proper normalization would go here
+    // But for now, we'll just return the blob with metadata
+    
+    // Create a new blob with the same content but potentially fixed type
+    const normalizedBlob = new Blob([blob], { 
+      type: blob.type || 'audio/webm;codecs=opus' 
+    });
+    
+    // Copy duration if it exists
+    if (blobDuration !== undefined) {
+      try {
+        Object.defineProperty(normalizedBlob, 'duration', {
+          value: blobDuration,
+          writable: false
+        });
+      } catch (err) {
+        console.warn("[normalizeAudioBlob] Could not copy duration to blob:", err);
+      }
+    }
+    
+    return normalizedBlob;
+  } catch (error) {
+    console.error('[normalizeAudioBlob] Error normalizing blob:', error);
+    // If normalization fails, return the original blob
     return blob;
   }
+}
+
+// Generate a unique ID for blobs
+export function generateBlobId(): string {
+  return `blob-${Date.now()}-${Math.random().toString(36).substring(2, 10)}`;
+}
+
+// Safe revocation of blob URLs with error handling
+export function safeRevokeObjectURL(url: string | null): void {
+  if (!url) return;
   
-  // If blob type is not specified or not recognized, try to infer it
-  let detectedType = blob.type || 'audio/webm';
-  
-  // Convert blob to ArrayBuffer to check header bytes
   try {
-    const arrayBuffer = await blob.arrayBuffer();
-    const header = new Uint8Array(arrayBuffer.slice(0, 4));
-    
-    // Check WebM signature (0x1A 0x45 0xDF 0xA3)
-    if (header[0] === 0x1A && header[1] === 0x45 && header[2] === 0xDF && header[3] === 0xA3) {
-      detectedType = 'audio/webm';
-    }
-    // Check WAV signature (RIFF header)
-    else if (header[0] === 0x52 && header[1] === 0x49 && header[2] === 0x46 && header[3] === 0x46) {
-      detectedType = 'audio/wav';
-    }
+    URL.revokeObjectURL(url);
   } catch (error) {
-    console.warn('[BlobUtils] Failed to detect file type from header bytes:', error);
+    console.warn('[safeRevokeObjectURL] Error revoking URL:', error);
   }
-  
-  // Create a new blob with the correct type
-  console.log('[BlobUtils] Normalizing audio blob to type:', detectedType);
-  const normalizedBlob = new Blob([await blob.arrayBuffer()], { type: detectedType });
-  
-  // Copy over duration property if present
-  if ('duration' in blob) {
-    Object.defineProperty(normalizedBlob, 'duration', {
-      value: (blob as any).duration,
-      writable: false
-    });
-  }
-  
-  return normalizedBlob;
 }
