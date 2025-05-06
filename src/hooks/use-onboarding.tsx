@@ -20,7 +20,7 @@ export function useOnboarding() {
       setDisplayName(name);
     }
     
-    // Also clear the tutorial flag to ensure tutorial shows for all users
+    // Always clear the tutorial flag to ensure tutorial shows
     localStorage.removeItem('soulo_visited_app_before');
     
     setLoading(false);

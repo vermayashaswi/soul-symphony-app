@@ -153,6 +153,7 @@ const TutorialContext = createContext<TutorialContextType | undefined>(undefined
 // Storage keys
 const TUTORIAL_COMPLETED_KEY = 'soulo_tutorial_completed';
 const TUTORIAL_CURRENT_STEP_KEY = 'soulo_tutorial_current_step';
+const VISITED_APP_BEFORE_KEY = 'soulo_visited_app_before';
 
 // Provider component
 export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -165,12 +166,23 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   
   // Load tutorial state from localStorage on mount
   useEffect(() => {
-    const completedStatus = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === 'true';
-    setIsTutorialCompleted(completedStatus);
+    // Check for the special reset flag set in App.tsx
+    const tutorialReset = localStorage.getItem('tutorial_reset_20250506') === 'true';
     
-    const savedStep = localStorage.getItem(TUTORIAL_CURRENT_STEP_KEY);
-    if (savedStep) {
-      setCurrentStep(parseInt(savedStep, 10));
+    if (tutorialReset) {
+      // If we're in reset mode, force the tutorial to be incomplete
+      setIsTutorialCompleted(false);
+      setCurrentStep(0);
+      console.log('Tutorial reset detected, forcing tutorial to show');
+    } else {
+      // Normal behavior - check if tutorial was completed
+      const completedStatus = localStorage.getItem(TUTORIAL_COMPLETED_KEY) === 'true';
+      setIsTutorialCompleted(completedStatus);
+      
+      const savedStep = localStorage.getItem(TUTORIAL_CURRENT_STEP_KEY);
+      if (savedStep) {
+        setCurrentStep(parseInt(savedStep, 10));
+      }
     }
   }, []);
 
@@ -197,9 +209,12 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       !isActive && // Tutorial not already active
       (location.pathname === '/app' || location.pathname === '/app/home') // We're on the main app route or home
     ) {
+      console.log('Tutorial conditions met, should show tutorial');
+      
       // Start tutorial with slight delay to ensure the UI is ready
       setTimeout(() => {
         setIsActive(true);
+        console.log('Tutorial activated');
       }, 1000);
     }
   }, [user, location.pathname, isTutorialCompleted, isActive]);
@@ -231,8 +246,10 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Start the tutorial
   const startTutorial = () => {
+    console.log('Tutorial manually started');
     setCurrentStep(0);
     setIsActive(true);
+    localStorage.removeItem(VISITED_APP_BEFORE_KEY);
   };
 
   // Move to next step
@@ -253,20 +270,29 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Skip the tutorial
   const skipTutorial = () => {
+    console.log('Tutorial skipped');
     setIsActive(false);
     setIsTutorialCompleted(true);
+    localStorage.setItem(VISITED_APP_BEFORE_KEY, 'true');
   };
 
   // Complete the tutorial
   const completeTutorial = () => {
+    console.log('Tutorial completed');
     setIsActive(false);
     setIsTutorialCompleted(true);
+    localStorage.setItem(VISITED_APP_BEFORE_KEY, 'true');
   };
 
   // Reset the tutorial
   const resetTutorial = () => {
+    console.log('Tutorial manually reset');
     setCurrentStep(0);
     setIsTutorialCompleted(false);
+    localStorage.removeItem(TUTORIAL_COMPLETED_KEY);
+    localStorage.removeItem(TUTORIAL_CURRENT_STEP_KEY);
+    localStorage.removeItem(VISITED_APP_BEFORE_KEY);
+    localStorage.removeItem('onboardingComplete');
   };
 
   return (

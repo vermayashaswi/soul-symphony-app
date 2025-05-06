@@ -14,11 +14,20 @@ const TutorialManager: React.FC = () => {
   const { user } = useAuth();
   const { resetTutorial } = useTutorial();
   
-  // Reset tutorial when user logs in
+  // Check for reset flag from App.tsx
   useEffect(() => {
-    if (user) {
-      // Reset tutorial when user logs in so it will show again
+    const tutorialReset = localStorage.getItem('tutorial_reset_20250506') === 'true';
+    
+    // Reset tutorial when user logs in or when reset flag is present
+    if (user && (tutorialReset || !localStorage.getItem('soulo_tutorial_completed'))) {
+      console.log('TutorialManager: Resetting tutorial for user login or by reset flag');
       resetTutorial();
+      
+      // After resetting, remove the global reset flag to prevent infinite resets
+      // This allows the user to dismiss the tutorial if they want
+      if (tutorialReset) {
+        localStorage.removeItem('tutorial_reset_20250506');
+      }
     }
   }, [user, resetTutorial]);
   

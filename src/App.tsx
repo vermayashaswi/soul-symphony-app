@@ -46,6 +46,27 @@ const App: React.FC = () => {
       console.log('Fixing malformed URL path:', currentPath);
       window.history.replaceState(null, '', '/');
     }
+
+    // TEMPORARY SOLUTION: Reset all tutorial flags in localStorage
+    // This will ensure the tutorial shows up again for all users
+    // Remove this block once all users have seen the tutorial again
+    const resetAllTutorialFlags = () => {
+      console.log('Resetting all tutorial flags in localStorage');
+      localStorage.removeItem('soulo_tutorial_completed');
+      localStorage.removeItem('soulo_tutorial_current_step');
+      localStorage.removeItem('onboardingComplete');
+      localStorage.removeItem('soulo_visited_app_before');
+      
+      // Set a flag to indicate we've already reset the flags for this user's session
+      // This prevents resetting on every app reload
+      if (!localStorage.getItem('tutorial_reset_20250506')) {
+        localStorage.setItem('tutorial_reset_20250506', 'true');
+        console.log('Tutorial flags reset complete');
+      }
+    };
+
+    // Execute the reset
+    resetAllTutorialFlags();
   }, []);
 
   return (
