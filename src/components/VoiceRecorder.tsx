@@ -21,9 +21,13 @@ interface VoiceRecorderProps {
   onCancel?: () => void;
   className?: string;
   updateDebugInfo?: (info: {status: string, duration?: number}) => void;
+  audioStatus?: string;
+  recordingDuration?: number;
+  setRecordingDuration?: React.Dispatch<React.SetStateAction<number>>;
+  processingError?: string | null;
 }
 
-export function VoiceRecorder({ onRecordingComplete, onCancel, className, updateDebugInfo }: VoiceRecorderProps) {
+export function VoiceRecorder({ onRecordingComplete, onCancel, className, updateDebugInfo, audioStatus, recordingDuration, setRecordingDuration, processingError }: VoiceRecorderProps) {
   const [isProcessing, setIsProcessing] = useState(false);
   const [recordingError, setRecordingError] = useState<string | null>(null);
   const [showAnimation, setShowAnimation] = useState(true);
