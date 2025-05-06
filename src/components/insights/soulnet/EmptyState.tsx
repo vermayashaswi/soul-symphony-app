@@ -4,7 +4,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
 
 interface EmptyStateProps {
-  onStartRecording?: () => void; // Make sure this is defined and optional
+  onStartRecording: () => void; // Make this required since it's being used
 }
 
 export const EmptyState = ({ onStartRecording }: EmptyStateProps) => {
@@ -23,15 +23,13 @@ export const EmptyState = ({ onStartRecording }: EmptyStateProps) => {
         <TranslatableText text="Add more journal entries to visualize connections between entities and emotions in your journaling." />
       </p>
       
-      {onStartRecording && (
-        <Button 
-          onClick={onStartRecording}
-          variant="default"
-          className="mt-6"
-        >
-          <TranslatableText text="Start Recording" />
-        </Button>
-      )}
+      <Button 
+        onClick={onStartRecording}
+        variant="default"
+        className="mt-6"
+      >
+        <TranslatableText text="Start Recording" />
+      </Button>
     </div>
   );
 };
