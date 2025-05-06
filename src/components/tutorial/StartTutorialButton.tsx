@@ -4,6 +4,8 @@ import { Button } from '@/components/ui/button';
 import { HelpCircle } from 'lucide-react';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useLocation } from 'react-router-dom';
+import { isAppRoute } from '@/routes/RouteHelpers';
 
 interface StartTutorialButtonProps {
   variant?: 'default' | 'outline' | 'ghost';
@@ -17,6 +19,13 @@ const StartTutorialButton: React.FC<StartTutorialButtonProps> = ({
   className = '',
 }) => {
   const { startTutorial, isTutorialActive } = useTutorial();
+  const location = useLocation();
+  const isAppPath = isAppRoute(location.pathname);
+
+  // Don't render the button on non-app routes
+  if (!isAppPath) {
+    return null;
+  }
 
   const handleStartTutorial = () => {
     if (!isTutorialActive) {

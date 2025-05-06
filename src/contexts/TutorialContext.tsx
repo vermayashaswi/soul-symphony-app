@@ -2,6 +2,7 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { isAppRoute } from '@/routes/RouteHelpers';
 
 export type TutorialStep = {
   id: string;
@@ -94,17 +95,26 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [completedSteps, setCompletedSteps] = useState<Record<string, boolean>>({});
   const location = useLocation();
   const { onboardingComplete, completeOnboarding } = useOnboarding();
+  
+  // Check if this is an app route
+  const isAppPath = isAppRoute(location.pathname);
 
-  // Check if we should show tutorial on initial load
+  // Only show tutorial on app routes, not on the marketing website
   useEffect(() => {
+    // If not on an app route, make sure tutorial is inactive
+    if (!isAppPath) {
+      setIsTutorialActive(false);
+      return;
+    }
+
     const tutorialShown = localStorage.getItem('tutorialShown') === 'true';
 
-    if (onboardingComplete === false && !tutorialShown) {
-      // Only show tutorial automatically on first app usage
+    if (onboardingComplete === false && !tutorialShown && isAppPath) {
+      // Only show tutorial automatically on first app usage and only on app routes
       setIsTutorialActive(true);
       localStorage.setItem('tutorialShown', 'true');
     }
-  }, [onboardingComplete]);
+  }, [onboardingComplete, isAppPath]);
 
   // Navigate to the correct route when the tutorial step changes
   useEffect(() => {
@@ -116,8 +126,11 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [currentStepIndex, isTutorialActive, location.pathname]);
 
   const startTutorial = () => {
-    setCurrentStepIndex(0);
-    setIsTutorialActive(true);
+    // Only allow starting tutorial on app routes
+    if (isAppPath) {
+      setCurrentStepIndex(0);
+      setIsTutorialActive(true);
+    }
   };
 
   const endTutorial = () => {

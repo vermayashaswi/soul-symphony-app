@@ -3,8 +3,9 @@ import React, { useEffect, useRef, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useTutorial, TutorialStep } from '@/contexts/TutorialContext';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { isAppRoute } from '@/routes/RouteHelpers';
 import { 
   ChevronRight, 
   ChevronLeft, 
@@ -27,6 +28,15 @@ const TutorialOverlay = () => {
   const [targetElementPosition, setTargetElementPosition] = useState({ top: 0, left: 0, width: 0, height: 0 });
   const tooltipRef = useRef<HTMLDivElement>(null);
   const navigate = useNavigate();
+  const location = useLocation();
+  
+  // Only show tutorial on app routes
+  const isAppPath = isAppRoute(location.pathname);
+  
+  // If not on an app route, don't render anything
+  if (!isAppPath) {
+    return null;
+  }
   
   // Find the target element and calculate its position
   useEffect(() => {
