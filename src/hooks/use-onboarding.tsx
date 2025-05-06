@@ -20,6 +20,9 @@ export function useOnboarding() {
       setDisplayName(name);
     }
     
+    // Also clear the tutorial flag to ensure tutorial shows for all users
+    localStorage.removeItem('soulo_visited_app_before');
+    
     setLoading(false);
   }, []);
 
@@ -31,6 +34,11 @@ export function useOnboarding() {
   const resetOnboarding = () => {
     localStorage.removeItem('onboardingComplete');
     setOnboardingComplete(false);
+    
+    // Also reset tutorial state
+    localStorage.removeItem('soulo_tutorial_completed');
+    localStorage.removeItem('soulo_tutorial_current_step');
+    localStorage.removeItem('soulo_visited_app_before');
   };
 
   const saveNameToProfile = async (userId: string, name: string) => {

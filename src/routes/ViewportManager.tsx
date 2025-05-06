@@ -1,13 +1,29 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Outlet, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { TutorialProvider } from '@/contexts/TutorialContext';
+import { TutorialProvider, useTutorial } from '@/contexts/TutorialContext';
 import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
+
+// Separate component to use the tutorial hook inside the TutorialProvider
+const TutorialManager: React.FC = () => {
+  const { user } = useAuth();
+  const { resetTutorial } = useTutorial();
+  
+  // Reset tutorial when user logs in
+  useEffect(() => {
+    if (user) {
+      // Reset tutorial when user logs in so it will show again
+      resetTutorial();
+    }
+  }, [user, resetTutorial]);
+  
+  return null;
+};
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
@@ -25,6 +41,7 @@ const ViewportManager: React.FC = () => {
   // Render the appropriate layout based on route and device
   return (
     <TutorialProvider>
+      <TutorialManager />
       <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} overflow-x-hidden`}>
         <Outlet />
       </div>

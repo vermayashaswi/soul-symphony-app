@@ -1,4 +1,3 @@
-
 import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -188,24 +187,19 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }
   }, [currentStep, isActive]);
 
-  // Check if we should auto-start the tutorial
+  // Show tutorial for all logged in users on app routes
   useEffect(() => {
     if (
       user && // User must be logged in
       isAppRoute(location.pathname) && // Must be on an app route
       !isTutorialCompleted && // Tutorial not completed
       !isActive && // Tutorial not already active
-      location.pathname === '/app' // We're on the main app route
+      location.pathname === '/app' || location.pathname === '/app/home' // We're on the main app route or home
     ) {
-      // Auto-start only if this is the first visit after login
-      const hasVisitedBefore = localStorage.getItem('soulo_visited_app_before') === 'true';
-      if (!hasVisitedBefore) {
-        localStorage.setItem('soulo_visited_app_before', 'true');
-        // Slight delay to ensure the UI is ready
-        setTimeout(() => {
-          setIsActive(true);
-        }, 1000);
-      }
+      // Start tutorial with slight delay to ensure the UI is ready
+      setTimeout(() => {
+        setIsActive(true);
+      }, 1000);
     }
   }, [user, location.pathname, isTutorialCompleted, isActive]);
 
