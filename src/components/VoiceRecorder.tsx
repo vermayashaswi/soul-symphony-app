@@ -408,7 +408,7 @@ export function VoiceRecorder({
       // Add a small delay to ensure UI has updated
       await new Promise<void>((resolve) => {
         const timeoutId = setTimeout(() => {
-          resolve();
+          resolve(); // Call resolve with no arguments to match () => void
           // Remove this timeout from our tracking array when it completes
           timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
         }, 100);
@@ -677,9 +677,9 @@ export function VoiceRecorder({
     domClearAttemptedRef.current = false;
     saveStartTimeRef.current = null;
     
-    await new Promise<void>(resolve => {
+    await new Promise<void>((resolve) => {
       const timeoutId = setTimeout(() => {
-        resolve();
+        resolve(); // Call resolve with no arguments to match () => void
         timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
       }, 300);
       timeoutsRef.current.push(timeoutId);
