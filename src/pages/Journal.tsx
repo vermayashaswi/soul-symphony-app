@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -898,4 +899,196 @@ const Journal = () => {
       const updatedProcessingEntries = processingEntries.filter(
         tempId => !tempIdsToDelete.includes(tempId) && getEntryIdForProcessingId(tempId) !== entryId
       );
-      setProcessing
+      setProcessingEntries(updatedProcessingEntries);
+      
+      // Apply local changes to entries before database changes are reflected
+      setLocalEntries(prev => prev.filter(entry => entry.id !== entryId));
+      setPendingDeletionIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(entryId);
+        return newSet;
+      });
+      setHasLocalChanges(true);
+      
+      if (deletingEntryId === entryId) {
+        setDeletingEntryId(null);
+      }
+      
+      const { error } = await supabase
+        .from('journal_entries')
+        .delete()
+        .eq('id', entryId);
+      
+      if (error) {
+        console.error(`[Journal] Error deleting entry ${entryId}:`, error);
+        throw new Error(error.message);
+      }
+      
+      console.log(`[Journal] Entry ${entryId} successfully deleted`);
+      
+      setRefreshKey(prev => prev + 1);
+      fetchEntries();
+      
+      toast.success('Entry deleted successfully', {
+        duration: 3000,
+        closeButton: false
+      });
+      
+      // Update search results if active
+      if (filteredEntries.length > 0) {
+        setFilteredEntries(prev => prev.filter(entry => entry.id !== entryId));
+      }
+    } catch (error) {
+      console.error('[Journal] Error deleting entry:', error);
+      
+      // Revert local changes
+      setPendingDeletionIds(prev => {
+        const newSet = new Set(prev);
+        newSet.delete(entryId);
+        return newSet;
+      });
+      
+      setLocalEntries(lastSuccessfulEntriesRef.current);
+      setHasLocalChanges(false);
+      
+      toast.error('Failed to delete entry', {
+        duration: 3000,
+        closeButton: false
+      });
+    } finally {
+      setIsDeletingEntry(false);
+    }
+  }, [user?.id, isDeletingEntry, processingEntries, toastIds, fetchEntries, filteredEntries.length]);
+
+  // Define the function to handle searching
+  const handleSearch = useCallback((searchResults: JournalEntry[]) => {
+    setFilteredEntries(searchResults);
+  }, []);
+
+  // Define function to clear search results
+  const clearSearchResults = useCallback(() => {
+    setFilteredEntries([]);
+  }, []);
+
+  // Format bytes to human-readable string
+  const formatBytes = (bytes: number, decimals = 2) => {
+    if (!bytes) return '0 Bytes';
+    
+    const k = 1024;
+    const dm = decimals < 0 ? 0 : decimals;
+    const sizes = ['Bytes', 'KB', 'MB', 'GB'];
+    
+    const i = Math.floor(Math.log(bytes) / Math.log(k));
+    
+    return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
+  };
+
+  if (hasRenderError) {
+    return (
+      <div className="p-4 border border-red-500 rounded-md">
+        <div className="flex items-center mb-2">
+          <AlertCircle className="text-red-500 mr-2 h-5 w-5" />
+          <h3 className="text-lg font-semibold">Rendering Error</h3>
+        </div>
+        <p className="mb-4">There was a problem rendering the journal.</p>
+        <Button 
+          onClick={() => {
+            setHasRenderError(false);
+            setRefreshKey(prev => prev + 1);
+            window.location.reload();
+          }}
+          className="flex items-center gap-2"
+        >
+          <RefreshCw className="h-4 w-4" />
+          <span>Try Again</span>
+        </Button>
+      </div>
+    );
+  }
+
+  if (!isProfileChecked || isCheckingProfile) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh]">
+        <Loader2 className="h-8 w-8 animate-spin text-primary mb-4" />
+        <p className="text-lg text-center">
+          <TranslatableText text="Loading your journal..." />
+        </p>
+      </div>
+    );
+  }
+
+  if (showRetryButton) {
+    return (
+      <div className="flex flex-col items-center justify-center h-[50vh]">
+        <div className="flex items-center mb-4 text-amber-500">
+          <AlertCircle className="h-8 w-8 mr-2" />
+        </div>
+        <p className="text-lg text-center mb-4">
+          <TranslatableText text="There was a problem loading your journal profile." />
+        </p>
+        <Button onClick={handleRetryProfileCreation} className="flex items-center gap-2">
+          <RefreshCw className="h-4 w-4" />
+          <TranslatableText text="Retry" />
+        </Button>
+      </div>
+    );
+  }
+
+  return (
+    <ErrorBoundary>
+      <div className="container max-w-4xl mx-auto pb-20">
+        <JournalHeader />
+        
+        <Tabs 
+          value={activeTab} 
+          onValueChange={handleTabChange}
+          className="mt-6"
+          defaultValue="record"
+        >
+          <TabsList className="grid w-full grid-cols-2 mb-4 bg-background border">
+            <TabsTrigger value="record">
+              <TranslatableText text="Record" />
+            </TabsTrigger>
+            <TabsTrigger value="entries">
+              <TranslatableText text="Entries" />
+            </TabsTrigger>
+          </TabsList>
+          
+          <TabsContent value="record" className="mt-2">
+            <VoiceRecorder 
+              onRecordingComplete={handleRecordingComplete}
+              isRecording={false}
+              audioStatus={audioStatus}
+              recordingDuration={recordingDuration}
+              setRecordingDuration={setRecordingDuration}
+              processingError={processingError}
+            />
+          </TabsContent>
+          
+          <TabsContent value="entries" className="mt-0">
+            <div className="mb-4">
+              <JournalSearch onSearch={handleSearch} onClearSearch={clearSearchResults} />
+            </div>
+            
+            <div ref={entriesListRef}>
+              <JournalEntriesList
+                entries={filteredEntries.length > 0 ? filteredEntries : localEntries}
+                loading={loading && !hasLocalChanges}
+                loadMore={() => {}} // Placeholder for pagination
+                hasMoreEntries={false} // Placeholder for pagination
+                isLoadingMore={false} // Placeholder for pagination
+                onDeleteEntry={handleDeleteEntry}
+                processingEntries={processingEntries}
+                processedEntryIds={processedEntryIds}
+                onStartRecording={handleStartRecording}
+                isProcessingFirstEntry={isProcessingFirstEntry}
+              />
+            </div>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </ErrorBoundary>
+  );
+};
+
+export default Journal;
