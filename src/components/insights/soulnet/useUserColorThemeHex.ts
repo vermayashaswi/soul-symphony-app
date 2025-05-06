@@ -4,18 +4,22 @@ import { useTheme } from '@/hooks/use-theme';
 export function useUserColorThemeHex() {
   const { colorTheme, customColor } = useTheme();
   switch (colorTheme) {
-    case 'Default':
+    case 'blue':
       return '#3b82f6';
-    case 'Calm':
-      return '#8b5cf6';
-    case 'Soothing':
-      return '#FFDEE2';
-    case 'Energy':
-      return '#f59e0b';
-    case 'Focus':
+    case 'green':
       return '#10b981';
-    case 'Custom':
-      return customColor || '#3b82f6';
+    case 'purple':
+      return '#8b5cf6';
+    case 'pink':
+      return '#ec4899';
+    case 'orange':
+      return '#f97316';
+    case 'red':
+      return '#ef4444';
+    case 'teal':
+      return '#14b8a6';
+    case 'indigo':
+      return '#6366f1';
     default:
       return '#3b82f6';
   }

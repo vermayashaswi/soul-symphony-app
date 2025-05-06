@@ -1,4 +1,3 @@
-
 import { useEffect } from 'react';
 import { useLocation } from 'react-router-dom';
 
@@ -16,12 +15,12 @@ export const useScrollRestoration = () => {
       setTimeout(() => {
         const element = document.getElementById(hash.substring(1));
         if (element) {
-          element.scrollIntoView({ behavior: 'smooth' });
+          element.scrollIntoView({ behavior: 'auto' });
         }
       }, 100);
     } else {
-      // Otherwise scroll to top on route change
-      window.scrollTo({ top: 0, behavior: 'instant' });
+      // Otherwise scroll to top on route change - use instant behavior to avoid conflicts with tutorial
+      window.scrollTo({ top: 0, behavior: 'auto' });
     }
   }, [pathname, hash]);
 };
@@ -30,5 +29,5 @@ export const useScrollRestoration = () => {
  * Utility function to scroll to the top of the page
  */
 export const scrollToTop = () => {
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo({ top: 0, behavior: 'auto' });
 };

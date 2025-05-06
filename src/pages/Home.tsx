@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -13,6 +14,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import WelcomeElement from '@/components/tutorial/WelcomeElement';
 
 const Home = () => {
   const { user } = useAuth();
@@ -25,6 +27,16 @@ const Home = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
+
+  // Disable smooth scrolling to prevent conflicts with tutorial
+  useEffect(() => {
+    const originalScrollBehavior = document.documentElement.style.scrollBehavior;
+    document.documentElement.style.scrollBehavior = 'auto';
+    
+    return () => {
+      document.documentElement.style.scrollBehavior = originalScrollBehavior;
+    };
+  }, []);
 
   useEffect(() => {
     // Pre-translate common labels to avoid async issues
@@ -164,6 +176,9 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
+      {/* Add the welcome element for tutorial targeting */}
+      <WelcomeElement />
+      
       {/* Background Animation */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />

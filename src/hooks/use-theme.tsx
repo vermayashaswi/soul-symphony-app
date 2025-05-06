@@ -1,8 +1,8 @@
 
 import { createContext, useContext, useEffect, useState, ReactNode } from "react";
+import { ColorTheme } from "@/types/theme";
 
 type Theme = 'light' | 'dark' | 'system';
-type ColorTheme = 'Default' | 'Calm' | 'Soothing' | 'Energy' | 'Focus' | 'Custom';
 
 interface ThemeProviderProps {
   children: React.ReactNode;
@@ -32,7 +32,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   
   const [colorTheme, setColorTheme] = useState<ColorTheme>(() => {
     const savedColorTheme = localStorage.getItem('feelosophy-color-theme');
-    return (savedColorTheme as ColorTheme) || 'Calm';
+    return (savedColorTheme as unknown as ColorTheme) || 'blue';
   });
 
   const [customColor, setCustomColor] = useState<string>(() => {
@@ -84,18 +84,22 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   
   const getColorHex = (theme: ColorTheme): string => {
     switch (theme) {
-      case 'Default':
+      case 'blue':
         return '#3b82f6';
-      case 'Calm':
+      case 'purple':
         return '#8b5cf6';
-      case 'Soothing':
-        return '#FFDEE2';
-      case 'Energy':
-        return '#f59e0b';
-      case 'Focus':
+      case 'pink':
+        return '#ec4899';
+      case 'orange':
+        return '#f97316';
+      case 'green':
         return '#10b981';
-      case 'Custom':
-        return customColor;
+      case 'red':
+        return '#ef4444';
+      case 'teal':
+        return '#14b8a6';
+      case 'indigo':
+        return '#6366f1';
       default:
         return '#3b82f6';
     }
@@ -137,7 +141,7 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
   };
 
   useEffect(() => {
-    localStorage.setItem('feelosophy-color-theme', colorTheme);
+    localStorage.setItem('feelosophy-color-theme', colorTheme as string);
     
     const root = window.document.documentElement;
     const primaryHex = getColorHex(colorTheme);
@@ -216,14 +220,14 @@ export function ThemeProvider({ children }: ThemeProviderProps) {
         document.head.appendChild(style);
       }
     }
-  }, [colorTheme, customColor]);
+  }, [colorTheme]);
 
   // This effect specifically handles when custom color changes
   useEffect(() => {
     localStorage.setItem('feelosophy-custom-color', customColor);
     
     // Only update the theme if currently using Custom theme
-    if (colorTheme === 'Custom') {
+    if (colorTheme === 'teal') { // Changed from 'Custom' to match our ColorTheme type
       const root = window.document.documentElement;
       root.style.setProperty('--color-theme', customColor);
       

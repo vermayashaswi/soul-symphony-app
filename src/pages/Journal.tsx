@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -1001,6 +1000,9 @@ const Journal = () => {
                     processedEntryIds={processedEntryIds}
                     onStartRecording={handleStartRecording}
                     onDeleteEntry={handleDeleteEntry}
+                    loadMore={() => fetchEntries()}
+                    hasMoreEntries={false}
+                    isLoadingMore={loading && displayEntries.length > 0}
                   />
                 </ErrorBoundary>
               </TabsContent>
