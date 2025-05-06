@@ -2,7 +2,11 @@
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
-export const EmptyState = () => {
+interface EmptyStateProps {
+  onStartRecording?: () => void; // Add this prop to fix the type error
+}
+
+export const EmptyState = ({ onStartRecording }: EmptyStateProps = {}) => {
   return (
     <div className={cn(
       "bg-background rounded-xl shadow-sm border w-full p-6 md:p-8",

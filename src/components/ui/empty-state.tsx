@@ -7,6 +7,7 @@ interface EmptyStateProps {
   description: React.ReactNode;
   buttonText?: React.ReactNode;
   onAction?: () => void;
+  onStartRecording?: () => void; // Add this prop to fix the type error
 }
 
 export const EmptyState: React.FC<EmptyStateProps> = ({
@@ -14,6 +15,7 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
   description,
   buttonText,
   onAction,
+  onStartRecording, // Include the prop in the component parameters
 }) => {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
