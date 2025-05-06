@@ -919,7 +919,7 @@ const Journal = () => {
       // Make the API call to actually delete the entry
       try {
         const { error } = await supabase
-          .from('journal_entries')
+          .from('Journal Entries') // Fixed table name (it's "Journal Entries", not "journal_entries")
           .delete()
           .eq('id', entryId)
           .eq('user_id', user.id);
@@ -1045,8 +1045,6 @@ const Journal = () => {
               <div className="bg-white rounded-lg shadow-sm border p-6">
                 <VoiceRecorder 
                   onRecordingComplete={handleRecordingComplete}
-                  isProcessing={isSavingRecording}
-                  processingError={processingError}
                 />
               </div>
             </TabsContent>
@@ -1054,7 +1052,10 @@ const Journal = () => {
             <TabsContent value="entries" className="focus:outline-none">
               <div className="space-y-4" ref={entriesListRef}>
                 {(!loading && entries && entries.length > 0) && (
-                  <JournalSearch entries={entries} onSearchResults={handleSearchResults} />  
+                  <JournalSearch 
+                    entries={entries} 
+                    onSearchResults={handleSearchResults}
+                  />  
                 )}
                 
                 <JournalEntriesList 
