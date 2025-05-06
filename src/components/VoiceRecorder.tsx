@@ -569,7 +569,9 @@ export function VoiceRecorder({
             }));
             
             // Small delay to ensure event is processed
-            await new Promise(r => safeTimeout(r, 50));
+            await new Promise<void>((resolve) => {
+              safeTimeout(() => resolve(), 50);
+            });
           } catch (eventError) {
             console.warn('[VoiceRecorder] Error dispatching processing event:', eventError);
           }
@@ -682,7 +684,6 @@ export function VoiceRecorder({
     
     await new Promise<void>((resolve) => {
       const timeoutId = setTimeout(() => {
-        // Explicitly declare resolve with no parameters to match Promise<void>
         resolve();
         
         timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
