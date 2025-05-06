@@ -408,7 +408,10 @@ export function VoiceRecorder({
       // Add a small delay to ensure UI has updated
       await new Promise<void>((resolve) => {
         const timeoutId = setTimeout(() => {
-          resolve(); // Fix: Call resolve without arguments to match the Promise<void> type
+          // Create a no-argument function that calls resolve
+          const noArgResolve = () => resolve();
+          noArgResolve();
+          
           // Remove this timeout from our tracking array when it completes
           timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
         }, 100);
@@ -679,7 +682,10 @@ export function VoiceRecorder({
     
     await new Promise<void>((resolve) => {
       const timeoutId = setTimeout(() => {
-        resolve(); // Fix: Call resolve without arguments to match the Promise<void> type
+        // Create a no-argument function that calls resolve
+        const noArgResolve = () => resolve();
+        noArgResolve();
+        
         timeoutsRef.current = timeoutsRef.current.filter(id => id !== timeoutId);
       }, 300);
       timeoutsRef.current.push(timeoutId);
