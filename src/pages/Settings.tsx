@@ -13,7 +13,7 @@ import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { ColorPicker } from '@/components/settings/ColorPicker';
-import ProfilePictureUpload from '@/components/settings/ProfilePictureUpload';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import { supabase } from '@/integrations/supabase/client';
 import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 import { toast as shadcnToast } from '@/hooks/use-toast';
@@ -21,7 +21,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import RestartTutorialButton from '@/components/tutorial/RestartTutorialButton';
 
 const Settings = () => {
-  const { color: colorTheme, setColor: updateTheme, mode: themeMode, setMode: setThemeMode } = useTheme();
+  const { theme: colorTheme, setTheme: updateTheme, systemTheme: themeMode, setTheme: setThemeMode } = useTheme();
   const { user, signOut } = useAuth();
   const { currentLanguage, setLanguage, languages } = useTranslation();
   const [username, setUsername] = useState('');
@@ -219,12 +219,12 @@ const Settings = () => {
               <CardFooter className="flex justify-between">
                 <Button
                   variant="destructive"
-                  onClick={handleSignOut}
+                  onClick={() => signOut()}
                 >
                   <TranslatableText text="Sign Out" />
                 </Button>
                 <Button 
-                  onClick={saveProfile}
+                  onClick={() => saveProfile()}
                   disabled={isLoading}
                 >
                   <TranslatableText text="Save Profile" />

@@ -1,6 +1,6 @@
+
 import React from 'react';
 import { cn } from '@/lib/utils';
-import { ColorTheme } from '@/types/theme';
 
 interface ColorPickerProps {
   selectedTheme?: string;
