@@ -4,6 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Mic, Loader2 } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { cn } from '@/lib/utils';
+import { EmptyState } from '@/components/insights/soulnet/EmptyState';
 
 interface EmptyJournalStateProps {
   onStartRecording: () => void;
