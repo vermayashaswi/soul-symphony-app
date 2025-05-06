@@ -1,4 +1,3 @@
-
 import { useState, useRef, useEffect } from 'react';
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -10,7 +9,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } f
 import { Input } from "@/components/ui/input";
 import { Slider } from "@/components/ui/slider";
 
-export function ProfilePictureUpload() {
+interface ProfilePictureUploadProps {
+  userId?: string;
+  currentImageUrl?: string | null;
+  onImageUploaded?: (url: string) => void;
+}
+
+export function ProfilePictureUpload({ userId, currentImageUrl, onImageUploaded }: ProfilePictureUploadProps) {
   const { user, updateUserProfile } = useAuth();
   const [uploading, setUploading] = useState(false);
   const [selectedImage, setSelectedImage] = useState<string | null>(null);
@@ -121,6 +126,9 @@ export function ProfilePictureUpload() {
         // Release the object URL to free memory
         URL.revokeObjectURL(selectedImage);
         setSelectedImage(null);
+        if (onImageUploaded) {
+          onImageUploaded(publicUrl);
+        }
       } else {
         toast.error('Failed to update profile');
       }
@@ -365,3 +373,6 @@ export function ProfilePictureUpload() {
     </div>
   );
 }
+
+// Add default export to fix the Settings.tsx import issue
+export default ProfilePictureUpload;

@@ -21,7 +21,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import RestartTutorialButton from '@/components/tutorial/RestartTutorialButton';
 
 const Settings = () => {
-  const { colorTheme, updateTheme, themeMode, setThemeMode } = useTheme();
+  const { color: colorTheme, setColor: updateTheme, mode: themeMode, setMode: setThemeMode } = useTheme();
   const { user, signOut } = useAuth();
   const { currentLanguage, setLanguage, languages } = useTranslation();
   const [username, setUsername] = useState('');

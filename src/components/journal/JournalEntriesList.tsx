@@ -7,6 +7,10 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import EmptyJournalState from './EmptyJournalState';
 
+interface EmptyJournalStateProps {
+  onStartRecording?: () => void;
+}
+
 interface JournalEntriesListProps {
   entries: JournalEntry[];
   loading: boolean;
@@ -14,6 +18,8 @@ interface JournalEntriesListProps {
   hasMoreEntries: boolean;
   isLoadingMore: boolean;
   onEntryDeleted?: (id: number) => void;
+  onDeleteEntry?: (id: number) => Promise<void>;
+  processingEntries?: any[];
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
@@ -22,7 +28,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   loadMore,
   hasMoreEntries,
   isLoadingMore,
-  onEntryDeleted
+  onEntryDeleted,
+  onDeleteEntry
 }) => {
   if (loading && entries.length === 0) {
     return (
@@ -35,7 +42,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   }
 
   if (!loading && entries.length === 0) {
-    return <EmptyJournalState />;
+    return <EmptyJournalState onStartRecording={() => {}} />;
   }
 
   return (
@@ -44,7 +51,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         <JournalEntryCard 
           key={entry.id} 
           entry={entry} 
-          onDeleted={() => onEntryDeleted?.(entry.id)} 
+          onDelete={() => onEntryDeleted?.(entry.id) || onDeleteEntry?.(entry.id)} 
           showDate={true}
         />
       ))}

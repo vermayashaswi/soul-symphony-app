@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Button } from "@/components/ui/button";
 import { Send } from "lucide-react";
@@ -12,18 +11,22 @@ interface ChatInputProps {
   onSendMessage: (message: string) => void;
   disabled?: boolean;
   isSending?: boolean;
+  isLoading?: boolean;
   autoFocus?: boolean;
   placeholder?: string;
   className?: string;
+  userId?: string;
 }
 
 const ChatInput: React.FC<ChatInputProps> = ({
   onSendMessage,
   disabled = false,
   isSending = false,
+  isLoading = false,
   autoFocus = false,
   placeholder = "Your message...",
-  className = ""
+  className = "",
+  userId
 }) => {
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
@@ -71,6 +74,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     }
   }, [autoFocus]);
 
+  // Add this function to match the component usage in ChatInput
   const handleVoiceInput = (transcription: string) => {
     if (transcription && transcription.trim()) {
       onSendMessage(transcription.trim());
@@ -86,7 +90,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
           onChange={handleMessageChange}
           onKeyDown={handleKeyDown}
           placeholder={translatedPlaceholder}
-          disabled={disabled || isSending}
+          disabled={disabled || isSending || isLoading}
           className="min-h-[60px] resize-none pr-10"
           rows={1}
         />
@@ -97,7 +101,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             onTranscriptionComplete={handleVoiceInput}
             size="sm"
             variant="ghost"
-            disabled={disabled || isSending}
+            disabled={disabled || isSending || isLoading}
           />
         </div>
       </div>
@@ -108,11 +112,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
         >
           <Button 
             onClick={handleSendMessage}
-            disabled={!message.trim() || disabled || isSending}
+            disabled={!message.trim() || disabled || isSending || isLoading}
             size="icon"
             className="h-[60px] w-[60px] rounded-full"
           >
-            {isSending ? (
+            {isSending || isLoading ? (
               <div className="h-5 w-5 border-t-2 border-primary-foreground rounded-full animate-spin" />
             ) : (
               <Send className="h-5 w-5" />

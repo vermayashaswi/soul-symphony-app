@@ -9,12 +9,14 @@ interface MoodCalendarProps {
   sentimentData: any[];
   isLoading?: boolean;
   filterLabel?: string;
+  timeRange?: any;
 }
 
 const MoodCalendar: React.FC<MoodCalendarProps> = ({
   sentimentData,
   isLoading = false,
   filterLabel,
+  timeRange
 }) => {
   const [interval, setInterval] = useState('month');
 
@@ -47,7 +49,7 @@ const MoodCalendar: React.FC<MoodCalendarProps> = ({
       </CardHeader>
       <CardContent className="pt-2">
         <MoodCalendarGrid 
-          data={sentimentData} 
+          sentimentData={sentimentData} 
           interval={interval} 
           isLoading={isLoading}
           filterLabel={filterLabel}

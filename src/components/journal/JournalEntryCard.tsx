@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -52,8 +53,10 @@ interface JournalEntryCardProps {
   processing?: boolean;
   processed?: boolean;
   setEntries?: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
+  showDate?: boolean;
 }
 
+// Update the component signature
 export function JournalEntryCard({ 
   entry, 
   onDelete, 
@@ -61,7 +64,8 @@ export function JournalEntryCard({
   isProcessing = false,
   processing = false,
   processed = false,
-  setEntries
+  setEntries,
+  showDate = false
 }: JournalEntryCardProps) {
   const safeEntry = {
     id: entry?.id || 0,
