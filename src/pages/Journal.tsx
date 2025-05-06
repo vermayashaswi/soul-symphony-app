@@ -1028,6 +1028,12 @@ const Journal = () => {
     return `${parseFloat((bytes / Math.pow(k, i)).toFixed(dm))} ${sizes[i]}`;
   };
 
+  const handlePlaceholderEntryCreated = useCallback(() => {
+    console.log('[Journal] Placeholder entry created, refreshing entries');
+    fetchEntries();
+    setRefreshKey(prev => prev + 1);
+  }, [fetchEntries]);
+
   if (hasRenderError) {
     return (
       <div className="p-4 border border-red-500 rounded-md">
@@ -1084,7 +1090,7 @@ const Journal = () => {
       <div className="container max-w-4xl mx-auto pb-20">
         <JournalHeader />
         
-        {/* Add the PlaceholderEntryManager component */}
+        {/* PlaceholderEntryManager with the proper callback */}
         {user?.id && !loading && entries.length === 0 && !isFirstTimeUser && (
           <PlaceholderEntryManager 
             onEntryCreated={handlePlaceholderEntryCreated}
