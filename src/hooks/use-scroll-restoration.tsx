@@ -16,12 +16,11 @@ export const useScrollRestoration = () => {
       setTimeout(() => {
         const element = document.getElementById(hash.substring(1));
         if (element) {
-          // Only use smooth scrolling for hash navigation
           element.scrollIntoView({ behavior: 'smooth' });
         }
       }, 100);
     } else {
-      // Use instant scrolling for regular navigation to prevent unwanted animations
+      // Otherwise scroll to top on route change
       window.scrollTo({ top: 0, behavior: 'instant' });
     }
   }, [pathname, hash]);
@@ -31,6 +30,5 @@ export const useScrollRestoration = () => {
  * Utility function to scroll to the top of the page
  */
 export const scrollToTop = () => {
-  // Changed from smooth to instant to remove animation
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 };

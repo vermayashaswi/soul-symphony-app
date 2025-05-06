@@ -165,9 +165,9 @@
   }
 }
 
-/* Removed smooth scrolling behavior from html element */
+/* Add custom styles for scroll to top behavior */
 html {
-  /* scroll-behavior: smooth; - removed to eliminate unwanted scrolling animations */
+  scroll-behavior: smooth;
 }
 
 /* Support for system theme preference media query */

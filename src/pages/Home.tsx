@@ -99,16 +99,6 @@ const Home = () => {
     fetchUserProfile();
   }, [user]);
 
-  useEffect(() => {
-    // Disable any scrolling animations on home page mount
-    document.documentElement.style.scrollBehavior = 'auto';
-    
-    // Restore default behavior when component unmounts
-    return () => {
-      document.documentElement.style.scrollBehavior = '';
-    };
-  }, []);
-
   const updateDisplayName = async (name: string) => {
     if (!user) return;
 
@@ -173,7 +163,7 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+    <div className="min-h-screen bg-background text-foreground relative">
       {/* Background Animation */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
@@ -227,9 +217,7 @@ const Home = () => {
                 </div>
               </motion.div>
               <div className="ml-2 relative z-[1000] pointer-events-auto">
-                <div id="language-selector">
-                  <LanguageSelector />
-                </div>
+                <LanguageSelector />
               </div>
             </div>
           </div>
@@ -258,7 +246,6 @@ const Home = () => {
           }}
         />
         <motion.button
-          id="home-journal-arrow" // Add this ID for the tutorial
           onClick={navigateToJournal}
           className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20"
           whileHover={{ scale: 1.1 }}
