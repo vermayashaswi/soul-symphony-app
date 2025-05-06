@@ -67,6 +67,8 @@ const Journal = () => {
   const [isFirstTimeUser, setIsFirstTimeUser] = useState(false);
   const [toastLockActive, setToastLockActive] = useState(false);
   const firstTimeProcessingRef = useRef(false);
+  // Add componentMountedRef to fix errors
+  const componentMountedRef = useRef(true);
 
   const { 
     entries, 
@@ -79,6 +81,17 @@ const Journal = () => {
     refreshKey,
     isProfileChecked
   );
+
+  // Update useEffect to set componentMountedRef to false when unmounting
+  useEffect(() => {
+    // Set to true when mounting
+    componentMountedRef.current = true;
+    
+    return () => {
+      // Set to false when unmounting
+      componentMountedRef.current = false;
+    };
+  }, []);
 
   // Detect if this is a first-time user (no entries)
   useEffect(() => {
@@ -268,8 +281,7 @@ const Journal = () => {
       }
     };
     
-    const componentMountedRef = useRef(true);
-    
+    // Using componentMountedRef
     window.addEventListener('processingEntriesChanged', handleProcessingEntriesChanged as EventListener);
     window.addEventListener('processingEntryMapped', handleProcessingEntryMapped as EventListener);
     
