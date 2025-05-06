@@ -7,7 +7,7 @@ interface GenericEmptyStateProps {
   description: React.ReactNode;
   buttonText?: React.ReactNode;
   onAction?: () => void;
-  onStartRecording?: () => void; // Added this prop
+  onStartRecording?: () => void;
 }
 
 // Renamed from EmptyState to GenericEmptyState to avoid confusion
