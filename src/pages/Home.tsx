@@ -231,10 +231,12 @@ const Home = () => {
                   <TranslatableText text={formattedDate} forceTranslate={true} />
                 </div>
               </motion.div>
-              <div className="ml-2 relative z-[1000] pointer-events-auto">
-                <LanguageSelector />
-              </div>
             </div>
+          </div>
+          
+          {/* Language Selector moved to row below */}
+          <div className="flex justify-end mt-2 z-[1000]">
+            <LanguageSelector />
           </div>
         </div>
       </div>

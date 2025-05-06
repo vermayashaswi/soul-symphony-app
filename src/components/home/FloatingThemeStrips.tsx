@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef, useMemo, useCallback } from 'react';
 import { motion } from 'framer-motion';
 import { useTheme } from '@/hooks/use-theme';
@@ -28,7 +27,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
   const [uniqueThemes, setUniqueThemes] = useState<ProcessedThemeData[]>([]);
   const [translatedThemes, setTranslatedThemes] = useState<ProcessedThemeData[]>([]);
   const { theme } = useTheme();
-  const [translatedLabel, setTranslatedLabel] = useState<string>("7-day themes");
   const isDarkMode = theme === 'dark';
   
   // Enhanced animation management
@@ -62,24 +60,16 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     }
   };
   
-  // Translate the label immediately with fallback
+  // Handle language changes & uniqueThemes updates
   useEffect(() => {
-    console.log("FloatingThemeStrips: Translating label");
-    const translateLabel = async () => {
-      try {
-        // Use direct translation to ensure it works regardless of route
-        const result = await directTranslate("7-day themes");
-        console.log("FloatingThemeStrips: Label translated to:", result);
-        setTranslatedLabel(result || "7-day themes");
-      } catch (error) {
-        console.error('FloatingThemeStrips: Error translating label:', error);
-        // Keep using existing label
-      }
-    };
-    
-    translateLabel();
-    
-    // Listen for language changes
+    if (uniqueThemes.length > 0) {
+      console.log(`FloatingThemeStrips: Themes updated or language changed to ${currentLanguage}`);
+      translateAllThemes(uniqueThemes);
+    }
+  }, [currentLanguage, uniqueThemes]);
+
+  // Listen for language changes
+  useEffect(() => {
     const handleLanguageChange = async () => {
       console.log("FloatingThemeStrips: Language change detected");
       
@@ -97,9 +87,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
       // Reset animations ref to clear old references
       animationsRef.current = {};
       
-      // Update translated label
-      translateLabel();
-      
       // Reset translation ready state temporarily
       setTranslationReady(false);
       
@@ -112,7 +99,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     return () => {
       window.removeEventListener('languageChange', handleLanguageChange as EventListener);
     };
-  }, [currentLanguage]);
+  }, []);
   
   // Process themes data with memoization
   const processThemeData = useMemo(() => {
@@ -245,14 +232,6 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
     }
   }, [currentLanguage]);
   
-  // Handle language changes & uniqueThemes updates
-  useEffect(() => {
-    if (uniqueThemes.length > 0) {
-      console.log(`FloatingThemeStrips: Themes updated or language changed to ${currentLanguage}`);
-      translateAllThemes(uniqueThemes);
-    }
-  }, [currentLanguage, uniqueThemes, translateAllThemes]);
-
   // Initialize on first load
   useEffect(() => {
     if (isInitialLoad && uniqueThemes.length > 0) {
@@ -302,44 +281,58 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
 
   return (
     <div className="relative w-full h-full overflow-hidden">
-      <div className="absolute top-[70px] right-6 z-50">
+      <div className="absolute inset-x-0 top-20 bottom-80 pointer-events-none">
+        {/* Enhanced Top Row Theme Strip - This replaces the legend and floats in the top row */}
         <motion.div
-          initial={{ scale: 1 }}
-          animate={{ scale: [1, 1.05, 1] }}
-          transition={{
-            duration: 2,
-            repeat: Infinity,
-            repeatType: "reverse"
-          }}
-          className="px-1.5 py-0.5 text-center rounded-sm scale-75"
+          key={`top-theme-strip-${animationKeyRef.current}`}
+          className="absolute left-0 w-auto h-10 px-4 py-2 flex items-center rounded-md"
           style={{
-            backgroundColor: `${themeColor}50`,
-            borderLeft: `3px solid ${themeColor}`,
-            borderRight: `3px solid ${themeColor}`,
-            boxShadow: `0 0 1px 0 ${themeColor}40`,
-            backdropFilter: 'blur(4px)',
+            top: '0%',
+            backgroundColor: `${themeColor}70`, // Darker background
+            borderLeft: `4px solid ${themeColor}`,
+            borderRight: `4px solid ${themeColor}`,
+            boxShadow: `0 0 10px 0 ${themeColor}70, 0 0 5px 0 ${themeColor}`, // Glow effect
+            backdropFilter: 'blur(6px)',
+            zIndex: 20,
+          }}
+          initial={{ 
+            x: -300,
+            opacity: 0 
+          }}
+          animate={{ 
+            x: ['100vw', '0vw', '-100vw'], // Float horizontally
+            opacity: [0, 1, 0]
+          }}
+          transition={{
+            duration: 20,
+            repeat: Infinity,
+            repeatType: 'loop',
+            ease: 'linear',
+          }}
+          onAnimationStart={(definition) => {
+            // Store animation reference for cleanup
+            animationsRef.current['top-theme-strip'] = definition;
           }}
         >
-          <TranslatableText 
-            text={translatedLabel || "7-day themes"} 
-            forceTranslate={true}
-            className="text-xs font-medium whitespace-nowrap"
+          <span 
+            className="text-lg font-medium whitespace-nowrap"
             style={{
               color: isDarkMode ? '#ffffff' : '#000000',
-              fontWeight: 500,
-              letterSpacing: '0.01em',
+              textShadow: isDarkMode ? '0 0 3px rgba(255,255,255,0.3)' : '0 0 3px rgba(0,0,0,0.2)',
+              fontWeight: 600,
               WebkitFontSmoothing: 'antialiased',
-              MozOsxFontSmoothing: 'grayscale'
+              MozOsxFontSmoothing: 'grayscale',
             }}
-          />
+          >
+            {themesToShow[0]?.translatedTheme || themesToShow[0]?.theme || "Journal Themes"}
+          </span>
         </motion.div>
-      </div>
-      
-      <div className="absolute inset-x-0 top-20 bottom-80 pointer-events-none">
-        {themesToShow.slice(0, 6).map((themeItem, index) => {
+        
+        {/* Other theme strips */}
+        {themesToShow.slice(1, 6).map((themeItem, index) => {
           const sectionHeight = 100 / Math.min(6, themesToShow.length);
           const randomOffset = Math.random() * 5 - 2.5;
-          const yPosition = (index * sectionHeight) + (sectionHeight / 2) + randomOffset;
+          const yPosition = ((index + 1) * sectionHeight) + (sectionHeight / 2) + randomOffset;
           
           const direction = index % 2 === 0;
           const speed = 15 + Math.random() * 10;
@@ -356,11 +349,11 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
               className="absolute left-0 w-auto h-8 px-3 py-1 flex items-center rounded-sm"
               style={{
                 top: `${yPosition}%`,
-                backgroundColor: `${themeColor}50`,
+                backgroundColor: `${themeColor}60`, // Darker background
                 borderLeft: `3px solid ${themeColor}`,
                 borderRight: `3px solid ${themeColor}`,
-                boxShadow: `0 0 1px 0 ${themeColor}40`,
-                backdropFilter: 'blur(4px)',
+                boxShadow: `0 0 5px 0 ${themeColor}70`, // Glow effect
+                backdropFilter: 'blur(5px)',
                 zIndex: 15,
               }}
               initial={{ 
@@ -387,7 +380,7 @@ const FloatingThemeStrips: React.FC<FloatingThemeStripsProps> = ({
                 className="text-sm md:text-base font-medium whitespace-nowrap"
                 style={{
                   color: isDarkMode ? '#ffffff' : '#000000',
-                  textShadow: 'none',
+                  textShadow: isDarkMode ? '0 0 2px rgba(255,255,255,0.2)' : '0 0 2px rgba(0,0,0,0.1)',
                   fontWeight: 500,
                   WebkitFontSmoothing: 'antialiased',
                   MozOsxFontSmoothing: 'grayscale',
