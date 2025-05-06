@@ -1,10 +1,11 @@
 
 import React from 'react';
 import { cn } from '@/lib/utils';
+import { ColorTheme } from '@/types/theme';
 
 interface ColorPickerProps {
-  selectedTheme?: string;
-  onChange?: (color: string) => void;
+  selectedTheme?: ColorTheme;
+  onChange?: (color: ColorTheme) => void;
 }
 
 export const ColorPicker: React.FC<ColorPickerProps> = ({
@@ -22,7 +23,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
     { name: 'indigo', color: '#6366f1', hoverColor: '#4f46e5' },
   ];
 
-  const handleColorChange = (color: string) => {
+  const handleColorChange = (color: ColorTheme) => {
     if (onChange) {
       onChange(color);
     }
@@ -42,7 +43,7 @@ export const ColorPicker: React.FC<ColorPickerProps> = ({
             backgroundColor: option.color,
             boxShadow: selectedTheme === option.name ? `0 0 0 2px ${option.hoverColor}` : 'none'
           }}
-          onClick={() => handleColorChange(option.name)}
+          onClick={() => handleColorChange(option.name as ColorTheme)}
           aria-label={`Select ${option.name} theme`}
           title={`${option.name.charAt(0).toUpperCase() + option.name.slice(1)} theme`}
         />

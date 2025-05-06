@@ -60,11 +60,12 @@ const Settings = () => {
           setUsername(data.display_name || data.full_name || '');
           setProfileImageUrl(data.avatar_url || null);
           
-          // Check if settings property exists before accessing its properties
-          if (data.settings) {
-            if (typeof data.settings === 'object' && data.settings !== null) {
-              setBatchSize(data.settings.batch_size || 10);
-            }
+          // We need to use type assertion here since we know the database structure
+          // might include settings even if TypeScript doesn't know about it
+          const profileData = data as any;
+          
+          if (profileData.settings && typeof profileData.settings === 'object') {
+            setBatchSize(profileData.settings.batch_size || 10);
           }
         }
       } catch (error) {
