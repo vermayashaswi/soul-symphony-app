@@ -99,6 +99,16 @@ const Home = () => {
     fetchUserProfile();
   }, [user]);
 
+  useEffect(() => {
+    // Disable any scrolling animations on home page mount
+    document.documentElement.style.scrollBehavior = 'auto';
+    
+    // Restore default behavior when component unmounts
+    return () => {
+      document.documentElement.style.scrollBehavior = '';
+    };
+  }, []);
+
   const updateDisplayName = async (name: string) => {
     if (!user) return;
 
@@ -163,7 +173,7 @@ const Home = () => {
   };
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
       {/* Background Animation */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
