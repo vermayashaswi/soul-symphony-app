@@ -81,8 +81,8 @@ const tutorialSteps: TutorialStep[] = [
   },
   {
     id: 'tutorial-complete',
-    title: 'You're All Set!',
-    content: 'You've completed the tutorial. You can access it again anytime from the Settings menu.',
+    title: 'You\'re All Set!',
+    content: 'You\'ve completed the tutorial. You can access it again anytime from the Settings menu.',
     position: 'bottom',
     nextButtonText: 'Finish',
   }
