@@ -12,6 +12,7 @@ interface TooltipPositionStyles {
   left?: string;
   right?: string;
   transform?: string;
+  maxWidth?: string;
 }
 
 const TutorialOverlay: React.FC = () => {
@@ -36,6 +37,53 @@ const TutorialOverlay: React.FC = () => {
   const tooltipRef = useRef<HTMLDivElement>(null);
   const overlayRef = useRef<HTMLDivElement>(null);
 
+  // Function to ensure tooltip is within viewport
+  const adjustTooltipPosition = (initialStyles: TooltipPositionStyles) => {
+    const tooltip = tooltipRef.current;
+    if (!tooltip) return initialStyles;
+
+    const adjustedStyles = { ...initialStyles };
+    const tooltipRect = tooltip.getBoundingClientRect();
+    
+    // Check if tooltip would be cut off at bottom
+    if (tooltipRect.bottom > window.innerHeight - 80) { // Add 80px buffer for mobile nav
+      // If tooltip is positioned from top, adjust top value
+      if (adjustedStyles.top) {
+        const newTop = Math.max(0, window.innerHeight - tooltipRect.height - 100);
+        adjustedStyles.top = `${newTop}px`;
+        delete adjustedStyles.bottom; // Remove bottom if it exists
+      }
+      // If tooltip is positioned from bottom, just ensure it's visible
+      else if (adjustedStyles.bottom) {
+        adjustedStyles.bottom = `${Math.min(parseInt(adjustedStyles.bottom), window.innerHeight - tooltipRect.height - 20)}px`;
+      }
+    }
+
+    // Check if tooltip would be cut off at top
+    if (tooltipRect.top < 10) {
+      if (adjustedStyles.top) {
+        adjustedStyles.top = '10px';
+      }
+    }
+
+    // Check if tooltip would be cut off on the sides
+    const maxWidth = window.innerWidth - 20;
+    if (tooltipRect.right > maxWidth) {
+      adjustedStyles.left = `${Math.max(10, maxWidth - tooltipRect.width)}px`;
+      delete adjustedStyles.right; // Remove right if it exists
+    }
+
+    if (tooltipRect.left < 10) {
+      adjustedStyles.left = '10px';
+      delete adjustedStyles.right; // Remove right if it exists
+    }
+    
+    // Set maxWidth to prevent overflow
+    adjustedStyles.maxWidth = `${Math.min(tooltipRect.width, maxWidth - 20)}px`;
+    
+    return adjustedStyles;
+  };
+
   // When the step changes, find the target element and position the tooltip
   useEffect(() => {
     if (!isActive || !currentStepDetails) return;
@@ -48,15 +96,29 @@ const TutorialOverlay: React.FC = () => {
     return () => clearTimeout(timerId);
   }, [currentStepDetails, isActive]);
 
+  // After tooltip is positioned initially, check if it's within viewport
+  useEffect(() => {
+    if (!isActive || !tooltipRef.current) return;
+    
+    // Additional delay to check positioning after initial placement
+    const checkTimerId = setTimeout(() => {
+      const adjustedStyles = adjustTooltipPosition(tooltipStyles);
+      setTooltipStyles(adjustedStyles);
+    }, 500);
+    
+    return () => clearTimeout(checkTimerId);
+  }, [tooltipStyles, isActive]);
+
   // Handle positioning of tooltip relative to the target element
   const positionTooltipForStep = (step: TutorialStep) => {
     if (step.position === 'center') {
       // Center overlay tooltip - full screen overlay with centered tooltip
       setIsCentered(true);
       setTooltipStyles({
-        top: '50%',
+        top: '40%', // Move up slightly from center
         left: '50%',
         transform: 'translate(-50%, -50%)',
+        maxWidth: '80%'
       });
       setHighlightStyles({
         top: '50%',
@@ -102,45 +164,57 @@ const TutorialOverlay: React.FC = () => {
       });
       
       // Position tooltip based on specified position
-      const tooltipRect = tooltipRef.current?.getBoundingClientRect() || {
-        width: 280,
-        height: 160,
-      };
+      const tooltipWidth = 280;
+      const tooltipHeight = 160;
+      
+      let initialTooltipStyles: TooltipPositionStyles = {};
       
       switch (step.position) {
         case 'top':
-          setTooltipStyles({
+          initialTooltipStyles = {
             bottom: `${window.innerHeight - rect.top + 10}px`,
-            left: `${rect.left + rect.width / 2 - tooltipRect.width / 2}px`,
-          });
+            left: `${rect.left + rect.width / 2 - tooltipWidth / 2}px`,
+          };
           break;
         case 'bottom':
-          setTooltipStyles({
-            top: `${rect.bottom + 10}px`,
-            left: `${rect.left + rect.width / 2 - tooltipRect.width / 2}px`,
-          });
+          // For bottom positioning, ensure it's not too low
+          if (rect.bottom + tooltipHeight + 10 > window.innerHeight - 80) {
+            // If would be too low, position above instead
+            initialTooltipStyles = {
+              bottom: `${window.innerHeight - rect.top + 10}px`,
+              left: `${rect.left + rect.width / 2 - tooltipWidth / 2}px`,
+            };
+          } else {
+            initialTooltipStyles = {
+              top: `${rect.bottom + 10}px`,
+              left: `${rect.left + rect.width / 2 - tooltipWidth / 2}px`,
+            };
+          }
           break;
         case 'left':
-          setTooltipStyles({
-            top: `${rect.top + rect.height / 2 - tooltipRect.height / 2}px`,
+          initialTooltipStyles = {
+            top: `${rect.top + rect.height / 2 - tooltipHeight / 2}px`,
             right: `${window.innerWidth - rect.left + 10}px`,
-          });
+          };
           break;
         case 'right':
-          setTooltipStyles({
-            top: `${rect.top + rect.height / 2 - tooltipRect.height / 2}px`,
+          initialTooltipStyles = {
+            top: `${rect.top + rect.height / 2 - tooltipHeight / 2}px`,
             left: `${rect.right + 10}px`,
-          });
+          };
           break;
       }
+      
+      setTooltipStyles(initialTooltipStyles);
     } else {
       console.warn(`Tutorial target element not found: ${step.targetId}`);
       // Fallback to center if target not found
       setIsCentered(true);
       setTooltipStyles({
-        top: '50%',
+        top: '40%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
+        maxWidth: '80%'
       });
     }
   };

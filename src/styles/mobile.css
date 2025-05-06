@@ -127,6 +127,24 @@
     height: 1.5px !important;
     margin: 1px auto !important;
   }
+  
+  /* Tutorial overlay mobile fixes */
+  .fixed.inset-0.z-\[9999\].pointer-events-auto {
+    z-index: 100000 !important; /* Ensure tutorial stays on top */
+  }
+  
+  /* Make tutorial tooltips more mobile-friendly */
+  .bg-background.rounded-lg.shadow-lg.border.border-border.p-4 {
+    font-size: 14px !important;
+    max-height: calc(70vh - 80px) !important;
+    overflow-y: auto !important;
+  }
+  
+  /* Ensure tutorial buttons are easier to tap */
+  .bg-background.rounded-lg.shadow-lg .flex.gap-2 button {
+    min-height: 36px !important;
+    min-width: 60px !important;
+  }
 }
 
 /* Styles for both mobile and desktop */
@@ -159,5 +177,10 @@
   
   .compact-year-view td {
     height: 14px;
+  }
+  
+  /* Tutorial overlay improvements for all screen sizes */
+  .z-\[10000\].pointer-events-auto {
+    max-height: calc(100vh - 100px); /* Ensure tooltip fits in viewport */
   }
 }

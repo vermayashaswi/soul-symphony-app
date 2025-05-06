@@ -13,6 +13,7 @@ import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
 const TutorialManager: React.FC = () => {
   const { user } = useAuth();
   const { resetTutorial } = useTutorial();
+  const location = useLocation();
   
   // Check for reset flag from App.tsx
   useEffect(() => {
@@ -46,12 +47,35 @@ const ViewportManager: React.FC = () => {
     isWebsiteRoute: isWebsiteRoute(location.pathname),
     user: !!user
   });
+
+  // Adjust viewport height for mobile devices to handle address bar
+  useEffect(() => {
+    const setVh = () => {
+      // First, get the viewport height and multiply it by 1% to get a value for a vh unit
+      const vh = window.innerHeight * 0.01;
+      // Then set the value in the --vh custom property to the root of the document
+      document.documentElement.style.setProperty('--vh', `${vh}px`);
+    };
+
+    // Set the height initially
+    setVh();
+
+    // Reset the height whenever the window size changes
+    window.addEventListener('resize', setVh);
+    window.addEventListener('orientationchange', setVh);
+
+    return () => {
+      window.removeEventListener('resize', setVh);
+      window.removeEventListener('orientationchange', setVh);
+    };
+  }, []);
   
   // Render the appropriate layout based on route and device
   return (
     <TutorialProvider>
       <TutorialManager />
-      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} overflow-x-hidden`}>
+      <div className="app-container overflow-x-hidden min-h-screen" 
+           style={{ minHeight: 'calc(var(--vh, 1vh) * 100)' }}>
         <Outlet />
       </div>
       

@@ -3,6 +3,7 @@ import React, { createContext, useState, useContext, useEffect } from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useAuth } from '@/contexts/AuthContext';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 // Define the tutorial steps
 export interface TutorialStep {
@@ -14,6 +15,8 @@ export interface TutorialStep {
   route?: string; // The route this step should be shown on
   action?: 'navigate' | null; // Action to take when showing this step
   actionTarget?: string; // Target for the action (e.g., route to navigate to)
+  mobileOnly?: boolean; // Whether this step is only for mobile
+  desktopOnly?: boolean; // Whether this step is only for desktop
 }
 
 // Define all tutorial steps
@@ -163,6 +166,14 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const location = useLocation();
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { isMobile } = useIsMobile();
+  
+  // Filter steps based on device type
+  const filteredSteps = tutorialSteps.filter(step => {
+    if (step.mobileOnly && !isMobile) return false;
+    if (step.desktopOnly && isMobile) return false;
+    return true;
+  });
   
   // Load tutorial state from localStorage on mount
   useEffect(() => {
@@ -220,8 +231,8 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   }, [user, location.pathname, isTutorialCompleted, isActive]);
 
   // Get details for current step
-  const currentStepDetails = isActive && currentStep < tutorialSteps.length 
-    ? tutorialSteps[currentStep] 
+  const currentStepDetails = isActive && currentStep < filteredSteps.length 
+    ? filteredSteps[currentStep] 
     : null;
 
   // Helper to check if the current route matches the required route for a step
@@ -234,7 +245,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   useEffect(() => {
     if (isActive && currentStepDetails && !isOnCorrectRoute(currentStepDetails)) {
       // Find the next step that matches the current route
-      const nextValidStepIndex = tutorialSteps.findIndex(
+      const nextValidStepIndex = filteredSteps.findIndex(
         (step, index) => index >= currentStep && isOnCorrectRoute(step)
       );
       
@@ -254,7 +265,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   // Move to next step
   const nextStep = () => {
-    if (currentStep < tutorialSteps.length - 1) {
+    if (currentStep < filteredSteps.length - 1) {
       setCurrentStep(currentStep + 1);
     } else {
       completeTutorial();
@@ -308,7 +319,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         completeTutorial,
         resetTutorial,
         currentStepDetails,
-        totalSteps: tutorialSteps.length,
+        totalSteps: filteredSteps.length,
       }}
     >
       {children}
