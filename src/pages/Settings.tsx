@@ -19,9 +19,10 @@ import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 import { toast as shadcnToast } from '@/hooks/use-toast';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import RestartTutorialButton from '@/components/tutorial/RestartTutorialButton';
+import { ColorTheme } from '@/types/theme';
 
 const Settings = () => {
-  const { theme: colorTheme, setTheme: updateTheme, systemTheme: themeMode, setTheme: setThemeMode } = useTheme();
+  const { theme: themeMode, setTheme: setThemeMode, colorTheme, setColorTheme } = useTheme();
   const { user, signOut } = useAuth();
   const { currentLanguage, setLanguage, languages } = useTranslation();
   const [username, setUsername] = useState('');
@@ -278,8 +279,8 @@ const Settings = () => {
                     <TranslatableText text="Color Theme" />
                   </Label>
                   <ColorPicker
-                    selectedTheme={colorTheme}
-                    onChange={updateTheme}
+                    selectedTheme={colorTheme as unknown as ColorTheme}
+                    onChange={(color: ColorTheme) => setColorTheme(color as any)}
                   />
                 </div>
               </CardContent>
