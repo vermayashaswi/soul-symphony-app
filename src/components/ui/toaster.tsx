@@ -1,4 +1,5 @@
 
+import React from "react";
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
@@ -25,9 +26,13 @@ export function Toaster() {
             {...props} 
             className={
               isDarkMode
-                ? "bg-theme border-white/10 text-black shadow-lg"
-                : "bg-theme border-black/10 text-black shadow-lg"
+                ? "bg-theme border-white/10 text-black shadow-lg shadcn-toast-element"
+                : "bg-theme border-black/10 text-black shadow-lg shadcn-toast-element"
             }
+            style={{
+              zIndex: 1001, // Ensure consistent z-index
+              position: 'relative' // Ensure position is set
+            }}
           >
             <div className="grid gap-1">
               {title && (

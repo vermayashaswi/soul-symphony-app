@@ -8,6 +8,22 @@ import { TranslationLoadingOverlay } from '@/components/translation/TranslationL
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import './styles/emoji.css';
 
+// Add a global error boundary for toast operations
+if (typeof window !== 'undefined') {
+  // Override toast dismiss method with error handling
+  const originalToastDismiss = window.toast?.dismiss;
+  if (originalToastDismiss) {
+    window.toast.dismiss = function(...args: any[]) {
+      try {
+        return originalToastDismiss.apply(this, args);
+      } catch (e) {
+        console.warn('Error in toast.dismiss:', e);
+        return undefined;
+      }
+    };
+  }
+}
+
 const App: React.FC = () => {
   useEffect(() => {
     console.log('App mounted, current path:', window.location.pathname);
@@ -28,7 +44,18 @@ const App: React.FC = () => {
       <JournalProcessingInitializer />
       <AppRoutes />
       <Toaster />
-      <SonnerToaster position="top-right" />
+      <SonnerToaster 
+        position="top-right" 
+        closeButton
+        richColors
+        toastOptions={{
+          duration: 3000, // Shorter duration to minimize conflicts
+          style: { 
+            zIndex: 1000,
+            position: 'relative'
+          }
+        }}
+      />
     </TranslationProvider>
   );
 };
