@@ -2,20 +2,21 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 
-interface EmptyStateProps {
+interface GenericEmptyStateProps {
   title: React.ReactNode;
   description: React.ReactNode;
   buttonText?: React.ReactNode;
   onAction?: () => void;
-  onStartRecording?: () => void; // Add this prop to fix the type error
+  onStartRecording?: () => void;
 }
 
-export const EmptyState: React.FC<EmptyStateProps> = ({
+// Renamed from EmptyState to GenericEmptyState to avoid confusion
+export const GenericEmptyState: React.FC<GenericEmptyStateProps> = ({
   title,
   description,
   buttonText,
   onAction,
-  onStartRecording, // Include the prop in the component parameters
+  onStartRecording,
 }) => {
   return (
     <div className="flex flex-col items-center justify-center py-12 text-center">
@@ -32,3 +33,6 @@ export const EmptyState: React.FC<EmptyStateProps> = ({
     </div>
   );
 };
+
+// For backward compatibility, we'll export the same component as EmptyState
+export const EmptyState = GenericEmptyState;
