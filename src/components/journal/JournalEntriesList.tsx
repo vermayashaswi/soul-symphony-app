@@ -3,7 +3,7 @@ import React from 'react';
 import { JournalEntry } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
-import { Loader2 } from 'lucide-react';
+import { Loader2, Info } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import EmptyJournalState from '@/components/journal/EmptyJournalState';
 
@@ -49,32 +49,57 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     );
   }
 
+  // Helper function to identify placeholder entries
+  const isPlaceholderEntry = (entry: JournalEntry) => {
+    return entry.content?.includes('Welcome to SOULo Journal!') && 
+           entry.content?.includes('This is an example entry');
+  };
+
   return (
     <div>
-      {entries.map((entry) => (
-        <div key={entry.id} className="mb-4 p-4 bg-white rounded-md shadow-sm border">
-          <div className="text-sm text-muted-foreground mb-1">
-            {new Date(entry.created_at).toLocaleDateString()}
-          </div>
-          <p>{entry.content}</p>
-          <div className="mt-2">
-            {processingEntries.length > 0 && (
-              <p className="text-sm text-orange-500">
-                <TranslatableText text="Processing..." />
-              </p>
+      {entries.map((entry) => {
+        const isPlaceholder = isPlaceholderEntry(entry);
+        
+        return (
+          <div 
+            key={entry.id} 
+            className={cn(
+              "mb-4 p-4 bg-white rounded-md shadow-sm border",
+              isPlaceholder && "border-blue-300 bg-blue-50"
             )}
-            <Button 
-              variant="outline" 
-              size="sm"
-              onClick={() => onDeleteEntry(entry.id)}
-              disabled={processingEntries.length > 0}
-              className={cn(processingEntries.length > 0 && "cursor-not-allowed opacity-75")}
-            >
-              <TranslatableText text="Delete" />
-            </Button>
+          >
+            {isPlaceholder && (
+              <div className="flex items-center mb-2 text-blue-600 text-sm font-medium">
+                <Info className="h-4 w-4 mr-1" />
+                <TranslatableText text="Example Entry" />
+              </div>
+            )}
+            
+            <div className="text-sm text-muted-foreground mb-1">
+              {new Date(entry.created_at).toLocaleDateString()}
+            </div>
+            
+            <p>{entry.content}</p>
+            
+            <div className="mt-2">
+              {processingEntries.length > 0 && (
+                <p className="text-sm text-orange-500">
+                  <TranslatableText text="Processing..." />
+                </p>
+              )}
+              <Button 
+                variant="outline" 
+                size="sm"
+                onClick={() => onDeleteEntry(entry.id)}
+                disabled={processingEntries.length > 0}
+                className={cn(processingEntries.length > 0 && "cursor-not-allowed opacity-75")}
+              >
+                <TranslatableText text="Delete" />
+              </Button>
+            </div>
           </div>
-        </div>
-      ))}
+        );
+      })}
       {isLoadingMore && (
         <div className="flex items-center justify-center py-4">
           <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />

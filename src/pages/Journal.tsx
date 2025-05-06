@@ -16,6 +16,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
 import { EmptyState } from '@/components/insights/soulnet/EmptyState';
+import PlaceholderEntryManager from '@/components/journal/PlaceholderEntryManager';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -1082,6 +1083,15 @@ const Journal = () => {
     <ErrorBoundary>
       <div className="container max-w-4xl mx-auto pb-20">
         <JournalHeader />
+        
+        {/* Add the PlaceholderEntryManager component */}
+        {user?.id && !loading && entries.length === 0 && !isFirstTimeUser && (
+          <PlaceholderEntryManager 
+            onEntryCreated={handlePlaceholderEntryCreated}
+            hasEntries={entries.length > 0}
+            isProcessingFirstEntry={isProcessingFirstEntry}
+          />
+        )}
         
         <Tabs 
           value={activeTab} 
