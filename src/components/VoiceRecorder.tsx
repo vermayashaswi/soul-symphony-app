@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { Loader2, AlertTriangle } from 'lucide-react';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -712,7 +711,6 @@ export function VoiceRecorder({
   useEffect(() => {
     if (recordingDuration !== undefined && setRecordingDuration && componentMountedRef.current && !isUnmounting) {
       // We're just using the external value, not setting it
-      // setRecordingTime was the invalid line, replaced with proper code
       console.log(`[VoiceRecorder] Using external recording duration: ${recordingDuration}`);
     }
   }, [recordingDuration, isUnmounting]);
