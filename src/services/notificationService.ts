@@ -1,4 +1,3 @@
-
 import { toast } from "sonner";
 
 // Duration constants
@@ -133,75 +132,105 @@ export const clearToast = (toastId: string | number) => {
   }
 };
 
-// Enhanced aggressive toast clearing function
+// Enhanced aggressive toast clearing function with DOM node existence checks
 export const clearAllToasts = (): Promise<boolean> => {
   console.log('[NotificationService] Clearing all toasts');
   
   return new Promise((resolve) => {
-    // First use the standard dismiss method
-    toast.dismiss();
-    
-    // Clear all timeouts
-    clearToastTimeouts();
-    
-    // Then clear our tracking set
-    activeToasts.clear();
-    
-    // As a safety measure for any persistent toasts with the loading state,
-    // get all toast elements and remove them manually if needed
-    if (isBrowser()) {
-      try {
-        // Try to find any toast container elements that might be persisting
-        const toastContainers = document.querySelectorAll('[data-sonner-toast]');
-        console.log(`[NotificationService] Found ${toastContainers.length} persistent toast containers`);
-        
-        if (toastContainers.length > 0) {
-          toastContainers.forEach(container => {
-            // Manual removal since we've disabled close buttons
-            if (container.parentNode) {
-              container.parentNode?.removeChild(container);
-            }
-          });
+    try {
+      // First use the standard dismiss method
+      toast.dismiss();
+      
+      // Clear all timeouts
+      clearToastTimeouts();
+      
+      // Then clear our tracking set
+      activeToasts.clear();
+      
+      // As a safety measure for any persistent toasts with the loading state,
+      // get all toast elements and remove them manually if needed
+      if (isBrowser()) {
+        try {
+          // Try to find any toast container elements that might be persisting
+          const toastContainers = document.querySelectorAll('[data-sonner-toast]');
+          console.log(`[NotificationService] Found ${toastContainers.length} persistent toast containers`);
+          
+          if (toastContainers.length > 0) {
+            toastContainers.forEach(container => {
+              // Check if the element is still in the DOM and has a parent
+              // This prevents "Failed to execute 'removeChild'" errors
+              if (container.parentNode && document.body.contains(container)) {
+                try {
+                  container.parentNode.removeChild(container);
+                } catch (err) {
+                  console.warn('[NotificationService] Error removing toast container:', err);
+                }
+              }
+            });
+          }
+          
+          // Also try to clear any toast containers
+          const sonnerRoots = document.querySelectorAll('[data-sonner-toaster]');
+          console.log(`[NotificationService] Found ${sonnerRoots.length} sonner root containers`);
+          
+          if (sonnerRoots.length > 0) {
+            sonnerRoots.forEach(root => {
+              // Check if the root is still in the DOM
+              if (document.body.contains(root)) {
+                // Don't remove the container, but clear its children
+                try {
+                  while (root.firstChild) {
+                    root.removeChild(root.firstChild);
+                  }
+                } catch (err) {
+                  console.warn('[NotificationService] Error clearing toast root children:', err);
+                }
+              }
+            });
+          }
+        } catch (e) {
+          console.error('[NotificationService] Error trying to clean up persistent toasts:', e);
         }
-        
-        // Also try to clear any toast containers
-        const sonnerRoots = document.querySelectorAll('[data-sonner-toaster]');
-        console.log(`[NotificationService] Found ${sonnerRoots.length} sonner root containers`);
-        
-        if (sonnerRoots.length > 0) {
-          sonnerRoots.forEach(root => {
-            // Don't remove the container, but clear its children
-            while (root.firstChild) {
-              root.removeChild(root.firstChild);
-            }
-          });
-        }
-      } catch (e) {
-        console.error('[NotificationService] Error trying to clean up persistent toasts:', e);
       }
+    } catch (e) {
+      console.error('[NotificationService] Error in main cleanup flow:', e);
     }
     
     // Give it a small delay to ensure DOM updates are complete
     setTimeout(() => {
       // Additional safety check after DOM update
       if (isBrowser()) {
-        const remainingToasts = document.querySelectorAll('[data-sonner-toast]');
-        if (remainingToasts.length > 0) {
-          console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after cleanup`);
-          try {
-            remainingToasts.forEach(toast => {
-              if (toast.parentNode) {
-                toast.parentNode.removeChild(toast);
-              }
-            });
-          } catch (e) {
-            console.error('[NotificationService] Error in final toast cleanup:', e);
+        try {
+          const remainingToasts = document.querySelectorAll('[data-sonner-toast]');
+          if (remainingToasts.length > 0) {
+            console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after cleanup`);
+            try {
+              remainingToasts.forEach(toast => {
+                // Add existence check before removal
+                if (toast.parentNode && document.body.contains(toast)) {
+                  try {
+                    toast.parentNode.removeChild(toast);
+                  } catch (err) {
+                    console.warn('[NotificationService] Error removing toast in final cleanup:', err);
+                  }
+                }
+              });
+            } catch (e) {
+              console.error('[NotificationService] Error in final toast cleanup:', e);
+            }
           }
+        } catch (e) {
+          console.error('[NotificationService] Error in final cleanup check:', e);
         }
       }
       
       // Call toast.dismiss() one more time as a final measure
-      toast.dismiss();
+      try {
+        toast.dismiss();
+      } catch (e) {
+        console.error('[NotificationService] Error in final toast dismiss:', e);
+      }
+      
       resolve(true);
     }, 50);
   });
@@ -211,36 +240,50 @@ export const clearAllToasts = (): Promise<boolean> => {
 export const ensureAllToastsCleared = async (): Promise<boolean> => {
   console.log('[NotificationService] Ensuring all toasts are completely cleared');
   
-  // First attempt
-  await clearAllToasts();
-  
-  // Wait a bit and check if any toasts remain
-  await new Promise(resolve => setTimeout(resolve, 50));
-  
-  if (isBrowser()) {
-    const remainingToasts = document.querySelectorAll('[data-sonner-toast]');
-    if (remainingToasts.length > 0) {
-      console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after first cleanup`);
-      
-      // Second attempt with more aggressive DOM manipulation
-      toast.dismiss();
-      await new Promise(resolve => setTimeout(resolve, 50));
-      
+  try {
+    // First attempt
+    await clearAllToasts();
+    
+    // Wait a bit and check if any toasts remain
+    await new Promise(resolve => setTimeout(resolve, 50));
+    
+    if (isBrowser()) {
       try {
-        document.querySelectorAll('[data-sonner-toast]').forEach(toast => {
-          if (toast.parentNode) {
-            toast.parentNode.removeChild(toast);
+        const remainingToasts = document.querySelectorAll('[data-sonner-toast]');
+        if (remainingToasts.length > 0) {
+          console.log(`[NotificationService] Found ${remainingToasts.length} remaining toasts after first cleanup`);
+          
+          // Second attempt with more aggressive DOM manipulation
+          toast.dismiss();
+          await new Promise(resolve => setTimeout(resolve, 50));
+          
+          try {
+            document.querySelectorAll('[data-sonner-toast]').forEach(toast => {
+              // Add existence check before removal
+              if (toast.parentNode && document.body.contains(toast)) {
+                try {
+                  toast.parentNode.removeChild(toast);
+                } catch (err) {
+                  console.warn('[NotificationService] Error removing toast in second cleanup:', err);
+                }
+              }
+            });
+          } catch (e) {
+            console.error('[NotificationService] Error in second toast cleanup:', e);
           }
-        });
+        }
       } catch (e) {
-        console.error('[NotificationService] Error in second toast cleanup:', e);
+        console.error('[NotificationService] Error checking remaining toasts:', e);
       }
     }
+    
+    // Final attempt to ensure cleanup is complete
+    await clearAllToasts();
+    return true;
+  } catch (e) {
+    console.error('[NotificationService] Error in ensureAllToastsCleared:', e);
+    return true; // Still return true to not block the flow
   }
-  
-  // Final attempt to ensure cleanup is complete
-  await clearAllToasts();
-  return true;
 };
 
 // Function to request notification permissions (web only for now)

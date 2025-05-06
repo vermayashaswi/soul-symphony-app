@@ -78,14 +78,23 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
 
   useEffect(() => {
     const clearToastsOnMount = async () => {
-      await ensureAllToastsCleared();
-      setToastsCleared(true);
+      try {
+        await ensureAllToastsCleared();
+        setToastsCleared(true);
+      } catch (err) {
+        console.error('[VoiceRecorder] Error clearing toasts on mount:', err);
+        setToastsCleared(true);
+      }
     };
     
     clearToastsOnMount();
     
     return () => {
-      clearAllToasts();
+      try {
+        clearAllToasts();
+      } catch (err) {
+        console.error('[VoiceRecorder] Error clearing toasts on unmount:', err);
+      }
     };
   }, []);
 
@@ -184,7 +193,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       
       setWaitingForClear(true);
       
-      await ensureAllToastsCleared();
+      try {
+        await ensureAllToastsCleared();
+      } catch (err) {
+        console.error('[VoiceRecorder] Error clearing toasts before save:', err);
+      }
       
       if (!domClearAttemptedRef.current) {
         domClearAttemptedRef.current = true;
@@ -193,8 +206,12 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           if (toastElements.length > 0) {
             console.log(`[VoiceRecorder] Found ${toastElements.length} lingering toasts, removing manually`);
             toastElements.forEach(el => {
-              if (el.parentNode) {
-                el.parentNode.removeChild(el);
+              if (el.parentNode && document.body.contains(el)) {
+                try {
+                  el.parentNode.removeChild(el);
+                } catch (innerError) {
+                  console.warn('[VoiceRecorder] Error removing toast element:', innerError);
+                }
               }
             });
           }
@@ -305,10 +322,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
           setRecordingError(error?.message || "An unexpected error occurred");
           
           setTimeout(() => {
-            toast.error("Error saving recording", {
-              id: 'error-toast',
-              duration: 3000
-            });
+            try {
+              toast.error("Error saving recording", {
+                id: 'error-toast',
+                duration: 3000
+              });
+            } catch (toastError) {
+              console.error('[VoiceRecorder] Error showing error toast:', toastError);
+            }
           }, 300);
           
           setIsProcessing(false);
@@ -321,10 +342,14 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
       setRecordingError(error?.message || "An unexpected error occurred");
       
       setTimeout(() => {
-        toast.error("Error saving recording", {
-          id: 'error-toast',
-          duration: 3000
-        });
+        try {
+          toast.error("Error saving recording", {
+            id: 'error-toast',
+            duration: 3000
+          });
+        } catch (toastError) {
+          console.error('[VoiceRecorder] Error showing error toast:', toastError);
+        }
       }, 300);
       
       setIsProcessing(false);
@@ -334,7 +359,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
   };
 
   const handleRestart = async () => {
-    await ensureAllToastsCleared();
+    try {
+      await ensureAllToastsCleared();
+    } catch (err) {
+      console.error('[VoiceRecorder] Error clearing toasts during restart:', err);
+    }
     
     resetRecording();
     resetPlayback();
@@ -350,9 +379,13 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
     
     await new Promise(resolve => setTimeout(resolve, 300));
     
-    toast.info("Starting a new recording", {
-      duration: 2000
-    });
+    try {
+      toast.info("Starting a new recording", {
+        duration: 2000
+      });
+    } catch (toastError) {
+      console.error('[VoiceRecorder] Error showing info toast during restart:', toastError);
+    }
   };
 
   const shouldShowPrompt = !isRecording && !audioBlob;
@@ -381,7 +414,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
               hasPermission={hasPermission}
               onRecordingStart={async () => {
                 console.log('[VoiceRecorder] Starting new recording');
-                await ensureAllToastsCleared();
+                try {
+                  await ensureAllToastsCleared();
+                } catch (err) {
+                  console.error('[VoiceRecorder] Error clearing toasts before recording:', err);
+                }
                 startRecording();
               }}
               onRecordingStop={() => {
@@ -415,7 +452,11 @@ export function VoiceRecorder({ onRecordingComplete, onCancel, className, update
                   audioDuration={audioDuration}
                   onTogglePlayback={async () => {
                     console.log('[VoiceRecorder] Toggle playback clicked');
-                    await ensureAllToastsCleared();
+                    try {
+                      await ensureAllToastsCleared();
+                    } catch (err) {
+                      console.error('[VoiceRecorder] Error clearing toasts before playback:', err);
+                    }
                     togglePlayback();
                   }}
                   onSaveEntry={handleSaveEntry}
