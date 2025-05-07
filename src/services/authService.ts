@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -164,6 +165,21 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
   try {
     // Check if there's a session before trying to sign out
     const { data: sessionData } = await supabase.auth.getSession();
+    
+    // If there's a user ID, reset their tutorial progress
+    if (sessionData?.session?.user?.id) {
+      try {
+        await supabase
+          .from('profiles')
+          .update({
+            tutorial_completed: 'NO',
+            tutorial_step: 0
+          })
+          .eq('id', sessionData.session.user.id);
+      } catch (error) {
+        console.error('Error resetting tutorial status during logout:', error);
+      }
+    }
     
     // If no session exists, just clean up local state and redirect
     if (!sessionData?.session) {

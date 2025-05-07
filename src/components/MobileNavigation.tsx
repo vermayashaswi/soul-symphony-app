@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -83,11 +82,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }
   
   const navItems = [
-    { path: '/app/home', icon: Home, label: 'Home' },
-    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
-    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
-    { path: '/app/insights', icon: BarChart2, label: 'Insights' },
-    { path: '/app/settings', icon: Settings, label: 'Settings' },
+    { path: '/app/home', icon: Home, label: 'Home', dataTutorial: 'home-button' },
+    { path: '/app/journal', icon: BookOpen, label: 'Journal', dataTutorial: 'journal-button' },
+    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat', dataTutorial: 'chat-button' },
+    { path: '/app/insights', icon: BarChart2, label: 'Insights', dataTutorial: 'insights-button' },
+    { path: '/app/settings', icon: Settings, label: 'Settings', dataTutorial: 'settings-button' },
   ];
 
   const getActiveStatus = (path: string) => {
@@ -106,6 +105,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
+      data-tutorial="main-navigation"
     >
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
@@ -121,6 +121,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-primary"
               )}
+              data-tutorial={item.dataTutorial}
             >
               <div className="relative">
                 <item.icon size={22} />

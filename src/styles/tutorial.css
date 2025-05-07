@@ -1,0 +1,27 @@
+
+/* Tutorial highlight styles */
+.tutorial-highlight {
+  position: relative;
+  z-index: 9001 !important;
+  animation: pulse 2s infinite;
+  box-shadow: 0 0 0 10px rgba(var(--primary), 0.3);
+  border-radius: inherit;
+}
+
+@keyframes pulse {
+  0% {
+    box-shadow: 0 0 0 0 rgba(var(--primary), 0.4);
+  }
+  70% {
+    box-shadow: 0 0 0 10px rgba(var(--primary), 0);
+  }
+  100% {
+    box-shadow: 0 0 0 0 rgba(var(--primary), 0);
+  }
+}
+
+/* Make tutorial target elements clickable through the overlay */
+[data-tutorial] {
+  position: relative;
+  z-index: 9001;
+}

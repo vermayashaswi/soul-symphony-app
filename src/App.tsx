@@ -1,36 +1,34 @@
 
 import React, { useEffect } from 'react';
-import AppRoutes from './routes/AppRoutes';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
+import { RouterProvider } from 'react-router-dom';
+import { Toaster } from '@/components/ui/sonner';
+import { ThemeProvider } from '@/hooks/use-theme';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { TranslationProvider } from '@/contexts/TranslationContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { JournalProcessingInitializer } from './app/journal-processing-init';
+import { router } from '@/routes/routeConfig';
+import './App.css';
+import './styles/mobile.css';
 import './styles/emoji.css';
+import './styles/tutorial.css'; // Add the tutorial styles
 
-const App: React.FC = () => {
-  useEffect(() => {
-    console.log('App mounted, current path:', window.location.pathname);
-    
-    // Clean up any malformed paths
-    const currentPath = window.location.pathname;
-    
-    // Fix incorrectly formatted URLs that have domains or https in the path
-    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      console.log('Fixing malformed URL path:', currentPath);
-      window.history.replaceState(null, '', '/');
-    }
-  }, []);
+// Import the TutorialProvider
+import { TutorialProvider } from '@/contexts/TutorialContext';
 
+function App() {
   return (
-    <TranslationProvider>
-      <TranslationLoadingOverlay />
-      <JournalProcessingInitializer />
-      <AppRoutes />
-      <Toaster />
-      <SonnerToaster position="top-right" />
-    </TranslationProvider>
+    <>
+      <AuthProvider>
+        <ThemeProvider>
+          <TranslationProvider>
+            <TutorialProvider>
+              <RouterProvider router={router} />
+            </TutorialProvider>
+          </TranslationProvider>
+        </ThemeProvider>
+      </AuthProvider>
+      <Toaster position="top-center" richColors closeButton />
+    </>
   );
-};
+}
 
 export default App;
