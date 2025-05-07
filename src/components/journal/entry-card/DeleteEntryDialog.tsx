@@ -1,62 +1,117 @@
-
-import React from 'react';
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { Loader2 } from 'lucide-react';
+import React, { useState } from 'react';
+import { Button } from '@/components/ui/button';
+import { 
+  AlertDialog, 
+  AlertDialogAction, 
+  AlertDialogCancel, 
+  AlertDialogContent, 
+  AlertDialogDescription, 
+  AlertDialogFooter, 
+  AlertDialogHeader, 
+  AlertDialogTitle, 
+  AlertDialogTrigger 
+} from '@/components/ui/alert-dialog';
+import { Trash, Loader2 } from "lucide-react";
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { toast } from 'sonner';
 
 interface DeleteEntryDialogProps {
-  showDeleteDialog: boolean;
-  closeDeleteDialog: () => void;
-  handleDeleteConfirmation: () => void;
-  isDeleting: boolean;
-  deleteError: string | null;
+  onDelete: () => Promise<void>;
+  isDeleting?: boolean;
 }
 
-export function DeleteEntryDialog({
-  showDeleteDialog,
-  closeDeleteDialog,
-  handleDeleteConfirmation,
-  isDeleting,
-  deleteError
-}: DeleteEntryDialogProps) {
+export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryDialogProps) {
+  const [open, setOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  
+  const handleDelete = async () => {
+    if (isProcessing) return;
+    
+    try {
+      setError(null);
+      setIsProcessing(true);
+      console.log("[DeleteEntryDialog] Starting delete operation");
+      
+      // Wait for the deletion to complete before proceeding
+      await onDelete();
+      
+      console.log("[DeleteEntryDialog] Delete operation completed successfully");
+      
+      // Show success toast
+      toast.success("Entry deleted successfully", {
+        duration: 3000,
+        closeButton: false
+      });
+      
+      // Dispatch an event to notify other components of the deletion
+      window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
+        detail: { action: 'delete' }
+      }));
+
+      // Only close the dialog after everything is complete
+      setTimeout(() => {
+        setIsProcessing(false);
+        setOpen(false);
+      }, 100);
+      
+    } catch (error) {
+      console.error("[DeleteEntryDialog] Error deleting entry:", error);
+      
+      // Set error state and show toast
+      const errorMessage = error instanceof Error ? error.message : "Failed to delete entry";
+      setError(errorMessage);
+      toast.error(`Error: ${errorMessage}`);
+      setIsProcessing(false);
+      
+      // Keep dialog open if there was an error
+    }
+  };
+
   return (
-    <AlertDialog open={showDeleteDialog} onOpenChange={closeDeleteDialog}>
+    <AlertDialog open={open} onOpenChange={setOpen}>
+      <AlertDialogTrigger asChild>
+        <button 
+          className="hover:text-red-500 text-gray-500" 
+          disabled={isDeleting}
+        >
+          {isDeleting ? (
+            <Loader2 size={16} className="animate-spin" />
+          ) : (
+            <Trash size={16} />
+          )}
+        </button>
+      </AlertDialogTrigger>
       <AlertDialogContent>
         <AlertDialogHeader>
           <AlertDialogTitle>
-            <TranslatableText text="Delete Journal Entry" />
+            <TranslatableText text="Delete entry" />
           </AlertDialogTitle>
           <AlertDialogDescription>
-            <TranslatableText text="Are you sure you want to delete this journal entry? This action cannot be undone." />
+            <TranslatableText text="This action cannot be undone. This will permanently delete your journal entry." />
           </AlertDialogDescription>
-          {deleteError && (
-            <p className="text-red-500 text-sm mt-2">{deleteError}</p>
+          
+          {error && (
+            <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-red-800 dark:text-red-200 text-sm">
+              {error}
+            </div>
           )}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isDeleting}>
+          <AlertDialogCancel disabled={isProcessing}>
             <TranslatableText text="Cancel" />
           </AlertDialogCancel>
-          <AlertDialogAction
+          <AlertDialogAction 
             onClick={(e) => {
-              e.preventDefault();
-              handleDeleteConfirmation();
-            }}
-            disabled={isDeleting}
-            className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
+              e.preventDefault(); // Prevent automatic closing of dialog
+              handleDelete();
+            }} 
+            className="bg-red-500 hover:bg-red-600" 
+            disabled={isProcessing}
           >
-            {isDeleting ? (
+            {isProcessing ? (
               <>
-                <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                <Loader2 size={16} className="mr-2 animate-spin" />
                 <TranslatableText text="Deleting..." />
               </>
             ) : (

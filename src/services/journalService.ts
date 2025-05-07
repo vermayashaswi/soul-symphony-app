@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { JournalEntry } from '@/types/journal';
+import { JournalEntry } from '@/components/journal/JournalEntryCard';
 
 /**
  * Checks if a user profile exists
@@ -56,90 +56,6 @@ export const createUserProfile = async (userId: string): Promise<boolean> => {
     return true;
   } catch (error: any) {
     console.error('[JournalService] Error creating profile:', error.message);
-    return false;
-  }
-};
-
-/**
- * Creates a placeholder journal entry for new users
- */
-export const createPlaceholderEntry = async (userId: string): Promise<number | null> => {
-  try {
-    console.log('[JournalService] Creating placeholder entry for user:', userId);
-    
-    // Sample entry data with predefined content
-    const placeholderData = {
-      user_id: userId,
-      "refined text": "Welcome to your journal! This is an example of what your entries will look like. You can record your thoughts by tapping the 'Record' tab and speaking. Your entries will be analyzed for emotions, themes, and key insights.",
-      master_themes: ["Getting Started", "Welcome", "Journal Example"],
-      sentiment: "positive",
-      emotions: {
-        "joy": 0.8,
-        "curiosity": 0.7,
-        "anticipation": 0.6
-      },
-      entities: [
-        {
-          type: "concept",
-          name: "journal",
-          text: "journal"
-        },
-        {
-          type: "activity",
-          name: "recording",
-          text: "recording"
-        }
-      ],
-      "is_placeholder": true
-    };
-    
-    // Insert the placeholder entry into the database
-    const { data, error } = await supabase
-      .from('Journal Entries')
-      .insert(placeholderData)
-      .select('id')
-      .single();
-      
-    if (error) {
-      console.error('[JournalService] Error creating placeholder entry:', error);
-      return null;
-    }
-    
-    console.log('[JournalService] Placeholder entry created with ID:', data.id);
-    return data.id;
-  } catch (error: any) {
-    console.error('[JournalService] Error creating placeholder entry:', error.message);
-    return null;
-  }
-};
-
-/**
- * Checks if a user has any journal entries
- */
-export const checkHasJournalEntries = async (userId: string): Promise<boolean> => {
-  try {
-    if (!userId) {
-      console.error('[JournalService] No user ID provided to check journal entries');
-      return false;
-    }
-    
-    console.log('[JournalService] Checking if user has any journal entries:', userId);
-    
-    const { count, error } = await supabase
-      .from('Journal Entries')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
-      
-    if (error) {
-      console.error('[JournalService] Error checking journal entries:', error);
-      return false;
-    }
-    
-    const hasEntries = count !== null && count > 0;
-    console.log(`[JournalService] User has ${count} journal entries`);
-    return hasEntries;
-  } catch (error: any) {
-    console.error('[JournalService] Error checking journal entries:', error.message);
     return false;
   }
 };
