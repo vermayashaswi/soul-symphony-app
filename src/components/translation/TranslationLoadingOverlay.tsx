@@ -1,43 +1,22 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { motion, AnimatePresence } from 'framer-motion';
 import { Progress } from '@/components/ui/progress';
 
 export function TranslationLoadingOverlay() {
-  const [isTranslating, setIsTranslating] = useState(false);
-  const [translationProgress, setTranslationProgress] = useState(0);
+  // Safe access to the translation context with default values
+  let isTranslating = false;
+  let translationProgress = 0;
   
-  // Get translation context safely
-  useEffect(() => {
-    try {
-      const getContextValues = () => {
-        try {
-          const { isTranslating: contextIsTranslating, translationProgress: contextProgress } = useTranslation();
-          setIsTranslating(contextIsTranslating);
-          setTranslationProgress(contextProgress);
-        } catch (error) {
-          console.error('TranslationLoadingOverlay: Error accessing translation context', error);
-        }
-      };
-      
-      // Get values initially
-      getContextValues();
-      
-      // Listen for language change events to update overlay
-      const handleLanguageChange = () => {
-        getContextValues();
-      };
-      
-      window.addEventListener('languageChange', handleLanguageChange as EventListener);
-      
-      return () => {
-        window.removeEventListener('languageChange', handleLanguageChange as EventListener);
-      };
-    } catch (error) {
-      console.error('TranslationLoadingOverlay: Error setting up context access', error);
-    }
-  }, []);
+  try {
+    const translationContext = useTranslation();
+    isTranslating = translationContext?.isTranslating || false;
+    translationProgress = translationContext?.translationProgress || 0;
+  } catch (error) {
+    console.error('TranslationLoadingOverlay: Error accessing translation context', error);
+    return null; // Return nothing if context isn't available yet
+  }
 
   return (
     <AnimatePresence>

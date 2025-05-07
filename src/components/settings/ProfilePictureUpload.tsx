@@ -365,6 +365,3 @@ export function ProfilePictureUpload() {
     </div>
   );
 }
-
-// Also export as default for backward compatibility
-export default ProfilePictureUpload;
