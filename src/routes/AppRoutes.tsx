@@ -34,7 +34,7 @@ const AppRoutes = () => {
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
         {/* App Routes */}
-        <Route path="/app" element={<OnboardingScreen />} />
+        <Route path="/app" element={<Home />} />
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         

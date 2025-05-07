@@ -1,3 +1,4 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
@@ -30,8 +31,9 @@ export function RecordingButton({
     return (
       <motion.button
         onClick={onPermissionRequest}
-        className="relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-red-500 border-red-600 w-20 h-20"
+        className="voice-recorder-button relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg bg-red-500 border-red-600 w-20 h-20"
         whileTap={{ scale: 0.95 }}
+        data-tutorial="microphone-button"
       >
         <Mic className="w-8 h-8 text-white" />
       </motion.button>
@@ -46,11 +48,11 @@ export function RecordingButton({
   }
   
   return (
-    <div className="relative flex items-center justify-center">
+    <div className="recording-button-container relative flex items-center justify-center" data-tutorial="recording-container">
       <motion.button
         onClick={isRecording ? onRecordingStop : onRecordingStart}
         className={cn(
-          "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
+          "voice-recorder-button relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
           isRecording ? "bg-red-500 border-red-600" : "bg-theme-color hover:bg-theme-color/90 border-theme-color/20",
           "w-20 h-20",
           audioBlob && "opacity-50 cursor-not-allowed" // Grey out when recording is done
@@ -60,6 +62,7 @@ export function RecordingButton({
         }}
         whileTap={{ scale: 0.95 }}
         disabled={audioBlob !== null} // Disable when recording is done
+        data-tutorial="microphone-button"
       >
         {isRecording ? (
           <Square className="w-7 h-7 text-white" />

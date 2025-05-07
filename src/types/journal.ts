@@ -25,6 +25,7 @@ export interface JournalEntry {
   original_language?: string; // Keep as optional
   translation_text?: string; // Keep as optional
   tempId?: string; // Temporary ID for tracking processing entries
+  is_tutorial_entry?: boolean; // Flag for tutorial entries that shouldn't be deleted
 }
 
 export interface JournalEntryFormData extends JournalEntry {

@@ -6,7 +6,9 @@ import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
+import { TutorialProvider } from '@/contexts/TutorialContext';
 import './styles/emoji.css';
+import { TooltipProvider } from '@/components/ui/tooltip';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -24,11 +26,15 @@ const App: React.FC = () => {
 
   return (
     <TranslationProvider>
-      <TranslationLoadingOverlay />
-      <JournalProcessingInitializer />
-      <AppRoutes />
-      <Toaster />
-      <SonnerToaster position="top-right" />
+      <TutorialProvider>
+        <TooltipProvider delayDuration={0}>
+          <TranslationLoadingOverlay />
+          <JournalProcessingInitializer />
+          <AppRoutes />
+          <Toaster />
+          <SonnerToaster position="top-right" />
+        </TooltipProvider>
+      </TutorialProvider>
     </TranslationProvider>
   );
 };
