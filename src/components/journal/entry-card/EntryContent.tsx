@@ -1,55 +1,62 @@
 
-import React, { useEffect, useState } from 'react';
-import { LoadingEntryContent } from './LoadingEntryContent';
-import { TranslatedContent } from './TranslatedContent';
+import React, { useState } from 'react';
 import { JournalEntry } from '@/types/journal';
+import { TranslatedContent } from './TranslatedContent';
+import { cn } from '@/lib/utils';
+import { Button } from '@/components/ui/button';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { ChevronDown, ChevronUp } from 'lucide-react';
 
 interface EntryContentProps {
   entry: JournalEntry;
   isExpanded: boolean;
-  isProcessing?: boolean;
   entryId: number;
-  onOverflowChange?: (hasOverflow: boolean) => void;
+  className?: string;
 }
 
-export function EntryContent({ 
-  entry, 
-  isExpanded, 
-  isProcessing = false,
-  entryId,
-  onOverflowChange
-}: EntryContentProps) {
-  const [isLoading, setIsLoading] = useState(isProcessing);
-  const contentRef = React.useRef<HTMLDivElement>(null);
+export function EntryContent({ entry, isExpanded, entryId, className }: EntryContentProps) {
+  const [expanded, setExpanded] = useState(isExpanded);
+  const content = entry.content || entry["refined text"] || entry["transcription text"] || "";
+  const shouldTruncate = content.length > 300;
+  
+  const toggleExpand = () => {
+    setExpanded(!expanded);
+  };
 
-  // Function to check for long content that might benefit from expand/collapse functionality
-  useEffect(() => {
-    const checkForLongContent = () => {
-      if (!contentRef.current) return;
-      
-      // Consider content as "long" if it's more than a certain number of characters
-      // or has multiple paragraphs
-      const isLongContent = entry.content.length > 280 || entry.content.split('\n').length > 2;
-      onOverflowChange?.(isLongContent);
-    };
-
-    // Wait for any potential content changes to finish before checking
-    const timer = setTimeout(checkForLongContent, 100);
-    
-    return () => clearTimeout(timer);
-  }, [entry.content, onOverflowChange]);
-
-  if (isLoading || isProcessing) {
-    return <LoadingEntryContent />;
-  }
+  const displayContent = shouldTruncate && !expanded 
+    ? content.substring(0, 300) + '...' 
+    : content;
 
   return (
-    <div ref={contentRef} className="w-full">
+    <div className={cn("content-container", className)}>
       <TranslatedContent 
-        content={entry.content} 
-        isExpanded={isExpanded} 
-        entryId={entryId} 
+        content={displayContent} 
+        isExpanded={expanded}
+        entryId={entryId}
       />
+      
+      {shouldTruncate && (
+        <div className="px-4 pb-2">
+          <Button 
+            variant="ghost"
+            size="sm"
+            onClick={toggleExpand}
+            className="text-xs text-muted-foreground hover:text-primary flex items-center gap-1"
+          >
+            {expanded ? (
+              <>
+                <ChevronUp size={14} />
+                <TranslatableText text="Show less" />
+              </>
+            ) : (
+              <>
+                <ChevronDown size={14} />
+                <TranslatableText text="Read more" />
+              </>
+            )}
+          </Button>
+        </div>
+      )}
     </div>
   );
 }

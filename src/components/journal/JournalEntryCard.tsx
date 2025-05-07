@@ -9,7 +9,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import { FloatingDotsToggle, ThemeLoader, DeleteEntryDialog, EntryContent, EditEntryButton, ExtractThemeButton, LoadingEntryContent } from './entry-card';
+import { FloatingDotsToggle, ThemeLoader, DeleteEntryDialog, EntryContent, EditEntryButton, ExtractThemeButton, LoadingEntryContent, TranslatedContent } from './entry-card';
 import { cn } from '@/lib/utils';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from 'react-i18next';
@@ -263,6 +263,16 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       </div>
 
       <EntryContent entry={entry} isExpanded={isExpanded} entryId={entry.id} />
+      
+      {/* Add ThemeLoader component here */}
+      <div className="px-4 py-2">
+        <ThemeLoader 
+          entryId={entry.id}
+          initialThemes={entry.master_themes || []}
+          content={entry.content}
+          isProcessing={processing}
+        />
+      </div>
 
       <DeleteEntryDialog
         showDeleteDialog={showDeleteDialog}

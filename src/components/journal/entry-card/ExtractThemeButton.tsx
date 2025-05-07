@@ -1,36 +1,30 @@
 
 import React from 'react';
 import { Button } from '@/components/ui/button';
+import { Tag } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { Sparkles } from 'lucide-react';
 
 interface ExtractThemeButtonProps {
   onClick: () => void;
-  isLoading?: boolean;
   disabled?: boolean;
+  processing?: boolean;
 }
 
 export function ExtractThemeButton({ 
   onClick, 
-  isLoading = false, 
-  disabled = false 
+  disabled = false,
+  processing = false
 }: ExtractThemeButtonProps) {
   return (
-    <Button
-      variant="ghost"
-      size="sm"
-      className="text-xs flex items-center gap-1.5"
+    <Button 
+      variant="ghost" 
+      size="sm" 
       onClick={onClick}
-      disabled={isLoading || disabled}
+      disabled={disabled || processing}
+      className="text-muted-foreground hover:text-foreground"
     >
-      <Sparkles className="h-3.5 w-3.5" />
-      <span>
-        {isLoading ? (
-          <TranslatableText text="Extracting..." />
-        ) : (
-          <TranslatableText text="Extract Themes" />
-        )}
-      </span>
+      <Tag size={16} className="mr-2" />
+      <TranslatableText text={processing ? "Extracting..." : "Extract Themes"} />
     </Button>
   );
 }
