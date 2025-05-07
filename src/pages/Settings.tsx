@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useTheme } from '@/hooks/use-theme';
@@ -130,160 +129,24 @@ const Settings = () => {
       <p className="text-muted-foreground text-center mb-6">Personalize your SoulO experience</p>
       
       <div className="space-y-6">
-        {/* Profile Section */}
-        <section className="bg-card rounded-lg p-6 shadow-md">
-          <div className="flex flex-col items-center">
-            <div className="mb-6">
-              <ProfilePictureUpload />
-            </div>
-            
-            <div className="w-full flex flex-col items-center mb-8">
-              {isEditingName ? (
-                <div className="flex items-center gap-2 mb-2 w-full max-w-xs">
-                  <Input
-                    value={displayName}
-                    onChange={(e) => setDisplayName(e.target.value)}
-                    className="flex-1"
-                    placeholder="Your display name"
-                  />
-                  <Button 
-                    onClick={handleUpdateDisplayName}
-                    disabled={isLoading || displayName === initialName}
-                    size="sm"
-                  >
-                    <TranslatableText text="Save" />
-                  </Button>
-                </div>
-              ) : (
-                <div className="flex items-center gap-2 mb-2">
-                  <h2 className="text-xl font-semibold">{displayName || user?.email?.split('@')[0]}</h2>
-                  <button onClick={() => setIsEditingName(true)} className="text-muted-foreground hover:text-primary">
-                    <Edit size={16} />
-                  </button>
-                </div>
-              )}
-              
-              <p className="text-sm text-muted-foreground">{user?.email}</p>
-            </div>
-            
-            <div className="grid grid-cols-2 gap-4 w-full mb-8">
-              <Card className="bg-secondary">
-                <CardContent className="p-4 text-center flex flex-col items-center justify-center">
-                  <p className="text-sm text-muted-foreground mb-1"><TranslatableText text="Journal Entries" /></p>
-                  <p className="text-3xl font-bold">{journalCount || 0}</p>
-                </CardContent>
-              </Card>
-              <Card className="bg-secondary">
-                <CardContent className="p-4 text-center flex flex-col items-center justify-center">
-                  <p className="text-sm text-muted-foreground mb-1"><TranslatableText text="Max Streak" /></p>
-                  <p className="text-3xl font-bold">{maxStreak || 0} <span className="text-sm font-normal text-muted-foreground">days</span></p>
-                </CardContent>
-              </Card>
-            </div>
-            
-            <Button 
-              variant="destructive" 
-              onClick={handleSignOut}
-              className="w-full flex items-center justify-center"
-            >
-              <LogOut className="mr-2 h-4 w-4" />
-              <TranslatableText text="Sign Out" />
-            </Button>
-          </div>
-        </section>
-        
-        {/* Appearance Section */}
-        <section className="bg-card rounded-lg p-6 shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-center">
-            <TranslatableText text="Appearance" />
-          </h2>
-          
-          <div className="space-y-6">
-            <div>
-              <label className="block text-sm font-medium mb-3 text-center">
-                <TranslatableText text="Theme Mode" />
-              </label>
-              <div className="flex gap-2">
-                <Button
-                  variant={theme === 'light' ? 'default' : 'outline'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setTheme('light')}
-                >
-                  <TranslatableText text="Light" />
-                </Button>
-                <Button
-                  variant={theme === 'dark' ? 'default' : 'outline'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setTheme('dark')}
-                >
-                  <TranslatableText text="Dark" />
-                </Button>
-                <Button
-                  variant={theme === 'system' ? 'default' : 'outline'}
-                  size="sm"
-                  className="flex-1"
-                  onClick={() => setTheme('system')}
-                >
-                  <TranslatableText text="System" />
-                </Button>
-              </div>
-            </div>
-            
-            <div>
-              <label className="block text-sm font-medium mb-3 text-center">
-                <TranslatableText text="Color Theme" />
-              </label>
-              <ThemeSelector />
-            </div>
-            
-            <div className="pt-2">
-              <Button 
-                variant="outline" 
-                className="w-full"
-                onClick={() => document.getElementById('customizeColorBtn')?.click()}
-              >
-                <TranslatableText text="Customize Your Color" />
-              </Button>
-              {/* Hidden button to open the ColorPicker */}
-              <Button 
-                id="customizeColorBtn"
-                className="hidden"
-                onClick={() => {
-                  // This functionality will be implemented when needed
-                }}
-              >
-                Custom
-              </Button>
-            </div>
-            
-            <div className="text-center">
-              <label className="block text-sm font-medium mb-2">
-                <TranslatableText text="Tutorial" />
-              </label>
-              <RestartTutorialButton />
-            </div>
-          </div>
-        </section>
-        
         {/* Preferences Section */}
         <section className="bg-card rounded-lg p-6 shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-center">
+          <h2 className="text-xl font-semibold mb-5 text-theme-color">
             <TranslatableText text="Preferences" />
           </h2>
           
-          <div className="space-y-4">
-            <div className="flex flex-col items-center mb-4">
-              <div className="flex items-center justify-between w-full mb-2">
-                <p className="font-medium"><TranslatableText text="Notifications" /></p>
-                <Switch 
-                  checked={notificationsEnabled} 
-                  onCheckedChange={toggleNotifications} 
-                />
+          <div>
+            <div className="flex items-center justify-between mb-2">
+              <div className="flex items-center">
+                <Bell className="mr-3 h-5 w-5 text-muted-foreground" />
+                <span className="font-medium"><TranslatableText text="Notifications" /></span>
               </div>
-              <p className="text-sm text-muted-foreground w-full text-center">{notificationSummary}</p>
+              <Switch 
+                checked={notificationsEnabled} 
+                onCheckedChange={toggleNotifications} 
+              />
             </div>
+            <p className="text-sm text-muted-foreground mb-4 ml-8">{notificationSummary}</p>
             
             <Button 
               variant="outline" 
@@ -297,18 +160,21 @@ const Settings = () => {
         
         {/* Help & Support Section */}
         <section className="bg-card rounded-lg p-6 shadow-md">
-          <h2 className="text-xl font-semibold mb-4 text-center">
+          <h2 className="text-xl font-semibold mb-5 text-theme-color">
             <TranslatableText text="Help & Support" />
           </h2>
           
-          <div className="space-y-2">
+          <div className="space-y-3">
             <button 
               className="flex items-center justify-between w-full p-3 hover:bg-muted rounded-md transition-colors"
               onClick={() => setShowFAQ(true)}
             >
               <div className="flex items-center">
                 <HelpCircle className="mr-3 h-5 w-5 text-muted-foreground" />
-                <span><TranslatableText text="FAQ" /></span>
+                <div className="text-left">
+                  <span className="font-medium block"><TranslatableText text="FAQ" /></span>
+                  <span className="text-sm text-muted-foreground"><TranslatableText text="Frequently asked questions" /></span>
+                </div>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
@@ -319,20 +185,38 @@ const Settings = () => {
             >
               <div className="flex items-center">
                 <Shield className="mr-3 h-5 w-5 text-muted-foreground" />
-                <span><TranslatableText text="Privacy Policy" /></span>
+                <div className="text-left">
+                  <span className="font-medium block"><TranslatableText text="Privacy Policy" /></span>
+                  <span className="text-sm text-muted-foreground"><TranslatableText text="How we protect your data" /></span>
+                </div>
               </div>
               <ChevronRight className="h-4 w-4 text-muted-foreground" />
             </button>
             
             <Button 
-              variant="outline" 
-              className="w-full mt-2 flex items-center justify-center"
+              className="w-full mt-4 bg-theme-color hover:bg-theme-color/90 text-white flex items-center justify-center"
               onClick={() => window.location.href = 'mailto:support@soulo.online'}
             >
               <Mail className="mr-2 h-4 w-4" />
               <TranslatableText text="Contact Support" />
             </Button>
           </div>
+        </section>
+        
+        {/* Account Section */}
+        <section className="bg-card rounded-lg p-6 shadow-md">
+          <h2 className="text-xl font-semibold mb-5 text-theme-color">
+            <TranslatableText text="Account" />
+          </h2>
+          
+          <Button 
+            variant="destructive" 
+            onClick={handleSignOut}
+            className="w-full flex items-center justify-center"
+          >
+            <LogOut className="mr-2 h-4 w-4" />
+            <TranslatableText text="Sign Out" />
+          </Button>
         </section>
       </div>
       
