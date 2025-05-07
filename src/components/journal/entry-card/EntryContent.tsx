@@ -1,10 +1,11 @@
 
 import React, { useEffect, useState } from 'react';
 import { LoadingEntryContent } from './LoadingEntryContent';
-import { TranslatedContent } from '../entry-card/TranslatedContent';
+import { TranslatedContent } from './TranslatedContent';
+import { JournalEntry } from '@/types/journal';
 
 interface EntryContentProps {
-  content: string;
+  entry: JournalEntry;
   isExpanded: boolean;
   isProcessing?: boolean;
   entryId: number;
@@ -12,7 +13,7 @@ interface EntryContentProps {
 }
 
 export function EntryContent({ 
-  content, 
+  entry, 
   isExpanded, 
   isProcessing = false,
   entryId,
@@ -28,7 +29,7 @@ export function EntryContent({
       
       // Consider content as "long" if it's more than a certain number of characters
       // or has multiple paragraphs
-      const isLongContent = content.length > 280 || content.split('\n').length > 2;
+      const isLongContent = entry.content.length > 280 || entry.content.split('\n').length > 2;
       onOverflowChange?.(isLongContent);
     };
 
@@ -36,7 +37,7 @@ export function EntryContent({
     const timer = setTimeout(checkForLongContent, 100);
     
     return () => clearTimeout(timer);
-  }, [content, onOverflowChange]);
+  }, [entry.content, onOverflowChange]);
 
   if (isLoading || isProcessing) {
     return <LoadingEntryContent />;
@@ -45,12 +46,10 @@ export function EntryContent({
   return (
     <div ref={contentRef} className="w-full">
       <TranslatedContent 
-        content={content} 
+        content={entry.content} 
         isExpanded={isExpanded} 
         entryId={entryId} 
       />
     </div>
   );
 }
-
-export default EntryContent;

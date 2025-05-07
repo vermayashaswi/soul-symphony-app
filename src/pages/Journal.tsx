@@ -815,6 +815,13 @@ const Journal = () => {
     }, 100);
   }, [fetchEntries]);
 
+  const handlePlaceholderEntryCreated = (entryId: number) => {
+    console.log('[Journal] Placeholder entry created:', entryId);
+    setPlaceholderEntryCreated(true);
+    setRefreshKey(prev => prev + 1);
+    fetchEntries();
+  };
+
   const formatBytes = (bytes: number, decimals = 2) => {
     if (bytes === 0) return '0 Bytes';
     
