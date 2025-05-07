@@ -1,9 +1,10 @@
 
-import React, { createContext, useState, useContext, useEffect } from 'react';
+import React, { createContext, useState, useContext, useEffect, useRef } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useTranslation } from './TranslationContext';
+import { useNavigate } from 'react-router-dom';
 
 type TutorialStep = 'welcome' | 'journal' | 'insights' | 'chat' | 'settings' | 'complete';
 
@@ -18,9 +19,23 @@ interface TutorialContextType {
   skipTutorial: () => void;
   tutorialProgress: number;
   isTutorialCompleted: boolean;
+  tutorialTarget: string;
+  targetPosition: string;
+  createSampleEntry: () => Promise<void>;
+  sampleEntryCreated: boolean;
 }
 
 const steps: TutorialStep[] = ['welcome', 'journal', 'insights', 'chat', 'settings', 'complete'];
+
+// Define target elements for each step
+const stepTargets: Record<TutorialStep, { target: string; position: string }> = {
+  welcome: { target: 'full-screen', position: 'center' },
+  journal: { target: 'journal-button', position: 'bottom' },
+  insights: { target: 'insights-button', position: 'bottom' },
+  chat: { target: 'chat-button', position: 'bottom' },
+  settings: { target: 'settings-button', position: 'bottom' },
+  complete: { target: 'full-screen', position: 'center' }
+};
 
 export const TutorialContext = createContext<TutorialContextType | undefined>(undefined);
 
@@ -28,8 +43,15 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState<TutorialStep>('welcome');
   const [isTutorialCompleted, setIsTutorialCompleted] = useState(true);
+  const [sampleEntryCreated, setSampleEntryCreated] = useState(false);
   const { user } = useAuth();
   const { translate } = useTranslation();
+  const navigate = useNavigate();
+  const sampleEntryRef = useRef<number | null>(null);
+
+  // Get target and position for current step
+  const tutorialTarget = stepTargets[currentStep]?.target || 'full-screen';
+  const targetPosition = stepTargets[currentStep]?.position || 'center';
 
   // Calculate progress percentage
   const tutorialProgress = ((steps.indexOf(currentStep) + 1) / steps.length) * 100;
@@ -70,6 +92,48 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
     checkTutorialStatus();
   }, [user]);
+
+  // Create a sample journal entry for the tutorial
+  const createSampleEntry = async () => {
+    if (!user) return;
+    if (sampleEntryCreated) return;
+
+    try {
+      console.log('Creating sample journal entry for tutorial');
+      const sampleText = "I have just started my SOULo voice journaling journey. I am extremely excited in various ways this will help me be more aware about my emotions and well-being. I wish to constantly explore all areas of my life and talk about it.";
+      
+      const { data, error } = await supabase
+        .from('Journal Entries')
+        .insert([{
+          user_id: user.id,
+          "refined text": sampleText,
+          "transcription text": sampleText,
+          content: sampleText,
+          sentiment: "positive",
+          emotions: { "excitement": 0.8, "happiness": 0.7, "curiosity": 0.6 },
+          master_themes: ["journaling", "emotions", "well-being", "self-awareness"],
+          created_at: new Date().toISOString(),
+          Edit_Status: 0,
+          duration: 30,
+          is_tutorial_entry: true  // Flag to mark this as a special tutorial entry
+        }])
+        .select('id')
+        .single();
+      
+      if (error) {
+        console.error('Error creating sample journal entry:', error);
+        return;
+      }
+      
+      if (data) {
+        sampleEntryRef.current = data.id;
+        console.log('Created sample journal entry with ID:', data.id);
+        setSampleEntryCreated(true);
+      }
+    } catch (error) {
+      console.error('Error creating sample entry:', error);
+    }
+  };
 
   const updateTutorialStep = async (step: TutorialStep) => {
     if (!user) return;
@@ -112,6 +176,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const startTutorial = () => {
     setIsActive(true);
     setCurrentStep('welcome');
+    navigate('/app');
   };
 
   const nextStep = () => {
@@ -120,6 +185,29 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const nextStep = steps[currentIndex + 1];
       setCurrentStep(nextStep);
       updateTutorialStep(nextStep);
+      
+      // Navigate to the appropriate page based on the step
+      switch (nextStep) {
+        case 'journal':
+          navigate('/app/journal');
+          // Create sample entry when reaching the journal step
+          createSampleEntry();
+          break;
+        case 'insights':
+          navigate('/app/insights');
+          break;
+        case 'chat':
+          navigate('/app/chat');
+          break;
+        case 'settings':
+          navigate('/app/settings');
+          break;
+        case 'complete':
+          navigate('/app');
+          break;
+        default:
+          break;
+      }
     } else {
       completeTutorial();
     }
@@ -131,6 +219,27 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       const prevStep = steps[currentIndex - 1];
       setCurrentStep(prevStep);
       updateTutorialStep(prevStep);
+      
+      // Navigate back to the appropriate page
+      switch (prevStep) {
+        case 'welcome':
+          navigate('/app');
+          break;
+        case 'journal':
+          navigate('/app/journal');
+          break;
+        case 'insights':
+          navigate('/app/insights');
+          break;
+        case 'chat':
+          navigate('/app/chat');
+          break;
+        case 'settings':
+          navigate('/app/settings');
+          break;
+        default:
+          break;
+      }
     }
   };
 
@@ -164,7 +273,11 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         completeTutorial,
         skipTutorial,
         tutorialProgress,
-        isTutorialCompleted
+        isTutorialCompleted,
+        tutorialTarget,
+        targetPosition,
+        createSampleEntry,
+        sampleEntryCreated
       }}
     >
       {children}
