@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User, Languages } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User, Languages, Search, X } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
