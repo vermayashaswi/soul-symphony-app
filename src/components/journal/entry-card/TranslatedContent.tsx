@@ -27,25 +27,28 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
   const handleTranslation = async () => {
     setIsLoading(true);
     try {
+      // Ensure we have content to translate
+      const contentToTranslate = content || "";
+      
       if (currentLanguage === 'en') {
-        setTranslatedContent(content);
+        setTranslatedContent(contentToTranslate);
       } else {
         // Always keep the original content initially
-        setTranslatedContent(content);
+        setTranslatedContent(contentToTranslate);
         
         // IMPORTANT: Always translate from English regardless of the detected language
         // This is the key change - we always assume the refined text is in English
-        const translated = await translate(content, "en", entryId);
+        const translated = await translate(contentToTranslate, "en", entryId);
         
         if (translated) {
           // Clean the translation result before setting it
           const cleanedResult = cleanTranslationResult(translated);
-          setTranslatedContent(cleanedResult || content);
+          setTranslatedContent(cleanedResult || contentToTranslate);
         }
       }
     } catch (error) {
       console.error('Translation error:', error);
-      setTranslatedContent(content); // Fallback to original content
+      setTranslatedContent(content || ""); // Fallback to original content
     } finally {
       setIsLoading(false);
     }
@@ -60,7 +63,7 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
   useEffect(() => {
     const handleLanguageChange = () => {
       // First set to original content to ensure visibility
-      setTranslatedContent(content);
+      setTranslatedContent(content || "");
       // Then retranslate
       handleTranslation();
     };
@@ -76,12 +79,12 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
     <div>
       {isExpanded ? (
         <div className="relative">
-          <p className="text-xs md:text-sm text-foreground">{translatedContent || content}</p>
+          <p className="text-xs md:text-sm text-foreground">{translatedContent || content || ""}</p>
           {isLoading && <div className="absolute top-0 right-0 w-2 h-2 bg-primary/50 rounded-full animate-pulse"></div>}
         </div>
       ) : (
         <div className="relative">
-          <p className="text-xs md:text-sm text-foreground">{translatedContent || content}</p>
+          <p className="text-xs md:text-sm text-foreground">{translatedContent || content || ""}</p>
           {isLoading && <div className="absolute top-0 right-0 w-2 h-2 bg-primary/50 rounded-full animate-pulse"></div>}
         </div>
       )}

@@ -28,7 +28,8 @@ export function EntryContent({
       
       // Consider content as "long" if it's more than a certain number of characters
       // or has multiple paragraphs
-      const isLongContent = content.length > 280 || content.split('\n').length > 2;
+      const contentToCheck = content || "";
+      const isLongContent = contentToCheck.length > 280 || contentToCheck.split('\n').length > 2;
       onOverflowChange?.(isLongContent);
     };
 
@@ -45,7 +46,7 @@ export function EntryContent({
   return (
     <div ref={contentRef} className="w-full">
       <TranslatedContent 
-        content={content} 
+        content={content || ""} 
         isExpanded={isExpanded} 
         entryId={entryId} 
       />

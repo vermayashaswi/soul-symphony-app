@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -16,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
+import { usePlaceholderEntry } from '@/hooks/use-placeholder-entry';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -23,6 +23,7 @@ const logInfo = (message: string, source: string) => {
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
+  const { ensurePlaceholderEntry } = usePlaceholderEntry();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
@@ -450,8 +451,21 @@ const Journal = () => {
     checkUserProfile(user.id);
   };
 
-  const handleStartRecording = () => {
+  const handleStartRecording = async () => {
     console.log('Starting new recording');
+    
+    // If user has no entries, create a placeholder to prevent state errors
+    if (user?.id && (!entries || entries.length === 0)) {
+      try {
+        await ensurePlaceholderEntry();
+        // Force refresh entries after placeholder creation
+        fetchEntries();
+        setRefreshKey(prev => prev + 1);
+      } catch (error) {
+        console.error('[Journal] Error ensuring placeholder entry:', error);
+      }
+    }
+    
     setActiveTab('record');
     setLastAction('Start Recording Tab');
     setProcessingError(null);
@@ -502,6 +516,16 @@ const Journal = () => {
     }
     
     try {
+      // Ensure user has at least one entry (placeholder if needed)
+      // This helps prevent DOM errors during first entry recording
+      if (entries.length === 0) {
+        console.log('[Journal] First recording detected, checking placeholder entry');
+        await ensurePlaceholderEntry();
+        // Refresh entries to include the placeholder
+        fetchEntries();
+        setRefreshKey(prev => prev + 1);
+      }
+      
       await new Promise<void>((resolve) => {
         clearAllToasts();
         setTimeout(() => {
