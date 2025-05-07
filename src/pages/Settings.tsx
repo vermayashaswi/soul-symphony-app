@@ -6,8 +6,8 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
 import LanguageSelector from '@/components/LanguageSelector';
 import { toast } from 'sonner';
-import ColorPicker from '@/components/settings/ColorPicker';
-import ProfilePictureUpload from '@/components/settings/ProfilePictureUpload';
+import { ColorPicker } from '@/components/settings/ColorPicker';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import { ResetTutorialButton } from '@/components/tutorial/ResetTutorialButton';
 
 const Settings = () => {

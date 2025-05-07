@@ -1,18 +1,33 @@
 
-import React, { useEffect } from 'react';
-import { RouterProvider } from 'react-router-dom';
+import React from 'react';
+import { createBrowserRouter, RouterProvider } from 'react-router-dom';
 import { Toaster } from '@/components/ui/sonner';
 import { ThemeProvider } from '@/hooks/use-theme';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { TranslationProvider } from '@/contexts/TranslationContext';
-import { router } from '@/routes/routeConfig';
+import { appRoutes, websiteRoutes, specialRoutes } from '@/routes/routeConfig';
 import './App.css';
 import './styles/mobile.css';
 import './styles/emoji.css';
-import './styles/tutorial.css'; // Add the tutorial styles
-
-// Import the TutorialProvider
+import './styles/tutorial.css';
 import { TutorialProvider } from '@/contexts/TutorialContext';
+
+// Create the router from our route configuration
+const router = createBrowserRouter([...websiteRoutes, ...appRoutes, ...specialRoutes].map(route => {
+  if (route.redirectPath) {
+    return {
+      path: route.path,
+      element: <React.Fragment key={route.path}>{route.element}</React.Fragment>,
+      loader: () => {
+        return { redirectTo: route.redirectPath };
+      }
+    };
+  }
+  return {
+    path: route.path,
+    element: <React.Fragment key={route.path}>{route.element}</React.Fragment>
+  };
+}));
 
 function App() {
   return (
