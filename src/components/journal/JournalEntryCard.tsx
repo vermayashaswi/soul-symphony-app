@@ -17,7 +17,6 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { textWillOverflow } from '@/utils/textUtils';
-import { useTranslation } from '@/contexts/TranslationContext';
 
 export interface JournalEntry {
   id: number;
@@ -43,7 +42,6 @@ export interface JournalEntry {
   translation_text?: string;
   original_language?: string;
   tempId?: string;
-  is_tutorial_entry?: boolean; // Added the missing property
 }
 
 interface JournalEntryCardProps {
@@ -54,29 +52,17 @@ interface JournalEntryCardProps {
   processing?: boolean;
   processed?: boolean;
   setEntries?: React.Dispatch<React.SetStateAction<JournalEntry[]>>;
-  customActions?: React.ReactNode;
-  showContent?: boolean;
-  imageOverride?: string;
-  isPreview?: boolean;
-  className?: string;
 }
 
 export function JournalEntryCard({ 
   entry, 
-  onDelete,
+  onDelete, 
   isNew = false, 
   isProcessing = false,
   processing = false,
   processed = false,
-  setEntries,
-  customActions,
-  showContent = true,
-  imageOverride = null,
-  isPreview = false,
-  className = "",
+  setEntries
 }: JournalEntryCardProps) {
-  const { translate } = useTranslation();
-  
   const safeEntry = {
     id: entry?.id || 0,
     content: entry?.content || "Processing entry...",
@@ -438,39 +424,6 @@ export function JournalEntryCard({
     setHasOverflow(overflow);
   };
 
-  const isTutorialEntry = React.useMemo(() => {
-    return entry?.is_tutorial_entry === true;
-  }, [entry]);
-
-  const handleDeleteButtonClick = async () => {
-    // Prevent deletion of tutorial entries
-    if (isTutorialEntry) {
-      toast.error(translate ? await translate('Tutorial entries cannot be deleted.') : 'Tutorial entries cannot be deleted.');
-      return;
-    }
-    
-    try {
-      if (onDelete && safeEntry.id) {
-        console.log(`[JournalEntryCard] Deleting entry ${safeEntry.id}`);
-        
-        // Mark as deleted immediately to prevent re-renders
-        setIsDeleted(true);
-        
-        // Call the parent's onDelete handler and ensure we return the promise
-        return await onDelete(safeEntry.id);
-      } else {
-        throw new Error("Delete handler not available or invalid entry ID");
-      }
-    } catch (error) {
-      console.error("[JournalEntryCard] Error during deletion:", error);
-      
-      // Reset deleted state if there was an error
-      setIsDeleted(false);
-      
-      throw error; // Propagate the error to be handled by the dialog
-    }
-  };
-
   if (hasError) {
     return (
       <Card className="bg-background shadow-md border-red-300">
@@ -523,6 +476,29 @@ export function JournalEntryCard({
     );
   }
 
+  const handleDelete = async () => {
+    try {
+      if (onDelete && safeEntry.id) {
+        console.log(`[JournalEntryCard] Deleting entry ${safeEntry.id}`);
+        
+        // Mark as deleted immediately to prevent re-renders
+        setIsDeleted(true);
+        
+        // Call the parent's onDelete handler and ensure we return the promise
+        return await onDelete(safeEntry.id);
+      } else {
+        throw new Error("Delete handler not available or invalid entry ID");
+      }
+    } catch (error) {
+      console.error("[JournalEntryCard] Error during deletion:", error);
+      
+      // Reset deleted state if there was an error
+      setIsDeleted(false);
+      
+      throw error; // Propagate the error to be handled by the dialog
+    }
+  };
+
   return (
     <ErrorBoundary>
       <motion.div
@@ -564,7 +540,7 @@ export function JournalEntryCard({
                 onEntryUpdated={handleEntryUpdate}
               />
               <DeleteEntryDialog 
-                onDelete={handleDeleteButtonClick} 
+                onDelete={handleDelete} 
               />
             </div>
           </div>
