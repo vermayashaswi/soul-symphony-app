@@ -5,7 +5,6 @@ import { useTutorial } from '@/contexts/TutorialContext';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Progress } from '@/components/ui/progress';
 import { motion, AnimatePresence } from 'framer-motion';
-import { TooltipProvider, Tooltip, TooltipTrigger, TooltipContent } from '@/components/ui/tooltip';
 import { ArrowLeft, ArrowRight, XCircle } from 'lucide-react';
 
 interface TutorialTooltipProps {
@@ -30,6 +29,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
     width: window.innerWidth,
     height: window.innerHeight
   });
+  const [arrowPoints, setArrowPoints] = useState<{x1: number, y1: number, x2: number, y2: number} | null>(null);
 
   // Handle resize events
   useEffect(() => {
@@ -55,7 +55,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
 
     let element: HTMLElement | null = null;
     
-    // Find element by data-tutorial attribute or ID
+    // Try finding by data-tutorial attribute first
     element = document.querySelector(`[data-tutorial="${tutorialTarget}"]`) as HTMLElement;
     
     // If not found by data attribute, try by ID
@@ -63,7 +63,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
       element = document.getElementById(tutorialTarget);
     }
     
-    // If still not found, check specific cases
+    // If still not found, check specific cases based on the step
     if (!element) {
       switch (tutorialTarget) {
         case 'journal-button':
@@ -78,9 +78,34 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
         case 'settings-button':
           element = document.querySelector('[href="/app/settings"]') as HTMLElement;
           break;
+        case 'microphone-button':
+          element = document.querySelector('.voice-recorder-button') as HTMLElement;
+          if (!element) {
+            // Try alternate selectors for the microphone button
+            const candidates = [
+              '.voice-recorder-container button',
+              '[aria-label="Record"]',
+              '.recording-button-container button'
+            ];
+            
+            for (const selector of candidates) {
+              const el = document.querySelector(selector);
+              if (el) {
+                element = el as HTMLElement;
+                break;
+              }
+            }
+          }
+          break;
         default:
           break;
       }
+    }
+    
+    if (element) {
+      console.log(`Found target element for ${tutorialTarget}:`, element);
+    } else {
+      console.warn(`Could not find target element for ${tutorialTarget}`);
     }
     
     setTargetElement(element);
@@ -94,6 +119,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
         left: windowSize.width / 2 - (tooltipRef.current?.offsetWidth || 300) / 2,
         top: windowSize.height / 2 - (tooltipRef.current?.offsetHeight || 200) / 2
       });
+      setArrowPoints(null);
       return;
     }
 
@@ -103,37 +129,81 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
     
     // Calculate position based on target position parameter
     let newPosition = { top: 0, left: 0 };
+    let arrow = { x1: 0, y1: 0, x2: 0, y2: 0 };
     
     switch (targetPosition) {
       case 'top':
         newPosition = {
           left: rect.left + rect.width / 2 - tooltipWidth / 2,
-          top: rect.top - tooltipHeight - 10
+          top: rect.top - tooltipHeight - 20 // Add extra space for arrow
+        };
+        
+        // Arrow points from bottom of tooltip to top of element
+        arrow = {
+          x1: tooltipWidth / 2,
+          y1: tooltipHeight,
+          x2: tooltipWidth / 2,
+          y2: tooltipHeight + 20
         };
         break;
+      
       case 'bottom':
         newPosition = {
           left: rect.left + rect.width / 2 - tooltipWidth / 2,
-          top: rect.bottom + 10
+          top: rect.bottom + 20 // Add space for arrow
+        };
+        
+        // Arrow points from top of tooltip to bottom of element
+        arrow = {
+          x1: tooltipWidth / 2,
+          y1: 0,
+          x2: tooltipWidth / 2,
+          y2: -20
         };
         break;
+      
       case 'left':
         newPosition = {
-          left: rect.left - tooltipWidth - 10,
+          left: rect.left - tooltipWidth - 20, // Add space for arrow
           top: rect.top + rect.height / 2 - tooltipHeight / 2
         };
+        
+        // Arrow points from right of tooltip to left of element
+        arrow = {
+          x1: tooltipWidth,
+          y1: tooltipHeight / 2,
+          x2: tooltipWidth + 20,
+          y2: tooltipHeight / 2
+        };
         break;
+      
       case 'right':
         newPosition = {
-          left: rect.right + 10,
+          left: rect.right + 20, // Add space for arrow
           top: rect.top + rect.height / 2 - tooltipHeight / 2
         };
+        
+        // Arrow points from left of tooltip to right of element
+        arrow = {
+          x1: 0,
+          y1: tooltipHeight / 2,
+          x2: -20,
+          y2: tooltipHeight / 2
+        };
         break;
+        
       default:
-        // Default to bottom
+        // Default to bottom position if not specified
         newPosition = {
           left: rect.left + rect.width / 2 - tooltipWidth / 2,
-          top: rect.bottom + 10
+          top: rect.bottom + 20
+        };
+        
+        arrow = {
+          x1: tooltipWidth / 2,
+          y1: 0,
+          x2: tooltipWidth / 2,
+          y2: -20
         };
         break;
     }
@@ -149,24 +219,65 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
     }
     
     setPosition(newPosition);
+    setArrowPoints(arrow);
   }, [targetElement, targetPosition, tutorialTarget, windowSize]);
 
   // Apply highlight to target element
   useEffect(() => {
     if (!targetElement || tutorialTarget === 'full-screen') return;
     
-    // Add highlight styles
+    // Create overlay if it doesn't exist
+    let overlay = document.getElementById('tutorial-overlay');
+    if (!overlay) {
+      overlay = document.createElement('div');
+      overlay.id = 'tutorial-overlay';
+      document.body.appendChild(overlay);
+    }
+    
+    // Style the overlay to cover the whole screen with a semi-transparent background
+    overlay.style.position = 'fixed';
+    overlay.style.top = '0';
+    overlay.style.left = '0';
+    overlay.style.width = '100%';
+    overlay.style.height = '100%';
+    overlay.style.backgroundColor = 'rgba(0, 0, 0, 0.5)';
+    overlay.style.zIndex = '999';
+    overlay.style.pointerEvents = 'none'; // Allow clicking through
+    
+    // Position and style for the target element
+    const rect = targetElement.getBoundingClientRect();
+    
+    // Cut a hole in the overlay for the target element
+    overlay.style.boxShadow = `0 0 0 9999px rgba(0, 0, 0, 0.5)`;
+    overlay.style.clipPath = `polygon(
+      0% 0%, 100% 0%, 100% 100%, 0% 100%, 
+      0% 0%, 
+      ${rect.left - 10}px ${rect.top - 10}px, 
+      ${rect.left - 10}px ${rect.bottom + 10}px, 
+      ${rect.right + 10}px ${rect.bottom + 10}px, 
+      ${rect.right + 10}px ${rect.top - 10}px, 
+      ${rect.left - 10}px ${rect.top - 10}px, 
+      0% 0%
+    )`;
+    
+    // Add highlight styles to the target element
     targetElement.style.position = 'relative';
     targetElement.style.zIndex = '1000';
-    targetElement.style.boxShadow = '0 0 0 4px rgba(var(--primary), 0.7)';
+    targetElement.style.boxShadow = '0 0 0 4px rgba(var(--primary), 0.7), 0 0 10px rgba(var(--primary), 0.5)';
     targetElement.style.borderRadius = '4px';
+    targetElement.style.transition = 'box-shadow 0.3s ease';
     
     return () => {
-      // Remove highlight styles
+      // Remove overlay and highlight styles
+      if (overlay) {
+        document.body.removeChild(overlay);
+      }
+      
       targetElement.style.boxShadow = '';
       targetElement.style.zIndex = '';
       targetElement.style.position = '';
       targetElement.style.borderRadius = '';
+      targetElement.style.transition = '';
     };
   }, [targetElement, tutorialTarget]);
 
@@ -191,7 +302,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
               <TranslatableText text="Journal" />
             </h3>
             <p className="mb-4">
-              <TranslatableText text="The Journal tab is where you record and review your thoughts and feelings. Tap the microphone button to start recording your thoughts." />
+              <TranslatableText text="This is your Journal page! Here you can record your thoughts and feelings by tapping the microphone button in the center. Try making your first entry!" />
             </p>
           </>
         );
@@ -202,7 +313,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
               <TranslatableText text="Insights" />
             </h3>
             <p className="mb-4">
-              <TranslatableText text="The Insights tab shows visualizations of your emotional patterns and themes over time." />
+              <TranslatableText text="The Insights tab shows visualizations of your emotional patterns and themes over time. The more journal entries you create, the richer your insights will be!" />
             </p>
           </>
         );
@@ -213,7 +324,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
               <TranslatableText text="Chat" />
             </h3>
             <p className="mb-4">
-              <TranslatableText text="The Chat tab lets you have conversations with Ruh about your journal entries and emotional patterns." />
+              <TranslatableText text="The Chat tab lets you have conversations with Ruh about your journal entries and emotional patterns. Ask questions about your feelings or get advice!" />
             </p>
           </>
         );
@@ -224,7 +335,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
               <TranslatableText text="Settings" />
             </h3>
             <p className="mb-4">
-              <TranslatableText text="The Settings tab lets you customize your experience and manage your account." />
+              <TranslatableText text="The Settings tab lets you customize your experience, update your profile information, and manage your account preferences." />
             </p>
           </>
         );
@@ -235,7 +346,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
               <TranslatableText text="Congratulations!" />
             </h3>
             <p className="mb-4">
-              <TranslatableText text="You're all set to start your journaling journey. Remember, you can revisit this tutorial anytime from the Settings page." />
+              <TranslatableText text="You've completed the tour! You're now ready to start your journaling journey with SOULo. Remember, you can revisit this tutorial anytime from the Settings page." />
             </p>
           </>
         );
@@ -264,6 +375,47 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
         }}
         className="bg-card border rounded-lg shadow-lg p-4 tutorial-tooltip"
       >
+        {/* Arrow connecting tooltip to target element */}
+        {arrowPoints && (
+          <svg 
+            className="absolute pointer-events-none" 
+            style={{
+              width: '100%',
+              height: '100%',
+              top: 0,
+              left: 0,
+              overflow: 'visible'
+            }}
+          >
+            <defs>
+              <marker
+                id="arrowhead"
+                markerWidth="10"
+                markerHeight="7"
+                refX="0"
+                refY="3.5"
+                orient="auto"
+              >
+                <polygon
+                  points="0 0, 10 3.5, 0 7"
+                  fill="currentColor"
+                  className="text-primary"
+                />
+              </marker>
+            </defs>
+            <line
+              x1={arrowPoints.x1}
+              y1={arrowPoints.y1}
+              x2={arrowPoints.x2}
+              y2={arrowPoints.y2}
+              stroke="currentColor"
+              strokeWidth="2"
+              className="text-primary"
+              markerEnd="url(#arrowhead)"
+            />
+          </svg>
+        )}
+        
         <div className="text-right mb-2">
           <Button
             variant="ghost"

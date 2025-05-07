@@ -27,10 +27,10 @@ interface TutorialContextType {
 
 const steps: TutorialStep[] = ['welcome', 'journal', 'insights', 'chat', 'settings', 'complete'];
 
-// Define target elements for each step
+// Define target elements for each step with precise positioning
 const stepTargets: Record<TutorialStep, { target: string; position: string }> = {
   welcome: { target: 'full-screen', position: 'center' },
-  journal: { target: 'journal-button', position: 'bottom' },
+  journal: { target: 'microphone-button', position: 'bottom' },
   insights: { target: 'insights-button', position: 'bottom' },
   chat: { target: 'chat-button', position: 'bottom' },
   settings: { target: 'settings-button', position: 'bottom' },
@@ -48,6 +48,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const { translate } = useTranslation();
   const navigate = useNavigate();
   const sampleEntryRef = useRef<number | null>(null);
+  const navigationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Get target and position for current step
   const tutorialTarget = stepTargets[currentStep]?.target || 'full-screen';
@@ -181,6 +182,74 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     setCurrentStep('welcome');
     navigate('/app');
   };
+  
+  // Handle proper navigation with timing
+  const navigateToStep = (step: TutorialStep) => {
+    // Clear any existing timeouts
+    if (navigationTimeoutRef.current) {
+      clearTimeout(navigationTimeoutRef.current);
+    }
+    
+    // Prepare navigation based on the step
+    let route = '/app';
+    switch (step) {
+      case 'journal':
+        route = '/app/journal';
+        break;
+      case 'insights':
+        route = '/app/insights';
+        break;
+      case 'chat':
+        route = '/app/chat';
+        break;
+      case 'settings':
+        route = '/app/settings';
+        break;
+      case 'welcome':
+      case 'complete':
+        route = '/app';
+        break;
+    }
+    
+    console.log(`Navigating to ${route} for tutorial step: ${step}`);
+    
+    // Introduce slight delay to ensure smooth transitions
+    navigationTimeoutRef.current = setTimeout(() => {
+      navigate(route);
+      
+      // Add extra delay for journal step to ensure UI loads properly
+      if (step === 'journal') {
+        navigationTimeoutRef.current = setTimeout(() => {
+          // Create sample entry when reaching the journal step
+          createSampleEntry();
+          
+          // Additional time for microphone button to be visible
+          navigationTimeoutRef.current = setTimeout(() => {
+            console.log('Checking for microphone button presence');
+            const micButton = document.querySelector('[data-tutorial="microphone-button"]');
+            if (!micButton) {
+              // Retry targeting
+              const fallbackSelectors = [
+                '.voice-recorder-button',
+                '.recording-button-container button',
+                '.VoiceRecorder button',
+                '[aria-label="Record"]'
+              ];
+              
+              for (const selector of fallbackSelectors) {
+                const button = document.querySelector(selector);
+                if (button) {
+                  button.setAttribute('data-tutorial', 'microphone-button');
+                  console.log('Found and tagged microphone button with fallback selector');
+                  break;
+                }
+              }
+            }
+          }, 500);
+        }, 500);
+      }
+    }, 300);
+  };
 
   const nextStep = () => {
     const currentIndex = steps.indexOf(currentStep);
@@ -190,27 +259,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateTutorialStep(nextStep);
       
       // Navigate to the appropriate page based on the step
-      switch (nextStep) {
-        case 'journal':
-          navigate('/app/journal');
-          // Create sample entry when reaching the journal step
-          createSampleEntry();
-          break;
-        case 'insights':
-          navigate('/app/insights');
-          break;
-        case 'chat':
-          navigate('/app/chat');
-          break;
-        case 'settings':
-          navigate('/app/settings');
-          break;
-        case 'complete':
-          navigate('/app');
-          break;
-        default:
-          break;
-      }
+      navigateToStep(nextStep);
     } else {
       completeTutorial();
     }
@@ -224,25 +273,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       updateTutorialStep(prevStep);
       
       // Navigate back to the appropriate page
-      switch (prevStep) {
-        case 'welcome':
-          navigate('/app');
-          break;
-        case 'journal':
-          navigate('/app/journal');
-          break;
-        case 'insights':
-          navigate('/app/insights');
-          break;
-        case 'chat':
-          navigate('/app/chat');
-          break;
-        case 'settings':
-          navigate('/app/settings');
-          break;
-        default:
-          break;
-      }
+      navigateToStep(prevStep);
     }
   };
 
@@ -263,6 +294,15 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       toast.info(await translate("Tutorial skipped. You can restart it anytime from settings."));
     }
   };
+  
+  // Clean up navigation timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (navigationTimeoutRef.current) {
+        clearTimeout(navigationTimeoutRef.current);
+      }
+    };
+  }, []);
 
   return (
     <TutorialContext.Provider

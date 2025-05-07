@@ -1,46 +1,74 @@
 
-import React from 'react';
+import React, { useEffect } from 'react';
 import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialTooltip from './TutorialTooltip';
-import { useEffect } from 'react';
 
 const TutorialModal: React.FC = () => {
-  const { isActive, isTutorialCompleted } = useTutorial();
+  const { isActive, isTutorialCompleted, currentStep } = useTutorial();
 
-  // Add data attributes to navigation elements for tutorial targeting
+  // Add data attributes to navigation and UI elements for tutorial targeting
   useEffect(() => {
-    // Add data-tutorial attributes to navigation elements
     const addTutorialAttributes = () => {
-      // Journal navigation
+      // Navigation elements
       const journalNav = document.querySelector('[href="/app/journal"]');
       if (journalNav) journalNav.setAttribute('data-tutorial', 'journal-button');
       
-      // Insights navigation
       const insightsNav = document.querySelector('[href="/app/insights"]');
       if (insightsNav) insightsNav.setAttribute('data-tutorial', 'insights-button');
       
-      // Chat navigation
-      const chatNav = document.querySelector('[href="/app/chat"]');
+      const chatNav = document.querySelector('[href="/app/smart-chat"], [href="/app/chat"]');
       if (chatNav) chatNav.setAttribute('data-tutorial', 'chat-button');
       
-      // Settings navigation
       const settingsNav = document.querySelector('[href="/app/settings"]');
       if (settingsNav) settingsNav.setAttribute('data-tutorial', 'settings-button');
       
-      // Journal microphone button
-      const micButton = document.querySelector('.voice-recorder-button');
-      if (micButton) micButton.setAttribute('data-tutorial', 'microphone-button');
+      // Add microphone button targeting based on current step
+      if (currentStep === 'journal') {
+        // Target different possible selectors for the microphone button
+        const micSelectors = [
+          '.voice-recorder-button',
+          '.recording-button-container button',
+          '.relative button svg[class*="Mic"]',
+          '.VoiceRecorder button',
+          '[aria-label="Record"]'
+        ];
+        
+        let microphoneButton = null;
+        
+        for (const selector of micSelectors) {
+          const button = document.querySelector(selector);
+          if (button) {
+            microphoneButton = button;
+            break;
+          }
+        }
+        
+        if (microphoneButton) {
+          console.log('Found microphone button:', microphoneButton);
+          microphoneButton.setAttribute('data-tutorial', 'microphone-button');
+          
+          // Find the parent container and add the attribute as well for better targeting
+          let parent = microphoneButton.parentElement;
+          for (let i = 0; i < 3 && parent; i++) {
+            parent.setAttribute('data-tutorial', 'recording-container');
+            parent = parent.parentElement;
+          }
+        } else {
+          console.warn('Could not find microphone button for tutorial targeting');
+        }
+      }
     };
     
-    // Run initial setup and then periodically check for elements
+    // Run initial setup
     addTutorialAttributes();
     
+    // Periodically check for elements since they might load dynamically
     const interval = setInterval(() => {
       addTutorialAttributes();
-    }, 1000);
+    }, 500);
     
     return () => clearInterval(interval);
-  }, []);
+  }, [currentStep]);
   
   return <TutorialTooltip open={isActive && !isTutorialCompleted} />;
 };
