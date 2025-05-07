@@ -7,8 +7,8 @@ import { Input } from '@/components/ui/input';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import ProfilePictureUpload from '@/components/settings/ProfilePictureUpload';
-import ColorPicker from '@/components/settings/ColorPicker';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
+import { ColorPicker } from '@/components/settings/ColorPicker';
 import RestartTutorialButton from '@/components/tutorial/RestartTutorialButton';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
@@ -105,7 +105,7 @@ const Settings = () => {
           </h2>
           
           <div className="flex flex-col items-center mb-4">
-            <ProfilePictureUpload userId={user?.id} />
+            <ProfilePictureUpload />
           </div>
           
           <div className="space-y-4">
@@ -180,7 +180,11 @@ const Settings = () => {
               <label className="block text-sm font-medium mb-2">
                 <TranslatableText text="Accent Color" />
               </label>
-              <ColorPicker />
+              <ColorPicker 
+                value={""} 
+                onChange={() => {}}
+                applyImmediately={true}
+              />
             </div>
             
             <div>
