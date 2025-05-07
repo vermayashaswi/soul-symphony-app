@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -15,7 +16,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
-import { usePlaceholderEntry } from '@/hooks/use-placeholder-entry';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -23,7 +23,6 @@ const logInfo = (message: string, source: string) => {
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
-  const { ensurePlaceholderEntry } = usePlaceholderEntry();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
@@ -451,21 +450,8 @@ const Journal = () => {
     checkUserProfile(user.id);
   };
 
-  const handleStartRecording = async () => {
+  const handleStartRecording = () => {
     console.log('Starting new recording');
-    
-    // If user has no entries, create a placeholder to prevent state errors
-    if (user?.id && (!entries || entries.length === 0)) {
-      try {
-        await ensurePlaceholderEntry();
-        // Force refresh entries after placeholder creation
-        fetchEntries();
-        setRefreshKey(prev => prev + 1);
-      } catch (error) {
-        console.error('[Journal] Error ensuring placeholder entry:', error);
-      }
-    }
-    
     setActiveTab('record');
     setLastAction('Start Recording Tab');
     setProcessingError(null);
@@ -516,46 +502,6 @@ const Journal = () => {
     }
     
     try {
-      // ENHANCED: More robust placeholder entry handling with verification
-      // This is critical for first-time users to prevent DOM errors
-      if (entries.length === 0) {
-        console.log('[Journal] First recording detected, ensuring placeholder entry with verification');
-        
-        // First attempt to create and verify placeholder entry
-        const placeholderSuccess = await ensurePlaceholderEntry();
-        console.log(`[Journal] Placeholder entry creation ${placeholderSuccess ? 'succeeded' : 'failed'}`);
-        
-        // Robust fetch to load the placeholder entry
-        await new Promise(resolve => {
-          // Short delay to allow database to process
-          setTimeout(async () => {
-            // Fetch entries to include the placeholder
-            await fetchEntries();
-            setRefreshKey(prev => prev + 1);
-            
-            // Additional fetch for extra reliability
-            setTimeout(async () => {
-              await fetchEntries();
-              resolve(null);
-            }, 300);
-          }, 200);
-        });
-        
-        // Check again to see if entries are loaded
-        if (entries.length === 0) {
-          console.log('[Journal] Still no entries after placeholder creation, attempting second verification');
-          
-          // Last attempt with longer timeout
-          await new Promise(resolve => {
-            setTimeout(async () => {
-              await fetchEntries();
-              setRefreshKey(prev => prev + 1);
-              resolve(null);
-            }, 500);
-          });
-        }
-      }
-      
       await new Promise<void>((resolve) => {
         clearAllToasts();
         setTimeout(() => {
@@ -572,11 +518,8 @@ const Journal = () => {
       setSafeToSwitchTab(false);
       setEntriesReady(false);
       
-      // Safely switch tabs with DOM safety check
       setTimeout(() => {
-        if (document.getElementById('journal-entries-container')) {
-          setActiveTab('entries');
-        }
+        setActiveTab('entries');
       }, 50);
       
       const toastId = toast.loading('Processing your journal entry with AI...', {

@@ -219,8 +219,6 @@ export type Database = {
           onboarding_completed: boolean | null
           reminder_settings: Json | null
           timezone: string | null
-          tutorial_completed: string | null
-          tutorial_step: number | null
           updated_at: string
         }
         Insert: {
@@ -234,8 +232,6 @@ export type Database = {
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
           timezone?: string | null
-          tutorial_completed?: string | null
-          tutorial_step?: number | null
           updated_at?: string
         }
         Update: {
@@ -249,8 +245,6 @@ export type Database = {
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
           timezone?: string | null
-          tutorial_completed?: string | null
-          tutorial_step?: number | null
           updated_at?: string
         }
         Relationships: []

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -183,19 +182,14 @@ const Home = () => {
       <div className="relative z-20 flex flex-col h-screen">
         <div className="p-4 flex flex-col">
           <div className="flex justify-between items-start w-full relative">
-            {/* Modified journal name container to allow 2 lines */}
             <div className="relative max-w-[65%]">
               <h1
-                className="text-2xl font-bold text-theme break-words leading-tight"
+                className="text-2xl font-bold text-theme truncate"
                 style={{
                   fontWeight: 700,
                   letterSpacing: '0.005em',
                   WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale',
-                  maxHeight: '60px', /* Allows roughly 2 lines at this font size */
-                  overflowWrap: 'break-word',
-                  wordWrap: 'break-word',
-                  hyphens: 'auto'
+                  MozOsxFontSmoothing: 'grayscale'
                 }}
               >
                 <TranslatableText text={getJournalName()} forceTranslate={true} />

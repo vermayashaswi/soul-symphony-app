@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -629,7 +628,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
 
 // Simple Language Selector component for onboarding
 const LanguageSelector = () => {
-  const { currentLanguage, setLanguage, languages } = useTranslation();
+  const { currentLanguage, setLanguage } = useTranslation();
 
   const handleLanguageChange = (value: string) => {
     setLanguage(value);
@@ -640,8 +639,8 @@ const LanguageSelector = () => {
       <SelectTrigger className="w-full">
         <SelectValue placeholder="Select a language" />
       </SelectTrigger>
-      <SelectContent className="max-h-[300px] overflow-y-auto">
-        {languages.map((language) => (
+      <SelectContent>
+        {LANGUAGES.map((language) => (
           <SelectItem key={language.code} value={language.code}>
             {language.label}
           </SelectItem>

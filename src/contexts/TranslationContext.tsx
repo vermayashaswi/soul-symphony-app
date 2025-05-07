@@ -5,7 +5,7 @@ import { staticTranslationService } from '@/services/staticTranslationService';
 import { preloadWebsiteTranslations } from '@/utils/website-translations';
 import { useLocation } from 'react-router-dom';
 
-// Define the language options with all 21 languages
+// Define the language options
 export const languages = [
   { code: 'en', label: 'English' },
   { code: 'es', label: 'Español' },
@@ -17,17 +17,6 @@ export const languages = [
   { code: 'ru', label: 'Русский' },
   { code: 'ar', label: 'العربية' },
   { code: 'pt', label: 'Português' },
-  { code: 'it', label: 'Italiano' },
-  { code: 'ko', label: '한국어' },
-  { code: 'bn', label: 'বাংলা' },
-  { code: 'ta', label: 'தமிழ்' },
-  { code: 'te', label: 'తెలుగు' },
-  { code: 'mr', label: 'मराठी' },
-  { code: 'gu', label: 'ગુજરાતી' },
-  { code: 'kn', label: 'ಕನ್ನಡ' },
-  { code: 'ml', label: 'മലയാളം' },
-  { code: 'pa', label: 'ਪੰਜਾਬੀ' },
-  { code: 'or', label: 'ଓଡ଼ିଆ' },
 ];
 
 // Local memory cache to prevent flickering during navigation
@@ -41,7 +30,6 @@ interface TranslationContextType {
   translate: (text: string, sourceLanguage?: string, entryId?: number) => Promise<string>;
   getCachedTranslation: (text: string, language: string) => string | null;
   prefetchTranslationsForRoute: (routeTexts: string[]) => Promise<void>;
-  languages: { code: string; label: string }[]; // Add languages to the context type
 }
 
 const TranslationContext = createContext<TranslationContextType | undefined>(undefined);
@@ -270,8 +258,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       translationProgress,
       translate,
       getCachedTranslation,
-      prefetchTranslationsForRoute,
-      languages // Add languages to the context value
+      prefetchTranslationsForRoute
     }}>
       {children}
     </TranslationContext.Provider>

@@ -19,7 +19,6 @@ export function EntryContent({
   onOverflowChange
 }: EntryContentProps) {
   const [isLoading, setIsLoading] = useState(isProcessing);
-  const [hasError, setHasError] = useState(false);
   const contentRef = React.useRef<HTMLDivElement>(null);
 
   // Function to check for long content that might benefit from expand/collapse functionality
@@ -27,16 +26,10 @@ export function EntryContent({
     const checkForLongContent = () => {
       if (!contentRef.current) return;
       
-      try {
-        // Consider content as "long" if it's more than a certain number of characters
-        // or has multiple paragraphs
-        const contentToCheck = content || "";
-        const isLongContent = contentToCheck.length > 280 || contentToCheck.split('\n').length > 2;
-        onOverflowChange?.(isLongContent);
-      } catch (error) {
-        console.error('[EntryContent] Error checking content length:', error);
-        setHasError(true);
-      }
+      // Consider content as "long" if it's more than a certain number of characters
+      // or has multiple paragraphs
+      const isLongContent = content.length > 280 || content.split('\n').length > 2;
+      onOverflowChange?.(isLongContent);
     };
 
     // Wait for any potential content changes to finish before checking
@@ -45,27 +38,8 @@ export function EntryContent({
     return () => clearTimeout(timer);
   }, [content, onOverflowChange]);
 
-  // Handle errors and loading
-  useEffect(() => {
-    setIsLoading(isProcessing);
-    
-    // Reset error state when content changes
-    if (content) {
-      setHasError(false);
-    }
-  }, [content, isProcessing]);
-
   if (isLoading || isProcessing) {
     return <LoadingEntryContent />;
-  }
-
-  if (hasError || !content) {
-    // Provide fallback for error state
-    return (
-      <div className="p-2 text-muted-foreground text-sm">
-        Entry content unavailable
-      </div>
-    );
   }
 
   return (

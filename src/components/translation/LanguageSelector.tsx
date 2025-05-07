@@ -13,8 +13,19 @@ import { Globe } from 'lucide-react';
 export function LanguageSelector() {
   const { currentLanguage, setLanguage, isTranslating } = useTranslation();
 
-  // Use languages from TranslationContext instead of local definition
-  const { languages } = useTranslation();
+  // Use locally defined languages to avoid circular imports
+  const languages = [
+    { code: 'en', label: 'English' },
+    { code: 'es', label: 'Español' },
+    { code: 'fr', label: 'Français' },
+    { code: 'de', label: 'Deutsch' },
+    { code: 'hi', label: 'हिन्दी' },
+    { code: 'zh', label: '中文' },
+    { code: 'ja', label: '日本語' },
+    { code: 'ru', label: 'Русский' },
+    { code: 'ar', label: 'العربية' },
+    { code: 'pt', label: 'Português' },
+  ];
 
   const currentLanguageLabel = languages.find(lang => lang.code === currentLanguage)?.label || 'Language';
   
@@ -36,7 +47,7 @@ export function LanguageSelector() {
           <span>{currentLanguageLabel}</span>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent align="end" className="bg-background border border-border max-h-64 overflow-y-auto">
+      <DropdownMenuContent align="end" className="bg-background border border-border">
         {languages.map((language) => (
           <DropdownMenuItem
             key={language.code}

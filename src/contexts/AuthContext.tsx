@@ -3,11 +3,7 @@ import { Session, User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { AuthContextType } from '@/types/auth';
-import { 
-  ensureProfileExists as ensureProfileExistsService, 
-  updateUserProfile as updateUserProfileService, 
-  updateTimezone 
-} from '@/services/profileService';
+import { ensureProfileExists as ensureProfileExistsService, updateUserProfile as updateUserProfileService } from '@/services/profileService';
 import { 
   signInWithGoogle as signInWithGoogleService,
   signInWithEmail as signInWithEmailService,
@@ -36,7 +32,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
-  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
   const location = useLocation();
 
   const createUserSession = async (userId: string) => {
@@ -74,30 +69,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsMobileDevice(isMobile);
       logInfo(`Detected ${isMobile ? 'mobile' : 'desktop'} device`, 'AuthContext');
     };
-    
-    // Set up path change listener
-    const handlePathChange = () => {
-      setCurrentPath(window.location.pathname);
-    };
 
-    // Listen for path changes
-    window.addEventListener('popstate', handlePathChange);
-    
-    const originalPushState = window.history.pushState;
-    window.history.pushState = function() {
-      originalPushState.apply(this, arguments as any);
-      handlePathChange();
-    };
-    
     checkMobile();
     
     return () => {
       if (autoRetryTimeoutId) {
         clearTimeout(autoRetryTimeoutId);
       }
-      
-      window.removeEventListener('popstate', handlePathChange);
-      window.history.pushState = originalPushState;
     };
   }, [autoRetryTimeoutId]);
 
@@ -301,15 +279,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     
     if (profileExistsStatus === true) {
       logProfile('Profile already exists, skipping creation', 'AuthContext');
-      
-      // Even if profile exists, make sure timezone is up to date
-      setTimeout(() => {
-        updateTimezone(currentUser.id)
-          .catch(e => {
-            logError(`Error updating timezone: ${e.message}`, 'AuthContext');
-          });
-      }, 0);
-      
       return true;
     }
     
@@ -405,14 +374,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               });
           }, 0);
           
-          // Update user timezone whenever they sign in
-          setTimeout(() => {
-            updateTimezone(currentSession.user.id)
-              .catch(error => {
-                logError(`Error updating timezone on sign in: ${error.message}`, 'AuthContext');
-              });
-          }, 0);
-          
           const initialDelay = isMobileDevice ? 1500 : 1000;
           logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
           
@@ -438,7 +399,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
         if (event === 'SIGNED_IN') {
           logInfo('User signed in successfully', 'AuthContext');
-          if (isAppRoute(currentPath)) {
+          if (isAppRoute(location.pathname)) {
             toast.success('Signed in successfully');
           }
         } else if (event === 'SIGNED_OUT') {
@@ -452,7 +413,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             setAutoRetryTimeoutId(null);
           }
           
-          if (isAppRoute(currentPath)) {
+          if (isAppRoute(location.pathname)) {
             toast.info('Signed out');
           }
         }
@@ -469,14 +430,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           createUserSession(currentSession.user.id)
             .catch(error => {
               console.error('Error creating user session on initial session check:', error);
-            });
-        }, 0);
-        
-        // Update user timezone on initial session check
-        setTimeout(() => {
-          updateTimezone(currentSession.user.id)
-            .catch(error => {
-              logError(`Error updating timezone on initial session: ${error.message}`, 'AuthContext');
             });
         }, 0);
         
@@ -510,7 +463,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         clearTimeout(autoRetryTimeoutId);
       }
     };
-  }, [isMobileDevice, currentPath]);
+  }, [isMobileDevice, location.pathname]);
 
   const value = {
     session,

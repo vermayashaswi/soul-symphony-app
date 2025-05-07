@@ -13,9 +13,22 @@ import { createDebugger } from '@/utils/debug/debugUtils';
 
 const debug = createDebugger('languageSelector');
 
-// Use the languages array from TranslationContext
+// Local definition of languages instead of importing from context
+const languages = [
+  { code: 'en', label: 'English' },
+  { code: 'es', label: 'Español' },
+  { code: 'fr', label: 'Français' },
+  { code: 'de', label: 'Deutsch' },
+  { code: 'hi', label: 'हिन्दी' },
+  { code: 'zh', label: '中文' },
+  { code: 'ja', label: '日本語' },
+  { code: 'ru', label: 'Русский' },
+  { code: 'ar', label: 'العربية' },
+  { code: 'pt', label: 'Português' },
+];
+
 const LanguageSelector = () => {
-  const { currentLanguage, setLanguage, isTranslating, languages } = useTranslation();
+  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
 
   const handleLanguageChange = async (languageCode: string) => {
     debug.info('Language change requested:', languageCode);

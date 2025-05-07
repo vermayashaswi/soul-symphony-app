@@ -5,18 +5,6 @@
 import { supabase } from '@/integrations/supabase/client';
 
 /**
- * Gets the user's current timezone
- */
-const getUserTimezone = (): string => {
-  try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
-  } catch (e) {
-    console.error('Error getting timezone:', e);
-    return 'UTC';
-  }
-};
-
-/**
  * Ensures that a user profile exists for the given user ID
  * Creates one if it doesn't exist
  */
@@ -27,7 +15,7 @@ export async function ensureUserProfileExists(userId: string | undefined): Promi
     // Check if user profile exists
     const { data: profile, error: fetchError } = await supabase
       .from('profiles')
-      .select('id, onboarding_completed, timezone')
+      .select('id, onboarding_completed')
       .eq('id', userId)
       .single();
       
@@ -45,21 +33,6 @@ export async function ensureUserProfileExists(userId: string | undefined): Promi
     import('./processing-state').then(({ setHasPreviousEntries }) => {
       setHasPreviousEntries(hasEntries);
     });
-    
-    // If timezone needs to be updated
-    if (profile && !profile.timezone) {
-      const timezone = getUserTimezone();
-      console.log('Updating user timezone to:', timezone);
-      
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ timezone })
-        .eq('id', userId);
-        
-      if (updateError) {
-        console.error('Error updating timezone:', updateError);
-      }
-    }
       
     // If profile doesn't exist, create one
     if (fetchError || !profile) {
@@ -77,7 +50,6 @@ export async function ensureUserProfileExists(userId: string | undefined): Promi
           email: userData.user?.email,
           full_name: userData.user?.user_metadata?.full_name || '',
           avatar_url: userData.user?.user_metadata?.avatar_url || '',
-          timezone: getUserTimezone(),
           onboarding_completed: false
         }]);
         
