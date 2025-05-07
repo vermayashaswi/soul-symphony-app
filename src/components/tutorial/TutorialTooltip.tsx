@@ -364,7 +364,7 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
         initial={{ opacity: 0, scale: 0.9 }}
         animate={{ opacity: 1, scale: 1 }}
         exit={{ opacity: 0, scale: 0.9 }}
-        transition={{ duration: 0.2 }}
+        transition={{ duration: 0.3, ease: "easeInOut" }}
         style={{
           position: 'fixed',
           top: `${position.top}px`,
@@ -430,9 +430,14 @@ const TutorialTooltip: React.FC<TutorialTooltipProps> = ({ open }) => {
           </Button>
         </div>
         
-        <div className="tutorial-content">
+        <motion.div 
+          className="tutorial-content"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1, duration: 0.3 }}
+        >
           {getStepContent()}
-        </div>
+        </motion.div>
         
         <div className="mt-4">
           <Progress value={tutorialProgress} className="h-1 mb-3" />

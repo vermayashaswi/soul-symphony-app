@@ -2,9 +2,10 @@
 import React, { useEffect } from 'react';
 import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialTooltip from './TutorialTooltip';
+import { LoadingState } from '@/components/insights/soulnet/LoadingState'; // Reuse the loading component
 
 const TutorialModal: React.FC = () => {
-  const { isActive, isTutorialCompleted, currentStep } = useTutorial();
+  const { isActive, isTutorialCompleted, currentStep, isNavigating } = useTutorial();
 
   // Add data attributes to navigation and UI elements for tutorial targeting
   useEffect(() => {
@@ -69,6 +70,17 @@ const TutorialModal: React.FC = () => {
     
     return () => clearInterval(interval);
   }, [currentStep]);
+  
+  // Display loading state during navigation
+  if (isNavigating) {
+    return (
+      <div className="fixed inset-0 z-[2000] flex items-center justify-center bg-background/70 backdrop-blur-sm">
+        <div className="w-full max-w-md">
+          <LoadingState />
+        </div>
+      </div>
+    );
+  }
   
   return <TutorialTooltip open={isActive && !isTutorialCompleted} />;
 };

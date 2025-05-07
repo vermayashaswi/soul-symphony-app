@@ -23,6 +23,7 @@ interface TutorialContextType {
   targetPosition: string;
   createSampleEntry: () => Promise<void>;
   sampleEntryCreated: boolean;
+  isNavigating: boolean; // New loading state
 }
 
 const steps: TutorialStep[] = ['welcome', 'journal', 'insights', 'chat', 'settings', 'complete'];
@@ -44,6 +45,7 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
   const [currentStep, setCurrentStep] = useState<TutorialStep>('welcome');
   const [isTutorialCompleted, setIsTutorialCompleted] = useState(true);
   const [sampleEntryCreated, setSampleEntryCreated] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false); // New loading state
   const { user } = useAuth();
   const { translate } = useTranslation();
   const navigate = useNavigate();
@@ -190,6 +192,9 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       clearTimeout(navigationTimeoutRef.current);
     }
     
+    // Set navigating state to true
+    setIsNavigating(true);
+    
     // Prepare navigation based on the step
     let route = '/app';
     switch (step) {
@@ -217,9 +222,12 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     navigationTimeoutRef.current = setTimeout(() => {
       navigate(route);
       
-      // Add extra delay for journal step to ensure UI loads properly
-      if (step === 'journal') {
-        navigationTimeoutRef.current = setTimeout(() => {
+      // Short delay before clearing navigation state to allow page to render
+      navigationTimeoutRef.current = setTimeout(() => {
+        setIsNavigating(false);
+        
+        // Add extra delay for journal step to ensure UI loads properly
+        if (step === 'journal') {
           // Create sample entry when reaching the journal step
           createSampleEntry();
           
@@ -246,8 +254,8 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
               }
             }
           }, 500);
-        }, 500);
-      }
+        }
+      }, 500);
     }, 300);
   };
 
@@ -320,7 +328,8 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         tutorialTarget,
         targetPosition,
         createSampleEntry,
-        sampleEntryCreated
+        sampleEntryCreated,
+        isNavigating
       }}
     >
       {children}
