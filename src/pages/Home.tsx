@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -184,12 +185,17 @@ const Home = () => {
           <div className="flex justify-between items-start w-full relative">
             <div className="relative max-w-[65%]">
               <h1
-                className="text-2xl font-bold text-theme truncate"
+                className="text-2xl font-bold text-theme break-words hyphens-auto"
                 style={{
                   fontWeight: 700,
                   letterSpacing: '0.005em',
                   WebkitFontSmoothing: 'antialiased',
-                  MozOsxFontSmoothing: 'grayscale'
+                  MozOsxFontSmoothing: 'grayscale',
+                  display: '-webkit-box',
+                  WebkitLineClamp: '2',
+                  WebkitBoxOrient: 'vertical',
+                  overflow: 'hidden',
+                  maxHeight: '60px'
                 }}
               >
                 <TranslatableText text={getJournalName()} forceTranslate={true} />
