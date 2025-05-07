@@ -6,6 +6,7 @@ import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
+import { TutorialProvider } from '@/contexts/TutorialContext';
 import './styles/emoji.css';
 
 const App: React.FC = () => {
@@ -24,11 +25,13 @@ const App: React.FC = () => {
 
   return (
     <TranslationProvider>
-      <TranslationLoadingOverlay />
-      <JournalProcessingInitializer />
-      <AppRoutes />
-      <Toaster />
-      <SonnerToaster position="top-right" />
+      <TutorialProvider>
+        <TranslationLoadingOverlay />
+        <JournalProcessingInitializer />
+        <AppRoutes />
+        <Toaster />
+        <SonnerToaster position="top-right" />
+      </TutorialProvider>
     </TranslationProvider>
   );
 };

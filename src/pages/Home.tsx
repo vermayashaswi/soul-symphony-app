@@ -14,11 +14,14 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import TutorialModal from '@/components/tutorial/TutorialModal';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 const Home = () => {
   const { user } = useAuth();
   const { colorTheme, theme } = useTheme();
   const { translate } = useTranslation();
+  const { isTutorialCompleted, startTutorial } = useTutorial();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [journalLabel, setJournalLabel] = useState("Journal");
@@ -26,6 +29,18 @@ const Home = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
+
+  useEffect(() => {
+    // Check if we should start the tutorial
+    if (user && isTutorialCompleted === false) {
+      // Small delay to ensure everything is loaded
+      const timer = setTimeout(() => {
+        startTutorial();
+      }, 500);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, isTutorialCompleted, startTutorial]);
 
   useEffect(() => {
     // Pre-translate common labels to avoid async issues
@@ -287,6 +302,9 @@ const Home = () => {
       <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
       </div>
+
+      {/* Tutorial Modal */}
+      <TutorialModal />
     </div>
   );
 };
