@@ -516,14 +516,44 @@ const Journal = () => {
     }
     
     try {
-      // Ensure user has at least one entry (placeholder if needed)
-      // This helps prevent DOM errors during first entry recording
+      // ENHANCED: More robust placeholder entry handling with verification
+      // This is critical for first-time users to prevent DOM errors
       if (entries.length === 0) {
-        console.log('[Journal] First recording detected, checking placeholder entry');
-        await ensurePlaceholderEntry();
-        // Refresh entries to include the placeholder
-        fetchEntries();
-        setRefreshKey(prev => prev + 1);
+        console.log('[Journal] First recording detected, ensuring placeholder entry with verification');
+        
+        // First attempt to create and verify placeholder entry
+        const placeholderSuccess = await ensurePlaceholderEntry();
+        console.log(`[Journal] Placeholder entry creation ${placeholderSuccess ? 'succeeded' : 'failed'}`);
+        
+        // Robust fetch to load the placeholder entry
+        await new Promise(resolve => {
+          // Short delay to allow database to process
+          setTimeout(async () => {
+            // Fetch entries to include the placeholder
+            await fetchEntries();
+            setRefreshKey(prev => prev + 1);
+            
+            // Additional fetch for extra reliability
+            setTimeout(async () => {
+              await fetchEntries();
+              resolve(null);
+            }, 300);
+          }, 200);
+        });
+        
+        // Check again to see if entries are loaded
+        if (entries.length === 0) {
+          console.log('[Journal] Still no entries after placeholder creation, attempting second verification');
+          
+          // Last attempt with longer timeout
+          await new Promise(resolve => {
+            setTimeout(async () => {
+              await fetchEntries();
+              setRefreshKey(prev => prev + 1);
+              resolve(null);
+            }, 500);
+          });
+        }
       }
       
       await new Promise<void>((resolve) => {
@@ -542,8 +572,11 @@ const Journal = () => {
       setSafeToSwitchTab(false);
       setEntriesReady(false);
       
+      // Safely switch tabs with DOM safety check
       setTimeout(() => {
-        setActiveTab('entries');
+        if (document.getElementById('journal-entries-container')) {
+          setActiveTab('entries');
+        }
       }, 50);
       
       const toastId = toast.loading('Processing your journal entry with AI...', {
