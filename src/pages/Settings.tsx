@@ -8,16 +8,16 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
-import { ColorPicker } from '@/components/settings/ColorPicker';
+import ThemeSelector from '@/components/settings/ThemeSelector';
 import RestartTutorialButton from '@/components/tutorial/RestartTutorialButton';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Card, CardContent } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription, DialogClose } from '@/components/ui/dialog';
 import { Switch } from '@/components/ui/switch';
-import { Bell, LogOut, Shield, Mail, HelpCircle, ChevronRight } from 'lucide-react';
+import { Bell, LogOut, Shield, Mail, HelpCircle, ChevronRight, Edit } from 'lucide-react';
 import NotificationSettings from '@/components/settings/NotificationSettings';
 import { useUserStats } from '@/hooks/use-user-stats';
-import ThemeSelector from '@/components/settings/ThemeSelector';
+import { Progress } from '@/components/ui/progress';
 
 const Settings = () => {
   const { user, signOut } = useAuth();
@@ -32,6 +32,7 @@ const Settings = () => {
   const [notificationsEnabled, setNotificationsEnabled] = useState(true);
   const [notificationSummary, setNotificationSummary] = useState('Twice daily: Evening');
   const { journalCount, maxStreak } = useUserStats();
+  const [isEditingName, setIsEditingName] = useState(false);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -95,6 +96,7 @@ const Settings = () => {
       
       toast.success('Display name updated successfully');
       setInitialName(displayName);
+      setIsEditingName(false);
     } catch (error) {
       console.error('Error updating display name:', error);
       toast.error('Failed to update display name');
@@ -121,86 +123,84 @@ const Settings = () => {
   };
 
   return (
-    <div className="container max-w-2xl mx-auto py-8 px-4 pb-24">
-      <h1 className="text-2xl font-bold mb-6">
+    <div className="container max-w-lg mx-auto py-8 px-4 pb-24">
+      <h1 className="text-2xl font-bold mb-1 text-center">
         <TranslatableText text="Settings" />
       </h1>
+      <p className="text-muted-foreground text-center mb-6">Personalize your SoulO experience</p>
       
       <div className="space-y-6">
         {/* Profile Section */}
-        <section className="bg-card rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">
-            <TranslatableText text="Your Profile" />
-          </h2>
-          
-          <div className="flex items-center mb-6">
-            <div className="flex-shrink-0">
+        <section className="bg-card rounded-lg p-6 shadow-md">
+          <div className="flex flex-col items-center">
+            <div className="mb-6">
               <ProfilePictureUpload />
             </div>
-            <div className="ml-6 flex-1">
-              <div className="space-y-4">
-                <div>
-                  <label htmlFor="displayName" className="block text-sm font-medium mb-1">
-                    <TranslatableText text="Display Name" />
-                  </label>
-                  <div className="flex">
-                    <Input
-                      id="displayName"
-                      value={displayName}
-                      onChange={(e) => setDisplayName(e.target.value)}
-                      className="flex-1"
-                    />
-                    <Button 
-                      onClick={handleUpdateDisplayName}
-                      disabled={isLoading || displayName === initialName}
-                      className="ml-2"
-                      size="sm"
-                    >
-                      <TranslatableText text="Save" />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div>
-                  <label htmlFor="email" className="block text-sm font-medium mb-1">
-                    <TranslatableText text="Email" />
-                  </label>
+            
+            <div className="w-full flex flex-col items-center mb-8">
+              {isEditingName ? (
+                <div className="flex items-center gap-2 mb-2 w-full max-w-xs">
                   <Input
-                    id="email"
-                    value={user?.email || ''}
-                    disabled
-                    className="bg-muted"
+                    value={displayName}
+                    onChange={(e) => setDisplayName(e.target.value)}
+                    className="flex-1"
+                    placeholder="Your display name"
                   />
+                  <Button 
+                    onClick={handleUpdateDisplayName}
+                    disabled={isLoading || displayName === initialName}
+                    size="sm"
+                  >
+                    <TranslatableText text="Save" />
+                  </Button>
                 </div>
-              </div>
+              ) : (
+                <div className="flex items-center gap-2 mb-2">
+                  <h2 className="text-xl font-semibold">{displayName || user?.email?.split('@')[0]}</h2>
+                  <button onClick={() => setIsEditingName(true)} className="text-muted-foreground hover:text-primary">
+                    <Edit size={16} />
+                  </button>
+                </div>
+              )}
+              
+              <p className="text-sm text-muted-foreground">{user?.email}</p>
             </div>
-          </div>
-          
-          <div className="grid grid-cols-2 gap-4 mb-4">
-            <Card className="p-4 bg-background">
-              <CardContent className="p-0 text-center">
-                <p className="text-sm text-muted-foreground"><TranslatableText text="Journal Entries" /></p>
-                <p className="text-3xl font-bold mt-1">{journalCount || 0}</p>
-              </CardContent>
-            </Card>
-            <Card className="p-4 bg-background">
-              <CardContent className="p-0 text-center">
-                <p className="text-sm text-muted-foreground"><TranslatableText text="Max Streak" /></p>
-                <p className="text-3xl font-bold mt-1">{maxStreak || 0}</p>
-              </CardContent>
-            </Card>
+            
+            <div className="grid grid-cols-2 gap-4 w-full mb-8">
+              <Card className="bg-secondary">
+                <CardContent className="p-4 text-center flex flex-col items-center justify-center">
+                  <p className="text-sm text-muted-foreground mb-1"><TranslatableText text="Journal Entries" /></p>
+                  <p className="text-3xl font-bold">{journalCount || 0}</p>
+                </CardContent>
+              </Card>
+              <Card className="bg-secondary">
+                <CardContent className="p-4 text-center flex flex-col items-center justify-center">
+                  <p className="text-sm text-muted-foreground mb-1"><TranslatableText text="Max Streak" /></p>
+                  <p className="text-3xl font-bold">{maxStreak || 0} <span className="text-sm font-normal text-muted-foreground">days</span></p>
+                </CardContent>
+              </Card>
+            </div>
+            
+            <Button 
+              variant="destructive" 
+              onClick={handleSignOut}
+              className="w-full flex items-center justify-center"
+            >
+              <LogOut className="mr-2 h-4 w-4" />
+              <TranslatableText text="Sign Out" />
+            </Button>
           </div>
         </section>
         
         {/* Appearance Section */}
-        <section className="bg-card rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">
+        <section className="bg-card rounded-lg p-6 shadow-md">
+          <h2 className="text-xl font-semibold mb-4 text-center">
             <TranslatableText text="Appearance" />
           </h2>
           
           <div className="space-y-6">
             <div>
-              <label className="block text-sm font-medium mb-3">
+              <label className="block text-sm font-medium mb-3 text-center">
                 <TranslatableText text="Theme Mode" />
               </label>
               <div className="flex gap-2">
@@ -232,7 +232,7 @@ const Settings = () => {
             </div>
             
             <div>
-              <label className="block text-sm font-medium mb-3">
+              <label className="block text-sm font-medium mb-3 text-center">
                 <TranslatableText text="Color Theme" />
               </label>
               <ThemeSelector />
@@ -258,7 +258,7 @@ const Settings = () => {
               </Button>
             </div>
             
-            <div>
+            <div className="text-center">
               <label className="block text-sm font-medium mb-2">
                 <TranslatableText text="Tutorial" />
               </label>
@@ -268,24 +268,21 @@ const Settings = () => {
         </section>
         
         {/* Preferences Section */}
-        <section className="bg-card rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">
+        <section className="bg-card rounded-lg p-6 shadow-md">
+          <h2 className="text-xl font-semibold mb-4 text-center">
             <TranslatableText text="Preferences" />
           </h2>
           
           <div className="space-y-4">
-            <div className="flex items-center justify-between">
-              <div className="flex items-center">
-                <Bell className="mr-3 h-5 w-5 text-muted-foreground" />
-                <div>
-                  <p className="font-medium"><TranslatableText text="Notifications" /></p>
-                  <p className="text-sm text-muted-foreground">{notificationSummary}</p>
-                </div>
+            <div className="flex flex-col items-center mb-4">
+              <div className="flex items-center justify-between w-full mb-2">
+                <p className="font-medium"><TranslatableText text="Notifications" /></p>
+                <Switch 
+                  checked={notificationsEnabled} 
+                  onCheckedChange={toggleNotifications} 
+                />
               </div>
-              <Switch 
-                checked={notificationsEnabled} 
-                onCheckedChange={toggleNotifications} 
-              />
+              <p className="text-sm text-muted-foreground w-full text-center">{notificationSummary}</p>
             </div>
             
             <Button 
@@ -299,8 +296,8 @@ const Settings = () => {
         </section>
         
         {/* Help & Support Section */}
-        <section className="bg-card rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">
+        <section className="bg-card rounded-lg p-6 shadow-md">
+          <h2 className="text-xl font-semibold mb-4 text-center">
             <TranslatableText text="Help & Support" />
           </h2>
           
@@ -329,29 +326,13 @@ const Settings = () => {
             
             <Button 
               variant="outline" 
-              className="w-full mt-2 flex items-center"
+              className="w-full mt-2 flex items-center justify-center"
               onClick={() => window.location.href = 'mailto:support@soulo.online'}
             >
               <Mail className="mr-2 h-4 w-4" />
               <TranslatableText text="Contact Support" />
             </Button>
           </div>
-        </section>
-        
-        {/* Account Section */}
-        <section className="bg-card rounded-lg p-6 shadow-sm">
-          <h2 className="text-xl font-semibold mb-4">
-            <TranslatableText text="Account" />
-          </h2>
-          
-          <Button 
-            variant="destructive" 
-            onClick={handleSignOut}
-            className="w-full flex items-center justify-center"
-          >
-            <LogOut className="mr-2 h-4 w-4" />
-            <TranslatableText text="Sign Out" />
-          </Button>
         </section>
       </div>
       
