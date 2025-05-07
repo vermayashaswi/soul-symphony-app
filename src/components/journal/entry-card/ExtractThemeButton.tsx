@@ -34,3 +34,5 @@ export function ExtractThemeButton({
     </Button>
   );
 }
+
+export default ExtractThemeButton;

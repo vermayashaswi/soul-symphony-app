@@ -18,3 +18,5 @@ export function TranslatedContent({
     </div>
   );
 }
+
+export default TranslatedContent;

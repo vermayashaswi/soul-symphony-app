@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -16,17 +17,41 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { toast } from 'sonner';
 
 interface DeleteEntryDialogProps {
-  onDelete: () => Promise<void>;
+  onDelete?: () => Promise<void>;
   isDeleting?: boolean;
+  // Add these props to match what's being passed from JournalEntryCard
+  showDeleteDialog?: boolean;
+  closeDeleteDialog?: () => void;
+  handleDeleteConfirmation?: () => Promise<void>;
+  deleteError?: string | null;
 }
 
-export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryDialogProps) {
+export function DeleteEntryDialog({ 
+  onDelete, 
+  isDeleting = false,
+  showDeleteDialog = false,
+  closeDeleteDialog = () => {},
+  handleDeleteConfirmation,
+  deleteError = null
+}: DeleteEntryDialogProps) {
   const [open, setOpen] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   
+  // Use passed props if available, otherwise use internal state
+  const dialogOpen = showDeleteDialog !== undefined ? showDeleteDialog : open;
+  const setDialogOpen = closeDeleteDialog ? (value: boolean) => {
+    if (!value) closeDeleteDialog();
+    setOpen(value);
+  } : setOpen;
+  
   const handleDelete = async () => {
     if (isProcessing) return;
+    
+    // If handleDeleteConfirmation was provided, use it instead
+    if (handleDeleteConfirmation) {
+      return handleDeleteConfirmation();
+    }
     
     try {
       setError(null);
@@ -34,7 +59,9 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
       console.log("[DeleteEntryDialog] Starting delete operation");
       
       // Wait for the deletion to complete before proceeding
-      await onDelete();
+      if (onDelete) {
+        await onDelete();
+      }
       
       console.log("[DeleteEntryDialog] Delete operation completed successfully");
       
@@ -52,7 +79,7 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
       // Only close the dialog after everything is complete
       setTimeout(() => {
         setIsProcessing(false);
-        setOpen(false);
+        setDialogOpen(false);
       }, 100);
       
     } catch (error) {
@@ -68,8 +95,11 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
     }
   };
 
+  // Use the passed deleteError if available
+  const displayError = deleteError || error;
+
   return (
-    <AlertDialog open={open} onOpenChange={setOpen}>
+    <AlertDialog open={dialogOpen} onOpenChange={setDialogOpen}>
       <AlertDialogTrigger asChild>
         <button 
           className="hover:text-red-500 text-gray-500" 
@@ -91,14 +121,14 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
             <TranslatableText text="This action cannot be undone. This will permanently delete your journal entry." />
           </AlertDialogDescription>
           
-          {error && (
+          {displayError && (
             <div className="mt-2 p-2 bg-red-50 dark:bg-red-900/20 border border-red-200 dark:border-red-800 rounded text-red-800 dark:text-red-200 text-sm">
-              {error}
+              {displayError}
             </div>
           )}
         </AlertDialogHeader>
         <AlertDialogFooter>
-          <AlertDialogCancel disabled={isProcessing}>
+          <AlertDialogCancel disabled={isProcessing || isDeleting}>
             <TranslatableText text="Cancel" />
           </AlertDialogCancel>
           <AlertDialogAction 
@@ -107,9 +137,9 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
               handleDelete();
             }} 
             className="bg-red-500 hover:bg-red-600" 
-            disabled={isProcessing}
+            disabled={isProcessing || isDeleting}
           >
-            {isProcessing ? (
+            {isProcessing || isDeleting ? (
               <>
                 <Loader2 size={16} className="mr-2 animate-spin" />
                 <TranslatableText text="Deleting..." />

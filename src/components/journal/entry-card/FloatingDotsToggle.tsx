@@ -5,10 +5,17 @@ import { GripVertical } from 'lucide-react';
 
 interface FloatingDotsToggleProps {
   onClick: () => void;
-  isExpanded: boolean;
+  isExpanded?: boolean;
+  pressed?: boolean; // Add pressed prop
+  "aria-label"?: string; // Add aria-label prop
 }
 
-export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsToggleProps) {
+export function FloatingDotsToggle({ 
+  onClick, 
+  isExpanded = false,
+  pressed,
+  "aria-label": ariaLabel = "Toggle options"
+}: FloatingDotsToggleProps) {
   // Add a wrapper function to log when toggle is clicked
   const handleClick = () => {
     console.log('[FloatingDotsToggle] Toggle clicked, current state:', isExpanded);
@@ -21,7 +28,8 @@ export function FloatingDotsToggle({ onClick, isExpanded }: FloatingDotsTogglePr
       onClick={handleClick}
       whileHover={{ scale: 1.1 }}
       whileTap={{ scale: 0.95 }}
-      aria-label={isExpanded ? "Hide themes" : "Show themes"}
+      aria-label={ariaLabel}
+      aria-pressed={pressed}
     >
       {isExpanded ? (
         // Dots animation when expanded (themes shown)
