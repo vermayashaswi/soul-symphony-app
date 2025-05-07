@@ -10,6 +10,18 @@ import { logInfo, logError, logProfile, logAuthError } from '@/components/debug/
 const MAX_PROFILE_CREATION_RETRIES = 3;
 
 /**
+ * Gets the user's current timezone
+ */
+const getUserTimezone = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (e) {
+    console.error('Error getting timezone:', e);
+    return 'UTC';
+  }
+};
+
+/**
  * Ensures a profile exists for the given user with automatic retries
  */
 export const ensureProfileExists = async (user: User | null): Promise<boolean> => {
@@ -30,7 +42,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
       // First check if the profile already exists - use maybeSingle to prevent errors if not found
       const { data, error } = await supabase
         .from('profiles')
-        .select('id')
+        .select('id, timezone')
         .eq('id', user.id)
         .maybeSingle();
         
@@ -45,9 +57,28 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         return false;
       }
       
-      // If profile already exists, return true immediately
+      // If profile already exists, check if timezone needs to be updated
       if (data) {
         logProfile(`Profile already exists: ${data.id}`, 'ProfileService');
+        
+        // Update timezone if it's not set
+        if (!data.timezone) {
+          const timezone = getUserTimezone();
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({
+              timezone,
+              updated_at: new Date().toISOString()
+            })
+            .eq('id', user.id);
+            
+          if (updateError) {
+            logError(`Error updating timezone: ${updateError.message}`, 'ProfileService', updateError);
+          } else {
+            logProfile(`Updated timezone to ${timezone}`, 'ProfileService');
+          }
+        }
+        
         return true;
       }
       
@@ -57,11 +88,13 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
       let fullName = '';
       let avatarUrl = '';
       const email = user.email || '';
+      const timezone = getUserTimezone();
       
       // Log all metadata to help debug
       logProfile('User metadata received', 'ProfileService', {
         userMetadata: user.user_metadata,
-        authProvider: user.app_metadata?.provider
+        authProvider: user.app_metadata?.provider,
+        timezone
       });
       
       // Handle different authentication providers' metadata formats
@@ -95,6 +128,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         email,
         full_name: fullName,
         avatar_url: avatarUrl, 
+        timezone,
         onboarding_completed: false,
         updated_at: new Date().toISOString()
       };
@@ -191,14 +225,26 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
     }
 
     if (user.id) {
-      // Ensure avatar_url is updated in the profiles table too
+      // Prepare profile update data
+      const profileUpdate: Record<string, any> = {
+        updated_at: new Date().toISOString(),
+      };
+      
+      // Add avatar_url if present in metadata
+      if (metadata.avatar_url) {
+        profileUpdate.avatar_url = metadata.avatar_url;
+      }
+      
+      // Add timezone if present in metadata
+      if (metadata.timezone) {
+        profileUpdate.timezone = metadata.timezone;
+      }
+      
+      // Update profile table with new metadata
       logProfile('Updating profile table with new metadata', 'ProfileService');
       const { error: profileError } = await supabase
         .from('profiles')
-        .update({
-          avatar_url: metadata.avatar_url, // Ensure field name matches
-          updated_at: new Date().toISOString(),
-        })
+        .update(profileUpdate)
         .eq('id', user.id);
         
       if (profileError) {
@@ -210,6 +256,38 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
     return true;
   } catch (error: any) {
     logError(`Error updating profile: ${error.message}`, 'ProfileService', error);
+    return false;
+  }
+};
+
+/**
+ * Updates the timezone for a user profile
+ * This is a dedicated function to ensure timezone is always kept updated
+ */
+export const updateTimezone = async (userId: string | undefined): Promise<boolean> => {
+  if (!userId) return false;
+  
+  try {
+    const timezone = getUserTimezone();
+    logProfile(`Updating timezone to ${timezone} for user ${userId}`, 'ProfileService');
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update({ 
+        timezone, 
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', userId);
+      
+    if (error) {
+      logError(`Error updating timezone: ${error.message}`, 'ProfileService', error);
+      return false;
+    }
+    
+    logProfile(`Timezone updated successfully to ${timezone}`, 'ProfileService');
+    return true;
+  } catch (error: any) {
+    logError(`Error updating timezone: ${error.message}`, 'ProfileService', error);
     return false;
   }
 };
