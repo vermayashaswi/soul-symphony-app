@@ -661,10 +661,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
   }
 ];
 
-// Enhanced Language Selector component for onboarding
+// Enhanced Language Selector component for onboarding - simplified without search
 const LanguageSelector = () => {
   const { currentLanguage, setLanguage } = useTranslation();
-  const [searchQuery, setSearchQuery] = useState('');
 
   const handleLanguageChange = (value: string) => {
     setLanguage(value);
@@ -683,22 +682,11 @@ const LanguageSelector = () => {
     }
   };
 
-  // Filter languages based on search query
-  const filteredLanguages = useCallback(() => {
-    if (!searchQuery) return LANGUAGES;
-    
-    return LANGUAGES.filter(lang => 
-      lang.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lang.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lang.region.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery]);
-
   // Group languages by region
   const languagesByRegion = () => {
     const regions = {};
     
-    filteredLanguages().forEach(lang => {
+    LANGUAGES.forEach(lang => {
       if (!regions[lang.region]) {
         regions[lang.region] = [];
       }
@@ -712,52 +700,24 @@ const LanguageSelector = () => {
   const regions = Object.keys(grouped);
 
   return (
-    <div className="w-full flex flex-col gap-2">
-      {/* Search input */}
-      <div className="relative">
-        <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-        <Input
-          placeholder="Find language..." 
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          className="pl-9 h-9"
-          autoComplete="off"
-        />
-        {searchQuery && (
-          <X 
-            className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground cursor-pointer hover:text-foreground"
-            onClick={() => setSearchQuery('')}
-          />
-        )}
-      </div>
-      
+    <div className="w-full">
       <Select value={currentLanguage} onValueChange={handleLanguageChange}>
         <SelectTrigger className="w-full">
           <SelectValue placeholder="Select a language" />
         </SelectTrigger>
         <SelectContent className="max-h-[300px]">
-          {searchQuery ? (
-            // Flat list when searching
-            filteredLanguages().map((language) => (
-              <SelectItem key={language.code} value={language.code}>
-                {language.label}
+          {regions.map(region => (
+            <React.Fragment key={region}>
+              <SelectItem value={`group_${region}`} disabled className="font-semibold text-muted-foreground">
+                {region}
               </SelectItem>
-            ))
-          ) : (
-            // Grouped by region when not searching
-            regions.map(region => (
-              <React.Fragment key={region}>
-                <SelectItem value={`group_${region}`} disabled className="font-semibold text-muted-foreground">
-                  {region}
+              {grouped[region].map(language => (
+                <SelectItem key={language.code} value={language.code} className="pl-6">
+                  {language.label}
                 </SelectItem>
-                {grouped[region].map(language => (
-                  <SelectItem key={language.code} value={language.code} className="pl-6">
-                    {language.label}
-                  </SelectItem>
-                ))}
-              </React.Fragment>
-            ))
-          )}
+              ))}
+            </React.Fragment>
+          ))}
         </SelectContent>
       </Select>
     </div>

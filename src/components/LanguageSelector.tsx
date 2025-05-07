@@ -1,5 +1,5 @@
 import React, { useState, useCallback } from 'react';
-import { Globe, Search, X } from 'lucide-react';
+import { Globe } from 'lucide-react';
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -10,7 +10,6 @@ import {
   DropdownMenuLabel,
 } from "@/components/ui/dropdown-menu";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { useTranslation } from '@/contexts/TranslationContext';
 import { createDebugger } from '@/utils/debug/debugUtils';
 
@@ -75,19 +74,7 @@ const languages = [
 
 const LanguageSelector = () => {
   const { currentLanguage, setLanguage, isTranslating } = useTranslation();
-  const [searchQuery, setSearchQuery] = useState('');
   const [isOpen, setIsOpen] = useState(false);
-
-  // Filter languages based on search query
-  const filteredLanguages = useCallback(() => {
-    if (!searchQuery) return languages;
-    
-    return languages.filter(lang => 
-      lang.label.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lang.code.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      lang.region.toLowerCase().includes(searchQuery.toLowerCase())
-    );
-  }, [searchQuery]);
 
   const handleLanguageChange = async (languageCode: string) => {
     debug.info('Language change requested:', languageCode);
@@ -125,9 +112,8 @@ const LanguageSelector = () => {
   // Group languages by region for organized display
   const groupedLanguages = () => {
     const groups = {};
-    const filtered = filteredLanguages();
     
-    filtered.forEach(lang => {
+    languages.forEach(lang => {
       if (!groups[lang.region]) {
         groups[lang.region] = [];
       }
@@ -154,28 +140,8 @@ const LanguageSelector = () => {
         align="end" 
         className="max-h-[400px] overflow-y-auto bg-background border border-border w-64"
       >
-        {/* Search input */}
-        <div className="p-2 sticky top-0 bg-background z-10 border-b border-border">
-          <div className="relative">
-            <Search className="absolute left-2.5 top-2.5 h-4 w-4 text-muted-foreground" />
-            <Input
-              placeholder="Find language..." 
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-9 h-9"
-              autoComplete="off"
-            />
-            {searchQuery && (
-              <X 
-                className="absolute right-2.5 top-2.5 h-4 w-4 text-muted-foreground cursor-pointer hover:text-foreground"
-                onClick={() => setSearchQuery('')}
-              />
-            )}
-          </div>
-        </div>
-        
         {/* Recently used languages */}
-        {recentLanguages.length > 0 && !searchQuery && (
+        {recentLanguages.length > 0 && (
           <>
             <DropdownMenuLabel>Recent</DropdownMenuLabel>
             {recentLanguages.map((language) => (
@@ -195,41 +161,24 @@ const LanguageSelector = () => {
         )}
 
         {/* Group languages by region */}
-        {searchQuery ? (
-          // When searching, show flat list
-          filteredLanguages().map((language) => (
-            <DropdownMenuItem
-              key={language.code}
-              onClick={() => handleLanguageChange(language.code)}
-              className={`cursor-pointer ${
-                currentLanguage === language.code ? "bg-primary/10 text-primary font-medium" : ""
-              }`}
-              disabled={isTranslating}
-            >
-              {language.label}
-            </DropdownMenuItem>
-          ))
-        ) : (
-          // When not searching, show grouped languages
-          Object.entries(groupedLanguages()).map(([region, langs]) => (
-            <DropdownMenuGroup key={region}>
-              <DropdownMenuLabel>{region}</DropdownMenuLabel>
-              {(langs as any[]).map((language) => (
-                <DropdownMenuItem
-                  key={language.code}
-                  onClick={() => handleLanguageChange(language.code)}
-                  className={`cursor-pointer ${
-                    currentLanguage === language.code ? "bg-primary/10 text-primary font-medium" : ""
-                  }`}
-                  disabled={isTranslating}
-                >
-                  {language.label}
-                </DropdownMenuItem>
-              ))}
-              {region !== Object.keys(groupedLanguages()).slice(-1)[0] && <DropdownMenuSeparator />}
-            </DropdownMenuGroup>
-          ))
-        )}
+        {Object.entries(groupedLanguages()).map(([region, langs]) => (
+          <DropdownMenuGroup key={region}>
+            <DropdownMenuLabel>{region}</DropdownMenuLabel>
+            {(langs as any[]).map((language) => (
+              <DropdownMenuItem
+                key={language.code}
+                onClick={() => handleLanguageChange(language.code)}
+                className={`cursor-pointer ${
+                  currentLanguage === language.code ? "bg-primary/10 text-primary font-medium" : ""
+                }`}
+                disabled={isTranslating}
+              >
+                {language.label}
+              </DropdownMenuItem>
+            ))}
+            {region !== Object.keys(groupedLanguages()).slice(-1)[0] && <DropdownMenuSeparator />}
+          </DropdownMenuGroup>
+        ))}
       </DropdownMenuContent>
     </DropdownMenu>
   );
