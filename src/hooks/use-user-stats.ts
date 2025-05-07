@@ -15,7 +15,7 @@ export function useUserStats() {
       try {
         // Get journal entry count
         const { count: entryCount, error: entriesError } = await supabase
-          .from('journal_entries')
+          .from('Journal Entries')  // Corrected table name to match the database schema
           .select('id', { count: 'exact' })
           .eq('user_id', user.id);
           
