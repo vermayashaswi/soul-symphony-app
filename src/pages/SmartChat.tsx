@@ -4,8 +4,7 @@ import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
-import { AlertCircle, Trash2, Plus } from "lucide-react";
-import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
+import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
@@ -196,8 +195,6 @@ export default function SmartChat() {
     generateTitleForPreviousThread();
   }, [currentThreadId, user?.id]);
 
-  const hasEnoughEntries = !loading && entries.length > 0;
-
   const createNewThread = async (): Promise<string | null> => {
     if (!user?.id) return null;
     
@@ -328,24 +325,6 @@ export default function SmartChat() {
         className="smart-chat-container w-full h-[calc(100vh)] flex"
         ref={chatContainerRef}
       >
-        {!hasEnoughEntries && !loading && (
-          <Alert className="absolute z-10 top-4 left-1/2 transform -translate-x-1/2 w-max mb-6 border-amber-300 bg-amber-50 text-amber-800">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle><TranslatableText text="No journal entries found" /></AlertTitle>
-            <AlertDescription className="mt-2">
-              <p><TranslatableText text="The AI Assistant works best when you have journal entries to analyze. Create some journal entries to get personalized insights." /></p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-2 border-amber-300 text-amber-800 hover:bg-amber-100"
-                onClick={() => navigate('/journal')}
-              >
-                <TranslatableText text="Go to Journal" />
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        
         <div className="w-72 h-full border-r">
           <ChatThreadList 
             activeThreadId={currentThreadId}
@@ -402,24 +381,6 @@ export default function SmartChat() {
         exit={{ opacity: 0 }}
         className="smart-chat-container flex-1 flex flex-col"
       >
-        {!hasEnoughEntries && !loading && (
-          <Alert className="mx-3 mt-3 border-amber-300 bg-amber-50 text-amber-800">
-            <AlertCircle className="h-4 w-4" />
-            <AlertTitle className="text-sm"><TranslatableText text="No journal entries found" /></AlertTitle>
-            <AlertDescription className="mt-1 text-xs">
-              <p><TranslatableText text="Create journal entries to get personalized insights." /></p>
-              <Button 
-                variant="outline" 
-                size="sm" 
-                className="mt-1 h-7 text-xs border-amber-300 text-amber-800 hover:bg-amber-100"
-                onClick={() => navigate('/journal')}
-              >
-                <TranslatableText text="Go to Journal" />
-              </Button>
-            </AlertDescription>
-          </Alert>
-        )}
-        
         <div className="flex-1 flex flex-col">
           <MobileChatInterface 
             currentThreadId={currentThreadId}

@@ -3,6 +3,7 @@ import React from "react";
 import { motion } from "framer-motion";
 import { MessageSquare, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
+import { TranslatableText } from "@/components/translation/TranslatableText";
 
 const EmptyChatState: React.FC = () => {
   return (
@@ -15,10 +16,12 @@ const EmptyChatState: React.FC = () => {
         <MessageSquare className="h-8 w-8 text-primary" />
       </div>
       
-      <h3 className="text-xl font-bold mb-2">Start a Conversation</h3>
+      <h3 className="text-xl font-bold mb-2">
+        <TranslatableText text="Start a Conversation" />
+      </h3>
       
       <p className="text-muted-foreground max-w-md">
-        Ask me anything about your journal insights
+        <TranslatableText text="Ask me anything about your thoughts, feelings, or daily life. I'm here to help!" />
       </p>
       
       <Button 
@@ -30,7 +33,7 @@ const EmptyChatState: React.FC = () => {
           if (newChatButton) newChatButton.click();
         }}
       >
-        New Chat
+        <TranslatableText text="New Chat" />
       </Button>
     </motion.div>
   );

@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
