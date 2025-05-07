@@ -140,7 +140,7 @@ export function JournalEntryCard({
     if (score > 0.2) {
       return 'border-green-500 border-2';
     } else if (score >= -0.1 && score <= 0.2) {
-      return 'border-[#FEF7CD] border-2';
+      return 'border-yellow-400 border-2'; // Material Design yellow
     } else {
       return 'border-[#ea384c] border-2';
     }
