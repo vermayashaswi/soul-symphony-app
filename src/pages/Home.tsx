@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -13,7 +14,6 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { Tutorial } from '@/components/tutorial/Tutorial';
 
 const Home = () => {
   const { user } = useAuth();
@@ -165,9 +165,6 @@ const Home = () => {
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
-      {/* Tutorial Component */}
-      <Tutorial />
-      
       {/* Background Animation */}
       <div className="absolute inset-0 z-0">
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
@@ -262,7 +259,6 @@ const Home = () => {
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
           transition={{ delay: 0.5 }}
-          data-tutorial="home-journal-button"
         >
           <ArrowRight className="text-primary-foreground h-6 w-6" />
         </motion.button>
@@ -288,7 +284,7 @@ const Home = () => {
       </div>
 
       {/* Inspirational Quote */}
-      <div className="fixed inset-x-0 bottom-16 pb-5 z-25" data-tutorial="quote-section">
+      <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
       </div>
     </div>

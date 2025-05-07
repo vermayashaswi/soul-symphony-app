@@ -1,34 +1,36 @@
 
 import React, { useEffect } from 'react';
-import { RouterProvider } from 'react-router-dom';
-import { Toaster } from '@/components/ui/sonner';
-import { ThemeProvider } from '@/hooks/use-theme';
-import { AuthProvider } from '@/contexts/AuthContext';
+import AppRoutes from './routes/AppRoutes';
+import { Toaster } from "@/components/ui/toaster";
+import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
-import { router } from '@/routes/routeConfig';
-import './App.css';
-import './styles/mobile.css';
+import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
+import { JournalProcessingInitializer } from './app/journal-processing-init';
 import './styles/emoji.css';
-import './styles/tutorial.css'; // Add the tutorial styles
 
-// Import the TutorialProvider
-import { TutorialProvider } from '@/contexts/TutorialContext';
+const App: React.FC = () => {
+  useEffect(() => {
+    console.log('App mounted, current path:', window.location.pathname);
+    
+    // Clean up any malformed paths
+    const currentPath = window.location.pathname;
+    
+    // Fix incorrectly formatted URLs that have domains or https in the path
+    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
+      console.log('Fixing malformed URL path:', currentPath);
+      window.history.replaceState(null, '', '/');
+    }
+  }, []);
 
-function App() {
   return (
-    <>
-      <AuthProvider>
-        <ThemeProvider>
-          <TranslationProvider>
-            <TutorialProvider>
-              <RouterProvider router={router} />
-            </TutorialProvider>
-          </TranslationProvider>
-        </ThemeProvider>
-      </AuthProvider>
-      <Toaster position="top-center" richColors closeButton />
-    </>
+    <TranslationProvider>
+      <TranslationLoadingOverlay />
+      <JournalProcessingInitializer />
+      <AppRoutes />
+      <Toaster />
+      <SonnerToaster position="top-right" />
+    </TranslationProvider>
   );
-}
+};
 
 export default App;
