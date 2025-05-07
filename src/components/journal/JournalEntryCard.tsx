@@ -43,6 +43,7 @@ export interface JournalEntry {
   translation_text?: string;
   original_language?: string;
   tempId?: string;
+  is_tutorial_entry?: boolean; // Added the missing property
 }
 
 interface JournalEntryCardProps {
