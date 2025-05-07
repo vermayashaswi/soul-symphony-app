@@ -1,9 +1,9 @@
+
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { translationCache } from '@/services/translationCache';
 import { toast } from 'sonner';
 import { staticTranslationService } from '@/services/staticTranslationService';
 import { preloadWebsiteTranslations } from '@/utils/website-translations';
-import { useLocation } from 'react-router-dom';
 
 // Define the language options with all 21 languages
 export const languages = [
@@ -50,7 +50,36 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const [isTranslating, setIsTranslating] = useState(false);
   const [currentLanguage, setCurrentLanguage] = useState('en');
   const [translationProgress, setTranslationProgress] = useState(100);
-  const location = useLocation();
+  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
+  
+  // Track path changes without useLocation
+  useEffect(() => {
+    const handlePathChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    
+    window.addEventListener('popstate', handlePathChange);
+    
+    // Also listen for changes when using history.pushState/replaceState
+    const originalPushState = window.history.pushState;
+    const originalReplaceState = window.history.replaceState;
+    
+    window.history.pushState = function() {
+      originalPushState.apply(this, arguments as any);
+      handlePathChange();
+    };
+    
+    window.history.replaceState = function() {
+      originalReplaceState.apply(this, arguments as any);
+      handlePathChange();
+    };
+    
+    return () => {
+      window.removeEventListener('popstate', handlePathChange);
+      window.history.pushState = originalPushState;
+      window.history.replaceState = originalReplaceState;
+    };
+  }, []);
   
   // Create a unique cache key
   const createCacheKey = (text: string, language: string): string => {
@@ -139,7 +168,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     // When the route changes, we can prefetch translations for common UI elements
     const commonUIElements = ['Home', 'Blog', 'Settings', 'Profile', 'Logout', 'Download'];
     prefetchTranslationsForRoute(commonUIElements).catch(console.error);
-  }, [location.pathname, prefetchTranslationsForRoute]);
+  }, [currentPath, prefetchTranslationsForRoute]);
 
   // Function to translate text using our service
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {

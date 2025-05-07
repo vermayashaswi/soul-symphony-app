@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { useLocation } from 'react-router-dom';
 import { isWebsiteRoute } from '@/routes/RouteHelpers';
 
 interface TranslatableTextProps {
@@ -29,15 +28,27 @@ export function TranslatableText({
   const [translatedText, setTranslatedText] = useState<string>(text); // Initialize with source text
   const [isLoading, setIsLoading] = useState(false);
   const { translate, currentLanguage, getCachedTranslation } = useTranslation();
-  const location = useLocation();
   const prevLangRef = useRef<string>(currentLanguage);
   const initialLoadDoneRef = useRef<boolean>(false);
   const textRef = useRef<string>(text); // Track text changes
   const mountedRef = useRef<boolean>(true);
+  const [currentPath, setCurrentPath] = useState<string>(window.location.pathname);
+  
+  // Keep track of route changes without using useLocation
+  useEffect(() => {
+    const handlePathChange = () => {
+      setCurrentPath(window.location.pathname);
+    };
+    
+    window.addEventListener('popstate', handlePathChange);
+    
+    return () => {
+      window.removeEventListener('popstate', handlePathChange);
+    };
+  }, []);
   
   // Check if on website route - but allow forced translation
-  const pathname = location.pathname;
-  const isOnWebsite = isWebsiteRoute(pathname);
+  const isOnWebsite = isWebsiteRoute(currentPath);
   
   // Helper function to clean translation results
   const cleanTranslationResult = (result: string): string => {
