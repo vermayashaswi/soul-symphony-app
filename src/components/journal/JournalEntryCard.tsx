@@ -17,6 +17,7 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { textWillOverflow } from '@/utils/textUtils';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 export interface JournalEntry {
   id: number;
@@ -73,6 +74,8 @@ export function JournalEntryCard({
   isPreview = false,
   className = "",
 }: JournalEntryCardProps) {
+  const { translate } = useTranslation();
+  
   const safeEntry = {
     id: entry?.id || 0,
     content: entry?.content || "Processing entry...",
