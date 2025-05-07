@@ -5,18 +5,53 @@ import { staticTranslationService } from '@/services/staticTranslationService';
 import { preloadWebsiteTranslations } from '@/utils/website-translations';
 import { useLocation } from 'react-router-dom';
 
-// Define the language options
+// Define the comprehensive language options
 export const languages = [
-  { code: 'en', label: 'English' },
-  { code: 'es', label: 'Español' },
-  { code: 'fr', label: 'Français' },
-  { code: 'de', label: 'Deutsch' },
-  { code: 'hi', label: 'हिन्दी' },
-  { code: 'zh', label: '中文' },
-  { code: 'ja', label: '日本語' },
-  { code: 'ru', label: 'Русский' },
-  { code: 'ar', label: 'العربية' },
-  { code: 'pt', label: 'Português' },
+  // Currently implemented languages
+  { code: 'en', label: 'English', region: 'European' },
+  { code: 'es', label: 'Español', region: 'European' },
+  { code: 'fr', label: 'Français', region: 'European' },
+  { code: 'de', label: 'Deutsch', region: 'European' },
+  { code: 'hi', label: 'हिन्दी', region: 'Indian' },
+  { code: 'zh', label: '中文', region: 'Asian' },
+  { code: 'ja', label: '日本語', region: 'Asian' },
+  { code: 'ru', label: 'Русский', region: 'European' },
+  { code: 'ar', label: 'العربية', region: 'Middle Eastern' },
+  { code: 'pt', label: 'Português', region: 'European' },
+
+  // Additional Indian regional languages
+  { code: 'bn', label: 'বাংলা', region: 'Indian' },
+  { code: 'ta', label: 'தமிழ்', region: 'Indian' },
+  { code: 'te', label: 'తెలుగు', region: 'Indian' },
+  { code: 'mr', label: 'मराठी', region: 'Indian' },
+  { code: 'gu', label: 'ગુજરાતી', region: 'Indian' },
+  { code: 'kn', label: 'ಕನ್ನಡ', region: 'Indian' },
+  { code: 'ml', label: 'മലയാളം', region: 'Indian' },
+  { code: 'pa', label: 'ਪੰਜਾਬੀ', region: 'Indian' },
+  { code: 'as', label: 'অসমীয়া', region: 'Indian' },
+  { code: 'or', label: 'ଓଡ଼ିଆ', region: 'Indian' },
+  { code: 'ur', label: 'اردو', region: 'Indian' },
+  { code: 'sd', label: 'سنڌي', region: 'Indian' },
+  { code: 'ks', label: 'कॉशुर', region: 'Indian' },
+  { code: 'kok', label: 'कोंकणी', region: 'Indian' },
+  { code: 'mai', label: 'मैथिली', region: 'Indian' },
+
+  // Other major global languages
+  { code: 'it', label: 'Italiano', region: 'European' },
+  { code: 'ko', label: '한국어', region: 'Asian' },
+  { code: 'tr', label: 'Türkçe', region: 'European' },
+  { code: 'nl', label: 'Nederlands', region: 'European' },
+  { code: 'pl', label: 'Polski', region: 'European' },
+  { code: 'sv', label: 'Svenska', region: 'European' },
+  { code: 'th', label: 'ไทย', region: 'Asian' },
+  { code: 'vi', label: 'Tiếng Việt', region: 'Asian' },
+  { code: 'id', label: 'Bahasa Indonesia', region: 'Asian' },
+  { code: 'uk', label: 'Українська', region: 'European' },
+  { code: 'el', label: 'Ελληνικά', region: 'European' },
+  { code: 'ro', label: 'Română', region: 'European' },
+  { code: 'hu', label: 'Magyar', region: 'European' },
+  { code: 'cs', label: 'Čeština', region: 'European' },
+  { code: 'he', label: 'עברית', region: 'Middle Eastern' },
 ];
 
 // Local memory cache to prevent flickering during navigation
