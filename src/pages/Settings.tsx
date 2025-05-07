@@ -56,7 +56,7 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
   );
 }
 
-export default function Settings() {
+const Settings = () => {
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationFrequency, setNotificationFrequency] = useState<NotificationFrequency>('once');
@@ -1141,6 +1141,6 @@ export default function Settings() {
       
     </div>
   );
-}
+};
 
 export default Settings;
