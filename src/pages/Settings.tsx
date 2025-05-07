@@ -88,8 +88,8 @@ const Settings = () => {
               <TranslatableText text="Accent Color" />
             </p>
             <ColorPicker 
-              currentColor={colorTheme} 
-              onColorChange={setColorTheme}
+              value={colorTheme} 
+              onChange={setColorTheme}
             />
           </div>
         </div>
