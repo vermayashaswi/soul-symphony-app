@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -16,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
+import PlaceholderEntryManager from '@/components/journal/PlaceholderEntryManager';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -62,6 +62,7 @@ const Journal = () => {
   const lastSuccessfulEntriesRef = useRef<JournalEntry[]>([]);
   const forceUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
+  const [placeholderEntryCreated, setPlaceholderEntryCreated] = useState(false);
 
   const { 
     entries, 
@@ -887,6 +888,13 @@ const Journal = () => {
   return (
     <ErrorBoundary onReset={resetError}>
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
+        {/* Add the PlaceholderEntryManager component */}
+        <PlaceholderEntryManager 
+          userId={user?.id}
+          onPlaceholderCreated={handlePlaceholderEntryCreated}
+          isProfileChecked={isProfileChecked}
+        />
+        
         <JournalHeader />
         
         {isCheckingProfile ? (

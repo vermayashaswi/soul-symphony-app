@@ -10,6 +10,8 @@ import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
 import { useProcessingEntries } from '@/hooks/use-processing-entries';
 import { processingStateManager, EntryProcessingState } from '@/utils/journal/processing-state-manager';
 
+import { Loader2 } from 'lucide-react';
+
 interface JournalEntriesListProps {
   entries: JournalEntry[];
   loading: boolean;
@@ -17,6 +19,7 @@ interface JournalEntriesListProps {
   processedEntryIds: number[];
   onStartRecording: () => void;
   onDeleteEntry: (entryId: number) => void;
+  isCreatingPlaceholder?: boolean;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
@@ -26,6 +29,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   processedEntryIds,
   onStartRecording,
   onDeleteEntry,
+  isCreatingPlaceholder = false,
 }) => {
   // Use our hook to get processing entries
   const { activeProcessingIds, isProcessing } = useProcessingEntries();
@@ -286,11 +290,15 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
               processed={processedEntryIds.includes(entry.id)}
               onDelete={handleDeleteEntry}
               setEntries={null} // Pass null since we don't want to modify entries directly here
+              isPlaceholder={!!entry.is_placeholder}
             />
           ))}
         </div>
       ) : shouldShowEmpty ? (
-        <EmptyJournalState onStartRecording={onStartRecording} />
+        <EmptyJournalState 
+          onStartRecording={onStartRecording} 
+          isCreatingPlaceholder={isCreatingPlaceholder}
+        />
       ) : null}
     </div>
   );
