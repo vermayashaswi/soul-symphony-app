@@ -243,7 +243,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
         </div>
         <DropdownMenu open={isDropdownOpen} onOpenChange={setIsDropdownOpen}>
           <DropdownMenuTrigger asChild>
-            <FloatingDotsToggle pressed={isDropdownOpen} aria-label="Open dropdown menu" />
+            <FloatingDotsToggle onClick={toggleDropdown} pressed={isDropdownOpen} aria-label="Open dropdown menu" />
           </DropdownMenuTrigger>
           <DropdownMenuContent align="end" forceMount className="w-[160px]">
             <DropdownMenuItem onClick={handleEditClick} disabled={processing || isDeleting}>
