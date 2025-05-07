@@ -72,8 +72,8 @@ export function useJournalEntries(
   const entryIdsSet = useRef<Set<number>>(new Set());
   const fetchRetryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const deletedEntryIdRef = useRef<number | null>(null);
-  const deletedEntryIdsRef = useRef<Set<number>>(new Set());
-  const lastDeletedEntryIdRef = useRef<number | null>(null);
+  const deletedEntryIdsRef = useRef<Set<number>>(new Set()); // Define a single instance of this ref
+  const lastDeletedEntryIdRef = useRef<number | null>(null); // Define a single instance of this ref
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -121,10 +121,6 @@ export function useJournalEntries(
       }, 60000); // 1 minute cache validity
     }
   }, [entries, userId, refreshKey]);
-
-  // Add a ref to track deleted entry IDs for this hook instance
-  const deletedEntryIdsRef = useRef<Set<number>>(new Set());
-  const lastDeletedEntryIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     const handleEntryDeleted = (event: CustomEvent) => {
