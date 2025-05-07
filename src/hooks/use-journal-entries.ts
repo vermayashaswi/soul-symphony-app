@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useCallback, useRef } from 'react';
 import { JournalEntry } from '@/types/journal';
 import { checkUserProfile, createUserProfile, fetchJournalEntries } from '@/services/journalService';
@@ -13,7 +12,7 @@ type UseJournalEntriesReturn = {
   profileExists: boolean | null;
 };
 
-// IMPROVED FIX: Enhanced global cache for entries with improved cache invalidation
+// Enhanced global cache for entries with improved cache invalidation
 const globalEntriesCache: {
   entries: JournalEntry[];
   lastFetchTime: Date | null;
@@ -22,12 +21,14 @@ const globalEntriesCache: {
   entryIds: Set<number>;
   cacheExpiryTime: number;
   lastDeletedEntryId?: number | null;
+  deletedEntryIds: Set<number>; // Track all deleted entry IDs
 } = {
   entries: [],
   lastFetchTime: null,
   entryIds: new Set(),
   cacheExpiryTime: 0, // Timestamp when cache should be considered expired
-  lastDeletedEntryId: null // Track the last deleted entry for better cache invalidation
+  lastDeletedEntryId: null, // Track the last deleted entry for better cache invalidation
+  deletedEntryIds: new Set() // Store all deleted entry IDs
 };
 
 export function useJournalEntries(
@@ -41,8 +42,12 @@ export function useJournalEntries(
         globalEntriesCache.entries.length > 0 &&
         (!globalEntriesCache.lastRefreshKey || globalEntriesCache.lastRefreshKey === refreshKey) &&
         Date.now() < globalEntriesCache.cacheExpiryTime) {
-      console.log('[useJournalEntries] Initializing from global cache:', globalEntriesCache.entries.length);
-      return globalEntriesCache.entries;
+      // Filter out any deleted entries from the cache
+      const filteredEntries = globalEntriesCache.entries.filter(
+        entry => !globalEntriesCache.deletedEntryIds.has(entry.id)
+      );
+      console.log('[useJournalEntries] Initializing from global cache:', filteredEntries.length);
+      return filteredEntries;
     }
     return [];
   });
@@ -67,6 +72,8 @@ export function useJournalEntries(
   const entryIdsSet = useRef<Set<number>>(new Set());
   const fetchRetryTimerRef = useRef<NodeJS.Timeout | null>(null);
   const deletedEntryIdRef = useRef<number | null>(null);
+  const deletedEntryIdsRef = useRef<Set<number>>(new Set());
+  const lastDeletedEntryIdRef = useRef<number | null>(null);
 
   useEffect(() => {
     entriesRef.current = entries;
@@ -78,6 +85,12 @@ export function useJournalEntries(
       const seenIds = new Set<number>();
       
       for (const entry of entries) {
+        // Skip any entries that are in the deleted list
+        if (deletedEntryIdsRef.current.has(entry.id) || 
+            globalEntriesCache.deletedEntryIds.has(entry.id)) {
+          continue;
+        }
+        
         if (!seenIds.has(entry.id)) {
           seenIds.add(entry.id);
           uniqueEntries.push(entry);
@@ -85,9 +98,9 @@ export function useJournalEntries(
       }
       
       // Check if we need to remember a deleted entry ID
-      if (deletedEntryIdRef.current) {
-        globalEntriesCache.lastDeletedEntryId = deletedEntryIdRef.current;
-        deletedEntryIdRef.current = null;
+      if (lastDeletedEntryIdRef.current) {
+        globalEntriesCache.lastDeletedEntryId = lastDeletedEntryIdRef.current;
+        lastDeletedEntryIdRef.current = null;
       }
       
       globalEntriesCache.entries = uniqueEntries;
@@ -108,6 +121,43 @@ export function useJournalEntries(
       }, 60000); // 1 minute cache validity
     }
   }, [entries, userId, refreshKey]);
+
+  // Add a ref to track deleted entry IDs for this hook instance
+  const deletedEntryIdsRef = useRef<Set<number>>(new Set());
+  const lastDeletedEntryIdRef = useRef<number | null>(null);
+
+  useEffect(() => {
+    const handleEntryDeleted = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId) {
+        const deletedId = Number(event.detail.entryId);
+        console.log(`[useJournalEntries] Detected entry deleted event: ${deletedId}`);
+        
+        // Add to local deleted IDs set
+        deletedEntryIdsRef.current.add(deletedId);
+        
+        // Add to global cache of deleted IDs
+        globalEntriesCache.deletedEntryIds.add(deletedId);
+        globalEntriesCache.lastDeletedEntryId = deletedId;
+        
+        // Update last deleted ID ref
+        lastDeletedEntryIdRef.current = deletedId;
+        
+        // Invalidate cache immediately
+        globalEntriesCache.cacheExpiryTime = 0;
+        
+        // Filter entries to remove the deleted one
+        setEntries(currentEntries => 
+          currentEntries.filter(entry => entry.id !== deletedId)
+        );
+      }
+    };
+    
+    window.addEventListener('journalEntryDeleted', handleEntryDeleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('journalEntryDeleted', handleEntryDeleted as EventListener);
+    };
+  }, []);
 
   // IMPORTANT: Fix for the TypeScript error - Declare verifyUserProfile before fetchEntries
   const verifyUserProfile = useCallback(async (userId: string) => {
@@ -147,7 +197,7 @@ export function useJournalEntries(
     
     // Check if there was a recently deleted entry ID
     const hasRecentDeletion = globalEntriesCache.lastDeletedEntryId !== null || 
-                             deletedEntryIdRef.current !== null;
+                             lastDeletedEntryIdRef.current !== null;
     
     // Cache invalidation logic - always invalidate cache if there was a deletion
     if (hasRecentDeletion) {
@@ -178,8 +228,15 @@ export function useJournalEntries(
     if (globalEntriesCache.userId === userId && 
         globalEntriesCache.entries.length > 0 &&
         !hasRecentDeletion) {
-      console.log('[useJournalEntries] Using cached entries while fetching fresh data');
-      setEntries(globalEntriesCache.entries);
+      // Filter out deleted entries from the cached data we're showing
+      const filteredCachedEntries = globalEntriesCache.entries.filter(entry => 
+        !deletedEntryIdsRef.current.has(entry.id) &&
+        !globalEntriesCache.deletedEntryIds.has(entry.id)
+      );
+      
+      console.log('[useJournalEntries] Using filtered cached entries while fetching fresh data:', 
+                 filteredCachedEntries.length);
+      setEntries(filteredCachedEntries);
       
       // Only show loading indicator for initial loads, not refreshes with existing data
       if (!cacheInitializedRef.current) {
@@ -233,6 +290,14 @@ export function useJournalEntries(
       }, 8000); // 8 seconds for longer recordings
       
       const journalEntries = await fetchJournalEntries(userId, fetchTimeoutRef);
+      
+      // Filter out any entries that have been deleted
+      const filteredEntries = journalEntries.filter(entry => 
+        !deletedEntryIdsRef.current.has(entry.id) &&
+        !globalEntriesCache.deletedEntryIds.has(entry.id)
+      );
+      
+      console.log(`[useJournalEntries] Fetched ${journalEntries.length} entries, filtered to ${filteredEntries.length} after removing deleted entries`);
       
       if (journalEntries.length === 0) {
         consecutiveEmptyFetchesRef.current += 1;
@@ -523,9 +588,12 @@ export function useJournalEntries(
     };
   }, [userId, refreshKey, fetchEntries, lastRefreshKey]);
 
-  return { 
-    entries, 
-    loading, 
+  return {
+    entries: entries.filter(entry => 
+      !deletedEntryIdsRef.current.has(entry.id) &&
+      !globalEntriesCache.deletedEntryIds.has(entry.id)
+    ),
+    loading,
     fetchEntries,
     lastFetchTime,
     fetchCount,

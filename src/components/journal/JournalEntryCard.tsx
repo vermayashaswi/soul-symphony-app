@@ -85,6 +85,7 @@ export function JournalEntryCard({
   const [thumbsUp, setThumbsUp] = useState(false);
   const [thumbsDown, setThumbsDown] = useState(false);
   const [hasOverflow, setHasOverflow] = useState(false);
+  const [isDeleted, setIsDeleted] = useState(false);  // Add state to track if this entry has been deleted
   const mountedRef = useRef<boolean>(true);
   
   // Initial check for content overflow
@@ -94,6 +95,28 @@ export function JournalEntryCard({
       setHasOverflow(overflow);
     }
   }, [safeEntry.content]);
+  
+  // Listen for global deletion events
+  useEffect(() => {
+    const handleEntryDeleted = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId === safeEntry.id) {
+        console.log(`[JournalEntryCard] Detected deletion event for this entry: ${safeEntry.id}`);
+        setIsDeleted(true);
+      }
+    };
+    
+    window.addEventListener('journalEntryDeleted', handleEntryDeleted as EventListener);
+    
+    return () => {
+      window.removeEventListener('journalEntryDeleted', handleEntryDeleted as EventListener);
+    };
+  }, [safeEntry.id]);
+  
+  // If this entry has been marked as deleted, don't render it
+  if (isDeleted) {
+    console.log(`[JournalEntryCard] Not rendering deleted entry: ${safeEntry.id}`);
+    return null;
+  }
   
   const extractThemes = (): string[] => {
     try {
@@ -457,6 +480,10 @@ export function JournalEntryCard({
     try {
       if (onDelete && safeEntry.id) {
         console.log(`[JournalEntryCard] Deleting entry ${safeEntry.id}`);
+        
+        // Mark as deleted immediately to prevent re-renders
+        setIsDeleted(true);
+        
         // Call the parent's onDelete handler and ensure we return the promise
         return await onDelete(safeEntry.id);
       } else {
@@ -464,6 +491,10 @@ export function JournalEntryCard({
       }
     } catch (error) {
       console.error("[JournalEntryCard] Error during deletion:", error);
+      
+      // Reset deleted state if there was an error
+      setIsDeleted(false);
+      
       throw error; // Propagate the error to be handled by the dialog
     }
   };
@@ -509,22 +540,7 @@ export function JournalEntryCard({
                 onEntryUpdated={handleEntryUpdate}
               />
               <DeleteEntryDialog 
-                onDelete={async () => {
-                  return new Promise<void>(async (resolve, reject) => {
-                    try {
-                      if (onDelete && safeEntry.id) {
-                        // Call the parent's onDelete handler
-                        await onDelete(safeEntry.id);
-                        resolve();
-                      } else {
-                        reject(new Error("Delete handler not available"));
-                      }
-                    } catch (error) {
-                      console.error("[JournalEntryCard] Error during deletion:", error);
-                      reject(error);
-                    }
-                  });
-                }} 
+                onDelete={handleDelete} 
               />
             </div>
           </div>

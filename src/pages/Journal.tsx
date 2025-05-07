@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { processRecording, getEntryIdForProcessingId, removeProcessingEntryById } from '@/utils/audio-processing';
@@ -62,6 +61,7 @@ const Journal = () => {
   const lastSuccessfulEntriesRef = useRef<JournalEntry[]>([]);
   const forceUpdateTimerRef = useRef<NodeJS.Timeout | null>(null);
   const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
+  const [deletedEntryIds, setDeletedEntryIds] = useState<Set<number>>(new Set());
 
   const { 
     entries, 
@@ -77,10 +77,12 @@ const Journal = () => {
 
   useEffect(() => {
     if (entries && entries.length > 0 && !hasLocalChanges) {
-      setLocalEntries(entries);
-      lastSuccessfulEntriesRef.current = entries;
+      // Filter out any entries that are in our deleted entries list
+      const filteredEntries = entries.filter(entry => !deletedEntryIds.has(entry.id));
+      setLocalEntries(filteredEntries);
+      lastSuccessfulEntriesRef.current = filteredEntries;
     } else if (entries && entries.length > 0) {
-      const deletedIds = new Set([...pendingDeletionIds]);
+      const deletedIds = new Set([...pendingDeletionIds, ...deletedEntryIds]);
       
       const mergedEntries = entries.filter(entry => !deletedIds.has(entry.id));
       
@@ -89,7 +91,7 @@ const Journal = () => {
         lastSuccessfulEntriesRef.current = mergedEntries;
       }
     }
-  }, [entries, hasLocalChanges, pendingDeletionIds]);
+  }, [entries, hasLocalChanges, pendingDeletionIds, deletedEntryIds]);
 
   useEffect(() => {
     const handleError = (event: ErrorEvent) => {
@@ -721,13 +723,22 @@ const Journal = () => {
         return updated;
       });
       
+      // Update local entries to immediately remove the deleted entry
       setLocalEntries(prevEntries => {
         const filteredEntries = prevEntries.filter(entry => entry.id !== entryId);
         console.log(`[Journal] Locally filtered entries: ${filteredEntries.length} (removed entry ${entryId})`);
         return filteredEntries;
       });
       
+      // Add to both pending deletion IDs (for temporary state) and permanent deleted entry IDs
       setPendingDeletionIds(prev => {
+        const newSet = new Set(prev);
+        newSet.add(entryId);
+        return newSet;
+      });
+
+      // Add to permanent deleted entries record
+      setDeletedEntryIds(prev => {
         const newSet = new Set(prev);
         newSet.add(entryId);
         return newSet;
@@ -735,6 +746,7 @@ const Journal = () => {
       
       setHasLocalChanges(true);
       
+      // Perform the actual deletion in the database
       const { error } = await supabase
         .from('Journal Entries')
         .delete()
@@ -747,6 +759,7 @@ const Journal = () => {
       
       console.log(`[Journal] Entry ${entryId} successfully deleted from database`);
       
+      // Dispatch event to notify other components about the deletion
       window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
         detail: { 
           action: 'delete',
@@ -755,15 +768,19 @@ const Journal = () => {
         }
       }));
       
+      // Schedule refresh intervals to ensure UI is updated
       const refreshIntervals = [300, 1000, 2500];
       refreshIntervals.forEach((interval, index) => {
         setTimeout(() => {
           if (index === refreshIntervals.length - 1) {
+            // Keep the entry ID in deletedEntryIds permanently, but remove from pendingDeletionIds
             setPendingDeletionIds(prev => {
               const newSet = new Set(prev);
               newSet.delete(entryId);
               return newSet;
             });
+            
+            // Only reset hasLocalChanges when we've confirmed deletion
             setHasLocalChanges(false);
           }
           
@@ -785,9 +802,15 @@ const Journal = () => {
       setLastAction(`Delete Entry Error (${entryId})`);
       toast.error('Failed to delete entry');
       
+      // On error, restore the entry from the deleted lists
       if (hasLocalChanges) {
         setLocalEntries(entries);
         setPendingDeletionIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(entryId);
+          return newSet;
+        });
+        setDeletedEntryIds(prev => {
           const newSet = new Set(prev);
           newSet.delete(entryId);
           return newSet;
@@ -843,10 +866,27 @@ const Journal = () => {
       }
     };
     
+    // Add handler for entry deletion events
+    const handleJournalEntryDeleted = (event: CustomEvent) => {
+      if (event.detail && event.detail.entryId) {
+        const deletedId = Number(event.detail.entryId);
+        console.log(`[Journal] Entry deletion event detected for ID: ${deletedId}`);
+        
+        // Add to permanent deleted IDs
+        setDeletedEntryIds(prev => {
+          const newSet = new Set(prev);
+          newSet.add(deletedId);
+          return newSet;
+        });
+      }
+    };
+    
     window.addEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
+    window.addEventListener('journalEntryDeleted', handleJournalEntryDeleted as EventListener);
     
     return () => {
       window.removeEventListener('journalEntryUpdated', handleJournalEntryUpdated as EventListener);
+      window.removeEventListener('journalEntryDeleted', handleJournalEntryDeleted as EventListener);
     };
   }, [fetchEntries]);
 
@@ -857,8 +897,10 @@ const Journal = () => {
 
   // Update the entries handling to ensure types are compatible
   const displayEntries = hasLocalChanges ? localEntries : 
-                        (entries && entries.length > 0) ? entries : 
-                        (lastSuccessfulEntriesRef.current.length > 0) ? lastSuccessfulEntriesRef.current : [];
+                        (entries && entries.length > 0) ? 
+                          entries.filter(entry => !deletedEntryIds.has(entry.id)) : 
+                        (lastSuccessfulEntriesRef.current.length > 0) ? 
+                          lastSuccessfulEntriesRef.current.filter(entry => !deletedEntryIds.has(entry.id)) : [];
   
   // Define the missing showLoading variable
   const isReallyEmpty = displayEntries.length === 0 && 

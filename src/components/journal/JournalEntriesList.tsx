@@ -39,6 +39,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   // Track the last action taken
   const [lastAction, setLastAction] = useState<string | null>(null);
   
+  // Add a tracking set for deleted entry IDs
+  const deletedEntryIdsRef = useRef<Set<number>>(new Set());
+  
   // Determine if we have any entries to show
   const hasEntries = entries && entries.length > 0;
   
@@ -146,7 +149,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     
   }, [processingEntries, entries, processedEntryIds, isProcessing, activeProcessingIds, hasEntries, recoveringFromDelete]);
   
-  // Handle entry deletion with improved error handling
+  // Handle entry deletion with improved cleanup logic
   const handleDeleteEntry = async (entryId: number) => {
     try {
       console.log(`[JournalEntriesList] Handling delete for entry: ${entryId}`);
@@ -156,6 +159,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         console.error("[JournalEntriesList] Invalid entry ID for deletion");
         return Promise.reject(new Error("Invalid entry ID"));
       }
+      
+      // Track this entry as deleted to prevent it from reappearing
+      deletedEntryIdsRef.current.add(entryId);
       
       // Mark that we're recovering from a deletion to prevent blank screen
       setRecoveringFromDelete(true);
@@ -187,9 +193,6 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       
       console.log(`[JournalEntriesList] Delete handler completed for entry: ${entryId}`);
       
-      // Check if we still have entries after deletion
-      const remainingEntries = entries.filter(e => e.id !== entryId);
-      
       // Always reset the recovering state after a short delay, even if there are no entries left
       // This ensures the EmptyJournalState will show properly when the last entry is deleted
       setTimeout(() => {
@@ -211,6 +214,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       return Promise.reject(error);
     }
   };
+  
+  // Filter entries to remove any that have been deleted
+  const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
   
   // Filter active processing IDs to prevent duplicates with real entries
   const filteredProcessingIds = activeProcessingIds.filter(tempId => {
@@ -240,11 +246,11 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     return true;
   });
   
-  console.log(`[JournalEntriesList] Rendering with: entries=${entries?.length || 0}, activeProcessingIds=${activeProcessingIds.length}, filteredProcessingIds=${filteredProcessingIds.length}`);
+  console.log(`[JournalEntriesList] Rendering with: entries=${filteredEntries.length || 0} (after filtering deleted), activeProcessingIds=${activeProcessingIds.length}, filteredProcessingIds=${filteredProcessingIds.length}`);
 
-  // Determine what content to show based on entries, loading state, and processing state
-  const shouldShowEmpty = !hasEntries && !isLoading && filteredProcessingIds.length === 0 && !recoveringFromDelete;
-  const shouldShowEntries = hasEntries || filteredProcessingIds.length > 0 || recoveringFromDelete;
+  // Determine what content to show based on filtered entries, loading state, and processing state
+  const shouldShowEmpty = !filteredEntries.length && !isLoading && filteredProcessingIds.length === 0 && !recoveringFromDelete;
+  const shouldShowEntries = filteredEntries.length > 0 || filteredProcessingIds.length > 0 || recoveringFromDelete;
   
   return (
     <div className="journal-entries-list" id="journal-entries-container" data-last-action={lastAction}>
@@ -257,7 +263,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           </p>
         </div>
       ) : shouldShowEntries ? (
-        <div className="grid gap-4" data-entries-count={entries.length}>
+        <div className="grid gap-4" data-entries-count={filteredEntries.length}>
           {/* Show processing entry skeletons for any active processing entries */}
           {filteredProcessingIds.length > 0 && (
             <div data-processing-cards-container="true" className="processing-cards-container">
@@ -275,7 +281,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           )}
           
           {/* Then display regular entries */}
-          {entries.map((entry) => (
+          {filteredEntries.map((entry) => (
             <JournalEntryCard
               key={entry.id || entry.tempId || Math.random()}
               entry={{

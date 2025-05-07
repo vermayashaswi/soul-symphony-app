@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { 
@@ -47,6 +48,11 @@ export function DeleteEntryDialog({ onDelete, isDeleting = false }: DeleteEntryD
       // Dispatch an event to notify other components of the deletion
       window.dispatchEvent(new CustomEvent('journalEntriesNeedRefresh', {
         detail: { action: 'delete' }
+      }));
+      
+      // Force UI refresh to ensure deleted entries are removed from view
+      window.dispatchEvent(new CustomEvent('journalUIForceRefresh', {
+        detail: { action: 'delete', timestamp: Date.now() }
       }));
 
       // Only close the dialog after everything is complete
