@@ -82,6 +82,9 @@ export const TutorialProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           } else {
             setCurrentStep('welcome');
           }
+          
+          // Once we determine the tutorial isn't completed, activate it
+          setIsActive(true);
         } else {
           setIsTutorialCompleted(true);
         }

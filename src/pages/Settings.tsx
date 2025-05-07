@@ -75,14 +75,6 @@ const Settings = () => {
 
   const handleSignOut = async () => {
     try {
-      // Before signing out, update the tutorial_completed status to "NO" in the database
-      if (user) {
-        await supabase
-          .from('profiles')
-          .update({ tutorial_completed: 'NO' })
-          .eq('id', user.id);
-      }
-      
       await signOut();
       toast.success('Successfully signed out');
     } catch (error) {
