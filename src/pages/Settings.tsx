@@ -9,7 +9,7 @@ import { useAuth } from '@/contexts/AuthContext';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TranslationProvider, useTranslation } from '@/contexts/TranslationContext';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import ProfilePictureUpload from '@/components/settings/ProfilePictureUpload';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 
