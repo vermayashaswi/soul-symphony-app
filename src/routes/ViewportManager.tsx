@@ -22,6 +22,7 @@ const ViewportManager: React.FC = () => {
   
   // Check if current route is an onboarding route
   const isOnboardingRoute = location.pathname.includes('onboarding');
+  const isSettingsRoute = location.pathname.includes('settings');
   
   // Render the appropriate layout based on route and device
   return (
