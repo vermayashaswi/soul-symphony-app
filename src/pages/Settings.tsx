@@ -10,15 +10,19 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { TranslationProvider, useTranslation } from '@/contexts/TranslationContext';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
+import { ColorPicker } from '@/components/settings/ColorPicker';
 import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
+import { Circle, CheckCircle, Palette } from 'lucide-react';
+import { useUserColorThemeHex } from '@/components/insights/soulnet/useUserColorThemeHex';
 
 const Settings = () => {
   const { user, updateUserProfile } = useAuth();
-  const { colorTheme, setColorTheme } = useTheme();
+  const { colorTheme, setColorTheme, customColor, setCustomColor, theme, setTheme } = useTheme();
   const [displayName, setDisplayName] = useState('');
   const [timezone, setTimezone] = useState<string>('');
   const [isLoading, setIsLoading] = useState(false);
+  const themeColor = useUserColorThemeHex();
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -76,6 +80,25 @@ const Settings = () => {
 
   const handleDisplayNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setDisplayName(e.target.value);
+  };
+  
+  const getColorForTheme = (themeName: string): string => {
+    switch (themeName) {
+      case 'Default':
+        return '#3b82f6';
+      case 'Calm':
+        return '#8b5cf6';
+      case 'Soothing':
+        return '#FFDEE2';
+      case 'Energy':
+        return '#f59e0b';
+      case 'Focus':
+        return '#10b981';
+      case 'Custom':
+        return customColor;
+      default:
+        return '#3b82f6';
+    }
   };
 
   return (
@@ -149,36 +172,84 @@ const Settings = () => {
                 <TranslatableText text="Appearance" />
               </CardTitle>
             </CardHeader>
-            <CardContent>
-              <div className="space-y-2">
-                <Label>
-                  <TranslatableText text="Theme" />
+            <CardContent className="space-y-6">
+              <div className="space-y-3">
+                <Label className="text-base">
+                  <TranslatableText text="Display Mode" />
                 </Label>
-                <RadioGroup
-                  value={colorTheme}
-                  onValueChange={setColorTheme}
-                  className="flex flex-col space-y-1"
-                >
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="light" id="light" />
-                    <Label htmlFor="light">
-                      <TranslatableText text="Light" />
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="dark" id="dark" />
-                    <Label htmlFor="dark">
-                      <TranslatableText text="Dark" />
-                    </Label>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <RadioGroupItem value="system" id="system" />
-                    <Label htmlFor="system">
-                      <TranslatableText text="System" />
-                    </Label>
-                  </div>
-                </RadioGroup>
+                <div className="grid grid-cols-3 gap-3">
+                  {['light', 'dark', 'system'].map((mode) => (
+                    <div
+                      key={mode}
+                      onClick={() => setTheme(mode as 'light' | 'dark' | 'system')}
+                      className={`flex flex-col items-center justify-center p-3 rounded-lg border cursor-pointer transition-all ${
+                        theme === mode 
+                          ? 'border-theme bg-theme-lighter shadow-md' 
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div className={`w-10 h-10 rounded-full flex items-center justify-center mb-2 ${
+                        mode === 'light' ? 'bg-white border' : 
+                        mode === 'dark' ? 'bg-gray-900 text-white' : 'bg-gradient-to-r from-white to-gray-900'
+                      }`}>
+                        {theme === mode && (
+                          <CheckCircle className="w-5 h-5" />
+                        )}
+                      </div>
+                      <span className="text-sm capitalize">
+                        <TranslatableText text={mode} />
+                      </span>
+                    </div>
+                  ))}
+                </div>
               </div>
+
+              <div className="space-y-3">
+                <Label className="text-base">
+                  <TranslatableText text="Color Theme" />
+                </Label>
+                <div className="grid grid-cols-3 gap-3">
+                  {['Default', 'Calm', 'Soothing', 'Energy', 'Focus', 'Custom'].map((themeOption) => (
+                    <div
+                      key={themeOption}
+                      onClick={() => setColorTheme(themeOption as any)}
+                      className={`flex flex-col items-center justify-center p-3 rounded-lg border cursor-pointer transition-all ${
+                        colorTheme === themeOption 
+                          ? 'border-theme bg-theme-lighter shadow-md'
+                          : 'border-border hover:border-primary/50'
+                      }`}
+                    >
+                      <div 
+                        className="w-10 h-10 rounded-full flex items-center justify-center mb-2"
+                        style={{ backgroundColor: getColorForTheme(themeOption) }}
+                      >
+                        {colorTheme === themeOption && (
+                          <CheckCircle className="w-5 h-5 text-white drop-shadow-md" />
+                        )}
+                        {themeOption === 'Custom' && colorTheme !== 'Custom' && (
+                          <Palette className="w-5 h-5 text-white drop-shadow-md" />
+                        )}
+                      </div>
+                      <span className="text-sm">
+                        <TranslatableText text={themeOption} />
+                      </span>
+                    </div>
+                  ))}
+                </div>
+              </div>
+              
+              {colorTheme === 'Custom' && (
+                <div className="pt-4 border-t">
+                  <Label className="text-base mb-4 block">
+                    <TranslatableText text="Custom Color" />
+                  </Label>
+                  <ColorPicker 
+                    value={customColor}
+                    onChange={setCustomColor}
+                    applyImmediately
+                  />
+                </div>
+              )}
             </CardContent>
           </Card>
         </TabsContent>
