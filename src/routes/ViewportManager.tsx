@@ -20,6 +20,9 @@ const ViewportManager: React.FC = () => {
     user: !!user
   });
   
+  // Check if current route is an onboarding route
+  const isOnboardingRoute = location.pathname === '/app' || location.pathname === '/app/onboarding';
+  
   // Render the appropriate layout based on route and device
   return (
     <>
@@ -27,8 +30,8 @@ const ViewportManager: React.FC = () => {
         <Outlet />
       </div>
       
-      {/* Display mobile navigation ONLY on actual app routes AND when user is logged in */}
-      {isAppRoute(location.pathname) && user && (
+      {/* Display mobile navigation ONLY on actual app routes AND when user is logged in AND NOT on onboarding routes */}
+      {isAppRoute(location.pathname) && user && !isOnboardingRoute && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </>

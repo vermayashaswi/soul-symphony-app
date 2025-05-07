@@ -51,14 +51,20 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
+    // Define routes where navigation should be hidden
+    const hiddenRoutes = ['/app', '/app/auth', '/app/onboarding'];
+    const isHiddenRoute = hiddenRoutes.includes(location.pathname);
+    
     const shouldShowNav = (isMobile || isNativeApp()) && 
-                          !isKeyboardVisible; 
+                          !isKeyboardVisible &&
+                          !isHiddenRoute;
     
     console.log('MobileNavigation visibility check:', { 
       shouldShowNav, 
       isMobile, 
       isNativeApp: isNativeApp(),
       path: location.pathname,
+      isHiddenRoute,
       isKeyboardVisible
     });
     
@@ -69,13 +75,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  const hiddenRoutes = ['/app/auth', '/app/onboarding'];
+  // Explicitly list routes where we don't want the navigation to appear
+  const hiddenRoutes = ['/app', '/app/auth', '/app/onboarding'];
   
-  if (!onboardingComplete && location.pathname === '/app') {
-    return null;
-  }
-  
-  if (hiddenRoutes.includes(location.pathname)) {
+  if (hiddenRoutes.includes(location.pathname) || !onboardingComplete) {
     return null;
   }
   
