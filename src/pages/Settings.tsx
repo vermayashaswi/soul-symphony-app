@@ -77,6 +77,9 @@ export default function Settings() {
   const [originalDisplayName, setOriginalDisplayName] = useState<string>('');
   const [isEditingName, setIsEditingName] = useState(false);
   const [isLoadingProfile, setIsLoadingProfile] = useState(true);
+  const [nameError, setNameError] = useState<string | null>(null);
+  
+  const MAX_NAME_LENGTH = 25;
   
   const colorThemes = [
     { name: 'Default', color: 'bg-blue-500' },
@@ -191,28 +194,26 @@ export default function Settings() {
   }, [user]);
 
   useEffect(() => {
-    if (typeof window !== 'undefined') {
-      const enabled = localStorage.getItem('notification_enabled') === 'true';
-      const frequency = localStorage.getItem('notification_frequency') as NotificationFrequency;
-      const times = localStorage.getItem('notification_times');
-      
-      if (enabled) {
-        setNotificationsEnabled(true);
-      }
-      
-      if (frequency && ['once', 'twice', 'thrice'].includes(frequency)) {
-        setNotificationFrequency(frequency);
-      }
-      
-      if (times) {
-        try {
-          const parsedTimes = JSON.parse(times) as NotificationTime[];
-          if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
-            setNotificationTimes(parsedTimes);
-          }
-        } catch (e) {
-          console.error('Error parsing notification times from localStorage', e);
+    const enabled = localStorage.getItem('notification_enabled') === 'true';
+    const frequency = localStorage.getItem('notification_frequency') as NotificationFrequency;
+    const times = localStorage.getItem('notification_times');
+    
+    if (enabled) {
+      setNotificationsEnabled(true);
+    }
+    
+    if (frequency && ['once', 'twice', 'thrice'].includes(frequency)) {
+      setNotificationFrequency(frequency);
+    }
+    
+    if (times) {
+      try {
+        const parsedTimes = JSON.parse(times) as NotificationTime[];
+        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
+          setNotificationTimes(parsedTimes);
         }
+      } catch (e) {
+        console.error('Error parsing notification times from localStorage', e);
       }
     }
   }, []);
@@ -244,15 +245,28 @@ export default function Settings() {
     }
   };
 
-  const applyCustomColor = () => {
-    setCustomColor(colorPickerValue);
-    setColorTheme('Custom');
-    toast.success(<TranslatableText text="Custom color applied" forceTranslate={true} />);
-    setShowColorPicker(false);
+  const validateDisplayName = (name: string): boolean => {
+    if (name.length > MAX_NAME_LENGTH) {
+      setNameError(`Display name cannot exceed ${MAX_NAME_LENGTH} characters`);
+      return false;
+    }
+    setNameError(null);
+    return true;
+  };
+
+  const handleNameChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const newName = e.target.value;
+    setDisplayName(newName);
+    validateDisplayName(newName);
   };
 
   const saveDisplayName = async () => {
     if (!user) return;
+    
+    // Validate name length before saving
+    if (!validateDisplayName(displayName.trim())) {
+      return;
+    }
     
     try {
       const { error } = await supabase
@@ -281,6 +295,7 @@ export default function Settings() {
   const cancelNameEdit = () => {
     setDisplayName(originalDisplayName);
     setIsEditingName(false);
+    setNameError(null);
   };
   
   const handleToggleNotifications = (checked: boolean) => {
@@ -408,11 +423,15 @@ export default function Settings() {
                     <div className="flex flex-col space-y-2">
                       <Input
                         value={displayName}
-                        onChange={(e) => setDisplayName(e.target.value)}
+                        onChange={handleNameChange}
                         placeholder="Enter your display name"
-                        className="max-w-xs"
+                        className={cn("max-w-xs", nameError && "border-red-500")}
                         autoFocus
+                        maxLength={MAX_NAME_LENGTH}
                       />
+                      {nameError && (
+                        <p className="text-xs text-red-500">{nameError}</p>
+                      )}
                       <div className="flex gap-2 mt-2">
                         <Button 
                           variant="outline" 
@@ -428,7 +447,7 @@ export default function Settings() {
                           size="sm"
                           onClick={saveDisplayName}
                           className="flex items-center gap-1 bg-theme hover:bg-theme/90"
-                          disabled={!displayName.trim() || displayName.trim() === originalDisplayName}
+                          disabled={!displayName.trim() || displayName.trim() === originalDisplayName || !!nameError || displayName.length > MAX_NAME_LENGTH}
                         >
                           <Save className="h-3 w-3" />
                           <TranslatableText text="Save" />
