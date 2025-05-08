@@ -26,7 +26,6 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import RestartTutorialButton from '@/components/tutorial/RestartTutorialButton';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -56,7 +55,7 @@ function SettingItem({ icon: Icon, title, description, children }: SettingItemPr
   );
 }
 
-const Settings = () => {
+export default function Settings() {
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
   const [notificationFrequency, setNotificationFrequency] = useState<NotificationFrequency>('once');
@@ -381,13 +380,6 @@ const Settings = () => {
         <TranslatableText text={timeLabels} />
       </div>
     );
-  };
-
-  const applyCustomColor = () => {
-    setCustomColor(colorPickerValue);
-    setColorTheme('Custom');
-    toast.success(<TranslatableText text="Custom color applied" forceTranslate={true} />);
-    setShowColorPicker(false);
   };
 
   return (
@@ -1124,23 +1116,6 @@ const Settings = () => {
           </div>
         </DialogContent>
       </Dialog>
-      
-      <div className="space-y-6">
-        <div>
-          <h3 className="text-lg font-medium">
-            <TranslatableText text="App Tutorial" forceTranslate={true} />
-          </h3>
-          <p className="text-sm text-muted-foreground">
-            <TranslatableText text="Restart the app tutorial to learn about the app's features" forceTranslate={true} />
-          </p>
-        </div>
-        <div className="flex flex-col space-y-2">
-          <RestartTutorialButton />
-        </div>
-      </div>
-      
     </div>
   );
-};
-
-export default Settings;
+}

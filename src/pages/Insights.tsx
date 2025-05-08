@@ -186,7 +186,9 @@ export default function Insights() {
             </div>
           ) : (
             <>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-2 md:px-0">
+              <div className={cn(
+                "grid grid-cols-1 md:grid-cols-3 gap-6 mb-8 px-2 md:px-0"
+              )}>
                 <motion.div
                   initial={{ opacity: 0, y: 20 }}
                   animate={{ opacity: 1, y: 0 }}
@@ -368,7 +370,7 @@ export default function Insights() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.4 }}
-                className="mood-calendar-container mb-8 w-full px-2 md:px-0"
+                className="mb-8 w-full px-2 md:px-0"
               >
                 <MoodCalendar 
                   sentimentData={getSentimentData()}
@@ -380,7 +382,7 @@ export default function Insights() {
                 initial={{ opacity: 0, y: 20 }}
                 animate={{ opacity: 1, y: 0 }}
                 transition={{ duration: 0.4, delay: 0.5 }}
-                className="soulnet-visualization mb-8 w-full px-0 md:px-2"
+                className="mb-8 w-full px-0 md:px-2"
               >
                 <ErrorBoundary>
                   <SoulNet userId={user?.id} timeRange={timeRange} />
