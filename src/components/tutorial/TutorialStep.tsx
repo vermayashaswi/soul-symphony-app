@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { X, ArrowLeft, ArrowRight } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { Progress } from '@/components/ui/progress';
 
 interface TutorialStepProps {
   step: number;
@@ -30,38 +31,43 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
 }) => {
   return (
     <motion.div
-      className="bg-card border shadow-lg rounded-lg p-6 max-w-md relative"
-      style={{ maxWidth: '350px' }}
+      className="bg-card border shadow-lg rounded-lg p-6 relative"
+      style={{ maxWidth: '350px', zIndex: 10001 }}
     >
-      {/* Step indicator */}
-      <div className="flex justify-between items-center mb-2">
-        <div className="bg-primary text-primary-foreground w-8 h-8 rounded-full flex items-center justify-center font-bold">
-          {step}
+      {/* Close button */}
+      <Button 
+        variant="ghost" 
+        size="sm" 
+        className="h-8 w-8 p-0 rounded-full absolute top-4 right-4" 
+        onClick={onSkip}
+        aria-label="Skip tutorial"
+      >
+        <X className="h-4 w-4" />
+      </Button>
+
+      {/* Progress bar */}
+      <div className="mb-6 mt-2">
+        <Progress value={(step / totalSteps) * 100} className="h-2" />
+        <div className="flex justify-between mt-1">
+          <div className="text-xs text-muted-foreground">
+            <TranslatableText text={`Step ${step}`} />
+          </div>
+          <div className="text-xs text-muted-foreground">
+            <TranslatableText text={`${step}/${totalSteps}`} />
+          </div>
         </div>
-        <div className="text-sm text-muted-foreground">
-          <TranslatableText text={`${step}/${totalSteps}`} />
-        </div>
-        <Button 
-          variant="ghost" 
-          size="sm" 
-          className="h-8 w-8 p-0 rounded-full" 
-          onClick={onSkip}
-          aria-label="Skip tutorial"
-        >
-          <X className="h-4 w-4" />
-        </Button>
       </div>
       
       {/* Content */}
-      <h3 className="text-lg font-bold mb-2">
+      <h3 className="text-lg font-bold mb-3">
         <TranslatableText text={title} />
       </h3>
-      <p className="text-muted-foreground mb-4">
+      <p className="text-muted-foreground mb-6">
         <TranslatableText text={description} />
       </p>
       
       {/* Navigation buttons */}
-      <div className="flex justify-between mt-4">
+      <div className="flex justify-between mt-5">
         {!isFirstStep ? (
           <Button 
             variant="outline"
@@ -82,7 +88,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           onClick={onNext}
           className="flex items-center gap-1"
         >
-          <TranslatableText text={isLastStep ? "Finish" : "Got it"} />
+          <TranslatableText text={isLastStep ? "Finish" : "Next"} />
           {!isLastStep && <ArrowRight className="h-4 w-4" />}
         </Button>
       </div>

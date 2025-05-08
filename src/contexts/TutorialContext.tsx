@@ -31,38 +31,70 @@ const tutorialSteps: TutorialStep[] = [
   {
     id: 1,
     title: "Welcome to Soul Symphony",
-    description: "Let's take a quick tour to help you get started with the app.",
+    description: "Let's take a quick tour of the app to help you understand how it can support your emotional journey. We'll explore key features to get you started.",
     targetPath: "/app/home",
     position: "center"
   },
   {
     id: 2,
     title: "Your Journal",
-    description: "Record your thoughts and feelings by speaking or typing. We'll analyze them to provide insights.",
+    description: "Record your thoughts and feelings by speaking or typing. We'll analyze them to provide insights about your emotional patterns and themes.",
     targetPath: "/app/journal",
     targetSelector: ".recording-button-container",
     position: "bottom"
   },
   {
     id: 3,
-    title: "Your Insights",
-    description: "Discover patterns in your emotional journey with personalized insights and visualizations.",
+    title: "Insights Overview",
+    description: "Your Insights page shows patterns in your emotional journey. Let's explore how it helps you understand your feelings better.",
     targetPath: "/app/insights",
     targetSelector: ".insights-page-content",
     position: "top"
   },
   {
     id: 4,
+    title: "Time Range Selection",
+    description: "Change the time range to see your emotional patterns over different periods - day, week, month, or year.",
+    targetPath: "/app/insights",
+    targetSelector: ".insights-time-toggle",
+    position: "bottom"
+  },
+  {
+    id: 5,
+    title: "Emotional Summary Cards",
+    description: "These cards show your dominant mood, biggest emotional changes, and journal activity for the selected time period.",
+    targetPath: "/app/insights",
+    targetSelector: ".grid-cols-1",
+    position: "right"
+  },
+  {
+    id: 6,
+    title: "Emotion Chart",
+    description: "This chart visualizes your emotional patterns over time. Click on any emotion to see when and how often it appears in your journal.",
+    targetPath: "/app/insights",
+    targetSelector: ".recharts-responsive-container",
+    position: "top"
+  },
+  {
+    id: 7,
+    title: "Mood Calendar",
+    description: "The calendar shows your overall mood for each day, helping you identify patterns and trends in your emotional wellbeing.",
+    targetPath: "/app/insights",
+    targetSelector: ".mood-calendar-container",
+    position: "top"
+  },
+  {
+    id: 8,
     title: "Smart Chat",
-    description: "Chat with Ruh, your AI companion who can help you understand your emotions and journal entries.",
+    description: "Chat with Ruh, your AI companion who can help you understand your emotions and journal entries. Ask questions about your mood patterns or journal content.",
     targetPath: "/app/smart-chat",
     targetSelector: ".smart-chat-container",
     position: "bottom"
   },
   {
-    id: 5,
+    id: 9,
     title: "All Set!",
-    description: "You're all set to start your journey with Soul Symphony. Record your first journal entry to begin.",
+    description: "You're all set to start your journey with Soul Symphony. Record your first journal entry to begin tracking your emotional wellbeing.",
     targetPath: "/app/home",
     position: "center"
   }
