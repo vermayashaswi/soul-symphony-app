@@ -124,6 +124,20 @@ export const TutorialProvider: React.FC<{children: React.ReactNode}> = ({ childr
   const navigate = useNavigate();
   const location = useLocation();
 
+  // Helper function to check if current route is an onboarding route
+  const isOnboardingRoute = () => {
+    const path = location.pathname;
+    return path === '/app' || 
+           path === '/app/onboarding' || 
+           path.startsWith('/app/onboarding/') ||
+           path === '/onboarding' ||
+           path.startsWith('/onboarding/') ||
+           path === '/app/auth' || 
+           path.startsWith('/app/auth/') ||
+           path === '/auth' ||
+           path.startsWith('/auth/');
+  };
+
   // Check if the tutorial should be shown when component mounts
   useEffect(() => {
     const checkTutorialStatus = async () => {
@@ -150,10 +164,9 @@ export const TutorialProvider: React.FC<{children: React.ReactNode}> = ({ childr
         let startingStep = data.tutorial_step || 0;
         
         // Don't show tutorial during onboarding
-        const isOnboardingRoute = location.pathname === '/app' || location.pathname === '/app/onboarding';
-        
-        if (isOnboardingRoute) {
+        if (isOnboardingRoute()) {
           setIsActive(false);
+          setCurrentStep(0);
           setIsLoadingTutorial(false);
           return;
         }
@@ -171,8 +184,9 @@ export const TutorialProvider: React.FC<{children: React.ReactNode}> = ({ childr
         
         setCurrentStep(startingStep);
         
-        // Only auto-start if tutorial is not completed
-        if (shouldShowTutorial) {
+        // Only auto-start if tutorial is not completed and we're not on an onboarding route
+        if (shouldShowTutorial && !isOnboardingRoute()) {
+          console.log('Starting tutorial at step:', startingStep);
           setIsActive(true);
           
           // If we have a saved step, navigate to the correct path
@@ -182,6 +196,8 @@ export const TutorialProvider: React.FC<{children: React.ReactNode}> = ({ childr
               navigate(targetPath);
             }
           }
+        } else {
+          setIsActive(false);
         }
         
         setIsTutorialChecked(true);
@@ -213,8 +229,23 @@ export const TutorialProvider: React.FC<{children: React.ReactNode}> = ({ childr
     updateTutorialStep();
   }, [currentStep, isActive, user]);
 
+  // Watch for route changes that might take us to onboarding routes
+  useEffect(() => {
+    // If we navigate to an onboarding route, deactivate the tutorial
+    if (isOnboardingRoute() && isActive) {
+      console.log('Deactivating tutorial - navigated to onboarding route');
+      setIsActive(false);
+    }
+  }, [location.pathname, isActive]);
+
   // Start the tutorial
   const startTutorial = () => {
+    // Don't start if we're on onboarding route
+    if (isOnboardingRoute()) {
+      console.log('Cannot start tutorial during onboarding');
+      return;
+    }
+    
     setIsActive(true);
     setCurrentStep(1);
     

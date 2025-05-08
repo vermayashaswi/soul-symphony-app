@@ -32,12 +32,25 @@ const TutorialOverlay: React.FC = () => {
   const [connectorStart, setConnectorStart] = useState({ x: 0, y: 0 });
   const [connectorEnd, setConnectorEnd] = useState({ x: 0, y: 0 });
   const [isTransitioning, setIsTransitioning] = useState(false);
+  const [isInitialRender, setIsInitialRender] = useState(true);
   const tooltipRef = useRef<HTMLDivElement>(null);
+  const findElementAttempts = useRef(0);
   
   useEffect(() => {
     setMounted(true);
     return () => setMounted(false);
   }, []);
+
+  // Reset initial render flag when steps change
+  useEffect(() => {
+    if (currentStep > 0) {
+      // Small delay before resetting to prevent flicker during transitions
+      const timer = setTimeout(() => {
+        setIsInitialRender(false);
+      }, 300);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStep]);
 
   // Calculate connector points when element or tooltip positions change
   useEffect(() => {
@@ -87,6 +100,8 @@ const TutorialOverlay: React.FC = () => {
     
     const step = tutorialSteps[currentStep - 1];
     if (!step) return;
+    
+    findElementAttempts.current = 0;
 
     const findElement = () => {
       if (!step.targetSelector || step.position === 'center') {
@@ -108,13 +123,21 @@ const TutorialOverlay: React.FC = () => {
         // Calculate tooltip position based on element position
         calculateTooltipPosition(rect, step.position || 'bottom');
       } else {
-        // If element not found, retry after a short delay
-        setTimeout(findElement, 500);
+        // If element not found and we haven't tried too many times, retry
+        if (findElementAttempts.current < 10) {
+          findElementAttempts.current += 1;
+          setTimeout(findElement, 300);
+        } else {
+          console.error(`Could not find element with selector: ${step.targetSelector}`);
+          // Fall back to center positioning if element cannot be found
+          setTargetElement(null);
+          calculateTooltipPosition(null, 'center');
+        }
       }
     };
 
     // Small delay to ensure page has rendered
-    setTimeout(findElement, 300);
+    const timer = setTimeout(findElement, 300);
     
     // Add resize listener to update position
     const handleResize = () => {
@@ -123,11 +146,14 @@ const TutorialOverlay: React.FC = () => {
     };
     
     window.addEventListener('resize', handleResize);
-    return () => window.removeEventListener('resize', handleResize);
+    return () => {
+      window.removeEventListener('resize', handleResize);
+      clearTimeout(timer);
+    };
   }, [isActive, currentStep, tutorialSteps, mounted, isTransitioning]);
   
   // Calculate tooltip position based on element position and desired placement
-  const calculateTooltipPosition = (rect: DOMRect, position: string = 'bottom') => {
+  const calculateTooltipPosition = (rect: DOMRect | null, position: string = 'bottom') => {
     const padding = 20;
     const tooltipWidth = 350; // Based on max-width of tooltip
     const tooltipHeight = 250; // Estimated average height
@@ -137,28 +163,33 @@ const TutorialOverlay: React.FC = () => {
     let top = 0;
     let left = 0;
     
-    switch (position) {
-      case 'top':
-        top = Math.max(20, rect.top - tooltipHeight - padding);
-        left = rect.left + rect.width / 2 - tooltipWidth / 2;
-        break;
-      case 'bottom':
-        top = rect.bottom + padding;
-        left = rect.left + rect.width / 2 - tooltipWidth / 2;
-        break;
-      case 'left':
-        top = rect.top + rect.height / 2 - tooltipHeight / 2;
-        left = Math.max(20, rect.left - tooltipWidth - padding);
-        break;
-      case 'right':
-        top = rect.top + rect.height / 2 - tooltipHeight / 2;
-        left = rect.right + padding;
-        break;
-      case 'center':
-      default:
-        top = windowHeight / 2 - tooltipHeight / 2;
-        left = windowWidth / 2 - tooltipWidth / 2;
-        break;
+    if (rect) {
+      switch (position) {
+        case 'top':
+          top = Math.max(20, rect.top - tooltipHeight - padding);
+          left = rect.left + rect.width / 2 - tooltipWidth / 2;
+          break;
+        case 'bottom':
+          top = rect.bottom + padding;
+          left = rect.left + rect.width / 2 - tooltipWidth / 2;
+          break;
+        case 'left':
+          top = rect.top + rect.height / 2 - tooltipHeight / 2;
+          left = Math.max(20, rect.left - tooltipWidth - padding);
+          break;
+        case 'right':
+          top = rect.top + rect.height / 2 - tooltipHeight / 2;
+          left = rect.right + padding;
+          break;
+        case 'center':
+          top = windowHeight / 2 - tooltipHeight / 2;
+          left = windowWidth / 2 - tooltipWidth / 2;
+          break;
+      }
+    } else {
+      // Center position if no rect is provided
+      top = windowHeight / 2 - tooltipHeight / 2;
+      left = windowWidth / 2 - tooltipWidth / 2;
     }
     
     // Ensure tooltip stays within viewport bounds
@@ -222,7 +253,7 @@ const TutorialOverlay: React.FC = () => {
     <AnimatePresence mode="sync">
       {isActive && (
         <>
-          {/* Dimmed overlay with spotlight */}
+          {/* Dimmed overlay with spotlight - adjusted to 25% opacity (75% visibility) */}
           <motion.div
             key="spotlight-overlay"
             initial={{ opacity: 0 }}
@@ -231,16 +262,16 @@ const TutorialOverlay: React.FC = () => {
             transition={{ duration: 0.3 }}
             className="fixed inset-0 z-[9997] pointer-events-auto"
             style={{
-              backgroundColor: 'rgba(0, 0, 0, 0.5)', // Reduced darkness
-              backdropFilter: 'blur(1px)', // Reduced blur (70% reduction)
-              WebkitBackdropFilter: 'blur(1px)', // Reduced blur for Safari
+              backgroundColor: 'rgba(0, 0, 0, 0.25)', // Changed to 25% opacity (75% visibility)
+              backdropFilter: 'blur(0.5px)', // Minimal blur effect
+              WebkitBackdropFilter: 'blur(0.5px)', // Minimal blur for Safari
               clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, ${getSpotlightClipPath()})`,
               WebkitClipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, ${getSpotlightClipPath()})`,
             }}
           />
           
           {/* Connector line between tooltip and target element */}
-          {showConnector && (
+          {showConnector && !isInitialRender && (
             <TutorialConnector
               start={connectorStart}
               end={connectorEnd}
@@ -255,7 +286,12 @@ const TutorialOverlay: React.FC = () => {
             initial={{ opacity: 0, scale: 0.9 }}
             animate={{ opacity: 1, scale: 1 }}
             exit={{ opacity: 0, scale: 0.9 }}
-            transition={{ duration: 0.3 }}
+            transition={{ 
+              type: "spring",
+              damping: 30,
+              stiffness: 500,
+              duration: 0.4 
+            }}
             className="fixed z-[9999] pointer-events-auto"
             style={{
               top: tooltipPosition.top,

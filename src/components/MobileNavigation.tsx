@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -69,10 +68,20 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  // Hide navigation during onboarding and auth screens
-  const hiddenRoutes = ['/app/auth', '/app/onboarding', '/app'];
-  
-  if (!onboardingComplete || hiddenRoutes.includes(location.pathname)) {
+  // Hide navigation during onboarding and auth screens - more extensive check
+  const isOnboardingPath = location.pathname === '/app/onboarding' || 
+                           location.pathname === '/app' || 
+                           location.pathname.startsWith('/app/onboarding/') ||
+                           location.pathname === '/onboarding' ||
+                           location.pathname.startsWith('/onboarding/');
+                           
+  const isAuthPath = location.pathname === '/app/auth' || 
+                     location.pathname.startsWith('/app/auth/') ||
+                     location.pathname === '/auth' ||
+                     location.pathname.startsWith('/auth/');
+
+  if (!onboardingComplete || isOnboardingPath || isAuthPath) {
+    console.log('Hiding navigation bar - onboarding/auth path detected');
     return null;
   }
   
