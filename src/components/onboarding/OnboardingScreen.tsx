@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -699,20 +700,29 @@ const LanguageSelector = () => {
   const grouped = languagesByRegion();
   const regions = Object.keys(grouped);
 
+  // Find the current language label
+  const currentLanguageLabel = LANGUAGES.find(lang => lang.code === currentLanguage)?.label || 'Select a language';
+
   return (
     <div className="w-full">
       <Select value={currentLanguage} onValueChange={handleLanguageChange}>
-        <SelectTrigger className="w-full">
-          <SelectValue placeholder="Select a language" />
+        <SelectTrigger className="w-full bg-background/80 border-theme/20 text-white">
+          <SelectValue placeholder="Select a language" className="text-white">
+            {currentLanguageLabel}
+          </SelectValue>
         </SelectTrigger>
-        <SelectContent className="max-h-[300px]">
+        <SelectContent className="max-h-[300px] bg-background/90 border-theme/30">
           {regions.map(region => (
             <React.Fragment key={region}>
               <SelectItem value={`group_${region}`} disabled className="font-semibold text-muted-foreground">
                 {region}
               </SelectItem>
               {grouped[region].map(language => (
-                <SelectItem key={language.code} value={language.code} className="pl-6">
+                <SelectItem 
+                  key={language.code} 
+                  value={language.code} 
+                  className="pl-6 hover:bg-theme/20 data-[state=checked]:bg-theme/40 data-[state=checked]:text-white"
+                >
                   {language.label}
                 </SelectItem>
               ))}

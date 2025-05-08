@@ -1,3 +1,4 @@
+
 import React, { useState, useCallback } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
 import {
@@ -81,6 +82,16 @@ export function LanguageSelector() {
     console.log(`LanguageSelector: Language selected: ${code}`);
     setLanguage(code);
     setIsOpen(false);
+
+    // Store recently used language
+    try {
+      const recentLangs = localStorage.getItem('recentLanguages');
+      const parsed = recentLangs ? JSON.parse(recentLangs) : [];
+      const updated = [code, ...parsed.filter(c => c !== code)].slice(0, 3);
+      localStorage.setItem('recentLanguages', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to store recent language:', err);
+    }
   };
 
   // Filter languages based on search query
@@ -134,7 +145,7 @@ export function LanguageSelector() {
           disabled={isTranslating}
         >
           <Globe className={`h-4 w-4 ${isTranslating ? "animate-pulse" : ""}`} />
-          <span>{currentLanguageLabel}</span>
+          <span className="text-foreground">{currentLanguageLabel}</span>
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent 

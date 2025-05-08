@@ -294,3 +294,32 @@ body {
 .goog-te-gadget-simple {
   display: none !important;
 }
+
+/* Enhanced Select component styles for dark backgrounds */
+.dark [data-radix-select-trigger] [data-placeholder],
+[data-radix-select-trigger] [data-placeholder] {
+  color: #F1F1F1;
+}
+
+.dark [data-radix-select-content],
+[data-radix-select-content] {
+  background-color: hsl(var(--background));
+  border-color: rgba(var(--color-theme), 0.3);
+}
+
+.dark [data-radix-select-item][data-state="checked"],
+[data-radix-select-item][data-state="checked"] {
+  background-color: rgba(var(--color-theme), 0.4);
+  color: white;
+}
+
+/* Specific styles for onboarding select component */
+.onboarding-language-select [data-radix-select-trigger] {
+  background-color: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+  color: white;
+}
+
+.onboarding-language-select [data-radix-select-value] {
+  color: white;
+}

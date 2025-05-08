@@ -20,6 +20,9 @@ const App: React.FC = () => {
       console.log('Fixing malformed URL path:', currentPath);
       window.history.replaceState(null, '', '/');
     }
+    
+    // Apply a CSS class to the document body for theme-specific overrides
+    document.body.classList.add('app-initialized');
   }, []);
 
   return (
