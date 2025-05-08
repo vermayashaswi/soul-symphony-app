@@ -382,6 +382,13 @@ export default function Settings() {
     );
   };
 
+  const applyCustomColor = () => {
+    setCustomColor(colorPickerValue);
+    setColorTheme('Custom');
+    toast.success(<TranslatableText text="Custom color applied" forceTranslate={true} />);
+    setShowColorPicker(false);
+  };
+
   return (
     <div className="min-h-screen pb-20">
       <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
