@@ -10,7 +10,7 @@ interface Point {
 interface TutorialConnectorProps {
   start: Point;
   end: Point;
-  position: 'top' | 'bottom' | 'left' | 'right';
+  position: 'top' | 'bottom' | 'left' | 'right' | 'center';
 }
 
 const TutorialConnector: React.FC<TutorialConnectorProps> = ({ start, end, position }) => {
@@ -40,6 +40,12 @@ const TutorialConnector: React.FC<TutorialConnectorProps> = ({ start, end, posit
           cp1: { x: start.x + 30, y: midY },
           cp2: { x: end.x - 30, y: midY }
         };
+      case 'center':
+        // For center position, create a subtle arc
+        return {
+          cp1: { x: midX, y: start.y },
+          cp2: { x: midX, y: end.y }
+        };
       default:
         return {
           cp1: { x: midX, y: start.y },
@@ -49,6 +55,11 @@ const TutorialConnector: React.FC<TutorialConnectorProps> = ({ start, end, posit
   };
 
   const { cp1, cp2 } = getControlPoints();
+  
+  // Don't render a connector for center position
+  if (position === 'center') {
+    return null;
+  }
   
   // SVG path for the bezier curve
   const path = `M${start.x},${start.y} C${cp1.x},${cp1.y} ${cp2.x},${cp2.y} ${end.x},${end.y}`;
