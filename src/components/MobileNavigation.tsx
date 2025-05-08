@@ -69,13 +69,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  const hiddenRoutes = ['/app/auth', '/app/onboarding'];
+  // Hide navigation during onboarding and auth screens
+  const hiddenRoutes = ['/app/auth', '/app/onboarding', '/app'];
   
-  if (!onboardingComplete && location.pathname === '/app') {
-    return null;
-  }
-  
-  if (hiddenRoutes.includes(location.pathname)) {
+  if (!onboardingComplete || hiddenRoutes.includes(location.pathname)) {
     return null;
   }
   

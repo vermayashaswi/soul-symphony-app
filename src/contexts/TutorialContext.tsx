@@ -149,6 +149,15 @@ export const TutorialProvider: React.FC<{children: React.ReactNode}> = ({ childr
         const shouldShowTutorial = data.tutorial_completed === 'NO';
         let startingStep = data.tutorial_step || 0;
         
+        // Don't show tutorial during onboarding
+        const isOnboardingRoute = location.pathname === '/app' || location.pathname === '/app/onboarding';
+        
+        if (isOnboardingRoute) {
+          setIsActive(false);
+          setIsLoadingTutorial(false);
+          return;
+        }
+        
         // If we have a step saved but tutorial is marked as completed, reset to step 0
         if (!shouldShowTutorial && startingStep > 0) {
           startingStep = 0;

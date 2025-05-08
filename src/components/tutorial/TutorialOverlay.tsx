@@ -231,9 +231,9 @@ const TutorialOverlay: React.FC = () => {
             transition={{ duration: 0.3 }}
             className="fixed inset-0 z-[9997] pointer-events-auto"
             style={{
-              backgroundColor: 'rgba(0, 0, 0, 0.75)',
-              backdropFilter: 'blur(2px)', 
-              WebkitBackdropFilter: 'blur(2px)',
+              backgroundColor: 'rgba(0, 0, 0, 0.5)', // Reduced darkness
+              backdropFilter: 'blur(1px)', // Reduced blur (70% reduction)
+              WebkitBackdropFilter: 'blur(1px)', // Reduced blur for Safari
               clipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, ${getSpotlightClipPath()})`,
               WebkitClipPath: `polygon(0% 0%, 100% 0%, 100% 100%, 0% 100%, 0% 0%, ${getSpotlightClipPath()})`,
             }}
