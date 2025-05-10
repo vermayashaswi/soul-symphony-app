@@ -1,7 +1,7 @@
 
 import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
-import '../../../src/types/three-reference';  // Add type reference
+import '@/types/three-reference';  // Fixed import path
 import { useFrame } from '@react-three/fiber';
 
 interface NodeMeshProps {
@@ -43,19 +43,22 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     [type]
   );
 
-  useFrame(({ clock }) => {
+  // Fix: Use state for animation instead of relying on clock from RootState
+  useFrame((state, delta) => {
     try {
       if (!meshRef.current) return;
       
       if (isHighlighted) {
         const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
-        const pulse = Math.sin(clock.getElapsedTime() * 2.5) * pulseIntensity + 1.1;
+        // Use time calculation based on delta directly
+        const time = state.clock ? state.clock.getElapsedTime() : performance.now() / 1000;
+        const pulse = Math.sin(time * 2.5) * pulseIntensity + 1.1;
         meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
         
         if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           const emissiveIntensity = isSelected 
-            ? 1.0 + Math.sin(clock.getElapsedTime() * 3) * 0.3
-            : 0.7 + (connectionStrength * 0.3) + Math.sin(clock.getElapsedTime() * 3) * 0.2;
+            ? 1.0 + Math.sin(time * 3) * 0.3
+            : 0.7 + (connectionStrength * 0.3) + Math.sin(time * 3) * 0.2;
           
           meshRef.current.material.emissiveIntensity = emissiveIntensity;
         }

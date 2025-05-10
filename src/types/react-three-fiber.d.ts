@@ -32,6 +32,7 @@ declare module '@react-three/fiber' {
     camera: THREE.Camera;
     size: { width: number; height: number };
     viewport: { width: number; height: number; initialDpr: number; dpr: number; factor: number; distance: number };
+    clock: THREE.Clock; // Added the missing clock property
   }
 
   export function Canvas(props: {

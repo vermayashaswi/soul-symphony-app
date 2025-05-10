@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import '../../../src/types/three-reference';  // Add type reference
+import '@/types/three-reference';  // Fixed import path
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import Node from './Node';
