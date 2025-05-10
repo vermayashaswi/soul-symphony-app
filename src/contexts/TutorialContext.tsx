@@ -2,7 +2,7 @@ import React, { createContext, useContext, useState, useEffect, ReactNode } from
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
-import { useLocation } from 'react-router-dom';
+import { useLocation, useNavigate } from 'react-router-dom';
 
 // Define the interface for a tutorial step
 export interface TutorialStep {
@@ -25,6 +25,7 @@ interface TutorialContextType {
   prevStep: () => void;
   skipTutorial: () => void;
   completeTutorial: () => void;
+  resetTutorial: () => void;
 }
 
 // Create the context with a default undefined value
@@ -56,6 +57,7 @@ const initialTutorialSteps: TutorialStep[] = [
 export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
   const location = useLocation();
+  const navigate = useNavigate();
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<TutorialStep[]>(initialTutorialSteps);
@@ -184,6 +186,37 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
+  // Function to reset the tutorial
+  const resetTutorial = async () => {
+    if (!user) return;
+    
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({ 
+          tutorial_completed: 'NO',
+          tutorial_step: 0
+        })
+        .eq('id', user.id);
+        
+      if (error) {
+        console.error('Error resetting tutorial:', error);
+        toast.error('Failed to reset tutorial. Please try again.');
+        return;
+      }
+      
+      setCurrentStep(0);
+      setTutorialChecked(false);
+      toast.success('Tutorial reset successfully! Redirecting to home page...');
+      
+      // Navigate to home page to start the tutorial
+      navigate('/app/home');
+    } catch (error) {
+      console.error('Error resetting tutorial:', error);
+      toast.error('Something went wrong. Please try again.');
+    }
+  };
+  
   // Provide the context value
   const contextValue: TutorialContextType = {
     isActive,
@@ -193,7 +226,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     nextStep,
     prevStep,
     skipTutorial,
-    completeTutorial
+    completeTutorial,
+    resetTutorial
   };
   
   return (

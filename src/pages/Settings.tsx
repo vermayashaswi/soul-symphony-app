@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar } from 'lucide-react';
+import { User, Bell, Lock, Moon, Sun, Palette, HelpCircle, Shield, Mail, Check as CheckIcon, LogOut, Monitor, Pencil, Save, X, Clock, Calendar, RefreshCw } from 'lucide-react';
 import { Button } from "@/components/ui/button";
 import { Switch } from "@/components/ui/switch";
 import { Separator } from "@/components/ui/separator";
@@ -26,6 +26,7 @@ import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -101,6 +102,8 @@ export default function Settings() {
     { label: 'Twice a day', value: 'twice' },
     { label: 'Three times a day', value: 'thrice' },
   ];
+
+  const { resetTutorial } = useTutorial();
 
   useEffect(() => {
     const calculateMaxStreak = async () => {
@@ -739,7 +742,7 @@ export default function Settings() {
               </Button>
             </div>
             
-            <div className="mt-6 text-center">
+            <div className="mt-6 text-center flex justify-center gap-3">
               <Button 
                 variant="default" 
                 className="gap-2 bg-theme-color hover:bg-theme-color/90" 
@@ -747,6 +750,15 @@ export default function Settings() {
               >
                 <Mail className="h-4 w-4" />
                 <TranslatableText text="Contact Support" />
+              </Button>
+              
+              <Button 
+                variant="outline" 
+                className="gap-2 border-theme-color text-theme-color hover:bg-theme-color/10" 
+                onClick={resetTutorial}
+              >
+                <RefreshCw className="h-4 w-4" />
+                <TranslatableText text="Restart Tutorial" />
               </Button>
             </div>
           </motion.div>
