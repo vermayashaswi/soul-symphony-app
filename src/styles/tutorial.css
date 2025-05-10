@@ -28,9 +28,9 @@
 .tutorial-connector {
   stroke: var(--color-theme);
   stroke-width: 2px;
-  stroke-dasharray: 4;
+  stroke-dasharray: 6;
   fill: none;
-  opacity: 0.7;
+  opacity: 0.8;
 }
 
 .tutorial-step-indicator {
@@ -49,4 +49,16 @@
   background-color: rgba(0, 0, 0, 0.75);
   pointer-events: auto;
   touch-action: none;
+}
+
+/* Special styling for step 2 connector */
+.tutorial-step-2-connector {
+  stroke-dasharray: 6;
+  animation: dash 15s linear infinite;
+}
+
+@keyframes dash {
+  to {
+    stroke-dashoffset: -100;
+  }
 }

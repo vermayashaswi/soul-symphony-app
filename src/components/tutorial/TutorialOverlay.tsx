@@ -23,12 +23,6 @@ const TutorialOverlay: React.FC = () => {
 
   // Handle highlighting specific elements
   const targetElement = currentTutorialStep.targetElement;
-  const targetStyle = targetElement ? {
-    position: 'relative',
-    zIndex: 9998,
-    filter: 'none',
-    pointerEvents: 'auto',
-  } as React.CSSProperties : {};
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto">
