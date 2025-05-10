@@ -1,4 +1,6 @@
+
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
+import '../../../src/types/three-reference';  // Add type reference
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';

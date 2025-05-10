@@ -1,6 +1,7 @@
+
 import React, { useState, useEffect, useRef } from 'react';
+import '../../../src/types/three-reference';  // Add type reference
 import { Text } from '@react-three/drei';
-import { useTranslation } from '@/contexts/TranslationContext';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 

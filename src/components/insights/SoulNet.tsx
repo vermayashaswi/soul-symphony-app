@@ -1,4 +1,6 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
+import '../../../src/types/three-reference';  // Add type reference
 import { Canvas } from '@react-three/fiber';
 import { TimeRange } from '@/hooks/use-insights-data';
 import { supabase } from '@/integrations/supabase/client';

@@ -48,26 +48,28 @@ const TutorialOverlay: React.FC = () => {
 
       {/* Apply special styles to target element if needed */}
       {targetElement && (
-        <style jsx global>{`
-          ${targetElement} {
-            position: relative;
-            z-index: 9998;
-            filter: none;
-            pointer-events: auto;
-          }
-          ${targetElement}::before {
-            content: '';
-            position: absolute;
-            inset: -8px;
-            background: radial-gradient(
-              circle at center,
-              rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.2) 0%,
-              transparent 70%
-            );
-            border-radius: inherit;
-            z-index: -1;
-          }
-        `}</style>
+        <style dangerouslySetInnerHTML={{
+          __html: `
+            ${targetElement} {
+              position: relative;
+              z-index: 9998;
+              filter: none;
+              pointer-events: auto;
+            }
+            ${targetElement}::before {
+              content: '';
+              position: absolute;
+              inset: -8px;
+              background: radial-gradient(
+                circle at center,
+                rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.2) 0%,
+                transparent 70%
+              );
+              border-radius: inherit;
+              z-index: -1;
+            }
+          `
+        }} />
       )}
 
       {/* Tutorial step */}
