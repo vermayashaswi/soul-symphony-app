@@ -15,6 +15,12 @@ interface TutorialStepProps {
   totalSteps: number;
 }
 
+interface PositionState {
+  top: number;
+  left?: number;
+  right?: number;
+}
+
 const TutorialStep: React.FC<TutorialStepProps> = ({
   step,
   onNext,
@@ -25,7 +31,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   stepNumber,
   totalSteps
 }) => {
-  const [position, setPosition] = useState({ top: 20, right: 20 });
+  const [position, setPosition] = useState<PositionState>({ top: 20, right: 20 });
   const stepRef = useRef<HTMLDivElement>(null);
   const [targetRect, setTargetRect] = useState<DOMRect | null>(null);
   const [connectorPath, setConnectorPath] = useState<string>('');
@@ -39,46 +45,55 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         setTargetRect(rect);
         
         // Calculate position based on specified position and target element
-        let top = 0;
-        let left = 0;
-        let right = 0;
+        let newPosition: PositionState = { top: 0 };
         
         // For step 2 - special positioning in the top right corner
         if (step.id === 2) {
-          top = 150;
-          right = 20;
+          newPosition = { top: 150, right: 20 };
           // Default to positioning in the top right
-          setPosition({ top, right });
+          setPosition(newPosition);
         } else {
           // Standard positioning logic
           switch (step.position) {
             case 'top':
-              top = rect.top - (stepRef.current?.offsetHeight || 0) - 20;
-              left = rect.left + rect.width / 2 - (stepRef.current?.offsetWidth || 0) / 2;
+              newPosition = {
+                top: rect.top - (stepRef.current?.offsetHeight || 0) - 20,
+                left: rect.left + rect.width / 2 - (stepRef.current?.offsetWidth || 0) / 2
+              };
               break;
             case 'bottom':
-              top = rect.bottom + 20;
-              left = rect.left + rect.width / 2 - (stepRef.current?.offsetWidth || 0) / 2;
+              newPosition = {
+                top: rect.bottom + 20,
+                left: rect.left + rect.width / 2 - (stepRef.current?.offsetWidth || 0) / 2
+              };
               break;
             case 'left':
-              top = rect.top + rect.height / 2 - (stepRef.current?.offsetHeight || 0) / 2;
-              left = rect.left - (stepRef.current?.offsetWidth || 0) - 20;
+              newPosition = {
+                top: rect.top + rect.height / 2 - (stepRef.current?.offsetHeight || 0) / 2,
+                left: rect.left - (stepRef.current?.offsetWidth || 0) - 20
+              };
               break;
             case 'right':
-              top = rect.top + rect.height / 2 - (stepRef.current?.offsetHeight || 0) / 2;
-              left = rect.right + 20;
+              newPosition = {
+                top: rect.top + rect.height / 2 - (stepRef.current?.offsetHeight || 0) / 2,
+                left: rect.right + 20
+              };
               break;
             default:
               // Center in viewport if no position specified
-              top = window.innerHeight / 2 - (stepRef.current?.offsetHeight || 0) / 2;
-              left = window.innerWidth / 2 - (stepRef.current?.offsetWidth || 0) / 2;
+              newPosition = {
+                top: window.innerHeight / 2 - (stepRef.current?.offsetHeight || 0) / 2,
+                left: window.innerWidth / 2 - (stepRef.current?.offsetWidth || 0) / 2
+              };
           }
           
           // Keep within viewport bounds
-          top = Math.max(20, Math.min(top, window.innerHeight - (stepRef.current?.offsetHeight || 0) - 20));
-          left = Math.max(20, Math.min(left, window.innerWidth - (stepRef.current?.offsetWidth || 0) - 20));
+          newPosition.top = Math.max(20, Math.min(newPosition.top, window.innerHeight - (stepRef.current?.offsetHeight || 0) - 20));
+          if (newPosition.left !== undefined) {
+            newPosition.left = Math.max(20, Math.min(newPosition.left, window.innerWidth - (stepRef.current?.offsetWidth || 0) - 20));
+          }
           
-          setPosition({ top, left });
+          setPosition(newPosition);
         }
       }
     } else {
@@ -126,16 +141,15 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Determine the style based on position
   const getPositionStyle = () => {
-    if ('right' in position) {
-      return {
-        top: position.top,
-        right: position.right
-      };
+    const style: React.CSSProperties = { top: position.top };
+    
+    if (position.right !== undefined) {
+      style.right = position.right;
+    } else if (position.left !== undefined) {
+      style.left = position.left;
     }
-    return {
-      top: position.top,
-      left: position.left
-    };
+    
+    return style;
   };
   
   return (
