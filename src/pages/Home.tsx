@@ -14,11 +14,13 @@ import { toast } from 'sonner';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 const Home = () => {
   const { user } = useAuth();
   const { colorTheme, theme } = useTheme();
   const { translate } = useTranslation();
+  const { isActive, currentStep, steps } = useTutorial();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [refreshKey, setRefreshKey] = useState<number>(0);
   const [journalLabel, setJournalLabel] = useState("Journal");
@@ -26,6 +28,9 @@ const Home = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   const navigate = useNavigate();
+  
+  // Check if we're in tutorial step 2
+  const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
 
   useEffect(() => {
     // Pre-translate common labels to avoid async issues
@@ -155,6 +160,19 @@ const Home = () => {
     visible: { x: 0, opacity: 1, transition: { duration: 0.5, ease: "easeOut" } }
   };
 
+  // Arrow button style calculation based on tutorial state
+  const getArrowButtonStyles = () => {
+    if (isInArrowTutorialStep) {
+      return {
+        zIndex: 9998,
+        position: 'relative' as 'relative',
+        visibility: 'visible' as 'visible',
+        opacity: 1
+      };
+    }
+    return {};
+  };
+
   const navigateToJournal = () => {
     try {
       navigate('/app/journal');
@@ -233,8 +251,11 @@ const Home = () => {
         </div>
       </div>
 
-      {/* Central arrow button */}
-      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-auto journal-arrow-button">
+      {/* Central arrow button - Enhanced for tutorial visibility */}
+      <div 
+        className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-auto journal-arrow-button"
+        style={getArrowButtonStyles()}
+      >
         <motion.div
           className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
           initial={{ scale: 1, opacity: 0.5 }}

@@ -44,7 +44,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 2,
     title: 'Your Journal',
-    content: 'Press this arrow to start recording a journal entry instantly',
+    content: 'Press this central arrow button to start recording a journal entry instantly. It\'s the heart of your journaling experience.',
     targetElement: '.journal-arrow-button',
     position: 'top',
     showNextButton: true,

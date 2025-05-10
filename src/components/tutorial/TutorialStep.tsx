@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -110,22 +111,29 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     if (targetRect && stepRef.current && step.targetElement) {
       const stepRect = stepRef.current.getBoundingClientRect();
       
-      // For step 2, create a connector from bottom-left of popup to arrow button
+      // For step 2, create a connector from popup to arrow button
       if (step.id === 2) {
-        // Arrow button position (target)
-        const targetCenterX = targetRect.left + targetRect.width / 2;
-        const targetCenterY = targetRect.top + targetRect.height / 2;
-        
-        // Starting point (at the bottom of the popup)
-        const startX = stepRect.left + 40;  // Start from the left side of the popup
-        const startY = stepRect.bottom - 10;  // Just above the bottom edge
-        
-        // Create a curved path connecting the popup to the arrow button
-        const controlPointX = (startX + targetCenterX) / 2;
-        const controlPointY = startY + 50;
-        
-        // Create SVG path with curve
-        setConnectorPath(`M${startX},${startY} Q${controlPointX},${controlPointY} ${targetCenterX},${targetCenterY}`);
+        const targetElement = document.querySelector('.journal-arrow-button');
+        if (targetElement) {
+          // Get the updated target rectangle for the button
+          const buttonRect = targetElement.getBoundingClientRect();
+          
+          // Button center coordinates
+          const buttonCenterX = buttonRect.left + buttonRect.width / 2;
+          const buttonCenterY = buttonRect.top + buttonRect.height / 2;
+          
+          // Starting point from the popup
+          const startX = stepRect.right - 40; // Start from right side of popup
+          const startY = stepRect.bottom - 10;
+          
+          // Create a curved path to the button
+          const controlPointX = startX - 30;
+          const controlPointY = buttonCenterY - 50;
+          
+          setConnectorPath(`M${startX},${startY} Q${controlPointX},${controlPointY} ${buttonCenterX},${buttonCenterY}`);
+        } else {
+          console.error("Arrow button element not found for tutorial connector");
+        }
       } else {
         // Default connector logic
         const targetCenterX = targetRect.left + targetRect.width / 2;
@@ -221,10 +229,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           <path
             d={connectorPath}
             stroke="var(--color-theme)"
-            strokeWidth="2"
+            strokeWidth="3"
             fill="none"
             strokeDasharray="6"
-            opacity="0.8"
+            opacity="1"
+            className={step.id === 2 ? "tutorial-step-2-connector" : ""}
           />
         </svg>
       )}
