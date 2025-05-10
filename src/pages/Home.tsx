@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import LanguageSelector from '@/components/LanguageSelector';
@@ -14,6 +13,7 @@ import { useNavigate } from 'react-router-dom';
 import { toast } from 'sonner';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
 
 const Home = () => {
   const { user } = useAuth();
@@ -170,6 +170,9 @@ const Home = () => {
         <EnergyAnimation fullScreen={true} bottomNavOffset={true} />
       </div>
 
+      {/* Tutorial Overlay */}
+      <TutorialOverlay />
+
       {/* Preload Image */}
       <div className="hidden">
         <img
@@ -231,7 +234,7 @@ const Home = () => {
       </div>
 
       {/* Central arrow button */}
-      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-auto">
+      <div className="absolute top-[calc(50%-31px)] left-1/2 transform -translate-x-1/2 -translate-y-1/2 z-40 pointer-events-auto journal-arrow-button">
         <motion.div
           className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
           initial={{ scale: 1, opacity: 0.5 }}
