@@ -20,15 +20,27 @@ const JournalNavigationButton: React.FC = () => {
     }
   };
 
-  // Special styles for when the tutorial is active
-  const buttonWrapperStyle: React.CSSProperties = {
+  // Special styling for when the tutorial is active
+  const buttonWrapperStyle = {
     position: 'absolute',
     top: 'calc(50% - 31px)',
     left: '50%',
     transform: 'translate(-50%, -50%)',
     zIndex: isInArrowTutorialStep ? 9998 : 40,
-    pointerEvents: 'auto'
-  };
+    pointerEvents: 'auto',
+    visibility: 'visible',
+    opacity: 1
+  } as React.CSSProperties;
+
+  // Add debug logging to help with positioning
+  React.useEffect(() => {
+    if (isInArrowTutorialStep) {
+      const element = document.querySelector('.journal-arrow-button');
+      if (element) {
+        console.log('Journal arrow button position:', element.getBoundingClientRect());
+      }
+    }
+  }, [isInArrowTutorialStep]);
 
   return (
     <div 

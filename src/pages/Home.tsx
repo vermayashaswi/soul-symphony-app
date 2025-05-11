@@ -19,19 +19,19 @@ const Home = () => {
       {/* Background elements including animations */}
       <BackgroundElements />
 
-      {/* Tutorial overlay system */}
-      <TutorialOverlay />
+      {/* Journal content with summary and quote */}
+      <JournalContent />
 
+      {/* Central navigation button - moved up in the DOM order to ensure proper z-index */}
+      <JournalNavigationButton />
+
+      {/* Header with journal name and date */}
       <div className="relative z-20 flex flex-col h-screen">
-        {/* Header with journal name and date */}
         <JournalHeader />
       </div>
 
-      {/* Central navigation button */}
-      <JournalNavigationButton />
-
-      {/* Journal content with summary and quote */}
-      <JournalContent />
+      {/* Tutorial overlay system - this should be last to overlay everything */}
+      <TutorialOverlay />
     </div>
   );
 };

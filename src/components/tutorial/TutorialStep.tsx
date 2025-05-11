@@ -47,8 +47,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         
         // For step 2 - special positioning in the top right corner
         if (step.id === 2) {
-          // Position popup to the side and top of the arrow button
-          setPosition({ top: 150, right: 20 });
+          // Position popup in the top right corner
+          setPosition({ top: 100, right: 20 });
         } else {
           // Standard positioning logic for other steps
           switch (step.position) {
@@ -96,44 +96,45 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Calculate connector path if target element is specified
   useEffect(() => {
-    if (step.targetElement) {
-      // For step 2, create a connector from popup to arrow button
-      if (step.id === 2) {
-        const buttonElement = document.querySelector('.journal-arrow-button');
-        if (buttonElement && stepRef.current) {
-          // Get the updated target rectangle for the button
-          const buttonRect = buttonElement.getBoundingClientRect();
-          const stepRect = stepRef.current.getBoundingClientRect();
-          
-          // Button center coordinates
-          const buttonCenterX = buttonRect.left + buttonRect.width / 2;
-          const buttonCenterY = buttonRect.top + buttonRect.height / 2;
-          
-          // Starting point from the popup
-          const startX = stepRect.right - 40; // Start from right side of popup
-          const startY = stepRect.bottom - 10;
-          
-          // Create a curved path to the button
-          const controlPointX = buttonCenterX + (startX - buttonCenterX) * 0.5;
-          const controlPointY = buttonCenterY - 40;
-          
-          setConnectorPath(`M${startX},${startY} Q${controlPointX},${controlPointY} ${buttonCenterX},${buttonCenterY}`);
-        }
-      } else {
-        // Default connector logic for other steps
-        const targetElement = document.querySelector(step.targetElement);
-        if (targetElement && stepRef.current) {
-          const targetRect = targetElement.getBoundingClientRect();
-          const stepRect = stepRef.current.getBoundingClientRect();
-          
-          const targetCenterX = targetRect.left + targetRect.width / 2;
-          const targetCenterY = targetRect.top + targetRect.height / 2;
-          const stepCenterX = stepRect.left + stepRect.width / 2;
-          const stepCenterY = stepRect.top + stepRect.height / 2;
-          
-          // Create SVG path connecting the two elements
-          setConnectorPath(`M${stepCenterX},${stepCenterY} L${targetCenterX},${targetCenterY}`);
-        }
+    if (step.targetElement && step.id === 2) {
+      const buttonElement = document.querySelector('.journal-arrow-button');
+      if (buttonElement && stepRef.current) {
+        // Log positions for debugging
+        console.log('Button element rect:', buttonElement.getBoundingClientRect());
+        console.log('Step element rect:', stepRef.current.getBoundingClientRect());
+        
+        // Get the updated target rectangle for the button
+        const buttonRect = buttonElement.getBoundingClientRect();
+        const stepRect = stepRef.current.getBoundingClientRect();
+        
+        // Button center coordinates
+        const buttonCenterX = buttonRect.left + buttonRect.width / 2;
+        const buttonCenterY = buttonRect.top + buttonRect.height / 2;
+        
+        // Starting point from the popup (bottom left corner)
+        const startX = stepRect.left + 40; 
+        const startY = stepRect.bottom - 10;
+        
+        // Create a curved path to the button
+        const controlPointX = startX + (buttonCenterX - startX) * 0.5;
+        const controlPointY = startY + (buttonCenterY - startY) * 0.5;
+        
+        setConnectorPath(`M${startX},${startY} Q${controlPointX},${controlPointY} ${buttonCenterX},${buttonCenterY}`);
+      }
+    } else if (step.targetElement) {
+      // Default connector logic for other steps
+      const targetElement = document.querySelector(step.targetElement);
+      if (targetElement && stepRef.current) {
+        const targetRect = targetElement.getBoundingClientRect();
+        const stepRect = stepRef.current.getBoundingClientRect();
+        
+        const targetCenterX = targetRect.left + targetRect.width / 2;
+        const targetCenterY = targetRect.top + targetRect.height / 2;
+        const stepCenterX = stepRect.left + stepRect.width / 2;
+        const stepCenterY = stepRect.top + stepRect.height / 2;
+        
+        // Create SVG path connecting the two elements
+        setConnectorPath(`M${stepCenterX},${stepCenterY} L${targetCenterX},${targetCenterY}`);
       }
     }
   }, [position, step.id, step.targetElement]);
@@ -146,6 +147,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       style.right = position.right;
     } else if (position.left !== undefined) {
       style.left = position.left;
+    }
+    
+    // Set a smaller width for step 2
+    if (step.id === 2) {
+      style.maxWidth = '280px';
     }
     
     return style;
@@ -211,11 +217,16 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         )}
       </div>
       
-      {/* Connector line */}
+      {/* Connector line - higher priority for step 2 */}
       {connectorPath && (
         <svg 
-          className="absolute top-0 left-0 pointer-events-none z-[-1]" 
-          style={{ width: '100vw', height: '100vh', position: 'fixed' }}
+          className="absolute top-0 left-0 pointer-events-none" 
+          style={{ 
+            width: '100vw', 
+            height: '100vh', 
+            position: 'fixed', 
+            zIndex: step.id === 2 ? 9990 : 9989 
+          }}
         >
           <path
             d={connectorPath}
