@@ -38,9 +38,25 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   // Calculate position based on target element (if specified)
   useEffect(() => {
     if (step.id === 2) {
-      // For step 2 - fixed position in the top right corner
-      setPosition({ top: 140, right: 20 });
-      console.log("Positioning popup for step 2 in top right:", { top: 140, right: 20 });
+      // For step 2 - position the popup above the arrow button in the center
+      const arrowButton = document.querySelector('.journal-arrow-button');
+      if (arrowButton) {
+        const rect = arrowButton.getBoundingClientRect();
+        // Position above the arrow button
+        setPosition({
+          top: rect.top - 170, // Position above the button with some margin
+          left: '50%',
+          right: undefined
+        });
+        console.log("Positioning popup for step 2 above arrow button:", { 
+          top: rect.top - 170,
+          left: '50%'
+        });
+      } else {
+        // Fallback if button not found
+        setPosition({ top: 140, left: '50%' });
+        console.log("Arrow button not found, using fallback position");
+      }
     } else if (step.targetElement) {
       const targetElement = document.querySelector(step.targetElement);
       if (targetElement) {
@@ -91,7 +107,10 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Determine the style based on position
   const getPositionStyle = () => {
-    const style: React.CSSProperties = { top: position.top };
+    const style: React.CSSProperties = { 
+      top: position.top,
+      transform: step.id === 2 ? 'translateX(-50%)' : undefined // Center horizontally for step 2
+    };
     
     if (position.right !== undefined) {
       style.right = position.right;

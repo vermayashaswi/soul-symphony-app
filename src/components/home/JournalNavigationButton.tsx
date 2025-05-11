@@ -33,7 +33,7 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, [isActive, currentStep, isInArrowTutorialStep]);
 
-  // Position in the center of the screen where the red dot is shown
+  // Position the button centered over the energy animation
   const buttonWrapperStyle = {
     position: 'absolute',
     top: '50%', 
