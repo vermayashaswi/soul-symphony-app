@@ -18,8 +18,8 @@ interface TutorialStepProps {
 
 interface PositionState {
   top: number;
-  left?: number;
-  right?: number;
+  left?: number | string;
+  right?: number | string;
 }
 
 const TutorialStep: React.FC<TutorialStepProps> = ({
@@ -42,10 +42,10 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       const arrowButton = document.querySelector('.journal-arrow-button');
       if (arrowButton) {
         const rect = arrowButton.getBoundingClientRect();
-        // Position above the arrow button
+        // Position above the arrow button with percentage-based horizontal centering
         setPosition({
           top: rect.top - 170, // Position above the button with some margin
-          left: '50%',
+          left: '50%', // This is a string percentage value
           right: undefined
         });
         console.log("Positioning popup for step 2 above arrow button:", { 
