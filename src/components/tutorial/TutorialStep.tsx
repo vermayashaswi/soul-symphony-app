@@ -47,9 +47,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         
         // For step 2 - position popup in the top right corner
         if (step.id === 2) {
-          // Higher position to leave more space for the connector
-          setPosition({ top: 100, right: 30 });
-          console.log("Positioning popup for step 2 in top right:", { top: 100, right: 30 });
+          // Higher position to leave more space
+          setPosition({ top: 80, right: 20 });
+          console.log("Positioning popup for step 2 in top right:", { top: 80, right: 20 });
         } else {
           // Standard positioning logic for other steps
           switch (step.position) {
@@ -98,29 +98,33 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   // Calculate connector path with improved direct approach for step 2
   useEffect(() => {
     if (step.targetElement && step.id === 2) {
-      const buttonElement = document.querySelector('.journal-arrow-button');
+      const buttonElement = document.querySelector('.journal-arrow-button button');
       if (buttonElement && stepRef.current) {
-        // Get accurate button position - VERY IMPORTANT
+        // Get accurate button position
         const buttonRect = buttonElement.getBoundingClientRect();
         const stepRect = stepRef.current.getBoundingClientRect();
         
         console.log('Button element rect:', buttonRect);
+        console.log('Button element center:', {
+          x: buttonRect.left + buttonRect.width / 2,
+          y: buttonRect.top + buttonRect.height / 2
+        });
         console.log('Step element rect:', stepRect);
         
-        // Direct link to button center
+        // Button center point
         const buttonCenterX = buttonRect.left + buttonRect.width / 2;
         const buttonCenterY = buttonRect.top + buttonRect.height / 2;
         
-        // Starting point at the bottom left of popup
-        const startX = stepRect.left + 40; // Adjust starting point as needed
-        const startY = stepRect.bottom - 10;
+        // Starting point at the bottom of popup
+        const startX = stepRect.left + 30; // Start from left side of popup
+        const startY = stepRect.bottom; // Start from bottom of popup
         
         console.log('Connection points:', {
           start: { x: startX, y: startY },
           end: { x: buttonCenterX, y: buttonCenterY }
         });
         
-        // Simple direct path for clearer visual connection
+        // Create a direct path from popup to button center
         const path = `M${startX},${startY} L${buttonCenterX},${buttonCenterY}`;
         
         console.log("Generated connector path:", path);
@@ -156,9 +160,10 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       style.left = position.left;
     }
     
-    // Set a smaller width for step 2
+    // Set a smaller width for step 2 to make it more compact
     if (step.id === 2) {
       style.maxWidth = '220px';
+      style.minWidth = '200px';
     }
     
     return style;

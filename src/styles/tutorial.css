@@ -2,7 +2,7 @@
 /* Tutorial Overlay Styles */
 .tutorial-target {
   position: relative !important;
-  z-index: 9998 !important;
+  z-index: 9999 !important;
   filter: none !important;
   pointer-events: auto !important;
   visibility: visible !important;
@@ -45,7 +45,7 @@
   opacity: 0.8;
 }
 
-/* New direct connector for step 2 */
+/* Enhanced direct connector for step 2 */
 .tutorial-direct-connector {
   stroke: var(--color-theme);
   stroke-width: 3px;
@@ -83,25 +83,25 @@
 
 /* Enhanced button highlighting for tutorial step 2 */
 .journal-arrow-button.tutorial-target {
-  z-index: 9998 !important;
+  z-index: 9999 !important;
   position: relative !important;
   animation: pulse 2s infinite;
 }
 
 /* Enhanced button glow effect with stronger visibility */
 .tutorial-button-highlight {
-  box-shadow: 0 0 25px 12px var(--color-theme) !important;
+  box-shadow: 0 0 30px 15px var(--color-theme) !important;
   animation: button-pulse 1.5s infinite alternate !important;
   border: 2px solid white !important;
 }
 
 .tutorial-button-outer-glow {
-  filter: drop-shadow(0 0 10px var(--color-theme)) !important;
-  opacity: 0.9 !important;
+  filter: drop-shadow(0 0 15px var(--color-theme)) !important;
+  opacity: 0.95 !important;
 }
 
 .tutorial-button-inner {
-  transform: scale(1.1);
+  transform: scale(1.2);
 }
 
 @keyframes button-pulse {

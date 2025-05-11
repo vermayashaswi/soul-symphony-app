@@ -21,24 +21,33 @@ const Home = () => {
     if (isActive) {
       setTimeout(() => {
         const arrowButton = document.querySelector('.journal-arrow-button');
-        if (arrowButton) {
-          const rect = arrowButton.getBoundingClientRect();
-          console.log('Journal arrow button found:', rect);
+        const buttonElement = document.querySelector('.journal-arrow-button button');
+        
+        if (arrowButton && buttonElement) {
+          const arrowRect = arrowButton.getBoundingClientRect();
+          const buttonRect = buttonElement.getBoundingClientRect();
+          
+          console.log('Journal arrow wrapper found:', arrowRect);
+          console.log('Journal button element found:', buttonRect);
           console.log('Journal arrow center point:', {
-            x: rect.left + rect.width / 2,
-            y: rect.top + rect.height / 2
+            x: buttonRect.left + buttonRect.width / 2,
+            y: buttonRect.top + buttonRect.height / 2
           });
           
           // Check if button is visible and positioned correctly
-          if (rect.width === 0 || rect.height === 0) {
+          if (buttonRect.width === 0 || buttonRect.height === 0) {
             console.warn('Arrow button has zero dimensions!');
           }
           
           // Verify z-index
-          const computedStyle = window.getComputedStyle(arrowButton);
+          const computedStyle = window.getComputedStyle(buttonElement);
           console.log('Arrow button z-index:', computedStyle.zIndex);
         } else {
           console.warn('Journal arrow button not found in DOM');
+          console.warn('Button element queries:', {
+            wrapper: document.querySelector('.journal-arrow-button'),
+            button: document.querySelector('.journal-arrow-button button')
+          });
         }
       }, 500); // Small delay to ensure component is fully rendered
     }
@@ -50,7 +59,7 @@ const Home = () => {
       <BackgroundElements />
 
       {/* Central navigation button with enhanced positioning */}
-      <div className={`relative ${isInArrowTutorialStep ? 'z-[9998]' : 'z-40'}`}>
+      <div className={`relative ${isInArrowTutorialStep ? 'z-[9999]' : 'z-40'}`}>
         <JournalNavigationButton />
       </div>
 
