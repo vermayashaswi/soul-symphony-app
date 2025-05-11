@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -14,7 +13,6 @@ export interface TutorialStep {
   position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
   showNextButton?: boolean;
   showSkipButton?: boolean;
-  navigationPath?: string; // Added navigation path property for steps that require navigation
 }
 
 // Define the interface for the tutorial context
@@ -51,26 +49,8 @@ const initialTutorialSteps: TutorialStep[] = [
     position: 'top',
     showNextButton: true,
     showSkipButton: true,
-  },
-  {
-    id: 3,
-    title: 'Journal Tab',
-    content: 'The Journal tab is your dedicated space for creating new entries. Tap "Record Entry" to capture your thoughts and feelings through voice journaling.',
-    targetElement: '.mobile-nav-journal',
-    position: 'top',
-    showNextButton: true,
-    showSkipButton: true,
-    navigationPath: '/app/journal',
-  },
-  {
-    id: 4,
-    title: 'Past Entries',
-    content: 'All your past journal entries appear here. Browse through them to see themes, sentiment analysis, and track your emotional journey over time.',
-    targetElement: '.journal-entries-header',
-    position: 'bottom',
-    showNextButton: true,
-    showSkipButton: true,
   }
+  // More steps can be added here
 ];
 
 // Provider component that wraps the app
@@ -120,15 +100,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     
     checkTutorialStatus();
   }, [user, location.pathname, tutorialChecked]);
-  
-  // Navigate to the specified path when step changes and has a navigation path
-  useEffect(() => {
-    if (isActive && steps[currentStep]?.navigationPath) {
-      const path = steps[currentStep].navigationPath;
-      console.log(`Tutorial navigating to: ${path}`);
-      navigate(path);
-    }
-  }, [currentStep, isActive, navigate, steps]);
   
   // Function to update the tutorial step in the database
   const updateTutorialStep = async (step: number) => {

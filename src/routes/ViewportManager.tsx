@@ -6,21 +6,18 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { useTutorial } from '@/contexts/TutorialContext';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
   const { user } = useAuth();
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
-  const { isActive: isTutorialActive } = useTutorial();
   
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
-    user: !!user,
-    isTutorialActive
+    user: !!user
   });
   
   // Render the appropriate layout based on route and device

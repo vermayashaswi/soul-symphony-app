@@ -7,7 +7,6 @@ import { cn } from '@/lib/utils';
 import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTutorial } from '@/contexts/TutorialContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -18,7 +17,6 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const { isActive, currentStep } = useTutorial();
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
@@ -83,7 +81,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const navItems = [
     { path: '/app/home', icon: Home, label: 'Home' },
-    { path: '/app/journal', icon: BookOpen, label: 'Journal', className: 'journal-nav-item' },
+    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
     { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
     { path: '/app/insights', icon: BarChart2, label: 'Insights' },
     { path: '/app/settings', icon: Settings, label: 'Settings' },
@@ -95,9 +93,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   return (
     <motion.div 
-      className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted mobile-nav-clickable"
+      className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted"
       style={{
-        zIndex: 10000, 
+        zIndex: 9999, // Increased z-index to ensure it stays above other elements
         paddingTop: '0.40rem',
         paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))',
         height: 'calc(3.6rem + env(safe-area-inset-bottom))'
@@ -115,11 +113,10 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
               key={item.path}
               to={item.path}
               className={cn(
-                "flex flex-col items-center py-1 transition-colors mobile-nav-clickable",
+                "flex flex-col items-center py-1 transition-colors",
                 isActive 
                   ? "text-primary" 
-                  : "text-muted-foreground hover:text-primary",
-                item.className || ""
+                  : "text-muted-foreground hover:text-primary"
               )}
             >
               <div className="relative">

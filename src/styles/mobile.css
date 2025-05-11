@@ -58,11 +58,6 @@
     overflow-x: hidden !important;
   }
   
-  /* Fix quote spacing on home page to avoid the gap */
-  .fixed.inset-x-0.bottom-20 {
-    bottom: 4.5rem !important;
-  }
-  
   /* iOS-specific padding for safe areas */
   @supports (padding: max(0px)) {
     .smart-chat-container,

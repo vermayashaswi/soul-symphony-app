@@ -41,8 +41,8 @@ const JournalContent: React.FC = () => {
         </motion.div>
       </div>
 
-      {/* Inspirational Quote - Adjusted positioning to remove the gap */}
-      <div className="fixed inset-x-0 bottom-20 pb-2 z-25">
+      {/* Inspirational Quote */}
+      <div className="fixed inset-x-0 bottom-16 pb-5 z-25">
         <InspirationalQuote />
       </div>
     </>
