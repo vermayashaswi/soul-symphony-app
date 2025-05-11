@@ -15,6 +15,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
+import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -22,6 +24,7 @@ const logInfo = (message: string, source: string) => {
 
 const Journal = () => {
   const { user, ensureProfileExists } = useAuth();
+  const { isActive, currentStep, steps } = useTutorial();
   const [refreshKey, setRefreshKey] = useState(0);
   const [isProfileChecked, setIsProfileChecked] = useState(false);
   const [processingEntries, setProcessingEntries] = useState<string[]>([]);
@@ -930,6 +933,7 @@ const Journal = () => {
     <ErrorBoundary onReset={resetError}>
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
+        <TutorialOverlay />
         
         {isCheckingProfile ? (
           <div className="min-h-screen flex items-center justify-center">

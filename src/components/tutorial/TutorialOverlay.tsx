@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -71,6 +72,15 @@ const TutorialOverlay: React.FC = () => {
         recordButton.classList.add('tutorial-target', 'tutorial-button-highlight');
         console.log("Highlighted record entry button for tutorial step 3");
       }
+      
+      // Ensure the record tab is automatically selected
+      const recordTab = document.querySelector('[value="record"]');
+      if (recordTab && recordTab instanceof HTMLElement) {
+        setTimeout(() => {
+          recordTab.click();
+          console.log("Auto-clicked the record tab for tutorial step 3");
+        }, 300);
+      }
     } else if (currentTutorialStep.id === 4) {
       // Step 4: Highlight the journal entries header
       const entriesHeader = document.querySelector('.journal-entries-header');
@@ -84,6 +94,15 @@ const TutorialOverlay: React.FC = () => {
       if (entriesList) {
         entriesList.classList.add('tutorial-target', 'tutorial-list-highlight');
         console.log("Highlighted journal entries list for tutorial step 4");
+      }
+      
+      // Ensure the entries tab is automatically selected
+      const entriesTab = document.querySelector('[value="entries"]');
+      if (entriesTab && entriesTab instanceof HTMLElement) {
+        setTimeout(() => {
+          entriesTab.click();
+          console.log("Auto-clicked the entries tab for tutorial step 4");
+        }, 300);
       }
     }
 

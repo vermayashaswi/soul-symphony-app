@@ -7,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -17,6 +18,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const { isActive, currentStep } = useTutorial();
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
