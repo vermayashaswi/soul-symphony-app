@@ -45,56 +45,44 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         const rect = targetElement.getBoundingClientRect();
         setTargetRect(rect);
         
-        // Calculate position based on specified position and target element
-        let newPosition: PositionState = { top: 0 };
-        
         // For step 2 - special positioning in the top right corner
         if (step.id === 2) {
-          newPosition = { top: 150, right: 20 };
-          // Default to positioning in the top right
-          setPosition(newPosition);
+          // Position popup to the side and top of the arrow button
+          setPosition({ top: 150, right: 20 });
         } else {
-          // Standard positioning logic
+          // Standard positioning logic for other steps
           switch (step.position) {
             case 'top':
-              newPosition = {
+              setPosition({
                 top: rect.top - (stepRef.current?.offsetHeight || 0) - 20,
                 left: rect.left + rect.width / 2 - (stepRef.current?.offsetWidth || 0) / 2
-              };
+              });
               break;
             case 'bottom':
-              newPosition = {
+              setPosition({
                 top: rect.bottom + 20,
                 left: rect.left + rect.width / 2 - (stepRef.current?.offsetWidth || 0) / 2
-              };
+              });
               break;
             case 'left':
-              newPosition = {
+              setPosition({
                 top: rect.top + rect.height / 2 - (stepRef.current?.offsetHeight || 0) / 2,
                 left: rect.left - (stepRef.current?.offsetWidth || 0) - 20
-              };
+              });
               break;
             case 'right':
-              newPosition = {
+              setPosition({
                 top: rect.top + rect.height / 2 - (stepRef.current?.offsetHeight || 0) / 2,
                 left: rect.right + 20
-              };
+              });
               break;
             default:
               // Center in viewport if no position specified
-              newPosition = {
+              setPosition({
                 top: window.innerHeight / 2 - (stepRef.current?.offsetHeight || 0) / 2,
                 left: window.innerWidth / 2 - (stepRef.current?.offsetWidth || 0) / 2
-              };
+              });
           }
-          
-          // Keep within viewport bounds
-          newPosition.top = Math.max(20, Math.min(newPosition.top, window.innerHeight - (stepRef.current?.offsetHeight || 0) - 20));
-          if (newPosition.left !== undefined) {
-            newPosition.left = Math.max(20, Math.min(newPosition.left, window.innerWidth - (stepRef.current?.offsetWidth || 0) - 20));
-          }
-          
-          setPosition(newPosition);
         }
       }
     } else {
@@ -108,15 +96,14 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Calculate connector path if target element is specified
   useEffect(() => {
-    if (targetRect && stepRef.current && step.targetElement) {
-      const stepRect = stepRef.current.getBoundingClientRect();
-      
+    if (step.targetElement) {
       // For step 2, create a connector from popup to arrow button
       if (step.id === 2) {
-        const targetElement = document.querySelector('.journal-arrow-button');
-        if (targetElement) {
+        const buttonElement = document.querySelector('.journal-arrow-button');
+        if (buttonElement && stepRef.current) {
           // Get the updated target rectangle for the button
-          const buttonRect = targetElement.getBoundingClientRect();
+          const buttonRect = buttonElement.getBoundingClientRect();
+          const stepRect = stepRef.current.getBoundingClientRect();
           
           // Button center coordinates
           const buttonCenterX = buttonRect.left + buttonRect.width / 2;
@@ -127,25 +114,29 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           const startY = stepRect.bottom - 10;
           
           // Create a curved path to the button
-          const controlPointX = startX - 30;
-          const controlPointY = buttonCenterY - 50;
+          const controlPointX = buttonCenterX + (startX - buttonCenterX) * 0.5;
+          const controlPointY = buttonCenterY - 40;
           
           setConnectorPath(`M${startX},${startY} Q${controlPointX},${controlPointY} ${buttonCenterX},${buttonCenterY}`);
-        } else {
-          console.error("Arrow button element not found for tutorial connector");
         }
       } else {
-        // Default connector logic
-        const targetCenterX = targetRect.left + targetRect.width / 2;
-        const targetCenterY = targetRect.top + targetRect.height / 2;
-        const stepCenterX = stepRect.left + stepRect.width / 2;
-        const stepCenterY = stepRect.top + stepRect.height / 2;
-        
-        // Create SVG path connecting the two elements
-        setConnectorPath(`M${stepCenterX},${stepCenterY} L${targetCenterX},${targetCenterY}`);
+        // Default connector logic for other steps
+        const targetElement = document.querySelector(step.targetElement);
+        if (targetElement && stepRef.current) {
+          const targetRect = targetElement.getBoundingClientRect();
+          const stepRect = stepRef.current.getBoundingClientRect();
+          
+          const targetCenterX = targetRect.left + targetRect.width / 2;
+          const targetCenterY = targetRect.top + targetRect.height / 2;
+          const stepCenterX = stepRect.left + stepRect.width / 2;
+          const stepCenterY = stepRect.top + stepRect.height / 2;
+          
+          // Create SVG path connecting the two elements
+          setConnectorPath(`M${stepCenterX},${stepCenterY} L${targetCenterX},${targetCenterY}`);
+        }
       }
     }
-  }, [targetRect, step.targetElement, position, step.id]);
+  }, [position, step.id, step.targetElement]);
   
   // Determine the style based on position
   const getPositionStyle = () => {

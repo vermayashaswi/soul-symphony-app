@@ -1,0 +1,120 @@
+
+import React, { useState, useEffect } from 'react';
+import { motion } from 'framer-motion';
+import { format } from 'date-fns';
+import { useTheme } from '@/hooks/use-theme';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/contexts/TranslationContext';
+import LanguageSelector from '@/components/LanguageSelector';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useAuth } from '@/contexts/AuthContext';
+
+const JournalHeader: React.FC = () => {
+  const { user } = useAuth();
+  const { theme } = useTheme();
+  const { displayName } = useUserProfile();
+  const { translate } = useTranslation();
+  const [journalLabel, setJournalLabel] = useState("Journal");
+  const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
+  const today = new Date();
+  const formattedDate = format(today, 'EEE, MMM d');
+
+  // Pre-translate common labels
+  useEffect(() => {
+    const loadTranslations = async () => {
+      if (translate) {
+        setJournalLabel(await translate("Journal", "en"));
+        setYourJournalLabel(await translate("Your Journal", "en"));
+      }
+    };
+    
+    loadTranslations();
+  }, [translate]);
+
+  // Listen for language changes
+  useEffect(() => {
+    const handleLanguageChange = async () => {
+      if (translate) {
+        setJournalLabel(await translate("Journal", "en"));
+        setYourJournalLabel(await translate("Your Journal", "en"));
+      }
+    };
+    
+    window.addEventListener('languageChange', handleLanguageChange as EventListener);
+    
+    return () => {
+      window.removeEventListener('languageChange', handleLanguageChange as EventListener);
+    };
+  }, [translate]);
+
+  const getJournalName = () => {
+    if (displayName) {
+      return displayName.endsWith('s') ? 
+        `${displayName}' ${journalLabel}` : 
+        `${displayName}'s ${journalLabel}`;
+    }
+    if (user?.email) {
+      const name = user.email.split('@')[0];
+      return name.endsWith('s') ? 
+        `${name}' ${journalLabel}` : 
+        `${name}'s ${journalLabel}`;
+    }
+    return yourJournalLabel;
+  };
+
+  const dateStripVariants = {
+    hidden: { x: 100, opacity: 0 },
+    visible: { x: 0, opacity: 1, transition: { duration: 0.5, ease: "easeOut" } }
+  };
+
+  return (
+    <div className="p-4 flex flex-col">
+      <div className="flex justify-between items-start w-full relative">
+        <div className="relative max-w-[65%]">
+          <h1
+            className="text-2xl font-bold text-theme break-words hyphens-auto"
+            style={{
+              fontWeight: 700,
+              letterSpacing: '0.005em',
+              WebkitFontSmoothing: 'antialiased',
+              MozOsxFontSmoothing: 'grayscale',
+              display: '-webkit-box',
+              WebkitLineClamp: '2',
+              WebkitBoxOrient: 'vertical',
+              overflow: 'hidden',
+              maxHeight: '60px'
+            }}
+          >
+            <TranslatableText text={getJournalName()} forceTranslate={true} />
+          </h1>
+        </div>
+
+        <div className="flex items-center z-50">
+          <motion.div
+            variants={dateStripVariants}
+            initial="hidden"
+            animate="visible"
+            className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
+          >
+            <div
+              className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
+              style={{
+                fontWeight: 500,
+                letterSpacing: '0.01em',
+                WebkitFontSmoothing: 'antialiased',
+                MozOsxFontSmoothing: 'grayscale'
+              }}
+            >
+              <TranslatableText text={formattedDate} forceTranslate={true} />
+            </div>
+          </motion.div>
+          <div className="ml-2 relative z-[1000] pointer-events-auto">
+            <LanguageSelector />
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+};
+
+export default JournalHeader;

@@ -28,6 +28,8 @@ const TutorialOverlay: React.FC = () => {
         (arrowButton as HTMLElement).style.zIndex = '9998';
         (arrowButton as HTMLElement).style.position = 'relative';
         (arrowButton as HTMLElement).style.pointerEvents = 'auto';
+        (arrowButton as HTMLElement).style.visibility = 'visible';
+        (arrowButton as HTMLElement).style.opacity = '1';
         
         // Clean up when step changes
         return () => {
@@ -36,6 +38,8 @@ const TutorialOverlay: React.FC = () => {
           (arrowButton as HTMLElement).style.removeProperty('z-index');
           (arrowButton as HTMLElement).style.removeProperty('position');
           (arrowButton as HTMLElement).style.removeProperty('pointer-events');
+          (arrowButton as HTMLElement).style.removeProperty('visibility');
+          (arrowButton as HTMLElement).style.removeProperty('opacity');
         };
       }
     }
