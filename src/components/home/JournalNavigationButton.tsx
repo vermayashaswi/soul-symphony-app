@@ -33,10 +33,11 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, [isActive, currentStep, isInArrowTutorialStep]);
 
-  // Position the button centered over the energy animation
+  // Position the button lower on the screen (65% from top) instead of center (50%)
+  // This aligns with the pulsating energy animation's center
   const buttonWrapperStyle = {
     position: 'absolute',
-    top: '50%', 
+    top: '65%', // Changed from 50% to 65% to position it lower on the screen
     left: '50%',
     transform: 'translate(-50%, -50%)',
     zIndex: isInArrowTutorialStep ? 9999 : 40,

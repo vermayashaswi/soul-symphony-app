@@ -38,18 +38,18 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   // Calculate position based on target element (if specified)
   useEffect(() => {
     if (step.id === 2) {
-      // For step 2 - position the popup above the arrow button in the center
+      // For step 2 - position the popup above the arrow button which is now lower
       const arrowButton = document.querySelector('.journal-arrow-button');
       if (arrowButton) {
         const rect = arrowButton.getBoundingClientRect();
-        // Position above the arrow button with percentage-based horizontal centering
+        // Position well above the arrow button to ensure it's fully visible
         setPosition({
-          top: rect.top - 170, // Position above the button with some margin
-          left: '50%', // This is a string percentage value
+          top: rect.top - 200, // Increased from 170 to 200 to ensure visibility
+          left: '50%', // Center horizontally using percentage
           right: undefined
         });
         console.log("Positioning popup for step 2 above arrow button:", { 
-          top: rect.top - 170,
+          top: rect.top - 200,
           left: '50%'
         });
       } else {
