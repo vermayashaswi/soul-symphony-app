@@ -37,25 +37,6 @@
   }
 }
 
-.tutorial-connector {
-  stroke: var(--color-theme);
-  stroke-width: 2px;
-  stroke-dasharray: 6;
-  fill: none;
-  opacity: 0.8;
-}
-
-/* Enhanced direct connector for step 2 - more visible now */
-.tutorial-direct-connector {
-  stroke: var(--color-theme);
-  stroke-width: 3px;
-  stroke-dasharray: 5 3;
-  animation: dash 20s linear infinite;
-  filter: drop-shadow(0 0 3px var(--color-theme));
-  fill: none;
-  opacity: 1;
-}
-
 .tutorial-step-indicator {
   background-color: var(--color-theme);
   color: white;
@@ -74,13 +55,6 @@
   touch-action: none;
 }
 
-/* Improved animation for step 2 connector */
-@keyframes dash {
-  to {
-    stroke-dashoffset: -100;
-  }
-}
-
 /* Enhanced button highlighting for tutorial step 2 - much more prominent now */
 .journal-arrow-button.tutorial-target {
   z-index: 9999 !important;
@@ -91,7 +65,7 @@
 /* Stronger button glow effect with enhanced visibility */
 .tutorial-button-highlight {
   box-shadow: 0 0 30px 15px var(--color-theme) !important;
-  animation: button-pulse 1.5s infinite alternate !important;
+  animation: button-pulse 2s infinite alternate !important;
   border: 2px solid white !important;
 }
 
@@ -100,10 +74,7 @@
   opacity: 0.95 !important;
 }
 
-.tutorial-button-inner {
-  transform: scale(1.2);
-}
-
+/* Enhanced pulsating animation for the central button */
 @keyframes button-pulse {
   0% { box-shadow: 0 0 25px 12px var(--color-theme); }
   100% { box-shadow: 0 0 40px 18px var(--color-theme); }

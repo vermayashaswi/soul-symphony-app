@@ -23,23 +23,17 @@ const JournalNavigationButton: React.FC = () => {
 
   // Enhanced logging for positioning - for better debugging
   useEffect(() => {
-    if (buttonRef.current) {
+    if (buttonRef.current && isInArrowTutorialStep) {
       const rect = buttonRef.current.getBoundingClientRect();
       console.log('Journal arrow button position:', rect);
       console.log('Journal arrow button center:', {
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2
       });
-      
-      // Log window dimensions for reference
-      console.log('Window dimensions:', {
-        width: window.innerWidth,
-        height: window.innerHeight
-      });
     }
-  }, [isActive, currentStep]);
+  }, [isActive, currentStep, isInArrowTutorialStep]);
 
-  // Position exactly in the center of the screen - updated for better visibility
+  // Position exactly in the center of the screen
   const buttonWrapperStyle = {
     position: 'absolute',
     top: '50%', 
@@ -53,7 +47,7 @@ const JournalNavigationButton: React.FC = () => {
 
   return (
     <div 
-      className="journal-arrow-button" 
+      className={`journal-arrow-button ${isInArrowTutorialStep ? 'tutorial-target' : ''}`}
       style={buttonWrapperStyle}
       data-testid="journal-arrow-button"
       ref={buttonRef}
