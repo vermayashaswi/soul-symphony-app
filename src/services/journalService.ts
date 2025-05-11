@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 
 /**
  * Checks if a user profile exists

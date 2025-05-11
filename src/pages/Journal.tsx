@@ -1038,7 +1038,8 @@ const Journal = () => {
                   />
                   <JournalEntriesList
                     entries={entriesToDisplay}
-                    loading={showLoading}
+                    isLoading={showLoading}
+                    isError={!!entriesError && !loading}
                     processingEntries={processingEntries}
                     processedEntryIds={processedEntryIds}
                     onStartRecording={handleStartRecording}
