@@ -45,7 +45,7 @@
   opacity: 0.8;
 }
 
-/* Enhanced direct connector for step 2 */
+/* Enhanced direct connector for step 2 - more visible now */
 .tutorial-direct-connector {
   stroke: var(--color-theme);
   stroke-width: 3px;
@@ -81,14 +81,14 @@
   }
 }
 
-/* Enhanced button highlighting for tutorial step 2 */
+/* Enhanced button highlighting for tutorial step 2 - much more prominent now */
 .journal-arrow-button.tutorial-target {
   z-index: 9999 !important;
   position: relative !important;
   animation: pulse 2s infinite;
 }
 
-/* Enhanced button glow effect with stronger visibility */
+/* Stronger button glow effect with enhanced visibility */
 .tutorial-button-highlight {
   box-shadow: 0 0 30px 15px var(--color-theme) !important;
   animation: button-pulse 1.5s infinite alternate !important;

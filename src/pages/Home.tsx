@@ -58,8 +58,8 @@ const Home = () => {
       {/* Background elements including animations */}
       <BackgroundElements />
 
-      {/* Central navigation button with enhanced positioning */}
-      <div className={`relative ${isInArrowTutorialStep ? 'z-[9999]' : 'z-40'}`}>
+      {/* Central navigation button with exact center positioning and maximum z-index */}
+      <div className={`absolute inset-0 flex items-center justify-center ${isInArrowTutorialStep ? 'z-[9999]' : 'z-40'}`}>
         <JournalNavigationButton />
       </div>
 

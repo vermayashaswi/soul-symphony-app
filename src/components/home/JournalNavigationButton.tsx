@@ -39,13 +39,13 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, [isActive, currentStep]);
 
-  // Position correctly in the middle of the screen with proper z-indexing
+  // Position exactly in the center of the screen - updated for better visibility
   const buttonWrapperStyle = {
     position: 'absolute',
-    top: '50%', // Center vertically
+    top: '50%', 
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    zIndex: isInArrowTutorialStep ? 9999 : 40, // Higher z-index during tutorial
+    zIndex: isInArrowTutorialStep ? 9999 : 40,
     pointerEvents: 'auto',
     visibility: 'visible',
     opacity: 1
@@ -82,7 +82,7 @@ const JournalNavigationButton: React.FC = () => {
       <motion.button
         onClick={navigateToJournal}
         className={`w-16 h-16 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20 ${
-          isInArrowTutorialStep ? 'tutorial-button-inner' : ''
+          isInArrowTutorialStep ? 'tutorial-button-highlight' : ''
         }`}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}

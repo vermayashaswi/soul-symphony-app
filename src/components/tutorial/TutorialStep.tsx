@@ -45,11 +45,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         const rect = targetElement.getBoundingClientRect();
         setTargetRect(rect);
         
-        // For step 2 - position popup in the top right corner
+        // For step 2 - position popup in the top right corner (further out of the way)
         if (step.id === 2) {
-          // Higher position to leave more space
-          setPosition({ top: 80, right: 20 });
-          console.log("Positioning popup for step 2 in top right:", { top: 80, right: 20 });
+          // Higher position and more to the right to avoid overlap
+          setPosition({ top: 100, right: 40 });
+          console.log("Positioning popup for step 2 in top right:", { top: 100, right: 40 });
         } else {
           // Standard positioning logic for other steps
           switch (step.position) {
@@ -115,8 +115,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         const buttonCenterX = buttonRect.left + buttonRect.width / 2;
         const buttonCenterY = buttonRect.top + buttonRect.height / 2;
         
-        // Starting point at the bottom of popup
-        const startX = stepRect.left + 30; // Start from left side of popup
+        // Starting point from the bottom right of popup (better visual)
+        const startX = stepRect.left + stepRect.width - 30; // Start from right side of popup
         const startY = stepRect.bottom; // Start from bottom of popup
         
         console.log('Connection points:', {
@@ -124,7 +124,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           end: { x: buttonCenterX, y: buttonCenterY }
         });
         
-        // Create a direct path from popup to button center
+        // Create an improved direct path from popup to button center
         const path = `M${startX},${startY} L${buttonCenterX},${buttonCenterY}`;
         
         console.log("Generated connector path:", path);
