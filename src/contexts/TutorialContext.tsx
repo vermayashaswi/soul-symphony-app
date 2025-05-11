@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -37,6 +38,7 @@ const initialTutorialSteps: TutorialStep[] = [
     id: 1,
     title: 'Welcome to Soul Symphony',
     content: 'Let\'s take a quick tour to help you get started with your journaling journey.',
+    targetElement: '.journal-header-container', // Target the journal header
     position: 'center',
     showNextButton: true,
     showSkipButton: true,

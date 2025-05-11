@@ -62,6 +62,12 @@
   animation: pulse 2s infinite;
 }
 
+/* Journal header highlighting for tutorial step 1 */
+.journal-header-container.tutorial-target {
+  z-index: 9999 !important;
+  position: relative !important;
+}
+
 /* Stronger button glow effect with enhanced visibility */
 .tutorial-button-highlight {
   box-shadow: 0 0 30px 15px var(--color-theme) !important;

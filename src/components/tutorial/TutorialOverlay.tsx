@@ -15,9 +15,27 @@ const TutorialOverlay: React.FC = () => {
     skipTutorial
   } = useTutorial();
 
-  // Enhanced handling for the arrow button in step 2
+  // Enhanced handling for different tutorial steps
   useEffect(() => {
-    if (isActive && steps[currentStep]?.id === 2) {
+    if (!isActive) return;
+    
+    // Handle step 1 - journal header visibility
+    if (steps[currentStep]?.id === 1) {
+      const journalHeader = document.querySelector('.journal-header-container');
+      
+      if (journalHeader) {
+        console.log("Enhancing journal header visibility for tutorial step 1");
+        journalHeader.classList.add('tutorial-target');
+        
+        // Clean up when step changes
+        return () => {
+          console.log("Cleaning up journal header styles");
+          journalHeader.classList.remove('tutorial-target');
+        };
+      }
+    }
+    // Handle step 2 - arrow button visibility
+    else if (steps[currentStep]?.id === 2) {
       const arrowButton = document.querySelector('.journal-arrow-button');
       
       if (arrowButton) {

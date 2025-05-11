@@ -8,6 +8,7 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import LanguageSelector from '@/components/LanguageSelector';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
@@ -18,6 +19,10 @@ const JournalHeader: React.FC = () => {
   const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
+  
+  // Get tutorial context to check if we're in step 1
+  const { isActive, currentStep, steps } = useTutorial();
+  const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
 
   // Pre-translate common labels
   useEffect(() => {
@@ -68,11 +73,11 @@ const JournalHeader: React.FC = () => {
   };
 
   return (
-    <div className="p-4 flex flex-col">
+    <div className={`p-4 flex flex-col journal-header-container ${isInWelcomeTutorialStep ? 'tutorial-target' : ''}`}>
       <div className="flex justify-between items-start w-full relative">
-        <div className="relative max-w-[65%]">
+        <div className={`relative max-w-[65%] ${isInWelcomeTutorialStep ? 'z-[9999]' : ''}`}>
           <h1
-            className="text-2xl font-bold text-theme break-words hyphens-auto"
+            className={`text-2xl font-bold text-theme break-words hyphens-auto ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
             style={{
               fontWeight: 700,
               letterSpacing: '0.005em',
@@ -89,12 +94,12 @@ const JournalHeader: React.FC = () => {
           </h1>
         </div>
 
-        <div className="flex items-center z-50">
+        <div className={`flex items-center ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-50'}`}>
           <motion.div
             variants={dateStripVariants}
             initial="hidden"
             animate="visible"
-            className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'}`}
+            className={`px-3 py-1 rounded-l-md whitespace-nowrap ${theme === 'dark' ? 'bg-gray-800/80' : 'bg-gray-100/80'} ${isInWelcomeTutorialStep ? 'tutorial-highlight' : ''}`}
           >
             <div
               className={`text-sm font-medium ${theme === 'dark' ? 'text-white' : 'text-black'}`}
