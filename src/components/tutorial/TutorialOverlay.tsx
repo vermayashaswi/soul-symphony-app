@@ -15,7 +15,7 @@ const TutorialOverlay: React.FC = () => {
     skipTutorial
   } = useTutorial();
 
-  // Special handling for the arrow button in step 2
+  // Enhanced handling for the arrow button in step 2
   useEffect(() => {
     if (isActive && steps[currentStep]?.id === 2) {
       const arrowButton = document.querySelector('.journal-arrow-button');
@@ -26,11 +26,11 @@ const TutorialOverlay: React.FC = () => {
         // Add special highlighting class and ensure visibility
         arrowButton.classList.add('tutorial-target');
         
-        // Make the button element more prominent with glow effect
+        // Make the button element more prominent with enhanced glow effect
         const buttonElement = arrowButton.querySelector('button');
         if (buttonElement) {
-          buttonElement.classList.add('tutorial-button-glow');
-          console.log("Added glow effect to button element");
+          buttonElement.classList.add('tutorial-button-highlight');
+          console.log("Added enhanced highlighting effect to button element");
         }
         
         // Clean up when step changes
@@ -39,7 +39,7 @@ const TutorialOverlay: React.FC = () => {
           arrowButton.classList.remove('tutorial-target');
           
           if (buttonElement) {
-            buttonElement.classList.remove('tutorial-button-glow');
+            buttonElement.classList.remove('tutorial-button-highlight');
           }
         };
       } else {
@@ -58,7 +58,7 @@ const TutorialOverlay: React.FC = () => {
     <div className="fixed inset-0 z-[9997] pointer-events-auto">
       {/* Semi-transparent overlay */}
       <motion.div
-        className="tutorial-overlay"
+        className="tutorial-overlay absolute inset-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.75 }}
         exit={{ opacity: 0 }}

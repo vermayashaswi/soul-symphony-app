@@ -45,11 +45,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         const rect = targetElement.getBoundingClientRect();
         setTargetRect(rect);
         
-        // For step 2 - special positioning in the top right corner
+        // For step 2 - position popup in the top right corner
         if (step.id === 2) {
-          // Position popup in the top right corner with enough space not to obscure arrow
-          setPosition({ top: 80, right: 20 });
-          console.log("Positioning popup for step 2 in top right:", { top: 80, right: 20 });
+          // Higher position to leave more space for the connector
+          setPosition({ top: 100, right: 30 });
+          console.log("Positioning popup for step 2 in top right:", { top: 100, right: 30 });
         } else {
           // Standard positioning logic for other steps
           switch (step.position) {
@@ -95,37 +95,38 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [step.targetElement, step.position, step.id]);
   
-  // Calculate connector path with improved accuracy for step 2
+  // Calculate connector path with improved direct approach for step 2
   useEffect(() => {
     if (step.targetElement && step.id === 2) {
       const buttonElement = document.querySelector('.journal-arrow-button');
       if (buttonElement && stepRef.current) {
-        // Log positions for debugging
+        // Get accurate button position - VERY IMPORTANT
         const buttonRect = buttonElement.getBoundingClientRect();
         const stepRect = stepRef.current.getBoundingClientRect();
         
         console.log('Button element rect:', buttonRect);
         console.log('Step element rect:', stepRect);
         
-        // Button center coordinates - calculate true center
+        // Direct link to button center
         const buttonCenterX = buttonRect.left + buttonRect.width / 2;
         const buttonCenterY = buttonRect.top + buttonRect.height / 2;
         
-        // Starting point from the popup (bottom left corner for better visual)
-        const startX = stepRect.left + 30;
-        const startY = stepRect.bottom - 5;
+        // Starting point at the bottom left of popup
+        const startX = stepRect.left + 40; // Adjust starting point as needed
+        const startY = stepRect.bottom - 10;
         
-        // Create a better curved path to the button
-        const controlPointX1 = startX;
-        const controlPointY1 = startY + (buttonCenterY - startY) / 3;
-        const controlPointX2 = buttonCenterX - (buttonCenterX - startX) / 3;
-        const controlPointY2 = buttonCenterY;
+        console.log('Connection points:', {
+          start: { x: startX, y: startY },
+          end: { x: buttonCenterX, y: buttonCenterY }
+        });
         
-        // Use cubic bezier curve for smoother connector
-        const path = `M${startX},${startY} C${controlPointX1},${controlPointY1} ${controlPointX2},${controlPointY2} ${buttonCenterX},${buttonCenterY}`;
+        // Simple direct path for clearer visual connection
+        const path = `M${startX},${startY} L${buttonCenterX},${buttonCenterY}`;
         
         console.log("Generated connector path:", path);
         setConnectorPath(path);
+      } else {
+        console.warn("Could not find button element for tutorial connector");
       }
     } else if (step.targetElement) {
       // Default connector logic for other steps
@@ -157,7 +158,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     
     // Set a smaller width for step 2
     if (step.id === 2) {
-      style.maxWidth = '250px';
+      style.maxWidth = '220px';
     }
     
     return style;
@@ -223,20 +224,15 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         )}
       </div>
       
-      {/* Connector line with improved rendering for step 2 */}
+      {/* Direct connector line with improved z-index and visibility */}
       {connectorPath && (
         <svg 
-          className="absolute top-0 left-0 pointer-events-none" 
-          style={{ 
-            width: '100vw', 
-            height: '100vh', 
-            position: 'fixed', 
-            zIndex: 9990  // Always ensure connector is visible but below the popup
-          }}
+          className="fixed top-0 left-0 w-screen h-screen pointer-events-none" 
+          style={{ zIndex: 9990 }}
         >
           <path
             d={connectorPath}
-            className={step.id === 2 ? "tutorial-step-2-connector" : "tutorial-connector"}
+            className={step.id === 2 ? "tutorial-direct-connector" : "tutorial-connector"}
           />
         </svg>
       )}

@@ -32,12 +32,22 @@ const JournalNavigationButton: React.FC = () => {
     opacity: 1
   } as React.CSSProperties;
 
-  // Debug logging for positioning
+  // Enhanced logging for positioning - better debugging
   React.useEffect(() => {
-    // Always log the position to help with debugging
     const element = document.querySelector('.journal-arrow-button');
     if (element) {
-      console.log('Journal arrow button position:', element.getBoundingClientRect());
+      const rect = element.getBoundingClientRect();
+      console.log('Journal arrow button position:', rect);
+      console.log('Journal arrow button center:', {
+        x: rect.left + rect.width / 2,
+        y: rect.top + rect.height / 2
+      });
+      
+      // Log window dimensions for reference
+      console.log('Window dimensions:', {
+        width: window.innerWidth,
+        height: window.innerHeight
+      });
     }
   }, []);
 
@@ -48,15 +58,17 @@ const JournalNavigationButton: React.FC = () => {
       data-testid="journal-arrow-button"
     >
       <motion.div
-        className="absolute inset-0 rounded-full bg-primary/30 blur-md z-0"
+        className={`absolute inset-0 rounded-full bg-primary/30 blur-md z-0 ${
+          isInArrowTutorialStep ? 'tutorial-button-outer-glow' : ''
+        }`}
         initial={{ scale: 1, opacity: 0.5 }}
         animate={{
-          scale: [1, 1.15, 1],
-          opacity: [0.5, 0.8, 0.5]
+          scale: isInArrowTutorialStep ? [1, 1.25, 1] : [1, 1.15, 1],
+          opacity: isInArrowTutorialStep ? [0.5, 0.9, 0.5] : [0.5, 0.8, 0.5]
         }}
         transition={{
           repeat: Infinity,
-          duration: 2,
+          duration: isInArrowTutorialStep ? 1.5 : 2,
           ease: "easeInOut"
         }}
         style={{
@@ -68,7 +80,9 @@ const JournalNavigationButton: React.FC = () => {
       />
       <motion.button
         onClick={navigateToJournal}
-        className="w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20"
+        className={`w-12 h-12 rounded-full bg-primary flex items-center justify-center shadow-lg relative z-20 ${
+          isInArrowTutorialStep ? 'tutorial-button-inner' : ''
+        }`}
         whileHover={{ scale: 1.1 }}
         whileTap={{ scale: 0.95 }}
         initial={{ opacity: 0 }}

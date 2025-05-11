@@ -8,29 +8,49 @@ import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
 
 const Home = () => {
-  const { isActive } = useTutorial();
+  const { isActive, currentStep, steps } = useTutorial();
+  
+  // Check if we're in tutorial step 2
+  const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
   
   useEffect(() => {
-    console.log('Home component mounted');
+    console.log('Home component mounted, tutorial active:', isActive);
+    console.log('Current tutorial step:', currentStep);
     
-    // Check for tutorial element visibility
+    // Enhanced check for tutorial element visibility
     if (isActive) {
-      const arrowButton = document.querySelector('.journal-arrow-button');
-      if (arrowButton) {
-        console.log('Journal arrow button found:', arrowButton.getBoundingClientRect());
-      } else {
-        console.warn('Journal arrow button not found in DOM');
-      }
+      setTimeout(() => {
+        const arrowButton = document.querySelector('.journal-arrow-button');
+        if (arrowButton) {
+          const rect = arrowButton.getBoundingClientRect();
+          console.log('Journal arrow button found:', rect);
+          console.log('Journal arrow center point:', {
+            x: rect.left + rect.width / 2,
+            y: rect.top + rect.height / 2
+          });
+          
+          // Check if button is visible and positioned correctly
+          if (rect.width === 0 || rect.height === 0) {
+            console.warn('Arrow button has zero dimensions!');
+          }
+          
+          // Verify z-index
+          const computedStyle = window.getComputedStyle(arrowButton);
+          console.log('Arrow button z-index:', computedStyle.zIndex);
+        } else {
+          console.warn('Journal arrow button not found in DOM');
+        }
+      }, 500); // Small delay to ensure component is fully rendered
     }
-  }, [isActive]);
+  }, [isActive, currentStep]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative">
+    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
       {/* Background elements including animations */}
       <BackgroundElements />
 
-      {/* Central navigation button - ensure it's always properly positioned */}
-      <div className="relative z-40">
+      {/* Central navigation button with enhanced positioning */}
+      <div className={`relative ${isInArrowTutorialStep ? 'z-[9998]' : 'z-40'}`}>
         <JournalNavigationButton />
       </div>
 
@@ -42,7 +62,7 @@ const Home = () => {
         <JournalHeader />
       </div>
 
-      {/* Tutorial overlay system - this should be last to overlay everything */}
+      {/* Tutorial overlay system - this should be last to overlay everything except highlighted elements */}
       <TutorialOverlay />
     </div>
   );
