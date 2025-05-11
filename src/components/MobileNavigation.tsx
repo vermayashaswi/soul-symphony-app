@@ -81,7 +81,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   const navItems = [
     { path: '/app/home', icon: Home, label: 'Home' },
-    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
+    { path: '/app/journal', icon: BookOpen, label: 'Journal', className: 'journal-nav-item' },
     { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
     { path: '/app/insights', icon: BarChart2, label: 'Insights' },
     { path: '/app/settings', icon: Settings, label: 'Settings' },
@@ -116,7 +116,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 "flex flex-col items-center py-1 transition-colors",
                 isActive 
                   ? "text-primary" 
-                  : "text-muted-foreground hover:text-primary"
+                  : "text-muted-foreground hover:text-primary",
+                item.className || ""
               )}
             >
               <div className="relative">

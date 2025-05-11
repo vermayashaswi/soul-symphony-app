@@ -96,3 +96,67 @@
     box-shadow: 0 0 0 0 rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0);
   }
 }
+
+/* Mobile navigation item highlighting for step 3 */
+.tutorial-nav-highlight {
+  position: relative !important;
+  z-index: 10000 !important;
+  animation: nav-pulse 2s infinite alternate !important;
+}
+
+@keyframes nav-pulse {
+  0% { 
+    color: var(--color-theme) !important;
+    transform: scale(1.1);
+    text-shadow: 0 0 10px var(--color-theme);
+  }
+  100% { 
+    color: white !important;
+    transform: scale(1.2);
+    text-shadow: 0 0 20px var(--color-theme);
+  }
+}
+
+/* Journal record button highlighting for step 3 */
+.journal-record-button.tutorial-target {
+  z-index: 10000 !important;
+  animation: record-button-pulse 1.5s infinite alternate !important;
+}
+
+@keyframes record-button-pulse {
+  0% { transform: scale(1.05); }
+  100% { transform: scale(1.15); }
+}
+
+/* Journal entries header highlighting for step 4 */
+.journal-entries-header.tutorial-target {
+  position: relative !important;
+  z-index: 10000 !important;
+  animation: header-highlight 2s infinite alternate !important;
+}
+
+.tutorial-header-highlight {
+  text-shadow: 0 0 15px var(--color-theme) !important;
+  color: white !important;
+}
+
+@keyframes header-highlight {
+  0% { text-shadow: 0 0 10px var(--color-theme); }
+  100% { text-shadow: 0 0 25px var(--color-theme), 0 0 40px var(--color-theme); }
+}
+
+/* Journal entries list highlighting for step 4 */
+.journal-entries-list.tutorial-target {
+  position: relative !important;
+  z-index: 9999 !important;
+  animation: list-highlight 3s infinite alternate !important;
+}
+
+.tutorial-list-highlight {
+  box-shadow: 0 0 20px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.5) !important;
+}
+
+@keyframes list-highlight {
+  0% { box-shadow: 0 0 10px 2px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3); }
+  100% { box-shadow: 0 0 25px 8px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.6); }
+}

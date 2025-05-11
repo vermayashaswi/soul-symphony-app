@@ -1,31 +1,44 @@
 
 import React from 'react';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { useNavigate } from 'react-router-dom';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface JournalEntriesHeaderProps {
-  onStartRecording: () => void;
+  totalEntries: number;
 }
 
-export const JournalEntriesHeader: React.FC<JournalEntriesHeaderProps> = ({ 
-  onStartRecording 
-}) => {
+const JournalEntriesHeader: React.FC<JournalEntriesHeaderProps> = ({ totalEntries }) => {
+  const navigate = useNavigate();
+  
   return (
-    <div className="flex items-center justify-between mb-6">
-      <h2 className="text-xl font-semibold">
+    <div className="flex justify-between items-center mb-4 journal-entries-header">
+      <h2 className="text-xl font-semibold text-foreground">
         <TranslatableText text="Your journal entries" />
+        {totalEntries > 0 && (
+          <span className="text-muted-foreground text-sm ml-2">
+            ({totalEntries})
+          </span>
+        )}
       </h2>
-      <Button 
-        onClick={onStartRecording}
-        size="sm"
-        className="flex items-center gap-1"
+      
+      <motion.div
+        whileHover={{ scale: 1.05 }}
+        whileTap={{ scale: 0.95 }}
       >
-        <Plus className="w-4 h-4" />
-        <TranslatableText text="New entry" />
-      </Button>
+        <Button 
+          onClick={() => navigate('/app/journal/record')}
+          className="bg-primary hover:bg-primary/90 text-primary-foreground journal-record-button"
+          size="sm"
+        >
+          <Plus className="mr-1 h-4 w-4" />
+          <TranslatableText text="Record Entry" />
+        </Button>
+      </motion.div>
     </div>
   );
-}
+};
 
 export default JournalEntriesHeader;

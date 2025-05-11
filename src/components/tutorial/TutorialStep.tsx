@@ -41,6 +41,14 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       // For step 2 - fixed position in the top right corner
       setPosition({ top: 80, right: 30 });
       console.log("Positioning popup for step 2 in top right:", { top: 80, right: 30 });
+    } else if (step.id === 3) {
+      // For step 3 - position at the top right near the mobile nav
+      setPosition({ top: 80, right: 30 });
+      console.log("Positioning popup for step 3 in top right:", { top: 80, right: 30 });
+    } else if (step.id === 4) {
+      // For step 4 - position in the top right but a bit lower to show entries list
+      setPosition({ top: 140, right: 30 });
+      console.log("Positioning popup for step 4 in top right:", { top: 140, right: 30 });
     } else if (step.targetElement) {
       const targetElement = document.querySelector(step.targetElement);
       if (targetElement) {
@@ -99,8 +107,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       style.left = position.left;
     }
     
-    // Set a smaller width for step 2 to make it more compact
-    if (step.id === 2) {
+    // Set a smaller width for steps 2, 3, and 4 to make them more compact
+    if ([2, 3, 4].includes(step.id)) {
       style.maxWidth = '240px';
       style.minWidth = '200px';
     }
