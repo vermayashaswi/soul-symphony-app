@@ -105,6 +105,22 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [step.targetElement, step.position, step.id]);
   
+  // Handle navigation actions with stopPropagation to ensure they work
+  const handleNext = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onNext();
+  };
+  
+  const handlePrev = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onPrev();
+  };
+  
+  const handleSkip = (e: React.MouseEvent) => {
+    e.stopPropagation();
+    onSkip();
+  };
+  
   // Determine the style based on position
   const getPositionStyle = () => {
     const style: React.CSSProperties = { 
@@ -130,12 +146,13 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[9999] max-w-[320px]"
+      className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[10000] max-w-[320px] tutorial-step-container"
       style={getPositionStyle()}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ duration: 0.3 }}
+      onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind
     >
       {/* Step indicator */}
       <div className="flex justify-between items-center mb-2">
@@ -146,7 +163,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           variant="ghost" 
           size="sm" 
           className="h-8 w-8 p-0" 
-          onClick={onSkip}
+          onClick={handleSkip}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -158,14 +175,14 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       {/* Content */}
       <p className="text-sm text-muted-foreground mb-4">{step.content}</p>
       
-      {/* Navigation buttons */}
-      <div className="flex justify-between mt-2">
+      {/* Navigation buttons with enhanced z-index and click handling */}
+      <div className="flex justify-between mt-2 tutorial-buttons">
         {!isFirst && (
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={onPrev}
-            className="flex items-center gap-1"
+            onClick={handlePrev}
+            className="flex items-center gap-1 pointer-events-auto"
           >
             <ChevronLeft className="h-4 w-4" />
             Back
@@ -178,8 +195,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           <Button 
             variant="default" 
             size="sm" 
-            onClick={onNext}
-            className="flex items-center gap-1 bg-theme hover:bg-theme/80"
+            onClick={handleNext}
+            className="flex items-center gap-1 bg-theme hover:bg-theme/80 pointer-events-auto"
           >
             {isLast ? 'Finish' : 'Next'}
             {!isLast && <ChevronRight className="h-4 w-4" />}

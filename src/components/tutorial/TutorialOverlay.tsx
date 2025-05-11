@@ -15,6 +15,19 @@ const TutorialOverlay: React.FC = () => {
     skipTutorial
   } = useTutorial();
 
+  // Lock body scrolling when tutorial is active
+  useEffect(() => {
+    if (isActive) {
+      // Add a class to the body to prevent scrolling
+      document.body.classList.add('tutorial-active');
+      
+      // Clean up when tutorial is deactivated
+      return () => {
+        document.body.classList.remove('tutorial-active');
+      };
+    }
+  }, [isActive]);
+
   // Enhanced handling for different tutorial steps
   useEffect(() => {
     if (!isActive) return;
@@ -74,16 +87,17 @@ const TutorialOverlay: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto">
-      {/* Semi-transparent overlay */}
+      {/* Semi-transparent overlay with improved interaction blocking */}
       <motion.div
         className="tutorial-overlay absolute inset-0"
         initial={{ opacity: 0 }}
         animate={{ opacity: 0.75 }}
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
+        onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind
       />
 
-      {/* Tutorial step */}
+      {/* Tutorial step with enhanced z-index and pointer events */}
       <AnimatePresence mode="wait">
         <TutorialStep
           key={currentStep}

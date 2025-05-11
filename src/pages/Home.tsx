@@ -47,7 +47,7 @@ const Home = () => {
   }, [isActive, currentStep, isInArrowTutorialStep, isInWelcomeTutorialStep]);
 
   return (
-    <div className="min-h-screen bg-background text-foreground relative overflow-hidden">
+    <div className={`min-h-screen bg-background text-foreground relative overflow-hidden ${isActive ? 'tutorial-active-page' : ''}`}>
       {/* Background elements including animations */}
       <BackgroundElements />
 
