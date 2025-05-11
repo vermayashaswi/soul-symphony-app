@@ -33,12 +33,12 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, [isActive, currentStep, isInArrowTutorialStep]);
 
-  // Position exactly in the center of the screen
+  // Position at the center-bottom of the screen
   const buttonWrapperStyle = {
     position: 'absolute',
-    top: '50%', 
+    bottom: '25%', 
     left: '50%',
-    transform: 'translate(-50%, -50%)',
+    transform: 'translateX(-50%)',
     zIndex: isInArrowTutorialStep ? 9999 : 40,
     pointerEvents: 'auto',
     visibility: 'visible',

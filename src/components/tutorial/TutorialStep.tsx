@@ -39,8 +39,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   useEffect(() => {
     if (step.id === 2) {
       // For step 2 - fixed position in the top right corner
-      setPosition({ top: 80, right: 30 });
-      console.log("Positioning popup for step 2 in top right:", { top: 80, right: 30 });
+      setPosition({ top: 140, right: 20 });
+      console.log("Positioning popup for step 2 in top right:", { top: 140, right: 20 });
     } else if (step.targetElement) {
       const targetElement = document.querySelector(step.targetElement);
       if (targetElement) {
@@ -101,8 +101,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     
     // Set a smaller width for step 2 to make it more compact
     if (step.id === 2) {
-      style.maxWidth = '240px';
-      style.minWidth = '200px';
+      style.maxWidth = '280px';
+      style.minWidth = '240px';
     }
     
     return style;
