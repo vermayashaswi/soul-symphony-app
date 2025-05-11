@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -25,6 +24,19 @@ const TutorialOverlay: React.FC = () => {
 
     console.log(`Applying tutorial highlight for step ${currentStep + 1}:`, currentTutorialStep.title);
 
+    // Make mobile navigation always clickable during tutorial
+    const mobileNav = document.querySelector('[class*="fixed bottom-0 left-0 right-0"]');
+    if (mobileNav) {
+      mobileNav.classList.add('mobile-nav-clickable');
+      console.log("Made mobile navigation clickable during tutorial");
+    }
+
+    // Make all mobile navigation links clickable
+    const navLinks = document.querySelectorAll('.flex.justify-around.items-center a');
+    navLinks.forEach(link => {
+      link.classList.add('mobile-nav-clickable');
+    });
+
     // Step-specific handlers
     if (currentTutorialStep.id === 2) {
       // Step 2: Highlight the arrow button
@@ -49,7 +61,7 @@ const TutorialOverlay: React.FC = () => {
       const recordButton = document.querySelector('.journal-record-button');
       
       if (journalNavButton) {
-        journalNavButton.classList.add('mobile-nav-journal', 'tutorial-target', 'tutorial-nav-highlight');
+        journalNavButton.classList.add('mobile-nav-journal', 'tutorial-target', 'tutorial-nav-highlight', 'mobile-nav-clickable');
         console.log("Highlighted journal navigation button for tutorial step 3");
       } else {
         console.warn("Could not find journal navigation button for step 3");
@@ -94,6 +106,8 @@ const TutorialOverlay: React.FC = () => {
       
       if (journalNavButton) {
         journalNavButton.classList.remove('mobile-nav-journal', 'tutorial-target', 'tutorial-nav-highlight');
+        // Still keep it clickable
+        journalNavButton.classList.add('mobile-nav-clickable');
       }
       
       if (recordButton) {
@@ -121,7 +135,7 @@ const TutorialOverlay: React.FC = () => {
   const isLastStep = currentStep === totalSteps - 1;
 
   return (
-    <div className="fixed inset-0 z-[9997] pointer-events-auto">
+    <div className="fixed inset-0 z-[9997] pointer-events-none">
       {/* Semi-transparent overlay */}
       <motion.div
         className="tutorial-overlay absolute inset-0"

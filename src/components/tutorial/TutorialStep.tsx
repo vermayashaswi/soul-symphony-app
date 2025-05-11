@@ -119,7 +119,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[9999] max-w-[320px]"
+      className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[9999] max-w-[320px] tutorial-step-dialog pointer-events-auto"
       style={getPositionStyle()}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}

@@ -51,8 +51,20 @@
   inset: 0;
   z-index: 9997;
   background-color: rgba(0, 0, 0, 0.75);
-  pointer-events: auto;
+  pointer-events: none; /* Allow clicks to pass through the overlay */
   touch-action: none;
+}
+
+/* Ensure the tutorial step dialogs can still receive clicks */
+.tutorial-step-dialog {
+  pointer-events: auto !important; /* Only tutorial dialogs should capture clicks */
+}
+
+/* Ensure mobile navigation is clickable during tutorial */
+.mobile-nav-clickable {
+  position: relative !important;
+  z-index: 10000 !important; /* Higher z-index than tutorial overlay */
+  pointer-events: auto !important;
 }
 
 /* Enhanced button highlighting for tutorial step 2 - much more prominent now */
