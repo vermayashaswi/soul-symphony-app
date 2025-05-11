@@ -70,6 +70,8 @@
   stroke-width: 3px;
   stroke: var(--color-theme);
   filter: drop-shadow(0 0 2px var(--color-theme));
+  fill: none;
+  opacity: 0.9;
 }
 
 @keyframes dash {
@@ -85,15 +87,15 @@
   animation: pulse 2s infinite;
 }
 
-/* Button glow effect */
+/* Button glow effect with enhanced visibility */
 .tutorial-button-glow {
-  box-shadow: 0 0 15px 5px var(--color-theme) !important;
+  box-shadow: 0 0 20px 8px var(--color-theme) !important;
   animation: button-pulse 1.5s infinite alternate !important;
 }
 
 @keyframes button-pulse {
-  0% { box-shadow: 0 0 15px 5px var(--color-theme); }
-  100% { box-shadow: 0 0 25px 8px var(--color-theme); }
+  0% { box-shadow: 0 0 20px 8px var(--color-theme); }
+  100% { box-shadow: 0 0 30px 12px var(--color-theme); }
 }
 
 @keyframes pulse {
@@ -104,7 +106,7 @@
   
   50% {
     transform: scale(1.05);
-    box-shadow: 0 0 0 10px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0);
+    box-shadow: 0 0 0 15px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0);
   }
   
   100% {

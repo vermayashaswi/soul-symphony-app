@@ -20,27 +20,26 @@ const JournalNavigationButton: React.FC = () => {
     }
   };
 
-  // Special styling for when the tutorial is active
+  // Position correctly in the middle of the screen with proper z-indexing
   const buttonWrapperStyle = {
     position: 'absolute',
-    top: 'calc(50% - 31px)',
+    top: '50%', // Center vertically
     left: '50%',
     transform: 'translate(-50%, -50%)',
-    zIndex: isInArrowTutorialStep ? 9998 : 40,
+    zIndex: isInArrowTutorialStep ? 9998 : 40, // Higher z-index during tutorial
     pointerEvents: 'auto',
     visibility: 'visible',
     opacity: 1
   } as React.CSSProperties;
 
-  // Add debug logging to help with positioning
+  // Debug logging for positioning
   React.useEffect(() => {
-    if (isInArrowTutorialStep) {
-      const element = document.querySelector('.journal-arrow-button');
-      if (element) {
-        console.log('Journal arrow button position:', element.getBoundingClientRect());
-      }
+    // Always log the position to help with debugging
+    const element = document.querySelector('.journal-arrow-button');
+    if (element) {
+      console.log('Journal arrow button position:', element.getBoundingClientRect());
     }
-  }, [isInArrowTutorialStep]);
+  }, []);
 
   return (
     <div 

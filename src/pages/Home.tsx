@@ -12,18 +12,30 @@ const Home = () => {
   
   useEffect(() => {
     console.log('Home component mounted');
-  }, []);
+    
+    // Check for tutorial element visibility
+    if (isActive) {
+      const arrowButton = document.querySelector('.journal-arrow-button');
+      if (arrowButton) {
+        console.log('Journal arrow button found:', arrowButton.getBoundingClientRect());
+      } else {
+        console.warn('Journal arrow button not found in DOM');
+      }
+    }
+  }, [isActive]);
 
   return (
     <div className="min-h-screen bg-background text-foreground relative">
       {/* Background elements including animations */}
       <BackgroundElements />
 
+      {/* Central navigation button - ensure it's always properly positioned */}
+      <div className="relative z-40">
+        <JournalNavigationButton />
+      </div>
+
       {/* Journal content with summary and quote */}
       <JournalContent />
-
-      {/* Central navigation button - moved up in the DOM order to ensure proper z-index */}
-      <JournalNavigationButton />
 
       {/* Header with journal name and date */}
       <div className="relative z-20 flex flex-col h-screen">
