@@ -12,6 +12,10 @@ interface JournalEntriesListProps {
   isLoading: boolean;
   isError: boolean;
   onRetry?: () => void;
+  onStartRecording: () => void;
+  processingEntries?: string[];
+  processedEntryIds?: number[];
+  onDeleteEntry?: (entryId: number) => Promise<void>;
 }
 
 const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
@@ -19,6 +23,10 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   isLoading,
   isError,
   onRetry,
+  onStartRecording,
+  processingEntries = [],
+  processedEntryIds = [],
+  onDeleteEntry
 }) => {
   const isMobile = useIsMobile();
   
@@ -54,7 +62,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   
   // Empty state
   if (entries.length === 0) {
-    return <EmptyJournalState />;
+    return <EmptyJournalState onStartRecording={onStartRecording} />;
   }
   
   // List of entries
@@ -69,7 +77,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         <JournalEntryCard
           key={entry.id}
           entry={entry}
-          compact={isMobile}
+          isProcessing={entry.tempId && processingEntries.includes(entry.tempId)}
+          isProcessed={processedEntryIds.includes(entry.id)}
+          onDelete={onDeleteEntry ? () => onDeleteEntry(entry.id) : undefined}
         />
       ))}
     </motion.div>
