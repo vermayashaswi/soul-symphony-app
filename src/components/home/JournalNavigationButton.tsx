@@ -33,12 +33,12 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, [isActive, currentStep, isInArrowTutorialStep]);
 
-  // Position at the center-bottom of the screen
+  // Position in the center of the screen where the red dot is shown
   const buttonWrapperStyle = {
     position: 'absolute',
-    bottom: '25%', 
+    top: '50%', 
     left: '50%',
-    transform: 'translateX(-50%)',
+    transform: 'translate(-50%, -50%)',
     zIndex: isInArrowTutorialStep ? 9999 : 40,
     pointerEvents: 'auto',
     visibility: 'visible',
