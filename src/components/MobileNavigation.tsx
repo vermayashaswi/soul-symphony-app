@@ -97,7 +97,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     <motion.div 
       className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted mobile-nav-clickable"
       style={{
-        zIndex: 10000, // Increased z-index to ensure it stays above tutorial overlay
+        zIndex: 10000, 
         paddingTop: '0.40rem',
         paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))',
         height: 'calc(3.6rem + env(safe-area-inset-bottom))'
