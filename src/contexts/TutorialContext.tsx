@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -56,8 +55,8 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 3,
     title: 'Multilingual Recording',
-    content: 'The Record Entry tab lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
-    targetElement: '.record-entry-tab',
+    content: 'The New Entry button lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
+    targetElement: '.tutorial-record-entry-button', // Updated selector
     position: 'bottom',
     showNextButton: true,
     showSkipButton: true,
@@ -163,6 +162,12 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       const newStep = currentStep + 1;
       setCurrentStep(newStep);
       updateTutorialStep(newStep);
+      
+      // If moving to step 3, ensure we're on the journal page
+      if (steps[newStep].id === 3 && location.pathname !== '/app/journal') {
+        console.log("Navigating to journal page for step 3");
+        navigate('/app/journal');
+      }
     } else {
       completeTutorial();
     }

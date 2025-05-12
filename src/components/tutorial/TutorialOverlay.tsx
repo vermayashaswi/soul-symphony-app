@@ -97,46 +97,98 @@ const TutorialOverlay: React.FC = () => {
         console.warn("Could not find journal-arrow-button element for tutorial step 2");
       }
     }
-    // Handle step 3 - Record Entry tab visibility
+    // Handle step 3 - Record Entry tab/button visibility
     else if (steps[currentStep]?.id === 3) {
-      // Add slight delay to ensure Journal page has loaded
-      setTimeout(() => {
-        // Try multiple selectors to find the Record Entry tab
-        const recordEntryTab = document.querySelector('[data-value="record"]') || 
-                              document.querySelector('.record-entry-tab');
+      // First attempt at finding elements after a short delay
+      const initialDelay = setTimeout(() => {
+        applyStep3Highlighting();
+      }, 500);
+      
+      // Try again with longer delays to ensure elements are loaded
+      const secondAttempt = setTimeout(() => {
+        console.log("Second attempt at highlighting Record Entry elements");
+        applyStep3Highlighting();
+      }, 1000);
+      
+      const thirdAttempt = setTimeout(() => {
+        console.log("Third attempt at highlighting Record Entry elements");
+        applyStep3Highlighting();
+      }, 2000);
+      
+      // Function to apply highlighting to step 3 elements
+      const applyStep3Highlighting = () => {
+        // Try multiple selectors to find the target
+        const possibleSelectors = [
+          '[data-value="record"]',
+          '.record-entry-tab',
+          '.tutorial-record-entry-button',
+          'button[data-tutorial-target="record-entry"]',
+          '.record-entry-button'
+        ];
         
-        if (recordEntryTab) {
-          console.log("Enhancing Record Entry tab visibility for tutorial step 3");
+        let recordEntryElement = null;
+        
+        // Try each selector until we find a match
+        for (const selector of possibleSelectors) {
+          const element = document.querySelector(selector);
+          if (element) {
+            recordEntryElement = element;
+            console.log(`Found Record Entry element with selector: ${selector}`, element);
+            break;
+          }
+        }
+        
+        if (recordEntryElement) {
+          console.log("Enhancing Record Entry element visibility for tutorial step 3", recordEntryElement);
           
-          // Add tutorial target class to make the tab visible through overlay
-          recordEntryTab.classList.add('tutorial-target');
-          recordEntryTab.classList.add('record-entry-tab');
+          // Add tutorial target class to make the element visible through overlay
+          recordEntryElement.classList.add('tutorial-target');
+          recordEntryElement.classList.add('record-entry-tab');
           
           // Add enhanced highlighting for better visibility
-          recordEntryTab.classList.add('tutorial-highlight');
+          recordEntryElement.classList.add('tutorial-highlight');
           
-          // Force the tab to be visible
-          (recordEntryTab as HTMLElement).style.visibility = 'visible';
-          (recordEntryTab as HTMLElement).style.opacity = '1';
-          (recordEntryTab as HTMLElement).style.pointerEvents = 'auto';
+          // Force the element to be visible with inline styles
+          (recordEntryElement as HTMLElement).style.visibility = 'visible';
+          (recordEntryElement as HTMLElement).style.opacity = '1';
+          (recordEntryElement as HTMLElement).style.pointerEvents = 'auto';
+          (recordEntryElement as HTMLElement).style.position = 'relative';
+          (recordEntryElement as HTMLElement).style.zIndex = '10000';
           
-          console.log("Added classes to Record Entry tab:", recordEntryTab);
+          console.log("Added classes and styles to Record Entry element:", recordEntryElement);
+          
+          // Log computed styles to verify our styles are applied
+          const computedStyle = window.getComputedStyle(recordEntryElement);
+          console.log("Computed styles for Record Entry element:", {
+            visibility: computedStyle.visibility,
+            opacity: computedStyle.opacity,
+            zIndex: computedStyle.zIndex,
+            position: computedStyle.position
+          });
         } else {
-          console.warn("Could not find Record Entry tab for tutorial step 3 after delay");
+          console.warn("Could not find Record Entry element for tutorial step 3 with any selector");
         }
-      }, 500); // 500ms delay to ensure page has rendered
+      };
       
       // Clean up when step changes
       return () => {
-        console.log("Cleaning up Record Entry tab styles");
-        const recordEntryTab = document.querySelector('[data-value="record"]') || 
-                              document.querySelector('.record-entry-tab');
-                              
-        if (recordEntryTab) {
-          recordEntryTab.classList.remove('tutorial-target');
-          recordEntryTab.classList.remove('tutorial-highlight');
-          recordEntryTab.classList.remove('record-entry-tab');
-        }
+        console.log("Cleaning up Record Entry element styles");
+        clearTimeout(initialDelay);
+        clearTimeout(secondAttempt);
+        clearTimeout(thirdAttempt);
+        
+        // Remove classes from all possible elements
+        possibleSelectors.forEach(selector => {
+          const element = document.querySelector(selector);
+          if (element) {
+            element.classList.remove('tutorial-target', 'record-entry-tab', 'tutorial-highlight');
+            (element as HTMLElement).style.visibility = '';
+            (element as HTMLElement).style.opacity = '';
+            (element as HTMLElement).style.pointerEvents = '';
+            (element as HTMLElement).style.position = '';
+            (element as HTMLElement).style.zIndex = '';
+          }
+        });
       };
     }
   }, [isActive, currentStep, steps]);
