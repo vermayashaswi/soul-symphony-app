@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -46,7 +47,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 2,
     title: 'Your Journal',
-    content: 'Press this central arrow button to start recording a journal entry instantly. It\'s the heart of your journaling experience.',
+    content: 'Press this central arrow button to start recording a journal entry instantly. This is your daily oxygen to build your emotional repository.',
     targetElement: '.journal-arrow-button',
     position: 'top',
     showNextButton: true,
