@@ -99,28 +99,45 @@ const TutorialOverlay: React.FC = () => {
     }
     // Handle step 3 - Record Entry tab visibility
     else if (steps[currentStep]?.id === 3) {
-      const recordEntryTab = document.querySelector('[data-value="record"]');
+      // Add slight delay to ensure Journal page has loaded
+      setTimeout(() => {
+        // Try multiple selectors to find the Record Entry tab
+        const recordEntryTab = document.querySelector('[data-value="record"]') || 
+                              document.querySelector('.record-entry-tab');
+        
+        if (recordEntryTab) {
+          console.log("Enhancing Record Entry tab visibility for tutorial step 3");
+          
+          // Add tutorial target class to make the tab visible through overlay
+          recordEntryTab.classList.add('tutorial-target');
+          recordEntryTab.classList.add('record-entry-tab');
+          
+          // Add enhanced highlighting for better visibility
+          recordEntryTab.classList.add('tutorial-highlight');
+          
+          // Force the tab to be visible
+          (recordEntryTab as HTMLElement).style.visibility = 'visible';
+          (recordEntryTab as HTMLElement).style.opacity = '1';
+          (recordEntryTab as HTMLElement).style.pointerEvents = 'auto';
+          
+          console.log("Added classes to Record Entry tab:", recordEntryTab);
+        } else {
+          console.warn("Could not find Record Entry tab for tutorial step 3 after delay");
+        }
+      }, 500); // 500ms delay to ensure page has rendered
       
-      if (recordEntryTab) {
-        console.log("Enhancing Record Entry tab visibility for tutorial step 3");
-        
-        // Add tutorial target class to make the tab visible through overlay
-        recordEntryTab.classList.add('tutorial-target');
-        recordEntryTab.classList.add('record-entry-tab');
-        
-        // Add enhanced highlighting for better visibility
-        recordEntryTab.classList.add('tutorial-highlight');
-        
-        // Clean up when step changes
-        return () => {
-          console.log("Cleaning up Record Entry tab styles");
+      // Clean up when step changes
+      return () => {
+        console.log("Cleaning up Record Entry tab styles");
+        const recordEntryTab = document.querySelector('[data-value="record"]') || 
+                              document.querySelector('.record-entry-tab');
+                              
+        if (recordEntryTab) {
           recordEntryTab.classList.remove('tutorial-target');
           recordEntryTab.classList.remove('tutorial-highlight');
           recordEntryTab.classList.remove('record-entry-tab');
-        };
-      } else {
-        console.warn("Could not find Record Entry tab for tutorial step 3");
-      }
+        }
+      };
     }
   }, [isActive, currentStep, steps]);
 

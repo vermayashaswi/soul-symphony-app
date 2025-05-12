@@ -106,10 +106,26 @@ body.tutorial-active {
   border-radius: 0.5rem;
 }
 
+/* Specific styling for step 3 - more prominent highlight */
+.record-entry-tab.tutorial-target {
+  z-index: 10000 !important; /* Higher z-index than normal tutorial targets */
+  position: relative !important;
+  box-shadow: 0 0 20px 10px var(--color-theme) !important; 
+  animation: strong-tab-pulse 1.5s infinite alternate !important;
+  outline: 2px solid white !important;
+  opacity: 1 !important;
+}
+
 /* Record entry tab pulsating animation */
 @keyframes tab-pulse {
   0% { box-shadow: 0 0 10px 3px var(--color-theme); }
   100% { box-shadow: 0 0 20px 6px var(--color-theme); }
+}
+
+/* Stronger pulsating animation for Step 3 */
+@keyframes strong-tab-pulse {
+  0% { box-shadow: 0 0 15px 5px var(--color-theme); }
+  100% { box-shadow: 0 0 30px 10px var(--color-theme); }
 }
 
 /* Enhanced pulsating animation for the central button */

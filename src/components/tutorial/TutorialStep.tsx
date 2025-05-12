@@ -68,29 +68,39 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         console.log("Arrow button not found, using fallback position");
       }
     } else if (step.id === 3) {
-      // For step 3 - position the popup below the Record Entry tab
-      const recordEntryTab = document.querySelector('[data-value="record"]');
-      if (recordEntryTab) {
-        const rect = recordEntryTab.getBoundingClientRect();
-        // Position below the Record Entry tab
-        setPosition({
-          top: rect.bottom + 20,
-          left: rect.left + (rect.width / 2),
-          transform: 'translateX(-50%)'
-        });
-        console.log("Positioning popup for step 3 below Record Entry tab:", {
-          top: rect.bottom + 20,
-          left: rect.left + (rect.width / 2)
-        });
-      } else {
-        // Fallback if tab not found
-        setPosition({ 
-          top: 120, 
-          left: '50%', 
-          transform: 'translateX(-50%)' 
-        });
-        console.log("Record Entry tab not found, using fallback position");
-      }
+      // For step 3 - try to position below the Record Entry tab with improved targeting
+      console.log("Attempting to position popup for step 3");
+      
+      // Try multiple selectors with a delay to ensure the element is loaded
+      setTimeout(() => {
+        const recordEntryTab = document.querySelector('[data-value="record"]') || 
+                              document.querySelector('.record-entry-tab');
+        
+        if (recordEntryTab) {
+          const rect = recordEntryTab.getBoundingClientRect();
+          console.log("Found Record Entry tab with rect:", rect);
+          
+          // Position below the Record Entry tab with more spacing
+          setPosition({
+            top: rect.bottom + 30, // More space below the tab
+            left: rect.left + (rect.width / 2),
+            transform: 'translateX(-50%)'
+          });
+          console.log("Positioned popup for step 3 below Record Entry tab:", {
+            top: rect.bottom + 30,
+            left: rect.left + (rect.width / 2)
+          });
+        } else {
+          console.warn("Record Entry tab not found for positioning step 3 popup");
+          // Use a more reliable fallback position - center of top area
+          setPosition({ 
+            top: 130, 
+            left: '50%', 
+            transform: 'translateX(-50%)' 
+          });
+          console.log("Using fallback position for step 3");
+        }
+      }, 600); // Increased delay to ensure DOM elements are fully loaded
     } else if (step.targetElement) {
       const targetElement = document.querySelector(step.targetElement);
       if (targetElement) {
