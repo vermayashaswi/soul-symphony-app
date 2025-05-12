@@ -18,15 +18,18 @@ const Home = () => {
     console.log('Home component mounted, tutorial active:', isActive);
     console.log('Current tutorial step:', currentStep);
     
-    // Enhanced check for tutorial element visibility
+    // Prevent scrolling when tutorial is active
     if (isActive) {
+      document.body.style.overflow = 'hidden';
+      
+      // Enhanced check for tutorial element visibility
       if (isInWelcomeTutorialStep) {
         setTimeout(() => {
           const journalHeader = document.querySelector('.journal-header-container');
           if (journalHeader) {
             console.log('Journal header found and ready for tutorial highlighting');
           }
-        }, 500);
+        }, 100);
       } else if (isInArrowTutorialStep) {
         setTimeout(() => {
           const arrowButton = document.querySelector('.journal-arrow-button');
@@ -41,13 +44,21 @@ const Home = () => {
           } else {
             console.warn('Journal arrow button not found in DOM');
           }
-        }, 500); // Small delay to ensure component is fully rendered
+        }, 100);
       }
+      
+      // Cleanup function to restore scrolling
+      return () => {
+        document.body.style.overflow = '';
+      };
     }
   }, [isActive, currentStep, isInArrowTutorialStep, isInWelcomeTutorialStep]);
 
   return (
-    <div className={`min-h-screen bg-background text-foreground relative overflow-hidden ${isActive ? 'tutorial-active-page' : ''}`}>
+    <div 
+      className={`min-h-screen bg-background text-foreground relative overflow-hidden ${isActive ? 'tutorial-active-page' : ''}`}
+      style={{ touchAction: isActive ? 'none' : 'auto' }}
+    >
       {/* Background elements including animations */}
       <BackgroundElements />
 
@@ -61,8 +72,8 @@ const Home = () => {
       {/* Journal content with summary and quote */}
       <JournalContent />
 
-      {/* Header with journal name and date */}
-      <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col h-screen`}>
+      {/* Header with journal name and date - ensure visibility during tutorial */}
+      <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col`}>
         <JournalHeader />
       </div>
 

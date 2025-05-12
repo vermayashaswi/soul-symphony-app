@@ -15,15 +15,22 @@ const TutorialOverlay: React.FC = () => {
     skipTutorial
   } = useTutorial();
 
-  // Lock body scrolling when tutorial is active
+  // Enhanced scrolling prevention when tutorial is active
   useEffect(() => {
     if (isActive) {
-      // Add a class to the body to prevent scrolling
+      // Save current scroll position
+      const scrollPos = window.scrollY;
+      
+      // Add classes to the body to prevent scrolling
       document.body.classList.add('tutorial-active');
+      document.body.style.top = `-${scrollPos}px`;
       
       // Clean up when tutorial is deactivated
       return () => {
         document.body.classList.remove('tutorial-active');
+        document.body.style.top = '';
+        // Restore scroll position
+        window.scrollTo(0, scrollPos);
       };
     }
   }, [isActive]);
@@ -86,7 +93,7 @@ const TutorialOverlay: React.FC = () => {
   const isLastStep = currentStep === totalSteps - 1;
 
   return (
-    <div className="fixed inset-0 z-[9997] pointer-events-auto">
+    <div className="fixed inset-0 z-[9997] pointer-events-auto" onClick={(e) => e.stopPropagation()}>
       {/* Semi-transparent overlay with improved interaction blocking */}
       <motion.div
         className="tutorial-overlay absolute inset-0"

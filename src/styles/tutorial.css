@@ -57,25 +57,35 @@
   overflow: hidden !important;
 }
 
+/* Enhanced body style when tutorial is active - stronger scroll prevention */
 body.tutorial-active {
   overflow: hidden !important;
   touch-action: none !important;
+  position: fixed !important; /* Keep body fixed to prevent any scrolling */
+  width: 100% !important;
+  height: 100% !important;
 }
 
-/* Enhanced button highlighting for tutorial step 2 - much more prominent now */
-.journal-arrow-button.tutorial-target {
-  z-index: 9999 !important;
-  position: relative !important;
-  animation: pulse 2s infinite;
-}
-
-/* Journal header highlighting for tutorial step 1 */
+/* Journal header highlighting for tutorial step 1 - improved visibility */
 .journal-header-container.tutorial-target {
   z-index: 9999 !important;
   position: relative !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  max-height: unset !important; /* Remove any height restrictions */
+  overflow: visible !important;
 }
 
-/* Stronger button glow effect with enhanced visibility */
+/* Enhanced journal header text visibility for tutorial step 1 */
+.journal-header-container.tutorial-target h1 {
+  opacity: 1 !important;
+  visibility: visible !important;
+  display: block !important;
+  max-height: unset !important;
+  overflow: visible !important;
+}
+
+/* Enhanced button glow effect with enhanced visibility */
 .tutorial-button-highlight {
   box-shadow: 0 0 30px 15px var(--color-theme) !important;
   animation: button-pulse 2s infinite alternate !important;
@@ -117,6 +127,13 @@ body.tutorial-active {
   pointer-events: auto !important;
 }
 
+/* Ensure all tutorial step content is visible */
+.tutorial-step-container h3,
+.tutorial-step-container p {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
 .tutorial-buttons {
   z-index: 10001 !important; /* Above everything else */
   pointer-events: auto !important;
@@ -127,4 +144,16 @@ body.tutorial-active {
   position: relative;
   z-index: 10001 !important; /* Above everything else */
   pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Make Next button more pronounced */
+.tutorial-step-container button[class*="bg-theme"] {
+  transform: scale(1.05);
+  box-shadow: 0 0 10px 2px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7);
+}
+
+/* Tutorial modal style enhancements */
+.tutorial-step-container {
+  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4) !important;
 }

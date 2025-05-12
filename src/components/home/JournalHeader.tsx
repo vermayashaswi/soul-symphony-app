@@ -83,11 +83,13 @@ const JournalHeader: React.FC = () => {
               letterSpacing: '0.005em',
               WebkitFontSmoothing: 'antialiased',
               MozOsxFontSmoothing: 'grayscale',
-              display: '-webkit-box',
-              WebkitLineClamp: '2',
+              display: isInWelcomeTutorialStep ? 'block' : '-webkit-box',
+              WebkitLineClamp: isInWelcomeTutorialStep ? 'none' : '2',
               WebkitBoxOrient: 'vertical',
-              overflow: 'hidden',
-              maxHeight: '60px'
+              overflow: isInWelcomeTutorialStep ? 'visible' : 'hidden',
+              maxHeight: isInWelcomeTutorialStep ? 'none' : '60px',
+              visibility: 'visible',
+              opacity: 1
             }}
           >
             <TranslatableText text={getJournalName()} forceTranslate={true} />
@@ -107,7 +109,9 @@ const JournalHeader: React.FC = () => {
                 fontWeight: 500,
                 letterSpacing: '0.01em',
                 WebkitFontSmoothing: 'antialiased',
-                MozOsxFontSmoothing: 'grayscale'
+                MozOsxFontSmoothing: 'grayscale',
+                visibility: 'visible',
+                opacity: 1
               }}
             >
               <TranslatableText text={formattedDate} forceTranslate={true} />

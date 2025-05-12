@@ -37,7 +37,14 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Calculate position based on target element (if specified)
   useEffect(() => {
-    if (step.id === 2) {
+    if (step.id === 1) {
+      // For step 1 - position the popup in center of screen
+      setPosition({
+        top: window.innerHeight / 2 - 150,
+        left: '50%'
+      });
+      console.log("Positioning popup for step 1 in center of screen");
+    } else if (step.id === 2) {
       // For step 2 - position the popup well above the arrow button to ensure visibility
       const arrowButton = document.querySelector('.journal-arrow-button');
       if (arrowButton) {
@@ -107,17 +114,23 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Handle navigation actions with stopPropagation to ensure they work
   const handleNext = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
+    console.log("Next button clicked!");
     onNext();
   };
   
   const handlePrev = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
+    console.log("Previous button clicked!");
     onPrev();
   };
   
   const handleSkip = (e: React.MouseEvent) => {
+    e.preventDefault();
     e.stopPropagation();
+    console.log("Skip button clicked!");
     onSkip();
   };
   
@@ -125,19 +138,13 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   const getPositionStyle = () => {
     const style: React.CSSProperties = { 
       top: position.top,
-      transform: step.id === 2 ? 'translateX(-50%)' : undefined // Center horizontally for step 2
+      transform: step.id === 1 || step.id === 2 ? 'translateX(-50%)' : undefined // Center horizontally for steps 1 and 2
     };
     
     if (position.right !== undefined) {
       style.right = position.right;
     } else if (position.left !== undefined) {
       style.left = position.left;
-    }
-    
-    // Set a smaller width for step 2 to make it more compact
-    if (step.id === 2) {
-      style.maxWidth = '280px';
-      style.minWidth = '240px';
     }
     
     return style;
