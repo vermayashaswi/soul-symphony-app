@@ -5,6 +5,15 @@ import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialStep from './TutorialStep';
 import { useNavigate } from 'react-router-dom';
 
+// Define possible selectors at the component level so they are available throughout
+const RECORD_ENTRY_SELECTORS = [
+  '[data-value="record"]',
+  '.record-entry-tab',
+  '.tutorial-record-entry-button',
+  'button[data-tutorial-target="record-entry"]',
+  '.record-entry-button'
+];
+
 const TutorialOverlay: React.FC = () => {
   const { 
     isActive, 
@@ -117,19 +126,10 @@ const TutorialOverlay: React.FC = () => {
       
       // Function to apply highlighting to step 3 elements
       const applyStep3Highlighting = () => {
-        // Try multiple selectors to find the target
-        const possibleSelectors = [
-          '[data-value="record"]',
-          '.record-entry-tab',
-          '.tutorial-record-entry-button',
-          'button[data-tutorial-target="record-entry"]',
-          '.record-entry-button'
-        ];
-        
         let recordEntryElement = null;
         
         // Try each selector until we find a match
-        for (const selector of possibleSelectors) {
+        for (const selector of RECORD_ENTRY_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
             recordEntryElement = element;
@@ -178,7 +178,7 @@ const TutorialOverlay: React.FC = () => {
         clearTimeout(thirdAttempt);
         
         // Remove classes from all possible elements
-        possibleSelectors.forEach(selector => {
+        RECORD_ENTRY_SELECTORS.forEach(selector => {
           const element = document.querySelector(selector);
           if (element) {
             element.classList.remove('tutorial-target', 'record-entry-tab', 'tutorial-highlight');
