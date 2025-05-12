@@ -11,7 +11,8 @@ const RECORD_ENTRY_SELECTORS = [
   '.record-entry-tab',
   '.tutorial-record-entry-button',
   'button[data-tutorial-target="record-entry"]',
-  '.record-entry-button'
+  '.record-entry-button',
+  '#new-entry-button'  // Adding ID selector for more reliable targeting
 ];
 
 const TutorialOverlay: React.FC = () => {
@@ -92,18 +93,20 @@ const TutorialOverlay: React.FC = () => {
         cleanup = handleArrowButtonVisibility();
         break;
       case 3:
+        console.log('TutorialOverlay - Step 3 detected, current path:', location.pathname);
         // Ensure we're on the journal page for step 3
         if (location.pathname === '/app/journal') {
           cleanup = handleRecordEntryVisibility();
         } else {
-          console.log('TutorialOverlay - Not on journal page yet, waiting for navigation');
+          console.log('TutorialOverlay - Not on journal page yet. Will navigate there soon.');
+          navigate('/app/journal');
         }
         break;
     }
     
     // Return combined cleanup function
     return cleanup;
-  }, [isActive, currentStep, steps, location.pathname]);
+  }, [isActive, currentStep, steps, location.pathname, navigate]);
 
   // Handle step 1 - journal header visibility
   const handleJournalHeaderVisibility = () => {
@@ -158,12 +161,23 @@ const TutorialOverlay: React.FC = () => {
     setElementForStep3Found(false);
     
     // Use a series of attempts with increasing delays to find the element
-    const attempts = [100, 500, 1000, 2000];
+    const attempts = [100, 300, 500, 1000, 2000];
     const timeouts: NodeJS.Timeout[] = [];
     
     attempts.forEach((delay, index) => {
       const timeout = setTimeout(() => {
         console.log(`TutorialOverlay - Attempt ${index + 1} to find Record Entry element`);
+        
+        // Log all available elements in the DOM for debugging
+        console.log('Checking all possible Record Entry elements:');
+        RECORD_ENTRY_SELECTORS.forEach(selector => {
+          const elements = document.querySelectorAll(selector);
+          console.log(`  - ${selector}: ${elements.length} elements found`);
+          elements.forEach((el, i) => {
+            console.log(`    Element ${i}:`, el);
+          });
+        });
+        
         const found = applyStep3Highlighting();
         
         if (found) {
@@ -176,6 +190,11 @@ const TutorialOverlay: React.FC = () => {
           });
         } else if (index === attempts.length - 1) {
           console.warn('TutorialOverlay - All attempts to find Record Entry element failed');
+          
+          // Force showing the tutorial step even if the element wasn't found
+          // This ensures users can progress through the tutorial
+          setElementForStep3Found(true);
+          console.log('TutorialOverlay - Forcing step 3 to show anyway');
         }
       }, delay);
       
@@ -189,15 +208,15 @@ const TutorialOverlay: React.FC = () => {
       
       // Remove classes from all possible elements
       RECORD_ENTRY_SELECTORS.forEach(selector => {
-        const element = document.querySelector(selector);
-        if (element) {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
           element.classList.remove('tutorial-target', 'record-entry-tab', 'tutorial-highlight');
           (element as HTMLElement).style.visibility = '';
           (element as HTMLElement).style.opacity = '';
           (element as HTMLElement).style.pointerEvents = '';
           (element as HTMLElement).style.position = '';
           (element as HTMLElement).style.zIndex = '';
-        }
+        });
       });
     };
   };
@@ -206,19 +225,12 @@ const TutorialOverlay: React.FC = () => {
   const applyStep3Highlighting = (): boolean => {
     let recordEntryElement = null;
     
-    // Log all elements present in the DOM for debugging
-    console.log('TutorialOverlay - Searching for Record Entry elements with selectors:');
-    RECORD_ENTRY_SELECTORS.forEach(selector => {
-      const element = document.querySelector(selector);
-      console.log(`  - ${selector}: ${element ? 'FOUND' : 'not found'}`);
-    });
-    
     // Try each selector until we find a match
     for (const selector of RECORD_ENTRY_SELECTORS) {
-      const element = document.querySelector(selector);
-      if (element) {
-        recordEntryElement = element;
-        console.log(`Found Record Entry element with selector: ${selector}`, element);
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        recordEntryElement = elements[0];
+        console.log(`Found Record Entry element with selector: ${selector}`, recordEntryElement);
         break;
       }
     }
@@ -264,8 +276,9 @@ const TutorialOverlay: React.FC = () => {
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === totalSteps - 1;
 
-  // Don't render the step UI if on step 3 and the element hasn't been found yet
-  const shouldRenderStepUI = !(currentTutorialStep?.id === 3 && !elementForStep3Found && location.pathname === '/app/journal');
+  // For step 3, we'll show the UI regardless of whether the element is found 
+  // This ensures users can progress even if there are targeting issues
+  const shouldRenderStepUI = !(currentTutorialStep?.id === 3 && !elementForStep3Found && location.pathname === '/app/journal' && location.pathname !== '/app/journal');
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto" onClick={(e) => e.stopPropagation()}>

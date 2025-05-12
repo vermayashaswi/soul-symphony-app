@@ -99,7 +99,9 @@ body.tutorial-active {
 
 /* Record Entry tab highlighting for tutorial step 3 */
 [data-value="record"].tutorial-target,
-.tutorial-record-entry-button.tutorial-target {
+.tutorial-record-entry-button.tutorial-target,
+button[data-tutorial-target="record-entry"].tutorial-target,
+#new-entry-button.tutorial-target {
   z-index: 10000 !important;
   position: relative !important;
   box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7) !important;
@@ -114,7 +116,9 @@ body.tutorial-active {
 
 /* Specific styling for step 3 - more prominent highlight */
 .record-entry-tab.tutorial-target,
-.tutorial-record-entry-button.tutorial-target {
+.tutorial-record-entry-button.tutorial-target,
+button[data-tutorial-target="record-entry"].tutorial-target,
+#new-entry-button.tutorial-target {
   z-index: 10000 !important; /* Higher z-index than normal tutorial targets */
   position: relative !important;
   box-shadow: 0 0 20px 10px var(--color-theme) !important; 
