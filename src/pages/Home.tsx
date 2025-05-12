@@ -61,12 +61,8 @@ const Home = () => {
       {/* Background elements including animations */}
       <BackgroundElements />
 
-      {/* Central navigation button with exact center positioning and maximum z-index */}
-      <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-        <div className={`pointer-events-auto ${isInArrowTutorialStep ? 'z-[9999]' : 'z-40'}`}>
-          <JournalNavigationButton />
-        </div>
-      </div>
+      {/* Central navigation button - now using fixed positioning directly in the component */}
+      <JournalNavigationButton />
 
       {/* Journal content with summary and quote */}
       <JournalContent />
@@ -75,8 +71,6 @@ const Home = () => {
       <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col`}>
         <JournalHeader />
       </div>
-
-      {/* Removed TutorialOverlay from here as it's now in App.tsx */}
     </div>
   );
 };

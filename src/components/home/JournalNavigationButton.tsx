@@ -33,10 +33,11 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, [isActive, currentStep, isInArrowTutorialStep]);
 
-  // Position the button at exact center (50%) to align with the energy animation's center
+  // Adjusted to position exactly at the center of the screen
+  // Using fixed position instead of absolute to ensure it stays centered regardless of parent elements
   const buttonWrapperStyle = {
-    position: 'absolute',
-    top: '50%', // Changed back to 50% to center with the energy animation
+    position: 'fixed',
+    top: '50%',
     left: '50%',
     transform: 'translate(-50%, -50%)',
     zIndex: isInArrowTutorialStep ? 9999 : 40,
