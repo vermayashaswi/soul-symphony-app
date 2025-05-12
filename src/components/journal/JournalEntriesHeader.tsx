@@ -21,6 +21,7 @@ export const JournalEntriesHeader: React.FC<JournalEntriesHeaderProps> = ({
         size="sm"
         className="flex items-center gap-1 record-entry-button tutorial-record-entry-button"
         data-tutorial-target="record-entry"
+        id="new-entry-button"
       >
         <Plus className="w-4 h-4" />
         <TranslatableText text="New entry" />

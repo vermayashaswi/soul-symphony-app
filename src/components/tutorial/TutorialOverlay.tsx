@@ -1,9 +1,9 @@
 
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialStep from './TutorialStep';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 
 // Define possible selectors at the component level so they are available throughout
 const RECORD_ENTRY_SELECTORS = [
@@ -25,6 +25,8 @@ const TutorialOverlay: React.FC = () => {
     skipTutorial
   } = useTutorial();
   const navigate = useNavigate();
+  const location = useLocation();
+  const [elementForStep3Found, setElementForStep3Found] = useState(false);
 
   // Enhanced scrolling prevention when tutorial is active
   useEffect(() => {
@@ -49,35 +51,59 @@ const TutorialOverlay: React.FC = () => {
   // Handle navigation if specified in tutorial step
   useEffect(() => {
     if (!isActive) return;
+    
+    // Debug the current state
+    console.log('TutorialOverlay - Current state:', {
+      isActive,
+      currentStep,
+      currentPath: location.pathname,
+      currentStepData: steps[currentStep]
+    });
+    
     handleStepNavigation();
-  }, [isActive, currentStep, steps, navigate]);
+  }, [isActive, currentStep, steps, navigate, location.pathname]);
 
-  // Separated navigation handling logic
+  // Separated navigation handling logic with improved logging
   const handleStepNavigation = () => {
     const currentTutorialStep = steps[currentStep];
-    if (currentTutorialStep?.navigateTo) {
-      console.log(`Navigating to ${currentTutorialStep.navigateTo} for tutorial step ${currentTutorialStep.id}`);
+    if (currentTutorialStep?.navigateTo && location.pathname !== currentTutorialStep.navigateTo) {
+      console.log(`TutorialOverlay - Navigating to ${currentTutorialStep.navigateTo} for tutorial step ${currentTutorialStep.id}`);
       navigate(currentTutorialStep.navigateTo);
     }
   };
 
-  // Enhanced handling for different tutorial steps
+  // Enhanced handling for different tutorial steps with better detection for step 3
   useEffect(() => {
     if (!isActive) return;
     
     const currentTutorialStep = steps[currentStep];
     if (!currentTutorialStep) return;
     
+    console.log(`TutorialOverlay - Setting up step ${currentTutorialStep.id} on path ${location.pathname}`);
+    
     // Apply highlighting based on step ID
+    let cleanup: (() => void) | undefined;
+    
     switch (currentTutorialStep.id) {
       case 1:
-        return handleJournalHeaderVisibility();
+        cleanup = handleJournalHeaderVisibility();
+        break;
       case 2:
-        return handleArrowButtonVisibility();
+        cleanup = handleArrowButtonVisibility();
+        break;
       case 3:
-        return handleRecordEntryVisibility();
+        // Ensure we're on the journal page for step 3
+        if (location.pathname === '/app/journal') {
+          cleanup = handleRecordEntryVisibility();
+        } else {
+          console.log('TutorialOverlay - Not on journal page yet, waiting for navigation');
+        }
+        break;
     }
-  }, [isActive, currentStep, steps]);
+    
+    // Return combined cleanup function
+    return cleanup;
+  }, [isActive, currentStep, steps, location.pathname]);
 
   // Handle step 1 - journal header visibility
   const handleJournalHeaderVisibility = () => {
@@ -126,30 +152,40 @@ const TutorialOverlay: React.FC = () => {
     }
   };
 
-  // Handle step 3 - Record Entry tab/button visibility
+  // Handle step 3 - Record Entry tab/button visibility with improved debugging
   const handleRecordEntryVisibility = () => {
-    // First attempt at finding elements after a short delay
-    const initialDelay = setTimeout(() => {
-      applyStep3Highlighting();
-    }, 500);
+    console.log('TutorialOverlay - Setting up Record Entry visibility for step 3');
+    setElementForStep3Found(false);
     
-    // Try again with longer delays to ensure elements are loaded
-    const secondAttempt = setTimeout(() => {
-      console.log("Second attempt at highlighting Record Entry elements");
-      applyStep3Highlighting();
-    }, 1000);
+    // Use a series of attempts with increasing delays to find the element
+    const attempts = [100, 500, 1000, 2000];
+    const timeouts: NodeJS.Timeout[] = [];
     
-    const thirdAttempt = setTimeout(() => {
-      console.log("Third attempt at highlighting Record Entry elements");
-      applyStep3Highlighting();
-    }, 2000);
+    attempts.forEach((delay, index) => {
+      const timeout = setTimeout(() => {
+        console.log(`TutorialOverlay - Attempt ${index + 1} to find Record Entry element`);
+        const found = applyStep3Highlighting();
+        
+        if (found) {
+          console.log(`TutorialOverlay - Found element on attempt ${index + 1}`);
+          setElementForStep3Found(true);
+          
+          // Clear remaining timeouts
+          timeouts.forEach((t, i) => {
+            if (i > index) clearTimeout(t);
+          });
+        } else if (index === attempts.length - 1) {
+          console.warn('TutorialOverlay - All attempts to find Record Entry element failed');
+        }
+      }, delay);
+      
+      timeouts.push(timeout);
+    });
     
     // Clean up when step changes
     return () => {
       console.log("Cleaning up Record Entry element styles");
-      clearTimeout(initialDelay);
-      clearTimeout(secondAttempt);
-      clearTimeout(thirdAttempt);
+      timeouts.forEach(t => clearTimeout(t));
       
       // Remove classes from all possible elements
       RECORD_ENTRY_SELECTORS.forEach(selector => {
@@ -166,9 +202,16 @@ const TutorialOverlay: React.FC = () => {
     };
   };
   
-  // Function to apply highlighting to step 3 elements
-  const applyStep3Highlighting = () => {
+  // Function to apply highlighting to step 3 elements with better debugging
+  const applyStep3Highlighting = (): boolean => {
     let recordEntryElement = null;
+    
+    // Log all elements present in the DOM for debugging
+    console.log('TutorialOverlay - Searching for Record Entry elements with selectors:');
+    RECORD_ENTRY_SELECTORS.forEach(selector => {
+      const element = document.querySelector(selector);
+      console.log(`  - ${selector}: ${element ? 'FOUND' : 'not found'}`);
+    });
     
     // Try each selector until we find a match
     for (const selector of RECORD_ENTRY_SELECTORS) {
@@ -207,8 +250,11 @@ const TutorialOverlay: React.FC = () => {
         zIndex: computedStyle.zIndex,
         position: computedStyle.position
       });
+      
+      return true;
     } else {
       console.warn("Could not find Record Entry element for tutorial step 3 with any selector");
+      return false;
     }
   };
 
@@ -217,6 +263,9 @@ const TutorialOverlay: React.FC = () => {
   const currentTutorialStep = steps[currentStep];
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === totalSteps - 1;
+
+  // Don't render the step UI if on step 3 and the element hasn't been found yet
+  const shouldRenderStepUI = !(currentTutorialStep?.id === 3 && !elementForStep3Found && location.pathname === '/app/journal');
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto" onClick={(e) => e.stopPropagation()}>
@@ -232,17 +281,19 @@ const TutorialOverlay: React.FC = () => {
 
       {/* Tutorial step with enhanced z-index and pointer events */}
       <AnimatePresence mode="wait">
-        <TutorialStep
-          key={currentStep}
-          step={currentTutorialStep}
-          onNext={nextStep}
-          onPrev={prevStep}
-          onSkip={skipTutorial}
-          isFirst={isFirstStep}
-          isLast={isLastStep}
-          stepNumber={currentStep + 1}
-          totalSteps={totalSteps}
-        />
+        {shouldRenderStepUI && (
+          <TutorialStep
+            key={currentStep}
+            step={currentTutorialStep}
+            onNext={nextStep}
+            onPrev={prevStep}
+            onSkip={skipTutorial}
+            isFirst={isFirstStep}
+            isLast={isLastStep}
+            stepNumber={currentStep + 1}
+            totalSteps={totalSteps}
+          />
+        )}
       </AnimatePresence>
     </div>
   );

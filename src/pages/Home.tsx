@@ -1,7 +1,6 @@
 
 import React, { useEffect } from 'react';
 import { useTutorial } from '@/contexts/TutorialContext';
-import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
 import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
@@ -77,8 +76,7 @@ const Home = () => {
         <JournalHeader />
       </div>
 
-      {/* Tutorial overlay system - this should be last to overlay everything except highlighted elements */}
-      <TutorialOverlay />
+      {/* Removed TutorialOverlay from here as it's now in App.tsx */}
     </div>
   );
 };

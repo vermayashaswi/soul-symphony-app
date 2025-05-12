@@ -7,7 +7,9 @@ import { TranslationProvider } from '@/contexts/TranslationContext';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
+import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import './styles/emoji.css';
+import './styles/tutorial.css'; // Ensure tutorial styles are imported
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -32,6 +34,8 @@ const App: React.FC = () => {
         <TranslationLoadingOverlay />
         <JournalProcessingInitializer />
         <AppRoutes />
+        {/* Add the TutorialOverlay at the root level so it's available on all pages */}
+        <TutorialOverlay />
         <Toaster />
         <SonnerToaster position="top-right" />
       </TutorialProvider>
