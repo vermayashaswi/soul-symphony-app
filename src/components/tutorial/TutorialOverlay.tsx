@@ -3,6 +3,7 @@ import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialStep from './TutorialStep';
+import { useNavigate } from 'react-router-dom';
 
 const TutorialOverlay: React.FC = () => {
   const { 
@@ -14,6 +15,7 @@ const TutorialOverlay: React.FC = () => {
     prevStep, 
     skipTutorial
   } = useTutorial();
+  const navigate = useNavigate();
 
   // Enhanced scrolling prevention when tutorial is active
   useEffect(() => {
@@ -34,6 +36,17 @@ const TutorialOverlay: React.FC = () => {
       };
     }
   }, [isActive]);
+
+  // Handle navigation if specified in tutorial step
+  useEffect(() => {
+    if (!isActive) return;
+    
+    const currentTutorialStep = steps[currentStep];
+    if (currentTutorialStep?.navigateTo) {
+      console.log(`Navigating to ${currentTutorialStep.navigateTo} for tutorial step ${currentTutorialStep.id}`);
+      navigate(currentTutorialStep.navigateTo);
+    }
+  }, [isActive, currentStep, steps, navigate]);
 
   // Enhanced handling for different tutorial steps
   useEffect(() => {
@@ -82,6 +95,31 @@ const TutorialOverlay: React.FC = () => {
         };
       } else {
         console.warn("Could not find journal-arrow-button element for tutorial step 2");
+      }
+    }
+    // Handle step 3 - Record Entry tab visibility
+    else if (steps[currentStep]?.id === 3) {
+      const recordEntryTab = document.querySelector('[data-value="record"]');
+      
+      if (recordEntryTab) {
+        console.log("Enhancing Record Entry tab visibility for tutorial step 3");
+        
+        // Add tutorial target class to make the tab visible through overlay
+        recordEntryTab.classList.add('tutorial-target');
+        recordEntryTab.classList.add('record-entry-tab');
+        
+        // Add enhanced highlighting for better visibility
+        recordEntryTab.classList.add('tutorial-highlight');
+        
+        // Clean up when step changes
+        return () => {
+          console.log("Cleaning up Record Entry tab styles");
+          recordEntryTab.classList.remove('tutorial-target');
+          recordEntryTab.classList.remove('tutorial-highlight');
+          recordEntryTab.classList.remove('record-entry-tab');
+        };
+      } else {
+        console.warn("Could not find Record Entry tab for tutorial step 3");
       }
     }
   }, [isActive, currentStep, steps]);

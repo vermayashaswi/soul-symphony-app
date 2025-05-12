@@ -97,6 +97,21 @@ body.tutorial-active {
   opacity: 0.95 !important;
 }
 
+/* Record Entry tab highlighting for tutorial step 3 */
+[data-value="record"].tutorial-target {
+  z-index: 9999 !important;
+  position: relative !important;
+  box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7) !important;
+  animation: tab-pulse 2s infinite alternate !important;
+  border-radius: 0.5rem;
+}
+
+/* Record entry tab pulsating animation */
+@keyframes tab-pulse {
+  0% { box-shadow: 0 0 10px 3px var(--color-theme); }
+  100% { box-shadow: 0 0 20px 6px var(--color-theme); }
+}
+
 /* Enhanced pulsating animation for the central button */
 @keyframes button-pulse {
   0% { box-shadow: 0 0 25px 12px var(--color-theme); }

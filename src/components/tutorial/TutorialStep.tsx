@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -65,6 +66,30 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         // Fallback if button not found
         setPosition({ top: 140, left: '50%', transform: 'translateX(-50%)' });
         console.log("Arrow button not found, using fallback position");
+      }
+    } else if (step.id === 3) {
+      // For step 3 - position the popup below the Record Entry tab
+      const recordEntryTab = document.querySelector('[data-value="record"]');
+      if (recordEntryTab) {
+        const rect = recordEntryTab.getBoundingClientRect();
+        // Position below the Record Entry tab
+        setPosition({
+          top: rect.bottom + 20,
+          left: rect.left + (rect.width / 2),
+          transform: 'translateX(-50%)'
+        });
+        console.log("Positioning popup for step 3 below Record Entry tab:", {
+          top: rect.bottom + 20,
+          left: rect.left + (rect.width / 2)
+        });
+      } else {
+        // Fallback if tab not found
+        setPosition({ 
+          top: 120, 
+          left: '50%', 
+          transform: 'translateX(-50%)' 
+        });
+        console.log("Record Entry tab not found, using fallback position");
       }
     } else if (step.targetElement) {
       const targetElement = document.querySelector(step.targetElement);

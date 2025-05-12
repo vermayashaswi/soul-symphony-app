@@ -14,6 +14,7 @@ export interface TutorialStep {
   position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
   showNextButton?: boolean;
   showSkipButton?: boolean;
+  navigateTo?: string; // New property for navigation
 }
 
 // Define the interface for the tutorial context
@@ -51,6 +52,16 @@ const initialTutorialSteps: TutorialStep[] = [
     position: 'top',
     showNextButton: true,
     showSkipButton: true,
+  },
+  {
+    id: 3,
+    title: 'Multilingual Recording',
+    content: 'The Record Entry tab lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
+    targetElement: '.record-entry-tab',
+    position: 'bottom',
+    showNextButton: true,
+    showSkipButton: true,
+    navigateTo: '/app/journal' // Navigate to journal page for this step
   }
   // More steps can be added here
 ];
