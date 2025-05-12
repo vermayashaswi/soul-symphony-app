@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -17,9 +16,10 @@ interface TutorialStepProps {
 }
 
 interface PositionState {
-  top: number;
+  top?: number | string;
   left?: number | string;
   right?: number | string;
+  transform?: string;
 }
 
 const TutorialStep: React.FC<TutorialStepProps> = ({
@@ -32,18 +32,19 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   stepNumber,
   totalSteps
 }) => {
-  const [position, setPosition] = useState<PositionState>({ top: 20, right: 20 });
+  const [position, setPosition] = useState<PositionState>({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
   const stepRef = useRef<HTMLDivElement>(null);
   
   // Calculate position based on target element (if specified)
   useEffect(() => {
     if (step.id === 1) {
-      // For step 1 - position the popup in center of screen
+      // For step 1 - position the popup exactly in center of screen
       setPosition({
-        top: window.innerHeight / 2 - 150,
-        left: '50%'
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)'
       });
-      console.log("Positioning popup for step 1 in center of screen");
+      console.log("Positioning welcome popup for step 1 in exact center of screen");
     } else if (step.id === 2) {
       // For step 2 - position the popup well above the arrow button to ensure visibility
       const arrowButton = document.querySelector('.journal-arrow-button');
@@ -53,7 +54,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         setPosition({
           top: rect.top - 250, // Increased to 250px for better visibility
           left: '50%', // Center horizontally using percentage
-          right: undefined
+          right: undefined,
+          transform: 'translateX(-50%)'
         });
         console.log("Positioning popup for step 2 above arrow button:", { 
           top: rect.top - 250,
@@ -61,7 +63,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         });
       } else {
         // Fallback if button not found
-        setPosition({ top: 140, left: '50%' });
+        setPosition({ top: 140, left: '50%', transform: 'translateX(-50%)' });
         console.log("Arrow button not found, using fallback position");
       }
     } else if (step.targetElement) {
@@ -106,8 +108,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     } else {
       // If no target element, center in viewport
       setPosition({
-        top: window.innerHeight / 2 - (stepRef.current?.offsetHeight || 0) / 2,
-        left: window.innerWidth / 2 - (stepRef.current?.offsetWidth || 0) / 2
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)'
       });
     }
   }, [step.targetElement, step.position, step.id]);
@@ -134,20 +137,14 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     onSkip();
   };
   
-  // Determine the style based on position
+  // Apply all position styles directly
   const getPositionStyle = () => {
-    const style: React.CSSProperties = { 
+    return {
       top: position.top,
-      transform: step.id === 1 || step.id === 2 ? 'translateX(-50%)' : undefined // Center horizontally for steps 1 and 2
+      left: position.left,
+      right: position.right,
+      transform: position.transform
     };
-    
-    if (position.right !== undefined) {
-      style.right = position.right;
-    } else if (position.left !== undefined) {
-      style.left = position.left;
-    }
-    
-    return style;
   };
   
   return (
