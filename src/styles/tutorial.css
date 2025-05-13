@@ -169,6 +169,38 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   transform: translateZ(0) !important;
 }
 
+/* Step 5: Chat question suggestion highlighting */
+.chat-question-suggestion.tutorial-target,
+.chat-suggestion-item.tutorial-target,
+.tutorial-chat-question.tutorial-target {
+  z-index: 10000 !important;
+  position: relative !important;
+  box-shadow: 0 0 25px 12px var(--color-theme) !important; 
+  animation: strong-tab-pulse 1.5s infinite alternate !important;
+  border: 2px solid white !important;
+  opacity: 1 !important;
+  transform: translateZ(0) !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
+/* Step 6: Chat response highlighting */
+.chat-ai-response.tutorial-target,
+.chat-response-content.tutorial-target,
+.tutorial-chat-response.tutorial-target {
+  z-index: 10000 !important;
+  position: relative !important;
+  box-shadow: 0 0 25px 12px var(--color-theme) !important; 
+  animation: strong-tab-pulse 1.5s infinite alternate !important;
+  border: 2px solid white !important;
+  opacity: 1 !important;
+  transform: translateZ(0) !important;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  display: block !important;
+}
+
 /* Force elements to be visible and clickable even with overlay */
 .tutorial-target * {
   visibility: visible !important;

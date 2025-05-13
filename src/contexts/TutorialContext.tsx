@@ -1,27 +1,16 @@
+import React, { createContext, useContext, useState, useEffect } from 'react';
+import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
 
-import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
-import { useAuth } from './AuthContext';
-import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { isAppRoute } from '@/routes/RouteHelpers';
-
-// Define the interface for a tutorial step
-export interface TutorialStep {
+interface TutorialStep {
   id: number;
   title: string;
   content: string;
-  targetElement?: string; // Optional CSS selector for the element to highlight
-  alternativeSelectors?: string[]; // List of alternative selectors to try if primary fails
-  position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
-  showNextButton?: boolean;
-  showSkipButton?: boolean;
-  navigateTo?: string; // Property for navigation
-  waitForElement?: boolean; // Whether to wait for the element to be present before proceeding
+  target: string;
+  placement: 'top' | 'bottom' | 'left' | 'right';
+  navigateTo?: string;
 }
 
-// Define the interface for the tutorial context
-interface TutorialContextType {
+interface TutorialContextProps {
   isActive: boolean;
   currentStep: number;
   totalSteps: number;
@@ -29,370 +18,137 @@ interface TutorialContextType {
   nextStep: () => void;
   prevStep: () => void;
   skipTutorial: () => void;
-  completeTutorial: () => void;
-  resetTutorial: () => void;
+  startTutorial: () => void;
+  setIsTutorialCompleted: (completed: boolean) => void;
 }
 
-// Create the context with a default undefined value
-const TutorialContext = createContext<TutorialContextType | undefined>(undefined);
+interface TutorialProviderProps {
+  children: React.ReactNode;
+}
 
-// Define the initial tutorial steps with enhanced robustness
+const TutorialContext = createContext<TutorialContextProps | undefined>(undefined);
+
 const initialTutorialSteps: TutorialStep[] = [
   {
     id: 1,
-    title: 'Welcome to Soul Symphony',
-    content: 'Let\'s take a quick tour to help you get started with your journaling journey.',
-    targetElement: '.journal-header-container', // Target the journal header
-    position: 'center',
-    showNextButton: true,
-    showSkipButton: true,
+    title: "Welcome to SOULo!",
+    content: "SOULo helps you track your thoughts, emotions, and insights over time. Let's start by exploring the journal feature.",
+    target: ".journal-header-container",
+    placement: "bottom",
+    navigateTo: "/app/journal"
   },
   {
     id: 2,
-    title: 'Your Journal',
-    content: 'Press this central arrow button to start recording a journal entry instantly. This is your daily oxygen to build your emotional repository.',
-    targetElement: '.journal-arrow-button',
-    position: 'top',
-    showNextButton: true,
-    showSkipButton: true,
+    title: "Start your Journey",
+    content: "This is the heart of the app. Click this button to begin recording your thoughts and emotions.",
+    target: ".journal-arrow-button",
+    placement: "bottom",
+    navigateTo: "/app/journal"
   },
   {
     id: 3,
-    title: 'Multilingual Recording',
-    content: 'The New Entry button lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
-    targetElement: '.tutorial-record-entry-button',
-    alternativeSelectors: [
-      '[data-value="record"]',
-      '.record-entry-tab',
-      'button[data-tutorial-target="record-entry"]',
-      '#new-entry-button'
-    ],
-    position: 'bottom',
-    showNextButton: true,
-    showSkipButton: true,
-    navigateTo: '/app/journal', // Navigate to journal page for this step
-    waitForElement: true // Wait for the element to be present before proceeding
+    title: "Record New Entries",
+    content: "Click here to create a new journal entry when you want to record your thoughts and feelings.",
+    target: '[data-value="record"], .record-entry-tab, .tutorial-record-entry-button, button[data-tutorial-target="record-entry"], #new-entry-button',
+    placement: "bottom",
+    navigateTo: "/app/journal"
   },
   {
     id: 4,
-    title: 'Your Journal History',
-    content: 'View and explore all your past journal entries here. You can search, filter, and reflect on your emotional journey over time.',
-    targetElement: '[value="entries"]', // Target the Past Entries tab
-    alternativeSelectors: [
-      '.entries-tab',
-      'button[data-tutorial-target="past-entries"]',
-      '#past-entries-button'
-    ],
-    position: 'bottom',
-    showNextButton: true,
-    showSkipButton: true,
-    navigateTo: '/app/journal',
-    waitForElement: true
+    title: "View Past Entries",
+    content: "Here you can browse through all your previous journal entries and revisit your thoughts.",
+    target: '[data-value="entries"], .entries-tab, button[data-tutorial-target="past-entries"], #past-entries-button',
+    placement: "bottom",
+    navigateTo: "/app/journal"
+  },
+  {
+    id: 5,
+    title: "Ask Anything",
+    content: "Chat with Rūḥ to gain insights from your journal. You can ask questions or choose from suggestions.",
+    target: ".chat-question-suggestion",
+    placement: "bottom",
+    navigateTo: "/app/chat"
+  },
+  {
+    id: 6,
+    title: "Get Detailed Insights",
+    content: "Rūḥ provides detailed analyses of your journal entries with statistics, trends, and patterns.",
+    target: ".chat-ai-response",
+    placement: "top",
+    navigateTo: "/app/chat"
   }
-  // More steps can be added here
 ];
 
-// Provider component that wraps the app
-export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
-  const { user } = useAuth();
-  const location = useLocation();
-  const navigate = useNavigate();
+export const TutorialProvider: React.FC<TutorialProviderProps> = ({ children }) => {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [steps, setSteps] = useState<TutorialStep[]>(initialTutorialSteps);
-  const [tutorialChecked, setTutorialChecked] = useState(false);
-  const [navigationComplete, setNavigationComplete] = useState(true);
-  
-  // Check if tutorial should be active based on user's profile and current route
+  const [isTutorialCompleted, setIsTutorialCompleted] = useState(false);
+
   useEffect(() => {
-    const checkTutorialStatus = async () => {
-      if (!user || tutorialChecked || !isAppRoute(location.pathname)) return;
-      
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('tutorial_completed, tutorial_step')
-          .eq('id', user.id)
-          .single();
-        
-        if (error) {
-          console.error('Error fetching tutorial status:', error);
-          return;
-        }
-        
-        // Only activate tutorial on home page and if tutorial is not completed
-        const isHomePage = location.pathname === '/app/home';
-        const shouldActivate = data?.tutorial_completed === 'NO' && isHomePage;
-        
-        // Set the current tutorial step (default to 0 if null)
-        const startingStep = data?.tutorial_step || 0;
-        
-        if (shouldActivate) {
-          console.log('Activating tutorial at step:', startingStep);
-          setCurrentStep(startingStep);
-          setIsActive(true);
-        }
-        
-        setTutorialChecked(true);
-      } catch (error) {
-        console.error('Error in tutorial check:', error);
-      }
-    };
-    
-    checkTutorialStatus();
-  }, [user, location.pathname, tutorialChecked]);
-  
-  // Handle navigation between steps when route changes
+    const tutorialCompleted = localStorage.getItem('tutorialCompleted');
+    if (tutorialCompleted === 'true') {
+      setIsTutorialCompleted(true);
+    }
+  }, []);
+
   useEffect(() => {
-    if (isActive && navigationComplete === false) {
-      const currentTutorialStep = steps[currentStep];
-      
-      // Check if the current URL matches the required URL for the step
-      if (currentTutorialStep?.navigateTo && location.pathname === currentTutorialStep.navigateTo) {
-        console.log(`Navigation to ${currentTutorialStep.navigateTo} complete for step ${currentTutorialStep.id}`);
-        setNavigationComplete(true);
-        
-        // After navigation, give time for the page to render before looking for elements
-        if (currentTutorialStep.waitForElement && currentTutorialStep.targetElement) {
-          const checkElement = () => {
-            console.log(`Looking for element ${currentTutorialStep.targetElement} for step ${currentTutorialStep.id}`);
-            
-            // Try the primary selector
-            let element = document.querySelector(currentTutorialStep.targetElement!);
-            
-            // If not found, try alternative selectors if available
-            if (!element && currentTutorialStep.alternativeSelectors) {
-              for (const selector of currentTutorialStep.alternativeSelectors) {
-                element = document.querySelector(selector);
-                if (element) {
-                  console.log(`Found element using alternative selector: ${selector}`);
-                  break;
-                }
-              }
-            }
-            
-            if (element) {
-              console.log(`Element found for step ${currentTutorialStep.id}`);
-              
-              // Add a special class to ensure this element is visible in step 3
-              if (currentTutorialStep.id === 3) {
-                element.classList.add('tutorial-target');
-                element.classList.add('record-entry-tab');
-                console.log('Added special classes to record entry element');
-              }
-            } else {
-              console.warn(`Element not found for step ${currentTutorialStep.id}, retrying...`);
-              setTimeout(checkElement, 500);
-            }
-          };
-          
-          // Start checking for the element with a small delay to allow rendering
-          setTimeout(checkElement, 500);
-        }
-      }
-    }
-  }, [isActive, currentStep, steps, location.pathname, navigationComplete]);
-  
-  // Function to update the tutorial step in the database
-  const updateTutorialStep = async (step: number) => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ tutorial_step: step })
-        .eq('id', user.id);
-        
-      if (error) {
-        console.error('Error updating tutorial step:', error);
-      } else {
-        console.log('Tutorial step updated in database:', step);
-      }
-    } catch (error) {
-      console.error('Error updating tutorial step:', error);
-    }
-  };
-  
-  // Function to mark tutorial as completed
-  const completeTutorial = async () => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          tutorial_completed: 'YES',
-          tutorial_step: steps.length
-        })
-        .eq('id', user.id);
-        
-      if (error) {
-        console.error('Error completing tutorial:', error);
-        return;
-      }
-      
+    if (isTutorialCompleted) {
       setIsActive(false);
-      toast({
-        title: "Tutorial completed!",
-        description: "You can reset it any time in settings."
-      });
-      console.log('Tutorial marked as completed');
-    } catch (error) {
-      console.error('Error completing tutorial:', error);
+      setCurrentStep(0);
     }
+  }, [isTutorialCompleted]);
+
+  const startTutorial = () => {
+    setIsActive(true);
+    setCurrentStep(0);
   };
-  
-  // Move to the next step with enhanced navigation handling
+
   const nextStep = () => {
-    if (currentStep < steps.length - 1) {
-      const newStep = currentStep + 1;
-      const nextTutorialStep = steps[newStep];
-      
-      console.log(`Moving to tutorial step ${newStep} (ID: ${nextTutorialStep.id})`);
-      setCurrentStep(newStep);
-      updateTutorialStep(newStep);
-      
-      // Handle navigation if needed
-      if (nextTutorialStep.navigateTo && location.pathname !== nextTutorialStep.navigateTo) {
-        console.log(`Navigation needed for step ${nextTutorialStep.id} to ${nextTutorialStep.navigateTo}`);
-        setNavigationComplete(false);
-        navigate(nextTutorialStep.navigateTo);
-      }
+    if (currentStep < initialTutorialSteps.length - 1) {
+      setCurrentStep(currentStep + 1);
     } else {
-      console.log('Completing tutorial - reached the end');
-      completeTutorial();
+      setIsActive(false);
+      setIsTutorialCompleted(true);
+      localStorage.setItem('tutorialCompleted', 'true');
     }
   };
-  
-  // Move to the previous step
+
   const prevStep = () => {
     if (currentStep > 0) {
-      const newStep = currentStep - 1;
-      console.log(`Moving to previous step ${newStep} (ID: ${steps[newStep].id})`);
-      setCurrentStep(newStep);
-      updateTutorialStep(newStep);
-      
-      // If moving back to a step that has a different navigateTo, navigate there
-      const prevTutorialStep = steps[newStep];
-      if (prevTutorialStep.navigateTo && location.pathname !== prevTutorialStep.navigateTo) {
-        console.log(`Navigating back to ${prevTutorialStep.navigateTo} for previous step`);
-        navigate(prevTutorialStep.navigateTo);
-      }
+      setCurrentStep(currentStep - 1);
     }
   };
-  
-  // Skip the tutorial entirely
-  const skipTutorial = async () => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ tutorial_completed: 'YES' })
-        .eq('id', user.id);
-        
-      if (error) {
-        console.error('Error skipping tutorial:', error);
-        return;
-      }
-      
-      setIsActive(false);
-      toast({
-        title: "Tutorial skipped",
-        description: "You can always find help in the settings."
-      });
-      console.log('Tutorial skipped by user');
-    } catch (error) {
-      console.error('Error skipping tutorial:', error);
-    }
+
+  const skipTutorial = () => {
+    setIsActive(false);
+    setIsTutorialCompleted(true);
+    localStorage.setItem('tutorialCompleted', 'true');
   };
-  
-  // Function to reset the tutorial - updated to ensure proper navigation and toast timing
-  const resetTutorial = async () => {
-    if (!user) return;
-    
-    try {
-      const { error } = await supabase
-        .from('profiles')
-        .update({ 
-          tutorial_completed: 'NO',
-          tutorial_step: 0
-        })
-        .eq('id', user.id);
-        
-      if (error) {
-        console.error('Error resetting tutorial:', error);
-        toast({
-          title: "Error",
-          description: "Failed to reset tutorial. Please try again.",
-          variant: "destructive"
-        });
-        return;
-      }
-      
-      setCurrentStep(0);
-      setTutorialChecked(false);
-      
-      // Only navigate if we're not already on the app home page
-      if (location.pathname !== '/app/home') {
-        // First navigate to app home - use replace to prevent back navigation
-        console.log('Tutorial reset - redirecting to app home');
-        
-        // Display toast only if we're already on an app route
-        // This prevents toast from appearing on website routes
-        if (isAppRoute(location.pathname)) {
-          toast({
-            title: "Tutorial reset successfully!",
-            description: "Redirecting to app home page..."
-          });
-        }
-        
-        navigate('/app/home', { replace: true });
-      } else {
-        // If already on /app/home, just show toast and activate tutorial
-        toast({
-          title: "Tutorial reset successfully!",
-          description: "Restart from step 1"
-        });
-        setIsActive(true);
-      }
-    } catch (error) {
-      console.error('Error resetting tutorial:', error);
-      toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
-        variant: "destructive"
-      });
-    }
-  };
-  
-  // Provide the context value
-  const contextValue: TutorialContextType = {
-    isActive,
-    currentStep,
-    totalSteps: steps.length,
-    steps,
-    nextStep,
-    prevStep,
-    skipTutorial,
-    completeTutorial,
-    resetTutorial
-  };
-  
+
   return (
-    <TutorialContext.Provider value={contextValue}>
+    <TutorialContext.Provider
+      value={{
+        isActive,
+        currentStep,
+        totalSteps: initialTutorialSteps.length,
+        steps: initialTutorialSteps,
+        nextStep,
+        prevStep,
+        skipTutorial,
+        startTutorial,
+        setIsTutorialCompleted
+      }}
+    >
       {children}
+      {isActive && <TutorialOverlay />}
     </TutorialContext.Provider>
   );
 };
 
-// Custom hook to use the tutorial context
 export const useTutorial = () => {
   const context = useContext(TutorialContext);
-  
-  if (context === undefined) {
-    throw new Error('useTutorial must be used within a TutorialProvider');
+  if (!context) {
+    throw new Error("useTutorial must be used within a TutorialProvider");
   }
-  
   return context;
 };

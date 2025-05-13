@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -23,6 +22,18 @@ const ENTRIES_TAB_SELECTORS = [
   '#past-entries-button'
 ];
 
+const CHAT_QUESTION_SELECTORS = [
+  '.chat-question-suggestion',
+  '.chat-suggestion-item',
+  '.tutorial-chat-question'
+];
+
+const CHAT_RESPONSE_SELECTORS = [
+  '.chat-ai-response',
+  '.chat-response-content',
+  '.tutorial-chat-response'
+];
+
 const TutorialOverlay: React.FC = () => {
   const { 
     isActive, 
@@ -36,6 +47,8 @@ const TutorialOverlay: React.FC = () => {
   const navigate = useNavigate();
   const location = useLocation();
   const [elementForStep3Found, setElementForStep3Found] = useState(false);
+  const [elementForStep5Found, setElementForStep5Found] = useState(false);
+  const [elementForStep6Found, setElementForStep6Found] = useState(false);
   const [attempts, setAttempts] = useState(0);
   
   // Only render tutorial on app routes - strict checking
@@ -135,6 +148,30 @@ const TutorialOverlay: React.FC = () => {
         } else {
           console.log('TutorialOverlay - Not on journal page yet, will navigate there');
           navigate('/app/journal');
+        }
+        break;
+      case 5:
+        console.log('TutorialOverlay - Step 5 detected, current path:', location.pathname);
+        setAttempts(0);
+        setElementForStep5Found(false);
+        
+        if (location.pathname === '/app/chat') {
+          cleanup = handleChatQuestionVisibility();
+        } else {
+          console.log('TutorialOverlay - Not on chat page yet, will navigate there');
+          navigate('/app/chat');
+        }
+        break;
+      case 6:
+        console.log('TutorialOverlay - Step 6 detected, current path:', location.pathname);
+        setAttempts(0);
+        setElementForStep6Found(false);
+        
+        if (location.pathname === '/app/chat') {
+          cleanup = handleChatResponseVisibility();
+        } else {
+          console.log('TutorialOverlay - Not on chat page yet, will navigate there');
+          navigate('/app/chat');
         }
         break;
     }
@@ -453,6 +490,344 @@ const TutorialOverlay: React.FC = () => {
     };
   };
 
+  // Handle step 5 - Chat question suggestion visibility
+  const handleChatQuestionVisibility = () => {
+    console.log('TutorialOverlay - Setting up Chat Question Suggestion visibility for step 5');
+    
+    // Inject a temporary suggestion if it doesn't exist yet
+    const injectTempSuggestionTimeout = setTimeout(() => {
+      const existingSuggestion = document.querySelector('.chat-question-suggestion');
+      
+      if (!existingSuggestion) {
+        console.log('Creating temporary chat question suggestion element');
+        const chatContent = document.querySelector('.chat-interface, .smart-chat-container');
+        
+        if (chatContent) {
+          const tempSuggestion = document.createElement('div');
+          tempSuggestion.className = 'chat-question-suggestion tutorial-chat-question mb-4 p-3 bg-primary/10 rounded-lg cursor-pointer hover:bg-primary/20 transition-colors';
+          tempSuggestion.setAttribute('data-tutorial-highlight', 'true');
+          tempSuggestion.innerHTML = '<p class="font-medium">What were my top emotions last week?</p>';
+          tempSuggestion.style.position = 'relative';
+          tempSuggestion.style.zIndex = '10000';
+          tempSuggestion.style.visibility = 'visible';
+          tempSuggestion.style.opacity = '1';
+          
+          // Find the chat input area or empty state to inject before
+          const chatInputContainer = document.querySelector('.chat-input-container, .mobile-chat-input-container');
+          const emptyState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
+          
+          if (emptyState) {
+            emptyState.prepend(tempSuggestion);
+          } else if (chatContent.firstChild) {
+            chatContent.insertBefore(tempSuggestion, chatContent.firstChild);
+          } else {
+            chatContent.appendChild(tempSuggestion);
+          }
+          
+          console.log('Temporary chat suggestion element created and added to DOM');
+        }
+      }
+      
+      // Now search for the element and highlight it
+      const searchTimeout = setTimeout(() => {
+        console.log('Checking all possible Chat Question elements:');
+        CHAT_QUESTION_SELECTORS.forEach(selector => {
+          const elements = document.querySelectorAll(selector);
+          console.log(`  - ${selector}: ${elements.length} elements found`);
+          elements.forEach((el, i) => {
+            const rect = (el as HTMLElement).getBoundingClientRect();
+            console.log(`    Element ${i} rect:`, rect);
+          });
+        });
+        
+        const found = applyChatQuestionHighlighting();
+        
+        if (found) {
+          console.log(`TutorialOverlay - Found Chat Question element on attempt ${attempts + 1}`);
+          setElementForStep5Found(true);
+        } else {
+          // Retry logic
+          if (attempts < 5) {
+            console.log(`Retrying Chat Question element search (attempt ${attempts + 1} of 5)`);
+            setAttempts(prev => prev + 1);
+            setTimeout(() => handleChatQuestionVisibility(), 500);
+          } else {
+            console.warn('TutorialOverlay - Maximum attempts reached to find Chat Question element');
+            setElementForStep5Found(true);
+            console.log('TutorialOverlay - Forcing step 5 to show anyway');
+          }
+        }
+      }, 300);
+    }, 500);
+    
+    // Clean up when step changes
+    return () => {
+      clearTimeout(injectTempSuggestionTimeout);
+      console.log("Cleaning up Chat Question element styles");
+      
+      // Remove any temporary elements we created
+      const tempElements = document.querySelectorAll('[data-tutorial-highlight="true"]');
+      tempElements.forEach(el => {
+        el.remove();
+      });
+      
+      // Remove classes from all possible elements
+      CHAT_QUESTION_SELECTORS.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          element.classList.remove('tutorial-target', 'tutorial-highlight');
+          
+          const el = element as HTMLElement;
+          if (el) {
+            el.style.visibility = '';
+            el.style.opacity = '';
+            el.style.pointerEvents = '';
+            el.style.position = '';
+            el.style.zIndex = '';
+            el.style.boxShadow = '';
+            el.style.border = '';
+          }
+        });
+      });
+    };
+  };
+  
+  // Function to apply highlighting to step 5 chat question elements
+  const applyChatQuestionHighlighting = (): boolean => {
+    let chatQuestionElement = null;
+    
+    // Try each selector until we find a match
+    for (const selector of CHAT_QUESTION_SELECTORS) {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        chatQuestionElement = elements[0];
+        console.log(`Found Chat Question element with selector: ${selector}`, chatQuestionElement);
+        break;
+      }
+    }
+    
+    if (chatQuestionElement) {
+      console.log("Enhancing Chat Question element visibility for tutorial step 5", chatQuestionElement);
+      
+      // Add tutorial target class to make the element visible through overlay
+      chatQuestionElement.classList.add('tutorial-target');
+      chatQuestionElement.classList.add('tutorial-highlight');
+      
+      // Force the element to be visible with inline styles
+      const elementStyle = chatQuestionElement as HTMLElement;
+      elementStyle.style.visibility = 'visible';
+      elementStyle.style.opacity = '1';
+      elementStyle.style.pointerEvents = 'auto';
+      elementStyle.style.position = 'relative';
+      elementStyle.style.zIndex = '10000';
+      elementStyle.style.boxShadow = '0 0 20px 10px var(--color-theme)';
+      elementStyle.style.border = '2px solid var(--color-theme)';
+      
+      console.log("Added classes and styles to Chat Question element");
+      
+      return true;
+    } else {
+      console.warn("Could not find Chat Question element for tutorial step 5 with any selector");
+      return false;
+    }
+  };
+
+  // Handle step 6 - Chat AI response visibility
+  const handleChatResponseVisibility = () => {
+    console.log('TutorialOverlay - Setting up Chat Response visibility for step 6');
+    
+    // Inject a temporary AI response if it doesn't exist yet
+    const injectTempResponseTimeout = setTimeout(() => {
+      const existingResponse = document.querySelector('.chat-ai-response, .chat-response-content');
+      
+      if (!existingResponse) {
+        console.log('Creating temporary chat AI response element');
+        const chatContent = document.querySelector('.chat-content, .smart-chat-container');
+        
+        if (chatContent) {
+          // Create the container
+          const responseContainer = document.createElement('div');
+          responseContainer.className = 'chat-ai-response tutorial-chat-response mb-4 p-4 bg-white rounded-lg shadow-md';
+          responseContainer.setAttribute('data-tutorial-highlight', 'true');
+          
+          // Create the avatar
+          const avatarDiv = document.createElement('div');
+          avatarDiv.className = 'flex items-start mb-2';
+          
+          const avatar = document.createElement('div');
+          avatar.className = 'w-8 h-8 rounded-full bg-primary/20 flex items-center justify-center mr-2';
+          avatar.innerHTML = '<span className="text-primary font-bold">Rūḥ</span>';
+          
+          avatarDiv.appendChild(avatar);
+          
+          // Create the content
+          const contentDiv = document.createElement('div');
+          contentDiv.className = 'chat-response-content mt-2';
+          contentDiv.innerHTML = `
+            <p class="mb-2">Based on your journal entries, your top emotions last week were:</p>
+            <div class="mb-3 p-2 bg-gray-50 rounded">
+              <div class="flex justify-between items-center mb-1">
+                <span>Joy</span>
+                <span class="font-medium">35%</span>
+              </div>
+              <div class="w-full bg-gray-200 h-2 rounded-full">
+                <div class="bg-green-500 h-2 rounded-full" style="width: 35%"></div>
+              </div>
+            </div>
+            <div class="mb-3 p-2 bg-gray-50 rounded">
+              <div class="flex justify-between items-center mb-1">
+                <span>Gratitude</span>
+                <span class="font-medium">28%</span>
+              </div>
+              <div class="w-full bg-gray-200 h-2 rounded-full">
+                <div class="bg-blue-500 h-2 rounded-full" style="width: 28%"></div>
+              </div>
+            </div>
+            <div class="p-2 bg-gray-50 rounded">
+              <div class="flex justify-between items-center mb-1">
+                <span>Calm</span>
+                <span class="font-medium">20%</span>
+              </div>
+              <div class="w-full bg-gray-200 h-2 rounded-full">
+                <div class="bg-purple-500 h-2 rounded-full" style="width: 20%"></div>
+              </div>
+            </div>
+          `;
+          
+          // Add to the response container
+          responseContainer.appendChild(avatarDiv);
+          responseContainer.appendChild(contentDiv);
+          
+          // Apply tutorial styling
+          responseContainer.style.position = 'relative';
+          responseContainer.style.zIndex = '10000';
+          responseContainer.style.visibility = 'visible';
+          responseContainer.style.opacity = '1';
+          
+          // Add to the chat content
+          const chatMessages = document.querySelector('.chat-messages-container');
+          
+          if (chatMessages) {
+            chatMessages.appendChild(responseContainer);
+          } else if (chatContent) {
+            const emptyState = chatContent.querySelector('.flex.flex-col.items-center.justify-center');
+            if (emptyState) {
+              // Replace empty state with our response
+              emptyState.style.display = 'none';
+              chatContent.appendChild(responseContainer);
+            } else {
+              chatContent.appendChild(responseContainer);
+            }
+          }
+          
+          console.log('Temporary chat response element created and added to DOM');
+        }
+      }
+      
+      // Now search for the element and highlight it
+      const searchTimeout = setTimeout(() => {
+        console.log('Checking all possible Chat Response elements:');
+        CHAT_RESPONSE_SELECTORS.forEach(selector => {
+          const elements = document.querySelectorAll(selector);
+          console.log(`  - ${selector}: ${elements.length} elements found`);
+          elements.forEach((el, i) => {
+            const rect = (el as HTMLElement).getBoundingClientRect();
+            console.log(`    Element ${i} rect:`, rect);
+          });
+        });
+        
+        const found = applyChatResponseHighlighting();
+        
+        if (found) {
+          console.log(`TutorialOverlay - Found Chat Response element on attempt ${attempts + 1}`);
+          setElementForStep6Found(true);
+        } else {
+          // Retry logic
+          if (attempts < 5) {
+            console.log(`Retrying Chat Response element search (attempt ${attempts + 1} of 5)`);
+            setAttempts(prev => prev + 1);
+            setTimeout(() => handleChatResponseVisibility(), 500);
+          } else {
+            console.warn('TutorialOverlay - Maximum attempts reached to find Chat Response element');
+            setElementForStep6Found(true);
+            console.log('TutorialOverlay - Forcing step 6 to show anyway');
+          }
+        }
+      }, 300);
+    }, 500);
+    
+    // Clean up when step changes
+    return () => {
+      clearTimeout(injectTempResponseTimeout);
+      console.log("Cleaning up Chat Response element styles");
+      
+      // Remove any temporary elements we created
+      const tempElements = document.querySelectorAll('[data-tutorial-highlight="true"]');
+      tempElements.forEach(el => {
+        el.remove();
+      });
+      
+      // Remove classes from all possible elements
+      CHAT_RESPONSE_SELECTORS.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          element.classList.remove('tutorial-target', 'tutorial-highlight');
+          
+          const el = element as HTMLElement;
+          if (el) {
+            el.style.visibility = '';
+            el.style.opacity = '';
+            el.style.pointerEvents = '';
+            el.style.position = '';
+            el.style.zIndex = '';
+            el.style.boxShadow = '';
+            el.style.border = '';
+          }
+        });
+      });
+    };
+  };
+  
+  // Function to apply highlighting to step 6 chat response elements
+  const applyChatResponseHighlighting = (): boolean => {
+    let chatResponseElement = null;
+    
+    // Try each selector until we find a match
+    for (const selector of CHAT_RESPONSE_SELECTORS) {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        chatResponseElement = elements[0];
+        console.log(`Found Chat Response element with selector: ${selector}`, chatResponseElement);
+        break;
+      }
+    }
+    
+    if (chatResponseElement) {
+      console.log("Enhancing Chat Response element visibility for tutorial step 6", chatResponseElement);
+      
+      // Add tutorial target class to make the element visible through overlay
+      chatResponseElement.classList.add('tutorial-target');
+      chatResponseElement.classList.add('tutorial-highlight');
+      
+      // Force the element to be visible with inline styles
+      const elementStyle = chatResponseElement as HTMLElement;
+      elementStyle.style.visibility = 'visible';
+      elementStyle.style.opacity = '1';
+      elementStyle.style.pointerEvents = 'auto';
+      elementStyle.style.position = 'relative';
+      elementStyle.style.zIndex = '10000';
+      elementStyle.style.boxShadow = '0 0 20px 10px var(--color-theme)';
+      elementStyle.style.border = '2px solid var(--color-theme)';
+      
+      console.log("Added classes and styles to Chat Response element");
+      
+      return true;
+    } else {
+      console.warn("Could not find Chat Response element for tutorial step 6 with any selector");
+      return false;
+    }
+  };
+
   // If not an app route or tutorial not active, don't render anything
   if (!shouldShowTutorial) {
     console.log('TutorialOverlay not shown: isActive=', isActive, 'isAppRoute=', isAppRouteCurrent);
@@ -463,9 +838,11 @@ const TutorialOverlay: React.FC = () => {
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === totalSteps - 1;
 
-  // For step 3, only show if we found the element or are on attempt 5+
-  const shouldShowStep3UI = currentTutorialStep?.id !== 3 || 
-                           (elementForStep3Found || attempts >= 5);
+  // For steps with specific UI elements, only show if we found the element or are on attempt 5+
+  const shouldShowStepUI = 
+    (currentTutorialStep?.id !== 3 || (elementForStep3Found || attempts >= 5)) && 
+    (currentTutorialStep?.id !== 5 || (elementForStep5Found || attempts >= 5)) &&
+    (currentTutorialStep?.id !== 6 || (elementForStep6Found || attempts >= 5));
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto" onClick={(e) => e.stopPropagation()}>
@@ -481,7 +858,7 @@ const TutorialOverlay: React.FC = () => {
 
       {/* Tutorial step with enhanced z-index and pointer events */}
       <AnimatePresence mode="wait">
-        {shouldShowStep3UI && (
+        {shouldShowStepUI && (
           <TutorialStep
             key={currentStep}
             step={currentTutorialStep}
