@@ -219,14 +219,17 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         {messages.map((message, index) => {
           const isLast = index === messages.length - 1;
           
-          return isMobile ? (
+          // Modify the MobileChatMessage rendering section to handle the references properly
+          {isMobile ? (
             <MobileChatMessage 
               key={message.id || index}
               message={{
                 role: message.role as 'user' | 'assistant' | 'error',
                 content: message.content,
                 analysis: message.analysis_data,
-                references: message.reference_entries,
+                references: Array.isArray(message.reference_entries) 
+                  ? message.reference_entries 
+                  : (message.reference_entries ? [message.reference_entries] : []),
                 hasNumericResult: message.has_numeric_result
               }}
               showAnalysis={showDebugMode && hasAnalysisParam(message)}

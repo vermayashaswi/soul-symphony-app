@@ -18,30 +18,17 @@ import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { textWillOverflow } from '@/utils/textUtils';
 
-export interface JournalEntry {
-  id: number;
-  content: string;
-  created_at: string;
-  audio_url?: string;
-  sentiment?: string | null;
-  themes?: string[] | null;
+// Now we use the type directly from types/journal.ts rather than redefining it
+export interface JournalEntry extends JournalEntryType {
+  Edit_Status?: number | null;
+  user_feedback?: string | null;
+  translation_text?: string;
+  original_language?: string;
   master_themes?: string[];
-  entities?: Array<{
-    type: string;
-    name: string;
-    text?: string;
-  }>;
   foreignKey?: string;
   predictedLanguages?: {
     [key: string]: number;
   } | null;
-  Edit_Status?: number | null;
-  user_feedback?: string | null;
-  "transcription text"?: string;
-  "refined text"?: string;
-  translation_text?: string;
-  original_language?: string;
-  tempId?: string;
 }
 
 interface JournalEntryCardProps {
