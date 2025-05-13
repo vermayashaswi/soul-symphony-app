@@ -1,4 +1,5 @@
 
+import * as React from "react"
 import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
@@ -41,7 +42,7 @@ export function Toaster() {
                 </ToastDescription>
               )}
             </div>
-            {action && typeof action === 'object' ? action : null}
+            {action && typeof action === 'object' && React.isValidElement(action) ? action : null}
           </Toast>
         )
       })}
@@ -49,3 +50,4 @@ export function Toaster() {
     </ToastProvider>
   )
 }
+
