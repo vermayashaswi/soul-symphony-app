@@ -112,19 +112,13 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       }
     }
     
-    // Special handling for step 3 and 4 on mobile
+    // Special handling for step 3 and 4 on mobile - IMPROVED POSITIONING
     if (isMobile && isStep3or4) {
-      // For small screens, position at the center bottom area
-      newPos.top = viewportHeight - elementHeight - padding * 2;
-      newPos.left = viewportWidth / 2;
-      newPos.transform = 'translateX(-50%)';
-      
-      // For extreme small screens, just center it
-      if (newPos.top < padding * 4) {
-        newPos.top = viewportHeight / 2;
-        newPos.left = viewportWidth / 2;
-        newPos.transform = 'translate(-50%, -50%)';
-      }
+      // Position in center of screen for better visibility on all devices
+      newPos.top = '50%';
+      newPos.left = '50%';
+      newPos.transform = 'translate(-50%, -50%)';
+      console.log('Mobile device detected for step 3/4, forcing center position');
     } 
     // Regular left position adjustment for all other cases
     else {
@@ -210,12 +204,21 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           console.log("Arrow button not found for step 2, using fallback position");
         }
       } 
-      // Handle step 3 positioning for record entry button
+      // Handle step 3 positioning for record entry button - IMPROVED FOR VISIBILITY
       else if (step.id === 3) {
-        // For step 3 - find the record entry button with multiple selectors
         console.log("Calculating position for step 3...");
         
-        // Try multiple selectors to find the element
+        // For step 3 - use center positioning for maximum visibility on all devices
+        const centeredPos = {
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)'
+        };
+        
+        setPosition(centeredPos);
+        console.log("Positioned step 3 popup at center of screen for maximum visibility");
+        
+        // Try to find the record entry button for highlighting only
         const selectors = [
           '.tutorial-record-entry-button',
           '[data-value="record"]',
@@ -225,56 +228,38 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         ];
         
         let recordEntryElement = null;
-        let usedSelector = '';
-        
-        // Try each selector
         for (const selector of selectors) {
           const element = document.querySelector(selector);
           if (element) {
             recordEntryElement = element;
-            usedSelector = selector;
             console.log(`Found step 3 target using selector: ${selector}`, element);
+            
+            // Ensure the element is visible by adding tutorial classes
+            recordEntryElement.classList.add('tutorial-target');
+            recordEntryElement.classList.add('record-entry-tab');
             break;
           }
         }
         
-        if (recordEntryElement) {
-          const rect = recordEntryElement.getBoundingClientRect();
-          console.log(`Step 3 element rect using ${usedSelector}:`, rect);
-          
-          // Ensure the element is visible by adding tutorial classes
-          recordEntryElement.classList.add('tutorial-target');
-          recordEntryElement.classList.add('record-entry-tab');
-          
-          // Position below and centered with the element
-          const calculatedPos = {
-            top: rect.bottom + 20, // Below the element
-            left: rect.left + (rect.width / 2),
-            transform: 'translateX(-50%)'
-          };
-          
-          // Enhanced viewport adjustment for step 3
-          const adjustedPos = ensureWithinViewport(calculatedPos);
-          setPosition(adjustedPos);
-          
-          console.log("Positioned step 3 popup at:", adjustedPos);
-        } else {
-          console.warn("Could not find record entry element for step 3, using fallback position");
-          // Fallback position - center of screen for better visibility
-          const fallbackPos = { 
-            top: '40%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)' 
-          };
-          
-          setPosition(ensureWithinViewport(fallbackPos));
+        if (!recordEntryElement) {
+          console.warn("Could not find record entry element for step 3, but popup is still centered");
         }
       } 
-      // Handle step 4 positioning for past entries tab
+      // Handle step 4 positioning for past entries tab - ALSO IMPROVED FOR VISIBILITY
       else if (step.id === 4) {
-        // For step 4 - find the Past Entries tab using the same approach as step 3 for consistency
         console.log("Calculating position for step 4...");
         
+        // For step 4 - also use center positioning for consistency with step 3
+        const centeredPos = {
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)'
+        };
+        
+        setPosition(centeredPos);
+        console.log("Positioned step 4 popup at center of screen for maximum visibility");
+        
+        // Try to find the past entries tab for highlighting only
         const selectors = [
           '[value="entries"]',
           '.entries-tab',
@@ -283,71 +268,21 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         ];
         
         let entriesTabElement = null;
-        let usedSelector = '';
-        
-        // Try each selector
         for (const selector of selectors) {
           const element = document.querySelector(selector);
           if (element) {
             entriesTabElement = element;
-            usedSelector = selector;
             console.log(`Found step 4 target using selector: ${selector}`, element);
+            
+            // Add tutorial target class to ensure visibility
+            entriesTabElement.classList.add('tutorial-target');
+            entriesTabElement.classList.add('entries-tab');
             break;
           }
         }
         
-        if (entriesTabElement) {
-          const rect = entriesTabElement.getBoundingClientRect();
-          console.log(`Step 4 element rect using ${usedSelector}:`, rect);
-          
-          // Add tutorial target class to ensure visibility
-          entriesTabElement.classList.add('tutorial-target');
-          entriesTabElement.classList.add('entries-tab');
-          
-          // Mobile special positioning - on mobile devices, users may not see popups that are too low
-          const isMobile = window.innerWidth < 640;
-          let calculatedPos: PositionState;
-          
-          if (isMobile) {
-            // For mobile, position centered in the bottom half of screen for better visibility
-            calculatedPos = {
-              top: Math.min(rect.bottom + 20, window.innerHeight * 0.6), // No lower than 60% of screen height
-              left: '50%',
-              transform: 'translateX(-50%)'
-            };
-          } else {
-            // Desktop positioning - below the tab
-            calculatedPos = {
-              top: rect.bottom + 20,
-              left: rect.left + (rect.width / 2),
-              transform: 'translateX(-50%)'
-            };
-          }
-          
-          // Super-enhanced viewport adjustment specifically for step 4
-          // Force it up higher in the screen if at the bottom
-          const adjustedPos = { ...ensureWithinViewport(calculatedPos) };
-          
-          // Final adjustment to ensure it's visible - if still too low on screen, move it up
-          if (typeof adjustedPos.top === 'number' && adjustedPos.top > window.innerHeight * 0.7) {
-            adjustedPos.top = window.innerHeight * 0.5;
-            // Ensure it's centered horizontally for better visibility
-            adjustedPos.left = '50%'; 
-            adjustedPos.transform = 'translate(-50%, -50%)';
-          }
-          
-          setPosition(adjustedPos);
-          console.log("Positioned step 4 popup at:", adjustedPos);
-        } else {
-          console.warn("Could not find Past Entries tab for step 4, using fallback position");
-          // Fallback position - similar to step 3's fallback but adjusted for viewport
-          const fallbackPos = { 
-            top: '40%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)' 
-          };
-          
-          setPosition(ensureWithinViewport(fallbackPos));
+        if (!entriesTabElement) {
+          console.warn("Could not find Past Entries tab for step 4, but popup is still centered");
         }
       } 
       // Handle generic positioning for other steps
@@ -448,23 +383,14 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     
     // Add a tertiary check for visibility
     const tertiaryCheck = setTimeout(() => {
-      // Final forced position check - especially important for step 4
-      if (step.id === 4) {
-        console.log("Performing final position check for step 4");
-        if (stepRef.current) {
-          const rect = stepRef.current.getBoundingClientRect();
-          console.log("Current step 4 popup position:", rect);
-          
-          // If popup is off screen or too close to bottom, force it to center
-          if (rect.bottom > window.innerHeight - 20 || rect.top < 20) {
-            console.log("Step 4 popup may be off screen, forcing center position");
-            setPosition({
-              top: '50%',
-              left: '50%',
-              transform: 'translate(-50%, -50%)'
-            });
-          }
-        }
+      // Force centered position for steps 3 and 4 for maximum visibility
+      if (step.id === 3 || step.id === 4) {
+        console.log(`Performing final position check for step ${step.id}`);
+        setPosition({
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)'
+        });
       }
       
       // Final check specifically for step 1 on small screens

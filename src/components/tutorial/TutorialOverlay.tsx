@@ -273,6 +273,9 @@ const TutorialOverlay: React.FC = () => {
   const handleRecordEntryVisibility = () => {
     console.log('TutorialOverlay - Setting up Record Entry visibility for step 3');
     
+    // Always set element found to true for Step 3 to force the popup to show
+    setElementForStep3Found(true);
+    
     // Delay searching for elements to ensure they've loaded
     const searchTimeout = setTimeout(() => {
       // Log all possible elements in the DOM for debugging
@@ -286,25 +289,65 @@ const TutorialOverlay: React.FC = () => {
         });
       });
       
-      const found = applyStep3Highlighting();
-      
-      if (found) {
-        console.log(`TutorialOverlay - Found Record Entry element on attempt ${attempts + 1}`);
-        setElementForStep3Found(true);
-      } else {
-        // Retry logic - attempt to find the element again if we haven't reached 5 attempts
-        if (attempts < 5) {
-          console.log(`Retrying element search (attempt ${attempts + 1} of 5)`);
-          setAttempts(prev => prev + 1);
-          // Schedule another attempt
-          setTimeout(() => handleRecordEntryVisibility(), 500);
-        } else {
-          console.warn('TutorialOverlay - Maximum attempts reached to find Record Entry element');
-          // Force showing the tutorial step even if the element wasn't found
-          setElementForStep3Found(true);
-          console.log('TutorialOverlay - Forcing step 3 to show anyway');
+      // Try to find and highlight the record entry button
+      let recordEntryElement = null;
+      for (const selector of RECORD_ENTRY_SELECTORS) {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          recordEntryElement = elements[0];
+          console.log(`Found Record Entry element with selector: ${selector}`, recordEntryElement);
+          break;
         }
       }
+      
+      if (recordEntryElement) {
+        console.log("Enhancing Record Entry element visibility for step 3", recordEntryElement);
+        
+        // Add tutorial target class to make the element visible through overlay
+        recordEntryElement.classList.add('tutorial-target');
+        recordEntryElement.classList.add('record-entry-tab');
+        
+        // Add enhanced highlighting for better visibility
+        recordEntryElement.classList.add('tutorial-highlight');
+        
+        // Force the element to be visible with inline styles
+        const elementStyle = recordEntryElement as HTMLElement;
+        elementStyle.style.visibility = 'visible';
+        elementStyle.style.opacity = '1';
+        elementStyle.style.pointerEvents = 'auto';
+        elementStyle.style.position = 'relative';
+        elementStyle.style.zIndex = '10000';
+        elementStyle.style.boxShadow = '0 0 20px 10px var(--color-theme)';
+        
+        console.log("Added classes and styles to Record Entry element");
+        
+        // Log computed styles to verify our styles are applied
+        const computedStyle = window.getComputedStyle(recordEntryElement);
+        console.log("Computed styles for Record Entry element:", {
+          visibility: computedStyle.visibility,
+          opacity: computedStyle.opacity,
+          zIndex: computedStyle.zIndex,
+          position: computedStyle.position
+        });
+      } else {
+        console.warn("Could not find Record Entry element for step 3 with any selector");
+      }
+      
+      // Create and force styling of Step 3 tutorial popup container for guaranteed visibility
+      setTimeout(() => {
+        const step3Popup = document.querySelector('.tutorial-step-container[data-step="3"]');
+        if (step3Popup && step3Popup instanceof HTMLElement) {
+          step3Popup.style.position = 'fixed';
+          step3Popup.style.top = '50%';
+          step3Popup.style.left = '50%';
+          step3Popup.style.transform = 'translate(-50%, -50%)';
+          step3Popup.style.zIndex = '30000';
+          step3Popup.style.maxWidth = '300px';
+          step3Popup.style.width = 'calc(100% - 40px)';
+          step3Popup.style.border = '3px solid var(--color-theme)';
+          console.log('Forced styling for Step 3 popup applied');
+        }
+      }, 200);
     }, 500);
     
     // Clean up when step changes
@@ -330,57 +373,6 @@ const TutorialOverlay: React.FC = () => {
         });
       });
     };
-  };
-  
-  // Function to apply highlighting to step 3 elements with better debugging
-  const applyStep3Highlighting = (): boolean => {
-    let recordEntryElement = null;
-    
-    // Try each selector until we find a match
-    for (const selector of RECORD_ENTRY_SELECTORS) {
-      const elements = document.querySelectorAll(selector);
-      if (elements.length > 0) {
-        recordEntryElement = elements[0];
-        console.log(`Found Record Entry element with selector: ${selector}`, recordEntryElement);
-        break;
-      }
-    }
-    
-    if (recordEntryElement) {
-      console.log("Enhancing Record Entry element visibility for tutorial step 3", recordEntryElement);
-      
-      // Add tutorial target class to make the element visible through overlay
-      recordEntryElement.classList.add('tutorial-target');
-      recordEntryElement.classList.add('record-entry-tab');
-      
-      // Add enhanced highlighting for better visibility
-      recordEntryElement.classList.add('tutorial-highlight');
-      
-      // Force the element to be visible with inline styles
-      const elementStyle = recordEntryElement as HTMLElement;
-      elementStyle.style.visibility = 'visible';
-      elementStyle.style.opacity = '1';
-      elementStyle.style.pointerEvents = 'auto';
-      elementStyle.style.position = 'relative';
-      elementStyle.style.zIndex = '10000';
-      elementStyle.style.boxShadow = '0 0 20px 10px var(--color-theme)';
-      
-      console.log("Added classes and styles to Record Entry element");
-      
-      // Log computed styles to verify our styles are applied
-      const computedStyle = window.getComputedStyle(recordEntryElement);
-      console.log("Computed styles for Record Entry element:", {
-        visibility: computedStyle.visibility,
-        opacity: computedStyle.opacity,
-        zIndex: computedStyle.zIndex,
-        position: computedStyle.position
-      });
-      
-      return true;
-    } else {
-      console.warn("Could not find Record Entry element for tutorial step 3 with any selector");
-      return false;
-    }
   };
 
   // Handle step 4 - Past Entries tab visibility - Enhanced to match step 3's behavior
@@ -442,8 +434,24 @@ const TutorialOverlay: React.FC = () => {
           position: computedStyle.position
         });
       } else {
-        console.warn("Could not find Past Entries tab element for tutorial step 4 with any selector");
+        console.warn("Could not find Past Entries tab element for step 4 with any selector");
       }
+      
+      // Create and force styling of Step 4 tutorial popup container for guaranteed visibility
+      setTimeout(() => {
+        const step4Popup = document.querySelector('.tutorial-step-container[data-step="4"]');
+        if (step4Popup && step4Popup instanceof HTMLElement) {
+          step4Popup.style.position = 'fixed';
+          step4Popup.style.top = '50%';
+          step4Popup.style.left = '50%';
+          step4Popup.style.transform = 'translate(-50%, -50%)';
+          step4Popup.style.zIndex = '30000';
+          step4Popup.style.maxWidth = '300px';
+          step4Popup.style.width = 'calc(100% - 40px)';
+          step4Popup.style.border = '3px solid var(--color-theme)';
+          console.log('Forced styling for Step 4 popup applied');
+        }
+      }, 200);
     }, 500);
     
     // Clean up when step changes
@@ -482,9 +490,8 @@ const TutorialOverlay: React.FC = () => {
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === totalSteps - 1;
 
-  // For step 3, only show if we found the element or are on attempt 5+
-  const shouldShowStep3UI = currentTutorialStep?.id !== 3 || 
-                           (elementForStep3Found || attempts >= 5);
+  // For step 3, always show the UI since we're now centering it on screen
+  const shouldShowStep3UI = true;
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto" onClick={(e) => e.stopPropagation()}>
