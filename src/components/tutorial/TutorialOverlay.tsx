@@ -3,6 +3,7 @@ import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialStep from './TutorialStep';
 import { useNavigate, useLocation } from 'react-router-dom';
+import { isAppRoute } from '@/routes/RouteHelpers';
 
 // Define possible selectors at the component level so they are available throughout
 const RECORD_ENTRY_SELECTORS = [
@@ -35,10 +36,13 @@ const TutorialOverlay: React.FC = () => {
   const location = useLocation();
   const [elementForStep3Found, setElementForStep3Found] = useState(false);
   const [attempts, setAttempts] = useState(0);
-
+  
+  // Only render tutorial on app routes
+  const shouldShowTutorial = isActive && isAppRoute(location.pathname);
+  
   // Enhanced scrolling prevention when tutorial is active
   useEffect(() => {
-    if (!isActive) return;
+    if (!shouldShowTutorial) return;
     
     console.log('Tutorial active, disabling page scrolling');
     
@@ -57,11 +61,11 @@ const TutorialOverlay: React.FC = () => {
       window.scrollTo(0, scrollPos);
       console.log('Tutorial inactive, restored page scrolling');
     };
-  }, [isActive]);
+  }, [shouldShowTutorial]);
 
   // Handle navigation if specified in tutorial step
   useEffect(() => {
-    if (!isActive) return;
+    if (!shouldShowTutorial) return;
     
     // Debug the current state
     console.log('TutorialOverlay - Current state:', {
@@ -76,11 +80,11 @@ const TutorialOverlay: React.FC = () => {
       console.log(`TutorialOverlay - Navigating to ${currentTutorialStep.navigateTo} for tutorial step ${currentTutorialStep.id}`);
       navigate(currentTutorialStep.navigateTo);
     }
-  }, [isActive, currentStep, steps, navigate, location.pathname]);
+  }, [shouldShowTutorial, currentStep, steps, navigate, location.pathname]);
 
   // Enhanced handling for different tutorial steps with better detection
   useEffect(() => {
-    if (!isActive) return;
+    if (!shouldShowTutorial) return;
     
     const currentTutorialStep = steps[currentStep];
     if (!currentTutorialStep) return;
@@ -124,7 +128,7 @@ const TutorialOverlay: React.FC = () => {
     
     // Return combined cleanup function
     return cleanup;
-  }, [isActive, currentStep, steps, location.pathname, navigate, attempts]);
+  }, [shouldShowTutorial, currentStep, steps, location.pathname, navigate, attempts]);
 
   // Handle step 1 - journal header visibility
   const handleJournalHeaderVisibility = () => {
@@ -410,7 +414,8 @@ const TutorialOverlay: React.FC = () => {
     };
   };
 
-  if (!isActive) return null;
+  // If not an app route or tutorial not active, don't render anything
+  if (!shouldShowTutorial) return null;
 
   const currentTutorialStep = steps[currentStep];
   const isFirstStep = currentStep === 0;

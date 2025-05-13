@@ -1,9 +1,9 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { isAppRoute } from '@/routes/RouteHelpers';
 
 // Define the interface for a tutorial step
 export interface TutorialStep {
@@ -105,7 +105,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
     const checkTutorialStatus = async () => {
-      if (!user || tutorialChecked) return;
+      if (!user || tutorialChecked || !isAppRoute(location.pathname)) return;
       
       try {
         const { data, error } = await supabase
@@ -300,7 +300,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Function to reset the tutorial
+  // Function to reset the tutorial - updated to ensure proper navigation
   const resetTutorial = async () => {
     if (!user) return;
     
@@ -321,11 +321,17 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setCurrentStep(0);
       setTutorialChecked(false);
-      toast.success('Tutorial reset successfully! Redirecting to home page...');
-      console.log('Tutorial reset - redirecting to home');
       
-      // Navigate to home page to start the tutorial
-      navigate('/app/home');
+      // First navigate, then show toast - this ensures the toast appears after navigation
+      console.log('Tutorial reset - redirecting to app home');
+      
+      // Only show toast if we're already on an app route
+      if (isAppRoute(location.pathname)) {
+        toast.success('Tutorial reset successfully! Redirecting to home page...');
+      }
+      
+      // Navigate to home page to start the tutorial - use replace to prevent back navigation
+      navigate('/app/home', { replace: true });
     } catch (error) {
       console.error('Error resetting tutorial:', error);
       toast.error('Something went wrong. Please try again.');
