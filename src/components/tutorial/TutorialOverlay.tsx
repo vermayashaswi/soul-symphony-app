@@ -143,7 +143,7 @@ const TutorialOverlay: React.FC = () => {
     return cleanup;
   }, [shouldShowTutorial, currentStep, steps, location.pathname, navigate, attempts]);
 
-  // Handle step 1 - journal header visibility
+  // Handle step 1 - journal header visibility with enhanced positioning
   const handleJournalHeaderVisibility = () => {
     const journalHeader = document.querySelector('.journal-header-container');
     
@@ -154,6 +154,25 @@ const TutorialOverlay: React.FC = () => {
       // Log positioning for debugging
       const rect = journalHeader.getBoundingClientRect();
       console.log('Journal header position:', rect);
+      
+      // On smaller screens, make sure the tutorial will be visible 
+      if (window.innerWidth < 480) {
+        console.log('Small screen detected for step 1, applying special styling');
+        setTimeout(() => {
+          // Force any existing tutorial popup to be properly positioned
+          const tutorialPopup = document.querySelector('.tutorial-step-container[data-step="1"]');
+          if (tutorialPopup && tutorialPopup instanceof HTMLElement) {
+            tutorialPopup.style.position = 'fixed';
+            tutorialPopup.style.top = '50%';
+            tutorialPopup.style.left = '50%';
+            tutorialPopup.style.transform = 'translate(-50%, -50%)';
+            tutorialPopup.style.maxWidth = '90%';
+            tutorialPopup.style.width = '90%';
+            tutorialPopup.style.zIndex = '20000';
+            console.log('Fixed position for step 1 tutorial popup on small screen');
+          }
+        }, 100);
+      }
       
       // Clean up when step changes
       return () => {

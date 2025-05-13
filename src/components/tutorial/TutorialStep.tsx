@@ -79,6 +79,17 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     const isMobile = viewportWidth < 640;
     const isStep3or4 = step.id === 3 || step.id === 4;
     
+    // Special handling for step 1
+    const isStep1 = step.id === 1;
+    if (isStep1 && (isMobile || viewportHeight < 600)) {
+      // For step 1 on mobile or small height screens, center it regardless of calculations
+      return {
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)'
+      };
+    }
+    
     // Make adjustments to keep within viewport
     const newPos = { ...pos };
     
@@ -133,6 +144,17 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       }
     }
     
+    // Final check for very small screens - prioritize visibility over precise positioning
+    if (viewportWidth < 360 || viewportHeight < 500) {
+      // For very small screens, just center everything
+      console.log('Very small screen detected, centering popup');
+      return {
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)'
+      };
+    }
+    
     console.log('Adjusted position:', newPos);
     return newPos;
   };
@@ -142,6 +164,17 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   useEffect(() => {
     // Function to calculate position with enhanced logging
     const calculatePosition = () => {
+      // Special case for step 1 on small screens - always center
+      if (step.id === 1 && window.innerWidth < 480) {
+        setPosition({
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)'
+        });
+        console.log("Small screen detected, positioning step 1 popup in exact center");
+        return;
+      }
+      
       // Handle step 1 positioning
       if (step.id === 1) {
         // For step 1 - position the popup exactly in center of screen
@@ -433,6 +466,17 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           }
         }
       }
+      
+      // Final check specifically for step 1 on small screens
+      if (step.id === 1 && window.innerWidth < 480) {
+        console.log("Final position check for step 1 on small screens");
+        // Force centered positioning
+        setPosition({
+          top: '50%',
+          left: '50%',
+          transform: 'translate(-50%, -50%)'
+        });
+      }
     }, 500);
     
     return () => {
@@ -526,6 +570,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ duration: 0.3 }}
       onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind
+      data-step={step.id} // Add data attribute for easier CSS targeting
     >
       {/* Step indicator */}
       <div className="flex justify-between items-center mb-2">
