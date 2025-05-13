@@ -11,10 +11,12 @@ export interface TutorialStep {
   title: string;
   content: string;
   targetElement?: string; // Optional CSS selector for the element to highlight
+  alternativeSelectors?: string[]; // List of alternative selectors to try if primary fails
   position?: 'top' | 'bottom' | 'left' | 'right' | 'center';
   showNextButton?: boolean;
   showSkipButton?: boolean;
-  navigateTo?: string; // New property for navigation
+  navigateTo?: string; // Property for navigation
+  waitForElement?: boolean; // Whether to wait for the element to be present before proceeding
 }
 
 // Define the interface for the tutorial context
@@ -33,7 +35,7 @@ interface TutorialContextType {
 // Create the context with a default undefined value
 const TutorialContext = createContext<TutorialContextType | undefined>(undefined);
 
-// Define the initial tutorial steps
+// Define the initial tutorial steps with enhanced robustness
 const initialTutorialSteps: TutorialStep[] = [
   {
     id: 1,
@@ -57,11 +59,18 @@ const initialTutorialSteps: TutorialStep[] = [
     id: 3,
     title: 'Multilingual Recording',
     content: 'The New Entry button lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
-    targetElement: '.tutorial-record-entry-button', // Updated selector
+    targetElement: '.tutorial-record-entry-button',
+    alternativeSelectors: [
+      '[data-value="record"]',
+      '.record-entry-tab',
+      'button[data-tutorial-target="record-entry"]',
+      '#new-entry-button'
+    ],
     position: 'bottom',
     showNextButton: true,
     showSkipButton: true,
-    navigateTo: '/app/journal' // Navigate to journal page for this step
+    navigateTo: '/app/journal', // Navigate to journal page for this step
+    waitForElement: true // Wait for the element to be present before proceeding
   }
   // More steps can be added here
 ];
@@ -75,6 +84,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<TutorialStep[]>(initialTutorialSteps);
   const [tutorialChecked, setTutorialChecked] = useState(false);
+  const [navigationComplete, setNavigationComplete] = useState(true);
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
@@ -101,6 +111,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         const startingStep = data?.tutorial_step || 0;
         
         if (shouldActivate) {
+          console.log('Activating tutorial at step:', startingStep);
           setCurrentStep(startingStep);
           setIsActive(true);
         }
@@ -114,6 +125,57 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     checkTutorialStatus();
   }, [user, location.pathname, tutorialChecked]);
   
+  // Handle navigation between steps when route changes
+  useEffect(() => {
+    if (isActive && navigationComplete === false) {
+      const currentTutorialStep = steps[currentStep];
+      
+      // Check if the current URL matches the required URL for the step
+      if (currentTutorialStep?.navigateTo && location.pathname === currentTutorialStep.navigateTo) {
+        console.log(`Navigation to ${currentTutorialStep.navigateTo} complete for step ${currentTutorialStep.id}`);
+        setNavigationComplete(true);
+        
+        // After navigation, give time for the page to render before looking for elements
+        if (currentTutorialStep.waitForElement && currentTutorialStep.targetElement) {
+          const checkElement = () => {
+            console.log(`Looking for element ${currentTutorialStep.targetElement} for step ${currentTutorialStep.id}`);
+            
+            // Try the primary selector
+            let element = document.querySelector(currentTutorialStep.targetElement!);
+            
+            // If not found, try alternative selectors if available
+            if (!element && currentTutorialStep.alternativeSelectors) {
+              for (const selector of currentTutorialStep.alternativeSelectors) {
+                element = document.querySelector(selector);
+                if (element) {
+                  console.log(`Found element using alternative selector: ${selector}`);
+                  break;
+                }
+              }
+            }
+            
+            if (element) {
+              console.log(`Element found for step ${currentTutorialStep.id}`);
+              
+              // Add a special class to ensure this element is visible in step 3
+              if (currentTutorialStep.id === 3) {
+                element.classList.add('tutorial-target');
+                element.classList.add('record-entry-tab');
+                console.log('Added special classes to record entry element');
+              }
+            } else {
+              console.warn(`Element not found for step ${currentTutorialStep.id}, retrying...`);
+              setTimeout(checkElement, 500);
+            }
+          };
+          
+          // Start checking for the element with a small delay to allow rendering
+          setTimeout(checkElement, 500);
+        }
+      }
+    }
+  }, [isActive, currentStep, steps, location.pathname, navigationComplete]);
+  
   // Function to update the tutorial step in the database
   const updateTutorialStep = async (step: number) => {
     if (!user) return;
@@ -126,6 +188,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         
       if (error) {
         console.error('Error updating tutorial step:', error);
+      } else {
+        console.log('Tutorial step updated in database:', step);
       }
     } catch (error) {
       console.error('Error updating tutorial step:', error);
@@ -152,24 +216,30 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setIsActive(false);
       toast.success('Tutorial completed!');
+      console.log('Tutorial marked as completed');
     } catch (error) {
       console.error('Error completing tutorial:', error);
     }
   };
   
-  // Move to the next step
+  // Move to the next step with enhanced navigation handling
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       const newStep = currentStep + 1;
+      const nextTutorialStep = steps[newStep];
+      
+      console.log(`Moving to tutorial step ${newStep} (ID: ${nextTutorialStep.id})`);
       setCurrentStep(newStep);
       updateTutorialStep(newStep);
       
-      // If moving to step 3, ensure we're on the journal page
-      if (steps[newStep].id === 3 && location.pathname !== '/app/journal') {
-        console.log("Navigating to journal page for step 3");
-        navigate('/app/journal');
+      // Handle navigation if needed
+      if (nextTutorialStep.navigateTo && location.pathname !== nextTutorialStep.navigateTo) {
+        console.log(`Navigation needed for step ${nextTutorialStep.id} to ${nextTutorialStep.navigateTo}`);
+        setNavigationComplete(false);
+        navigate(nextTutorialStep.navigateTo);
       }
     } else {
+      console.log('Completing tutorial - reached the end');
       completeTutorial();
     }
   };
@@ -178,8 +248,16 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   const prevStep = () => {
     if (currentStep > 0) {
       const newStep = currentStep - 1;
+      console.log(`Moving to previous step ${newStep} (ID: ${steps[newStep].id})`);
       setCurrentStep(newStep);
       updateTutorialStep(newStep);
+      
+      // If moving back to a step that has a different navigateTo, navigate there
+      const prevTutorialStep = steps[newStep];
+      if (prevTutorialStep.navigateTo && location.pathname !== prevTutorialStep.navigateTo) {
+        console.log(`Navigating back to ${prevTutorialStep.navigateTo} for previous step`);
+        navigate(prevTutorialStep.navigateTo);
+      }
     }
   };
   
@@ -200,6 +278,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setIsActive(false);
       toast.info('Tutorial skipped. You can always find help in the settings.');
+      console.log('Tutorial skipped by user');
     } catch (error) {
       console.error('Error skipping tutorial:', error);
     }
@@ -227,6 +306,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setCurrentStep(0);
       setTutorialChecked(false);
       toast.success('Tutorial reset successfully! Redirecting to home page...');
+      console.log('Tutorial reset - redirecting to home');
       
       // Navigate to home page to start the tutorial
       navigate('/app/home');

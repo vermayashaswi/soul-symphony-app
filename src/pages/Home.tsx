@@ -15,7 +15,7 @@ const Home = () => {
   
   useEffect(() => {
     console.log('Home component mounted, tutorial active:', isActive);
-    console.log('Current tutorial step:', currentStep);
+    console.log('Current tutorial step:', currentStep, 'Step ID:', steps[currentStep]?.id);
     
     // Prevent scrolling when tutorial is active
     if (isActive) {
@@ -27,6 +27,12 @@ const Home = () => {
           const journalHeader = document.querySelector('.journal-header-container');
           if (journalHeader) {
             console.log('Journal header found and ready for tutorial highlighting');
+            
+            // Log positioning for debugging
+            const rect = journalHeader.getBoundingClientRect();
+            console.log('Journal header position:', rect);
+          } else {
+            console.warn('Journal header element not found');
           }
         }, 100);
       } else if (isInArrowTutorialStep) {
@@ -37,9 +43,18 @@ const Home = () => {
           if (arrowButton && buttonElement) {
             console.log('Journal arrow button found and ready for tutorial highlighting');
             
+            // Log detailed positioning and z-index for debugging
+            const rect = arrowButton.getBoundingClientRect();
+            console.log('Arrow button position:', rect);
+            console.log('Arrow button center:', {
+              x: rect.left + rect.width/2,
+              y: rect.top + rect.height/2
+            });
+            
             // Log z-index for debugging
             const computedStyle = window.getComputedStyle(buttonElement);
             console.log('Arrow button z-index:', computedStyle.zIndex);
+            console.log('Arrow button visibility:', computedStyle.visibility);
           } else {
             console.warn('Journal arrow button not found in DOM');
           }
@@ -51,7 +66,7 @@ const Home = () => {
         document.body.style.overflow = '';
       };
     }
-  }, [isActive, currentStep, isInArrowTutorialStep, isInWelcomeTutorialStep]);
+  }, [isActive, currentStep, isInArrowTutorialStep, isInWelcomeTutorialStep, steps]);
 
   return (
     <div 
@@ -61,7 +76,7 @@ const Home = () => {
       {/* Background elements including animations */}
       <BackgroundElements />
 
-      {/* Central navigation button - now using fixed positioning directly in the component */}
+      {/* Central navigation button - positioning is now entirely managed in the component */}
       <JournalNavigationButton />
 
       {/* Journal content with summary and quote */}

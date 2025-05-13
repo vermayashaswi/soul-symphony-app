@@ -21,35 +21,46 @@ const JournalNavigationButton: React.FC = () => {
     }
   };
 
-  // Enhanced logging for positioning - for better debugging
+  // Enhanced logging for button positioning - for better debugging
   useEffect(() => {
-    if (buttonRef.current && isInArrowTutorialStep) {
+    if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
       console.log('Journal arrow button position:', rect);
       console.log('Journal arrow button center:', {
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2
       });
+      console.log('Viewport center:', {
+        x: window.innerWidth / 2,
+        y: window.innerHeight / 2
+      });
+      
+      // Calculate offset from viewport center
+      const centerX = rect.left + rect.width / 2;
+      const centerY = rect.top + rect.height / 2;
+      const offsetX = centerX - (window.innerWidth / 2);
+      const offsetY = centerY - (window.innerHeight / 2);
+      console.log('Offset from viewport center:', { x: offsetX, y: offsetY });
     }
-  }, [isActive, currentStep, isInArrowTutorialStep]);
+  }, []);
 
-  // Ensure the button is centered in the viewport
-  // Using fixed position with translate to achieve perfect centering
-  const buttonWrapperStyle = {
-    position: 'fixed',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    zIndex: isInArrowTutorialStep ? 9999 : 40,
-    pointerEvents: 'auto',
-    visibility: 'visible',
-    opacity: 1
-  } as React.CSSProperties;
-
+  // Ensure the button is centered in the viewport without any parent influence
+  // Using the most reliable positioning method to guarantee exact centering
   return (
     <div 
       className={`journal-arrow-button ${isInArrowTutorialStep ? 'tutorial-target' : ''}`}
-      style={buttonWrapperStyle}
+      style={{
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: isInArrowTutorialStep ? 9999 : 40,
+        margin: 0,
+        padding: 0,
+        pointerEvents: 'auto',
+        visibility: 'visible',
+        opacity: 1,
+      }}
       data-testid="journal-arrow-button"
       ref={buttonRef}
     >
