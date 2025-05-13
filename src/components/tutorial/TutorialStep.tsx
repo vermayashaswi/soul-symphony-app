@@ -34,6 +34,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
 }) => {
   const [position, setPosition] = useState<PositionState>({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
   const stepRef = useRef<HTMLDivElement>(null);
+  const nextButtonRef = useRef<HTMLButtonElement>(null);
   const [renderKey, setRenderKey] = useState(0);
   
   // Force re-render on step changes to ensure clean positioning
@@ -281,13 +282,19 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   }, [step.id, renderKey]);
   
-  // Handle navigation actions with improved click capturing
+  // Enhanced Next button click handling with multiple approaches
   const handleNext = (e: React.MouseEvent) => {
     console.log(`[DEBUG] Next button clicked for step ${step.id}, applying stopPropagation`);
+    
+    // Enhanced event handling - stop propagation and prevent default more aggressively
     if (e && e.stopPropagation) {
       e.preventDefault();
       e.stopPropagation();
     }
+    
+    // Make the click more reliable by preventing other handlers from interfering
+    e.nativeEvent.stopImmediatePropagation();
+    
     console.log(`Tutorial: Next button clicked for step ${step.id}, calling onNext function`);
     
     // Directly call onNext with a small timeout to ensure event loop is clear
@@ -302,6 +309,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       e.preventDefault();
       e.stopPropagation();
     }
+    e.nativeEvent.stopImmediatePropagation();
     console.log(`Tutorial: Previous button clicked for step ${step.id}`);
     onPrev();
   };
@@ -311,9 +319,31 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       e.preventDefault();
       e.stopPropagation();
     }
+    e.nativeEvent.stopImmediatePropagation();
     console.log("Tutorial: Skip button clicked");
     onSkip();
   };
+  
+  // Check if next button is ready to be clicked and log its properties
+  useEffect(() => {
+    if (nextButtonRef.current && step.id === 1) {
+      const rect = nextButtonRef.current.getBoundingClientRect();
+      console.log('Next button position:', rect);
+      console.log('Next button computed style:', window.getComputedStyle(nextButtonRef.current));
+      
+      // Add direct click listener as an alternative approach
+      const handleDirectClick = () => {
+        console.log('Direct click listener fired');
+        onNext();
+      };
+      
+      nextButtonRef.current.addEventListener('click', handleDirectClick);
+      
+      return () => {
+        nextButtonRef.current?.removeEventListener('click', handleDirectClick);
+      };
+    }
+  }, [step.id, onNext]);
   
   // Apply all position styles directly
   const getPositionStyle = () => {
@@ -344,7 +374,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[20000] max-w-[320px] tutorial-step-container"
+      className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 max-w-[320px] tutorial-step-container"
       style={{
         top: position.top,
         left: position.left,
@@ -353,7 +383,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         backgroundColor: '#1A1F2C', // Dark background for all steps
         color: 'white',             // White text for all steps
         border: '3px solid var(--color-theme)',
-        boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)'
+        boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)',
+        zIndex: 30000, // Significantly increased z-index for all steps
+        pointerEvents: 'auto'
       }}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
@@ -402,9 +434,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         
         {step.showNextButton && (
           <Button 
+            ref={nextButtonRef}
             variant="default" 
             size="sm" 
             onClick={handleNext}
+            onMouseDown={(e) => e.stopPropagation()}
             className="flex items-center gap-1 bg-theme hover:bg-theme/80 pointer-events-auto z-50"
             data-testid="tutorial-next-button"
           >

@@ -18,60 +18,68 @@ const Home = () => {
     console.log('Current tutorial step:', currentStep, 'Step ID:', steps[currentStep]?.id);
     
     // Prevent scrolling when tutorial is active
-    if (isActive) {
-      document.body.style.overflow = 'hidden';
-      
-      // Enhanced check for tutorial element visibility
-      if (isInWelcomeTutorialStep) {
-        setTimeout(() => {
-          const journalHeader = document.querySelector('.journal-header-container');
-          if (journalHeader) {
-            console.log('Journal header found and ready for tutorial highlighting');
-            
-            // Log positioning for debugging
-            const rect = journalHeader.getBoundingClientRect();
-            console.log('Journal header position:', rect);
-          } else {
-            console.warn('Journal header element not found');
-          }
-        }, 100);
-      } else if (isInArrowTutorialStep) {
-        setTimeout(() => {
-          const arrowButton = document.querySelector('.journal-arrow-button');
-          const buttonElement = document.querySelector('.journal-arrow-button button');
+    document.body.style.overflow = 'hidden';
+    
+    // Enhanced check for tutorial element visibility
+    if (isInWelcomeTutorialStep) {
+      setTimeout(() => {
+        const journalHeader = document.querySelector('.journal-header-container');
+        if (journalHeader) {
+          console.log('Journal header found and ready for tutorial highlighting');
           
-          if (arrowButton && buttonElement) {
-            console.log('Journal arrow button found and ready for tutorial highlighting');
-            
-            // Log detailed positioning and z-index for debugging
-            const rect = arrowButton.getBoundingClientRect();
-            console.log('Arrow button position:', rect);
-            console.log('Arrow button center:', {
-              x: rect.left + rect.width/2,
-              y: rect.top + rect.height/2
-            });
-            
-            // Log z-index for debugging
-            const computedStyle = window.getComputedStyle(buttonElement);
-            console.log('Arrow button z-index:', computedStyle.zIndex);
-            console.log('Arrow button visibility:', computedStyle.visibility);
-          } else {
-            console.warn('Journal arrow button not found in DOM');
-          }
-        }, 100);
-      }
-      
-      // Cleanup function to restore scrolling
-      return () => {
-        document.body.style.overflow = '';
-      };
+          // Log positioning for debugging
+          const rect = journalHeader.getBoundingClientRect();
+          console.log('Journal header position:', rect);
+        } else {
+          console.warn('Journal header element not found');
+        }
+      }, 100);
+    } else if (isInArrowTutorialStep) {
+      setTimeout(() => {
+        const arrowButton = document.querySelector('.journal-arrow-button');
+        const buttonElement = document.querySelector('.journal-arrow-button button');
+        
+        if (arrowButton && buttonElement) {
+          console.log('Journal arrow button found and ready for tutorial highlighting');
+          
+          // Log detailed positioning and z-index for debugging
+          const rect = arrowButton.getBoundingClientRect();
+          console.log('Arrow button position:', rect);
+          console.log('Arrow button center:', {
+            x: rect.left + rect.width/2,
+            y: rect.top + rect.height/2
+          });
+          
+          // Log z-index for debugging
+          const computedStyle = window.getComputedStyle(buttonElement);
+          console.log('Arrow button z-index:', computedStyle.zIndex);
+          console.log('Arrow button visibility:', computedStyle.visibility);
+        } else {
+          console.warn('Journal arrow button not found in DOM');
+        }
+      }, 100);
     }
+    
+    // Cleanup function to restore scrolling
+    return () => {
+      document.body.style.overflow = '';
+    };
   }, [isActive, currentStep, isInArrowTutorialStep, isInWelcomeTutorialStep, steps]);
 
   return (
     <div 
-      className={`min-h-screen bg-background text-foreground relative overflow-hidden ${isActive ? 'tutorial-active-page' : ''}`}
-      style={{ touchAction: isActive ? 'none' : 'auto' }}
+      className="min-h-screen bg-background text-foreground relative overflow-hidden"
+      style={{ 
+        touchAction: 'none',
+        overflow: 'hidden',
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        width: '100%',
+        height: '100%'
+      }}
     >
       {/* Background elements including animations */}
       <BackgroundElements />

@@ -4,8 +4,12 @@ import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 
 const HomePage = () => {
+  // Restore scroll position on navigation
+  useScrollRestoration();
+
   const openAppStore = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);
     const appStoreUrl = 'https://apps.apple.com/app/soulo';
@@ -38,7 +42,7 @@ const HomePage = () => {
   console.log('HomePage: Rendering the website home page at route "/"');
 
   return (
-    <div className="min-h-screen bg-white">
+    <div className="min-h-screen bg-white overflow-x-hidden">
       <Navbar />
       <HeroSection 
         openAppStore={openAppStore}

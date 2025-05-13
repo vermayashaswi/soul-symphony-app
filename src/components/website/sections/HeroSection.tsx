@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { Suspense, lazy } from 'react';
 import { Apple, Play, Shield, Check } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import SouloLogo from '@/components/SouloLogo';
@@ -7,6 +7,10 @@ import { motion } from 'framer-motion';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { PhoneVoiceAnimation } from '@/components/website/PhoneVoiceAnimation';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
+
+// Lazy load the 3D background to improve initial load performance
+const ThreeDBackground = lazy(() => import('@/components/website/3DBackground'));
 
 interface HeroSectionProps {
   openAppStore: () => void;
@@ -21,10 +25,19 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
 
   return (
     <div className="relative w-full bg-gradient-to-br from-blue-50 to-purple-50 pt-24 md:pt-32 pb-16 md:pb-24 overflow-hidden">
+      {/* Background image */}
       <div 
         className="absolute inset-0 z-0 bg-cover bg-center opacity-20"
         style={{ backgroundImage: "url('/lovable-uploads/32abc730-009c-4901-912c-a16e7c2c1ec6.png')" }}
       ></div>
+      
+      {/* 3D Background animation */}
+      <Suspense fallback={null}>
+        <div className="absolute inset-0 z-0 opacity-30">
+          <ThreeDBackground />
+        </div>
+      </Suspense>
+      
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">
           <motion.div
@@ -77,7 +90,9 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
             transition={{ duration: 1, delay: 0.3 }}
             className="w-full lg:w-1/2 flex items-center justify-center"
           >
-            <PhoneVoiceAnimation />
+            <AspectRatio ratio={9/16} className="w-full max-w-sm">
+              <PhoneVoiceAnimation />
+            </AspectRatio>
           </motion.div>
         </div>
       </div>

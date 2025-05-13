@@ -1,3 +1,4 @@
+
 User-agent: Googlebot
 Allow: /
 
@@ -10,5 +11,23 @@ Allow: /
 User-agent: facebookexternalhit
 Allow: /
 
+# Prevent scrolling issues with certain crawlers
+User-agent: AdsBot-Google
+Allow: /
+
+User-agent: Mediapartners-Google
+Allow: /
+
+User-agent: Yeti
+Allow: /
+
+User-agent: Baiduspider
+Allow: /
+
 User-agent: *
 Allow: /
+
+# Prevent access to local state-specific routes
+Disallow: /app/journal/*/*
+Disallow: /app/settings/*
+Disallow: /app/debug/*
