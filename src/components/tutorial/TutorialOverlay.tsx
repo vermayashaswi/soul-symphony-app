@@ -31,13 +31,19 @@ const TutorialOverlay: React.FC = () => {
     nextStep, 
     prevStep, 
     skipTutorial,
-    tutorialCompleted
+    tutorialCompleted,
+    isNavigating
   } = useTutorial();
   const navigate = useNavigate();
   const location = useLocation();
   const [elementForStep3Found, setElementForStep3Found] = useState(false);
   const [attempts, setAttempts] = useState(0);
   const [lastLocationChange, setLastLocationChange] = useState(Date.now());
+  const [navState, setNavState] = useState({
+    fromStep: -1,
+    toStep: -1,
+    inProgress: false
+  });
   
   // Only render tutorial on app routes - strict checking
   const currentPath = location.pathname;
@@ -48,7 +54,53 @@ const TutorialOverlay: React.FC = () => {
   useEffect(() => {
     console.log('TutorialOverlay - Location changed to:', currentPath);
     setLastLocationChange(Date.now());
+    
+    // Update navigation state when location changes
+    if (navState.inProgress) {
+      console.log(`Navigation in progress: from step ${navState.fromStep} to step ${navState.toStep}`);
+      
+      // Check if we've reached the intended destination
+      const targetStep = steps[navState.toStep];
+      if (targetStep && targetStep.navigateTo === currentPath) {
+        console.log(`Reached destination ${currentPath} for step ${navState.toStep}`);
+        setNavState(prev => ({...prev, inProgress: false}));
+      }
+    }
   }, [currentPath]);
+  
+  // Track step changes to detect navigation
+  useEffect(() => {
+    console.log(`Current step changed to ${currentStep} (ID: ${steps[currentStep]?.id})`);
+    
+    // If we're navigating between steps
+    if (navState.inProgress && navState.toStep === currentStep) {
+      console.log(`Now on target step ${currentStep}, checking if UI needs updating`);
+      
+      // Force re-render of tutorial elements after a short delay
+      setTimeout(() => {
+        setAttempts(prev => prev + 1);
+      }, 200);
+    }
+  }, [currentStep]);
+  
+  // Monitor navigation state from context
+  useEffect(() => {
+    if (isNavigating) {
+      console.log('Navigation in progress detected from context');
+      setNavState(prev => ({
+        ...prev,
+        fromStep: prev.toStep !== -1 ? prev.toStep : currentStep,
+        toStep: currentStep,
+        inProgress: true
+      }));
+    } else if (navState.inProgress && !isNavigating) {
+      console.log('Navigation complete detected from context');
+      setNavState(prev => ({...prev, inProgress: false}));
+      
+      // Force a UI refresh when navigation completes
+      setAttempts(prev => prev + 1);
+    }
+  }, [isNavigating]);
   
   // Log whenever the component is rendered and what the decision is
   useEffect(() => {
@@ -58,7 +110,9 @@ const TutorialOverlay: React.FC = () => {
       isAppRouteCurrent,
       shouldShowTutorial,
       tutorialCompleted,
-      currentStepId: steps[currentStep]?.id
+      currentStepId: steps[currentStep]?.id,
+      isNavigating,
+      navState
     });
     
     // Add class to document body when tutorial is completed
@@ -75,7 +129,7 @@ const TutorialOverlay: React.FC = () => {
         document.body.classList.add('tutorial-completed');
       }
     };
-  }, [isActive, currentPath, isAppRouteCurrent, shouldShowTutorial, tutorialCompleted, currentStep]);
+  }, [isActive, currentPath, isAppRouteCurrent, shouldShowTutorial, tutorialCompleted, currentStep, isNavigating, navState]);
   
   // Enhanced scrolling prevention when tutorial is active
   useEffect(() => {
@@ -110,12 +164,25 @@ const TutorialOverlay: React.FC = () => {
       currentStep,
       currentPath: location.pathname,
       currentStepData: steps[currentStep],
+      isNavigating,
       timestamp: Date.now()
     });
     
     const currentTutorialStep = steps[currentStep];
+    
+    // Enhanced navigation check with backward support
     if (currentTutorialStep?.navigateTo && location.pathname !== currentTutorialStep.navigateTo) {
-      console.log(`TutorialOverlay - Navigating to ${currentTutorialStep.navigateTo} for tutorial step ${currentTutorialStep.id}`);
+      console.log(`TutorialOverlay - Path mismatch. Current: ${location.pathname}, Expected: ${currentTutorialStep.navigateTo}`);
+      console.log(`Initiating navigation to ${currentTutorialStep.navigateTo} for step ${currentTutorialStep.id}`);
+      
+      // Track this navigation attempt
+      setNavState({
+        fromStep: currentStep - 1 >= 0 ? currentStep - 1 : -1,
+        toStep: currentStep,
+        inProgress: true
+      });
+      
+      // Navigate to the correct path
       navigate(currentTutorialStep.navigateTo);
     } else if (currentTutorialStep?.id) {
       // If we're on the right path but need to render the correct step content
@@ -125,7 +192,7 @@ const TutorialOverlay: React.FC = () => {
       // This handles the case where navigation worked but the content didn't update
       setAttempts(prev => prev + 1);
     }
-  }, [shouldShowTutorial, currentStep, steps, navigate, location.pathname, lastLocationChange]);
+  }, [shouldShowTutorial, currentStep, steps, navigate, location.pathname, lastLocationChange, isNavigating]);
 
   // Handle step 1 - journal header visibility with enhanced positioning
   const handleJournalHeaderVisibility = () => {
@@ -499,7 +566,7 @@ const TutorialOverlay: React.FC = () => {
       <AnimatePresence mode="wait">
         {shouldShowStepUI && currentTutorialStep && (
           <TutorialStep
-            key={`${currentStep}-${currentTutorialStep.id}-${location.pathname}`}
+            key={`${currentStep}-${currentTutorialStep.id}-${location.pathname}-${attempts}`}
             step={currentTutorialStep}
             onNext={nextStep}
             onPrev={prevStep}

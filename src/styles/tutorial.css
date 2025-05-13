@@ -232,8 +232,9 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   border: 2px solid var(--color-theme) !important;
 }
 
-/* New styles for Step 3 to ensure it's fully visible */
-.tutorial-step-container[data-step="3"] {
+/* Improved styles for steps 3 and 4 to ensure they're fully visible during navigation */
+.tutorial-step-container[data-step="3"],
+.tutorial-step-container[data-step="4"] {
   position: fixed !important; /* Force fixed positioning */
   top: 50% !important;
   left: 50% !important;
@@ -241,9 +242,11 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   max-width: 300px !important;
   width: calc(100% - 40px) !important;
   z-index: 30000 !important; /* Extra high z-index */
-  background-color: var(--card) !important;
+  background-color: #1A1F2C !important; /* Dark background */
+  color: white !important;    /* White text */
   border: 3px solid var(--color-theme) !important;
   box-shadow: 0 0 40px rgba(0, 0, 0, 0.7) !important;
+  opacity: 1 !important;
 }
 
 /* Ensure all tutorial step content is visible */
@@ -280,7 +283,9 @@ button[data-tutorial-target="past-entries"].tutorial-target,
     font-size: 0.9rem;
   }
   
-  /* For step 3 & 4 on mobile, ensure popups stay in visible area */
+  /* For all steps on mobile, ensure popups stay in visible area */
+  .tutorial-step-container[data-step="1"],
+  .tutorial-step-container[data-step="2"],
   .tutorial-step-container[data-step="3"],
   .tutorial-step-container[data-step="4"] {
     top: 50% !important;
@@ -288,20 +293,8 @@ button[data-tutorial-target="past-entries"].tutorial-target,
     transform: translate(-50%, -50%) !important;
     max-width: 280px !important;
     width: 90% !important;
-  }
-  
-  /* Enhanced step 1 visibility on smaller screens */
-  .tutorial-step-container[data-step="1"] {
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    max-height: 90vh !important;
-    overflow-y: auto !important;
-    margin: 0 auto !important;
-    display: flex !important;
-    flex-direction: column !important;
-    max-width: 90% !important;
-    width: 280px !important;
+    background-color: #1A1F2C !important; /* Dark background for all steps */
+    color: white !important;               /* White text for all steps */
   }
   
   /* Enhanced step content for smaller screens */
@@ -334,16 +327,6 @@ button[data-tutorial-target="past-entries"].tutorial-target,
     margin-bottom: 0.5rem !important;
   }
   
-  /* Force Step 1 to center of screen */
-  .tutorial-step-container[data-step="1"] {
-    position: fixed !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
-    width: 90% !important;
-    max-height: 80vh !important;
-  }
-  
   /* Smaller buttons on very small screens */
   .tutorial-step-container button {
     padding: 4px 8px !important;
@@ -351,21 +334,32 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   }
 }
 
-/* Make tutorial steps 3 and 4 fully opaque */
-.tutorial-step-container[data-step="3"],
-.tutorial-step-container[data-step="4"] {
+/* Make all tutorial steps have consistent styling during navigation */
+.tutorial-step-container {
   background-color: #1A1F2C !important; /* Dark background */
-  color: white !important;
+  color: white !important;               /* White text */
   border: 3px solid var(--color-theme) !important;
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.7) !important;
 }
 
-.tutorial-step-container[data-step="3"] h3,
-.tutorial-step-container[data-step="4"] h3 {
+.tutorial-step-container h3 {
   color: white !important;
 }
 
-.tutorial-step-container[data-step="3"] p,
-.tutorial-step-container[data-step="4"] p {
+.tutorial-step-container p {
   color: rgba(255, 255, 255, 0.9) !important;
+}
+
+/* Enhanced visibility for steps during navigation */
+body:has([data-step="1"]),
+body:has([data-step="2"]),
+body:has([data-step="3"]),
+body:has([data-step="4"]) {
+  overflow: hidden !important;
+}
+
+/* Force all tutorial steps to be visible during transitions */
+[data-step="1"], [data-step="2"], [data-step="3"], [data-step="4"] {
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 30000 !important;
 }

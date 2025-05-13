@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,6 +33,7 @@ interface TutorialContextType {
   resetTutorial: () => void;
   tutorialCompleted: boolean;
   isInStep: (stepId: number) => boolean;
+  isNavigating: boolean; // New property to track navigation state
 }
 
 // Create the context with a default undefined value
@@ -47,7 +49,7 @@ const initialTutorialSteps: TutorialStep[] = [
     position: 'center',
     showNextButton: true,
     showSkipButton: true,
-    navigateTo: '/app/home', // Add explicit navigation to home for step 1
+    navigateTo: '/app/home', // Explicit navigation for step 1
   },
   {
     id: 2,
@@ -57,7 +59,7 @@ const initialTutorialSteps: TutorialStep[] = [
     position: 'top',
     showNextButton: true,
     showSkipButton: true,
-    navigateTo: '/app/home', // Add explicit navigation to home for step 2
+    navigateTo: '/app/home', // Explicit navigation for step 2
   },
   {
     id: 3,
@@ -106,6 +108,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [tutorialChecked, setTutorialChecked] = useState(false);
   const [navigationComplete, setNavigationComplete] = useState(true);
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
+  const [isNavigating, setIsNavigating] = useState(false); // Track navigation state
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
@@ -174,6 +177,21 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     checkTutorialCompletionStatus();
   }, [user]);
   
+  // Enhanced navigation tracking - watch for route changes to update navigation state
+  useEffect(() => {
+    if (isNavigating) {
+      console.log('Navigation in progress, detected route change to:', location.pathname);
+      const currentStepData = steps[currentStep];
+      
+      // Check if we've reached the intended destination
+      if (currentStepData && currentStepData.navigateTo === location.pathname) {
+        console.log('Reached intended destination:', location.pathname);
+        setIsNavigating(false);
+        setNavigationComplete(true);
+      }
+    }
+  }, [location.pathname, isNavigating, currentStep, steps]);
+  
   // Handle navigation between steps when route changes
   useEffect(() => {
     if (isActive && navigationComplete === false) {
@@ -183,6 +201,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (currentTutorialStep?.navigateTo && location.pathname === currentTutorialStep.navigateTo) {
         console.log(`Navigation to ${currentTutorialStep.navigateTo} complete for step ${currentTutorialStep.id}`);
         setNavigationComplete(true);
+        setIsNavigating(false);
         
         // After navigation, give time for the page to render before looking for elements
         if (currentTutorialStep.waitForElement && currentTutorialStep.targetElement) {
@@ -289,6 +308,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (nextTutorialStep.navigateTo && location.pathname !== nextTutorialStep.navigateTo) {
         console.log(`Navigation needed for step ${nextTutorialStep.id} to ${nextTutorialStep.navigateTo}`);
         setNavigationComplete(false);
+        setIsNavigating(true); // Set navigating state to true
         navigate(nextTutorialStep.navigateTo);
       }
     } else {
@@ -302,9 +322,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     if (currentStep > 0) {
       const newStep = currentStep - 1;
       const prevTutorialStep = steps[newStep];
+      const currentTutorialStep = steps[currentStep];
       
       console.log(`Moving to previous step ${newStep} (ID: ${prevTutorialStep.id})`);
-      console.log(`Current location: ${location.pathname}, Target navigation: ${prevTutorialStep.navigateTo || 'none'}`);
+      console.log(`Current location: ${location.pathname}, Current step: ${currentStep}, Target navigation: ${prevTutorialStep.navigateTo || 'none'}`);
       
       // Update the current step in state and database
       setCurrentStep(newStep);
@@ -314,12 +335,20 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (prevTutorialStep.navigateTo && location.pathname !== prevTutorialStep.navigateTo) {
         console.log(`Navigating back to ${prevTutorialStep.navigateTo} for previous step ${prevTutorialStep.id}`);
         
-        // Critical: Set navigation incomplete flag before navigating
-        // This ensures TutorialOverlay notices the navigation change
+        // Critical: Set navigation flags before navigating
         setNavigationComplete(false);
+        setIsNavigating(true);
         
-        // Navigate to the target page for the previous step
-        navigate(prevTutorialStep.navigateTo);
+        // Special handling for step 3 to step 2 backward navigation
+        if (currentTutorialStep.id === 3 && prevTutorialStep.id === 2) {
+          console.log('Special handling for step 3 to step 2 backward navigation');
+          
+          // Explicitly navigate back to home
+          navigate('/app/home');
+        } else {
+          // Regular navigation to the target page for the previous step
+          navigate(prevTutorialStep.navigateTo);
+        }
       }
     }
   };
@@ -376,6 +405,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setCurrentStep(0);
       setTutorialChecked(false);
       setTutorialCompleted(false);
+      setNavigationComplete(true);
+      setIsNavigating(false);
       
       // Only navigate if we're not already on the app home page
       if (location.pathname !== '/app/home') {
@@ -410,7 +441,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Provide the context value
+  // Provide the context value with the new isNavigating property
   const contextValue: TutorialContextType = {
     isActive,
     currentStep,
@@ -422,7 +453,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     completeTutorial,
     resetTutorial,
     tutorialCompleted,
-    isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId
+    isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId,
+    isNavigating // Expose the navigation state
   };
   
   return (
