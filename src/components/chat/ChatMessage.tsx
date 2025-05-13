@@ -51,8 +51,9 @@ const ChatMessage = ({
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(true);
   const isAssistant = message.role === 'assistant';
-  // Fix the error by checking for 'error' string in a type-safe way
-  const isError = message.role === 'user' ? false : (message.role === 'assistant' ? message.content.toLowerCase().includes('error') : message.role.toString().includes('error'));
+  // Fix type checking logic by avoiding toString() on never type
+  const isError = message.role === 'error' || 
+                 (message.role === 'assistant' && message.content.toLowerCase().includes('error'));
   const hasReferences = message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0;
   const hasAnalysis = message.analysis_data && typeof message.analysis_data === 'object' && Object.keys(message.analysis_data as object).length > 0;
   const maxReferencesToShowCollapsed = 2;

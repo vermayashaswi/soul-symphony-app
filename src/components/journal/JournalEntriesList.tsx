@@ -288,11 +288,12 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             const entryCreatedAt = entry.created_at || new Date().toISOString();
             
             // Create a new entry object with required properties and proper types
+            // The JournalEntry type now allows sentiment to be string | number so this is compatible
             const safeEntry: JournalEntry = {
               ...entry,
               content: entryContent,
               created_at: entryCreatedAt,
-              sentiment: entry.sentiment, // This will maintain the string | number type
+              sentiment: entry.sentiment,
             };
             
             return (

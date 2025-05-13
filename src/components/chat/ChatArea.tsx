@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '@/hooks/use-chat';
@@ -228,7 +227,6 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 content: message.content,
                 analysis: message.analysis_data,
                 references: message.reference_entries,
-                diagnostics: message.diagnostics,
                 hasNumericResult: message.has_numeric_result
               }}
               showAnalysis={showDebugMode && hasAnalysisParam(message)}
