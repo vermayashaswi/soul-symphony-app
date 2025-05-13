@@ -1,9 +1,9 @@
 
 import { useState, useCallback } from 'react'
 
-// Define ToasterToast type directly since it's not exported from toaster.tsx
+// Define ToasterToast type with id as optional
 export type ToasterToast = {
-  id: string
+  id?: string  // Make id optional
   title?: React.ReactNode
   description?: React.ReactNode
   action?: React.ReactNode
@@ -35,16 +35,20 @@ const createSimpleStore = <T,>(initialState: T) => {
   }
 }
 
-const store = createSimpleStore<ToasterToast[]>([])
+// Ensure all stored toasts have an ID
+type ToasterToastWithId = ToasterToast & { id: string }
+
+const store = createSimpleStore<ToasterToastWithId[]>([])
 
 export const useToastStore = store
 
 export function useToast() {
-  const [toasts, setToasts] = useState<ToasterToast[]>(store.get())
+  const [toasts, setToasts] = useState<ToasterToastWithId[]>(store.get())
 
   const createToast = useCallback((data: ToasterToast) => {
-    const id = crypto.randomUUID()
-    const toast = { ...data, id }
+    // Generate ID if not provided
+    const id = data.id || crypto.randomUUID()
+    const toast = { ...data, id } as ToasterToastWithId
 
     setToasts((toasts) => [...toasts, toast])
 
@@ -65,12 +69,12 @@ export function useToast() {
 
   const updateToast = useCallback((id: string, data: ToasterToast) => {
     setToasts((toasts) =>
-      toasts.map((toast) => (toast.id === id ? { ...toast, ...data } : toast))
+      toasts.map((toast) => (toast.id === id ? { ...toast, ...data, id } : toast))
     )
     store.set(
       store
         .get()
-        .map((toast) => (toast.id === id ? { ...toast, ...data } : toast))
+        .map((toast) => (toast.id === id ? { ...toast, ...data, id } : toast))
     )
   }, [])
 
@@ -99,17 +103,17 @@ export function useToast() {
 }
 
 // Create direct toast function for easier import
-// Fixed by correctly defining the type and attaching methods
 const toastFunction = ((data: ToasterToast) => {
-  const id = crypto.randomUUID()
-  const toast = { id, ...data }
+  // Generate ID if not provided
+  const id = data.id || crypto.randomUUID()
+  const toast = { ...data, id } as ToasterToastWithId
   const currentToasts = store.get()
   store.set([...currentToasts, toast])
   return {
     id,
     dismiss: () => store.set(store.get().filter(t => t.id !== id)),
     update: (newData: ToasterToast) => store.set(
-      store.get().map(t => t.id === id ? { ...t, ...newData } : t)
+      store.get().map(t => t.id === id ? { ...t, ...newData, id } : t)
     )
   }
 }) as ((data: ToasterToast) => {
@@ -129,7 +133,7 @@ toastFunction.update = (id: string, data: ToasterToast) => {
   store.set(
     store
       .get()
-      .map((toast) => (toast.id === id ? { ...toast, ...data } : toast))
+      .map((toast) => (toast.id === id ? { ...toast, ...data, id } : toast))
   )
 }
 
