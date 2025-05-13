@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -122,31 +123,51 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           });
         }
       } else if (step.id === 4) {
-        // For step 4 - find the Past Entries tab
+        // For step 4 - find the Past Entries tab using the same approach as step 3 for consistency
         console.log("Calculating position for step 4...");
         
-        const entriesTab = document.querySelector('[value="entries"]');
+        const selectors = [
+          '[value="entries"]',
+          '.entries-tab',
+          'button[data-tutorial-target="past-entries"]',
+          '#past-entries-button'
+        ];
         
-        if (entriesTab) {
-          const rect = entriesTab.getBoundingClientRect();
-          console.log("Past Entries tab rect for step 4:", rect);
+        let entriesTabElement = null;
+        let usedSelector = '';
+        
+        // Try each selector
+        for (const selector of selectors) {
+          const element = document.querySelector(selector);
+          if (element) {
+            entriesTabElement = element;
+            usedSelector = selector;
+            console.log(`Found step 4 target using selector: ${selector}`, element);
+            break;
+          }
+        }
+        
+        if (entriesTabElement) {
+          const rect = entriesTabElement.getBoundingClientRect();
+          console.log(`Step 4 element rect using ${usedSelector}:`, rect);
           
           // Add tutorial target class to ensure visibility
-          entriesTab.classList.add('tutorial-target');
+          entriesTabElement.classList.add('tutorial-target');
+          entriesTabElement.classList.add('entries-tab');
           
-          // Position below the tab
+          // Position below the tab - match step 3's positioning approach
           setPosition({
-            top: rect.bottom + 20,
-            left: rect.left + (rect.width / 2),
+            top: rect.bottom + 20, // Same offset as step 3
+            left: rect.left + (rect.width / 2), // Center aligned with the tab
             transform: 'translateX(-50%)'
           });
-          console.log("Positioned step 4 popup below Past Entries tab at:", {
+          console.log("Positioned step 4 popup at:", {
             top: rect.bottom + 20,
             left: rect.left + (rect.width / 2)
           });
         } else {
           console.warn("Could not find Past Entries tab for step 4, using fallback position");
-          // Fallback position
+          // Fallback position - similar to step 3's fallback
           setPosition({ 
             top: 120, 
             left: '75%', // Position toward the right side where Past Entries tab would be

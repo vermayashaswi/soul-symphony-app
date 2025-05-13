@@ -1024,7 +1024,14 @@ const Journal = () => {
                 >
                   <TranslatableText text="Record Entry" />
                 </TabsTrigger>
-                <TabsTrigger value="entries"><TranslatableText text="Past Entries" /></TabsTrigger>
+                <TabsTrigger 
+                  value="entries"
+                  className="entries-tab"
+                  data-tutorial-target="past-entries"
+                  id="past-entries-button"
+                >
+                  <TranslatableText text="Past Entries" />
+                </TabsTrigger>
               </TabsList>
               
               <TabsContent value="record" className="mt-0">

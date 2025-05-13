@@ -16,7 +16,9 @@ const RECORD_ENTRY_SELECTORS = [
 
 const ENTRIES_TAB_SELECTORS = [
   '[value="entries"]',
-  '.entries-tab'
+  '.entries-tab',
+  'button[data-tutorial-target="past-entries"]',
+  '#past-entries-button'
 ];
 
 const TutorialOverlay: React.FC = () => {
@@ -286,7 +288,7 @@ const TutorialOverlay: React.FC = () => {
     }
   };
 
-  // Handle step 4 - Past Entries tab visibility
+  // Handle step 4 - Past Entries tab visibility - Enhanced to match step 3's behavior
   const handleEntriesTabVisibility = () => {
     console.log('TutorialOverlay - Setting up Past Entries tab visibility for step 4');
     
@@ -322,10 +324,10 @@ const TutorialOverlay: React.FC = () => {
         entriesTabElement.classList.add('tutorial-target');
         entriesTabElement.classList.add('entries-tab');
         
-        // Add enhanced highlighting for better visibility
+        // Add enhanced highlighting for better visibility - Match step 3's highlighting
         entriesTabElement.classList.add('tutorial-highlight');
         
-        // Force the element to be visible with inline styles
+        // Force the element to be visible with inline styles - Match step 3's styling
         const elementStyle = entriesTabElement as HTMLElement;
         elementStyle.style.visibility = 'visible';
         elementStyle.style.opacity = '1';
@@ -334,6 +336,15 @@ const TutorialOverlay: React.FC = () => {
         elementStyle.style.zIndex = '10000';
         
         console.log("Added classes and styles to Past Entries tab element");
+        
+        // Log computed styles to verify our styles are applied
+        const computedStyle = window.getComputedStyle(entriesTabElement);
+        console.log("Computed styles for Past Entries tab element:", {
+          visibility: computedStyle.visibility,
+          opacity: computedStyle.opacity,
+          zIndex: computedStyle.zIndex,
+          position: computedStyle.position
+        });
       } else {
         console.warn("Could not find Past Entries tab element for tutorial step 4 with any selector");
       }

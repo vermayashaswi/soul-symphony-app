@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -76,6 +77,11 @@ const initialTutorialSteps: TutorialStep[] = [
     title: 'Your Journal History',
     content: 'View and explore all your past journal entries here. You can search, filter, and reflect on your emotional journey over time.',
     targetElement: '[value="entries"]', // Target the Past Entries tab
+    alternativeSelectors: [
+      '.entries-tab',
+      'button[data-tutorial-target="past-entries"]',
+      '#past-entries-button'
+    ],
     position: 'bottom',
     showNextButton: true,
     showSkipButton: true,
