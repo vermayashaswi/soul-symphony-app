@@ -167,7 +167,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       setRecoveringFromDelete(true);
       
       // Remove from processing state manager if present
-      processingStateManager.removeEntry(entryId);
+      processingStateManager.removeEntry(entryId.toString()); // Convert number to string here
       
       // Find any temporary processing entries that map to this entry ID and remove them
       const processingEntriesToRemove: string[] = [];

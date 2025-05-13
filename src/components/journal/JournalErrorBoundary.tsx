@@ -1,4 +1,3 @@
-
 import React, { Component, ErrorInfo, ReactNode } from 'react';
 import { Button } from '@/components/ui/button';
 import { processingStateManager } from '@/utils/journal/processing-state-manager';
@@ -38,7 +37,7 @@ export class JournalErrorBoundary extends Component<Props, State> {
   private handleReset = (): void => {
     // Reset all processing state to recover from errors
     resetProcessingState();
-    processingStateManager.clearAll();
+    processingStateManager.clearAll(); // This now exists and works
     
     // Call external reset handler if provided
     if (this.props.onReset) {

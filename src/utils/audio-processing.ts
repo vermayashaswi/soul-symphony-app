@@ -361,7 +361,8 @@ export function resetProcessingState(): void {
  */
 export function removeProcessingEntryById(entryId: number | string): void {
   // First notify the state manager
-  processingStateManager.removeEntry(entryId);
+  const entryIdString = entryId.toString(); // Convert to string for consistent handling
+  processingStateManager.removeEntry(entryIdString);
   
   // If it's a number (real entry ID), also clean up any mappings
   if (typeof entryId === 'number') {

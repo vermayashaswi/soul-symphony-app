@@ -1,3 +1,4 @@
+
 import { BehaviorSubject, Observable } from 'rxjs';
 import { showToast } from './toast-helper';
 
@@ -17,7 +18,7 @@ export interface ProcessingEntry {
   errorMessage?: string;
 }
 
-class ProcessingStateManager {
+export class ProcessingStateManager {
   private processingEntries: ProcessingEntry[] = [];
   private entriesSubject = new BehaviorSubject<ProcessingEntry[]>([]);
   
@@ -140,6 +141,21 @@ class ProcessingStateManager {
     this.processingEntries = [];
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Disposed state manager');
+  }
+  
+  public clearAll(): void {
+    // Add the missing clearAll method
+    this.processingEntries = [];
+    this.notifySubscribers();
+    console.log('[ProcessingStateManager] Cleared all processing entries');
+    
+    // Also clear from localStorage
+    try {
+      localStorage.removeItem('processingEntries');
+      console.log('[ProcessingStateManager] Cleared processing entries from localStorage');
+    } catch (error) {
+      console.error('[ProcessingStateManager] Error clearing localStorage:', error);
+    }
   }
   
   private notifySubscribers(): void {
