@@ -33,8 +33,8 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, [isActive, currentStep, isInArrowTutorialStep]);
 
-  // Adjusted to position exactly at the center of the screen
-  // Using fixed position instead of absolute to ensure it stays centered regardless of parent elements
+  // Ensure the button is centered in the viewport
+  // Using fixed position with translate to achieve perfect centering
   const buttonWrapperStyle = {
     position: 'fixed',
     top: '50%',
