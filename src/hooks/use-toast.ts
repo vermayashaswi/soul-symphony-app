@@ -16,6 +16,7 @@ export type ToasterToast = React.ComponentPropsWithoutRef<typeof Toast> & {
   description?: React.ReactNode
   action?: React.ReactNode
   variant?: "default" | "destructive" | "success" | "warning" | "info"
+  duration?: number
 }
 
 export type ToastProps = {
@@ -23,6 +24,7 @@ export type ToastProps = {
   description?: React.ReactNode
   action?: React.ReactNode
   variant?: "default" | "destructive" | "success" | "warning" | "info"
+  duration?: number
 }
 
 export const useToast = () => {
