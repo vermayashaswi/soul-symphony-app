@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/contexts/AuthContext';
@@ -79,7 +80,7 @@ export function useChatPersistence(queryClient: QueryClient) {
       return threadId;
     } catch (error) {
       console.error("Error creating thread:", error);
-      toast("Error", {
+      toast("Error creating thread", {
         description: "Failed to create a new conversation thread."
       });
       return null;
@@ -146,7 +147,7 @@ export function useChatPersistence(queryClient: QueryClient) {
       setMessages(formattedMessages);
     } catch (error) {
       console.error("Error loading thread:", error);
-      toast("Error", {
+      toast("Error loading thread", {
         description: "Failed to load conversation thread."
       });
     } finally {
@@ -362,9 +363,9 @@ export function useChatPersistence(queryClient: QueryClient) {
           : msg
       ));
       
-      toast("Error", {
-        description: "Failed to get a response. Please try again.",
-        variant: "destructive"
+      // Fix: Remove the 'variant' property which doesn't exist in ExternalToast type
+      toast("Error sending message", {
+        description: "Failed to get a response. Please try again."
       });
       
       return null;
