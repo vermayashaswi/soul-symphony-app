@@ -23,12 +23,20 @@ export function Toaster() {
         // Remove any properties that Toast component doesn't accept
         const { duration, dismissible, ...restProps } = props
         
+        // Ensure we always have an id
+        const toastId = id || crypto.randomUUID()
+        
+        // Map variant from our expanded set to the Toast component's supported variants
+        // Default to 'default' if the variant is not one of the accepted ones
+        const mappedVariant = variant === 'default' || variant === 'destructive' 
+          ? variant 
+          : 'default'
+        
         return (
           <Toast 
-            key={id} 
+            key={toastId} 
             {...restProps} 
-            // Only pass variant if it's one of the accepted values
-            variant={variant === 'default' || variant === 'destructive' ? variant : 'default'}
+            variant={mappedVariant}
             className={
               isDarkMode
                 ? "bg-theme border-white/10 text-black shadow-lg"
