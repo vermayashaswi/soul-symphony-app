@@ -37,11 +37,18 @@ const TutorialOverlay: React.FC = () => {
   const location = useLocation();
   const [elementForStep3Found, setElementForStep3Found] = useState(false);
   const [attempts, setAttempts] = useState(0);
+  const [lastLocationChange, setLastLocationChange] = useState(Date.now());
   
   // Only render tutorial on app routes - strict checking
   const currentPath = location.pathname;
   const isAppRouteCurrent = isAppRoute(currentPath);
   const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted;
+  
+  // Log whenever location changes to help with navigation debugging
+  useEffect(() => {
+    console.log('TutorialOverlay - Location changed to:', currentPath);
+    setLastLocationChange(Date.now());
+  }, [currentPath]);
   
   // Log whenever the component is rendered and what the decision is
   useEffect(() => {
@@ -50,7 +57,8 @@ const TutorialOverlay: React.FC = () => {
       currentPath,
       isAppRouteCurrent,
       shouldShowTutorial,
-      tutorialCompleted
+      tutorialCompleted,
+      currentStepId: steps[currentStep]?.id
     });
     
     // Add class to document body when tutorial is completed
@@ -67,7 +75,7 @@ const TutorialOverlay: React.FC = () => {
         document.body.classList.add('tutorial-completed');
       }
     };
-  }, [isActive, currentPath, isAppRouteCurrent, shouldShowTutorial, tutorialCompleted]);
+  }, [isActive, currentPath, isAppRouteCurrent, shouldShowTutorial, tutorialCompleted, currentStep]);
   
   // Enhanced scrolling prevention when tutorial is active
   useEffect(() => {
@@ -92,7 +100,7 @@ const TutorialOverlay: React.FC = () => {
     };
   }, [shouldShowTutorial]);
 
-  // Handle navigation if specified in tutorial step
+  // Enhanced navigation handling for tutorial steps
   useEffect(() => {
     if (!shouldShowTutorial) return;
     
@@ -101,63 +109,23 @@ const TutorialOverlay: React.FC = () => {
       isActive,
       currentStep,
       currentPath: location.pathname,
-      currentStepData: steps[currentStep]
+      currentStepData: steps[currentStep],
+      timestamp: Date.now()
     });
     
     const currentTutorialStep = steps[currentStep];
     if (currentTutorialStep?.navigateTo && location.pathname !== currentTutorialStep.navigateTo) {
       console.log(`TutorialOverlay - Navigating to ${currentTutorialStep.navigateTo} for tutorial step ${currentTutorialStep.id}`);
       navigate(currentTutorialStep.navigateTo);
+    } else if (currentTutorialStep?.id) {
+      // If we're on the right path but need to render the correct step content
+      console.log(`TutorialOverlay - Already on the right path for step ${currentTutorialStep.id}: ${location.pathname}`);
+      
+      // Force redraw tutorial content for the current step
+      // This handles the case where navigation worked but the content didn't update
+      setAttempts(prev => prev + 1);
     }
-  }, [shouldShowTutorial, currentStep, steps, navigate, location.pathname]);
-
-  // Enhanced handling for different tutorial steps with better detection
-  useEffect(() => {
-    if (!shouldShowTutorial) return;
-    
-    const currentTutorialStep = steps[currentStep];
-    if (!currentTutorialStep) return;
-    
-    console.log(`TutorialOverlay - Setting up step ${currentTutorialStep.id} on path ${location.pathname}`);
-    
-    // Apply highlighting based on step ID
-    let cleanup: (() => void) | undefined;
-    
-    switch (currentTutorialStep.id) {
-      case 1:
-        cleanup = handleJournalHeaderVisibility();
-        break;
-      case 2:
-        cleanup = handleArrowButtonVisibility();
-        break;
-      case 3:
-        console.log('TutorialOverlay - Step 3 detected, current path:', location.pathname);
-        // Reset attempt counter for new detection cycle
-        setAttempts(0);
-        setElementForStep3Found(false);
-        
-        // Ensure we're on the journal page for step 3
-        if (location.pathname === '/app/journal') {
-          cleanup = handleRecordEntryVisibility();
-        } else {
-          console.log('TutorialOverlay - Not on journal page yet, will navigate there');
-          navigate('/app/journal');
-        }
-        break;
-      case 4:
-        console.log('TutorialOverlay - Step 4 detected, current path:', location.pathname);
-        if (location.pathname === '/app/journal') {
-          cleanup = handleEntriesTabVisibility();
-        } else {
-          console.log('TutorialOverlay - Not on journal page yet, will navigate there');
-          navigate('/app/journal');
-        }
-        break;
-    }
-    
-    // Return combined cleanup function
-    return cleanup;
-  }, [shouldShowTutorial, currentStep, steps, location.pathname, navigate, attempts]);
+  }, [shouldShowTutorial, currentStep, steps, navigate, location.pathname, lastLocationChange]);
 
   // Handle step 1 - journal header visibility with enhanced positioning
   const handleJournalHeaderVisibility = () => {
@@ -512,8 +480,8 @@ const TutorialOverlay: React.FC = () => {
   const isFirstStep = currentStep === 0;
   const isLastStep = currentStep === totalSteps - 1;
 
-  // For step 3, always show the UI since we're now centering it on screen
-  const shouldShowStep3UI = true;
+  // Always show tutorial UI
+  const shouldShowStepUI = true;
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto" onClick={(e) => e.stopPropagation()}>
@@ -529,9 +497,9 @@ const TutorialOverlay: React.FC = () => {
 
       {/* Tutorial step with enhanced z-index and pointer events */}
       <AnimatePresence mode="wait">
-        {shouldShowStep3UI && (
+        {shouldShowStepUI && currentTutorialStep && (
           <TutorialStep
-            key={currentStep}
+            key={`${currentStep}-${currentTutorialStep.id}-${location.pathname}`}
             step={currentTutorialStep}
             onNext={nextStep}
             onPrev={prevStep}

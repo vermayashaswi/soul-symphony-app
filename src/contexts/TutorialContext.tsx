@@ -47,6 +47,7 @@ const initialTutorialSteps: TutorialStep[] = [
     position: 'center',
     showNextButton: true,
     showSkipButton: true,
+    navigateTo: '/app/home', // Add explicit navigation to home for step 1
   },
   {
     id: 2,
@@ -56,6 +57,7 @@ const initialTutorialSteps: TutorialStep[] = [
     position: 'top',
     showNextButton: true,
     showSkipButton: true,
+    navigateTo: '/app/home', // Add explicit navigation to home for step 2
   },
   {
     id: 3,
@@ -295,18 +297,28 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Move to the previous step
+  // Enhanced version of prevStep function with improved navigation for moving backwards
   const prevStep = () => {
     if (currentStep > 0) {
       const newStep = currentStep - 1;
-      console.log(`Moving to previous step ${newStep} (ID: ${steps[newStep].id})`);
+      const prevTutorialStep = steps[newStep];
+      
+      console.log(`Moving to previous step ${newStep} (ID: ${prevTutorialStep.id})`);
+      console.log(`Current location: ${location.pathname}, Target navigation: ${prevTutorialStep.navigateTo || 'none'}`);
+      
+      // Update the current step in state and database
       setCurrentStep(newStep);
       updateTutorialStep(newStep);
       
-      // If moving back to a step that has a different navigateTo, navigate there
-      const prevTutorialStep = steps[newStep];
+      // Enhanced navigation logic for stepping back
       if (prevTutorialStep.navigateTo && location.pathname !== prevTutorialStep.navigateTo) {
-        console.log(`Navigating back to ${prevTutorialStep.navigateTo} for previous step`);
+        console.log(`Navigating back to ${prevTutorialStep.navigateTo} for previous step ${prevTutorialStep.id}`);
+        
+        // Critical: Set navigation incomplete flag before navigating
+        // This ensures TutorialOverlay notices the navigation change
+        setNavigationComplete(false);
+        
+        // Navigate to the target page for the previous step
         navigate(prevTutorialStep.navigateTo);
       }
     }
