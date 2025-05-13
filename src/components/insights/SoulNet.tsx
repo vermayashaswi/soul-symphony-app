@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { Canvas } from '@react-three/fiber';
@@ -144,7 +143,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   // Get appropriate instructions based on device type
   const getInstructions = () => {
     if (isMobile) {
-      return <TranslatableText text="Drag to rotate �� Pinch to zoom • Tap a node to highlight connections" forceTranslate={true} />;
+      return <TranslatableText text="Drag to rotate  Pinch to zoom • Tap a node to highlight connections" forceTranslate={true} />;
     }
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
