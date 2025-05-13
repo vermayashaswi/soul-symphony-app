@@ -1,241 +1,303 @@
+import React, { useState, useEffect, useRef } from 'react';
+import { useRouter } from 'next/router';
+import { useChat } from '@/hooks/use-chat';
+import { ChatMessage as ChatMessageType } from '@/services/chat';
+import ChatMessage from '@/components/chat/ChatMessage';
+import MobileChatMessage from '@/components/chat/mobile/MobileChatMessage';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Send, Loader2, ChevronDown, Sparkles } from 'lucide-react';
+import { useIsMobile } from '@/hooks/use-mobile';
+import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTranslation } from '@/hooks/use-translation';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from '@/hooks/use-toast';
+import { cn } from '@/lib/utils';
+import { useDebugMode } from '@/hooks/use-debug-mode';
+import { useScrollToBottom } from '@/hooks/use-scroll-to-bottom';
+import { useLocalStorage } from '@/hooks/use-local-storage';
+import { useTheme } from '@/hooks/use-theme';
 
-import React, { useRef, useEffect, useState } from "react";
-import ChatMessage from "./ChatMessage";
-import { motion, AnimatePresence } from "framer-motion";
-import { Loader2 } from "lucide-react";
-import { ChatMessage as ChatMessageType } from "@/services/chatPersistenceService";
-import JournalEntryLoadingSkeleton from "../journal/JournalEntryLoadingSkeleton";
+// Helper function to check if a message has analysis data
+const hasAnalysisParam = (message: ChatMessageType) => {
+  return message && message.analysis_data && Object.keys(message.analysis_data).length > 0;
+};
 
 interface ChatAreaProps {
-  chatMessages: ChatMessageType[];
-  isLoading: boolean;
-  processingStage?: string;
   threadId?: string | null;
+  initialMessages?: ChatMessageType[];
+  onNewMessage?: (message: ChatMessageType) => void;
+  suggestedQuestions?: string[];
+  showSuggestions?: boolean;
+  className?: string;
+  placeholder?: string;
+  autoFocus?: boolean;
+  showScrollButton?: boolean;
 }
 
-const ChatArea: React.FC<ChatAreaProps> = ({ 
-  chatMessages, 
-  isLoading, 
-  processingStage,
-  threadId
+const ChatArea: React.FC<ChatAreaProps> = ({
+  threadId = null,
+  initialMessages = [],
+  onNewMessage,
+  suggestedQuestions = [],
+  showSuggestions = true,
+  className = '',
+  placeholder = 'Type a message...',
+  autoFocus = true,
+  showScrollButton = true,
 }) => {
-  const bottomRef = useRef<HTMLDivElement>(null);
-  const [prevMessageCount, setPrevMessageCount] = useState(0);
-  const [lastUserMessage, setLastUserMessage] = useState<ChatMessageType | null>(null);
-  const [localIsLoading, setLocalIsLoading] = useState(isLoading);
-  const [localProcessingStage, setLocalProcessingStage] = useState(processingStage);
+  const router = useRouter();
+  const isMobile = useIsMobile();
+  const { user } = useAuth();
+  const { showDebugMode } = useDebugMode();
+  const { theme } = useTheme();
+  const { isTranslating } = useTranslation();
   
-  // When loading changes externally, update local loading state
+  const [input, setInput] = useState('');
+  const [isTyping, setIsTyping] = useState(false);
+  const [showScrollToBottom, setShowScrollToBottom] = useState(false);
+  const [hasScrolled, setHasScrolled] = useState(false);
+  
+  const messagesEndRef = useRef<HTMLDivElement>(null);
+  const chatContainerRef = useRef<HTMLDivElement>(null);
+  const inputRef = useRef<HTMLInputElement>(null);
+  
+  // Get chat functionality from our hook
+  const {
+    messages,
+    sendMessage,
+    isLoading,
+    error,
+    isComplete,
+    clearMessages,
+  } = useChat({
+    threadId,
+    initialMessages,
+    onNewMessage,
+  });
+  
+  // Use our scroll to bottom hook
+  const { scrollToBottom } = useScrollToBottom(messagesEndRef);
+  
+  // Store the last message ID to avoid duplicate scrolling
+  const lastMessageIdRef = useRef<string | null>(null);
+  
+  // Handle scroll events to show/hide scroll button
+  const handleScroll = () => {
+    if (!chatContainerRef.current) return;
+    
+    const { scrollTop, scrollHeight, clientHeight } = chatContainerRef.current;
+    const isAtBottom = scrollHeight - scrollTop - clientHeight < 100;
+    
+    setShowScrollToBottom(!isAtBottom && hasScrolled);
+    
+    if (!hasScrolled && scrollTop > 100) {
+      setHasScrolled(true);
+    }
+  };
+  
+  // Scroll to bottom when new messages arrive
   useEffect(() => {
-    // If loading is starting, always update immediately
-    if (isLoading) {
-      setLocalIsLoading(true);
-      setLocalProcessingStage(processingStage);
-    } 
-    // If loading is ending, only update if we don't have an active processingStage stored
-    else if (!localProcessingStage || processingStage === null) {
-      setLocalIsLoading(false);
-      setLocalProcessingStage(null);
+    if (messages.length === 0) return;
+    
+    const lastMessage = messages[messages.length - 1];
+    
+    // Only scroll if this is a new message
+    if (lastMessage.id !== lastMessageIdRef.current) {
+      lastMessageIdRef.current = lastMessage.id;
+      scrollToBottom();
     }
-  }, [isLoading, processingStage]);
+  }, [messages, scrollToBottom]);
   
-  // Store loading state in sessionStorage to persist across navigation
+  // Set up scroll event listener
   useEffect(() => {
-    // Check for loading state on mount and make sure it's for this thread
-    const storedLoadingState = sessionStorage.getItem('chatLoadingState');
-    const storedProcessingStage = sessionStorage.getItem('chatProcessingStage');
-    const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
-    const timestamp = sessionStorage.getItem('chatProcessingTimestamp');
-    
-    // Check if we should clear a stale loading state (older than 5 minutes)
-    if (storedLoadingState === 'true' && timestamp) {
-      const now = Date.now();
-      const then = parseInt(timestamp);
-      const fiveMinutesMs = 5 * 60 * 1000;
-      
-      if (now - then > fiveMinutesMs) {
-        // Clear stale loading state
-        sessionStorage.removeItem('chatLoadingState');
-        sessionStorage.removeItem('chatProcessingStage');
-        sessionStorage.removeItem('chatProcessingThreadId');
-        sessionStorage.removeItem('chatProcessingTimestamp');
-        setLocalIsLoading(false);
-        setLocalProcessingStage(null);
-        return;
-      }
+    const chatContainer = chatContainerRef.current;
+    if (chatContainer) {
+      chatContainer.addEventListener('scroll', handleScroll);
+      return () => chatContainer.removeEventListener('scroll', handleScroll);
     }
-    
-    // Only restore loading state if it's for this thread
-    if (storedLoadingState === 'true' && !isLoading && threadId && storedThreadId === threadId) {
-      setLocalIsLoading(true);
-      if (storedProcessingStage) {
-        setLocalProcessingStage(storedProcessingStage);
-      }
-    }
-    
-    // Update storage when loading state changes
-    if (localIsLoading && threadId) {
-      sessionStorage.setItem('chatLoadingState', 'true');
-      sessionStorage.setItem('chatProcessingThreadId', threadId);
-      
-      if (!timestamp) {
-        sessionStorage.setItem('chatProcessingTimestamp', Date.now().toString());
-      }
-      
-      if (localProcessingStage) {
-        sessionStorage.setItem('chatProcessingStage', localProcessingStage);
-      }
-    } else if (!localIsLoading) {
-      const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
-      
-      // Only clear if this is the same thread that was loading
-      if (!threadId || storedThreadId === threadId) {
-        sessionStorage.removeItem('chatLoadingState');
-        sessionStorage.removeItem('chatProcessingStage');
-        sessionStorage.removeItem('chatProcessingThreadId');
-        sessionStorage.removeItem('chatProcessingTimestamp');
-      }
-    }
-    
-    // Clean up storage when component unmounts if we're no longer loading
-    return () => {
-      if (!localIsLoading) {
-        const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
-        
-        // Only clear if this is the same thread that was loading
-        if (!threadId || storedThreadId === threadId) {
-          sessionStorage.removeItem('chatLoadingState');
-          sessionStorage.removeItem('chatProcessingStage');
-          sessionStorage.removeItem('chatProcessingThreadId');
-          sessionStorage.removeItem('chatProcessingTimestamp');
-        }
-      }
-    };
-  }, [localIsLoading, localProcessingStage, isLoading, threadId]);
+  }, [hasScrolled]);
   
-  // Find the last user message
+  // Auto-focus input on mount if autoFocus is true
   useEffect(() => {
-    if (chatMessages.length > 0) {
-      const lastMsg = [...chatMessages].reverse().find(msg => msg.role === 'user');
-      setLastUserMessage(lastMsg || null);
-    } else {
-      setLastUserMessage(null);
+    if (autoFocus && inputRef.current && !isMobile) {
+      inputRef.current.focus();
     }
-
-    // Always scroll to bottom to ensure chat input is visible
-    bottomRef.current?.scrollIntoView({ behavior: 'smooth' });
-    setPrevMessageCount(chatMessages.length);
-    
-    // If we have a completed response, clear the loading state
-    if (chatMessages.length > prevMessageCount && prevMessageCount > 0) {
-      const lastMessageIsAssistant = chatMessages[chatMessages.length - 1]?.role === 'assistant';
-      
-      if (lastMessageIsAssistant) {
-        setLocalIsLoading(false);
-        setLocalProcessingStage(null);
-        
-        const storedThreadId = sessionStorage.getItem('chatProcessingThreadId');
-        
-        // Only clear if this is the same thread that was loading
-        if (!threadId || storedThreadId === threadId) {
-          sessionStorage.removeItem('chatLoadingState');
-          sessionStorage.removeItem('chatProcessingStage');
-          sessionStorage.removeItem('chatProcessingThreadId');
-          sessionStorage.removeItem('chatProcessingTimestamp');
-        }
-      }
-    }
-  }, [chatMessages, localIsLoading, prevMessageCount, threadId]);
+  }, [autoFocus, isMobile]);
   
-  // Check for duplicates by content to prevent doubled rendering
-  const uniqueMessages = chatMessages.reduce((acc: ChatMessageType[], current) => {
-    const isDuplicate = acc.find(item => 
-      item.id === current.id || 
-      (item.content === current.content && 
-       Math.abs(new Date(item.created_at).getTime() - new Date(current.created_at).getTime()) < 1000)
+  // Handle form submission
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    
+    if (!input.trim() || isLoading) return;
+    
+    try {
+      await sendMessage(input);
+      setInput('');
+      // Scroll to bottom after sending
+      setTimeout(scrollToBottom, 100);
+    } catch (error) {
+      console.error('Error sending message:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send message. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Handle suggested question click
+  const handleSuggestedQuestionClick = async (question: string) => {
+    if (isLoading) return;
+    
+    try {
+      await sendMessage(question);
+      // Scroll to bottom after sending
+      setTimeout(scrollToBottom, 100);
+    } catch (error) {
+      console.error('Error sending suggested question:', error);
+      toast({
+        title: 'Error',
+        description: 'Failed to send message. Please try again.',
+        variant: 'destructive',
+      });
+    }
+  };
+  
+  // Render suggested questions
+  const renderSuggestedQuestions = () => {
+    if (!showSuggestions || suggestedQuestions.length === 0 || messages.length > 0) {
+      return null;
+    }
+    
+    return (
+      <div className="mb-4 space-y-2">
+        <h3 className="text-sm font-medium text-muted-foreground">
+          <TranslatableText text="Suggested questions:" />
+        </h3>
+        <div className="flex flex-wrap gap-2">
+          {suggestedQuestions.map((question, index) => (
+            <Button
+              key={index}
+              variant="outline"
+              size="sm"
+              className="chat-question-suggestion text-xs h-auto py-1.5 px-2.5 bg-background/80 hover:bg-background"
+              onClick={() => handleSuggestedQuestionClick(question)}
+              disabled={isLoading}
+            >
+              <TranslatableText text={question} />
+            </Button>
+          ))}
+        </div>
+      </div>
     );
-    if (!isDuplicate) {
-      acc.push(current);
-    }
-    return acc;
-  }, []);
-  
-  // Filter out the last user message when loading to show it in the sticky header
-  const filteredMessages = localIsLoading && lastUserMessage 
-    ? uniqueMessages.filter(msg => msg.id !== lastUserMessage.id)
-    : uniqueMessages;
+  };
   
   return (
-    <div className="flex flex-col h-full">
-      {localIsLoading && lastUserMessage && (
-        <div className="sticky top-0 z-10 bg-background/95 backdrop-blur-sm border-b pb-3 pt-2 px-4">
-          <div className="flex items-start gap-3">
-            <div className="h-8 w-8 rounded-full bg-primary flex items-center justify-center text-xs font-medium text-primary-foreground">
-              You
-            </div>
-            <div className="bg-muted p-3 rounded-xl max-w-[75%] text-sm">
-              {lastUserMessage.content}
-            </div>
+    <div className={cn("flex flex-col h-full", className)}>
+      {/* Chat messages container */}
+      <div 
+        ref={chatContainerRef}
+        className="flex-1 overflow-y-auto px-4 py-4 space-y-4"
+        onScroll={handleScroll}
+      >
+        {/* Render suggested questions if available */}
+        {renderSuggestedQuestions()}
+        
+        {/* Render messages */}
+        {messages.map((message, index) => {
+          const isLast = index === messages.length - 1;
+          
+          return isMobile ? (
+            <MobileChatMessage 
+              key={message.id || index}
+              message={{
+                role: message.role as 'user' | 'assistant' | 'error',
+                content: message.content,
+                analysis: message.analysis_data,
+                references: message.reference_entries,
+                diagnostics: message.diagnostics,
+                hasNumericResult: message.has_numeric_result
+              }}
+              showAnalysis={showDebugMode && hasAnalysisParam(message)}
+            />
+          ) : (
+            <ChatMessage 
+              key={message.id || index}
+              message={message} 
+              isLastMessage={isLast} 
+              isComplete={isComplete} 
+              threadId={threadId}
+              showAnalysis={showDebugMode && hasAnalysisParam(message)}
+            />
+          );
+        })}
+        
+        {/* Loading indicator for first message */}
+        {isLoading && messages.length === 0 && (
+          <div className="flex items-center justify-center py-8">
+            <Loader2 className="h-8 w-8 animate-spin text-primary/70" />
           </div>
-        </div>
+        )}
+        
+        {/* Error message */}
+        {error && (
+          <div className="bg-destructive/10 text-destructive rounded-lg p-4 text-sm">
+            <p className="font-medium">
+              <TranslatableText text="Error:" />
+            </p>
+            <p>
+              <TranslatableText text={error} />
+            </p>
+          </div>
+        )}
+        
+        {/* Empty div for scrolling to bottom */}
+        <div ref={messagesEndRef} />
+      </div>
+      
+      {/* Scroll to bottom button */}
+      {showScrollButton && showScrollToBottom && (
+        <Button
+          variant="outline"
+          size="icon"
+          className="absolute bottom-20 right-4 rounded-full shadow-md bg-background"
+          onClick={scrollToBottom}
+        >
+          <ChevronDown className="h-4 w-4" />
+        </Button>
       )}
       
-      <div className="flex-1 overflow-y-auto px-4 py-6 space-y-6">
-        <AnimatePresence initial={false}>
-          {filteredMessages.map((message, index) => {
-            // Map 'error' role to 'assistant' for display purposes if needed
-            const displayMessage = {
-              ...message,
-              // Use type assertion to allow for potential 'error' role which might come from elsewhere
-              role: (message.role as string) === 'error' ? 'assistant' : message.role
-            };
-            
-            return (
-              <motion.div
-                key={message.id}
-                initial={{ opacity: 0, y: 20 }}
-                animate={{ opacity: 1, y: 0 }}
-                exit={{ opacity: 0, height: 0 }}
-                transition={{ duration: 0.3 }}
-              >
-                <ChatMessage 
-                  message={displayMessage}
-                  isLastMessage={index === filteredMessages.length - 1}
-                  isComplete={true}
-                  threadId={threadId}
-                />
-              </motion.div>
-            );
-          })}
-        </AnimatePresence>
-        
-        <AnimatePresence>
-          {localIsLoading && (
-            <motion.div 
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              exit={{ opacity: 0 }}
-              className="space-y-4"
-            >
-              <div className="flex items-center gap-3">
-                <div className="h-10 w-10 rounded-full bg-primary/10 flex items-center justify-center">
-                  <Loader2 className="h-5 w-5 text-primary animate-spin" />
-                </div>
-                <div className="bg-muted/40 rounded-xl p-3 max-w-[75%] text-sm">
-                  {localProcessingStage || "Processing your request..."}
-                </div>
-              </div>
-              
-              <JournalEntryLoadingSkeleton count={1} />
-            </motion.div>
-          )}
-        </AnimatePresence>
-        
-        <div 
-          ref={bottomRef} 
-          className="h-20" // Add some height to ensure enough scroll space
-        />
-      </div>
+      {/* Input form */}
+      <form 
+        onSubmit={handleSubmit} 
+        className="border-t bg-background p-4 sticky bottom-0 z-10"
+      >
+        <div className="flex items-center gap-2">
+          <Input
+            id="chat-input"
+            ref={inputRef}
+            type="text"
+            placeholder={isTranslating ? "Translating..." : placeholder}
+            value={input}
+            onChange={(e) => setInput(e.target.value)}
+            disabled={isLoading || isTranslating}
+            className="flex-1"
+            autoComplete="off"
+          />
+          <Button 
+            type="submit" 
+            size="icon"
+            disabled={!input.trim() || isLoading || isTranslating}
+          >
+            {isLoading ? (
+              <Loader2 className="h-4 w-4 animate-spin" />
+            ) : (
+              <Send className="h-4 w-4" />
+            )}
+          </Button>
+        </div>
+      </form>
     </div>
   );
 };

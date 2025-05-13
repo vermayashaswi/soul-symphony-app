@@ -6,10 +6,10 @@ export type Json = string | number | boolean | null | { [key: string]: Json } | 
 export interface JournalEntry {
   id: number;
   user_id?: string;
-  content?: string;
+  content: string; // Making content required to satisfy both usages
   "refined text"?: string;
   "transcription text"?: string;
-  created_at?: string;
+  created_at: string; // Making created_at required to satisfy both usages
   updated_at?: string;
   sentiment?: number | string;
   themes?: string[] | null;

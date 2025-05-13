@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { ChatMessage as ChatMessageType } from '@/services/chat';
 import { Loader2, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from 'lucide-react';
@@ -52,8 +51,8 @@ const ChatMessage = ({
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(true);
   const isAssistant = message.role === 'assistant';
-  // Fix the error by checking if message.role is 'error' as a string
-  const isError = message.role === 'error' || (message.role === 'assistant' && message.content.toLowerCase().includes('error'));
+  // Fix the error by using a string comparison and explicitly checking for 'error' string
+  const isError = message.role === 'error' || (typeof message.role === 'string' && message.role.includes('error')) || (message.role === 'assistant' && message.content.toLowerCase().includes('error'));
   const hasReferences = message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0;
   const hasAnalysis = message.analysis_data && typeof message.analysis_data === 'object' && Object.keys(message.analysis_data as object).length > 0;
   const maxReferencesToShowCollapsed = 2;

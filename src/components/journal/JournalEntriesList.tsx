@@ -281,19 +281,27 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           )}
           
           {/* Then display regular entries */}
-          {filteredEntries.map((entry) => (
-            <JournalEntryCard
-              key={entry.id || entry.tempId || Math.random()}
-              entry={{
-                ...entry,
-                content: entry.content || entry["refined text"] || entry["transcription text"] || ""
-              }}
-              processing={isProcessing(entry.tempId || '')}
-              processed={processedEntryIds.includes(entry.id)}
-              onDelete={handleDeleteEntry}
-              setEntries={null} // Pass null since we don't want to modify entries directly here
-            />
-          ))}
+          {filteredEntries.map((entry) => {
+            // Make sure content is never undefined
+            const entryContent = entry.content || entry["refined text"] || entry["transcription text"] || "";
+            // Make sure created_at is never undefined
+            const entryCreatedAt = entry.created_at || new Date().toISOString();
+            
+            return (
+              <JournalEntryCard
+                key={entry.id || entry.tempId || Math.random()}
+                entry={{
+                  ...entry,
+                  content: entryContent,
+                  created_at: entryCreatedAt
+                }}
+                processing={isProcessing(entry.tempId || '')}
+                processed={processedEntryIds.includes(entry.id)}
+                onDelete={handleDeleteEntry}
+                setEntries={null} // Pass null since we don't want to modify entries directly here
+              />
+            );
+          })}
         </div>
       ) : shouldShowEmpty ? (
         <EmptyJournalState onStartRecording={onStartRecording} />

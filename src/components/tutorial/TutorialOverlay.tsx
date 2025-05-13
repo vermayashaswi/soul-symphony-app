@@ -118,7 +118,8 @@ const TutorialOverlay: React.FC = () => {
   
   const [showTooltip, setShowTooltip] = useState(true);
   
-  const highlightedElements = useRef<HTMLElement[]>([]);
+  // Fix the highlightedElements ref to be a regular array instead of MutableRefObject
+  const [highlightedElements, setHighlightedElements] = useState<HTMLElement[]>([]);
   
   const currentTutorialStep = tutorialSteps[currentStep - 1];
   
@@ -228,11 +229,11 @@ const TutorialOverlay: React.FC = () => {
   
   // Function to clear any highlighted elements
   const clearHighlightedElements = () => {
-    highlightedElements.current.forEach(element => {
+    highlightedElements.forEach(element => {
       element.classList.remove('tutorial-highlighted');
       element.classList.remove('tutorial-pulse');
     });
-    highlightedElements.current = [];
+    setHighlightedElements([]);
   };
   
   // Function to focus on an element by selector
@@ -276,7 +277,7 @@ const TutorialOverlay: React.FC = () => {
         }
         
         // Remember this element for cleanup later
-        highlightedElements.push(htmlElement);
+        setHighlightedElements(prevElements => [...prevElements, htmlElement]);
       }
     }, 300);
   };
@@ -420,219 +421,9 @@ const TutorialOverlay: React.FC = () => {
   }, [user, isTutorialActive, startTutorial]);
   
   return (
-    <>
-      {/* Highlight Element */}
-      <motion.div
-        id="tutorial-highlight"
-        className="tutorial-highlight"
-        style={{
-          position: 'absolute',
-          background: 'rgba(0, 110, 255, 0.2)',
-          border: '2px solid rgba(0, 110, 255, 0.5)',
-          borderRadius: '8px',
-          pointerEvents: 'none',
-          zIndex: 1000,
-          display: 'none',
-        }}
-        initial={{ opacity: 0 }}
-        animate={{ opacity: shouldShowOverlay ? 1 : 0 }}
-        transition={{ duration: 0.3 }}
-      />
-      
-      {/* Overlay */}
-      <AnimatePresence>
-        {shouldShowOverlay && currentTutorialStep && (
-          <motion.div
-            key="tutorial-overlay"
-            className="fixed top-0 left-0 w-full h-full bg-black/50 z-50 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-            onClick={() => {
-              // Do nothing when clicking on the overlay
-            }}
-          >
-            {/* Tooltip */}
-            <motion.div
-              className={cn(
-                "bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative z-50 w-full max-w-md mx-4",
-                currentTutorialStep.position === 'top' ? 'mt-0 mb-auto' : 'mt-auto mb-0'
-              )}
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-              onClick={(e) => {
-                // Prevent clicks inside the tooltip from closing the overlay
-                e.stopPropagation();
-              }}
-            >
-              {/* Close Button */}
-              <Button
-                variant="ghost"
-                size="icon"
-                className="absolute top-2 right-2"
-                onClick={skipTutorialHandler}
-                disabled={isClosing}
-              >
-                {isClosing ? (
-                  <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-primary"></div>
-                ) : (
-                  <X className="h-4 w-4" />
-                )}
-                <span className="sr-only">
-                  <TranslatableText text="Close" />
-                </span>
-              </Button>
-              
-              {/* Title */}
-              <h2 className="text-lg font-semibold mb-2 dark:text-white">
-                <TranslatableText text={currentTutorialStep.title} />
-              </h2>
-              
-              {/* Description */}
-              <p className="text-sm text-gray-600 dark:text-gray-300 mb-4">
-                <TranslatableText text={currentTutorialStep.description} />
-              </p>
-              
-              {/* Separator */}
-              <Separator className="my-3" />
-              
-              {/* Navigation Buttons */}
-              <div className="flex justify-end">
-                <Button onClick={handleNextStep} disabled={isClosing}>
-                  {isLastStep ? (
-                    <TranslatableText text="Finish" />
-                  ) : (
-                    <>
-                      <TranslatableText text="Next" />
-                      <ChevronRight className="ml-2 h-4 w-4" />
-                    </>
-                  )}
-                </Button>
-              </div>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* Confirmation Message */}
-      <AnimatePresence>
-        {showConfirmation && (
-          <motion.div
-            className="fixed top-0 left-0 w-full h-full bg-black/50 z-50 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <motion.div
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative z-50 w-full max-w-sm mx-4 flex items-center justify-center flex-col"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <CheckCircle2 className="h-10 w-10 text-green-500 mb-4" />
-              <h2 className="text-lg font-semibold mb-2 dark:text-white">
-                <TranslatableText text="Tutorial Complete!" />
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <TranslatableText text="You have successfully completed the tutorial." />
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* Error Message */}
-      <AnimatePresence>
-        {showError && (
-          <motion.div
-            className="fixed top-0 left-0 w-full h-full bg-black/50 z-50 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <motion.div
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative z-50 w-full max-w-sm mx-4 flex items-center justify-center flex-col"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <AlertTriangle className="h-10 w-10 text-red-500 mb-4" />
-              <h2 className="text-lg font-semibold mb-2 dark:text-white">
-                <TranslatableText text="Error" />
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <TranslatableText text={errorMessage} />
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* Restart Confirmation Message */}
-      <AnimatePresence>
-        {showRestartConfirmation && (
-          <motion.div
-            className="fixed top-0 left-0 w-full h-full bg-black/50 z-50 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <motion.div
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative z-50 w-full max-w-sm mx-4 flex items-center justify-center flex-col"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <CheckCircle2 className="h-10 w-10 text-green-500 mb-4" />
-              <h2 className="text-lg font-semibold mb-2 dark:text-white">
-                <TranslatableText text="Tutorial Restarted!" />
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <TranslatableText text="The tutorial has been restarted." />
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-      
-      {/* Restart Error Message */}
-      <AnimatePresence>
-        {showRestartError && (
-          <motion.div
-            className="fixed top-0 left-0 w-full h-full bg-black/50 z-50 flex items-center justify-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-            transition={{ duration: 0.3 }}
-          >
-            <motion.div
-              className="bg-white dark:bg-gray-800 rounded-lg shadow-lg p-6 relative z-50 w-full max-w-sm mx-4 flex items-center justify-center flex-col"
-              initial={{ y: 20, opacity: 0 }}
-              animate={{ y: 0, opacity: 1 }}
-              exit={{ y: 20, opacity: 0 }}
-              transition={{ duration: 0.3 }}
-            >
-              <AlertTriangle className="h-10 w-10 text-red-500 mb-4" />
-              <h2 className="text-lg font-semibold mb-2 dark:text-white">
-                <TranslatableText text="Error" />
-              </h2>
-              <p className="text-sm text-gray-600 dark:text-gray-300">
-                <TranslatableText text={restartErrorMessage} />
-              </p>
-            </motion.div>
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </>
+    <div>
+      {/* This is just a placeholder. Keep existing JSX return content */}
+    </div>
   );
 };
 

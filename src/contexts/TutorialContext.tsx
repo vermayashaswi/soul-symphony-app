@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // Tutorial step definition
@@ -21,6 +22,10 @@ export interface TutorialContextProps {
   startTutorial: () => void;
   skipTutorial: () => void;
   resetTutorial: () => void;
+  endTutorial: () => void; // Added missing property
+  markStepAsComplete: (step: number) => void; // Added missing property
+  isTutorialActive: boolean; // Added missing property
+  isStepComplete: (step: number) => boolean; // Added missing property
 }
 
 // Create the context with a default value
@@ -33,13 +38,18 @@ export const TutorialContext = createContext<TutorialContextProps>({
   prevStep: () => {},
   startTutorial: () => {},
   skipTutorial: () => {},
-  resetTutorial: () => {}
+  resetTutorial: () => {},
+  endTutorial: () => {}, // Added missing property
+  markStepAsComplete: () => {}, // Added missing property
+  isTutorialActive: false, // Added missing property
+  isStepComplete: () => false, // Added missing property
 });
 
 // Create the provider component
 export const TutorialProvider = ({ children }: { children: React.ReactNode }) => {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
+  const [completedSteps, setCompletedSteps] = useState<Set<number>>(new Set());
   
   // Define tutorial steps
   const steps: TutorialStep[] = [
@@ -96,6 +106,8 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   ];
   
   const totalSteps = steps.length;
+  // For compatibility with both isActive and isTutorialActive
+  const isTutorialActive = isActive;
 
   // Navigation functions
   const nextStep = () => {
@@ -119,6 +131,26 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   const resetTutorial = () => {
     setIsActive(true);
     setCurrentStep(0);
+    return Promise.resolve();
+  };
+  
+  // Added missing functions
+  const endTutorial = () => {
+    setIsActive(false);
+    setCurrentStep(0);
+    return Promise.resolve();
+  };
+  
+  const markStepAsComplete = (step: number) => {
+    setCompletedSteps(prev => {
+      const newSet = new Set(prev);
+      newSet.add(step);
+      return newSet;
+    });
+  };
+  
+  const isStepComplete = (step: number) => {
+    return completedSteps.has(step);
   };
 
   // Provide the context value
@@ -133,7 +165,11 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
         prevStep,
         startTutorial,
         skipTutorial,
-        resetTutorial
+        resetTutorial,
+        endTutorial,
+        markStepAsComplete,
+        isTutorialActive,
+        isStepComplete
       }}
     >
       {children}
