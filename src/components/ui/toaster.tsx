@@ -14,13 +14,16 @@ import { useToast } from "@/hooks/use-toast"
 
 export function Toaster() {
   const { toasts } = useToast()
-  const { isDarkMode } = useTheme();
+  const { theme, systemTheme } = useTheme();
+  
+  // Determine dark mode based on theme settings
+  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
 
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
-        // Extract any 'type' property to avoid passing it to the Toast component
-        const { type, ...restProps } = props
+        // Extract any 'variant' property to avoid passing it to the Toast component
+        const { variant, ...restProps } = props
         
         return (
           <Toast 

@@ -5,9 +5,41 @@ import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { JournalEntryReference } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { extractReferenceDateInfo } from '@/utils/chat/threadUtils';
+import { Json } from '@/integrations/supabase/types';
 
-// Ensure a component exists for SmartChatInterface.tsx to render
+// Interface for journal entry references
+interface JournalEntryReference {
+  date: string;
+  content: string;
+  sentiment?: string;
+}
+
+// Helper function to extract reference date info
+const extractReferenceDateInfo = (dateStr: string) => {
+  try {
+    const date = new Date(dateStr);
+    const isDateInvalid = isNaN(date.getTime());
+    
+    if (isDateInvalid) {
+      return { 
+        formattedDate: "Invalid date", 
+        daysAgo: "unknown date", 
+        isDateInvalid: true 
+      };
+    }
+    
+    const formattedDate = format(date, 'MMM d, yyyy');
+    const daysAgo = formatDistanceToNow(date, { addSuffix: true });
+    
+    return { formattedDate, daysAgo, isDateInvalid: false };
+  } catch (error) {
+    return { 
+      formattedDate: "Invalid date", 
+      daysAgo: "unknown date", 
+      isDateInvalid: true 
+    };
+  }
+};
 
 // Keep using the existing ChatMessage component, but add the ability 
 // to have a tutorial-specific class for highlighting in Step 6
@@ -26,8 +58,8 @@ const ChatMessage = ({
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(true);
   const isAssistant = message.role === 'assistant';
   const isError = message.role === 'error';
-  const hasReferences = message.reference_entries && message.reference_entries.length > 0;
-  const hasAnalysis = message.analysis_data && Object.keys(message.analysis_data).length > 0;
+  const hasReferences = message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0;
+  const hasAnalysis = message.analysis_data && typeof message.analysis_data === 'object' && Object.keys(message.analysis_data as object).length > 0;
   const maxReferencesToShowCollapsed = 2;
   
   // Add tutorial-specific class for Step 6 highlighting
@@ -90,7 +122,7 @@ const ChatMessage = ({
   };
   
   const renderReferences = () => {
-    if (!hasReferences || !message.reference_entries) return null;
+    if (!hasReferences || !message.reference_entries || !Array.isArray(message.reference_entries)) return null;
     
     const referencesToShow = isCollapsed 
       ? message.reference_entries.slice(0, maxReferencesToShowCollapsed)
@@ -108,13 +140,10 @@ const ChatMessage = ({
           <TranslatableText text="References" />:
           {remainingCount > 0 && isCollapsed && (
             <span className="ml-1 text-xs text-gray-500">
-              <TranslatableText 
-                text="{count} more entries" 
-                values={{ count: remainingCount }} 
-              />
+              <TranslatableText text={`${remainingCount} more entries`} />
             </span>
           )}
-          {message.reference_entries.length > maxReferencesToShowCollapsed && (
+          {Array.isArray(message.reference_entries) && message.reference_entries.length > maxReferencesToShowCollapsed && (
             <button className="ml-auto text-gray-500 hover:text-gray-700">
               {isCollapsed ? <ChevronDown className="w-4 h-4" /> : <ChevronUp className="w-4 h-4" />}
             </button>
@@ -123,19 +152,19 @@ const ChatMessage = ({
         
         <div className="mt-2 space-y-2">
           {referencesToShow.map((ref: JournalEntryReference, i) => {
-            const { formattedDate, daysAgo, isDateInvalid } = extractReferenceDateInfo(ref.date);
+            const dateInfo = extractReferenceDateInfo(ref.date);
             
             return (
               <div key={i} className="bg-gray-50 p-2 rounded-md text-sm border border-gray-100">
                 <div className="flex justify-between items-center">
                   <div className="font-medium">
-                    {isDateInvalid ? (
+                    {dateInfo.isDateInvalid ? (
                       <TranslatableText text="Unknown date" />
                     ) : (
                       <>
-                        {formattedDate} 
+                        {dateInfo.formattedDate} 
                         <span className="text-xs text-gray-500 ml-1">
-                          ({daysAgo})
+                          ({dateInfo.daysAgo})
                         </span>
                       </>
                     )}

@@ -10,6 +10,7 @@ type ToasterToast = ToastT & {
   title?: React.ReactNode
   description?: React.ReactNode
   action?: React.ReactNode
+  variant?: "default" | "destructive"  // Add variant prop
 }
 
 const actionTypes = {
@@ -150,7 +151,7 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
-      open: true,
+      open: true,  // This is okay because we're adding it to our ToasterToast type
       onOpenChange: (open) => {
         if (!open) {
           dismiss()
@@ -167,9 +168,22 @@ function toast({ ...props }: Toast) {
 }
 
 export function useToast() {
+  const [state, setState] = React.useState<State>(memoryState)
+
+  React.useEffect(() => {
+    listeners.push(setState)
+    return () => {
+      const index = listeners.indexOf(setState)
+      if (index > -1) {
+        listeners.splice(index, 1)
+      }
+    }
+  }, [state])
+
   return {
     toast,
     dismiss: (toastId?: string) => dispatch({ type: "DISMISS_TOAST", toastId }),
+    toasts: state.toasts,
   }
 }
 

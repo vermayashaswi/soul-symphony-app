@@ -87,7 +87,6 @@ export function NetworkAwareContent({
       toast({
         title: offlineMsg,
         description: offlineDesc,
-        variant: "destructive",
         duration: 5000,
       });
     }
