@@ -1,7 +1,7 @@
 
 import React from 'react';
 import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { 
   Home, 
@@ -13,6 +13,18 @@ import SouloLogo from '@/components/SouloLogo';
 
 const MobileNavbar = () => {
   const navigate = useNavigate();
+  const location = useLocation();
+
+  // Don't show the navbar on onboarding or auth screens
+  const isOnboardingOrAuth = location.pathname === '/app/onboarding' || 
+                             location.pathname === '/app/auth' ||
+                             location.pathname === '/onboarding' ||
+                             location.pathname === '/auth' ||
+                             location.pathname === '/app';
+  
+  if (isOnboardingOrAuth) {
+    return null;
+  }
 
   return (
     <motion.nav

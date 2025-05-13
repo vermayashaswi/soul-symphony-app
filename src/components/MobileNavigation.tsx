@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -51,15 +50,24 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
+    // Don't show navigation on onboarding, auth, or root /app screens
+    const isOnboardingOrAuth = location.pathname === '/app/onboarding' || 
+                               location.pathname === '/app/auth' ||
+                               location.pathname === '/onboarding' || 
+                               location.pathname === '/auth' ||
+                               location.pathname === '/app';
+    
     const shouldShowNav = (isMobile || isNativeApp()) && 
-                          !isKeyboardVisible; 
+                          !isKeyboardVisible && 
+                          !isOnboardingOrAuth;
     
     console.log('MobileNavigation visibility check:', { 
       shouldShowNav, 
       isMobile, 
       isNativeApp: isNativeApp(),
       path: location.pathname,
-      isKeyboardVisible
+      isKeyboardVisible,
+      isOnboardingOrAuth
     });
     
     setIsVisible(shouldShowNav);

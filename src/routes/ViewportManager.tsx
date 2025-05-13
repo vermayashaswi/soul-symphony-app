@@ -13,11 +13,19 @@ const ViewportManager: React.FC = () => {
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
   
+  // Don't show nav on onboarding or auth screens
+  const isOnboardingOrAuth = location.pathname === '/app/onboarding' || 
+                             location.pathname === '/app/auth' ||
+                             location.pathname === '/onboarding' || 
+                             location.pathname === '/auth' ||
+                             location.pathname === '/app';
+  
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
-    user: !!user
+    user: !!user,
+    isOnboardingOrAuth
   });
   
   // Render the appropriate layout based on route and device
@@ -27,8 +35,8 @@ const ViewportManager: React.FC = () => {
         <Outlet />
       </div>
       
-      {/* Display mobile navigation ONLY on actual app routes AND when user is logged in */}
-      {isAppRoute(location.pathname) && user && (
+      {/* Display mobile navigation ONLY on actual app routes, when user is logged in, and not on onboarding/auth */}
+      {isAppRoute(location.pathname) && user && !isOnboardingOrAuth && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </>
