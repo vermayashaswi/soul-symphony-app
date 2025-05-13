@@ -1,5 +1,5 @@
 
-import { toast as sonnerToast, ToastT, useToast as sonnerUseToast } from "sonner";
+import { toast as sonnerToast, ToastT, type ToasterProps } from "sonner";
 
 type ToastProps = {
   title: string;
@@ -22,5 +22,14 @@ export function toast(props: ToastProps) {
   return sonnerToast(title, { description, action });
 }
 
-export const useToast = sonnerUseToast;
+// Sonner doesn't export a useToast hook directly, so we'll create a simple wrapper
+// that provides the toast instance from sonner
+export const useToast = () => {
+  return {
+    toast,
+    // We need to provide the expected interface that matches what our components expect
+    toasts: [] as ToastT[],
+  };
+};
+
 export type Toast = ToastT;
