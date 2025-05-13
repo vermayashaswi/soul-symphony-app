@@ -50,16 +50,6 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     console.log('Element size:', { width: elementWidth, height: elementHeight });
     console.log('Original position:', pos);
     
-    // Special handling for first step (Welcome) - always centered on screen
-    if (step.id === 1) {
-      console.log('Step 1 detected - forcing center positioning');
-      return {
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)'
-      };
-    }
-    
     // Calculate numerical position values
     let topValue = typeof pos.top === 'string' ? 
       (pos.top.includes('%') ? 
@@ -152,7 +142,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   useEffect(() => {
     // Function to calculate position with enhanced logging
     const calculatePosition = () => {
-      // Handle step 1 positioning - Always force center positioning
+      // Handle step 1 positioning
       if (step.id === 1) {
         // For step 1 - position the popup exactly in center of screen
         setPosition({
@@ -417,103 +407,82 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       }
     };
     
-    // Add special delay for first tutorial step to ensure proper rendering
-    if (step.id === 1) {
-      const initialDelay = setTimeout(() => {
-        console.log("Initial delay for step 1 complete, calculating position");
-        calculatePosition();
-        
-        // Add a secondary calculation after a longer delay for step 1
-        // This ensures the popup is properly positioned after all elements are fully rendered
-        setTimeout(() => {
-          console.log("Secondary positioning check for step 1");
-          setPosition({
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)'
-          });
-        }, 300);
-      }, 100);
-      
-      return () => clearTimeout(initialDelay);
-    } else {
-      // Run initial calculation for other steps
-      calculatePosition();
-      
-      // Set up a secondary check after short delay to handle dynamic elements
-      const secondaryCheck = setTimeout(calculatePosition, 300);
-      
-      // Add a tertiary check for visibility
-      const tertiaryCheck = setTimeout(() => {
-        // Final forced position check - especially important for step 4
-        if (step.id === 4) {
-          console.log("Performing final position check for step 4");
-          if (stepRef.current) {
-            const rect = stepRef.current.getBoundingClientRect();
-            console.log("Current step 4 popup position:", rect);
-            
-            // If popup is off screen or too close to bottom, force it to center
-            if (rect.bottom > window.innerHeight - 20 || rect.top < 20) {
-              console.log("Step 4 popup may be off screen, forcing center position");
-              setPosition({
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)'
-              });
-            }
+    // Run initial calculation
+    calculatePosition();
+    
+    // Set up a secondary check after short delay to handle dynamic elements
+    const secondaryCheck = setTimeout(calculatePosition, 300);
+    
+    // Add a tertiary check for visibility
+    const tertiaryCheck = setTimeout(() => {
+      // Final forced position check - especially important for step 4
+      if (step.id === 4) {
+        console.log("Performing final position check for step 4");
+        if (stepRef.current) {
+          const rect = stepRef.current.getBoundingClientRect();
+          console.log("Current step 4 popup position:", rect);
+          
+          // If popup is off screen or too close to bottom, force it to center
+          if (rect.bottom > window.innerHeight - 20 || rect.top < 20) {
+            console.log("Step 4 popup may be off screen, forcing center position");
+            setPosition({
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)'
+            });
           }
         }
-      }, 500);
+      }
+    }, 500);
+    
+    return () => {
+      clearTimeout(secondaryCheck);
+      clearTimeout(tertiaryCheck);
       
-      return () => {
-        clearTimeout(secondaryCheck);
-        clearTimeout(tertiaryCheck);
+      // Clean up any highlight classes when unmounting
+      if (step.targetElement) {
+        const targetElement = document.querySelector(step.targetElement);
+        if (targetElement) {
+          targetElement.classList.remove('tutorial-target');
+        }
+      }
+      
+      // Clean up step 3 specific elements
+      if (step.id === 3) {
+        const selectors = [
+          '.tutorial-record-entry-button',
+          '[data-value="record"]',
+          '.record-entry-tab',
+          'button[data-tutorial-target="record-entry"]',
+          '#new-entry-button'
+        ];
         
-        // Clean up any highlight classes when unmounting
-        if (step.targetElement) {
-          const targetElement = document.querySelector(step.targetElement);
-          if (targetElement) {
-            targetElement.classList.remove('tutorial-target');
+        selectors.forEach(selector => {
+          const element = document.querySelector(selector);
+          if (element) {
+            element.classList.remove('tutorial-target', 'record-entry-tab');
           }
-        }
+        });
+      }
+      
+      // Clean up step 4 specific elements
+      if (step.id === 4) {
+        const selectors = [
+          '[value="entries"]',
+          '.entries-tab',
+          'button[data-tutorial-target="past-entries"]',
+          '#past-entries-button'
+        ];
         
-        // Clean up step 3 specific elements
-        if (step.id === 3) {
-          const selectors = [
-            '.tutorial-record-entry-button',
-            '[data-value="record"]',
-            '.record-entry-tab',
-            'button[data-tutorial-target="record-entry"]',
-            '#new-entry-button'
-          ];
-          
-          selectors.forEach(selector => {
-            const element = document.querySelector(selector);
-            if (element) {
-              element.classList.remove('tutorial-target', 'record-entry-tab');
-            }
-          });
-        }
-        
-        // Clean up step 4 specific elements
-        if (step.id === 4) {
-          const selectors = [
-            '[value="entries"]',
-            '.entries-tab',
-            'button[data-tutorial-target="past-entries"]',
-            '#past-entries-button'
-          ];
-          
-          selectors.forEach(selector => {
-            const element = document.querySelector(selector);
-            if (element) {
-              element.classList.remove('tutorial-target', 'entries-tab');
-            }
-          });
-        }
-      };
-    }
-  }, [step.id, step.targetElement, step.position]);
+        selectors.forEach(selector => {
+          const element = document.querySelector(selector);
+          if (element) {
+            element.classList.remove('tutorial-target', 'entries-tab');
+          }
+        });
+      }
+    };
+  }, [step.id, step.targetElement, step.position, position]);
   
   // Handle navigation actions with stopPropagation to ensure they work
   const handleNext = (e: React.MouseEvent) => {
@@ -550,7 +519,6 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      id={`tutorial-step-${step.id}-popup`}
       className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[20000] max-w-[320px] tutorial-step-container"
       style={getPositionStyle()}
       initial={{ opacity: 0, scale: 0.8 }}

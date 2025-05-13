@@ -1,29 +1,28 @@
 
-"use client"
-
+import * as React from "react"
+import { useToast } from "@/hooks/use-toast"
 import {
   Toast,
-  ToastClose,
   ToastDescription,
   ToastProvider,
   ToastTitle,
   ToastViewport,
 } from "@/components/ui/toast"
 import { useTheme } from "@/hooks/use-theme"
-import { useToast } from "@/hooks/use-toast"
 
 export function Toaster() {
   const { toasts } = useToast()
-  const { theme, systemTheme } = useTheme();
+  const { theme, systemTheme } = useTheme()
   
-  // Determine dark mode based on theme settings
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
+  // Determine if we're in dark mode
+  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark')
 
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
-        // Extract any properties that shouldn't be passed to the Toast component
-        const { variant, type, onOpenChange, ...restProps } = props as any;
+        // Ensure we don't pass the incompatible 'type' property to Toast
+        // Extract any 'type' property to avoid passing it to the Toast component
+        const { type, ...restProps } = props
         
         return (
           <Toast 
@@ -32,17 +31,22 @@ export function Toaster() {
             className={
               isDarkMode
                 ? "bg-theme border-white/10 text-black shadow-lg"
-                : ""
+                : "bg-theme border-black/10 text-black shadow-lg"
             }
           >
             <div className="grid gap-1">
-              {title && <ToastTitle>{title}</ToastTitle>}
+              {title && (
+                <ToastTitle className="text-black">
+                  {title}
+                </ToastTitle>
+              )}
               {description && (
-                <ToastDescription>{description}</ToastDescription>
+                <ToastDescription className="text-black">
+                  {description}
+                </ToastDescription>
               )}
             </div>
-            {action}
-            <ToastClose />
+            {action && typeof action === 'object' && React.isValidElement(action) ? action : null}
           </Toast>
         )
       })}

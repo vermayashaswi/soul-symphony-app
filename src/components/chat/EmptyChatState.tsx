@@ -1,28 +1,11 @@
 
-import React, { useEffect } from "react";
+import React from "react";
 import { motion } from "framer-motion";
 import { MessageSquare, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 
 const EmptyChatState: React.FC = () => {
-  // Add sample questions that can be highlighted during tutorial
-  const sampleQuestions = [
-    "What were my top emotions last week?",
-    "How has my sleep quality changed over time?",
-    "What topics have I written about most often?",
-    "Did I achieve my goals from last month?",
-    "Show me patterns in my stress levels"
-  ];
-  
-  useEffect(() => {
-    // Add tutorial-specific classnames for highlighting
-    const firstQuestion = document.querySelector(".chat-question-suggestion");
-    if (firstQuestion) {
-      firstQuestion.classList.add("tutorial-chat-question");
-    }
-  }, []);
-  
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -37,27 +20,9 @@ const EmptyChatState: React.FC = () => {
         <TranslatableText text="Start a Conversation" />
       </h3>
       
-      <p className="text-muted-foreground max-w-md mb-6">
+      <p className="text-muted-foreground max-w-md">
         <TranslatableText text="Ask me anything about your thoughts, feelings, or daily life. I'm here to help!" />
       </p>
-      
-      <div className="w-full max-w-md space-y-3">
-        {sampleQuestions.map((question, index) => (
-          <div 
-            key={index} 
-            className={`chat-question-suggestion p-3 bg-primary/10 rounded-lg cursor-pointer hover:bg-primary/20 transition-colors ${index === 0 ? 'tutorial-chat-question' : ''}`}
-            onClick={() => {
-              const chatInput = document.querySelector('.chat-input textarea') as HTMLTextAreaElement;
-              if (chatInput) {
-                chatInput.value = question;
-                chatInput.focus();
-              }
-            }}
-          >
-            <p className="font-medium">{question}</p>
-          </div>
-        ))}
-      </div>
       
       <Button 
         variant="outline" 

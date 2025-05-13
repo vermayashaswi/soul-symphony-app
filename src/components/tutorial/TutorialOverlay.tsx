@@ -1,428 +1,500 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { cn } from '@/lib/utils';
-import { useIsMobile } from '@/hooks/use-mobile';
-import { useWindowSize } from '@/hooks/use-window-size';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTutorial } from '@/contexts/TutorialContext';
-import { Button } from '@/components/ui/button';
-import { ChevronRight, CheckCircle2, AlertTriangle, X } from 'lucide-react';
-import { Separator } from '@/components/ui/separator';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTheme } from '@/hooks/use-theme';
-import { toast } from 'sonner';
 
-// Define the steps for the tutorial
-const tutorialSteps = [
-  {
-    id: 1,
-    selector: '#journal-entries-container',
-    title: 'Welcome to Your Journal',
-    description: 'This is where your journal entries will appear. Let\'s start by creating your first entry.',
-    position: 'bottom',
-  },
-  {
-    id: 2,
-    selector: '#start-recording-button',
-    title: 'Start Recording',
-    description: 'Click this button to start recording your thoughts. Don\'t worry, you can always edit or delete the entry later.',
-    position: 'bottom',
-  },
-  {
-    id: 3,
-    selector: '#journal-entry-card-0',
-    title: 'Your First Entry',
-    description: 'Once you\'ve recorded your entry, it will appear here. Click on the entry to view and edit it.',
-    position: 'bottom',
-  },
-  {
-    id: 4,
-    selector: '#insights-tab-button',
-    title: 'Explore Insights',
-    description: 'Click here to explore insights derived from your journal entries. Discover trends and patterns in your thoughts and feelings.',
-    position: 'bottom',
-  },
-  {
-    id: 5,
-    selector: '#insights-container',
-    title: 'Insights Overview',
-    description: 'Here you can see an overview of your insights. Click on a specific insight to dive deeper.',
-    position: 'bottom',
-  },
-  {
-    id: 6,
-    selector: '.chat-ai-response',
-    title: 'Meet Rūḥ, Your AI Companion',
-    description: 'Rūḥ is here to help you understand your insights. Ask questions about your journal entries and get personalized feedback.',
-    position: 'bottom',
-  },
-  {
-    id: 7,
-    selector: '#chat-input',
-    title: 'Ask Rūḥ Anything',
-    description: 'Type your questions here and press enter to get a response from Rūḥ.',
-    position: 'top',
-  },
-  {
-    id: 8,
-    selector: '#account-button',
-    title: 'Manage Your Account',
-    description: 'Click here to manage your account settings, including your profile and subscription.',
-    position: 'bottom',
-  },
-  {
-    id: 9,
-    selector: '#tutorial-button',
-    title: 'Restart Tutorial',
-    description: 'You can restart this tutorial at any time by clicking here.',
-    position: 'bottom',
-  },
-  {
-    id: 10,
-    selector: '#app-logo',
-    title: 'Welcome to Lovable',
-    description: 'You\'re all set! Start exploring your journal and discover the power of self-reflection.',
-    position: 'bottom',
-  },
+import React, { useEffect, useState } from 'react';
+import { motion, AnimatePresence } from 'framer-motion';
+import { useTutorial } from '@/contexts/TutorialContext';
+import TutorialStep from './TutorialStep';
+import { useNavigate, useLocation } from 'react-router-dom';
+import { isAppRoute } from '@/routes/RouteHelpers';
+
+// Define possible selectors at the component level so they are available throughout
+const RECORD_ENTRY_SELECTORS = [
+  '[data-value="record"]',
+  '.record-entry-tab',
+  '.tutorial-record-entry-button',
+  'button[data-tutorial-target="record-entry"]',
+  '#new-entry-button',
+  '.record-entry-button'
 ];
 
-// Define the TutorialOverlay component
+const ENTRIES_TAB_SELECTORS = [
+  '[value="entries"]',
+  '.entries-tab',
+  'button[data-tutorial-target="past-entries"]',
+  '#past-entries-button'
+];
+
 const TutorialOverlay: React.FC = () => {
   const { 
+    isActive, 
     currentStep, 
-    startTutorial, 
-    endTutorial, 
-    markStepAsComplete, 
-    isTutorialActive,
-    isStepComplete,
-    resetTutorial,
+    totalSteps,
+    steps, 
+    nextStep, 
+    prevStep, 
+    skipTutorial
   } = useTutorial();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const [elementForStep3Found, setElementForStep3Found] = useState(false);
+  const [attempts, setAttempts] = useState(0);
   
-  const [showConfirmation, setShowConfirmation] = useState(false);
-  const [showError, setShowError] = useState(false);
-  const [errorMessage, setErrorMessage] = useState('');
-  const [showRestartConfirmation, setShowRestartConfirmation] = useState(false);
-  const [showRestartError, setShowRestartError] = useState(false);
-  const [restartErrorMessage, setRestartErrorMessage] = useState('');
+  // Only render tutorial on app routes - strict checking
+  const currentPath = location.pathname;
+  const isAppRouteCurrent = isAppRoute(currentPath);
+  const shouldShowTutorial = isActive && isAppRouteCurrent;
   
-  const [isClosing, setIsClosing] = useState(false);
-  const [isRestarting, setIsRestarting] = useState(false);
-  
-  const isMobile = useIsMobile();
-  const { width } = useWindowSize();
-  const { user } = useAuth();
-  const { theme } = useTheme();
-  
-  const [showWelcomeMessage, setShowWelcomeMessage] = useState(true);
-  const [showGoodbyeMessage, setShowGoodbyeMessage] = useState(false);
-  
-  const [showTooltip, setShowTooltip] = useState(true);
-  
-  // Fix the highlightedElements ref to be a regular array instead of MutableRefObject
-  const [highlightedElements, setHighlightedElements] = useState<HTMLElement[]>([]);
-  
-  const currentTutorialStep = tutorialSteps[currentStep - 1];
-  
-  // Determine if we're on the last step
-  const isLastStep = currentStep === tutorialSteps.length;
-  
-  // Determine if we should show the overlay
-  const shouldShowOverlay = isTutorialActive && currentTutorialStep;
-  
-  // Function to handle tutorial completion
-  const handleTutorialComplete = () => {
-    if (isLastStep) {
-      setShowConfirmation(true);
-      // End the tutorial after a delay to allow the confirmation to be seen
-      setTimeout(() => {
-        setShowConfirmation(false);
-        endTutorial();
-      }, 2000);
-    }
-  };
-  
-  // Function to handle tutorial error
-  const handleTutorialError = (message: string) => {
-    setErrorMessage(message);
-    setShowError(true);
-    // End the tutorial after a delay to allow the error to be seen
-    setTimeout(() => {
-      setShowError(false);
-      endTutorial();
-    }, 3000);
-  };
-  
-  // Function to handle tutorial restart confirmation
-  const handleTutorialRestartConfirmation = () => {
-    setShowRestartConfirmation(true);
-    // Restart the tutorial after a delay to allow the confirmation to be seen
-    setTimeout(() => {
-      setShowRestartConfirmation(false);
-      resetTutorialHandler();
-    }, 2000);
-  };
-  
-  // Function to handle tutorial restart error
-  const handleTutorialRestartError = (message: string) => {
-    setRestartErrorMessage(message);
-    setShowRestartError(true);
-    // End the tutorial after a delay to allow the error to be seen
-    setTimeout(() => {
-      setShowRestartError(false);
-    }, 3000);
-  };
-  
-  // Function to handle tutorial restart
-  const resetTutorialHandler = async () => {
-    setIsRestarting(true);
-    try {
-      await resetTutorial();
-      toast.success('Tutorial restarted successfully!');
-    } catch (error: any) {
-      console.error('Error resetting tutorial:', error);
-      handleTutorialRestartError('Failed to reset tutorial. Please try again.');
-    } finally {
-      setIsRestarting(false);
-    }
-  };
-  
-  // Function to handle tutorial skip
-  const skipTutorialHandler = async () => {
-    setIsClosing(true);
-    try {
-      await endTutorial();
-      toast.success('Tutorial skipped successfully!');
-    } catch (error: any) {
-      console.error('Error skipping tutorial:', error);
-      handleTutorialError('Failed to skip tutorial. Please try again.');
-    } finally {
-      setIsClosing(false);
-    }
-  };
-  
-  // Function to handle next step
-  const handleNextStep = async () => {
-    if (!currentTutorialStep) {
-      console.warn('No current tutorial step');
-      return;
-    }
-    
-    // Mark the current step as complete
-    markStepAsComplete(currentStep);
-    
-    // If it's the last step, complete the tutorial
-    if (isLastStep) {
-      handleTutorialComplete();
-    }
-  };
-  
-  // Function to check if an element is in the viewport
-  const isElementInViewport = (el: HTMLElement) => {
-    const rect = el.getBoundingClientRect();
-    return (
-      rect.top >= 0 &&
-      rect.left >= 0 &&
-      rect.bottom <= (window.innerHeight || document.documentElement.clientHeight) &&
-      rect.right <= (window.innerWidth || document.documentElement.clientWidth)
-    );
-  };
-  
-  // Function to clear any highlighted elements
-  const clearHighlightedElements = () => {
-    highlightedElements.forEach(element => {
-      element.classList.remove('tutorial-highlighted');
-      element.classList.remove('tutorial-pulse');
+  // Log whenever the component is rendered and what the decision is
+  useEffect(() => {
+    console.log('TutorialOverlay render check:', {
+      isActive,
+      currentPath,
+      isAppRouteCurrent,
+      shouldShowTutorial
     });
-    setHighlightedElements([]);
-  };
+  }, [isActive, currentPath, isAppRouteCurrent, shouldShowTutorial]);
   
-  // Function to focus on an element by selector
-  const focusElementBySelector = (selector: string) => {
-    // Clear any existing highlights
-    clearHighlightedElements();
+  // Enhanced scrolling prevention when tutorial is active
+  useEffect(() => {
+    if (!shouldShowTutorial) return;
     
-    setTimeout(() => {
-      let element = document.querySelector(selector);
-      if (!element) {
-        console.error(`Element with selector "${selector}" not found`);
-        return;
+    console.log('Tutorial active, disabling page scrolling');
+    
+    // Save current scroll position
+    const scrollPos = window.scrollY;
+    
+    // Add classes to the body to prevent scrolling
+    document.body.classList.add('tutorial-active');
+    document.body.style.top = `-${scrollPos}px`;
+    
+    // Clean up when tutorial is deactivated
+    return () => {
+      document.body.classList.remove('tutorial-active');
+      document.body.style.top = '';
+      // Restore scroll position
+      window.scrollTo(0, scrollPos);
+      console.log('Tutorial inactive, restored page scrolling');
+    };
+  }, [shouldShowTutorial]);
+
+  // Handle navigation if specified in tutorial step
+  useEffect(() => {
+    if (!shouldShowTutorial) return;
+    
+    // Debug the current state
+    console.log('TutorialOverlay - Current state:', {
+      isActive,
+      currentStep,
+      currentPath: location.pathname,
+      currentStepData: steps[currentStep]
+    });
+    
+    const currentTutorialStep = steps[currentStep];
+    if (currentTutorialStep?.navigateTo && location.pathname !== currentTutorialStep.navigateTo) {
+      console.log(`TutorialOverlay - Navigating to ${currentTutorialStep.navigateTo} for tutorial step ${currentTutorialStep.id}`);
+      navigate(currentTutorialStep.navigateTo);
+    }
+  }, [shouldShowTutorial, currentStep, steps, navigate, location.pathname]);
+
+  // Enhanced handling for different tutorial steps with better detection
+  useEffect(() => {
+    if (!shouldShowTutorial) return;
+    
+    const currentTutorialStep = steps[currentStep];
+    if (!currentTutorialStep) return;
+    
+    console.log(`TutorialOverlay - Setting up step ${currentTutorialStep.id} on path ${location.pathname}`);
+    
+    // Apply highlighting based on step ID
+    let cleanup: (() => void) | undefined;
+    
+    switch (currentTutorialStep.id) {
+      case 1:
+        cleanup = handleJournalHeaderVisibility();
+        break;
+      case 2:
+        cleanup = handleArrowButtonVisibility();
+        break;
+      case 3:
+        console.log('TutorialOverlay - Step 3 detected, current path:', location.pathname);
+        // Reset attempt counter for new detection cycle
+        setAttempts(0);
+        setElementForStep3Found(false);
+        
+        // Ensure we're on the journal page for step 3
+        if (location.pathname === '/app/journal') {
+          cleanup = handleRecordEntryVisibility();
+        } else {
+          console.log('TutorialOverlay - Not on journal page yet, will navigate there');
+          navigate('/app/journal');
+        }
+        break;
+      case 4:
+        console.log('TutorialOverlay - Step 4 detected, current path:', location.pathname);
+        if (location.pathname === '/app/journal') {
+          cleanup = handleEntriesTabVisibility();
+        } else {
+          console.log('TutorialOverlay - Not on journal page yet, will navigate there');
+          navigate('/app/journal');
+        }
+        break;
+    }
+    
+    // Return combined cleanup function
+    return cleanup;
+  }, [shouldShowTutorial, currentStep, steps, location.pathname, navigate, attempts]);
+
+  // Handle step 1 - journal header visibility
+  const handleJournalHeaderVisibility = () => {
+    const journalHeader = document.querySelector('.journal-header-container');
+    
+    if (journalHeader) {
+      console.log("Enhancing journal header visibility for tutorial step 1");
+      journalHeader.classList.add('tutorial-target');
+      
+      // Log positioning for debugging
+      const rect = journalHeader.getBoundingClientRect();
+      console.log('Journal header position:', rect);
+      
+      // Clean up when step changes
+      return () => {
+        console.log("Cleaning up journal header styles");
+        journalHeader.classList.remove('tutorial-target');
+      };
+    }
+    
+    return () => {};
+  };
+
+  // Handle step 2 - arrow button visibility with enhanced glow effect
+  const handleArrowButtonVisibility = () => {
+    const arrowButton = document.querySelector('.journal-arrow-button');
+    
+    if (arrowButton) {
+      console.log("Enhancing arrow button visibility for tutorial step 2");
+      
+      // Add special highlighting class and ensure visibility with stronger inline styles
+      arrowButton.classList.add('tutorial-target');
+      
+      // Force visibility with inline styles
+      const arrowButtonElement = arrowButton as HTMLElement;
+      arrowButtonElement.style.zIndex = "9990";
+      arrowButtonElement.style.visibility = "visible";
+      arrowButtonElement.style.opacity = "1";
+      arrowButtonElement.style.pointerEvents = "auto";
+      
+      // Make the button element more prominent with enhanced glow effect
+      const buttonElement = arrowButton.querySelector('button');
+      if (buttonElement) {
+        buttonElement.classList.add('tutorial-button-highlight');
+        console.log("Added enhanced highlighting effect to button element");
+        
+        // Force stronger glow effect with inline styles - important for visibility
+        const buttonStyleEl = buttonElement as HTMLElement;
+        buttonStyleEl.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+        buttonStyleEl.style.animation = "button-pulse 1.5s infinite alternate";
+        buttonStyleEl.style.border = "2px solid white";
+        buttonStyleEl.style.transform = "scale(1.05)";
+        
+        // Log positioning
+        const rect = buttonElement.getBoundingClientRect();
+        console.log('Button element position:', rect);
       }
       
-      // Position the highlight over the element
-      const rect = element.getBoundingClientRect();
-      const highlightElement = document.getElementById('tutorial-highlight');
+      // Also highlight the button's outer glow div if it exists
+      const outerGlowDiv = arrowButton.querySelector('.bg-primary\\/30');
+      if (outerGlowDiv) {
+        outerGlowDiv.classList.add('tutorial-button-outer-glow');
+        
+        // Add stronger glow for better visibility
+        const glowElement = outerGlowDiv as HTMLElement;
+        glowElement.style.filter = "drop-shadow(0 0 25px var(--color-theme))";
+        glowElement.style.opacity = "0.95";
+        
+        console.log("Added enhanced outer glow effect");
+      }
       
-      if (highlightElement && rect) {
-        // Cast element to HTMLElement to ensure style property exists
-        const htmlElement = element as HTMLElement;
+      // Clean up when step changes
+      return () => {
+        console.log("Cleaning up arrow button styles");
+        arrowButton.classList.remove('tutorial-target');
         
-        highlightElement.style.display = 'block';
-        highlightElement.style.top = `${rect.top + window.scrollY}px`;
-        highlightElement.style.left = `${rect.left + window.scrollX}px`;
-        highlightElement.style.width = `${rect.width}px`;
-        highlightElement.style.height = `${rect.height}px`;
-        
-        // Also add a class to the element itself for additional styling if needed
-        htmlElement.classList.add('tutorial-highlighted');
-        
-        // Add a pulsing animation using a class on the highlighted element
-        htmlElement.classList.add('tutorial-pulse');
-        
-        // If the element is not in view, scroll to it
-        if (!isElementInViewport(htmlElement)) {
-          htmlElement.scrollIntoView({
-            behavior: 'smooth',
-            block: 'center'
-          });
+        if (arrowButtonElement) {
+          arrowButtonElement.style.zIndex = "";
+          arrowButtonElement.style.visibility = "";
+          arrowButtonElement.style.opacity = "";
+          arrowButtonElement.style.pointerEvents = "";
         }
         
-        // Remember this element for cleanup later
-        setHighlightedElements(prevElements => [...prevElements, htmlElement]);
+        if (buttonElement) {
+          buttonElement.classList.remove('tutorial-button-highlight');
+          const buttonStyleEl = buttonElement as HTMLElement;
+          if (buttonStyleEl) {
+            buttonStyleEl.style.boxShadow = "";
+            buttonStyleEl.style.animation = "";
+            buttonStyleEl.style.border = "";
+            buttonStyleEl.style.transform = "";
+          }
+        }
+        
+        if (outerGlowDiv) {
+          outerGlowDiv.classList.remove('tutorial-button-outer-glow');
+          const glowElement = outerGlowDiv as HTMLElement;
+          glowElement.style.filter = "";
+          glowElement.style.opacity = "";
+        }
+      };
+    } else {
+      console.warn("Could not find journal-arrow-button element for tutorial step 2");
+    }
+    
+    return () => {};
+  };
+
+  // Handle step 3 - Record Entry tab/button visibility with improved debugging and retry logic
+  const handleRecordEntryVisibility = () => {
+    console.log('TutorialOverlay - Setting up Record Entry visibility for step 3');
+    
+    // Delay searching for elements to ensure they've loaded
+    const searchTimeout = setTimeout(() => {
+      // Log all possible elements in the DOM for debugging
+      console.log('Checking all possible Record Entry elements:');
+      RECORD_ENTRY_SELECTORS.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        console.log(`  - ${selector}: ${elements.length} elements found`);
+        elements.forEach((el, i) => {
+          const rect = (el as HTMLElement).getBoundingClientRect();
+          console.log(`    Element ${i} rect:`, rect);
+        });
+      });
+      
+      const found = applyStep3Highlighting();
+      
+      if (found) {
+        console.log(`TutorialOverlay - Found Record Entry element on attempt ${attempts + 1}`);
+        setElementForStep3Found(true);
+      } else {
+        // Retry logic - attempt to find the element again if we haven't reached 5 attempts
+        if (attempts < 5) {
+          console.log(`Retrying element search (attempt ${attempts + 1} of 5)`);
+          setAttempts(prev => prev + 1);
+          // Schedule another attempt
+          setTimeout(() => handleRecordEntryVisibility(), 500);
+        } else {
+          console.warn('TutorialOverlay - Maximum attempts reached to find Record Entry element');
+          // Force showing the tutorial step even if the element wasn't found
+          setElementForStep3Found(true);
+          console.log('TutorialOverlay - Forcing step 3 to show anyway');
+        }
       }
-    }, 300);
+    }, 500);
+    
+    // Clean up when step changes
+    return () => {
+      clearTimeout(searchTimeout);
+      console.log("Cleaning up Record Entry element styles");
+      
+      // Remove classes from all possible elements
+      RECORD_ENTRY_SELECTORS.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          element.classList.remove('tutorial-target', 'record-entry-tab', 'tutorial-highlight');
+          
+          // Also remove inline styles
+          const el = element as HTMLElement;
+          if (el) {
+            el.style.visibility = '';
+            el.style.opacity = '';
+            el.style.pointerEvents = '';
+            el.style.position = '';
+            el.style.zIndex = '';
+          }
+        });
+      });
+    };
   };
   
-  // Function to hide the highlight
-  const hideHighlight = () => {
-    const highlightElement = document.getElementById('tutorial-highlight');
-    if (highlightElement) {
-      highlightElement.style.display = 'none';
-    }
-    clearHighlightedElements();
-  };
-  
-  // Function to show the highlight
-  const showHighlight = () => {
-    const highlightElement = document.getElementById('tutorial-highlight');
-    if (highlightElement) {
-      highlightElement.style.display = 'block';
-    }
-  };
-  
-  // Function to update the highlight position
-  const updateHighlightPosition = () => {
-    if (!currentTutorialStep) {
-      console.warn('No current tutorial step');
-      return;
+  // Function to apply highlighting to step 3 elements with better debugging
+  const applyStep3Highlighting = (): boolean => {
+    let recordEntryElement = null;
+    
+    // Try each selector until we find a match
+    for (const selector of RECORD_ENTRY_SELECTORS) {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        recordEntryElement = elements[0];
+        console.log(`Found Record Entry element with selector: ${selector}`, recordEntryElement);
+        break;
+      }
     }
     
-    focusElementBySelector(currentTutorialStep.selector);
-  };
-  
-  // Function to handle key press events
-  const handleKeyPress = (event: KeyboardEvent) => {
-    if (event.key === 'Enter') {
-      handleNextStep();
-    }
-  };
-  
-  // Function to handle welcome message timeout
-  const handleWelcomeMessageTimeout = () => {
-    setShowWelcomeMessage(false);
-  };
-  
-  // Function to handle goodbye message timeout
-  const handleGoodbyeMessageTimeout = () => {
-    setShowGoodbyeMessage(false);
-  };
-  
-  // Function to handle tooltip timeout
-  const handleTooltipTimeout = () => {
-    setShowTooltip(false);
-  };
-  
-  // Function to handle start tutorial
-  const handleStartTutorial = () => {
-    startTutorial();
-  };
-  
-  // Function to handle end tutorial
-  const handleEndTutorial = () => {
-    endTutorial();
-  };
-  
-  // Function to handle mark step as complete
-  const handleMarkStepAsComplete = (step: number) => {
-    markStepAsComplete(step);
-  };
-  
-  // Function to handle is step complete
-  const handleIsStepComplete = (step: number) => {
-    return isStepComplete(step);
-  };
-  
-  // Function to handle reset tutorial
-  const handleResetTutorial = () => {
-    resetTutorial();
-  };
-  
-  // Use effect to focus on the current step's element
-  useEffect(() => {
-    if (shouldShowOverlay && currentTutorialStep) {
-      focusElementBySelector(currentTutorialStep.selector);
+    if (recordEntryElement) {
+      console.log("Enhancing Record Entry element visibility for tutorial step 3", recordEntryElement);
+      
+      // Add tutorial target class to make the element visible through overlay
+      recordEntryElement.classList.add('tutorial-target');
+      recordEntryElement.classList.add('record-entry-tab');
+      
+      // Add enhanced highlighting for better visibility
+      recordEntryElement.classList.add('tutorial-highlight');
+      
+      // Force the element to be visible with inline styles
+      const elementStyle = recordEntryElement as HTMLElement;
+      elementStyle.style.visibility = 'visible';
+      elementStyle.style.opacity = '1';
+      elementStyle.style.pointerEvents = 'auto';
+      elementStyle.style.position = 'relative';
+      elementStyle.style.zIndex = '10000';
+      elementStyle.style.boxShadow = '0 0 20px 10px var(--color-theme)';
+      
+      console.log("Added classes and styles to Record Entry element");
+      
+      // Log computed styles to verify our styles are applied
+      const computedStyle = window.getComputedStyle(recordEntryElement);
+      console.log("Computed styles for Record Entry element:", {
+        visibility: computedStyle.visibility,
+        opacity: computedStyle.opacity,
+        zIndex: computedStyle.zIndex,
+        position: computedStyle.position
+      });
+      
+      return true;
     } else {
-      hideHighlight();
+      console.warn("Could not find Record Entry element for tutorial step 3 with any selector");
+      return false;
     }
+  };
+
+  // Handle step 4 - Past Entries tab visibility - Enhanced to match step 3's behavior
+  const handleEntriesTabVisibility = () => {
+    console.log('TutorialOverlay - Setting up Past Entries tab visibility for step 4');
     
-    // Clean up any highlighted elements when the component unmounts or the step changes
-    return () => {
-      clearHighlightedElements();
-    };
-  }, [currentStep, shouldShowOverlay, currentTutorialStep]);
-  
-  // Use effect to add and remove key press listener
-  useEffect(() => {
-    if (shouldShowOverlay) {
-      window.addEventListener('keydown', handleKeyPress);
-    } else {
-      window.removeEventListener('keydown', handleKeyPress);
-    }
+    // Delay searching for elements to ensure they've loaded
+    const searchTimeout = setTimeout(() => {
+      // Log all possible elements in the DOM for debugging
+      console.log('Checking for Past Entries tab elements:');
+      ENTRIES_TAB_SELECTORS.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        console.log(`  - ${selector}: ${elements.length} elements found`);
+        elements.forEach((el, i) => {
+          const rect = (el as HTMLElement).getBoundingClientRect();
+          console.log(`    Element ${i} rect:`, rect);
+        });
+      });
+      
+      let entriesTabElement = null;
+      
+      // Try each selector until we find a match
+      for (const selector of ENTRIES_TAB_SELECTORS) {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          entriesTabElement = elements[0];
+          console.log(`Found Past Entries tab element with selector: ${selector}`, entriesTabElement);
+          break;
+        }
+      }
+      
+      if (entriesTabElement) {
+        console.log("Enhancing Past Entries tab visibility for tutorial step 4", entriesTabElement);
+        
+        // Add tutorial target class to make the element visible through overlay
+        entriesTabElement.classList.add('tutorial-target');
+        entriesTabElement.classList.add('entries-tab');
+        
+        // Add enhanced highlighting for better visibility - Match step 3's highlighting
+        entriesTabElement.classList.add('tutorial-highlight');
+        
+        // Force the element to be visible with inline styles - Match step 3's styling
+        const elementStyle = entriesTabElement as HTMLElement;
+        elementStyle.style.visibility = 'visible';
+        elementStyle.style.opacity = '1';
+        elementStyle.style.pointerEvents = 'auto';
+        elementStyle.style.position = 'relative';
+        elementStyle.style.zIndex = '10000';
+        elementStyle.style.boxShadow = '0 0 20px 10px var(--color-theme)';
+        
+        console.log("Added classes and styles to Past Entries tab element");
+        
+        // Log computed styles to verify our styles are applied
+        const computedStyle = window.getComputedStyle(entriesTabElement);
+        console.log("Computed styles for Past Entries tab element:", {
+          visibility: computedStyle.visibility,
+          opacity: computedStyle.opacity,
+          zIndex: computedStyle.zIndex,
+          position: computedStyle.position
+        });
+      } else {
+        console.warn("Could not find Past Entries tab element for tutorial step 4 with any selector");
+      }
+    }, 500);
     
+    // Clean up when step changes
     return () => {
-      window.removeEventListener('keydown', handleKeyPress);
+      clearTimeout(searchTimeout);
+      console.log("Cleaning up Past Entries tab element styles");
+      
+      // Remove classes from all possible elements
+      ENTRIES_TAB_SELECTORS.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          element.classList.remove('tutorial-target', 'entries-tab', 'tutorial-highlight');
+          
+          // Also clean up inline styles
+          const el = element as HTMLElement;
+          if (el) {
+            el.style.visibility = '';
+            el.style.opacity = '';
+            el.style.pointerEvents = '';
+            el.style.position = '';
+            el.style.zIndex = '';
+            el.style.boxShadow = '';
+          }
+        });
+      });
     };
-  }, [shouldShowOverlay]);
-  
-  // Use effect to show and hide welcome message
-  useEffect(() => {
-    if (showWelcomeMessage) {
-      setTimeout(handleWelcomeMessageTimeout, 3000);
-    }
-  }, [showWelcomeMessage]);
-  
-  // Use effect to show and hide goodbye message
-  useEffect(() => {
-    if (showGoodbyeMessage) {
-      setTimeout(handleGoodbyeMessageTimeout, 3000);
-    }
-  }, [showGoodbyeMessage]);
-  
-  // Use effect to show and hide tooltip
-  useEffect(() => {
-    if (showTooltip) {
-      setTimeout(handleTooltipTimeout, 3000);
-    }
-  }, [showTooltip]);
-  
-  // Use effect to update highlight position on window resize
-  useEffect(() => {
-    window.addEventListener('resize', updateHighlightPosition);
-    
-    return () => {
-      window.removeEventListener('resize', updateHighlightPosition);
-    };
-  }, []);
-  
-  // Use effect to start the tutorial when the component mounts
-  useEffect(() => {
-    if (user && !isTutorialActive) {
-      startTutorial();
-    }
-  }, [user, isTutorialActive, startTutorial]);
-  
+  };
+
+  // If not an app route or tutorial not active, don't render anything
+  if (!shouldShowTutorial) {
+    console.log('TutorialOverlay not shown: isActive=', isActive, 'isAppRoute=', isAppRouteCurrent);
+    return null;
+  }
+
+  const currentTutorialStep = steps[currentStep];
+  const isFirstStep = currentStep === 0;
+  const isLastStep = currentStep === totalSteps - 1;
+
+  // For step 3, only show if we found the element or are on attempt 5+
+  const shouldShowStep3UI = currentTutorialStep?.id !== 3 || 
+                           (elementForStep3Found || attempts >= 5);
+
   return (
-    <div>
-      {/* This is just a placeholder. Keep existing JSX return content */}
+    <div className="fixed inset-0 z-[9997] pointer-events-auto" onClick={(e) => e.stopPropagation()}>
+      {/* Semi-transparent overlay with improved interaction blocking */}
+      <motion.div
+        className="tutorial-overlay absolute inset-0"
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 0.75 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.3 }}
+        onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind
+      />
+
+      {/* Tutorial step with enhanced z-index and pointer events */}
+      <AnimatePresence mode="wait">
+        {shouldShowStep3UI && (
+          <TutorialStep
+            key={currentStep}
+            step={currentTutorialStep}
+            onNext={nextStep}
+            onPrev={prevStep}
+            onSkip={skipTutorial}
+            isFirst={isFirstStep}
+            isLast={isLastStep}
+            stepNumber={currentStep + 1}
+            totalSteps={totalSteps}
+          />
+        )}
+      </AnimatePresence>
     </div>
   );
 };

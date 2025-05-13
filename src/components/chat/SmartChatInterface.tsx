@@ -470,7 +470,7 @@ const SmartChatInterface = () => {
           <EmptyChatState />
         ) : (
           <ChatArea 
-            messages={chatHistory}
+            chatMessages={chatHistory}
             isLoading={loading}
             processingStage={processingStage || undefined}
             threadId={currentThreadId}

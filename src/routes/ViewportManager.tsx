@@ -13,15 +13,10 @@ const ViewportManager: React.FC = () => {
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
   
-  // Check if the current route is an onboarding route
-  const isOnboardingRoute = location.pathname.includes('/app/onboarding');
-  
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
-    isOnboardingRoute,
-    onboardingComplete,
     user: !!user
   });
   
@@ -32,17 +27,8 @@ const ViewportManager: React.FC = () => {
         <Outlet />
       </div>
       
-      {/* 
-        Display mobile navigation ONLY when:
-        1. On an app route 
-        2. User is logged in
-        3. Not on an onboarding route
-        4. Onboarding is complete or null (not false)
-      */}
-      {isAppRoute(location.pathname) && 
-       user && 
-       !isOnboardingRoute && 
-       onboardingComplete !== false && (
+      {/* Display mobile navigation ONLY on actual app routes AND when user is logged in */}
+      {isAppRoute(location.pathname) && user && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </>

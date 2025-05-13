@@ -51,38 +51,24 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
-    // Check for onboarding path
-    const isOnboardingPath = location.pathname.includes('/app/onboarding');
-    
-    // Only show navigation when:
-    // 1. Device is mobile or it's a native app
-    // 2. Keyboard is not visible
-    // 3. User is not in onboarding
-    // 4. Onboarding is complete
-    const shouldShowNav = 
-      (isMobile || isNativeApp()) && 
-      !isKeyboardVisible && 
-      !isOnboardingPath &&
-      onboardingComplete !== false; // null or true is fine, false means still in onboarding
+    const shouldShowNav = (isMobile || isNativeApp()) && 
+                          !isKeyboardVisible; 
     
     console.log('MobileNavigation visibility check:', { 
       shouldShowNav, 
       isMobile, 
       isNativeApp: isNativeApp(),
       path: location.pathname,
-      isKeyboardVisible,
-      isOnboardingPath,
-      onboardingComplete
+      isKeyboardVisible
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, onboardingComplete]);
+  }, [location.pathname, isMobile, isKeyboardVisible]);
   
   if (!isVisible) {
     return null;
   }
   
-  // Additional routes to hide navigation
   const hiddenRoutes = ['/app/auth', '/app/onboarding'];
   
   if (!onboardingComplete && location.pathname === '/app') {

@@ -1,29 +1,40 @@
 
-// Define Json type for type safety across the application
-export type Json = string | number | boolean | null | { [key: string]: Json } | Json[];
+import { Json } from '@/integrations/supabase/types';
 
-// Define JournalEntry interface
 export interface JournalEntry {
   id: number;
   user_id?: string;
-  content: string; // Making content required to satisfy both usages
-  "refined text"?: string;
+  created_at: string;
   "transcription text"?: string;
-  created_at: string; // Making created_at required to satisfy both usages
-  updated_at?: string;
-  sentiment?: string | number; // Allow both string and number for sentiment
-  themes?: string[] | null;
-  entities?: Json;
-  tempId?: string;
-  analysis_complete?: boolean;
+  "refined text"?: string;
   audio_url?: string;
-  language?: string;
+  duration?: number;
+  emotions?: Json;
+  sentiment?: string;
+  entities?: Array<{
+    type: string;
+    name: string;
+    text?: string;
+  }>;
+  "foreign key"?: string;
+  master_themes?: string[];
+  themes?: string[];
+  user_feedback?: string | null;
+  Edit_Status?: number | null;
+  content: string; // Changed from optional to required
+  original_language?: string; // Keep as optional
+  translation_text?: string; // Keep as optional
+  tempId?: string; // Temporary ID for tracking processing entries
 }
 
-// Define JournalEntryReference interface
-export interface JournalEntryReference {
-  date: string;
-  content: string;
-  sentiment?: string;
-  snippet?: string;
+export interface JournalEntryFormData extends JournalEntry {
+  text?: string;
 }
+
+export interface MoodDataPoint {
+  date: Date;
+  sentiment: number;
+  category?: 'positive' | 'neutral' | 'negative';
+}
+
+export { type Json } from '@/integrations/supabase/types';
