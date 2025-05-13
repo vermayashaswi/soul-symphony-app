@@ -1,69 +1,50 @@
 
-import { toast as sonnerToast } from 'sonner';
+import * as React from "react"
+import {
+  Toast,
+  ToastClose,
+  ToastDescription,
+  ToastProvider,
+  ToastTitle,
+  ToastViewport,
+} from "@/components/ui/toast"
+import { useToast as useToastPrimitive } from "@/components/ui/use-toast"
 
-// Define the props that can be passed to the toast function
+export type ToasterToast = React.ComponentPropsWithoutRef<typeof Toast> & {
+  id: string
+  title?: React.ReactNode
+  description?: React.ReactNode
+  action?: React.ReactNode
+  variant?: "default" | "destructive" | "success" | "warning" | "info"
+}
+
 export type ToastProps = {
-  title?: string;
-  description?: string;
-  action?: React.ReactNode;
-  cancel?: React.ReactNode;
-  duration?: number;
-  position?: 'top-right' | 'top-center' | 'top-left' | 'bottom-right' | 'bottom-center' | 'bottom-left';
-  important?: boolean;
-  variant?: 'default' | 'destructive' | 'success' | 'warning';
-};
-
-// Store toasts for the Toaster component to access
-const toasts: { id: string | number; title: string; description?: string; action?: React.ReactNode }[] = [];
-
-export const toast = (props: ToastProps | string) => {
-  if (typeof props === 'string') {
-    // Simple string toast
-    const id = sonnerToast(props);
-    toasts.push({ id, title: props });
-    return id;
-  }
-
-  // Object style toast
-  const { title, description, action, cancel, duration, position, important, variant } = props;
-  
-  let variantClass = '';
-  if (variant === 'destructive') {
-    variantClass = 'destructive';
-  } else if (variant === 'success') {
-    variantClass = 'success';
-  } else if (variant === 'warning') {
-    variantClass = 'warning';
-  }
-  
-  const id = sonnerToast(title || '', {
-    description,
-    action,
-    cancel,
-    duration,
-    position,
-    important,
-    className: variantClass ? `toast-${variantClass}` : undefined,
-  });
-
-  // Store the toast for the Toaster component
-  toasts.push({
-    id,
-    title: title || '',
-    description,
-    action
-  });
-
-  return id;
-};
+  title?: React.ReactNode
+  description?: React.ReactNode
+  action?: React.ReactNode
+  variant?: "default" | "destructive" | "success" | "warning" | "info"
+}
 
 export const useToast = () => {
+  const toastContext = useToastPrimitive()
+  
   return {
-    toast,
-    toasts,
-    dismiss: sonnerToast.dismiss,
-    error: (message: string) => toast({ title: 'Error', description: message, variant: 'destructive' }),
-    success: (message: string) => toast({ title: 'Success', description: message, variant: 'success' }),
-    warning: (message: string) => toast({ title: 'Warning', description: message, variant: 'warning' })
-  };
-};
+    ...toastContext,
+    toast: (props: ToastProps | string) => {
+      const id = Math.random().toString(36).substring(2, 9)
+      if (typeof props === "string") {
+        return toastContext.toast({
+          title: props,
+          id,
+        })
+      }
+      return toastContext.toast({ ...props, id })
+    },
+    toasts: toastContext.toasts ?? [],
+  }
+}
+
+export const toast = (props: ToastProps | string) => {
+  const { toast } = useToast()
+  return toast(props)
+}

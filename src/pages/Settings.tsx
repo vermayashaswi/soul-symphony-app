@@ -27,6 +27,7 @@ import { Checkbox } from "@/components/ui/checkbox";
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { useTutorialNavigation } from '@/hooks/use-tutorial-navigation';
 
 interface SettingItemProps {
   icon: React.ElementType;
@@ -104,6 +105,7 @@ export default function Settings() {
   ];
 
   const { resetTutorial } = useTutorial();
+  const { prepareForReset } = useTutorialNavigation();
 
   useEffect(() => {
     const calculateMaxStreak = async () => {
@@ -392,20 +394,20 @@ export default function Settings() {
     setShowColorPicker(false);
   };
 
-  // Updated resetTutorialHandler to include navigation
+  // Updated resetTutorialHandler to use our improved tutorial navigation
   const handleRestartTutorial = async () => {
     try {
-      // First reset the tutorial state
+      // First prepare the navigation system for a reset
+      prepareForReset();
+      
+      // Then reset the tutorial state
       await resetTutorial();
       
       // Show success toast
       toast.success(<TranslatableText text="Tutorial restarted successfully!" forceTranslate={true} />);
       
-      // Navigate to the home page where the tutorial will start
-      // Short delay to ensure tutorial state is properly reset before navigation
-      setTimeout(() => {
-        navigate('/app/journal');
-      }, 100);
+      // Navigate is now handled by the tutorial navigation system
+      // The hook will automatically navigate to the first step
     } catch (error) {
       console.error('Error restarting tutorial:', error);
       toast.error(<TranslatableText text="Failed to restart tutorial. Please try again." forceTranslate={true} />);
