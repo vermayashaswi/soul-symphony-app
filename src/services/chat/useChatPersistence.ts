@@ -81,8 +81,7 @@ export function useChatPersistence(queryClient: QueryClient) {
       console.error("Error creating thread:", error);
       toast({
         title: "Error",
-        description: "Failed to create a new conversation thread.",
-        variant: "destructive"
+        description: "Failed to create a new conversation thread."
       });
       return null;
     } finally {
@@ -150,8 +149,7 @@ export function useChatPersistence(queryClient: QueryClient) {
       console.error("Error loading thread:", error);
       toast({
         title: "Error",
-        description: "Failed to load conversation thread.",
-        variant: "destructive"
+        description: "Failed to load conversation thread."
       });
     } finally {
       setLoading(false);

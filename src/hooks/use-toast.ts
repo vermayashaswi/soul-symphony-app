@@ -3,6 +3,7 @@ import { useState, useCallback } from 'react';
 import { toast as sonnerToast } from 'sonner';
 
 export interface ToastProps {
+  id?: string;  // Added id property
   title?: string;
   description?: string;
   action?: React.ReactNode;
