@@ -281,24 +281,36 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   }, [step.id, renderKey]);
   
-  // Handle navigation actions with stopPropagation to ensure they work
+  // Handle navigation actions with improved click capturing
   const handleNext = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
-    console.log(`Tutorial: Next button clicked for step ${step.id}`);
-    onNext();
+    console.log(`[DEBUG] Next button clicked for step ${step.id}, applying stopPropagation`);
+    if (e && e.stopPropagation) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
+    console.log(`Tutorial: Next button clicked for step ${step.id}, calling onNext function`);
+    
+    // Directly call onNext with a small timeout to ensure event loop is clear
+    setTimeout(() => {
+      onNext();
+      console.log(`onNext function called for step ${step.id}`);
+    }, 10);
   };
   
   const handlePrev = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (e && e.stopPropagation) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     console.log(`Tutorial: Previous button clicked for step ${step.id}`);
     onPrev();
   };
   
   const handleSkip = (e: React.MouseEvent) => {
-    e.preventDefault();
-    e.stopPropagation();
+    if (e && e.stopPropagation) {
+      e.preventDefault();
+      e.stopPropagation();
+    }
     console.log("Tutorial: Skip button clicked");
     onSkip();
   };
@@ -360,11 +372,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           variant="ghost" 
           size="sm" 
           className="h-8 w-8 p-0 text-white hover:text-white/90" 
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            onSkip();
-          }}
+          onClick={handleSkip}
         >
           <X className="h-4 w-4" />
         </Button>
@@ -376,18 +384,13 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       {/* Content */}
       <p className="text-sm text-white/80 mb-4">{step.content}</p>
       
-      {/* Navigation buttons with enhanced z-index and click handling */}
+      {/* Navigation buttons with enhanced click handling */}
       <div className="flex justify-between mt-2 tutorial-buttons">
         {!isFirst && (
           <Button 
             variant="outline" 
             size="sm" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log(`Back button clicked for step ${step.id}`);
-              onPrev();
-            }}
+            onClick={handlePrev}
             className="flex items-center gap-1 pointer-events-auto border-white/30 text-white hover:text-white/90 hover:bg-white/10"
           >
             <ChevronLeft className="h-4 w-4" />
@@ -401,13 +404,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           <Button 
             variant="default" 
             size="sm" 
-            onClick={(e) => {
-              e.preventDefault();
-              e.stopPropagation();
-              console.log(`Next button clicked for step ${step.id}`);
-              onNext();
-            }}
-            className="flex items-center gap-1 bg-theme hover:bg-theme/80 pointer-events-auto"
+            onClick={handleNext}
+            className="flex items-center gap-1 bg-theme hover:bg-theme/80 pointer-events-auto z-50"
+            data-testid="tutorial-next-button"
           >
             {isLast ? 'Finish' : 'Next'}
             {!isLast && <ChevronRight className="h-4 w-4" />}
