@@ -740,6 +740,11 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
   
+  // Define isNameStep before it's used in useSwipeGesture
+  const isFirstStep = currentStep === 0;
+  const isNameStep = currentStep === 6;
+  const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
+  
   useEffect(() => {
     setColorTheme('Calm');
   }, [setColorTheme]);
@@ -803,10 +808,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
 
   const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
   const currentStepData = ONBOARDING_STEPS[currentStep];
-  
-  const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
-  const isNameStep = currentStep === 6;
-  const isFirstStep = currentStep === 0;
 
   return (
     <div className="flex flex-col h-[100dvh] bg-background dark">
