@@ -6,7 +6,7 @@ type ToastProps = {
   description?: string;
   action?: React.ReactNode;
   variant?: "default" | "destructive" | "success";
-  duration?: number; // Add support for duration
+  duration?: number;
 };
 
 export function toast(props: ToastProps) {
