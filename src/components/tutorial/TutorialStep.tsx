@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -125,6 +124,38 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             transform: 'translateX(-50%)' 
           });
         }
+      } else if (step.id === 4) {
+        // For step 4 - find the Past Entries tab
+        console.log("Calculating position for step 4...");
+        
+        const entriesTab = document.querySelector('[value="entries"]');
+        
+        if (entriesTab) {
+          const rect = entriesTab.getBoundingClientRect();
+          console.log("Past Entries tab rect for step 4:", rect);
+          
+          // Add tutorial target class to ensure visibility
+          entriesTab.classList.add('tutorial-target');
+          
+          // Position below the tab
+          setPosition({
+            top: rect.bottom + 20,
+            left: rect.left + (rect.width / 2),
+            transform: 'translateX(-50%)'
+          });
+          console.log("Positioned step 4 popup below Past Entries tab at:", {
+            top: rect.bottom + 20,
+            left: rect.left + (rect.width / 2)
+          });
+        } else {
+          console.warn("Could not find Past Entries tab for step 4, using fallback position");
+          // Fallback position
+          setPosition({ 
+            top: 120, 
+            left: '75%', // Position toward the right side where Past Entries tab would be
+            transform: 'translateX(-50%)' 
+          });
+        }
       } else if (step.targetElement) {
         // Generic positioning for other steps
         const targetElement = document.querySelector(step.targetElement);
@@ -226,6 +257,14 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             element.classList.remove('tutorial-target', 'record-entry-tab');
           }
         });
+      }
+      
+      // Clean up step 4 specific elements
+      if (step.id === 4) {
+        const entriesTab = document.querySelector('[value="entries"]');
+        if (entriesTab) {
+          entriesTab.classList.remove('tutorial-target');
+        }
       }
     };
   }, [step.id, step.targetElement, step.position]);

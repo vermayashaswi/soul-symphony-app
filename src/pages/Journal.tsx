@@ -1016,7 +1016,14 @@ const Journal = () => {
               className="mt-6"
             >
               <TabsList className="grid w-full grid-cols-2 mb-6">
-                <TabsTrigger value="record"><TranslatableText text="Record Entry" /></TabsTrigger>
+                <TabsTrigger 
+                  value="record" 
+                  className="tutorial-record-entry-button record-entry-tab"
+                  data-tutorial-target="record-entry"
+                  id="new-entry-button"
+                >
+                  <TranslatableText text="Record Entry" />
+                </TabsTrigger>
                 <TabsTrigger value="entries"><TranslatableText text="Past Entries" /></TabsTrigger>
               </TabsList>
               

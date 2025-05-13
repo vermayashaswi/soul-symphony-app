@@ -114,6 +114,21 @@ button[data-tutorial-target="record-entry"].tutorial-target,
   isolation: isolate !important;
 }
 
+/* Past Entries tab highlighting for tutorial step 4 */
+[value="entries"].tutorial-target,
+.entries-tab.tutorial-target {
+  z-index: 10000 !important;
+  position: relative !important;
+  box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7) !important;
+  animation: tab-pulse 2s infinite alternate !important;
+  border-radius: 0.5rem;
+  pointer-events: auto !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: flex !important;
+  isolation: isolate !important;
+}
+
 /* Specific styling for step 3 - more prominent highlight */
 .record-entry-tab.tutorial-target,
 .tutorial-record-entry-button.tutorial-target,
@@ -126,6 +141,18 @@ button[data-tutorial-target="record-entry"].tutorial-target,
   outline: 2px solid white !important;
   opacity: 1 !important;
   transform: translateZ(0) !important; /* Force a new stacking context */
+}
+
+/* Specific styling for step 4 - more prominent highlight */
+.entries-tab.tutorial-target,
+[value="entries"].tutorial-target {
+  z-index: 10000 !important;
+  position: relative !important;
+  box-shadow: 0 0 20px 10px var(--color-theme) !important; 
+  animation: strong-tab-pulse 1.5s infinite alternate !important;
+  outline: 2px solid white !important;
+  opacity: 1 !important;
+  transform: translateZ(0) !important;
 }
 
 /* Force elements to be visible and clickable even with overlay */

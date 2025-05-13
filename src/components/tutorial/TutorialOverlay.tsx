@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -13,6 +12,11 @@ const RECORD_ENTRY_SELECTORS = [
   'button[data-tutorial-target="record-entry"]',
   '#new-entry-button',
   '.record-entry-button'
+];
+
+const ENTRIES_TAB_SELECTORS = [
+  '[value="entries"]',
+  '.entries-tab'
 ];
 
 const TutorialOverlay: React.FC = () => {
@@ -100,6 +104,15 @@ const TutorialOverlay: React.FC = () => {
         // Ensure we're on the journal page for step 3
         if (location.pathname === '/app/journal') {
           cleanup = handleRecordEntryVisibility();
+        } else {
+          console.log('TutorialOverlay - Not on journal page yet, will navigate there');
+          navigate('/app/journal');
+        }
+        break;
+      case 4:
+        console.log('TutorialOverlay - Step 4 detected, current path:', location.pathname);
+        if (location.pathname === '/app/journal') {
+          cleanup = handleEntriesTabVisibility();
         } else {
           console.log('TutorialOverlay - Not on journal page yet, will navigate there');
           navigate('/app/journal');
@@ -271,6 +284,74 @@ const TutorialOverlay: React.FC = () => {
       console.warn("Could not find Record Entry element for tutorial step 3 with any selector");
       return false;
     }
+  };
+
+  // Handle step 4 - Past Entries tab visibility
+  const handleEntriesTabVisibility = () => {
+    console.log('TutorialOverlay - Setting up Past Entries tab visibility for step 4');
+    
+    // Delay searching for elements to ensure they've loaded
+    const searchTimeout = setTimeout(() => {
+      // Log all possible elements in the DOM for debugging
+      console.log('Checking for Past Entries tab elements:');
+      ENTRIES_TAB_SELECTORS.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        console.log(`  - ${selector}: ${elements.length} elements found`);
+        elements.forEach((el, i) => {
+          const rect = (el as HTMLElement).getBoundingClientRect();
+          console.log(`    Element ${i} rect:`, rect);
+        });
+      });
+      
+      let entriesTabElement = null;
+      
+      // Try each selector until we find a match
+      for (const selector of ENTRIES_TAB_SELECTORS) {
+        const elements = document.querySelectorAll(selector);
+        if (elements.length > 0) {
+          entriesTabElement = elements[0];
+          console.log(`Found Past Entries tab element with selector: ${selector}`, entriesTabElement);
+          break;
+        }
+      }
+      
+      if (entriesTabElement) {
+        console.log("Enhancing Past Entries tab visibility for tutorial step 4", entriesTabElement);
+        
+        // Add tutorial target class to make the element visible through overlay
+        entriesTabElement.classList.add('tutorial-target');
+        entriesTabElement.classList.add('entries-tab');
+        
+        // Add enhanced highlighting for better visibility
+        entriesTabElement.classList.add('tutorial-highlight');
+        
+        // Force the element to be visible with inline styles
+        const elementStyle = entriesTabElement as HTMLElement;
+        elementStyle.style.visibility = 'visible';
+        elementStyle.style.opacity = '1';
+        elementStyle.style.pointerEvents = 'auto';
+        elementStyle.style.position = 'relative';
+        elementStyle.style.zIndex = '10000';
+        
+        console.log("Added classes and styles to Past Entries tab element");
+      } else {
+        console.warn("Could not find Past Entries tab element for tutorial step 4 with any selector");
+      }
+    }, 500);
+    
+    // Clean up when step changes
+    return () => {
+      clearTimeout(searchTimeout);
+      console.log("Cleaning up Past Entries tab element styles");
+      
+      // Remove classes from all possible elements
+      ENTRIES_TAB_SELECTORS.forEach(selector => {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(element => {
+          element.classList.remove('tutorial-target', 'entries-tab', 'tutorial-highlight');
+        });
+      });
+    };
   };
 
   if (!isActive) return null;

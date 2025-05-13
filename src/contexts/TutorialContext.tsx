@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -71,6 +70,17 @@ const initialTutorialSteps: TutorialStep[] = [
     showSkipButton: true,
     navigateTo: '/app/journal', // Navigate to journal page for this step
     waitForElement: true // Wait for the element to be present before proceeding
+  },
+  {
+    id: 4,
+    title: 'Your Journal History',
+    content: 'View and explore all your past journal entries here. You can search, filter, and reflect on your emotional journey over time.',
+    targetElement: '[value="entries"]', // Target the Past Entries tab
+    position: 'bottom',
+    showNextButton: true,
+    showSkipButton: true,
+    navigateTo: '/app/journal',
+    waitForElement: true
   }
   // More steps can be added here
 ];
