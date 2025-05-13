@@ -9,27 +9,60 @@ type ToastProps = {
   duration?: number;
   position?: 'top-right' | 'top-center' | 'top-left' | 'bottom-right' | 'bottom-center' | 'bottom-left';
   important?: boolean;
+  variant?: 'default' | 'destructive' | 'success' | 'warning';
 };
+
+// Store toasts for the Toaster component to access
+const toasts: { id: string | number; title: string; description?: string; action?: React.ReactNode }[] = [];
 
 export const toast = (props: ToastProps | string) => {
   if (typeof props === 'string') {
     // Simple string toast
-    return sonnerToast(props);
+    const id = sonnerToast(props);
+    toasts.push({ id, title: props });
+    return id;
   }
 
   // Object style toast
-  const { title, description, action, cancel, duration, position, important } = props;
+  const { title, description, action, cancel, duration, position, important, variant } = props;
   
-  return sonnerToast(title || '', {
+  let variantClass = '';
+  if (variant === 'destructive') {
+    variantClass = 'destructive';
+  } else if (variant === 'success') {
+    variantClass = 'success';
+  } else if (variant === 'warning') {
+    variantClass = 'warning';
+  }
+  
+  const id = sonnerToast(title || '', {
     description,
     action,
     cancel,
     duration,
     position,
-    important
+    important,
+    className: variantClass ? `toast-${variantClass}` : undefined,
   });
+
+  // Store the toast for the Toaster component
+  toasts.push({
+    id,
+    title: title || '',
+    description,
+    action
+  });
+
+  return id;
 };
 
 export const useToast = () => {
-  return { toast };
+  return {
+    toast,
+    toasts,
+    dismiss: sonnerToast.dismiss,
+    error: (message: string) => toast({ title: 'Error', description: message, variant: 'destructive' }),
+    success: (message: string) => toast({ title: 'Success', description: message, variant: 'success' }),
+    warning: (message: string) => toast({ title: 'Warning', description: message, variant: 'warning' })
+  };
 };

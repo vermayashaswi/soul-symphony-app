@@ -21,7 +21,7 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
+      {Array.isArray(toasts) && toasts.map(function ({ id, title, description, action, ...props }) {
         // Extract any properties that shouldn't be passed to the Toast component
         const { variant, type, onOpenChange, ...restProps } = props as any;
         
