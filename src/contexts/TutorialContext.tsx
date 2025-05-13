@@ -155,6 +155,12 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
         // Force document body class for styling
         document.body.classList.add('tutorial-active');
         
+        // Enable scrolling to prevent page from being frozen
+        document.body.style.overflow = 'auto';
+        document.body.style.height = 'auto';
+        document.documentElement.style.overflow = 'auto';
+        document.documentElement.style.height = 'auto';
+        
         setIsActive(true);
         resolve();
       }, 50);
@@ -187,8 +193,26 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   useEffect(() => {
     return () => {
       document.body.classList.remove('tutorial-active');
+      
+      // Reset overflow settings on unmount
+      document.body.style.overflow = 'auto';
+      document.body.style.height = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.documentElement.style.height = 'auto';
     };
   }, []);
+
+  // Add effect to ensure proper body styles
+  useEffect(() => {
+    if (isActive) {
+      document.body.classList.add('tutorial-active');
+      // Enable scrolling
+      document.body.style.overflow = 'auto';
+      document.body.style.height = 'auto';
+    } else {
+      document.body.classList.remove('tutorial-active');
+    }
+  }, [isActive]);
 
   // Provide the context value
   return (

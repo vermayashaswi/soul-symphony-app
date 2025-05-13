@@ -392,6 +392,26 @@ export default function Settings() {
     setShowColorPicker(false);
   };
 
+  // Updated resetTutorialHandler to include navigation
+  const handleRestartTutorial = async () => {
+    try {
+      // First reset the tutorial state
+      await resetTutorial();
+      
+      // Show success toast
+      toast.success(<TranslatableText text="Tutorial restarted successfully!" forceTranslate={true} />);
+      
+      // Navigate to the home page where the tutorial will start
+      // Short delay to ensure tutorial state is properly reset before navigation
+      setTimeout(() => {
+        navigate('/app/journal');
+      }, 100);
+    } catch (error) {
+      console.error('Error restarting tutorial:', error);
+      toast.error(<TranslatableText text="Failed to restart tutorial. Please try again." forceTranslate={true} />);
+    }
+  };
+
   return (
     <div className="min-h-screen pb-20">
       <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
@@ -755,7 +775,7 @@ export default function Settings() {
               <Button 
                 variant="outline" 
                 className="gap-2 border-theme-color text-theme-color hover:bg-theme-color/10" 
-                onClick={resetTutorial}
+                onClick={handleRestartTutorial}
               >
                 <RefreshCw className="h-4 w-4" />
                 <TranslatableText text="Restart Tutorial" />

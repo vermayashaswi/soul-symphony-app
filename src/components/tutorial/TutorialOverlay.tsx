@@ -11,6 +11,7 @@ import { Separator } from '@/components/ui/separator';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTheme } from '@/hooks/use-theme';
 import { toast } from 'sonner';
+import { useTutorialNavigation } from '@/hooks/use-tutorial-navigation';
 
 // Define the steps for the tutorial
 const tutorialSteps = [
@@ -88,6 +89,9 @@ const tutorialSteps = [
 
 // Define the TutorialOverlay component
 const TutorialOverlay: React.FC = () => {
+  // Use the tutorial navigation hook to ensure we're on the right page
+  useTutorialNavigation();
+  
   const { 
     currentStep, 
     startTutorial, 
