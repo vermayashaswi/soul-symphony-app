@@ -1,11 +1,11 @@
+
 import React, { useState, useEffect } from 'react';
 import { ChatMessage as ChatMessageType } from '@/services/chat';
 import { Loader2, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { Json } from '@/integrations/supabase/types';
-import { JournalEntryReference } from '@/types/journal';
+import { Json, JournalEntryReference } from '@/types/journal';
 
 // Helper function to extract reference date info
 const extractReferenceDateInfo = (dateStr: string) => {
@@ -52,7 +52,8 @@ const ChatMessage = ({
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(true);
   const isAssistant = message.role === 'assistant';
-  const isError = message.role === 'error' || message.role === 'assistant' && message.content.toLowerCase().includes('error');
+  // Fix the error by checking if message.role is 'error' as a string
+  const isError = message.role === 'error' || (message.role === 'assistant' && message.content.toLowerCase().includes('error'));
   const hasReferences = message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0;
   const hasAnalysis = message.analysis_data && typeof message.analysis_data === 'object' && Object.keys(message.analysis_data as object).length > 0;
   const maxReferencesToShowCollapsed = 2;

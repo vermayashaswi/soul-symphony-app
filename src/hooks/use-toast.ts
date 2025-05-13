@@ -1,4 +1,3 @@
-
 import * as React from "react"
 import { toast as sonnerToast, type ToastT } from "sonner"
 
@@ -11,6 +10,7 @@ type ToasterToast = ToastT & {
   description?: React.ReactNode
   action?: React.ReactNode
   variant?: "default" | "destructive"  // Add variant prop
+  onOpenChange?: (open: boolean) => void  // Add this property to fix the type error
 }
 
 const actionTypes = {
@@ -152,11 +152,13 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
-      // Removed 'open: true' as it's not in ToasterToast
+      // Remove 'open: true' as it's not in ToasterToast
       onOpenChange: (open: boolean) => {
         if (!open) {
           dismiss()
         }
+        // Call the original onOpenChange if it exists
+        props.onOpenChange?.(open)
       },
     },
   })
