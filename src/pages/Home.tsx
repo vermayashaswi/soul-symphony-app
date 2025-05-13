@@ -76,7 +76,7 @@ const Home = () => {
       {/* Background elements including animations */}
       <BackgroundElements />
 
-      {/* Central navigation button - positioning is now entirely managed in the component */}
+      {/* Central navigation button - positioned in the center of the screen */}
       <JournalNavigationButton />
 
       {/* Journal content with summary and quote */}

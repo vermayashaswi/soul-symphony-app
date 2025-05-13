@@ -44,8 +44,6 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, []);
 
-  // Ensure the button is centered in the viewport without any parent influence
-  // Using the most reliable positioning method to guarantee exact centering
   return (
     <div 
       className={`journal-arrow-button ${isInArrowTutorialStep ? 'tutorial-target' : ''}`}
@@ -60,6 +58,11 @@ const JournalNavigationButton: React.FC = () => {
         pointerEvents: 'auto',
         visibility: 'visible',
         opacity: 1,
+        display: 'flex',
+        justifyContent: 'center',
+        alignItems: 'center',
+        width: 'auto',
+        height: 'auto',
       }}
       data-testid="journal-arrow-button"
       ref={buttonRef}

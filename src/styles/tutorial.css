@@ -1,4 +1,3 @@
-
 /* Tutorial Overlay Styles */
 .tutorial-target {
   position: relative !important;
@@ -85,7 +84,25 @@ body.tutorial-active {
   overflow: visible !important;
 }
 
+/* Enhanced styling for the central arrow button - ensure it stays centered */
+.journal-arrow-button {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 40;
+  visibility: visible !important;
+  opacity: 1 !important;
+  display: flex !important;
+  justify-content: center !important;
+  align-items: center !important;
+}
+
 /* Enhanced button glow effect with enhanced visibility */
+.journal-arrow-button.tutorial-target {
+  z-index: 9999 !important;
+}
+
 .tutorial-button-highlight {
   box-shadow: 0 0 30px 15px var(--color-theme) !important;
   animation: button-pulse 2s infinite alternate !important;

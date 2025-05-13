@@ -48,26 +48,23 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         });
         console.log("Positioned step 1 popup in exact center of screen");
       } else if (step.id === 2) {
-        // For step 2 - position the popup above the arrow button
+        // For step 2 - position the popup above the arrow button but keep the button centered
         const arrowButton = document.querySelector('.journal-arrow-button');
         if (arrowButton) {
           const rect = arrowButton.getBoundingClientRect();
           console.log("Arrow button rect for step 2:", rect);
           
-          // Position well above the arrow button
+          // Position above the center without affecting button's position
           setPosition({
-            top: Math.max(rect.top - 250, 20), // At least 20px from top
-            left: '50%', // Center horizontally using percentage
+            top: Math.max(120, window.innerHeight * 0.25), // Position in top 25% of screen
+            left: '50%', // Center horizontally
             right: undefined,
             transform: 'translateX(-50%)'
           });
-          console.log("Positioned step 2 popup above arrow button at", {
-            top: Math.max(rect.top - 250, 20),
-            left: '50%'
-          });
+          console.log("Positioned step 2 popup above arrow button without affecting button position");
         } else {
           // Fallback if button not found
-          setPosition({ top: 140, left: '50%', transform: 'translateX(-50%)' });
+          setPosition({ top: 120, left: '50%', transform: 'translateX(-50%)' });
           console.log("Arrow button not found for step 2, using fallback position");
         }
       } else if (step.id === 3) {
