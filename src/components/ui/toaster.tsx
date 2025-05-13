@@ -1,23 +1,19 @@
 
-"use client"
-
-import {
-  Toast,
-  ToastClose,
-  ToastDescription,
-  ToastProvider,
-  ToastTitle,
-  ToastViewport,
-} from "@/components/ui/toast"
-import { useTheme } from "@/hooks/use-theme"
-import { useToast } from "@/hooks/use-toast"
+// This component is responsible for rendering toast notifications
+import { Toast, ToastClose, ToastDescription, ToastProvider, ToastTitle, ToastViewport } from "@/components/ui/toast";
+import { useToast } from "@/hooks/use-toast";
 
 export function Toaster() {
-  const { toasts } = useToast()
-  const { theme, systemTheme } = useTheme();
-  
-  // Determine dark mode based on theme settings
-  const isDarkMode = theme === 'dark' || (theme === 'system' && systemTheme === 'dark');
+  const { toasts } = useToast();
+
+  // Adding a fallback for when toasts is undefined
+  if (!toasts || !Array.isArray(toasts)) {
+    return (
+      <ToastProvider>
+        <ToastViewport />
+      </ToastProvider>
+    );
+  }
 
   return (
     <ToastProvider>
@@ -26,15 +22,7 @@ export function Toaster() {
         const { variant, type, onOpenChange, ...restProps } = props as any;
         
         return (
-          <Toast 
-            key={id} 
-            {...restProps} 
-            className={
-              isDarkMode
-                ? "bg-theme border-white/10 text-black shadow-lg"
-                : ""
-            }
-          >
+          <Toast key={id} {...restProps}>
             <div className="grid gap-1">
               {title && <ToastTitle>{title}</ToastTitle>}
               {description && (
@@ -44,9 +32,9 @@ export function Toaster() {
             {action}
             <ToastClose />
           </Toast>
-        )
+        );
       })}
       <ToastViewport />
     </ToastProvider>
-  )
+  );
 }

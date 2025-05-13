@@ -1,7 +1,8 @@
 
 import { toast as sonnerToast } from 'sonner';
 
-type ToastProps = {
+// Define the props that can be passed to the toast function
+export type ToastProps = {
   title?: string;
   description?: string;
   action?: React.ReactNode;

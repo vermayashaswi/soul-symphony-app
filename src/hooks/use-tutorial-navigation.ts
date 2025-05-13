@@ -1,4 +1,4 @@
-import { useEffect, useRef } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useTutorial } from '@/contexts/TutorialContext';
 
@@ -13,11 +13,26 @@ export function useTutorialNavigation() {
   const location = useLocation();
   const lastNavigationRef = useRef<string | null>(null);
   const navigationAttempts = useRef<number>(0);
+  const [userInitiatedNavigation, setUserInitiatedNavigation] = useState<boolean>(false);
+  const lastPathRef = useRef<string>(location.pathname);
+
+  // Track whether the user has manually navigated away from the tutorial path
+  useEffect(() => {
+    if (lastPathRef.current !== location.pathname) {
+      // If the path has changed and it wasn't due to our automatic navigation
+      if (!lastNavigationRef.current || !lastNavigationRef.current.includes(location.pathname)) {
+        setUserInitiatedNavigation(true);
+        console.log('User initiated navigation detected to', location.pathname);
+      }
+      lastPathRef.current = location.pathname;
+    }
+  }, [location.pathname]);
 
   useEffect(() => {
     // Reset navigation attempts when step changes or tutorial activates/deactivates
     if (currentStep !== undefined) {
       navigationAttempts.current = 0;
+      setUserInitiatedNavigation(false);
     }
   }, [currentStep, isActive]);
   
@@ -28,6 +43,17 @@ export function useTutorialNavigation() {
     const currentPath = location.pathname;
     const targetStep = steps[currentStep];
     
+    // If the user has explicitly navigated away, don't force them back
+    if (userInitiatedNavigation) {
+      console.log('Allowing user to stay at', currentPath, 'despite tutorial target', targetStep.navigateTo);
+      return;
+    }
+    
+    // If this isn't a navigation step or we're already on the right path, do nothing
+    if (!targetStep.navigateTo || currentPath === targetStep.navigateTo) {
+      return;
+    }
+    
     // Prevent navigation loops - if we've recently navigated to this path for this step,
     // or if we've attempted to navigate too many times, don't force navigation
     if (lastNavigationRef.current === `${currentStep}-${targetStep.navigateTo}`) {
@@ -36,28 +62,26 @@ export function useTutorialNavigation() {
     
     // If we've tried to navigate too many times for this step, don't force any more navigations
     // This prevents deadlocks where the app keeps trying to navigate to a path
-    if (navigationAttempts.current > 5) {
-      console.warn('Too many navigation attempts for tutorial step', currentStep);
+    if (navigationAttempts.current > 3) {
+      console.warn('Too many navigation attempts for tutorial step', currentStep, 'giving up');
       return;
     }
     
-    // If this step has a specific page it should display on
-    if (targetStep.navigateTo && currentPath !== targetStep.navigateTo) {
-      console.log(`Tutorial navigation: Moving to ${targetStep.navigateTo} for step ${currentStep + 1}`);
-      
-      // Track this navigation attempt
-      lastNavigationRef.current = `${currentStep}-${targetStep.navigateTo}`;
-      navigationAttempts.current += 1;
-      
-      // Navigate to the target path
-      navigate(targetStep.navigateTo);
-      
-      // Reset the tracking after a delay to allow for possible manual navigation
-      setTimeout(() => {
-        lastNavigationRef.current = null;
-      }, 2000);
-    }
-  }, [isActive, currentStep, steps, navigate, location.pathname]);
+    // Navigate to the target path
+    console.log(`Tutorial navigation: Moving to ${targetStep.navigateTo} for step ${currentStep + 1}`);
+    
+    // Track this navigation attempt
+    lastNavigationRef.current = `${currentStep}-${targetStep.navigateTo}`;
+    navigationAttempts.current += 1;
+    
+    // Navigate to the target path
+    navigate(targetStep.navigateTo);
+    
+    // Reset the tracking after a delay to allow for possible manual navigation
+    setTimeout(() => {
+      lastNavigationRef.current = null;
+    }, 2000);
+  }, [isActive, currentStep, steps, navigate, location.pathname, userInitiatedNavigation]);
   
   return null;
 }
