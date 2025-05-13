@@ -21,11 +21,11 @@ export interface TutorialContextProps {
   prevStep: () => void;
   startTutorial: () => void;
   skipTutorial: () => void;
-  resetTutorial: () => void;
-  endTutorial: () => void; // Added missing property
-  markStepAsComplete: (step: number) => void; // Added missing property
-  isTutorialActive: boolean; // Added missing property
-  isStepComplete: (step: number) => boolean; // Added missing property
+  resetTutorial: () => Promise<void>;
+  endTutorial: () => Promise<void>; 
+  markStepAsComplete: (step: number) => void;
+  isTutorialActive: boolean;
+  isStepComplete: (step: number) => boolean;
 }
 
 // Create the context with a default value
@@ -38,11 +38,11 @@ export const TutorialContext = createContext<TutorialContextProps>({
   prevStep: () => {},
   startTutorial: () => {},
   skipTutorial: () => {},
-  resetTutorial: () => {},
-  endTutorial: () => {}, // Added missing property
-  markStepAsComplete: () => {}, // Added missing property
-  isTutorialActive: false, // Added missing property
-  isStepComplete: () => false, // Added missing property
+  resetTutorial: () => Promise.resolve(),
+  endTutorial: () => Promise.resolve(),
+  markStepAsComplete: () => {},
+  isTutorialActive: false,
+  isStepComplete: () => false,
 });
 
 // Create the provider component
@@ -119,25 +119,55 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   };
 
   const startTutorial = () => {
+    // Force document body class for styling
+    document.body.classList.add('tutorial-active');
+    
+    console.log('Starting tutorial');
     setIsActive(true);
     setCurrentStep(0);
+    
+    // Reset completed steps when starting fresh
+    setCompletedSteps(new Set());
   };
 
   const skipTutorial = () => {
+    document.body.classList.remove('tutorial-active');
+    
+    console.log('Skipping tutorial');
     setIsActive(false);
     setCurrentStep(0);
+    
+    // Clear completed steps when skipping
+    setCompletedSteps(new Set());
   };
   
-  const resetTutorial = () => {
-    setIsActive(true);
-    setCurrentStep(0);
-    return Promise.resolve();
-  };
-  
-  // Added missing functions
-  const endTutorial = () => {
+  const resetTutorial = async () => {
+    console.log('Resetting tutorial');
+    
+    // First ensure we're not active before restarting
     setIsActive(false);
     setCurrentStep(0);
+    setCompletedSteps(new Set());
+    
+    // Short delay to ensure clean reset before starting again
+    return new Promise<void>((resolve) => {
+      setTimeout(() => {
+        // Force document body class for styling
+        document.body.classList.add('tutorial-active');
+        
+        setIsActive(true);
+        resolve();
+      }, 50);
+    });
+  };
+  
+  const endTutorial = async () => {
+    document.body.classList.remove('tutorial-active');
+    
+    console.log('Ending tutorial');
+    setIsActive(false);
+    setCurrentStep(0);
+    
     return Promise.resolve();
   };
   
@@ -152,6 +182,13 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   const isStepComplete = (step: number) => {
     return completedSteps.has(step);
   };
+  
+  // Clean up body class when component unmounts
+  useEffect(() => {
+    return () => {
+      document.body.classList.remove('tutorial-active');
+    };
+  }, []);
 
   // Provide the context value
   return (

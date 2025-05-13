@@ -51,19 +51,34 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
-    // Check for onboarding path
-    const isOnboardingPath = location.pathname.includes('/app/onboarding');
+    // More comprehensive check for onboarding paths with any segments
+    const isOnboardingPath = location.pathname.includes('/onboarding') || 
+                            location.pathname.includes('/app/onboarding');
+    
+    // Extended list of paths where navigation should be hidden
+    const hiddenPaths = [
+      '/app/onboarding',
+      '/app/auth',
+      '/onboarding',
+      '/auth'
+    ];
+    
+    const shouldHideForSpecificPath = hiddenPaths.some(path => 
+      location.pathname.startsWith(path) || location.pathname === path
+    );
     
     // Only show navigation when:
     // 1. Device is mobile or it's a native app
     // 2. Keyboard is not visible
-    // 3. User is not in onboarding
-    // 4. Onboarding is complete
+    // 3. User is not in onboarding (check path AND onboarding status)
+    // 4. Onboarding is explicitly complete (true, not null or false)
+    // 5. Not on any hidden paths
     const shouldShowNav = 
       (isMobile || isNativeApp()) && 
       !isKeyboardVisible && 
       !isOnboardingPath &&
-      onboardingComplete !== false; // null or true is fine, false means still in onboarding
+      !shouldHideForSpecificPath &&
+      onboardingComplete === true; // Explicit check for true, not truthy
     
     console.log('MobileNavigation visibility check:', { 
       shouldShowNav, 
@@ -72,24 +87,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       path: location.pathname,
       isKeyboardVisible,
       isOnboardingPath,
-      onboardingComplete
+      onboardingComplete,
+      shouldHideForSpecificPath
     });
     
     setIsVisible(shouldShowNav);
   }, [location.pathname, isMobile, isKeyboardVisible, onboardingComplete]);
   
   if (!isVisible) {
-    return null;
-  }
-  
-  // Additional routes to hide navigation
-  const hiddenRoutes = ['/app/auth', '/app/onboarding'];
-  
-  if (!onboardingComplete && location.pathname === '/app') {
-    return null;
-  }
-  
-  if (hiddenRoutes.includes(location.pathname)) {
     return null;
   }
   

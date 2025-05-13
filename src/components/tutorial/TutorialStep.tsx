@@ -150,369 +150,174 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   // Calculate position based on target element with retry and enhanced logging
   // Also ensure popup stays within viewport
   useEffect(() => {
-    // Function to calculate position with enhanced logging
-    const calculatePosition = () => {
-      // Handle step 1 positioning - Always force center positioning
-      if (step.id === 1) {
-        // For step 1 - position the popup exactly in center of screen
-        setPosition({
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)'
-        });
-        console.log("Positioned step 1 popup in exact center of screen");
-      } 
-      // Handle step 2 positioning for arrow button
-      else if (step.id === 2) {
-        // For step 2 - position the popup above the arrow button but keep the button centered
-        const arrowButton = document.querySelector('.journal-arrow-button');
-        if (arrowButton) {
-          const rect = arrowButton.getBoundingClientRect();
-          console.log("Arrow button rect for step 2:", rect);
-          
-          // Position above the center without affecting button's position
-          const calculatedPos = {
-            top: Math.max(120, window.innerHeight * 0.25), // Position in top 25% of screen
-            left: '50%', // Center horizontally
-            right: undefined,
-            transform: 'translateX(-50%)'
-          };
-          
-          setPosition(ensureWithinViewport(calculatedPos));
-          console.log("Positioned step 2 popup above arrow button without affecting button position");
-        } else {
-          // Fallback if button not found
-          const fallbackPos = { top: 120, left: '50%', transform: 'translateX(-50%)' };
-          setPosition(ensureWithinViewport(fallbackPos));
-          console.log("Arrow button not found for step 2, using fallback position");
-        }
-      } 
-      // Handle step 3 positioning for record entry button
-      else if (step.id === 3) {
-        // For step 3 - find the record entry button with multiple selectors
-        console.log("Calculating position for step 3...");
-        
-        // Try multiple selectors to find the element
-        const selectors = [
-          '.tutorial-record-entry-button',
-          '[data-value="record"]',
-          '.record-entry-tab',
-          'button[data-tutorial-target="record-entry"]',
-          '#new-entry-button'
-        ];
-        
-        let recordEntryElement = null;
-        let usedSelector = '';
-        
-        // Try each selector
-        for (const selector of selectors) {
-          const element = document.querySelector(selector);
-          if (element) {
-            recordEntryElement = element;
-            usedSelector = selector;
-            console.log(`Found step 3 target using selector: ${selector}`, element);
-            break;
+    // Initial timeout to ensure components are fully rendered before positioning
+    const initialTimeout = setTimeout(() => {
+      // Function to calculate position with enhanced logging
+      const calculatePosition = () => {
+        // Always center Step 1 popup
+        if (step.id === 1) {
+          console.log("Positioning step 1 in exact center");
+          // Add id for CSS targeting
+          if (stepRef.current) {
+            stepRef.current.id = 'tutorial-step-1-popup';
           }
-        }
-        
-        if (recordEntryElement) {
-          const rect = recordEntryElement.getBoundingClientRect();
-          console.log(`Step 3 element rect using ${usedSelector}:`, rect);
-          
-          // Ensure the element is visible by adding tutorial classes
-          recordEntryElement.classList.add('tutorial-target');
-          recordEntryElement.classList.add('record-entry-tab');
-          
-          // Position below and centered with the element
-          const calculatedPos = {
-            top: rect.bottom + 20, // Below the element
-            left: rect.left + (rect.width / 2),
-            transform: 'translateX(-50%)'
-          };
-          
-          // Enhanced viewport adjustment for step 3
-          const adjustedPos = ensureWithinViewport(calculatedPos);
-          setPosition(adjustedPos);
-          
-          console.log("Positioned step 3 popup at:", adjustedPos);
-        } else {
-          console.warn("Could not find record entry element for step 3, using fallback position");
-          // Fallback position - center of screen for better visibility
-          const fallbackPos = { 
-            top: '40%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)' 
-          };
-          
-          setPosition(ensureWithinViewport(fallbackPos));
-        }
-      } 
-      // Handle step 4 positioning for past entries tab
-      else if (step.id === 4) {
-        // For step 4 - find the Past Entries tab using the same approach as step 3 for consistency
-        console.log("Calculating position for step 4...");
-        
-        const selectors = [
-          '[value="entries"]',
-          '.entries-tab',
-          'button[data-tutorial-target="past-entries"]',
-          '#past-entries-button'
-        ];
-        
-        let entriesTabElement = null;
-        let usedSelector = '';
-        
-        // Try each selector
-        for (const selector of selectors) {
-          const element = document.querySelector(selector);
-          if (element) {
-            entriesTabElement = element;
-            usedSelector = selector;
-            console.log(`Found step 4 target using selector: ${selector}`, element);
-            break;
-          }
-        }
-        
-        if (entriesTabElement) {
-          const rect = entriesTabElement.getBoundingClientRect();
-          console.log(`Step 4 element rect using ${usedSelector}:`, rect);
-          
-          // Add tutorial target class to ensure visibility
-          entriesTabElement.classList.add('tutorial-target');
-          entriesTabElement.classList.add('entries-tab');
-          
-          // Mobile special positioning - on mobile devices, users may not see popups that are too low
-          const isMobile = window.innerWidth < 640;
-          let calculatedPos: PositionState;
-          
-          if (isMobile) {
-            // For mobile, position centered in the bottom half of screen for better visibility
-            calculatedPos = {
-              top: Math.min(rect.bottom + 20, window.innerHeight * 0.6), // No lower than 60% of screen height
-              left: '50%',
-              transform: 'translateX(-50%)'
-            };
-          } else {
-            // Desktop positioning - below the tab
-            calculatedPos = {
-              top: rect.bottom + 20,
-              left: rect.left + (rect.width / 2),
-              transform: 'translateX(-50%)'
-            };
-          }
-          
-          // Super-enhanced viewport adjustment specifically for step 4
-          // Force it up higher in the screen if at the bottom
-          const adjustedPos = { ...ensureWithinViewport(calculatedPos) };
-          
-          // Final adjustment to ensure it's visible - if still too low on screen, move it up
-          if (typeof adjustedPos.top === 'number' && adjustedPos.top > window.innerHeight * 0.7) {
-            adjustedPos.top = window.innerHeight * 0.5;
-            // Ensure it's centered horizontally for better visibility
-            adjustedPos.left = '50%'; 
-            adjustedPos.transform = 'translate(-50%, -50%)';
-          }
-          
-          setPosition(adjustedPos);
-          console.log("Positioned step 4 popup at:", adjustedPos);
-        } else {
-          console.warn("Could not find Past Entries tab for step 4, using fallback position");
-          // Fallback position - similar to step 3's fallback but adjusted for viewport
-          const fallbackPos = { 
-            top: '40%', 
-            left: '50%', 
-            transform: 'translate(-50%, -50%)' 
-          };
-          
-          setPosition(ensureWithinViewport(fallbackPos));
-        }
-      } 
-      // Handle generic positioning for other steps
-      else if (step.targetElement) {
-        // Generic positioning for other steps with viewport boundary checks
-        const targetElement = document.querySelector(step.targetElement);
-        
-        if (targetElement) {
-          const rect = targetElement.getBoundingClientRect();
-          console.log(`Target element found for step ${step.id}:`, rect);
-          
-          // Add tutorial target class to ensure visibility
-          targetElement.classList.add('tutorial-target');
-          
-          // Calculate position based on specified direction
-          let calculatedPos: PositionState = { top: 0, left: 0 };
-          
-          switch (step.position) {
-            case 'top':
-              calculatedPos = {
-                top: rect.top - (stepRef.current?.offsetHeight || 0) - 20,
-                left: rect.left + rect.width / 2,
-                transform: 'translateX(-50%)'
-              };
-              break;
-            case 'bottom':
-              calculatedPos = {
-                top: rect.bottom + 20,
-                left: rect.left + rect.width / 2,
-                transform: 'translateX(-50%)'
-              };
-              break;
-            case 'left':
-              calculatedPos = {
-                top: rect.top + rect.height / 2,
-                left: rect.left - (stepRef.current?.offsetWidth || 0) - 20,
-                transform: 'translateY(-50%)'
-              };
-              break;
-            case 'right':
-              calculatedPos = {
-                top: rect.top + rect.height / 2,
-                left: rect.right + 20,
-                transform: 'translateY(-50%)'
-              };
-              break;
-            default:
-              // Center over the element
-              calculatedPos = {
-                top: rect.top + rect.height / 2,
-                left: rect.left + rect.width / 2,
-                transform: 'translate(-50%, -50%)'
-              };
-          }
-          
-          // Ensure the popup stays within viewport bounds
-          setPosition(ensureWithinViewport(calculatedPos));
-        } else {
-          console.warn(`Target element not found for step ${step.id}, using fallback position`);
-          // Center in viewport if element not found
-          const fallbackPos = {
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)'
-          };
-          
-          setPosition(ensureWithinViewport(fallbackPos));
-        }
-      } else {
-        // Default center position for steps without target elements
-        setPosition({
-          top: '50%',
-          left: '50%',
-          transform: 'translate(-50%, -50%)'
-        });
-      }
-      
-      // Additional check for viewport bounds after all positioning is done
-      if (stepRef.current) {
-        setTimeout(() => {
-          const currentPos = { ...position };
-          const adjustedPos = ensureWithinViewport(currentPos);
-          
-          // Only update if there are changes needed
-          if (JSON.stringify(currentPos) !== JSON.stringify(adjustedPos)) {
-            console.log("Final position adjustment to ensure within viewport:", adjustedPos);
-            setPosition(adjustedPos);
-          }
-        }, 50);
-      }
-    };
-    
-    // Add special delay for first tutorial step to ensure proper rendering
-    if (step.id === 1) {
-      const initialDelay = setTimeout(() => {
-        console.log("Initial delay for step 1 complete, calculating position");
-        calculatePosition();
-        
-        // Add a secondary calculation after a longer delay for step 1
-        // This ensures the popup is properly positioned after all elements are fully rendered
-        setTimeout(() => {
-          console.log("Secondary positioning check for step 1");
+          // Force center position for first popup regardless of entry point
           setPosition({
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)'
           });
-        }, 300);
-      }, 100);
-      
-      return () => clearTimeout(initialDelay);
-    } else {
-      // Run initial calculation for other steps
-      calculatePosition();
-      
-      // Set up a secondary check after short delay to handle dynamic elements
-      const secondaryCheck = setTimeout(calculatePosition, 300);
-      
-      // Add a tertiary check for visibility
-      const tertiaryCheck = setTimeout(() => {
-        // Final forced position check - especially important for step 4
-        if (step.id === 4) {
-          console.log("Performing final position check for step 4");
-          if (stepRef.current) {
-            const rect = stepRef.current.getBoundingClientRect();
-            console.log("Current step 4 popup position:", rect);
+          return; // Skip other positioning for step 1
+        } 
+        // Handle step 2 positioning for arrow button
+        else if (step.id === 2) {
+          // For step 2 - position the popup above the arrow button but keep the button centered
+          const arrowButton = document.querySelector('.journal-arrow-button');
+          if (arrowButton) {
+            const rect = arrowButton.getBoundingClientRect();
+            console.log("Arrow button rect for step 2:", rect);
             
-            // If popup is off screen or too close to bottom, force it to center
-            if (rect.bottom > window.innerHeight - 20 || rect.top < 20) {
-              console.log("Step 4 popup may be off screen, forcing center position");
-              setPosition({
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)'
-              });
+            // Position above the center without affecting button's position
+            const calculatedPos = {
+              top: Math.max(120, window.innerHeight * 0.25), // Position in top 25% of screen
+              left: '50%', // Center horizontally
+              right: undefined,
+              transform: 'translateX(-50%)'
+            };
+            
+            setPosition(ensureWithinViewport(calculatedPos));
+            console.log("Positioned step 2 popup above arrow button");
+            
+            // Set ID for CSS targeting
+            if (stepRef.current) {
+              stepRef.current.id = 'tutorial-step-2-popup';
             }
+          } else {
+            // Fallback if button not found
+            const fallbackPos = { top: 120, left: '50%', transform: 'translateX(-50%)' };
+            setPosition(ensureWithinViewport(fallbackPos));
+            console.log("Arrow button not found for step 2, using fallback position");
           }
-        }
-      }, 500);
-      
-      return () => {
-        clearTimeout(secondaryCheck);
-        clearTimeout(tertiaryCheck);
-        
-        // Clean up any highlight classes when unmounting
-        if (step.targetElement) {
+        } 
+        // Handle positioning for other steps with target elements
+        else if (step.targetElement) {
+          // Generic positioning for other steps with viewport boundary checks
           const targetElement = document.querySelector(step.targetElement);
+          
           if (targetElement) {
-            targetElement.classList.remove('tutorial-target');
+            const rect = targetElement.getBoundingClientRect();
+            console.log(`Target element found for step ${step.id}:`, rect);
+            
+            // Add tutorial target class to ensure visibility
+            targetElement.classList.add('tutorial-target');
+            
+            // Add ID for CSS targeting
+            if (stepRef.current) {
+              stepRef.current.id = `tutorial-step-${step.id}-popup`;
+            }
+            
+            // Calculate position based on specified direction
+            let calculatedPos: PositionState = { top: 0, left: 0 };
+            
+            switch (step.position) {
+              case 'top':
+                calculatedPos = {
+                  top: rect.top - (stepRef.current?.offsetHeight || 0) - 20,
+                  left: rect.left + rect.width / 2,
+                  transform: 'translateX(-50%)'
+                };
+                break;
+              case 'bottom':
+                calculatedPos = {
+                  top: rect.bottom + 20,
+                  left: rect.left + rect.width / 2,
+                  transform: 'translateX(-50%)'
+                };
+                break;
+              case 'left':
+                calculatedPos = {
+                  top: rect.top + rect.height / 2,
+                  left: rect.left - (stepRef.current?.offsetWidth || 0) - 20,
+                  transform: 'translateY(-50%)'
+                };
+                break;
+              case 'right':
+                calculatedPos = {
+                  top: rect.top + rect.height / 2,
+                  left: rect.right + 20,
+                  transform: 'translateY(-50%)'
+                };
+                break;
+              default:
+                // Center over the element
+                calculatedPos = {
+                  top: rect.top + rect.height / 2,
+                  left: rect.left + rect.width / 2,
+                  transform: 'translate(-50%, -50%)'
+                };
+            }
+            
+            // Ensure the popup stays within viewport bounds
+            setPosition(ensureWithinViewport(calculatedPos));
+          } else {
+            console.warn(`Target element not found for step ${step.id}, using fallback position`);
+            // Center in viewport if element not found
+            const fallbackPos = {
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)'
+            };
+            
+            setPosition(ensureWithinViewport(fallbackPos));
           }
-        }
-        
-        // Clean up step 3 specific elements
-        if (step.id === 3) {
-          const selectors = [
-            '.tutorial-record-entry-button',
-            '[data-value="record"]',
-            '.record-entry-tab',
-            'button[data-tutorial-target="record-entry"]',
-            '#new-entry-button'
-          ];
-          
-          selectors.forEach(selector => {
-            const element = document.querySelector(selector);
-            if (element) {
-              element.classList.remove('tutorial-target', 'record-entry-tab');
-            }
-          });
-        }
-        
-        // Clean up step 4 specific elements
-        if (step.id === 4) {
-          const selectors = [
-            '[value="entries"]',
-            '.entries-tab',
-            'button[data-tutorial-target="past-entries"]',
-            '#past-entries-button'
-          ];
-          
-          selectors.forEach(selector => {
-            const element = document.querySelector(selector);
-            if (element) {
-              element.classList.remove('tutorial-target', 'entries-tab');
-            }
+        } else {
+          // Default center position for steps without target elements
+          setPosition({
+            top: '50%',
+            left: '50%',
+            transform: 'translate(-50%, -50%)'
           });
         }
       };
-    }
+      
+      // Run initial calculation
+      calculatePosition();
+      
+      // Secondary check to ensure positioning after everything has rendered
+      const secondaryCheck = setTimeout(() => {
+        calculatePosition();
+        
+        // Special handling for step 1 - always force center
+        if (step.id === 1) {
+          if (stepRef.current) {
+            stepRef.current.style.position = 'fixed';
+            stepRef.current.style.top = '50%';
+            stepRef.current.style.left = '50%';
+            stepRef.current.style.transform = 'translate(-50%, -50%)';
+            stepRef.current.style.zIndex = '20000';
+            stepRef.current.style.margin = '0';
+            stepRef.current.style.maxWidth = '90%';
+            stepRef.current.style.width = '320px';
+          }
+        }
+      }, 300);
+      
+      return () => {
+        clearTimeout(secondaryCheck);
+      };
+    }, 500); // Longer initial delay to ensure components are ready
+    
+    return () => {
+      clearTimeout(initialTimeout);
+      
+      // Clean up any highlight classes when unmounting
+      if (step.targetElement) {
+        const targetElement = document.querySelector(step.targetElement);
+        if (targetElement) {
+          targetElement.classList.remove('tutorial-target');
+        }
+      }
+    };
   }, [step.id, step.targetElement, step.position]);
   
   // Handle navigation actions with stopPropagation to ensure they work
@@ -539,6 +344,20 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Apply all position styles directly
   const getPositionStyle = () => {
+    if (step.id === 1) {
+      // Force center for first step
+      return {
+        position: 'fixed',
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        zIndex: 20000,
+        margin: 0,
+        maxWidth: '90%',
+        width: '320px'
+      };
+    }
+    
     return {
       top: position.top,
       left: position.left,
