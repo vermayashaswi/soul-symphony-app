@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
 import { getAudioConfig, getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
+import { useTutorial } from "@/contexts/TutorialContext";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -31,7 +32,11 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
-
+  const { isInStep, tutorialCompleted } = useTutorial();
+  
+  // Only show glow when in tutorial step 3 AND tutorial is not completed
+  const shouldAddTutorialClass = isInStep(3) && !tutorialCompleted;
+  
   useEffect(() => {
     let cleanup = () => {};
     
@@ -164,13 +169,16 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           "relative rounded-full flex items-center justify-center",
           isRecording ? "bg-red-500 hover:bg-red-600" : "",
           isRecording && "animate-pulse",
+          shouldAddTutorialClass ? "tutorial-target record-entry-tab" : "",
           className
         )}
         style={{
           width: size === "sm" ? "48px" : "64px",
           height: size === "sm" ? "48px" : "64px",
-          transition: "all 0.3s ease"
+          transition: "all 0.3s ease",
+          boxShadow: shouldAddTutorialClass ? "0 0 20px 10px var(--color-theme)" : undefined
         }}
+        data-tutorial-target={shouldAddTutorialClass ? "record-entry" : undefined}
       >
         {isRecording ? (
           <Square className={`${size === "sm" ? "h-4 w-4" : "h-5 w-5"} text-white`} />

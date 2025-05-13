@@ -3,6 +3,7 @@ import React from 'react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface JournalEntriesHeaderProps {
   onStartRecording: () => void;
@@ -11,6 +12,9 @@ interface JournalEntriesHeaderProps {
 export const JournalEntriesHeader: React.FC<JournalEntriesHeaderProps> = ({ 
   onStartRecording 
 }) => {
+  const { isInStep, tutorialCompleted } = useTutorial();
+  const shouldAddTutorialClass = isInStep(3) && !tutorialCompleted;
+  
   return (
     <div className="flex items-center justify-between mb-6">
       <h2 className="text-xl font-semibold">
@@ -19,8 +23,8 @@ export const JournalEntriesHeader: React.FC<JournalEntriesHeaderProps> = ({
       <Button 
         onClick={onStartRecording}
         size="sm"
-        className="flex items-center gap-1 record-entry-button tutorial-record-entry-button"
-        data-tutorial-target="record-entry"
+        className={`flex items-center gap-1 record-entry-button ${shouldAddTutorialClass ? 'tutorial-record-entry-button' : ''}`}
+        data-tutorial-target={shouldAddTutorialClass ? "record-entry" : undefined}
         id="new-entry-button"
       >
         <Plus className="w-4 h-4" />

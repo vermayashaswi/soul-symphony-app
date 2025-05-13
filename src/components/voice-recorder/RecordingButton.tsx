@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { showToast } from '@/utils/journal/toast-helper';
 
 interface RecordingButtonProps {
   isRecording: boolean;
@@ -43,16 +44,19 @@ export function RecordingButton({
     );
   }
   
-  // Dynamic glow effect based on audio level - only show prominent glow during recording or tutorial step 3
+  // Only show glow when in tutorial step 3 AND tutorial is not completed
+  const shouldShowGlow = isInTutorialStep3 && !tutorialCompleted;
+  
+  // Dynamic glow effect based on audio level - only show prominent glow during recording or in tutorial step 3
   const glowSize = isRecording ? Math.max(12, Math.min(60, audioLevel / 5 * 3)) : 
-                   (isInTutorialStep3 ? 40 : 0);
+                  (shouldShowGlow ? 40 : 0);
   
   if (!isRecording && isProcessing) {
     return null; // Don't render anything when processing
   }
   
-  // Determine if we should add the tutorial target class
-  const shouldAddTutorialClass = isInTutorialStep3;
+  // Only add the tutorial target class if we're in tutorial step 3 AND tutorial is not completed
+  const shouldAddTutorialClass = isInTutorialStep3 && !tutorialCompleted;
   
   return (
     <div className={`relative flex items-center justify-center ${shouldAddTutorialClass ? 'tutorial-target record-entry-tab' : ''}`}>
@@ -63,11 +67,11 @@ export function RecordingButton({
           isRecording ? "bg-red-500 border-red-600" : "bg-theme-color hover:bg-theme-color/90 border-theme-color/20",
           "w-20 h-20",
           audioBlob && "opacity-50 cursor-not-allowed",
-          shouldAddTutorialClass && "tutorial-button-highlight"
+          shouldAddTutorialClass ? "tutorial-button-highlight" : ""
         )}
         style={{
-          // Only apply glow effect if recording or in tutorial step 3
-          boxShadow: (isRecording || isInTutorialStep3) && !tutorialCompleted ? 
+          // Only apply glow effect if recording or in tutorial step 3 AND tutorial not completed
+          boxShadow: (isRecording || shouldShowGlow) ? 
                      `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined
         }}
         whileTap={{ scale: 0.95 }}

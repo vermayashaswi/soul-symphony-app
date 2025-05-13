@@ -30,7 +30,8 @@ const TutorialOverlay: React.FC = () => {
     steps, 
     nextStep, 
     prevStep, 
-    skipTutorial
+    skipTutorial,
+    tutorialCompleted
   } = useTutorial();
   const navigate = useNavigate();
   const location = useLocation();
@@ -40,7 +41,7 @@ const TutorialOverlay: React.FC = () => {
   // Only render tutorial on app routes - strict checking
   const currentPath = location.pathname;
   const isAppRouteCurrent = isAppRoute(currentPath);
-  const shouldShowTutorial = isActive && isAppRouteCurrent;
+  const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted;
   
   // Log whenever the component is rendered and what the decision is
   useEffect(() => {
@@ -48,9 +49,25 @@ const TutorialOverlay: React.FC = () => {
       isActive,
       currentPath,
       isAppRouteCurrent,
-      shouldShowTutorial
+      shouldShowTutorial,
+      tutorialCompleted
     });
-  }, [isActive, currentPath, isAppRouteCurrent, shouldShowTutorial]);
+    
+    // Add class to document body when tutorial is completed
+    if (tutorialCompleted) {
+      document.body.classList.add('tutorial-completed');
+    } else {
+      document.body.classList.remove('tutorial-completed');
+    }
+    
+    // Cleanup function
+    return () => {
+      // Remove class when component unmounts
+      if (tutorialCompleted) {
+        document.body.classList.add('tutorial-completed');
+      }
+    };
+  }, [isActive, currentPath, isAppRouteCurrent, shouldShowTutorial, tutorialCompleted]);
   
   // Enhanced scrolling prevention when tutorial is active
   useEffect(() => {
@@ -487,7 +504,7 @@ const TutorialOverlay: React.FC = () => {
 
   // If not an app route or tutorial not active, don't render anything
   if (!shouldShowTutorial) {
-    console.log('TutorialOverlay not shown: isActive=', isActive, 'isAppRoute=', isAppRouteCurrent);
+    console.log('TutorialOverlay not shown: isActive=', isActive, 'isAppRouteCurrent=', isAppRouteCurrent, 'tutorialCompleted=', tutorialCompleted);
     return null;
   }
 

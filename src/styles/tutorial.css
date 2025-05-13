@@ -1,3 +1,4 @@
+
 /* Tutorial Overlay Styles */
 .tutorial-target {
   position: relative !important;
@@ -112,9 +113,11 @@ body.tutorial-active {
   transform: scale(1.05) !important;
 }
 
-/* Define a class to use when tutorial is completed - NO HIGHLIGHTING */
+/* When tutorial is completed or not in tutorial target mode - NO HIGHLIGHTING */
+.tutorial-completed .tutorial-button-highlight,
 .tutorial-completed .record-entry-button,
-.tutorial-completed [data-value="record"] {
+.tutorial-completed [data-value="record"],
+.tutorial-completed [data-tutorial-target] {
   box-shadow: none !important;
   animation: none !important;
   border: none !important;
