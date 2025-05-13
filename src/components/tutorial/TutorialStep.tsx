@@ -342,12 +342,12 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     onSkip();
   };
   
-  // Apply all position styles directly
-  const getPositionStyle = () => {
+  // Fix: Define CSS properties with proper types for framer-motion
+  const getPositionStyle = (): React.CSSProperties => {
     if (step.id === 1) {
       // Force center for first step
       return {
-        position: 'fixed',
+        position: 'fixed' as const,
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
