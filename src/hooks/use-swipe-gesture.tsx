@@ -7,6 +7,7 @@ export interface SwipeOptions {
   onSwipeUp?: () => void;
   onSwipeDown?: () => void;
   minDistance?: number;
+  disabled?: boolean;  // New option to disable swipe detection
 }
 
 export function useSwipeGesture(
@@ -15,25 +16,58 @@ export function useSwipeGesture(
 ) {
   useEffect(() => {
     const element = elementRef.current;
-    if (!element) return;
+    if (!element || options.disabled) return;
 
     let touchStartX = 0;
     let touchStartY = 0;
     let touchEndX = 0;
     let touchEndY = 0;
     const minSwipeDistance = options.minDistance || 50;
+    let isSwiping = false;
+    let startTarget: EventTarget | null = null;
 
     const handleTouchStart = (e: TouchEvent) => {
+      // Store the original target that received the touch start event
+      startTarget = e.target;
+      
+      // Don't initiate swipe if touching an input, textarea or select field
+      if (
+        startTarget instanceof HTMLElement && 
+        (startTarget.tagName === 'INPUT' || 
+         startTarget.tagName === 'TEXTAREA' || 
+         startTarget.tagName === 'SELECT')
+      ) {
+        return;
+      }
+      
       touchStartX = e.touches[0].clientX;
       touchStartY = e.touches[0].clientY;
+      isSwiping = true;
     };
 
     const handleTouchMove = (e: TouchEvent) => {
+      if (!isSwiping) return;
+      
       touchEndX = e.touches[0].clientX;
       touchEndY = e.touches[0].clientY;
     };
 
-    const handleTouchEnd = () => {
+    const handleTouchEnd = (e: TouchEvent) => {
+      if (!isSwiping) return;
+      
+      // Reset the swiping state
+      isSwiping = false;
+      
+      // Don't process swipe if the start target was an input element
+      if (
+        startTarget instanceof HTMLElement && 
+        (startTarget.tagName === 'INPUT' || 
+         startTarget.tagName === 'TEXTAREA' || 
+         startTarget.tagName === 'SELECT')
+      ) {
+        return;
+      }
+      
       const deltaX = touchEndX - touchStartX;
       const deltaY = touchEndY - touchStartY;
       

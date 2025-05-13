@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -798,7 +797,8 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         handlePrevious();
       }
     },
-    minDistance: 50
+    minDistance: 50,
+    disabled: isNameStep // Disable swipe gestures on the name entry step
   });
 
   const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
