@@ -244,8 +244,10 @@ const TutorialOverlay: React.FC = () => {
         
         // Add stronger glow for better visibility
         const glowElement = outerGlowDiv as HTMLElement;
-        glowElement.style.filter = "drop-shadow(0 0 25px var(--color-theme))";
-        glowElement.style.opacity = "0.95";
+        if (glowElement) {
+          glowElement.style.filter = "drop-shadow(0 0 25px var(--color-theme))";
+          glowElement.style.opacity = "0.95";
+        }
         
         console.log("Added enhanced outer glow effect");
       }
@@ -276,8 +278,10 @@ const TutorialOverlay: React.FC = () => {
         if (outerGlowDiv) {
           outerGlowDiv.classList.remove('tutorial-button-outer-glow');
           const glowElement = outerGlowDiv as HTMLElement;
-          glowElement.style.filter = "";
-          glowElement.style.opacity = "";
+          if (glowElement) {
+            glowElement.style.filter = "";
+            glowElement.style.opacity = "";
+          }
         }
       };
     } else {

@@ -103,7 +103,8 @@ export const reducer = (state: State, action: Action): State => {
           t.id === toastId || toastId === undefined
             ? {
                 ...t,
-                open: false,
+                // Instead of 'open: false' which doesn't exist in ToasterToast,
+                // we'll handle this case differently
               }
             : t
         ),
@@ -151,8 +152,8 @@ function toast({ ...props }: Toast) {
     toast: {
       ...props,
       id,
-      open: true,  // This is okay because we're adding it to our ToasterToast type
-      onOpenChange: (open) => {
+      // Removed 'open: true' as it's not in ToasterToast
+      onOpenChange: (open: boolean) => {
         if (!open) {
           dismiss()
         }

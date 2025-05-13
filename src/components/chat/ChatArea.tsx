@@ -200,7 +200,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               >
                 <ChatMessage 
                   message={displayMessage}
-                  showAnalysis={false}
+                  isLastMessage={index === filteredMessages.length - 1}
+                  isComplete={true}
+                  threadId={threadId}
                 />
               </motion.div>
             );

@@ -1,154 +1,145 @@
 import React, { createContext, useContext, useState, useEffect } from 'react';
-import TutorialOverlay from '@/components/tutorial/TutorialOverlay';
 
-interface TutorialStep {
+// Tutorial step definition
+export interface TutorialStep {
   id: number;
   title: string;
   content: string;
-  target: string;
-  placement: 'top' | 'bottom' | 'left' | 'right';
+  targetElement?: string;
+  position?: 'top' | 'right' | 'bottom' | 'left';
+  showNextButton?: boolean;
   navigateTo?: string;
 }
 
-interface TutorialContextProps {
+export interface TutorialContextProps {
   isActive: boolean;
   currentStep: number;
   totalSteps: number;
   steps: TutorialStep[];
   nextStep: () => void;
   prevStep: () => void;
-  skipTutorial: () => void;
   startTutorial: () => void;
-  setIsTutorialCompleted: (completed: boolean) => void;
+  skipTutorial: () => void;
+  resetTutorial: () => void;
 }
 
-interface TutorialProviderProps {
-  children: React.ReactNode;
-}
+// Create the context with a default value
+export const TutorialContext = createContext<TutorialContextProps>({
+  isActive: false,
+  currentStep: 0,
+  totalSteps: 0,
+  steps: [],
+  nextStep: () => {},
+  prevStep: () => {},
+  startTutorial: () => {},
+  skipTutorial: () => {},
+  resetTutorial: () => {}
+});
 
-const TutorialContext = createContext<TutorialContextProps | undefined>(undefined);
-
-const initialTutorialSteps: TutorialStep[] = [
-  {
-    id: 1,
-    title: "Welcome to SOULo!",
-    content: "SOULo helps you track your thoughts, emotions, and insights over time. Let's start by exploring the journal feature.",
-    target: ".journal-header-container",
-    placement: "bottom",
-    navigateTo: "/app/journal"
-  },
-  {
-    id: 2,
-    title: "Start your Journey",
-    content: "This is the heart of the app. Click this button to begin recording your thoughts and emotions.",
-    target: ".journal-arrow-button",
-    placement: "bottom",
-    navigateTo: "/app/journal"
-  },
-  {
-    id: 3,
-    title: "Record New Entries",
-    content: "Click here to create a new journal entry when you want to record your thoughts and feelings.",
-    target: '[data-value="record"], .record-entry-tab, .tutorial-record-entry-button, button[data-tutorial-target="record-entry"], #new-entry-button',
-    placement: "bottom",
-    navigateTo: "/app/journal"
-  },
-  {
-    id: 4,
-    title: "View Past Entries",
-    content: "Here you can browse through all your previous journal entries and revisit your thoughts.",
-    target: '[data-value="entries"], .entries-tab, button[data-tutorial-target="past-entries"], #past-entries-button',
-    placement: "bottom",
-    navigateTo: "/app/journal"
-  },
-  {
-    id: 5,
-    title: "Ask Anything",
-    content: "Chat with Rūḥ to gain insights from your journal. You can ask questions or choose from suggestions.",
-    target: ".chat-question-suggestion",
-    placement: "bottom",
-    navigateTo: "/app/chat"
-  },
-  {
-    id: 6,
-    title: "Get Detailed Insights",
-    content: "Rūḥ provides detailed analyses of your journal entries with statistics, trends, and patterns.",
-    target: ".chat-ai-response",
-    placement: "top",
-    navigateTo: "/app/chat"
-  }
-];
-
-export const TutorialProvider: React.FC<TutorialProviderProps> = ({ children }) => {
+// Create the provider component
+export const TutorialProvider = ({ children }: { children: React.ReactNode }) => {
   const [isActive, setIsActive] = useState(false);
   const [currentStep, setCurrentStep] = useState(0);
-  const [isTutorialCompleted, setIsTutorialCompleted] = useState(false);
-
-  useEffect(() => {
-    const tutorialCompleted = localStorage.getItem('tutorialCompleted');
-    if (tutorialCompleted === 'true') {
-      setIsTutorialCompleted(true);
+  
+  // Define tutorial steps
+  const steps: TutorialStep[] = [
+    {
+      id: 1,
+      title: "Welcome to Rūḥ!",
+      content: "Let's take a quick tour to show you around.",
+      targetElement: '.journal-header-container',
+      position: 'bottom',
+      showNextButton: true,
+      navigateTo: '/app/journal'
+    },
+    {
+      id: 2,
+      title: "Explore Past Entries",
+      content: "Tap the arrow to view entries from previous days.",
+      targetElement: '.journal-arrow-button',
+      position: 'top',
+      showNextButton: true
+    },
+    {
+      id: 3,
+      title: "Record New Entry",
+      content: "Click here to record a new journal entry.",
+      targetElement: '[data-value="record"]',
+      position: 'bottom',
+      showNextButton: true
+    },
+    {
+      id: 4,
+      title: "View Past Entries",
+      content: "Switch to this tab to see all your past entries.",
+      targetElement: '[value="entries"]',
+      position: 'bottom',
+      showNextButton: true
+    },
+    {
+      id: 5,
+      title: "Try Chat",
+      content: "Click on a question to ask Rūḥ about your journal.",
+      targetElement: '.chat-question-suggestion',
+      position: 'bottom',
+      showNextButton: true,
+      navigateTo: '/app/chat'
+    },
+    {
+      id: 6,
+      title: "AI Insights",
+      content: "Rūḥ analyzes your entries to provide personalized insights.",
+      targetElement: '.chat-ai-response',
+      position: 'bottom',
+      showNextButton: true
     }
-  }, []);
+  ];
+  
+  const totalSteps = steps.length;
 
-  useEffect(() => {
-    if (isTutorialCompleted) {
-      setIsActive(false);
-      setCurrentStep(0);
-    }
-  }, [isTutorialCompleted]);
+  // Navigation functions
+  const nextStep = () => {
+    setCurrentStep((prevStep) => Math.min(prevStep + 1, totalSteps - 1));
+  };
+
+  const prevStep = () => {
+    setCurrentStep((prevStep) => Math.max(prevStep - 1, 0));
+  };
 
   const startTutorial = () => {
     setIsActive(true);
     setCurrentStep(0);
   };
 
-  const nextStep = () => {
-    if (currentStep < initialTutorialSteps.length - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      setIsActive(false);
-      setIsTutorialCompleted(true);
-      localStorage.setItem('tutorialCompleted', 'true');
-    }
-  };
-
-  const prevStep = () => {
-    if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
-    }
-  };
-
   const skipTutorial = () => {
     setIsActive(false);
-    setIsTutorialCompleted(true);
-    localStorage.setItem('tutorialCompleted', 'true');
+    setCurrentStep(0);
+  };
+  
+  const resetTutorial = () => {
+    setIsActive(true);
+    setCurrentStep(0);
   };
 
+  // Provide the context value
   return (
     <TutorialContext.Provider
       value={{
         isActive,
         currentStep,
-        totalSteps: initialTutorialSteps.length,
-        steps: initialTutorialSteps,
+        totalSteps,
+        steps,
         nextStep,
         prevStep,
-        skipTutorial,
         startTutorial,
-        setIsTutorialCompleted
+        skipTutorial,
+        resetTutorial
       }}
     >
       {children}
-      {isActive && <TutorialOverlay />}
     </TutorialContext.Provider>
   );
 };
 
-export const useTutorial = () => {
-  const context = useContext(TutorialContext);
-  if (!context) {
-    throw new Error("useTutorial must be used within a TutorialProvider");
-  }
-  return context;
-};
+// Custom hook for consuming the context
+export const useTutorial = () => useContext(TutorialContext);

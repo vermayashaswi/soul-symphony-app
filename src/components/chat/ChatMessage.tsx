@@ -3,16 +3,9 @@ import { ChatMessage as ChatMessageType } from '@/services/chat';
 import { Loader2, ChevronDown, ChevronUp, FileSpreadsheet, AlertTriangle } from 'lucide-react';
 import { format, formatDistanceToNow } from 'date-fns';
 import { Badge } from '@/components/ui/badge';
-import { JournalEntryReference } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Json } from '@/integrations/supabase/types';
-
-// Interface for journal entry references
-interface JournalEntryReference {
-  date: string;
-  content: string;
-  sentiment?: string;
-}
+import { JournalEntryReference } from '@/types/journal';
 
 // Helper function to extract reference date info
 const extractReferenceDateInfo = (dateStr: string) => {
@@ -47,17 +40,19 @@ const ChatMessage = ({
   message, 
   isLastMessage,
   isComplete = true,
-  threadId
+  threadId,
+  showAnalysis = false
 }: { 
   message: ChatMessageType;
   isLastMessage?: boolean;
   isComplete?: boolean;
   threadId?: string | null;
+  showAnalysis?: boolean;
 }) => {
   const [isCollapsed, setIsCollapsed] = useState(true);
   const [isAnalysisCollapsed, setIsAnalysisCollapsed] = useState(true);
   const isAssistant = message.role === 'assistant';
-  const isError = message.role === 'error';
+  const isError = message.role === 'error' || message.role === 'assistant' && message.content.toLowerCase().includes('error');
   const hasReferences = message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0;
   const hasAnalysis = message.analysis_data && typeof message.analysis_data === 'object' && Object.keys(message.analysis_data as object).length > 0;
   const maxReferencesToShowCollapsed = 2;
@@ -151,7 +146,7 @@ const ChatMessage = ({
         </div>
         
         <div className="mt-2 space-y-2">
-          {referencesToShow.map((ref: JournalEntryReference, i) => {
+          {referencesToShow.map((ref: any, i) => {
             const dateInfo = extractReferenceDateInfo(ref.date);
             
             return (
@@ -258,7 +253,7 @@ const ChatMessage = ({
           {renderReferences()}
           
           {/* Analysis data (for debugging) */}
-          {renderAnalysisData()}
+          {showAnalysis && renderAnalysisData()}
           
           {/* Loading spinner for incomplete messages */}
           {!isComplete && (
