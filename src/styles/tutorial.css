@@ -260,6 +260,15 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   border: 2px solid var(--color-theme) !important;
 }
 
+/* Enhanced specific styling for step 1 to ensure it's always properly positioned */
+#tutorial-step-1-popup {
+  position: fixed !important;
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  z-index: 20000 !important;
+}
+
 /* Ensure all tutorial step content is visible */
 .tutorial-step-container h3,
 .tutorial-step-container p {
@@ -300,5 +309,11 @@ button[data-tutorial-target="past-entries"].tutorial-target,
     top: 50% !important;
     left: 50% !important;
     transform: translate(-50%, -50%) !important;
+  }
+  
+  /* Special positioning for step 1 on small screens */
+  #tutorial-step-1-popup {
+    max-width: 90%;
+    width: 90%;
   }
 }
