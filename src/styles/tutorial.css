@@ -100,7 +100,7 @@ body.tutorial-active {
 
 /* Enhanced button glow effect with enhanced visibility */
 .journal-arrow-button.tutorial-target {
-  z-index: 9999 !important;
+  z-index: 9990 !important; /* Lower than tutorial popup but higher than regular content */
 }
 
 .tutorial-button-highlight {
@@ -217,7 +217,7 @@ button[data-tutorial-target="record-entry"].tutorial-target,
 /* Tutorial step enhancements for better visibility and interaction */
 .tutorial-step-container {
   position: absolute;
-  z-index: 10000 !important; /* Above everything */
+  z-index: 20000 !important; /* Significantly higher than the button */
   pointer-events: auto !important;
 }
 

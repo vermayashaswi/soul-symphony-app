@@ -301,7 +301,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[10000] max-w-[320px] tutorial-step-container"
+      className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[20000] max-w-[320px] tutorial-step-container"
       style={getPositionStyle()}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
