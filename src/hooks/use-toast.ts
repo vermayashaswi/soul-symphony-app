@@ -1,9 +1,8 @@
 
 import { useState, useCallback } from 'react'
-import { createStore } from '@/lib/store'
-import { ToasterToast } from '@/components/ui/toaster'
 
-interface ToastData {
+// Define ToasterToast type directly since it's not exported from toaster.tsx
+export type ToasterToast = {
   id: string
   title?: React.ReactNode
   description?: React.ReactNode
@@ -13,12 +12,35 @@ interface ToastData {
   dismissible?: boolean
 }
 
-const store = createStore<ToastData[]>([])
+// Simple store implementation to replace the missing @/lib/store dependency
+const createSimpleStore = <T,>(initialState: T) => {
+  let state = initialState
+  const listeners: Array<(state: T) => void> = []
+
+  return {
+    get: () => state,
+    set: (newState: T) => {
+      state = newState
+      listeners.forEach(listener => listener(state))
+    },
+    subscribe: (listener: (state: T) => void) => {
+      listeners.push(listener)
+      return () => {
+        const index = listeners.indexOf(listener)
+        if (index > -1) {
+          listeners.splice(index, 1)
+        }
+      }
+    }
+  }
+}
+
+const store = createSimpleStore<ToasterToast[]>([])
 
 export const useToastStore = store
 
 export function useToast() {
-  const [toasts, setToasts] = useState<ToastData[]>(store.get())
+  const [toasts, setToasts] = useState<ToasterToast[]>(store.get())
 
   const createToast = useCallback((data: ToasterToast) => {
     const id = crypto.randomUUID()
@@ -55,17 +77,18 @@ export function useToast() {
   const toast = useCallback(
     (data: ToasterToast) => createToast(data),
     [createToast]
-  )
+  ) as ((data: ToasterToast) => {
+    id: string
+    dismiss: () => void
+    update: (data: ToasterToast) => void
+  }) & {
+    dismiss: (id: string) => void
+    update: (id: string, data: ToasterToast) => void
+  }
 
-  toast.dismiss = useCallback(
-    (id: string) => dismissToast(id),
-    [dismissToast]
-  )
-
-  toast.update = useCallback(
-    (id: string, data: ToasterToast) => updateToast(id, data),
-    [updateToast]
-  )
+  // Properly define the methods on the toast function
+  toast.dismiss = dismissToast
+  toast.update = updateToast
 
   return {
     toast,
@@ -76,24 +99,38 @@ export function useToast() {
 }
 
 // Create direct toast function for easier import
-export const toast = ((data) => {
-  return store.get().concat({
-    id: crypto.randomUUID(),
-    ...data,
-  })
-}) as unknown as ((data: ToasterToast) => void) & {
+// Fixed by correctly defining the type and attaching methods
+const toastFunction = ((data: ToasterToast) => {
+  const id = crypto.randomUUID()
+  const toast = { id, ...data }
+  const currentToasts = store.get()
+  store.set([...currentToasts, toast])
+  return {
+    id,
+    dismiss: () => store.set(store.get().filter(t => t.id !== id)),
+    update: (newData: ToasterToast) => store.set(
+      store.get().map(t => t.id === id ? { ...t, ...newData } : t)
+    )
+  }
+}) as ((data: ToasterToast) => {
+  id: string
+  dismiss: () => void
+  update: (data: ToasterToast) => void
+}) & {
   dismiss: (id: string) => void
   update: (id: string, data: ToasterToast) => void
 }
 
-toast.dismiss = (id) => {
+toastFunction.dismiss = (id: string) => {
   store.set(store.get().filter((toast) => toast.id !== id))
 }
 
-toast.update = (id, data) => {
+toastFunction.update = (id: string, data: ToasterToast) => {
   store.set(
     store
       .get()
       .map((toast) => (toast.id === id ? { ...toast, ...data } : toast))
   )
 }
+
+export const toast = toastFunction

@@ -19,15 +19,16 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {toasts.map(function ({ id, title, description, action, ...props }) {
-        // Ensure we don't pass the incompatible 'type' property to Toast
-        // Extract any 'type' property to avoid passing it to the Toast component
-        const { type, ...restProps } = props
+      {toasts.map(function ({ id, title, description, action, variant, ...props }) {
+        // Remove any properties that Toast component doesn't accept
+        const { duration, dismissible, ...restProps } = props
         
         return (
           <Toast 
             key={id} 
             {...restProps} 
+            // Only pass variant if it's one of the accepted values
+            variant={variant === 'default' || variant === 'destructive' ? variant : 'default'}
             className={
               isDarkMode
                 ? "bg-theme border-white/10 text-black shadow-lg"
