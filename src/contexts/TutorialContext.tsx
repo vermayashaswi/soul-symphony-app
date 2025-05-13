@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -31,6 +30,8 @@ interface TutorialContextType {
   skipTutorial: () => void;
   completeTutorial: () => void;
   resetTutorial: () => void;
+  tutorialCompleted: boolean;
+  isInStep: (stepId: number) => boolean;
 }
 
 // Create the context with a default undefined value
@@ -102,6 +103,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [steps, setSteps] = useState<TutorialStep[]>(initialTutorialSteps);
   const [tutorialChecked, setTutorialChecked] = useState(false);
   const [navigationComplete, setNavigationComplete] = useState(true);
+  const [tutorialCompleted, setTutorialCompleted] = useState(false);
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
@@ -141,6 +143,34 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     
     checkTutorialStatus();
   }, [user, location.pathname, tutorialChecked]);
+  
+  // Check tutorial completion status on initial load
+  useEffect(() => {
+    const checkTutorialCompletionStatus = async () => {
+      if (!user) return;
+
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('tutorial_completed')
+          .eq('id', user.id)
+          .single();
+          
+        if (error) {
+          console.error('Error checking tutorial completion status:', error);
+          return;
+        }
+        
+        // Set the tutorial completed state based on database value
+        setTutorialCompleted(data?.tutorial_completed === 'YES');
+        console.log('Tutorial completion status loaded:', data?.tutorial_completed === 'YES');
+      } catch (error) {
+        console.error('Error checking tutorial completion status:', error);
+      }
+    };
+    
+    checkTutorialCompletionStatus();
+  }, [user]);
   
   // Handle navigation between steps when route changes
   useEffect(() => {
@@ -232,6 +262,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       
       setIsActive(false);
+      setTutorialCompleted(true);
       toast({
         title: "Tutorial completed!",
         description: "You can reset it any time in settings."
@@ -332,6 +363,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setCurrentStep(0);
       setTutorialChecked(false);
+      setTutorialCompleted(false);
       
       // Only navigate if we're not already on the app home page
       if (location.pathname !== '/app/home') {
@@ -376,7 +408,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     prevStep,
     skipTutorial,
     completeTutorial,
-    resetTutorial
+    resetTutorial,
+    tutorialCompleted,
+    isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId
   };
   
   return (

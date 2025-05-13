@@ -1,7 +1,9 @@
+
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface RecordingButtonProps {
   isRecording: boolean;
@@ -26,6 +28,9 @@ export function RecordingButton({
   showAnimation = true,
   audioBlob = null
 }: RecordingButtonProps) {
+  const { isInStep, tutorialCompleted } = useTutorial();
+  const isInTutorialStep3 = isInStep(3);
+  
   if (hasPermission === false) {
     return (
       <motion.button
@@ -38,28 +43,36 @@ export function RecordingButton({
     );
   }
   
-  // Dynamic glow effect based on audio level - keep this prominent
-  const glowSize = isRecording ? Math.max(12, Math.min(60, audioLevel / 5 * 3)) : 0;
+  // Dynamic glow effect based on audio level - only show prominent glow during recording or tutorial step 3
+  const glowSize = isRecording ? Math.max(12, Math.min(60, audioLevel / 5 * 3)) : 
+                   (isInTutorialStep3 ? 40 : 0);
   
   if (!isRecording && isProcessing) {
     return null; // Don't render anything when processing
   }
   
+  // Determine if we should add the tutorial target class
+  const shouldAddTutorialClass = isInTutorialStep3;
+  
   return (
-    <div className="relative flex items-center justify-center">
+    <div className={`relative flex items-center justify-center ${shouldAddTutorialClass ? 'tutorial-target record-entry-tab' : ''}`}>
       <motion.button
         onClick={isRecording ? onRecordingStop : onRecordingStart}
         className={cn(
           "relative z-10 rounded-full flex items-center justify-center border transition-all duration-300 shadow-lg",
           isRecording ? "bg-red-500 border-red-600" : "bg-theme-color hover:bg-theme-color/90 border-theme-color/20",
           "w-20 h-20",
-          audioBlob && "opacity-50 cursor-not-allowed" // Grey out when recording is done
+          audioBlob && "opacity-50 cursor-not-allowed",
+          shouldAddTutorialClass && "tutorial-button-highlight"
         )}
         style={{
-          boxShadow: isRecording ? `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined
+          // Only apply glow effect if recording or in tutorial step 3
+          boxShadow: (isRecording || isInTutorialStep3) && !tutorialCompleted ? 
+                     `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined
         }}
         whileTap={{ scale: 0.95 }}
-        disabled={audioBlob !== null} // Disable when recording is done
+        disabled={audioBlob !== null}
+        data-tutorial-target={shouldAddTutorialClass ? "record-entry" : undefined}
       >
         {isRecording ? (
           <Square className="w-7 h-7 text-white" />

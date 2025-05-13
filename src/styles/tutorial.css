@@ -104,7 +104,7 @@ body.tutorial-active {
   z-index: 9990 !important; /* Lower than tutorial popup but higher than regular content */
 }
 
-/* Step 2: Button highlight - stronger glow effect */
+/* Step 2: Button highlight - stronger glow effect - ONLY APPLY DURING TUTORIAL */
 .tutorial-button-highlight {
   box-shadow: 0 0 35px 20px var(--color-theme) !important;
   animation: button-pulse 1.5s infinite alternate !important;
@@ -112,11 +112,13 @@ body.tutorial-active {
   transform: scale(1.05) !important;
 }
 
-/* Step 2: Outer glow styling */
-.tutorial-button-outer-glow {
-  filter: drop-shadow(0 0 25px var(--color-theme)) !important;
-  opacity: 0.95 !important;
-  animation: outer-glow-pulse 1.5s infinite alternate !important;
+/* Define a class to use when tutorial is completed - NO HIGHLIGHTING */
+.tutorial-completed .record-entry-button,
+.tutorial-completed [data-value="record"] {
+  box-shadow: none !important;
+  animation: none !important;
+  border: none !important;
+  transform: none !important;
 }
 
 /* Step 3 & 4: Tab highlighting styling - ENHANCED VISIBILITY */
