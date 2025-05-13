@@ -7,7 +7,7 @@ export function Toaster() {
   const { toasts } = useToast();
 
   // Adding a fallback for when toasts is undefined
-  if (!toasts || !Array.isArray(toasts)) {
+  if (!toasts || !toasts.length) {
     return (
       <ToastProvider>
         <ToastViewport />
@@ -17,7 +17,7 @@ export function Toaster() {
 
   return (
     <ToastProvider>
-      {Array.isArray(toasts) && toasts.map(function ({ id, title, description, action, ...props }) {
+      {toasts.map(function ({ id, title, description, action, ...props }) {
         // Extract any properties that shouldn't be passed to the Toast component
         const { variant, type, onOpenChange, ...restProps } = props as any;
         
