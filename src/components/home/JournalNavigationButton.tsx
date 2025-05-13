@@ -126,7 +126,7 @@ const JournalNavigationButton: React.FC = () => {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: isInArrowTutorialStep ? 9990 : 40, // Lower than popup but higher than normal
+        zIndex: isInArrowTutorialStep ? 30000 : 40, // Significantly increased z-index when in tutorial step 2
         margin: 0,
         padding: 0,
         pointerEvents: 'auto',
