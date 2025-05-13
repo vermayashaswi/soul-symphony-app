@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useChat } from '@/hooks/use-chat';
@@ -219,8 +220,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
         {messages.map((message, index) => {
           const isLast = index === messages.length - 1;
           
-          // Modify the MobileChatMessage rendering section to handle the references properly
-          {isMobile ? (
+          return isMobile ? (
             <MobileChatMessage 
               key={message.id || index}
               message={{
