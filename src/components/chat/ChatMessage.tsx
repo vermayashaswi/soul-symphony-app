@@ -33,6 +33,9 @@ const extractReferenceDateInfo = (dateStr: string) => {
   }
 };
 
+// Define missing variables used in the component
+const maxReferencesToShowCollapsed = 2;
+
 // Keep using the existing ChatMessage component, but add the ability 
 // to have a tutorial-specific class for highlighting in Step 6
 const ChatMessage = ({ 
@@ -58,6 +61,9 @@ const ChatMessage = ({
     (message.role === 'assistant' && message.content.toLowerCase().includes('error'));
   
   const hasReferences = message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0;
+  
+  // Check if the message has analysis data
+  const hasAnalysis = showAnalysis && message.analysis_data && Object.keys(message.analysis_data).length > 0;
   
   // Add tutorial-specific class for Step 6 highlighting
   useEffect(() => {
