@@ -172,9 +172,9 @@ const TutorialOverlay: React.FC = () => {
         console.log("Added enhanced highlighting effect to button element");
         
         // Force stronger glow effect with inline styles
-        const buttonStyleElement = buttonElement as HTMLElement;
-        buttonStyleElement.style.boxShadow = "0 0 30px 15px var(--color-theme)";
-        buttonStyleElement.style.animation = "button-pulse 2s infinite alternate";
+        const buttonStyleEl = buttonElement as HTMLElement;
+        buttonStyleEl.style.boxShadow = "0 0 30px 15px var(--color-theme)";
+        buttonStyleEl.style.animation = "button-pulse 2s infinite alternate";
         
         // Log positioning
         const rect = buttonElement.getBoundingClientRect();
@@ -202,9 +202,10 @@ const TutorialOverlay: React.FC = () => {
         
         if (buttonElement) {
           buttonElement.classList.remove('tutorial-button-highlight');
-          if (buttonStyleElement) {
-            buttonStyleElement.style.boxShadow = "";
-            buttonStyleElement.style.animation = "";
+          const buttonStyleEl = buttonElement as HTMLElement;
+          if (buttonStyleEl) {
+            buttonStyleEl.style.boxShadow = "";
+            buttonStyleEl.style.animation = "";
           }
         }
         
