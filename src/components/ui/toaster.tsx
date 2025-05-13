@@ -20,10 +20,14 @@ export function Toaster() {
   return (
     <ToastProvider>
       {toasts.map(function ({ id, title, description, action, ...props }) {
+        // Ensure we don't pass the incompatible 'type' property to Toast
+        // Extract any 'type' property to avoid passing it to the Toast component
+        const { type, ...restProps } = props
+        
         return (
           <Toast 
             key={id} 
-            {...props} 
+            {...restProps} 
             className={
               isDarkMode
                 ? "bg-theme border-white/10 text-black shadow-lg"
