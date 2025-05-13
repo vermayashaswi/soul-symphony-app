@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -345,7 +344,10 @@ const TutorialOverlay: React.FC = () => {
           step3Popup.style.maxWidth = '300px';
           step3Popup.style.width = 'calc(100% - 40px)';
           step3Popup.style.border = '3px solid var(--color-theme)';
-          console.log('Forced styling for Step 3 popup applied');
+          step3Popup.style.backgroundColor = '#1A1F2C'; // Solid dark background
+          step3Popup.style.color = 'white';             // White text
+          step3Popup.style.boxShadow = '0 0 30px rgba(0, 0, 0, 0.8)'; // Stronger shadow
+          console.log('Forced styling for Step 3 popup applied with opaque background');
         }
       }, 200);
     }, 500);
@@ -449,7 +451,10 @@ const TutorialOverlay: React.FC = () => {
           step4Popup.style.maxWidth = '300px';
           step4Popup.style.width = 'calc(100% - 40px)';
           step4Popup.style.border = '3px solid var(--color-theme)';
-          console.log('Forced styling for Step 4 popup applied');
+          step4Popup.style.backgroundColor = '#1A1F2C'; // Solid dark background
+          step4Popup.style.color = 'white';             // White text
+          step4Popup.style.boxShadow = '0 0 30px rgba(0, 0, 0, 0.8)'; // Stronger shadow
+          console.log('Forced styling for Step 4 popup applied with opaque background');
         }
       }, 200);
     }, 500);

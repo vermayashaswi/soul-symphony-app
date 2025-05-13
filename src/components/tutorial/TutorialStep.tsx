@@ -486,11 +486,30 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   };
   
+  // Set background color based on step ID - make step 3 and 4 fully opaque
+  const getBackgroundStyle = () => {
+    // Steps 3 and 4 should be fully opaque
+    if (step.id === 3 || step.id === 4) {
+      return {
+        backgroundColor: '#1A1F2C', // Dark opaque background
+        color: 'white',             // White text for better contrast
+        boxShadow: '0 0 20px rgba(0, 0, 0, 0.8)', // Stronger shadow
+        border: '3px solid var(--color-theme)' // Thicker purple border
+      };
+    }
+    
+    // Default styling for other steps
+    return {};
+  };
+  
   return (
     <motion.div
       ref={stepRef}
       className="absolute bg-card border border-theme shadow-lg rounded-xl p-4 z-[20000] max-w-[320px] tutorial-step-container"
-      style={getPositionStyle()}
+      style={{
+        ...getPositionStyle(),
+        ...getBackgroundStyle()
+      }}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
