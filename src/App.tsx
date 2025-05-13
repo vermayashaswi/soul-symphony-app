@@ -34,7 +34,7 @@ const App: React.FC = () => {
         <TranslationLoadingOverlay />
         <JournalProcessingInitializer />
         <AppRoutes />
-        {/* TutorialOverlay is still at root level, but it now has internal logic to only show on app routes */}
+        {/* TutorialOverlay has internal logic to only render on app routes */}
         <TutorialOverlay />
         <Toaster />
         <SonnerToaster position="top-right" />

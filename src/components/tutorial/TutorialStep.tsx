@@ -35,92 +35,114 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   const [position, setPosition] = useState<PositionState>({ top: '50%', left: '50%', transform: 'translate(-50%, -50%)' });
   const stepRef = useRef<HTMLDivElement>(null);
   
+  // Improved function to ensure the popup stays within viewport bounds
+  const ensureWithinViewport = (pos: PositionState): PositionState => {
+    const stepElement = stepRef.current;
+    if (!stepElement) return pos;
+    
+    const padding = 20; // padding from viewport edges
+    const viewportHeight = window.innerHeight;
+    const viewportWidth = window.innerWidth;
+    const elementHeight = stepElement.offsetHeight;
+    const elementWidth = stepElement.offsetWidth;
+    
+    console.log('Viewport size:', { width: viewportWidth, height: viewportHeight });
+    console.log('Element size:', { width: elementWidth, height: elementHeight });
+    console.log('Original position:', pos);
+    
+    // Calculate numerical position values
+    let topValue = typeof pos.top === 'string' ? 
+      (pos.top.includes('%') ? 
+        (parseFloat(pos.top) / 100) * viewportHeight : 
+        parseFloat(pos.top)
+      ) : pos.top || 0;
+      
+    let leftValue = typeof pos.left === 'string' ? 
+      (pos.left.includes('%') ? 
+        (parseFloat(pos.left) / 100) * viewportWidth : 
+        parseFloat(pos.left)
+      ) : pos.left || 0;
+    
+    // Adjust for transform if necessary
+    if (pos.transform) {
+      if (pos.transform.includes('translate(-50%, -50%)')) {
+        topValue -= elementHeight / 2;
+        leftValue -= elementWidth / 2;
+      } else if (pos.transform.includes('translateX(-50%)')) {
+        leftValue -= elementWidth / 2;
+      } else if (pos.transform.includes('translateY(-50%)')) {
+        topValue -= elementHeight / 2;
+      }
+    }
+    
+    // For mobile devices, steps 3 and 4 need special positioning
+    const isMobile = viewportWidth < 640;
+    const isStep3or4 = step.id === 3 || step.id === 4;
+    
+    // Make adjustments to keep within viewport
+    const newPos = { ...pos };
+    
+    // Adjust top position
+    if (topValue < padding) {
+      // Force a minimum distance from top of screen
+      newPos.top = padding;
+      // Remove translateY from transform if present
+      if (newPos.transform?.includes('translateY')) {
+        newPos.transform = newPos.transform.replace(/translateY\([^)]+\)/, '');
+      }
+    } else if (topValue + elementHeight + padding > viewportHeight) {
+      // Force a maximum from bottom of screen
+      const newTop = viewportHeight - elementHeight - padding;
+      newPos.top = newTop;
+      
+      // Remove translateY from transform if present
+      if (newPos.transform?.includes('translateY')) {
+        newPos.transform = newPos.transform.replace(/translateY\([^)]+\)/, '');
+      }
+    }
+    
+    // Special handling for step 3 and 4 on mobile
+    if (isMobile && isStep3or4) {
+      // For small screens, position at the center bottom area
+      newPos.top = viewportHeight - elementHeight - padding * 2;
+      newPos.left = viewportWidth / 2;
+      newPos.transform = 'translateX(-50%)';
+      
+      // For extreme small screens, just center it
+      if (newPos.top < padding * 4) {
+        newPos.top = viewportHeight / 2;
+        newPos.left = viewportWidth / 2;
+        newPos.transform = 'translate(-50%, -50%)';
+      }
+    } 
+    // Regular left position adjustment for all other cases
+    else {
+      // Adjust left position
+      if (leftValue < padding) {
+        newPos.left = padding;
+        // Remove translateX from transform to avoid double adjustment
+        if (newPos.transform?.includes('translateX')) {
+          newPos.transform = newPos.transform.replace(/translateX\([^)]+\)/, '');
+        }
+      } else if (leftValue + elementWidth + padding > viewportWidth) {
+        newPos.left = viewportWidth - elementWidth - padding;
+        // Remove translateX from transform to avoid double adjustment
+        if (newPos.transform?.includes('translateX')) {
+          newPos.transform = newPos.transform.replace(/translateX\([^)]+\)/, '');
+        }
+      }
+    }
+    
+    console.log('Adjusted position:', newPos);
+    return newPos;
+  };
+
   // Calculate position based on target element with retry and enhanced logging
   // Also ensure popup stays within viewport
   useEffect(() => {
-    // Function to ensure the popup stays within viewport bounds
-    const ensureWithinViewport = (pos: PositionState): PositionState => {
-      const stepElement = stepRef.current;
-      if (!stepElement) return pos;
-      
-      const padding = 20; // padding from viewport edges
-      const viewportHeight = window.innerHeight;
-      const viewportWidth = window.innerWidth;
-      const elementHeight = stepElement.offsetHeight;
-      const elementWidth = stepElement.offsetWidth;
-      
-      // Calculate numerical position values
-      let topValue = typeof pos.top === 'string' ? 
-        (pos.top.includes('%') ? 
-          (parseFloat(pos.top) / 100) * viewportHeight : 
-          parseFloat(pos.top)
-        ) : pos.top || 0;
-        
-      let leftValue = typeof pos.left === 'string' ? 
-        (pos.left.includes('%') ? 
-          (parseFloat(pos.left) / 100) * viewportWidth : 
-          parseFloat(pos.left)
-        ) : pos.left || 0;
-      
-      // Adjust for transform if necessary
-      if (pos.transform) {
-        if (pos.transform.includes('translate(-50%, -50%)')) {
-          topValue -= elementHeight / 2;
-          leftValue -= elementWidth / 2;
-        } else if (pos.transform.includes('translateX(-50%)')) {
-          leftValue -= elementWidth / 2;
-        } else if (pos.transform.includes('translateY(-50%)')) {
-          topValue -= elementHeight / 2;
-        }
-      }
-      
-      // Make adjustments to keep within viewport
-      const newPos = { ...pos };
-      
-      // Adjust top position
-      if (topValue < padding) {
-        if (pos.transform?.includes('translate') || pos.transform?.includes('translateY')) {
-          // Preserve horizontal centering if it was set
-          newPos.top = padding;
-        } else {
-          newPos.top = padding;
-        }
-      } else if (topValue + elementHeight + padding > viewportHeight) {
-        if (pos.transform?.includes('translate') || pos.transform?.includes('translateY')) {
-          // Preserve horizontal centering if it was set
-          newPos.top = viewportHeight - elementHeight - padding;
-        } else {
-          newPos.top = viewportHeight - elementHeight - padding;
-        }
-      }
-      
-      // Adjust left position
-      if (leftValue < padding) {
-        if (pos.transform?.includes('translate') || pos.transform?.includes('translateX')) {
-          // Preserve vertical centering if it was set
-          newPos.left = padding;
-          // Remove translateX from transform to avoid double adjustment
-          newPos.transform = pos.transform.replace(/translateX\([^)]+\)/, '');
-        } else {
-          newPos.left = padding;
-        }
-      } else if (leftValue + elementWidth + padding > viewportWidth) {
-        if (pos.transform?.includes('translate') || pos.transform?.includes('translateX')) {
-          // Preserve vertical centering if it was set
-          newPos.left = viewportWidth - elementWidth - padding;
-          // Remove translateX from transform to avoid double adjustment
-          newPos.transform = pos.transform.replace(/translateX\([^)]+\)/, '');
-        } else {
-          newPos.left = viewportWidth - elementWidth - padding;
-        }
-      }
-      
-      console.log(`Adjusted position for viewport bounds:`, newPos);
-      return newPos;
-    };
-
     // Function to calculate position with enhanced logging
     const calculatePosition = () => {
+      // Handle step 1 positioning
       if (step.id === 1) {
         // For step 1 - position the popup exactly in center of screen
         setPosition({
@@ -129,7 +151,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           transform: 'translate(-50%, -50%)'
         });
         console.log("Positioned step 1 popup in exact center of screen");
-      } else if (step.id === 2) {
+      } 
+      // Handle step 2 positioning for arrow button
+      else if (step.id === 2) {
         // For step 2 - position the popup above the arrow button but keep the button centered
         const arrowButton = document.querySelector('.journal-arrow-button');
         if (arrowButton) {
@@ -152,7 +176,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           setPosition(ensureWithinViewport(fallbackPos));
           console.log("Arrow button not found for step 2, using fallback position");
         }
-      } else if (step.id === 3) {
+      } 
+      // Handle step 3 positioning for record entry button
+      else if (step.id === 3) {
         // For step 3 - find the record entry button with multiple selectors
         console.log("Calculating position for step 3...");
         
@@ -194,23 +220,25 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             transform: 'translateX(-50%)'
           };
           
-          setPosition(ensureWithinViewport(calculatedPos));
-          console.log("Positioned step 3 popup at:", {
-            top: rect.bottom + 20,
-            left: rect.left + (rect.width / 2)
-          });
+          // Enhanced viewport adjustment for step 3
+          const adjustedPos = ensureWithinViewport(calculatedPos);
+          setPosition(adjustedPos);
+          
+          console.log("Positioned step 3 popup at:", adjustedPos);
         } else {
           console.warn("Could not find record entry element for step 3, using fallback position");
-          // Fallback position - top center of screen
+          // Fallback position - center of screen for better visibility
           const fallbackPos = { 
-            top: 120, 
+            top: '40%', 
             left: '50%', 
-            transform: 'translateX(-50%)' 
+            transform: 'translate(-50%, -50%)' 
           };
           
           setPosition(ensureWithinViewport(fallbackPos));
         }
-      } else if (step.id === 4) {
+      } 
+      // Handle step 4 positioning for past entries tab
+      else if (step.id === 4) {
         // For step 4 - find the Past Entries tab using the same approach as step 3 for consistency
         console.log("Calculating position for step 4...");
         
@@ -243,29 +271,54 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           entriesTabElement.classList.add('tutorial-target');
           entriesTabElement.classList.add('entries-tab');
           
-          // Position below the tab - match step 3's positioning approach
-          // But ensure it stays within viewport bounds
-          const calculatedPos = {
-            top: rect.bottom + 20, // Same offset as step 3
-            left: rect.left + (rect.width / 2), // Center aligned with the tab
-            transform: 'translateX(-50%)'
-          };
+          // Mobile special positioning - on mobile devices, users may not see popups that are too low
+          const isMobile = window.innerWidth < 640;
+          let calculatedPos: PositionState;
           
-          // Use the ensureWithinViewport function to adjust the position
-          setPosition(ensureWithinViewport(calculatedPos));
-          console.log("Positioned step 4 popup at:", calculatedPos);
+          if (isMobile) {
+            // For mobile, position centered in the bottom half of screen for better visibility
+            calculatedPos = {
+              top: Math.min(rect.bottom + 20, window.innerHeight * 0.6), // No lower than 60% of screen height
+              left: '50%',
+              transform: 'translateX(-50%)'
+            };
+          } else {
+            // Desktop positioning - below the tab
+            calculatedPos = {
+              top: rect.bottom + 20,
+              left: rect.left + (rect.width / 2),
+              transform: 'translateX(-50%)'
+            };
+          }
+          
+          // Super-enhanced viewport adjustment specifically for step 4
+          // Force it up higher in the screen if at the bottom
+          const adjustedPos = { ...ensureWithinViewport(calculatedPos) };
+          
+          // Final adjustment to ensure it's visible - if still too low on screen, move it up
+          if (typeof adjustedPos.top === 'number' && adjustedPos.top > window.innerHeight * 0.7) {
+            adjustedPos.top = window.innerHeight * 0.5;
+            // Ensure it's centered horizontally for better visibility
+            adjustedPos.left = '50%'; 
+            adjustedPos.transform = 'translate(-50%, -50%)';
+          }
+          
+          setPosition(adjustedPos);
+          console.log("Positioned step 4 popup at:", adjustedPos);
         } else {
           console.warn("Could not find Past Entries tab for step 4, using fallback position");
           // Fallback position - similar to step 3's fallback but adjusted for viewport
           const fallbackPos = { 
-            top: 120, 
-            left: '70%', // Position toward the right side where Past Entries tab would be
-            transform: 'translateX(-50%)' 
+            top: '40%', 
+            left: '50%', 
+            transform: 'translate(-50%, -50%)' 
           };
           
           setPosition(ensureWithinViewport(fallbackPos));
         }
-      } else if (step.targetElement) {
+      } 
+      // Handle generic positioning for other steps
+      else if (step.targetElement) {
         // Generic positioning for other steps with viewport boundary checks
         const targetElement = document.querySelector(step.targetElement);
         
@@ -360,8 +413,31 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     // Set up a secondary check after short delay to handle dynamic elements
     const secondaryCheck = setTimeout(calculatePosition, 300);
     
+    // Add a tertiary check for visibility
+    const tertiaryCheck = setTimeout(() => {
+      // Final forced position check - especially important for step 4
+      if (step.id === 4) {
+        console.log("Performing final position check for step 4");
+        if (stepRef.current) {
+          const rect = stepRef.current.getBoundingClientRect();
+          console.log("Current step 4 popup position:", rect);
+          
+          // If popup is off screen or too close to bottom, force it to center
+          if (rect.bottom > window.innerHeight - 20 || rect.top < 20) {
+            console.log("Step 4 popup may be off screen, forcing center position");
+            setPosition({
+              top: '50%',
+              left: '50%',
+              transform: 'translate(-50%, -50%)'
+            });
+          }
+        }
+      }
+    }, 500);
+    
     return () => {
       clearTimeout(secondaryCheck);
+      clearTimeout(tertiaryCheck);
       
       // Clean up any highlight classes when unmounting
       if (step.targetElement) {

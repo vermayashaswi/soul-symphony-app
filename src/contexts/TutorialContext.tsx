@@ -1,7 +1,8 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
+import { toast } from '@/hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAppRoute } from '@/routes/RouteHelpers';
 
@@ -231,7 +232,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       
       setIsActive(false);
-      toast.success('Tutorial completed!');
+      toast({
+        title: "Tutorial completed!",
+        description: "You can reset it any time in settings."
+      });
       console.log('Tutorial marked as completed');
     } catch (error) {
       console.error('Error completing tutorial:', error);
@@ -293,14 +297,17 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       
       setIsActive(false);
-      toast.info('Tutorial skipped. You can always find help in the settings.');
+      toast({
+        title: "Tutorial skipped",
+        description: "You can always find help in the settings."
+      });
       console.log('Tutorial skipped by user');
     } catch (error) {
       console.error('Error skipping tutorial:', error);
     }
   };
   
-  // Function to reset the tutorial - updated to ensure proper navigation
+  // Function to reset the tutorial - updated to ensure proper navigation and toast timing
   const resetTutorial = async () => {
     if (!user) return;
     
@@ -315,26 +322,47 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         
       if (error) {
         console.error('Error resetting tutorial:', error);
-        toast.error('Failed to reset tutorial. Please try again.');
+        toast({
+          title: "Error",
+          description: "Failed to reset tutorial. Please try again.",
+          variant: "destructive"
+        });
         return;
       }
       
       setCurrentStep(0);
       setTutorialChecked(false);
       
-      // First navigate, then show toast - this ensures the toast appears after navigation
-      console.log('Tutorial reset - redirecting to app home');
-      
-      // Only show toast if we're already on an app route
-      if (isAppRoute(location.pathname)) {
-        toast.success('Tutorial reset successfully! Redirecting to home page...');
+      // Only navigate if we're not already on the app home page
+      if (location.pathname !== '/app/home') {
+        // First navigate to app home - use replace to prevent back navigation
+        console.log('Tutorial reset - redirecting to app home');
+        
+        // Display toast only if we're already on an app route
+        // This prevents toast from appearing on website routes
+        if (isAppRoute(location.pathname)) {
+          toast({
+            title: "Tutorial reset successfully!",
+            description: "Redirecting to app home page..."
+          });
+        }
+        
+        navigate('/app/home', { replace: true });
+      } else {
+        // If already on /app/home, just show toast and activate tutorial
+        toast({
+          title: "Tutorial reset successfully!",
+          description: "Restart from step 1"
+        });
+        setIsActive(true);
       }
-      
-      // Navigate to home page to start the tutorial - use replace to prevent back navigation
-      navigate('/app/home', { replace: true });
     } catch (error) {
       console.error('Error resetting tutorial:', error);
-      toast.error('Something went wrong. Please try again.');
+      toast({
+        title: "Error",
+        description: "Something went wrong. Please try again.",
+        variant: "destructive"
+      });
     }
   };
   

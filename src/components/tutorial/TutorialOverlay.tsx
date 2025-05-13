@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -37,8 +38,20 @@ const TutorialOverlay: React.FC = () => {
   const [elementForStep3Found, setElementForStep3Found] = useState(false);
   const [attempts, setAttempts] = useState(0);
   
-  // Only render tutorial on app routes
-  const shouldShowTutorial = isActive && isAppRoute(location.pathname);
+  // Only render tutorial on app routes - strict checking
+  const currentPath = location.pathname;
+  const isAppRouteCurrent = isAppRoute(currentPath);
+  const shouldShowTutorial = isActive && isAppRouteCurrent;
+  
+  // Log whenever the component is rendered and what the decision is
+  useEffect(() => {
+    console.log('TutorialOverlay render check:', {
+      isActive,
+      currentPath,
+      isAppRouteCurrent,
+      shouldShowTutorial
+    });
+  }, [isActive, currentPath, isAppRouteCurrent, shouldShowTutorial]);
   
   // Enhanced scrolling prevention when tutorial is active
   useEffect(() => {
@@ -175,10 +188,12 @@ const TutorialOverlay: React.FC = () => {
         buttonElement.classList.add('tutorial-button-highlight');
         console.log("Added enhanced highlighting effect to button element");
         
-        // Force stronger glow effect with inline styles
+        // Force stronger glow effect with inline styles - important for visibility
         const buttonStyleEl = buttonElement as HTMLElement;
-        buttonStyleEl.style.boxShadow = "0 0 30px 15px var(--color-theme)";
-        buttonStyleEl.style.animation = "button-pulse 2s infinite alternate";
+        buttonStyleEl.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+        buttonStyleEl.style.animation = "button-pulse 1.5s infinite alternate";
+        buttonStyleEl.style.border = "2px solid white";
+        buttonStyleEl.style.transform = "scale(1.05)";
         
         // Log positioning
         const rect = buttonElement.getBoundingClientRect();
@@ -189,7 +204,13 @@ const TutorialOverlay: React.FC = () => {
       const outerGlowDiv = arrowButton.querySelector('.bg-primary\\/30');
       if (outerGlowDiv) {
         outerGlowDiv.classList.add('tutorial-button-outer-glow');
-        console.log("Added outer glow effect");
+        
+        // Add stronger glow for better visibility
+        const glowElement = outerGlowDiv as HTMLElement;
+        glowElement.style.filter = "drop-shadow(0 0 25px var(--color-theme))";
+        glowElement.style.opacity = "0.95";
+        
+        console.log("Added enhanced outer glow effect");
       }
       
       // Clean up when step changes
@@ -210,11 +231,16 @@ const TutorialOverlay: React.FC = () => {
           if (buttonStyleEl) {
             buttonStyleEl.style.boxShadow = "";
             buttonStyleEl.style.animation = "";
+            buttonStyleEl.style.border = "";
+            buttonStyleEl.style.transform = "";
           }
         }
         
         if (outerGlowDiv) {
           outerGlowDiv.classList.remove('tutorial-button-outer-glow');
+          const glowElement = outerGlowDiv as HTMLElement;
+          glowElement.style.filter = "";
+          glowElement.style.opacity = "";
         }
       };
     } else {
@@ -272,6 +298,16 @@ const TutorialOverlay: React.FC = () => {
         const elements = document.querySelectorAll(selector);
         elements.forEach(element => {
           element.classList.remove('tutorial-target', 'record-entry-tab', 'tutorial-highlight');
+          
+          // Also remove inline styles
+          const el = element as HTMLElement;
+          if (el) {
+            el.style.visibility = '';
+            el.style.opacity = '';
+            el.style.pointerEvents = '';
+            el.style.position = '';
+            el.style.zIndex = '';
+          }
         });
       });
     };
@@ -308,6 +344,7 @@ const TutorialOverlay: React.FC = () => {
       elementStyle.style.pointerEvents = 'auto';
       elementStyle.style.position = 'relative';
       elementStyle.style.zIndex = '10000';
+      elementStyle.style.boxShadow = '0 0 20px 10px var(--color-theme)';
       
       console.log("Added classes and styles to Record Entry element");
       
@@ -373,6 +410,7 @@ const TutorialOverlay: React.FC = () => {
         elementStyle.style.pointerEvents = 'auto';
         elementStyle.style.position = 'relative';
         elementStyle.style.zIndex = '10000';
+        elementStyle.style.boxShadow = '0 0 20px 10px var(--color-theme)';
         
         console.log("Added classes and styles to Past Entries tab element");
         
@@ -408,6 +446,7 @@ const TutorialOverlay: React.FC = () => {
             el.style.pointerEvents = '';
             el.style.position = '';
             el.style.zIndex = '';
+            el.style.boxShadow = '';
           }
         });
       });
@@ -415,7 +454,10 @@ const TutorialOverlay: React.FC = () => {
   };
 
   // If not an app route or tutorial not active, don't render anything
-  if (!shouldShowTutorial) return null;
+  if (!shouldShowTutorial) {
+    console.log('TutorialOverlay not shown: isActive=', isActive, 'isAppRoute=', isAppRouteCurrent);
+    return null;
+  }
 
   const currentTutorialStep = steps[currentStep];
   const isFirstStep = currentStep === 0;

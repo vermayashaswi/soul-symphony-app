@@ -21,7 +21,7 @@ const JournalNavigationButton: React.FC = () => {
     }
   };
 
-  // Enhanced logging for button positioning - for better debugging
+  // Enhanced handling for button highlighting in tutorial mode
   useEffect(() => {
     if (buttonRef.current) {
       const rect = buttonRef.current.getBoundingClientRect();
@@ -30,26 +30,39 @@ const JournalNavigationButton: React.FC = () => {
         x: rect.left + rect.width / 2,
         y: rect.top + rect.height / 2
       });
-      console.log('Viewport center:', {
-        x: window.innerWidth / 2,
-        y: window.innerHeight / 2
-      });
       
-      // Calculate offset from viewport center
-      const centerX = rect.left + rect.width / 2;
-      const centerY = rect.top + rect.height / 2;
-      const offsetX = centerX - (window.innerWidth / 2);
-      const offsetY = centerY - (window.innerHeight / 2);
-      console.log('Offset from viewport center:', { x: offsetX, y: offsetY });
-      
-      // Log if we're in the tutorial step
-      console.log('Is in arrow tutorial step:', isInArrowTutorialStep);
-      
+      // Apply special styles when in tutorial step 2
       if (isInArrowTutorialStep) {
-        // Additional debugging for tutorial mode
-        console.log('Button should be highlighted in tutorial mode');
+        console.log('Applying enhanced glow effect for tutorial step 2');
         
-        // Check if classes are applied
+        // Apply tutorial-target class
+        buttonRef.current.classList.add('tutorial-target');
+        
+        // Apply enhanced styles to the button directly
+        const buttonElement = buttonRef.current.querySelector('button');
+        if (buttonElement) {
+          buttonElement.classList.add('tutorial-button-highlight');
+          
+          // Force stronger glow effect with inline styles
+          const buttonStyleEl = buttonElement as HTMLElement;
+          buttonStyleEl.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+          buttonStyleEl.style.animation = "button-pulse 1.5s infinite alternate";
+          buttonStyleEl.style.border = "2px solid white";
+          buttonStyleEl.style.transform = "scale(1.05)";
+        }
+        
+        // Apply enhanced styles to the glow div
+        const glowDiv = buttonRef.current.querySelector('.bg-primary\\/30');
+        if (glowDiv) {
+          glowDiv.classList.add('tutorial-button-outer-glow');
+          
+          // Add stronger glow for better visibility
+          const glowElement = glowDiv as HTMLElement;
+          glowElement.style.filter = "drop-shadow(0 0 25px var(--color-theme))";
+          glowElement.style.opacity = "0.95";
+        }
+        
+        // Check after a short delay if styles were applied correctly
         setTimeout(() => {
           const hasTargetClass = buttonRef.current?.classList.contains('tutorial-target');
           const buttonElement = buttonRef.current?.querySelector('button');
@@ -58,14 +71,49 @@ const JournalNavigationButton: React.FC = () => {
           console.log('Has tutorial-target class:', hasTargetClass);
           console.log('Button has highlight class:', hasHighlightClass);
           
-          // Log z-index and other styles
-          if (buttonRef.current) {
-            const computedStyle = window.getComputedStyle(buttonRef.current);
-            console.log('Computed z-index:', computedStyle.zIndex);
-            console.log('Computed visibility:', computedStyle.visibility);
-            console.log('Computed opacity:', computedStyle.opacity);
+          // Reapply if needed
+          if (!hasTargetClass) {
+            console.log('Reapplying tutorial-target class');
+            buttonRef.current?.classList.add('tutorial-target');
           }
-        }, 500);
+          
+          if (!hasHighlightClass && buttonElement) {
+            console.log('Reapplying tutorial-button-highlight class');
+            buttonElement.classList.add('tutorial-button-highlight');
+            
+            // Force stronger glow effect with inline styles again
+            const buttonStyleEl = buttonElement as HTMLElement;
+            buttonStyleEl.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+            buttonStyleEl.style.animation = "button-pulse 1.5s infinite alternate";
+            buttonStyleEl.style.border = "2px solid white";
+            buttonStyleEl.style.transform = "scale(1.05)";
+          }
+        }, 200);
+      } else {
+        // Clean up tutorial styles when not in step 2
+        buttonRef.current.classList.remove('tutorial-target');
+        
+        const buttonElement = buttonRef.current.querySelector('button');
+        if (buttonElement) {
+          buttonElement.classList.remove('tutorial-button-highlight');
+          
+          // Remove inline styles
+          const buttonStyleEl = buttonElement as HTMLElement;
+          buttonStyleEl.style.boxShadow = "";
+          buttonStyleEl.style.animation = "";
+          buttonStyleEl.style.border = "";
+          buttonStyleEl.style.transform = "";
+        }
+        
+        const glowDiv = buttonRef.current.querySelector('.bg-primary\\/30');
+        if (glowDiv) {
+          glowDiv.classList.remove('tutorial-button-outer-glow');
+          
+          // Remove inline styles
+          const glowElement = glowDiv as HTMLElement;
+          glowElement.style.filter = "";
+          glowElement.style.opacity = "";
+        }
       }
     }
   }, [isInArrowTutorialStep]);
@@ -99,12 +147,12 @@ const JournalNavigationButton: React.FC = () => {
         }`}
         initial={{ scale: 1, opacity: 0.5 }}
         animate={{
-          scale: isInArrowTutorialStep ? [1, 1.3, 1] : [1, 1.15, 1],
-          opacity: isInArrowTutorialStep ? [0.5, 0.95, 0.5] : [0.5, 0.8, 0.5]
+          scale: isInArrowTutorialStep ? [1, 1.4, 1] : [1, 1.15, 1],
+          opacity: isInArrowTutorialStep ? [0.6, 1, 0.6] : [0.5, 0.8, 0.5]
         }}
         transition={{
           repeat: Infinity,
-          duration: isInArrowTutorialStep ? 1.2 : 2,
+          duration: isInArrowTutorialStep ? 1 : 2,
           ease: "easeInOut"
         }}
         style={{
@@ -112,7 +160,7 @@ const JournalNavigationButton: React.FC = () => {
           height: "calc(100% + 20px)",
           top: "-10px",
           left: "-10px",
-          filter: isInArrowTutorialStep ? "drop-shadow(0 0 15px var(--color-theme))" : "none",
+          filter: isInArrowTutorialStep ? "drop-shadow(0 0 25px var(--color-theme))" : "none",
         }}
       />
       <motion.button
@@ -126,7 +174,8 @@ const JournalNavigationButton: React.FC = () => {
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
         style={{
-          boxShadow: isInArrowTutorialStep ? "0 0 30px 15px var(--color-theme)" : "",
+          boxShadow: isInArrowTutorialStep ? "0 0 35px 20px var(--color-theme)" : "",
+          border: isInArrowTutorialStep ? "2px solid white" : "",
         }}
       >
         <ArrowRight className="text-primary-foreground h-8 w-8" />

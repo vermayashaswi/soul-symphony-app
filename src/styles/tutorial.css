@@ -19,7 +19,7 @@
   inset: -8px;
   background: radial-gradient(
     circle at center,
-    rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.4) 0%,
+    rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.6) 0%,
     transparent 70%
   );
   border-radius: inherit;
@@ -30,10 +30,10 @@
 
 @keyframes glow {
   from {
-    box-shadow: 0 0 5px 2px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3);
+    box-shadow: 0 0 10px 4px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.4);
   }
   to {
-    box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.6);
+    box-shadow: 0 0 20px 8px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7);
   }
 }
 
@@ -74,6 +74,7 @@ body.tutorial-active {
   visibility: visible !important;
   max-height: unset !important; /* Remove any height restrictions */
   overflow: visible !important;
+  box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.5) !important;
 }
 
 /* Enhanced journal header text visibility for tutorial step 1 */
@@ -106,16 +107,17 @@ body.tutorial-active {
 
 /* Step 2: Button highlight - stronger glow effect */
 .tutorial-button-highlight {
-  box-shadow: 0 0 30px 15px var(--color-theme) !important;
-  animation: button-pulse 2s infinite alternate !important;
+  box-shadow: 0 0 35px 20px var(--color-theme) !important;
+  animation: button-pulse 1.5s infinite alternate !important;
   border: 2px solid white !important;
+  transform: scale(1.05) !important;
 }
 
 /* Step 2: Outer glow styling */
 .tutorial-button-outer-glow {
-  filter: drop-shadow(0 0 15px var(--color-theme)) !important;
+  filter: drop-shadow(0 0 25px var(--color-theme)) !important;
   opacity: 0.95 !important;
-  animation: outer-glow-pulse 2s infinite alternate !important;
+  animation: outer-glow-pulse 1.5s infinite alternate !important;
 }
 
 /* Step 3 & 4: Tab highlighting styling */
@@ -129,8 +131,8 @@ button[data-tutorial-target="past-entries"].tutorial-target,
 #past-entries-button.tutorial-target {
   z-index: 10000 !important;
   position: relative !important;
-  box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7) !important;
-  animation: tab-pulse 2s infinite alternate !important;
+  box-shadow: 0 0 20px 10px var(--color-theme) !important;
+  animation: tab-pulse 1.5s infinite alternate !important;
   border-radius: 0.5rem;
   pointer-events: auto !important;
   visibility: visible !important;
@@ -146,7 +148,7 @@ button[data-tutorial-target="record-entry"].tutorial-target,
 #new-entry-button.tutorial-target {
   z-index: 10000 !important; /* Higher z-index than normal tutorial targets */
   position: relative !important;
-  box-shadow: 0 0 20px 10px var(--color-theme) !important; 
+  box-shadow: 0 0 25px 12px var(--color-theme) !important; 
   animation: strong-tab-pulse 1.5s infinite alternate !important;
   outline: 2px solid white !important;
   opacity: 1 !important;
@@ -160,7 +162,7 @@ button[data-tutorial-target="past-entries"].tutorial-target,
 #past-entries-button.tutorial-target {
   z-index: 10000 !important;
   position: relative !important;
-  box-shadow: 0 0 20px 10px var(--color-theme) !important; 
+  box-shadow: 0 0 25px 12px var(--color-theme) !important; 
   animation: strong-tab-pulse 1.5s infinite alternate !important;
   outline: 2px solid white !important;
   opacity: 1 !important;
@@ -176,26 +178,26 @@ button[data-tutorial-target="past-entries"].tutorial-target,
 
 /* Step 3 & 4: Tab pulsating animation */
 @keyframes tab-pulse {
-  0% { box-shadow: 0 0 10px 3px var(--color-theme); }
-  100% { box-shadow: 0 0 20px 6px var(--color-theme); }
+  0% { box-shadow: 0 0 15px 5px var(--color-theme); }
+  100% { box-shadow: 0 0 25px 8px var(--color-theme); }
 }
 
 /* Step 3 & 4: Stronger pulsating animation */
 @keyframes strong-tab-pulse {
-  0% { box-shadow: 0 0 15px 5px var(--color-theme); }
-  100% { box-shadow: 0 0 30px 10px var(--color-theme); }
+  0% { box-shadow: 0 0 20px 8px var(--color-theme); }
+  100% { box-shadow: 0 0 35px 15px var(--color-theme); }
 }
 
 /* Step 2: Enhanced pulsating animation for the central button */
 @keyframes button-pulse {
   0% { box-shadow: 0 0 25px 12px var(--color-theme); }
-  100% { box-shadow: 0 0 40px 18px var(--color-theme); }
+  100% { box-shadow: 0 0 45px 20px var(--color-theme); }
 }
 
 /* Step 2: Outer glow pulsating animation */
 @keyframes outer-glow-pulse {
-  0% { filter: drop-shadow(0 0 10px var(--color-theme)); opacity: 0.7; }
-  100% { filter: drop-shadow(0 0 25px var(--color-theme)); opacity: 0.95; }
+  0% { filter: drop-shadow(0 0 15px var(--color-theme)); opacity: 0.7; }
+  100% { filter: drop-shadow(0 0 35px var(--color-theme)); opacity: 1; }
 }
 
 @keyframes pulse {
@@ -222,6 +224,8 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   pointer-events: auto !important;
   max-width: 320px;
   width: calc(100% - 40px); /* Ensure it fits on mobile screens with margin */
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5) !important;
+  border: 2px solid var(--color-theme) !important;
 }
 
 /* Ensure all tutorial step content is visible */
@@ -250,16 +254,19 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   box-shadow: 0 0 10px 2px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7);
 }
 
-/* Tutorial modal style enhancements */
-.tutorial-step-container {
-  box-shadow: 0 0 20px rgba(0, 0, 0, 0.4) !important;
-}
-
 /* Add special media queries for smaller screens */
 @media (max-width: 640px) {
   .tutorial-step-container {
     max-width: 280px;
     padding: 12px !important;
     font-size: 0.9rem;
+  }
+  
+  /* For step 3 & 4 on mobile, ensure popups stay in visible area */
+  #tutorial-step-3-popup,
+  #tutorial-step-4-popup {
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
   }
 }
