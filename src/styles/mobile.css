@@ -43,11 +43,13 @@
     padding: 0 !important;
   }
   
-  /* Prevent horizontal scrolling at the root level */
+  /* Fix for body and html - allow vertical scrolling but prevent horizontal */
   html, body {
     overflow-x: hidden !important;
     width: 100% !important;
     position: relative !important;
+    overflow-y: auto !important; /* Allow vertical scrolling */
+    height: auto !important; /* Allow content to expand */
   }
   
   /* Fix for the App.css padding causing overflow */
@@ -56,6 +58,8 @@
     padding-right: 0 !important;
     max-width: 100% !important;
     overflow-x: hidden !important;
+    overflow-y: visible !important; /* Allow vertical scrolling */
+    height: auto !important; /* Allow content to expand */
   }
   
   /* iOS-specific padding for safe areas */
@@ -131,6 +135,13 @@
 
 /* Styles for both mobile and desktop */
 @media all {
+  /* Fix content container to allow scrolling */
+  .app-container {
+    overflow-y: auto !important;
+    height: auto !important;
+    min-height: 100vh !important;
+  }
+  
   /* Ensure SoulNet container has proper padding when not in fullscreen */
   .soulnet-container:not(.fixed) {
     margin: 0 8px !important;

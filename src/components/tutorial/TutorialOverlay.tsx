@@ -420,6 +420,34 @@ const TutorialOverlay: React.FC = () => {
     }
   }, [user, isTutorialActive, startTutorial]);
   
+  // New effect to fix body styles when tutorial is active
+  useEffect(() => {
+    if (isTutorialActive) {
+      // Add tutorial-active class but don't block scrolling
+      document.body.classList.add('tutorial-active');
+      document.body.style.overflow = 'auto';
+      document.body.style.height = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.documentElement.style.height = 'auto';
+    } else {
+      // Remove tutorial-active class when tutorial is not active
+      document.body.classList.remove('tutorial-active');
+      document.body.style.overflow = 'auto';
+      document.body.style.height = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.documentElement.style.height = 'auto';
+    }
+    
+    return () => {
+      // Cleanup
+      document.body.classList.remove('tutorial-active');
+      document.body.style.overflow = 'auto';
+      document.body.style.height = 'auto';
+      document.documentElement.style.overflow = 'auto';
+      document.documentElement.style.height = 'auto';
+    };
+  }, [isTutorialActive]);
+  
   return (
     <div>
       {/* This is just a placeholder. Keep existing JSX return content */}

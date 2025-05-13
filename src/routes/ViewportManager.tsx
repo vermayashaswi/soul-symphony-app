@@ -40,10 +40,27 @@ const ViewportManager: React.FC = () => {
     user: !!user
   });
   
+  // Enable scrolling on mount
+  useEffect(() => {
+    // Remove any restrictions on scrolling
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
+    
+    return () => {
+      // Reset when unmounting (though this component is unlikely to unmount)
+      document.body.style.overflow = '';
+      document.body.style.height = '';
+      document.documentElement.style.overflow = '';
+      document.documentElement.style.height = '';
+    };
+  }, []);
+  
   // Render the appropriate layout based on route and device
   return (
     <>
-      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} overflow-x-hidden`}>
+      <div className="app-container overflow-x-hidden overflow-y-auto min-h-screen">
         <Outlet />
       </div>
       

@@ -46,24 +46,24 @@
   line-height: 1rem;
 }
 
-/* Updated overlay with better blocking of background interactions */
+/* Updated overlay with better blocking of background interactions but allowing scrolling */
 .tutorial-overlay {
   position: fixed;
   inset: 0;
   z-index: 9997;
   background-color: rgba(0, 0, 0, 0.75);
   pointer-events: auto !important;
-  touch-action: none !important;
-  overflow: hidden !important;
+  touch-action: pan-y !important; /* Allow vertical scrolling */
+  overflow-y: auto !important; /* Allow vertical scrolling */
 }
 
-/* Enhanced body style when tutorial is active - stronger scroll prevention */
+/* Enhanced body style when tutorial is active - only prevent horizontal scrolling */
 body.tutorial-active {
-  overflow: hidden !important;
-  touch-action: none !important;
-  position: fixed !important; /* Keep body fixed to prevent any scrolling */
+  overflow-x: hidden !important;
+  touch-action: pan-y !important; /* Allow vertical scrolling */
+  position: relative !important; /* Allow scrolling */
   width: 100% !important;
-  height: 100% !important;
+  height: auto !important; /* Allow scrolling */
 }
 
 /* Journal header highlighting for tutorial step 1 - improved visibility */
