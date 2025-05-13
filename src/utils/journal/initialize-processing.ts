@@ -1,5 +1,6 @@
 
 import { processingStateManager, EntryProcessingState } from './processing-state-manager';
+import { showToast } from './toast-helper';
 
 export function initializeJournalProcessing() {
   // Restore state from localStorage on app start
