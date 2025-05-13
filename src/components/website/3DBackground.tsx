@@ -1,7 +1,7 @@
 
 import React, { useRef } from 'react';
 import { Canvas, useFrame } from '@react-three/fiber';
-import { Sphere, Stars } from '@react-three/drei';
+import { OrbitControls } from '@react-three/drei';
 import * as THREE from 'three';
 
 // Animated sphere component
@@ -20,7 +20,8 @@ const AnimatedSphere = ({ position = [0, 0, 0], size = 1, color = "#8a2be2" }) =
   });
   
   return (
-    <Sphere ref={sphereRef} args={[size, 32, 32]} position={position as [number, number, number]}>
+    <mesh ref={sphereRef} position={position as [number, number, number]}>
+      <sphereGeometry args={[size, 32, 32]} />
       <meshStandardMaterial 
         color={color} 
         roughness={0.4} 
@@ -30,7 +31,7 @@ const AnimatedSphere = ({ position = [0, 0, 0], size = 1, color = "#8a2be2" }) =
         transparent
         opacity={0.7}
       />
-    </Sphere>
+    </mesh>
   );
 };
 
@@ -42,8 +43,8 @@ export const ThreeDBackground: React.FC = () => {
         <ambientLight intensity={0.4} />
         <directionalLight position={[10, 10, 5]} intensity={1} />
         
-        {/* Stars background */}
-        <Stars radius={50} depth={50} count={1000} factor={4} />
+        {/* Create our own stars background */}
+        <Stars />
         
         {/* Animated spheres */}
         <AnimatedSphere position={[-3, 1, -2]} size={0.8} color="#8a2be2" />
@@ -52,8 +53,52 @@ export const ThreeDBackground: React.FC = () => {
         
         {/* Add fog for depth */}
         <fog attach="fog" args={["#000", 8, 30]} />
+        
+        {/* Add orbit controls for interactivity */}
+        <OrbitControls enableZoom={false} enablePan={false} enableRotate={true} />
       </Canvas>
     </div>
+  );
+};
+
+// Custom Stars component since we can't use the drei Stars
+const Stars = () => {
+  const groupRef = useRef<THREE.Group>(null);
+  
+  // Generate random stars
+  const starCount = 1000;
+  const positions = React.useMemo(() => {
+    const pos = [];
+    for (let i = 0; i < starCount; i++) {
+      const x = (Math.random() - 0.5) * 100;
+      const y = (Math.random() - 0.5) * 100;
+      const z = (Math.random() - 0.5) * 100;
+      pos.push(x, y, z);
+    }
+    return new Float32Array(pos);
+  }, [starCount]);
+  
+  // Animate stars
+  useFrame(({ clock }) => {
+    if (groupRef.current) {
+      groupRef.current.rotation.y = clock.getElapsedTime() * 0.02;
+    }
+  });
+  
+  return (
+    <group ref={groupRef}>
+      <points>
+        <bufferGeometry>
+          <bufferAttribute
+            attach="attributes-position"
+            count={starCount}
+            array={positions}
+            itemSize={3}
+          />
+        </bufferGeometry>
+        <pointsMaterial size={0.1} color="#ffffff" sizeAttenuation={true} />
+      </points>
+    </group>
   );
 };
 
