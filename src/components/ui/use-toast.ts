@@ -1,4 +1,3 @@
 
-// Re-export from the source hook file
-import { useToast, toast, type ToastProps } from "@/hooks/use-toast";
-export { useToast, toast, type ToastProps };
+// Directly re-export from the source file to avoid circular imports
+export { useToast, toast } from "@/hooks/use-toast";

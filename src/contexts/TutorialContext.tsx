@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // Tutorial step definition
@@ -20,11 +21,11 @@ export interface TutorialContextProps {
   prevStep: () => void;
   startTutorial: () => void;
   skipTutorial: () => void;
-  resetTutorial: () => Promise<void>;
-  endTutorial: () => Promise<void>; 
-  markStepAsComplete: (step: number) => void;
-  isTutorialActive: boolean;
-  isStepComplete: (step: number) => boolean;
+  resetTutorial: () => void;
+  endTutorial: () => void; // Added missing property
+  markStepAsComplete: (step: number) => void; // Added missing property
+  isTutorialActive: boolean; // Added missing property
+  isStepComplete: (step: number) => boolean; // Added missing property
 }
 
 // Create the context with a default value
@@ -37,11 +38,11 @@ export const TutorialContext = createContext<TutorialContextProps>({
   prevStep: () => {},
   startTutorial: () => {},
   skipTutorial: () => {},
-  resetTutorial: () => Promise.resolve(),
-  endTutorial: () => Promise.resolve(),
-  markStepAsComplete: () => {},
-  isTutorialActive: false,
-  isStepComplete: () => false,
+  resetTutorial: () => {},
+  endTutorial: () => {}, // Added missing property
+  markStepAsComplete: () => {}, // Added missing property
+  isTutorialActive: false, // Added missing property
+  isStepComplete: () => false, // Added missing property
 });
 
 // Create the provider component
@@ -118,83 +119,25 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   };
 
   const startTutorial = () => {
-    // Force document body class for styling
-    document.body.classList.add('tutorial-active');
-    
-    console.log('Starting tutorial');
     setIsActive(true);
     setCurrentStep(0);
-    
-    // Reset completed steps when starting fresh
-    setCompletedSteps(new Set());
   };
 
   const skipTutorial = () => {
-    document.body.classList.remove('tutorial-active');
-    
-    console.log('Skipping tutorial');
     setIsActive(false);
     setCurrentStep(0);
-    
-    // Clear completed steps when skipping
-    setCompletedSteps(new Set());
-    
-    // Make sure we reset body styles immediately
-    document.body.style.overflow = 'auto';
-    document.body.style.height = 'auto';
-    document.documentElement.style.overflow = 'auto';
-    document.documentElement.style.height = 'auto';
   };
   
-  const resetTutorial = async () => {
-    console.log('Resetting tutorial');
-    
-    // First ensure we're not active before restarting
-    setIsActive(false);
+  const resetTutorial = () => {
+    setIsActive(true);
     setCurrentStep(0);
-    setCompletedSteps(new Set());
-    
-    // Remove tutorial-active class immediately
-    document.body.classList.remove('tutorial-active');
-    
-    // Enable scrolling to prevent page from being frozen
-    document.body.style.overflow = 'auto';
-    document.body.style.height = 'auto';
-    document.documentElement.style.overflow = 'auto';
-    document.documentElement.style.height = 'auto';
-    
-    // Short delay to ensure clean reset before starting again
-    return new Promise<void>((resolve) => {
-      setTimeout(() => {
-        // Force document body class for styling
-        document.body.classList.add('tutorial-active');
-        
-        // Enable scrolling to prevent page from being frozen
-        document.body.style.overflow = 'auto';
-        document.body.style.height = 'auto';
-        document.documentElement.style.overflow = 'auto';
-        document.documentElement.style.height = 'auto';
-        
-        setIsActive(true);
-        resolve();
-      }, 50);
-    });
+    return Promise.resolve();
   };
   
-  const endTutorial = async () => {
-    document.body.classList.remove('tutorial-active');
-    
-    console.log('Ending tutorial');
+  // Added missing functions
+  const endTutorial = () => {
     setIsActive(false);
     setCurrentStep(0);
-    setCompletedSteps(new Set());
-    
-    // Reset body styles immediately
-    document.body.style.overflow = 'auto';
-    document.body.style.height = 'auto';
-    document.documentElement.style.overflow = 'auto';
-    document.documentElement.style.height = 'auto';
-    
     return Promise.resolve();
   };
   
@@ -209,31 +152,6 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
   const isStepComplete = (step: number) => {
     return completedSteps.has(step);
   };
-  
-  // Clean up body class when component unmounts
-  useEffect(() => {
-    return () => {
-      document.body.classList.remove('tutorial-active');
-      
-      // Reset overflow settings on unmount
-      document.body.style.overflow = 'auto';
-      document.body.style.height = 'auto';
-      document.documentElement.style.overflow = 'auto';
-      document.documentElement.style.height = 'auto';
-    };
-  }, []);
-
-  // Add effect to ensure proper body styles
-  useEffect(() => {
-    if (isActive) {
-      document.body.classList.add('tutorial-active');
-      // Enable scrolling
-      document.body.style.overflow = 'auto';
-      document.body.style.height = 'auto';
-    } else {
-      document.body.classList.remove('tutorial-active');
-    }
-  }, [isActive]);
 
   // Provide the context value
   return (

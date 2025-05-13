@@ -11,7 +11,6 @@ import { Separator } from '@/components/ui/separator';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTheme } from '@/hooks/use-theme';
 import { toast } from 'sonner';
-import { useTutorialNavigation } from '@/hooks/use-tutorial-navigation';
 
 // Define the steps for the tutorial
 const tutorialSteps = [
@@ -89,9 +88,6 @@ const tutorialSteps = [
 
 // Define the TutorialOverlay component
 const TutorialOverlay: React.FC = () => {
-  // Use the tutorial navigation hook to ensure we're on the right page
-  useTutorialNavigation();
-  
   const { 
     currentStep, 
     startTutorial, 
@@ -423,34 +419,6 @@ const TutorialOverlay: React.FC = () => {
       startTutorial();
     }
   }, [user, isTutorialActive, startTutorial]);
-  
-  // New effect to fix body styles when tutorial is active
-  useEffect(() => {
-    if (isTutorialActive) {
-      // Add tutorial-active class but don't block scrolling
-      document.body.classList.add('tutorial-active');
-      document.body.style.overflow = 'auto';
-      document.body.style.height = 'auto';
-      document.documentElement.style.overflow = 'auto';
-      document.documentElement.style.height = 'auto';
-    } else {
-      // Remove tutorial-active class when tutorial is not active
-      document.body.classList.remove('tutorial-active');
-      document.body.style.overflow = 'auto';
-      document.body.style.height = 'auto';
-      document.documentElement.style.overflow = 'auto';
-      document.documentElement.style.height = 'auto';
-    }
-    
-    return () => {
-      // Cleanup
-      document.body.classList.remove('tutorial-active');
-      document.body.style.overflow = 'auto';
-      document.body.style.height = 'auto';
-      document.documentElement.style.overflow = 'auto';
-      document.documentElement.style.height = 'auto';
-    };
-  }, [isTutorialActive]);
   
   return (
     <div>

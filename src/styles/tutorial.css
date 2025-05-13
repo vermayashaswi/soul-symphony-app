@@ -46,24 +46,24 @@
   line-height: 1rem;
 }
 
-/* Updated overlay with better blocking of background interactions but allowing scrolling */
+/* Updated overlay with better blocking of background interactions */
 .tutorial-overlay {
   position: fixed;
   inset: 0;
   z-index: 9997;
   background-color: rgba(0, 0, 0, 0.75);
   pointer-events: auto !important;
-  touch-action: pan-y !important; /* Allow vertical scrolling */
-  overflow-y: auto !important; /* Allow vertical scrolling */
+  touch-action: none !important;
+  overflow: hidden !important;
 }
 
-/* Enhanced body style when tutorial is active - only prevent horizontal scrolling */
+/* Enhanced body style when tutorial is active - stronger scroll prevention */
 body.tutorial-active {
-  overflow-x: hidden !important;
-  touch-action: pan-y !important; /* Allow vertical scrolling */
-  position: relative !important; /* Allow scrolling */
+  overflow: hidden !important;
+  touch-action: none !important;
+  position: fixed !important; /* Keep body fixed to prevent any scrolling */
   width: 100% !important;
-  height: auto !important; /* Allow scrolling */
+  height: 100% !important;
 }
 
 /* Journal header highlighting for tutorial step 1 - improved visibility */
@@ -98,11 +98,6 @@ body.tutorial-active {
   display: flex !important;
   justify-content: center !important;
   align-items: center !important;
-  pointer-events: auto !important;
-  width: auto !important;
-  height: auto !important;
-  margin: 0 !important;
-  padding: 0 !important;
 }
 
 /* Step 2: Enhanced button glow effect with enhanced visibility */
@@ -272,9 +267,6 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
   z-index: 20000 !important;
-  margin: 0 !important;
-  max-width: 90% !important;
-  width: 320px !important;
 }
 
 /* Ensure all tutorial step content is visible */
@@ -321,10 +313,7 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   
   /* Special positioning for step 1 on small screens */
   #tutorial-step-1-popup {
-    max-width: 90% !important;
-    width: 320px !important;
-    top: 50% !important;
-    left: 50% !important;
-    transform: translate(-50%, -50%) !important;
+    max-width: 90%;
+    width: 90%;
   }
 }

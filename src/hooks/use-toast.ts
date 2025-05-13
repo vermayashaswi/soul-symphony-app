@@ -1,29 +1,19 @@
 import * as React from "react";
-import {
-  type ToastActionElement,
+import type {
+  ToastActionElement,
+  ToastProps,
 } from "@/components/ui/toast";
 
 const TOAST_LIMIT = 5;
-const TOAST_REMOVE_DELAY = 1000;
+const TOAST_REMOVE_DELAY = 1000000;
 
-type ToasterToast = {
+type ToasterToast = ToastProps & {
   id: string;
   title?: React.ReactNode;
   description?: React.ReactNode;
   action?: ToastActionElement;
   variant?: "default" | "destructive" | "success" | "warning" | "info";
-  duration?: number;
-  open?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}
-
-export type ToastProps = {
-  title?: React.ReactNode;
-  description?: React.ReactNode;
-  action?: ToastActionElement;
-  variant?: "default" | "destructive" | "success" | "warning" | "info";
-  duration?: number;
-}
+};
 
 const actionTypes = {
   ADD_TOAST: "ADD_TOAST",
@@ -31,6 +21,13 @@ const actionTypes = {
   DISMISS_TOAST: "DISMISS_TOAST",
   REMOVE_TOAST: "REMOVE_TOAST",
 } as const;
+
+let count = 0;
+
+function genId() {
+  count = (count + 1) % Number.MAX_SAFE_INTEGER;
+  return count.toString();
+}
 
 type ActionType = typeof actionTypes;
 
@@ -45,11 +42,11 @@ type Action =
     }
   | {
       type: ActionType["DISMISS_TOAST"];
-      toastId?: string;
+      toastId?: ToasterToast["id"];
     }
   | {
       type: ActionType["REMOVE_TOAST"];
-      toastId?: string;
+      toastId?: ToasterToast["id"];
     };
 
 interface State {
@@ -67,7 +64,7 @@ const addToRemoveQueue = (toastId: string) => {
     toastTimeouts.delete(toastId);
     dispatch({
       type: actionTypes.REMOVE_TOAST,
-      toastId,
+      toastId: toastId,
     });
   }, TOAST_REMOVE_DELAY);
 
@@ -115,7 +112,6 @@ export const reducer = (state: State, action: Action): State => {
         ),
       };
     }
-
     case actionTypes.REMOVE_TOAST:
       if (action.toastId === undefined) {
         return {
@@ -141,15 +137,16 @@ function dispatch(action: Action) {
   });
 }
 
-export function toast(props: ToastProps) {
-  const id = Math.random().toString(36).substring(2, 9);
+interface Toast extends Omit<ToasterToast, "id"> {}
 
-  const update = (props: ToastProps) =>
+function toast({ ...props }: Toast) {
+  const id = genId();
+
+  const update = (props: ToasterToast) =>
     dispatch({
       type: actionTypes.UPDATE_TOAST,
       toast: { ...props, id },
     });
-
   const dismiss = () => dispatch({ type: actionTypes.DISMISS_TOAST, toastId: id });
 
   dispatch({
@@ -157,25 +154,19 @@ export function toast(props: ToastProps) {
     toast: {
       ...props,
       id,
-      open: true,
-      onOpenChange: (open: boolean) => {
-        if (!open) dismiss();
-      },
+      open: true, // Fix: use open:true instead of onOpenChange
+      onOpenChange: undefined, // Remove this property
     },
   });
 
   return {
-    id,
+    id: id,
     dismiss,
     update,
   };
 }
 
-toast.dismiss = (toastId?: string) => {
-  dispatch({ type: actionTypes.DISMISS_TOAST, toastId });
-};
-
-export function useToast() {
+function useToast() {
   const [state, setState] = React.useState<State>(memoryState);
 
   React.useEffect(() => {
@@ -191,6 +182,8 @@ export function useToast() {
   return {
     ...state,
     toast,
-    dismiss: (toastId?: string) => toast.dismiss(toastId),
+    dismiss: (toastId?: string) => dispatch({ type: actionTypes.DISMISS_TOAST, toastId }),
   };
 }
+
+export { useToast, toast };
