@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -37,7 +36,89 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   const stepRef = useRef<HTMLDivElement>(null);
   
   // Calculate position based on target element with retry and enhanced logging
+  // Also ensure popup stays within viewport
   useEffect(() => {
+    // Function to ensure the popup stays within viewport bounds
+    const ensureWithinViewport = (pos: PositionState): PositionState => {
+      const stepElement = stepRef.current;
+      if (!stepElement) return pos;
+      
+      const padding = 20; // padding from viewport edges
+      const viewportHeight = window.innerHeight;
+      const viewportWidth = window.innerWidth;
+      const elementHeight = stepElement.offsetHeight;
+      const elementWidth = stepElement.offsetWidth;
+      
+      // Calculate numerical position values
+      let topValue = typeof pos.top === 'string' ? 
+        (pos.top.includes('%') ? 
+          (parseFloat(pos.top) / 100) * viewportHeight : 
+          parseFloat(pos.top)
+        ) : pos.top || 0;
+        
+      let leftValue = typeof pos.left === 'string' ? 
+        (pos.left.includes('%') ? 
+          (parseFloat(pos.left) / 100) * viewportWidth : 
+          parseFloat(pos.left)
+        ) : pos.left || 0;
+      
+      // Adjust for transform if necessary
+      if (pos.transform) {
+        if (pos.transform.includes('translate(-50%, -50%)')) {
+          topValue -= elementHeight / 2;
+          leftValue -= elementWidth / 2;
+        } else if (pos.transform.includes('translateX(-50%)')) {
+          leftValue -= elementWidth / 2;
+        } else if (pos.transform.includes('translateY(-50%)')) {
+          topValue -= elementHeight / 2;
+        }
+      }
+      
+      // Make adjustments to keep within viewport
+      const newPos = { ...pos };
+      
+      // Adjust top position
+      if (topValue < padding) {
+        if (pos.transform?.includes('translate') || pos.transform?.includes('translateY')) {
+          // Preserve horizontal centering if it was set
+          newPos.top = padding;
+        } else {
+          newPos.top = padding;
+        }
+      } else if (topValue + elementHeight + padding > viewportHeight) {
+        if (pos.transform?.includes('translate') || pos.transform?.includes('translateY')) {
+          // Preserve horizontal centering if it was set
+          newPos.top = viewportHeight - elementHeight - padding;
+        } else {
+          newPos.top = viewportHeight - elementHeight - padding;
+        }
+      }
+      
+      // Adjust left position
+      if (leftValue < padding) {
+        if (pos.transform?.includes('translate') || pos.transform?.includes('translateX')) {
+          // Preserve vertical centering if it was set
+          newPos.left = padding;
+          // Remove translateX from transform to avoid double adjustment
+          newPos.transform = pos.transform.replace(/translateX\([^)]+\)/, '');
+        } else {
+          newPos.left = padding;
+        }
+      } else if (leftValue + elementWidth + padding > viewportWidth) {
+        if (pos.transform?.includes('translate') || pos.transform?.includes('translateX')) {
+          // Preserve vertical centering if it was set
+          newPos.left = viewportWidth - elementWidth - padding;
+          // Remove translateX from transform to avoid double adjustment
+          newPos.transform = pos.transform.replace(/translateX\([^)]+\)/, '');
+        } else {
+          newPos.left = viewportWidth - elementWidth - padding;
+        }
+      }
+      
+      console.log(`Adjusted position for viewport bounds:`, newPos);
+      return newPos;
+    };
+
     // Function to calculate position with enhanced logging
     const calculatePosition = () => {
       if (step.id === 1) {
@@ -56,16 +137,19 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           console.log("Arrow button rect for step 2:", rect);
           
           // Position above the center without affecting button's position
-          setPosition({
+          const calculatedPos = {
             top: Math.max(120, window.innerHeight * 0.25), // Position in top 25% of screen
             left: '50%', // Center horizontally
             right: undefined,
             transform: 'translateX(-50%)'
-          });
+          };
+          
+          setPosition(ensureWithinViewport(calculatedPos));
           console.log("Positioned step 2 popup above arrow button without affecting button position");
         } else {
           // Fallback if button not found
-          setPosition({ top: 120, left: '50%', transform: 'translateX(-50%)' });
+          const fallbackPos = { top: 120, left: '50%', transform: 'translateX(-50%)' };
+          setPosition(ensureWithinViewport(fallbackPos));
           console.log("Arrow button not found for step 2, using fallback position");
         }
       } else if (step.id === 3) {
@@ -104,11 +188,13 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           recordEntryElement.classList.add('record-entry-tab');
           
           // Position below and centered with the element
-          setPosition({
+          const calculatedPos = {
             top: rect.bottom + 20, // Below the element
             left: rect.left + (rect.width / 2),
             transform: 'translateX(-50%)'
-          });
+          };
+          
+          setPosition(ensureWithinViewport(calculatedPos));
           console.log("Positioned step 3 popup at:", {
             top: rect.bottom + 20,
             left: rect.left + (rect.width / 2)
@@ -116,11 +202,13 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         } else {
           console.warn("Could not find record entry element for step 3, using fallback position");
           // Fallback position - top center of screen
-          setPosition({ 
+          const fallbackPos = { 
             top: 120, 
             left: '50%', 
             transform: 'translateX(-50%)' 
-          });
+          };
+          
+          setPosition(ensureWithinViewport(fallbackPos));
         }
       } else if (step.id === 4) {
         // For step 4 - find the Past Entries tab using the same approach as step 3 for consistency
@@ -156,26 +244,29 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           entriesTabElement.classList.add('entries-tab');
           
           // Position below the tab - match step 3's positioning approach
-          setPosition({
+          // But ensure it stays within viewport bounds
+          const calculatedPos = {
             top: rect.bottom + 20, // Same offset as step 3
             left: rect.left + (rect.width / 2), // Center aligned with the tab
             transform: 'translateX(-50%)'
-          });
-          console.log("Positioned step 4 popup at:", {
-            top: rect.bottom + 20,
-            left: rect.left + (rect.width / 2)
-          });
+          };
+          
+          // Use the ensureWithinViewport function to adjust the position
+          setPosition(ensureWithinViewport(calculatedPos));
+          console.log("Positioned step 4 popup at:", calculatedPos);
         } else {
           console.warn("Could not find Past Entries tab for step 4, using fallback position");
-          // Fallback position - similar to step 3's fallback
-          setPosition({ 
+          // Fallback position - similar to step 3's fallback but adjusted for viewport
+          const fallbackPos = { 
             top: 120, 
-            left: '75%', // Position toward the right side where Past Entries tab would be
+            left: '70%', // Position toward the right side where Past Entries tab would be
             transform: 'translateX(-50%)' 
-          });
+          };
+          
+          setPosition(ensureWithinViewport(fallbackPos));
         }
       } else if (step.targetElement) {
-        // Generic positioning for other steps
+        // Generic positioning for other steps with viewport boundary checks
         const targetElement = document.querySelector(step.targetElement);
         
         if (targetElement) {
@@ -186,51 +277,58 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           targetElement.classList.add('tutorial-target');
           
           // Calculate position based on specified direction
+          let calculatedPos: PositionState = { top: 0, left: 0 };
+          
           switch (step.position) {
             case 'top':
-              setPosition({
+              calculatedPos = {
                 top: rect.top - (stepRef.current?.offsetHeight || 0) - 20,
                 left: rect.left + rect.width / 2,
                 transform: 'translateX(-50%)'
-              });
+              };
               break;
             case 'bottom':
-              setPosition({
+              calculatedPos = {
                 top: rect.bottom + 20,
                 left: rect.left + rect.width / 2,
                 transform: 'translateX(-50%)'
-              });
+              };
               break;
             case 'left':
-              setPosition({
+              calculatedPos = {
                 top: rect.top + rect.height / 2,
                 left: rect.left - (stepRef.current?.offsetWidth || 0) - 20,
                 transform: 'translateY(-50%)'
-              });
+              };
               break;
             case 'right':
-              setPosition({
+              calculatedPos = {
                 top: rect.top + rect.height / 2,
                 left: rect.right + 20,
                 transform: 'translateY(-50%)'
-              });
+              };
               break;
             default:
               // Center over the element
-              setPosition({
+              calculatedPos = {
                 top: rect.top + rect.height / 2,
                 left: rect.left + rect.width / 2,
                 transform: 'translate(-50%, -50%)'
-              });
+              };
           }
+          
+          // Ensure the popup stays within viewport bounds
+          setPosition(ensureWithinViewport(calculatedPos));
         } else {
           console.warn(`Target element not found for step ${step.id}, using fallback position`);
           // Center in viewport if element not found
-          setPosition({
+          const fallbackPos = {
             top: '50%',
             left: '50%',
             transform: 'translate(-50%, -50%)'
-          });
+          };
+          
+          setPosition(ensureWithinViewport(fallbackPos));
         }
       } else {
         // Default center position for steps without target elements
@@ -239,6 +337,20 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
           left: '50%',
           transform: 'translate(-50%, -50%)'
         });
+      }
+      
+      // Additional check for viewport bounds after all positioning is done
+      if (stepRef.current) {
+        setTimeout(() => {
+          const currentPos = { ...position };
+          const adjustedPos = ensureWithinViewport(currentPos);
+          
+          // Only update if there are changes needed
+          if (JSON.stringify(currentPos) !== JSON.stringify(adjustedPos)) {
+            console.log("Final position adjustment to ensure within viewport:", adjustedPos);
+            setPosition(adjustedPos);
+          }
+        }, 50);
       }
     };
     
@@ -279,13 +391,22 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       
       // Clean up step 4 specific elements
       if (step.id === 4) {
-        const entriesTab = document.querySelector('[value="entries"]');
-        if (entriesTab) {
-          entriesTab.classList.remove('tutorial-target');
-        }
+        const selectors = [
+          '[value="entries"]',
+          '.entries-tab',
+          'button[data-tutorial-target="past-entries"]',
+          '#past-entries-button'
+        ];
+        
+        selectors.forEach(selector => {
+          const element = document.querySelector(selector);
+          if (element) {
+            element.classList.remove('tutorial-target', 'entries-tab');
+          }
+        });
       }
     };
-  }, [step.id, step.targetElement, step.position]);
+  }, [step.id, step.targetElement, step.position, position]);
   
   // Handle navigation actions with stopPropagation to ensure they work
   const handleNext = (e: React.MouseEvent) => {

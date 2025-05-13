@@ -124,7 +124,7 @@ const TutorialOverlay: React.FC = () => {
     
     // Return combined cleanup function
     return cleanup;
-  }, [isActive, currentStep, steps, location.pathname, navigate]);
+  }, [isActive, currentStep, steps, location.pathname, navigate, attempts]);
 
   // Handle step 1 - journal header visibility
   const handleJournalHeaderVisibility = () => {
@@ -148,15 +148,22 @@ const TutorialOverlay: React.FC = () => {
     return () => {};
   };
 
-  // Handle step 2 - arrow button visibility
+  // Handle step 2 - arrow button visibility with enhanced glow effect
   const handleArrowButtonVisibility = () => {
     const arrowButton = document.querySelector('.journal-arrow-button');
     
     if (arrowButton) {
       console.log("Enhancing arrow button visibility for tutorial step 2");
       
-      // Add special highlighting class and ensure visibility
+      // Add special highlighting class and ensure visibility with stronger inline styles
       arrowButton.classList.add('tutorial-target');
+      
+      // Force visibility with inline styles
+      const arrowButtonElement = arrowButton as HTMLElement;
+      arrowButtonElement.style.zIndex = "9990";
+      arrowButtonElement.style.visibility = "visible";
+      arrowButtonElement.style.opacity = "1";
+      arrowButtonElement.style.pointerEvents = "auto";
       
       // Make the button element more prominent with enhanced glow effect
       const buttonElement = arrowButton.querySelector('button');
@@ -164,9 +171,21 @@ const TutorialOverlay: React.FC = () => {
         buttonElement.classList.add('tutorial-button-highlight');
         console.log("Added enhanced highlighting effect to button element");
         
+        // Force stronger glow effect with inline styles
+        const buttonStyleElement = buttonElement as HTMLElement;
+        buttonStyleElement.style.boxShadow = "0 0 30px 15px var(--color-theme)";
+        buttonStyleElement.style.animation = "button-pulse 2s infinite alternate";
+        
         // Log positioning
         const rect = buttonElement.getBoundingClientRect();
         console.log('Button element position:', rect);
+      }
+      
+      // Also highlight the button's outer glow div if it exists
+      const outerGlowDiv = arrowButton.querySelector('.bg-primary\\/30');
+      if (outerGlowDiv) {
+        outerGlowDiv.classList.add('tutorial-button-outer-glow');
+        console.log("Added outer glow effect");
       }
       
       // Clean up when step changes
@@ -174,8 +193,23 @@ const TutorialOverlay: React.FC = () => {
         console.log("Cleaning up arrow button styles");
         arrowButton.classList.remove('tutorial-target');
         
+        if (arrowButtonElement) {
+          arrowButtonElement.style.zIndex = "";
+          arrowButtonElement.style.visibility = "";
+          arrowButtonElement.style.opacity = "";
+          arrowButtonElement.style.pointerEvents = "";
+        }
+        
         if (buttonElement) {
           buttonElement.classList.remove('tutorial-button-highlight');
+          if (buttonStyleElement) {
+            buttonStyleElement.style.boxShadow = "";
+            buttonStyleElement.style.animation = "";
+          }
+        }
+        
+        if (outerGlowDiv) {
+          outerGlowDiv.classList.remove('tutorial-button-outer-glow');
         }
       };
     } else {
@@ -360,6 +394,16 @@ const TutorialOverlay: React.FC = () => {
         const elements = document.querySelectorAll(selector);
         elements.forEach(element => {
           element.classList.remove('tutorial-target', 'entries-tab', 'tutorial-highlight');
+          
+          // Also clean up inline styles
+          const el = element as HTMLElement;
+          if (el) {
+            el.style.visibility = '';
+            el.style.opacity = '';
+            el.style.pointerEvents = '';
+            el.style.position = '';
+            el.style.zIndex = '';
+          }
         });
       });
     };

@@ -41,8 +41,34 @@ const JournalNavigationButton: React.FC = () => {
       const offsetX = centerX - (window.innerWidth / 2);
       const offsetY = centerY - (window.innerHeight / 2);
       console.log('Offset from viewport center:', { x: offsetX, y: offsetY });
+      
+      // Log if we're in the tutorial step
+      console.log('Is in arrow tutorial step:', isInArrowTutorialStep);
+      
+      if (isInArrowTutorialStep) {
+        // Additional debugging for tutorial mode
+        console.log('Button should be highlighted in tutorial mode');
+        
+        // Check if classes are applied
+        setTimeout(() => {
+          const hasTargetClass = buttonRef.current?.classList.contains('tutorial-target');
+          const buttonElement = buttonRef.current?.querySelector('button');
+          const hasHighlightClass = buttonElement?.classList.contains('tutorial-button-highlight');
+          
+          console.log('Has tutorial-target class:', hasTargetClass);
+          console.log('Button has highlight class:', hasHighlightClass);
+          
+          // Log z-index and other styles
+          if (buttonRef.current) {
+            const computedStyle = window.getComputedStyle(buttonRef.current);
+            console.log('Computed z-index:', computedStyle.zIndex);
+            console.log('Computed visibility:', computedStyle.visibility);
+            console.log('Computed opacity:', computedStyle.opacity);
+          }
+        }, 500);
+      }
     }
-  }, []);
+  }, [isInArrowTutorialStep]);
 
   return (
     <div 
@@ -85,7 +111,8 @@ const JournalNavigationButton: React.FC = () => {
           width: "calc(100% + 20px)",
           height: "calc(100% + 20px)",
           top: "-10px",
-          left: "-10px"
+          left: "-10px",
+          filter: isInArrowTutorialStep ? "drop-shadow(0 0 15px var(--color-theme))" : "none",
         }}
       />
       <motion.button
@@ -98,6 +125,9 @@ const JournalNavigationButton: React.FC = () => {
         initial={{ opacity: 0 }}
         animate={{ opacity: 1 }}
         transition={{ delay: 0.5 }}
+        style={{
+          boxShadow: isInArrowTutorialStep ? "0 0 30px 15px var(--color-theme)" : "",
+        }}
       >
         <ArrowRight className="text-primary-foreground h-8 w-8" />
       </motion.button>

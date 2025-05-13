@@ -99,41 +99,31 @@ body.tutorial-active {
   align-items: center !important;
 }
 
-/* Enhanced button glow effect with enhanced visibility */
+/* Step 2: Enhanced button glow effect with enhanced visibility */
 .journal-arrow-button.tutorial-target {
   z-index: 9990 !important; /* Lower than tutorial popup but higher than regular content */
 }
 
+/* Step 2: Button highlight - stronger glow effect */
 .tutorial-button-highlight {
   box-shadow: 0 0 30px 15px var(--color-theme) !important;
   animation: button-pulse 2s infinite alternate !important;
   border: 2px solid white !important;
 }
 
+/* Step 2: Outer glow styling */
 .tutorial-button-outer-glow {
   filter: drop-shadow(0 0 15px var(--color-theme)) !important;
   opacity: 0.95 !important;
+  animation: outer-glow-pulse 2s infinite alternate !important;
 }
 
-/* Record Entry tab highlighting for tutorial step 3 */
+/* Step 3 & 4: Tab highlighting styling */
 [data-value="record"].tutorial-target,
 .tutorial-record-entry-button.tutorial-target,
 button[data-tutorial-target="record-entry"].tutorial-target,
-#new-entry-button.tutorial-target {
-  z-index: 10000 !important;
-  position: relative !important;
-  box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7) !important;
-  animation: tab-pulse 2s infinite alternate !important;
-  border-radius: 0.5rem;
-  pointer-events: auto !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  display: flex !important;
-  isolation: isolate !important;
-}
-
-/* Past Entries tab highlighting for tutorial step 4 */
-[value="entries"].tutorial-target,
+#new-entry-button.tutorial-target,
+[data-value="entries"].tutorial-target,
 .entries-tab.tutorial-target,
 button[data-tutorial-target="past-entries"].tutorial-target,
 #past-entries-button.tutorial-target {
@@ -149,7 +139,7 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   isolation: isolate !important;
 }
 
-/* Specific styling for step 3 - more prominent highlight */
+/* Step 3: Specific styling for record entry tab - more prominent highlight */
 .record-entry-tab.tutorial-target,
 .tutorial-record-entry-button.tutorial-target,
 button[data-tutorial-target="record-entry"].tutorial-target,
@@ -163,7 +153,7 @@ button[data-tutorial-target="record-entry"].tutorial-target,
   transform: translateZ(0) !important; /* Force a new stacking context */
 }
 
-/* Specific styling for step 4 - more prominent highlight - Matches step 3 styling */
+/* Step 4: Specific styling for past entries tab - exactly match step 3 styling */
 .entries-tab.tutorial-target,
 [value="entries"].tutorial-target,
 button[data-tutorial-target="past-entries"].tutorial-target,
@@ -184,22 +174,28 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   pointer-events: auto !important;
 }
 
-/* Record entry tab pulsating animation */
+/* Step 3 & 4: Tab pulsating animation */
 @keyframes tab-pulse {
   0% { box-shadow: 0 0 10px 3px var(--color-theme); }
   100% { box-shadow: 0 0 20px 6px var(--color-theme); }
 }
 
-/* Stronger pulsating animation for Step 3 and Step 4 */
+/* Step 3 & 4: Stronger pulsating animation */
 @keyframes strong-tab-pulse {
   0% { box-shadow: 0 0 15px 5px var(--color-theme); }
   100% { box-shadow: 0 0 30px 10px var(--color-theme); }
 }
 
-/* Enhanced pulsating animation for the central button */
+/* Step 2: Enhanced pulsating animation for the central button */
 @keyframes button-pulse {
   0% { box-shadow: 0 0 25px 12px var(--color-theme); }
   100% { box-shadow: 0 0 40px 18px var(--color-theme); }
+}
+
+/* Step 2: Outer glow pulsating animation */
+@keyframes outer-glow-pulse {
+  0% { filter: drop-shadow(0 0 10px var(--color-theme)); opacity: 0.7; }
+  100% { filter: drop-shadow(0 0 25px var(--color-theme)); opacity: 0.95; }
 }
 
 @keyframes pulse {
@@ -224,6 +220,8 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   position: absolute;
   z-index: 20000 !important; /* Significantly higher than the button */
   pointer-events: auto !important;
+  max-width: 320px;
+  width: calc(100% - 40px); /* Ensure it fits on mobile screens with margin */
 }
 
 /* Ensure all tutorial step content is visible */
@@ -255,4 +253,13 @@ button[data-tutorial-target="past-entries"].tutorial-target,
 /* Tutorial modal style enhancements */
 .tutorial-step-container {
   box-shadow: 0 0 20px rgba(0, 0, 0, 0.4) !important;
+}
+
+/* Add special media queries for smaller screens */
+@media (max-width: 640px) {
+  .tutorial-step-container {
+    max-width: 280px;
+    padding: 12px !important;
+    font-size: 0.9rem;
+  }
 }
