@@ -3,7 +3,7 @@ import { useState, useCallback } from 'react'
 
 // Define ToasterToast type with id as optional
 export type ToasterToast = {
-  id?: string  // Make id optional
+  id?: string  // ID is optional - we'll generate one if not provided
   title?: React.ReactNode
   description?: React.ReactNode
   action?: React.ReactNode
@@ -36,7 +36,7 @@ const createSimpleStore = <T,>(initialState: T) => {
 }
 
 // Ensure all stored toasts have an ID
-type ToasterToastWithId = ToasterToast & { id: string }
+type ToasterToastWithId = Omit<ToasterToast, 'id'> & { id: string }
 
 const store = createSimpleStore<ToasterToastWithId[]>([])
 
@@ -81,7 +81,7 @@ export function useToast() {
   const toast = useCallback(
     (data: ToasterToast) => createToast(data),
     [createToast]
-  ) as ((data: ToasterToast) => {
+  ) as unknown as ((data: ToasterToast) => {
     id: string
     dismiss: () => void
     update: (data: ToasterToast) => void
@@ -116,7 +116,7 @@ const toastFunction = ((data: ToasterToast) => {
       store.get().map(t => t.id === id ? { ...t, ...newData, id } : t)
     )
   }
-}) as ((data: ToasterToast) => {
+}) as unknown as ((data: ToasterToast) => {
   id: string
   dismiss: () => void
   update: (data: ToasterToast) => void
