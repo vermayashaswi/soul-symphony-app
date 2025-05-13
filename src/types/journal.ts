@@ -11,7 +11,7 @@ export interface JournalEntry {
   "transcription text"?: string;
   created_at: string; // Making created_at required to satisfy both usages
   updated_at?: string;
-  sentiment?: number | string;
+  sentiment?: string | number; // Allow both string and number for sentiment
   themes?: string[] | null;
   entities?: Json;
   tempId?: string;

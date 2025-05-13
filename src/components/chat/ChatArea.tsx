@@ -1,5 +1,6 @@
+
 import React, { useState, useEffect, useRef } from 'react';
-import { useRouter } from 'next/router';
+import { useNavigate } from 'react-router-dom';
 import { useChat } from '@/hooks/use-chat';
 import { ChatMessage as ChatMessageType } from '@/services/chat';
 import ChatMessage from '@/components/chat/ChatMessage';
@@ -33,6 +34,9 @@ interface ChatAreaProps {
   placeholder?: string;
   autoFocus?: boolean;
   showScrollButton?: boolean;
+  messages?: ChatMessageType[]; // Add this to make it compatible with SmartChatInterface
+  isLoading?: boolean; // Add this to make it compatible with SmartChatInterface
+  processingStage?: string; // Add this to make it compatible with SmartChatInterface
 }
 
 const ChatArea: React.FC<ChatAreaProps> = ({
@@ -45,8 +49,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   placeholder = 'Type a message...',
   autoFocus = true,
   showScrollButton = true,
+  messages: externalMessages, // New prop for external message control
+  isLoading: externalIsLoading, // New prop for external loading state
 }) => {
-  const router = useRouter();
+  // Replace router with navigate
+  const navigate = useNavigate();
   const isMobile = useIsMobile();
   const { user } = useAuth();
   const { showDebugMode } = useDebugMode();
@@ -64,9 +71,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   
   // Get chat functionality from our hook
   const {
-    messages,
+    messages: hookMessages,
     sendMessage,
-    isLoading,
+    isLoading: hookIsLoading,
     error,
     isComplete,
     clearMessages,
@@ -75,6 +82,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     initialMessages,
     onNewMessage,
   });
+
+  // Use external messages if provided, otherwise use hook messages
+  const messages = externalMessages || hookMessages;
+  // Use external loading state if provided, otherwise use hook loading state
+  const isLoading = externalIsLoading !== undefined ? externalIsLoading : hookIsLoading;
   
   // Use our scroll to bottom hook
   const { scrollToBottom } = useScrollToBottom(messagesEndRef);

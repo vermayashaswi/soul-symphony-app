@@ -287,14 +287,18 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             // Make sure created_at is never undefined
             const entryCreatedAt = entry.created_at || new Date().toISOString();
             
+            // Create a new entry object with required properties and proper types
+            const safeEntry: JournalEntry = {
+              ...entry,
+              content: entryContent,
+              created_at: entryCreatedAt,
+              sentiment: entry.sentiment, // This will maintain the string | number type
+            };
+            
             return (
               <JournalEntryCard
                 key={entry.id || entry.tempId || Math.random()}
-                entry={{
-                  ...entry,
-                  content: entryContent,
-                  created_at: entryCreatedAt
-                }}
+                entry={safeEntry}
                 processing={isProcessing(entry.tempId || '')}
                 processed={processedEntryIds.includes(entry.id)}
                 onDelete={handleDeleteEntry}
