@@ -1,5 +1,5 @@
 
-import { toast as sonnerToast, ToastT, useToaster } from "sonner";
+import { toast as sonnerToast, ToastT, useToast as sonnerUseToast } from "sonner";
 
 type ToastProps = {
   title: string;
@@ -22,5 +22,5 @@ export function toast(props: ToastProps) {
   return sonnerToast(title, { description, action });
 }
 
-export const useToast = useToaster;
+export const useToast = sonnerUseToast;
 export type Toast = ToastT;

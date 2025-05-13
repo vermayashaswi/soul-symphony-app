@@ -20,7 +20,7 @@ serve(async (req) => {
   }
 
   try {
-    const { userId, messageId, threadId, queryText, timezoneOffset } = await req.json();
+    const { userId, messageId, threadId, content: queryText, timezoneOffset } = await req.json();
 
     if (!userId) {
       throw new Error('User ID is required');

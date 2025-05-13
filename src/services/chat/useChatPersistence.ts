@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useCallback } from 'react';
 import { v4 as uuidv4 } from 'uuid';
 import { useAuth } from '@/contexts/AuthContext';
@@ -147,7 +148,8 @@ export function useChatPersistence(queryClient: QueryClient) {
       setMessages(formattedMessages);
     } catch (error) {
       console.error("Error loading thread:", error);
-      toast("Error loading thread", {
+      toast({
+        title: "Error loading thread",
         description: "Failed to load conversation thread."
       });
     } finally {
@@ -363,7 +365,7 @@ export function useChatPersistence(queryClient: QueryClient) {
           : msg
       ));
       
-      // Fix: Remove the 'variant' property which doesn't exist in ExternalToast type
+      // Fix: Use the correct object format for toast
       toast({
         title: "Error sending message",
         description: "Failed to get a response. Please try again."
