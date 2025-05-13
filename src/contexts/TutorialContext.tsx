@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect } from 'react';
 
 // Tutorial step definition
@@ -139,6 +138,12 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
     
     // Clear completed steps when skipping
     setCompletedSteps(new Set());
+    
+    // Make sure we reset body styles immediately
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
   };
   
   const resetTutorial = async () => {
@@ -148,6 +153,15 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
     setIsActive(false);
     setCurrentStep(0);
     setCompletedSteps(new Set());
+    
+    // Remove tutorial-active class immediately
+    document.body.classList.remove('tutorial-active');
+    
+    // Enable scrolling to prevent page from being frozen
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
     
     // Short delay to ensure clean reset before starting again
     return new Promise<void>((resolve) => {
@@ -173,6 +187,13 @@ export const TutorialProvider = ({ children }: { children: React.ReactNode }) =>
     console.log('Ending tutorial');
     setIsActive(false);
     setCurrentStep(0);
+    setCompletedSteps(new Set());
+    
+    // Reset body styles immediately
+    document.body.style.overflow = 'auto';
+    document.body.style.height = 'auto';
+    document.documentElement.style.overflow = 'auto';
+    document.documentElement.style.height = 'auto';
     
     return Promise.resolve();
   };
