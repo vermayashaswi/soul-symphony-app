@@ -13,6 +13,8 @@ type ToasterToast = {
   action?: ToastActionElement;
   variant?: "default" | "destructive" | "success" | "warning" | "info";
   duration?: number;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 }
 
 export type ToastProps = {
