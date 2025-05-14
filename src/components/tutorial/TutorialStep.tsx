@@ -84,15 +84,25 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [onNext, step.id]);
   
-  // Simplified modal positioning based on step ID - use fixed positioning for consistency
+  // Improved modal positioning based on step ID - use fixed positioning for consistency
   const getPositionStyle = () => {
+    // Special positioning for step 2 to move it slightly higher so it doesn't cover the arrow
+    if (step.id === 2) {
+      return {
+        top: '35%',  // Moved higher (from 50% to 35%)
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        position: 'fixed' as const
+      };
+    }
+    
     // For steps 3 and 4 - position in center for consistency
     if (step.id === 3 || step.id === 4) {
       return {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        position: 'fixed' as const // Fixed positioning to avoid layout shifts
+        position: 'fixed' as const
       };
     }
     
@@ -101,7 +111,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       top: '50%',
       left: '50%',
       transform: 'translate(-50%, -50%)',
-      position: 'fixed' as const // Fixed positioning for all steps
+      position: 'fixed' as const
     };
   };
   
@@ -147,14 +157,19 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       {/* Content */}
       <p className="text-sm text-white/80 mb-4">{step.content}</p>
       
-      {/* Navigation buttons with enhanced click handling */}
+      {/* Navigation buttons with enhanced click handling and improved back button contrast */}
       <div className="flex justify-between mt-2 tutorial-buttons">
         {!isFirst && (
           <Button 
             variant="outline" 
             size="sm" 
             onClick={handlePrev}
-            className="flex items-center gap-1 pointer-events-auto border-white/30 text-white hover:text-white/90 hover:bg-white/10"
+            className="flex items-center gap-1 pointer-events-auto bg-gray-800 border-white/50 text-white hover:text-white hover:bg-gray-700"
+            style={{
+              color: "#FFFFFF !important", // Ensure text is visible in light mode
+              backgroundColor: "#333333",  // Dark background for back button
+              borderColor: "rgba(255,255,255,0.5)"
+            }}
           >
             <ChevronLeft className="h-4 w-4" />
             Back

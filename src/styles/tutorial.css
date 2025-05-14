@@ -1,5 +1,5 @@
 
-/* Tutorial Overlay Styles - Revised for consistency and better z-index hierarchy */
+/* Tutorial Overlay Styles - Revised for better z-index hierarchy and visibility */
 
 /* Base Tutorial Classes */
 .tutorial-target {
@@ -61,13 +61,13 @@ body.tutorial-active {
   box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.5) !important;
 }
 
-/* Step 2: Arrow button styling */
+/* Step 2: Arrow button styling - INCREASED z-index to ensure it's visible but behind the tutorial */
 .journal-arrow-button.tutorial-target {
   position: fixed !important;
   top: 50% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
-  z-index: 9999 !important;
+  z-index: 10000 !important; /* Increased from 9999 but still below tutorial popup */
   visibility: visible !important;
   opacity: 1 !important;
 }
@@ -94,15 +94,26 @@ body.tutorial-active {
 
 /* Tutorial navigation buttons */
 .tutorial-buttons {
-  z-index: 10001 !important; /* Above everything else */
+  z-index: 30001 !important; /* Above everything else */
   pointer-events: auto !important;
 }
 
 .tutorial-step-container button {
   position: relative;
-  z-index: 10001 !important; /* Above everything else */
+  z-index: 30001 !important; /* Above everything else */
   pointer-events: auto !important;
   cursor: pointer !important;
+}
+
+/* Specifically style the back button to have good contrast in all themes */
+.tutorial-buttons button[variant="outline"] {
+  color: white !important;
+  background-color: #333333 !important;
+  border-color: rgba(255,255,255,0.5) !important;
+}
+
+.tutorial-buttons button[variant="outline"]:hover {
+  background-color: #444444 !important;
 }
 
 /* Animation keyframes - pulsating effects */

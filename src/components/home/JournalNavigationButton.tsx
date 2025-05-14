@@ -102,7 +102,7 @@ const JournalNavigationButton: React.FC = () => {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: isInArrowTutorialStep ? 9999 : 40,
+        zIndex: isInArrowTutorialStep ? 10000 : 40, // Increased z-index when in tutorial mode
         margin: 0,
         padding: 0,
         pointerEvents: 'auto',
