@@ -96,9 +96,10 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // Default styling for other steps
+    // Default styling for other steps - CHANGED: from solid color to transparent with gradient
     return {
-      backgroundColor: '#1A1F2C',
+      background: 'linear-gradient(to bottom, rgba(26, 31, 44, 0.85), rgba(26, 31, 44, 0.95))',
+      backgroundColor: 'transparent',
       color: 'white'
     };
   };
@@ -137,7 +138,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      className="tutorial-step-container bg-card border border-theme shadow-lg rounded-xl p-4 max-w-[320px]"
+      className="tutorial-step-container rounded-xl p-4 max-w-[320px]" // REMOVED: bg-card border border-theme shadow-lg
       style={{
         ...getPositionStyle(),
         ...getBackgroundStyle(),
