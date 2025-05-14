@@ -7,64 +7,30 @@ import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
 
 const Home = () => {
-  const { isActive, currentStep, steps } = useTutorial();
+  const { isActive, currentStep, steps, navigationState } = useTutorial();
   
-  // Check if we're in tutorial steps
-  const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
+  // Check if we're in specific tutorial steps
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
+  const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
   
   useEffect(() => {
-    console.log('Home component mounted, tutorial active:', isActive);
-    console.log('Current tutorial step:', currentStep, 'Step ID:', steps[currentStep]?.id);
+    console.log('Home component mounted, tutorial state:', {
+      isActive, 
+      currentStep, 
+      stepId: steps[currentStep]?.id,
+      navigationInProgress: navigationState.inProgress
+    });
     
     // Prevent scrolling when tutorial is active
-    document.body.style.overflow = 'hidden';
-    
-    // Enhanced check for tutorial element visibility
-    if (isInWelcomeTutorialStep) {
-      setTimeout(() => {
-        const journalHeader = document.querySelector('.journal-header-container');
-        if (journalHeader) {
-          console.log('Journal header found and ready for tutorial highlighting');
-          
-          // Log positioning for debugging
-          const rect = journalHeader.getBoundingClientRect();
-          console.log('Journal header position:', rect);
-        } else {
-          console.warn('Journal header element not found');
-        }
-      }, 100);
-    } else if (isInArrowTutorialStep) {
-      setTimeout(() => {
-        const arrowButton = document.querySelector('.journal-arrow-button');
-        const buttonElement = document.querySelector('.journal-arrow-button button');
-        
-        if (arrowButton && buttonElement) {
-          console.log('Journal arrow button found and ready for tutorial highlighting');
-          
-          // Log detailed positioning and z-index for debugging
-          const rect = arrowButton.getBoundingClientRect();
-          console.log('Arrow button position:', rect);
-          console.log('Arrow button center:', {
-            x: rect.left + rect.width/2,
-            y: rect.top + rect.height/2
-          });
-          
-          // Log z-index for debugging
-          const computedStyle = window.getComputedStyle(buttonElement);
-          console.log('Arrow button z-index:', computedStyle.zIndex);
-          console.log('Arrow button visibility:', computedStyle.visibility);
-        } else {
-          console.warn('Journal arrow button not found in DOM');
-        }
-      }, 100);
+    if (isActive) {
+      document.body.style.overflow = 'hidden';
     }
     
     // Cleanup function to restore scrolling
     return () => {
       document.body.style.overflow = '';
     };
-  }, [isActive, currentStep, isInArrowTutorialStep, isInWelcomeTutorialStep, steps]);
+  }, [isActive, currentStep, steps, navigationState]);
 
   return (
     <div 

@@ -1,5 +1,7 @@
 
-/* Tutorial Overlay Styles */
+/* Tutorial Overlay Styles - Revised for consistency and better z-index hierarchy */
+
+/* Base Tutorial Classes */
 .tutorial-target {
   position: relative !important;
   z-index: 9999 !important;
@@ -9,44 +11,7 @@
   opacity: 1 !important;
 }
 
-.tutorial-highlight {
-  position: relative;
-}
-
-.tutorial-highlight::before {
-  content: '';
-  position: absolute;
-  inset: -8px;
-  background: radial-gradient(
-    circle at center,
-    rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.6) 0%,
-    transparent 70%
-  );
-  border-radius: inherit;
-  z-index: -1;
-  pointer-events: none;
-  animation: glow 2s infinite alternate;
-}
-
-@keyframes glow {
-  from {
-    box-shadow: 0 0 10px 4px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.4);
-  }
-  to {
-    box-shadow: 0 0 20px 8px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7);
-  }
-}
-
-.tutorial-step-indicator {
-  background-color: var(--color-theme);
-  color: white;
-  padding: 0.25rem 0.5rem;
-  border-radius: 0.375rem;
-  font-size: 0.75rem;
-  line-height: 1rem;
-}
-
-/* Updated overlay with better blocking of background interactions */
+/* Tutorial Overlay - Better background interaction blocking */
 .tutorial-overlay {
   position: fixed;
   inset: 0;
@@ -61,51 +26,53 @@
 body.tutorial-active {
   overflow: hidden !important;
   touch-action: none !important;
-  position: fixed !important; /* Keep body fixed to prevent any scrolling */
+  position: fixed !important;
   width: 100% !important;
   height: 100% !important;
 }
 
-/* Journal header highlighting for tutorial step 1 - improved visibility */
+/* Tutorial step container - consistent styling for all steps */
+.tutorial-step-container {
+  position: fixed !important;
+  z-index: 30000 !important;
+  max-width: 320px;
+  width: calc(100% - 40px);
+  background-color: #1A1F2C !important;
+  color: white !important;
+  border: 3px solid var(--color-theme) !important;
+  box-shadow: 0 0 30px rgba(0, 0, 0, 0.7) !important;
+  pointer-events: auto !important;
+}
+
+/* Force all tutorial step content to be visible */
+.tutorial-step-container h3,
+.tutorial-step-container p {
+  color: white !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+
+/* Step 1: Journal header styling */
 .journal-header-container.tutorial-target {
   z-index: 9999 !important;
   position: relative !important;
   opacity: 1 !important;
   visibility: visible !important;
-  max-height: unset !important; /* Remove any height restrictions */
-  overflow: visible !important;
   box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.5) !important;
 }
 
-/* Enhanced journal header text visibility for tutorial step 1 */
-.journal-header-container.tutorial-target h1 {
-  opacity: 1 !important;
-  visibility: visible !important;
-  display: block !important;
-  max-height: unset !important;
-  overflow: visible !important;
-}
-
-/* Enhanced styling for the central arrow button - ensure it stays centered */
-.journal-arrow-button {
+/* Step 2: Arrow button styling */
+.journal-arrow-button.tutorial-target {
   position: fixed !important;
   top: 50% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
-  z-index: 40;
+  z-index: 9999 !important;
   visibility: visible !important;
   opacity: 1 !important;
-  display: flex !important;
-  justify-content: center !important;
-  align-items: center !important;
 }
 
-/* Step 2: Enhanced button glow effect with enhanced visibility */
-.journal-arrow-button.tutorial-target {
-  z-index: 9990 !important; /* Lower than tutorial popup but higher than regular content */
-}
-
-/* Step 2: Button highlight - stronger glow effect - ONLY APPLY DURING TUTORIAL */
+/* Step 2: Button highlight - stronger glow effect */
 .tutorial-button-highlight {
   box-shadow: 0 0 35px 20px var(--color-theme) !important;
   animation: button-pulse 1.5s infinite alternate !important;
@@ -113,44 +80,10 @@ body.tutorial-active {
   transform: scale(1.05) !important;
 }
 
-/* When tutorial is completed or not in tutorial target mode - NO HIGHLIGHTING */
-.tutorial-completed .tutorial-button-highlight,
-.tutorial-completed .record-entry-button,
-.tutorial-completed [data-value="record"],
-.tutorial-completed [data-tutorial-target] {
-  box-shadow: none !important;
-  animation: none !important;
-  border: none !important;
-  transform: none !important;
-}
-
-/* Step 3 & 4: Tab highlighting styling - ENHANCED VISIBILITY */
-[data-value="record"].tutorial-target,
-.tutorial-record-entry-button.tutorial-target,
-button[data-tutorial-target="record-entry"].tutorial-target,
-#new-entry-button.tutorial-target,
-[data-value="entries"].tutorial-target,
-.entries-tab.tutorial-target,
-button[data-tutorial-target="past-entries"].tutorial-target,
-#past-entries-button.tutorial-target {
-  z-index: 10000 !important;
-  position: relative !important;
-  box-shadow: 0 0 20px 10px var(--color-theme) !important;
-  animation: tab-pulse 1.5s infinite alternate !important;
-  border-radius: 0.5rem;
-  pointer-events: auto !important;
-  visibility: visible !important;
-  opacity: 1 !important;
-  display: flex !important;
-  isolation: isolate !important;
-}
-
-/* Step 3: Specific styling for record entry tab - more prominent highlight */
+/* Steps 3 & 4: Tab highlighting styling */
 .record-entry-tab.tutorial-target,
-.tutorial-record-entry-button.tutorial-target,
-button[data-tutorial-target="record-entry"].tutorial-target,
-#new-entry-button.tutorial-target {
-  z-index: 10000 !important; /* Higher z-index than normal tutorial targets */
+.entries-tab.tutorial-target {
+  z-index: 10000 !important;
   position: relative !important;
   box-shadow: 0 0 25px 12px var(--color-theme) !important; 
   animation: strong-tab-pulse 1.5s infinite alternate !important;
@@ -159,109 +92,12 @@ button[data-tutorial-target="record-entry"].tutorial-target,
   transform: translateZ(0) !important; /* Force a new stacking context */
 }
 
-/* Step 4: Specific styling for past entries tab - exactly match step 3 styling */
-.entries-tab.tutorial-target,
-[value="entries"].tutorial-target,
-button[data-tutorial-target="past-entries"].tutorial-target,
-#past-entries-button.tutorial-target {
-  z-index: 10000 !important;
-  position: relative !important;
-  box-shadow: 0 0 25px 12px var(--color-theme) !important; 
-  animation: strong-tab-pulse 1.5s infinite alternate !important;
-  outline: 2px solid white !important;
-  opacity: 1 !important;
-  transform: translateZ(0) !important;
-}
-
-/* Force elements to be visible and clickable even with overlay */
-.tutorial-target * {
-  visibility: visible !important;
-  opacity: 1 !important;
-  pointer-events: auto !important;
-}
-
-/* Step 3 & 4: Tab pulsating animation */
-@keyframes tab-pulse {
-  0% { box-shadow: 0 0 15px 5px var(--color-theme); }
-  100% { box-shadow: 0 0 25px 8px var(--color-theme); }
-}
-
-/* Step 3 & 4: Stronger pulsating animation */
-@keyframes strong-tab-pulse {
-  0% { box-shadow: 0 0 20px 8px var(--color-theme); }
-  100% { box-shadow: 0 0 35px 15px var(--color-theme); }
-}
-
-/* Step 2: Enhanced pulsating animation for the central button */
-@keyframes button-pulse {
-  0% { box-shadow: 0 0 25px 12px var(--color-theme); }
-  100% { box-shadow: 0 0 45px 20px var(--color-theme); }
-}
-
-/* Step 2: Outer glow pulsating animation */
-@keyframes outer-glow-pulse {
-  0% { filter: drop-shadow(0 0 15px var(--color-theme)); opacity: 0.7; }
-  100% { filter: drop-shadow(0 0 35px var(--color-theme)); opacity: 1; }
-}
-
-@keyframes pulse {
-  0% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7);
-  }
-  
-  50% {
-    transform: scale(1.05);
-    box-shadow: 0 0 0 15px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0);
-  }
-  
-  100% {
-    transform: scale(1);
-    box-shadow: 0 0 0 0 rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0);
-  }
-}
-
-/* Tutorial step enhancements for better visibility and interaction */
-.tutorial-step-container {
-  position: absolute;
-  z-index: 20000 !important; /* Significantly higher than the button */
-  pointer-events: auto !important;
-  max-width: 320px;
-  width: calc(100% - 40px); /* Ensure it fits on mobile screens with margin */
-  box-shadow: 0 0 30px rgba(0, 0, 0, 0.5) !important;
-  border: 2px solid var(--color-theme) !important;
-}
-
-/* Improved styles for steps 3 and 4 to ensure they're fully visible during navigation */
-.tutorial-step-container[data-step="3"],
-.tutorial-step-container[data-step="4"] {
-  position: fixed !important; /* Force fixed positioning */
-  top: 50% !important;
-  left: 50% !important;
-  transform: translate(-50%, -50%) !important;
-  max-width: 300px !important;
-  width: calc(100% - 40px) !important;
-  z-index: 30000 !important; /* Extra high z-index */
-  background-color: #1A1F2C !important; /* Dark background */
-  color: white !important;    /* White text */
-  border: 3px solid var(--color-theme) !important;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.7) !important;
-  opacity: 1 !important;
-}
-
-/* Ensure all tutorial step content is visible */
-.tutorial-step-container h3,
-.tutorial-step-container p {
-  opacity: 1 !important;
-  visibility: visible !important;
-}
-
+/* Tutorial navigation buttons */
 .tutorial-buttons {
   z-index: 10001 !important; /* Above everything else */
   pointer-events: auto !important;
 }
 
-/* Ensure navigation buttons are clickable */
 .tutorial-step-container button {
   position: relative;
   z-index: 10001 !important; /* Above everything else */
@@ -269,48 +105,35 @@ button[data-tutorial-target="past-entries"].tutorial-target,
   cursor: pointer !important;
 }
 
-/* Make Next button more pronounced */
-.tutorial-step-container button[class*="bg-theme"] {
-  transform: scale(1.05);
-  box-shadow: 0 0 10px 2px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.7);
+/* Animation keyframes - pulsating effects */
+@keyframes button-pulse {
+  0% { box-shadow: 0 0 25px 12px var(--color-theme); }
+  100% { box-shadow: 0 0 45px 20px var(--color-theme); }
 }
 
-/* Add special media queries for smaller screens */
+@keyframes strong-tab-pulse {
+  0% { box-shadow: 0 0 20px 8px var(--color-theme); }
+  100% { box-shadow: 0 0 35px 15px var(--color-theme); }
+}
+
+/* Responsive styling for different screen sizes */
 @media (max-width: 640px) {
   .tutorial-step-container {
     max-width: 280px;
     padding: 12px !important;
     font-size: 0.9rem;
-  }
-  
-  /* For all steps on mobile, ensure popups stay in visible area */
-  .tutorial-step-container[data-step="1"],
-  .tutorial-step-container[data-step="2"],
-  .tutorial-step-container[data-step="3"],
-  .tutorial-step-container[data-step="4"] {
     top: 50% !important;
     left: 50% !important;
     transform: translate(-50%, -50%) !important;
-    max-width: 280px !important;
-    width: 90% !important;
-    background-color: #1A1F2C !important; /* Dark background for all steps */
-    color: white !important;               /* White text for all steps */
   }
   
-  /* Enhanced step content for smaller screens */
   .tutorial-step-container p {
     font-size: 0.85rem !important;
     line-height: 1.4 !important;
     margin-bottom: 0.75rem !important;
   }
-  
-  /* Better button spacing for mobile */
-  .tutorial-buttons {
-    margin-top: 0.75rem !important;
-  }
 }
 
-/* Extra small screen adjustments */
 @media (max-width: 360px) {
   .tutorial-step-container {
     max-width: 90% !important;
@@ -327,39 +150,8 @@ button[data-tutorial-target="past-entries"].tutorial-target,
     margin-bottom: 0.5rem !important;
   }
   
-  /* Smaller buttons on very small screens */
   .tutorial-step-container button {
     padding: 4px 8px !important;
     font-size: 0.8rem !important;
   }
-}
-
-/* Make all tutorial steps have consistent styling during navigation */
-.tutorial-step-container {
-  background-color: #1A1F2C !important; /* Dark background */
-  color: white !important;               /* White text */
-  border: 3px solid var(--color-theme) !important;
-}
-
-.tutorial-step-container h3 {
-  color: white !important;
-}
-
-.tutorial-step-container p {
-  color: rgba(255, 255, 255, 0.9) !important;
-}
-
-/* Enhanced visibility for steps during navigation */
-body:has([data-step="1"]),
-body:has([data-step="2"]),
-body:has([data-step="3"]),
-body:has([data-step="4"]) {
-  overflow: hidden !important;
-}
-
-/* Force all tutorial steps to be visible during transitions */
-[data-step="1"], [data-step="2"], [data-step="3"], [data-step="4"] {
-  opacity: 1 !important;
-  visibility: visible !important;
-  z-index: 30000 !important;
 }

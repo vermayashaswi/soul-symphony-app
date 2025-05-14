@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -32,7 +33,10 @@ interface TutorialContextType {
   resetTutorial: () => void;
   tutorialCompleted: boolean;
   isInStep: (stepId: number) => boolean;
-  isNavigating: boolean; // New property to track navigation state
+  navigationState: {
+    inProgress: boolean;
+    targetRoute: string | null;
+  };
 }
 
 // Create the context with a default undefined value
@@ -93,7 +97,6 @@ const initialTutorialSteps: TutorialStep[] = [
     navigateTo: '/app/journal',
     waitForElement: true
   }
-  // More steps can be added here
 ];
 
 // Provider component that wraps the app
@@ -105,9 +108,22 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   const [currentStep, setCurrentStep] = useState(0);
   const [steps, setSteps] = useState<TutorialStep[]>(initialTutorialSteps);
   const [tutorialChecked, setTutorialChecked] = useState(false);
-  const [navigationComplete, setNavigationComplete] = useState(true);
+  const [navigationState, setNavigationState] = useState({
+    inProgress: false,
+    targetRoute: null as string | null
+  });
   const [tutorialCompleted, setTutorialCompleted] = useState(false);
-  const [isNavigating, setIsNavigating] = useState(false); // Track navigation state
+  
+  // Enhanced logging for debugging
+  useEffect(() => {
+    console.log('TutorialProvider - Current state:', {
+      isActive,
+      currentStep,
+      currentStepID: steps[currentStep]?.id,
+      currentPath: location.pathname,
+      navigationState
+    });
+  }, [isActive, currentStep, steps, location.pathname, navigationState]);
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
@@ -127,7 +143,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
         
         // Only activate tutorial if tutorial is not completed
-        // Made the path check more general to work from any route
         const shouldActivate = data?.tutorial_completed === 'NO';
         
         // Set the current tutorial step (default to 0 if null)
@@ -145,6 +160,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           }
         }
         
+        setTutorialCompleted(data?.tutorial_completed === 'YES');
         setTutorialChecked(true);
       } catch (error) {
         console.error('Error in tutorial check:', error);
@@ -154,100 +170,61 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     checkTutorialStatus();
   }, [user, location.pathname, tutorialChecked, navigate]);
   
-  // Check tutorial completion status on initial load
+  // Enhanced route change detection for navigation between steps
   useEffect(() => {
-    const checkTutorialCompletionStatus = async () => {
-      if (!user) return;
-
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('tutorial_completed')
-          .eq('id', user.id)
-          .single();
-          
-        if (error) {
-          console.error('Error checking tutorial completion status:', error);
-          return;
-        }
-        
-        // Set the tutorial completed state based on database value
-        setTutorialCompleted(data?.tutorial_completed === 'YES');
-        console.log('Tutorial completion status loaded:', data?.tutorial_completed === 'YES');
-      } catch (error) {
-        console.error('Error checking tutorial completion status:', error);
-      }
-    };
-    
-    checkTutorialCompletionStatus();
-  }, [user]);
-  
-  // Enhanced navigation tracking - watch for route changes to update navigation state
-  useEffect(() => {
-    if (isNavigating) {
-      console.log('Navigation in progress, detected route change to:', location.pathname);
+    if (navigationState.inProgress && navigationState.targetRoute === location.pathname) {
+      console.log(`Navigation complete: arrived at ${location.pathname}`);
+      setNavigationState({
+        inProgress: false,
+        targetRoute: null
+      });
+      
+      // After navigation completes, check for elements that need to be highlighted
       const currentStepData = steps[currentStep];
-      
-      // Check if we've reached the intended destination
-      if (currentStepData && currentStepData.navigateTo === location.pathname) {
-        console.log('Reached intended destination:', location.pathname);
-        setIsNavigating(false);
-        setNavigationComplete(true);
-      }
-    }
-  }, [location.pathname, isNavigating, currentStep, steps]);
-  
-  // Handle navigation between steps when route changes
-  useEffect(() => {
-    if (isActive && navigationComplete === false) {
-      const currentTutorialStep = steps[currentStep];
-      
-      // Check if the current URL matches the required URL for the step
-      if (currentTutorialStep?.navigateTo && location.pathname === currentTutorialStep.navigateTo) {
-        console.log(`Navigation to ${currentTutorialStep.navigateTo} complete for step ${currentTutorialStep.id}`);
-        setNavigationComplete(true);
-        setIsNavigating(false);
+      if (currentStepData && currentStepData.waitForElement) {
+        console.log(`Step ${currentStepData.id} is waiting for element: ${currentStepData.targetElement}`);
         
-        // After navigation, give time for the page to render before looking for elements
-        if (currentTutorialStep.waitForElement && currentTutorialStep.targetElement) {
-          const checkElement = () => {
-            console.log(`Looking for element ${currentTutorialStep.targetElement} for step ${currentTutorialStep.id}`);
-            
-            // Try the primary selector
-            let element = document.querySelector(currentTutorialStep.targetElement!);
-            
-            // If not found, try alternative selectors if available
-            if (!element && currentTutorialStep.alternativeSelectors) {
-              for (const selector of currentTutorialStep.alternativeSelectors) {
-                element = document.querySelector(selector);
-                if (element) {
-                  console.log(`Found element using alternative selector: ${selector}`);
-                  break;
-                }
-              }
-            }
-            
-            if (element) {
-              console.log(`Element found for step ${currentTutorialStep.id}`);
-              
-              // Add a special class to ensure this element is visible in step 3
-              if (currentTutorialStep.id === 3) {
-                element.classList.add('tutorial-target');
-                element.classList.add('record-entry-tab');
-                console.log('Added special classes to record entry element');
-              }
-            } else {
-              console.warn(`Element not found for step ${currentTutorialStep.id}, retrying...`);
-              setTimeout(checkElement, 500);
-            }
-          };
-          
-          // Start checking for the element with a small delay to allow rendering
-          setTimeout(checkElement, 500);
-        }
+        // Wait for the DOM to be ready after navigation
+        setTimeout(() => {
+          checkForTargetElement(currentStepData);
+        }, 500);
       }
     }
-  }, [isActive, currentStep, steps, location.pathname, navigationComplete]);
+  }, [location.pathname, navigationState.inProgress, navigationState.targetRoute]);
+  
+  // Helper function to check for target elements and apply highlighting
+  const checkForTargetElement = (stepData: TutorialStep) => {
+    const selectors = [
+      stepData.targetElement,
+      ...(stepData.alternativeSelectors || [])
+    ].filter(Boolean) as string[];
+    
+    let targetElement: Element | null = null;
+    
+    // Try each selector until we find a match
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        targetElement = element;
+        console.log(`Found target element using selector: ${selector}`);
+        break;
+      }
+    }
+    
+    if (targetElement) {
+      console.log(`Applying highlighting to element for step ${stepData.id}`);
+      targetElement.classList.add('tutorial-target');
+      
+      // Add special classes based on step
+      if (stepData.id === 3) {
+        targetElement.classList.add('record-entry-tab');
+      } else if (stepData.id === 4) {
+        targetElement.classList.add('entries-tab');
+      }
+    } else {
+      console.warn(`Could not find any target element for step ${stepData.id}`);
+    }
+  };
   
   // Function to update the tutorial step in the database
   const updateTutorialStep = async (step: number) => {
@@ -294,77 +271,101 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         description: "You can reset it any time in settings."
       });
       console.log('Tutorial marked as completed');
+      
+      // Clean up any lingering tutorial classes
+      document.body.classList.remove('tutorial-active');
+      const targetElements = document.querySelectorAll('.tutorial-target');
+      targetElements.forEach(el => el.classList.remove('tutorial-target'));
     } catch (error) {
       console.error('Error completing tutorial:', error);
     }
   };
   
-  // Move to the next step with enhanced logic to handle any navigation state
+  // Enhanced next step function with improved navigation handling
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       const newStep = currentStep + 1;
-      const nextTutorialStep = steps[newStep];
+      const nextStepData = steps[newStep];
       
-      console.log(`Moving to tutorial step ${newStep} (ID: ${nextTutorialStep.id})`);
+      console.log(`Moving to tutorial step ${newStep} (ID: ${nextStepData.id})`);
       
-      // First update the step in state BEFORE any navigation
+      // First update the current step in state and database
       setCurrentStep(newStep);
       updateTutorialStep(newStep);
       
+      // Clean up any existing highlight classes
+      const targetElements = document.querySelectorAll('.tutorial-target, .record-entry-tab, .entries-tab');
+      targetElements.forEach(el => {
+        el.classList.remove('tutorial-target', 'record-entry-tab', 'entries-tab');
+      });
+      
       // Handle navigation if needed
-      if (nextTutorialStep.navigateTo && location.pathname !== nextTutorialStep.navigateTo) {
-        console.log(`Navigation needed for step ${nextTutorialStep.id} to ${nextTutorialStep.navigateTo}`);
-        setNavigationComplete(false);
-        setIsNavigating(true);
+      if (nextStepData.navigateTo && location.pathname !== nextStepData.navigateTo) {
+        console.log(`Navigation needed for step ${nextStepData.id} to ${nextStepData.navigateTo}`);
         
-        // Add a small delay before navigation to ensure state updates first
-        setTimeout(() => {
-          navigate(nextTutorialStep.navigateTo);
-        }, 50);
+        setNavigationState({
+          inProgress: true,
+          targetRoute: nextStepData.navigateTo
+        });
+        
+        // Navigate to the target page
+        navigate(nextStepData.navigateTo);
+      } else {
+        // If we're already on the right page, immediately check for elements to highlight
+        if (nextStepData.waitForElement) {
+          setTimeout(() => {
+            checkForTargetElement(nextStepData);
+          }, 200);
+        }
       }
     } else {
+      // Last step, complete the tutorial
       console.log('Completing tutorial - reached the end');
       completeTutorial();
     }
   };
   
-  // Enhanced version of prevStep function with improved navigation for moving backwards
+  // Enhanced prev step function with improved navigation handling
   const prevStep = () => {
     if (currentStep > 0) {
       const newStep = currentStep - 1;
-      const prevTutorialStep = steps[newStep];
-      const currentTutorialStep = steps[currentStep];
+      const prevStepData = steps[newStep];
       
-      console.log(`Moving to previous step ${newStep} (ID: ${prevTutorialStep.id})`);
-      console.log(`Current location: ${location.pathname}, Current step: ${currentStep}, Target navigation: ${prevTutorialStep.navigateTo || 'none'}`);
+      console.log(`Moving to previous step ${newStep} (ID: ${prevStepData.id})`);
       
-      // Update the current step in state and database
+      // First update the current step in state and database
       setCurrentStep(newStep);
       updateTutorialStep(newStep);
       
-      // Enhanced navigation logic for stepping back
-      if (prevTutorialStep.navigateTo && location.pathname !== prevTutorialStep.navigateTo) {
-        console.log(`Navigating back to ${prevTutorialStep.navigateTo} for previous step ${prevTutorialStep.id}`);
+      // Clean up any existing highlight classes
+      const targetElements = document.querySelectorAll('.tutorial-target, .record-entry-tab, .entries-tab');
+      targetElements.forEach(el => {
+        el.classList.remove('tutorial-target', 'record-entry-tab', 'entries-tab');
+      });
+      
+      // Handle navigation if needed
+      if (prevStepData.navigateTo && location.pathname !== prevStepData.navigateTo) {
+        console.log(`Navigation needed for step ${prevStepData.id} to ${prevStepData.navigateTo}`);
         
-        // Critical: Set navigation flags before navigating
-        setNavigationComplete(false);
-        setIsNavigating(true);
+        setNavigationState({
+          inProgress: true,
+          targetRoute: prevStepData.navigateTo
+        });
         
-        // Special handling for step 3 to step 2 backward navigation
-        if (currentTutorialStep.id === 3 && prevTutorialStep.id === 2) {
-          console.log('Special handling for step 3 to step 2 backward navigation');
-          
-          // Explicitly navigate back to home
-          navigate('/app/home');
-        } else {
-          // Regular navigation to the target page for the previous step
-          navigate(prevTutorialStep.navigateTo);
+        // Navigate to the target page
+        navigate(prevStepData.navigateTo);
+      } else {
+        // If we're already on the right page, immediately check for elements to highlight
+        if (prevStepData.waitForElement) {
+          setTimeout(() => {
+            checkForTargetElement(prevStepData);
+          }, 200);
         }
       }
     }
   };
   
-  // Skip the tutorial entirely
+  // Enhanced skip tutorial function
   const skipTutorial = async () => {
     if (!user) return;
     
@@ -380,17 +381,26 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       
       setIsActive(false);
+      setTutorialCompleted(true);
       toast({
         title: "Tutorial skipped",
         description: "You can always find help in the settings."
       });
+      
+      // Clean up any lingering tutorial classes
+      document.body.classList.remove('tutorial-active');
+      const targetElements = document.querySelectorAll('.tutorial-target, .record-entry-tab, .entries-tab');
+      targetElements.forEach(el => {
+        el.classList.remove('tutorial-target', 'record-entry-tab', 'entries-tab');
+      });
+      
       console.log('Tutorial skipped by user');
     } catch (error) {
       console.error('Error skipping tutorial:', error);
     }
   };
   
-  // Function to reset the tutorial - updated to ensure proper navigation and toast timing
+  // Enhanced reset tutorial function
   const resetTutorial = async () => {
     if (!user) return;
     
@@ -416,8 +426,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setCurrentStep(0);
       setTutorialChecked(false);
       setTutorialCompleted(false);
-      setNavigationComplete(true);
-      setIsNavigating(false);
+      setNavigationState({
+        inProgress: false,
+        targetRoute: null
+      });
       
       // Only navigate if we're not already on the app home page
       if (location.pathname !== '/app/home') {
@@ -452,7 +464,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Provide the context value with the new isNavigating property
+  // Provide the context value with the updated navigationState property
   const contextValue: TutorialContextType = {
     isActive,
     currentStep,
@@ -465,7 +477,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     resetTutorial,
     tutorialCompleted,
     isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId,
-    isNavigating // Expose the navigation state
+    navigationState
   };
   
   return (
