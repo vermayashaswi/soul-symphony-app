@@ -16,14 +16,20 @@ export type ChatMessage = {
   content: string;
   sender: 'user' | 'assistant' | 'error';
   created_at: string;
-  reference_entries?: Json | null;
-  analysis_data?: Json | null;
+  reference_entries?: Json | any[] | null;
+  analysis_data?: Json | any | null;
   has_numeric_result?: boolean | null;
   role: 'user' | 'assistant' | 'error';
   sub_query1?: string | null;
   sub_query2?: string | null;
   sub_query3?: string | null;
   sub_query_responses?: any[] | null;
+  isInteractive?: boolean;
+  interactiveOptions?: any[];
+  references?: any[]; // Alias for reference_entries
+  analysis?: any; // Alias for analysis_data
+  hasNumericResult?: boolean; // Alias for has_numeric_result
+  diagnostics?: any; // For debug diagnostics
 };
 
 export type SubQueryResponse = {

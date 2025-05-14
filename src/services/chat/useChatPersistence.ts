@@ -35,6 +35,8 @@ export interface ChatMessagePersistence {
   references?: any[];
   analysis?: any;
   hasNumericResult?: boolean;
+  sub_query_responses?: any[];
+  diagnostics?: any;
 }
 
 export const useChatPersistence = (userId: string | undefined) => {
@@ -85,9 +87,11 @@ export const useChatPersistence = (userId: string | undefined) => {
           // Convert ChatMessage to ChatMessagePersistence
           const persistenceMessages: ChatMessagePersistence[] = threadMessages.map(msg => ({
             ...msg,
-            references: msg.reference_entries as any[],
+            references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
             analysis: msg.analysis_data,
-            hasNumericResult: msg.has_numeric_result
+            hasNumericResult: msg.has_numeric_result,
+            reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
+            sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
           }));
           setMessages(persistenceMessages);
         }
@@ -118,9 +122,11 @@ export const useChatPersistence = (userId: string | undefined) => {
         const persistenceMessage: ChatMessagePersistence = {
           ...newMessage,
           sender: newMessage.sender as 'user' | 'assistant' | 'error',
-          references: newMessage.reference_entries,
+          references: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
           analysis: newMessage.analysis_data,
-          hasNumericResult: newMessage.has_numeric_result
+          hasNumericResult: newMessage.has_numeric_result,
+          reference_entries: Array.isArray(newMessage.reference_entries) ? newMessage.reference_entries : [],
+          sub_query_responses: Array.isArray(newMessage.sub_query_responses) ? newMessage.sub_query_responses : []
         };
         setMessages(prev => [...prev, persistenceMessage]);
       })
@@ -206,9 +212,11 @@ export const useChatPersistence = (userId: string | undefined) => {
         // Convert to ChatMessagePersistence to avoid type mismatch
         const persistenceMessage: ChatMessagePersistence = {
           ...savedMessage,
-          references: savedMessage.reference_entries as any[],
+          references: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
           analysis: savedMessage.analysis_data,
-          hasNumericResult: savedMessage.has_numeric_result as boolean
+          hasNumericResult: savedMessage.has_numeric_result as boolean,
+          reference_entries: Array.isArray(savedMessage.reference_entries) ? savedMessage.reference_entries : [],
+          sub_query_responses: Array.isArray(savedMessage.sub_query_responses) ? savedMessage.sub_query_responses : []
         };
         
         // Replace temp message with saved one

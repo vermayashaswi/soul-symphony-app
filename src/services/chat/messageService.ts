@@ -1,6 +1,7 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { ChatMessage, InteractiveOption } from "@/types/chat";
+import { ChatMessage } from "@/types/chat";
+import { Json } from "@/integrations/supabase/types";
 
 /**
  * Gets the user's timezone offset in minutes
@@ -28,10 +29,12 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       sender: msg.sender as 'user' | 'assistant' | 'error',
       role: msg.role as 'user' | 'assistant' | 'error',
       // Add aliases for backward compatibility
-      references: msg.reference_entries,
+      references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
       analysis: msg.analysis_data,
-      hasNumericResult: msg.has_numeric_result
-    }));
+      hasNumericResult: msg.has_numeric_result,
+      // Ensure sub_query_responses is always an array
+      sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
+    } as ChatMessage));
   } catch (error) {
     console.error("Error fetching thread messages:", error);
     return [];
@@ -49,7 +52,7 @@ export const saveMessage = async (
   analysis?: any,
   hasNumericResult?: boolean,
   isInteractive?: boolean,
-  interactiveOptions?: InteractiveOption[]
+  interactiveOptions?: any[]
 ): Promise<ChatMessage | null> => {
   try {
     // Create the base message object
@@ -61,6 +64,8 @@ export const saveMessage = async (
       reference_entries: references || null,
       analysis_data: analysis || null,
       has_numeric_result: hasNumericResult || false,
+      // Ensure sub_query_responses is always an array if present
+      sub_query_responses: [] // Default empty array
     };
     
     // Insert the message
@@ -82,9 +87,11 @@ export const saveMessage = async (
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: data.role as 'user' | 'assistant' | 'error',
       // Add aliases for backward compatibility
-      references: data.reference_entries,
+      references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
       analysis: data.analysis_data,
-      hasNumericResult: data.has_numeric_result
+      hasNumericResult: data.has_numeric_result,
+      // Ensure sub_query_responses is always an array
+      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
     };
     
     // If this is an interactive message with options, add those properties

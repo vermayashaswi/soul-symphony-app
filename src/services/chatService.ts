@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { createFallbackQueryPlan, convertGptPlanToQueryPlan } from "./chat/queryPlannerService";
 import { getUserTimezoneOffset } from "./chat";
@@ -321,7 +320,8 @@ async function processWithQueryPlan(
           sender: "assistant",
           content: segmentResults[0].response,
           references: segmentResults[0].references,
-          diagnostics
+          diagnostics,
+          created_at: new Date().toISOString()
         };
       }
       
@@ -362,7 +362,8 @@ async function processWithQueryPlan(
           sender: "assistant",
           content: segmentResults[0].response + "\n\n(Note: There was an error combining all parts of your question. This is a partial answer.)",
           references: segmentResults[0].references,
-          diagnostics
+          diagnostics,
+          created_at: new Date().toISOString()
         };
       }
       
@@ -396,7 +397,8 @@ async function processWithQueryPlan(
         sender: "assistant",
         content: combinedData.response,
         references: allReferences,
-        diagnostics
+        diagnostics,
+        created_at: new Date().toISOString()
       };
     }
     
