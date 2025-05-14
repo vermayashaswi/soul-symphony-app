@@ -84,6 +84,25 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [onNext, step.id]);
   
+  // Get background color based on step ID - make step 2 transparent
+  const getBackgroundStyle = () => {
+    // Special styling for step 2 - transparent background to see the arrow behind
+    if (step.id === 2) {
+      return {
+        backgroundColor: 'rgba(26, 31, 44, 0.2)', // 20% opacity for the background
+        backdropFilter: 'blur(2px)', // Slight blur to improve text readability
+        color: 'white',
+        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow to ensure readability
+      };
+    }
+    
+    // Default styling for other steps
+    return {
+      backgroundColor: '#1A1F2C',
+      color: 'white'
+    };
+  };
+  
   // Improved modal positioning based on step ID - use fixed positioning for consistency
   const getPositionStyle = () => {
     // Special positioning for step 2 to move it slightly higher so it doesn't cover the arrow
@@ -121,8 +140,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       className="tutorial-step-container bg-card border border-theme shadow-lg rounded-xl p-4 max-w-[320px]"
       style={{
         ...getPositionStyle(),
-        backgroundColor: '#1A1F2C', // Dark background for all steps
-        color: 'white',             // White text for all steps
+        ...getBackgroundStyle(),
         border: '3px solid var(--color-theme)',
         boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)',
         zIndex: 30000, // Consistently high z-index for all steps
@@ -167,7 +185,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             className="flex items-center gap-1 pointer-events-auto bg-gray-800 border-white/50 text-white hover:text-white hover:bg-gray-700"
             style={{
               color: "#FFFFFF !important", // Ensure text is visible in light mode
-              backgroundColor: "#333333",  // Dark background for back button
+              backgroundColor: step.id === 2 ? "rgba(51,51,51,0.8)" : "#333333",  // More opaque for step 2
               borderColor: "rgba(255,255,255,0.5)"
             }}
           >
@@ -186,7 +204,13 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             onClick={handleNext}
             className="flex items-center gap-1 bg-theme hover:bg-theme/80 pointer-events-auto z-50"
             data-testid="tutorial-next-button"
-            style={{ cursor: 'pointer', position: 'relative', zIndex: 30001 }}
+            style={{ 
+              cursor: 'pointer', 
+              position: 'relative', 
+              zIndex: 30001,
+              backgroundColor: 'var(--color-theme)',
+              opacity: 1  // Ensure buttons remain fully opaque
+            }}
           >
             {isLast ? 'Finish' : 'Next'}
             {!isLast && <ChevronRight className="h-4 w-4" />}

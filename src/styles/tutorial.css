@@ -44,12 +44,24 @@ body.tutorial-active {
   pointer-events: auto !important;
 }
 
+/* Special styling for step 2 to make it semi-transparent */
+.tutorial-step-container[data-step="2"] {
+  background-color: rgba(26, 31, 44, 0.2) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
 /* Force all tutorial step content to be visible */
 .tutorial-step-container h3,
 .tutorial-step-container p {
   color: white !important;
   opacity: 1 !important;
   visibility: visible !important;
+}
+
+/* Add text shadow for better readability on transparent backgrounds */
+.tutorial-step-container[data-step="2"] h3,
+.tutorial-step-container[data-step="2"] p {
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important;
 }
 
 /* Step 1: Journal header styling */
@@ -154,6 +166,12 @@ body.tutorial-active {
 
 .tutorial-buttons button[variant="outline"]:hover {
   background-color: #444444 !important;
+}
+
+/* Special styling for step 2 - more opaque buttons for visibility */
+.tutorial-step-container[data-step="2"] .tutorial-buttons button[variant="outline"] {
+  background-color: rgba(51,51,51,0.8) !important;
+  border-color: rgba(255,255,255,0.7) !important;
 }
 
 /* Navigation bar styling during active tutorial */
