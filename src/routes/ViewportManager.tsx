@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Outlet, useLocation } from 'react-router-dom';
+import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
@@ -13,7 +13,7 @@ const ViewportManager: React.FC = () => {
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
   
-  // Expanded list of routes where navigation should be hidden
+  // Comprehensive list of routes where navigation should be hidden
   const onboardingOrAuthPaths = [
     '/app/onboarding',
     '/app/auth',
@@ -26,14 +26,28 @@ const ViewportManager: React.FC = () => {
   // Check if current path is in the list of paths where navigation should be hidden
   const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
   
+  // Explicit check for app root path with authenticated user - needs special handling
+  const isAppRootWithUser = location.pathname === '/app' && !!user;
+  
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
     user: !!user,
     isOnboardingOrAuth,
-    onboardingCompletePath: location.pathname === '/app' && !onboardingComplete
+    onboardingComplete,
+    isAppRootWithUser,
+    hideNavigation: 
+      isOnboardingOrAuth || 
+      !user || 
+      (location.pathname === '/app' && !onboardingComplete)
   });
+  
+  // If we're at /app and the user is logged in, redirect to /app/home
+  if (isAppRootWithUser && onboardingComplete) {
+    console.log('Redirecting authenticated user from /app to /app/home');
+    return <Navigate to="/app/home" replace />;
+  }
   
   // Render the appropriate layout based on route and device
   return (

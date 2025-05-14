@@ -18,9 +18,38 @@ import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
 import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
+import { useAuth } from '@/contexts/AuthContext';
+import { useOnboarding } from '@/hooks/use-onboarding';
 
 const AppRoutes = () => {
   console.log('Rendering AppRoutes component');
+  const { user } = useAuth();
+  const { onboardingComplete } = useOnboarding();
+  
+  // This will be used for conditional rendering of the /app route
+  const AppRootRedirect = () => {
+    console.log('AppRootRedirect - Auth status:', { 
+      user: !!user, 
+      onboardingComplete 
+    });
+    
+    if (user) {
+      if (onboardingComplete) {
+        // If user is logged in and onboarding is complete, go to home
+        console.log('User logged in and onboarding complete, redirecting to /app/home');
+        return <Navigate to="/app/home" replace />;
+      } else {
+        // If user is logged in but onboarding is not complete, go to onboarding
+        console.log('User logged in but onboarding not complete, redirecting to /app/onboarding');
+        return <Navigate to="/app/onboarding" replace />;
+      }
+    } else {
+      // If user is not logged in, go to onboarding
+      console.log('User not logged in, redirecting to /app/onboarding');
+      return <Navigate to="/app/onboarding" replace />;
+    }
+  };
+  
   return (
     <Routes>
       {/* Wrap all routes that need ViewportManager in a parent Route */}
@@ -34,7 +63,7 @@ const AppRoutes = () => {
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
         {/* App Routes */}
-        <Route path="/app" element={<OnboardingScreen />} />
+        <Route path="/app" element={<AppRootRedirect />} />
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         

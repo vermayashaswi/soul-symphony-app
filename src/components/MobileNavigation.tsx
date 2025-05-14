@@ -8,6 +8,7 @@ import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { useAuth } from '@/contexts/AuthContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -19,6 +20,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { isActive: isTutorialActive } = useTutorial();
+  const { user } = useAuth();
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
@@ -53,7 +55,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
-    // Comprehensive list of paths where navigation should be hidden
+    // Comprehensive list of paths where navigation should be hidden - must match ViewportManager
     const onboardingOrAuthPaths = [
       '/app/onboarding',
       '/app/auth',
@@ -66,13 +68,20 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     // Check if current path is in the list of paths where navigation should be hidden
     const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
     
+    // Explicit check for app root path - hide navigation here regardless of onboarding status
+    const isAppRoot = location.pathname === '/app';
+    
     // Only show navigation if:
     // 1. We're on mobile or in native app
     // 2. Keyboard is not visible
     // 3. We're not on an onboarding/auth screen
+    // 4. User is authenticated
+    // 5. Onboarding is complete if we're checking
     const shouldShowNav = (isMobile || isNativeApp()) && 
                           !isKeyboardVisible && 
-                          !isOnboardingOrAuth;
+                          !isOnboardingOrAuth &&
+                          !!user &&
+                          onboardingComplete !== false;
     
     console.log('MobileNavigation visibility check:', { 
       shouldShowNav, 
@@ -81,18 +90,22 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       path: location.pathname,
       isKeyboardVisible,
       isOnboardingOrAuth,
+      isAppRoot,
+      hasUser: !!user,
+      onboardingComplete,
       isTutorialActive
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete]);
   
   if (!isVisible) {
     return null;
   }
   
   // Additional safety check - don't show if onboarding is not complete
-  if (!onboardingComplete && location.pathname === '/app') {
+  if (onboardingComplete === false || location.pathname === '/app') {
+    console.log('MobileNavigation: Not rendering due to onboarding status or /app path');
     return null;
   }
   

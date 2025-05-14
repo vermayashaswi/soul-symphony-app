@@ -16,7 +16,7 @@ const Index = () => {
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
-  const { resetOnboarding } = useOnboarding();
+  const { onboardingComplete } = useOnboarding();
   const networkStatus = useNetworkStatus();
   const { translate } = useTranslation();
 
@@ -29,15 +29,23 @@ const Index = () => {
   useEffect(() => {
     // If user is logged in, redirect them to the app home page
     if (user) {
-      console.log('User is logged in, redirecting to /app/home');
-      navigate('/app/home');
+      console.log('Index - User is logged in, redirecting to /app/home', {
+        onboardingComplete,
+        user: !!user
+      });
+      
+      if (onboardingComplete) {
+        navigate('/app/home');
+      } else {
+        navigate('/app/onboarding');
+      }
     }
     
     // Check URL parameters for specific redirects
     if (urlParams.has('insights')) {
       navigate('/app/insights');
     }
-  }, [user, navigate, urlParams]);
+  }, [user, navigate, urlParams, onboardingComplete]);
 
   useEffect(() => {
     // Pre-translate common strings used on the index page
@@ -64,7 +72,10 @@ const Index = () => {
     }
   }, [networkStatus.speed, translate]);
   
-  console.log('Rendering Index.tsx component, path:', window.location.pathname);
+  console.log('Rendering Index.tsx component, path:', window.location.pathname, {
+    hasUser: !!user,
+    onboardingComplete
+  });
 
   // This should only render the website home page component
   return (
