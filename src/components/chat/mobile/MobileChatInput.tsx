@@ -90,39 +90,6 @@ export default function MobileChatInput({
       inputElement.addEventListener('focus', handleFocus);
     }
     
-    // Ensure input visibility based on tutorial state
-    const ensureInputVisibility = () => {
-      if (inputContainerRef.current) {
-        if (isInChatTutorialStep) {
-          // Completely hide during tutorial step 5
-          inputContainerRef.current.style.visibility = 'hidden';
-          inputContainerRef.current.style.opacity = '0';
-          inputContainerRef.current.style.display = 'none';
-          inputContainerRef.current.style.height = '0';
-          inputContainerRef.current.style.width = '0';
-          inputContainerRef.current.style.pointerEvents = 'none';
-          inputContainerRef.current.style.position = 'absolute';
-          inputContainerRef.current.style.zIndex = '-999';
-          inputContainerRef.current.style.transform = 'translateY(1000px)';
-        } else {
-          // Show normally otherwise
-          inputContainerRef.current.style.visibility = 'visible';
-          inputContainerRef.current.style.opacity = '1';
-          inputContainerRef.current.style.display = 'flex';
-          inputContainerRef.current.style.height = '';
-          inputContainerRef.current.style.width = '';
-          inputContainerRef.current.style.pointerEvents = '';
-          inputContainerRef.current.style.position = '';
-          inputContainerRef.current.style.zIndex = '60';
-          inputContainerRef.current.style.transform = '';
-        }
-      }
-    };
-    
-    // Run immediately and set interval for consistent checking
-    ensureInputVisibility();
-    const visibilityInterval = setInterval(ensureInputVisibility, 300);
-    
     return () => {
       if (window.visualViewport) {
         window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
@@ -134,9 +101,8 @@ export default function MobileChatInput({
       }
       
       document.body.classList.remove('keyboard-visible');
-      clearInterval(visibilityInterval);
     };
-  }, [isKeyboardVisible, isInChatTutorialStep]);
+  }, [isKeyboardVisible]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
@@ -200,11 +166,7 @@ export default function MobileChatInput({
         transition: 'all 0.2s ease',
         borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
         borderBottom: !isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
-        visibility: 'visible',
-        opacity: 1,
-        transform: 'translateZ(0)',
-        willChange: 'transform, bottom',
-        backgroundColor: '#000000',  // Changed to black background color
+        backgroundColor: '#000000',  // Black background color
       }}
     >
       <div className="flex-1 relative">

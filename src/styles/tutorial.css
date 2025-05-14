@@ -60,6 +60,7 @@ body.tutorial-active {
 /* Step 5: Fully opaque background for step 5 */
 .tutorial-step-container[data-step="5"] {
   background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 5 */
+  top: 15% !important; /* Move even higher to avoid overlapping with chat questions */
 }
 
 /* Steps 2-4: Semi-transparent with blur */
@@ -146,6 +147,16 @@ body.tutorial-active {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
+  pointer-events: auto !important;
+}
+
+/* Enhanced styling for step 5 to ensure chat suggestions are prominently visible */
+.tutorial-active[data-current-step="5"] .chat-question-highlight {
+  z-index: 20000 !important; /* Extremely high z-index for chat suggestions during step 5 */
+  position: relative !important;
+  box-shadow: 0 0 40px 25px var(--color-theme) !important; /* Even stronger glow */
+  animation: ultra-strong-pulse 1.5s infinite alternate !important; /* Enhanced animation */
+  transform: translateZ(0) scale(1.1) !important; /* Bigger scale */
 }
 
 /* Tutorial navigation buttons */
@@ -179,37 +190,24 @@ body.tutorial-active {
   touch-action: none !important;
 }
 
-/* Enhanced aggressive hiding of chat input during step 5 */
-.tutorial-active .mobile-chat-interface .p-2.border-t.border-border,
-.tutorial-active[data-current-step="5"] .mobile-chat-interface .p-2.border-t.border-border {
-  opacity: 0 !important; /* Make fully invisible */
-  visibility: hidden !important;
-  z-index: -1 !important; /* Push it below everything */
-  display: none !important; /* Don't render it at all */
-  pointer-events: none !important;
-  height: 0 !important;
-  width: 0 !important;
-  overflow: hidden !important;
-  position: absolute !important;
-  transform: translateY(1000px) !important; /* Move it far away */
-}
-
-/* Hide chat input completely for step 5 tutorial - even more aggressive styles */
-.tutorial-active[data-current-step="5"] .mobile-chat-interface form,
-.tutorial-active[data-current-step="5"] .mobile-chat-interface input,
-.tutorial-active[data-current-step="5"] .mobile-chat-interface textarea,
-.tutorial-active[data-current-step="5"] .mobile-chat-interface button[type="submit"],
-.tutorial-active[data-current-step="5"] .mobile-chat-interface .input-container,
-.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
-  display: none !important;
+/* Ultra aggressive hiding of chat inputs during step 5 */
+body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,
+body.tutorial-active[data-current-step="5"] form,
+body.tutorial-active[data-current-step="5"] input,
+body.tutorial-active[data-current-step="5"] textarea,
+body.tutorial-active[data-current-step="5"] button[type="submit"] {
   opacity: 0 !important;
   visibility: hidden !important;
-  pointer-events: none !important;
+  display: none !important;
   height: 0 !important;
   width: 0 !important;
-  transform: translateY(1000px) !important;
   position: absolute !important;
-  z-index: -999 !important;
+  z-index: -9999 !important;
+  transform: translateY(9999px) !important;
+  pointer-events: none !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(100%) !important;
+  overflow: hidden !important;
 }
 
 /* Animation keyframes - pulsating effects */
@@ -221,6 +219,11 @@ body.tutorial-active {
 @keyframes strong-tab-pulse {
   0% { box-shadow: 0 0 20px 8px var(--color-theme); }
   100% { box-shadow: 0 0 35px 15px var(--color-theme); }
+}
+
+@keyframes ultra-strong-pulse {
+  0% { box-shadow: 0 0 30px 15px var(--color-theme); opacity: 0.8; }
+  100% { box-shadow: 0 0 50px 30px var(--color-theme); opacity: 1; }
 }
 
 @keyframes chat-pulse {
@@ -247,7 +250,8 @@ body.tutorial-active {
   
   /* Special override for step 5 on mobile */
   .tutorial-step-container[data-step="5"] {
-    top: 30% !important; /* Force to be higher on mobile */
+    top: 15% !important; /* Force to be higher on mobile */
+    transform: translate(-50%, 0) !important; /* Adjust transform for top position */
   }
 }
 
@@ -274,6 +278,6 @@ body.tutorial-active {
   
   /* Special override for step 5 on small mobile */
   .tutorial-step-container[data-step="5"] {
-    top: 25% !important; /* Force to be even higher on small mobile */
+    top: 15% !important; /* Force to be even higher on small mobile */
   }
 }

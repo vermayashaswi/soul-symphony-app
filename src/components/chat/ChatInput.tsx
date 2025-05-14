@@ -32,13 +32,23 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const ensureInputVisibility = () => {
       if (inputContainerRef.current) {
         if (isInTutorial) {
-          // Hide during tutorial step 5
+          // Completely hide during tutorial step 5
+          inputContainerRef.current.style.display = 'none';
           inputContainerRef.current.style.visibility = 'hidden';
           inputContainerRef.current.style.opacity = '0';
+          inputContainerRef.current.style.height = '0';
+          inputContainerRef.current.style.position = 'absolute';
+          inputContainerRef.current.style.zIndex = '-999';
+          inputContainerRef.current.style.transform = 'translateY(1000px)';
         } else {
           // Show normally
+          inputContainerRef.current.style.display = 'block';
           inputContainerRef.current.style.visibility = 'visible';
           inputContainerRef.current.style.opacity = '1';
+          inputContainerRef.current.style.height = '';
+          inputContainerRef.current.style.position = '';
+          inputContainerRef.current.style.zIndex = '20';
+          inputContainerRef.current.style.transform = '';
         }
       }
     };
@@ -90,7 +100,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
         marginBottom: '5px', 
         position: 'relative', 
         zIndex: 20,
-        backgroundColor: '#000000' // Added black background
+        backgroundColor: '#000000' // Black background
       }}
       ref={inputContainerRef}
     >
