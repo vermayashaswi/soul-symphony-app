@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -12,6 +13,7 @@ import { toast } from "sonner";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
+import { useAuth } from "@/contexts/AuthContext"; // Add import for useAuth
 import { 
   Select,
   SelectContent,
@@ -739,6 +741,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth(); // Get authentication status
   
   // Define isNameStep before it's used in useSwipeGesture
   const isFirstStep = currentStep === 0;
@@ -779,15 +782,25 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   };
   
   const handleSkip = () => {
+    console.log("Skip button clicked, user auth status:", !!user);
+    
     if (name) {
       localStorage.setItem("user_display_name", name.trim());
     }
     
     localStorage.setItem("onboardingComplete", "true");
+    
     if (onComplete) {
       onComplete();
     } else {
-      navigate("/app/auth");
+      // Check if user is already authenticated
+      if (user) {
+        console.log("User is authenticated, navigating to /app/home");
+        navigate("/app/home");
+      } else {
+        console.log("User is not authenticated, navigating to /app/auth");
+        navigate("/app/auth");
+      }
     }
   };
 
