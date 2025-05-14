@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -515,7 +514,7 @@ export default function MobileChatInterface({
   };
 
   return (
-    <div className="mobile-chat-interface h-full flex flex-col pb-20 relative">
+    <div className="mobile-chat-interface h-full flex flex-col relative">
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -540,7 +539,6 @@ export default function MobileChatInterface({
                   <Plus className="h-4 w-4" />
                   <TranslatableText text="New Chat" />
                 </Button>
-                {/* Removed extra close button here */}
               </SheetHeader>
               
               <div className="mt-2 h-[calc(100vh-80px)]">
@@ -548,7 +546,6 @@ export default function MobileChatInterface({
                   activeThreadId={threadId}
                   onSelectThread={(threadId) => {
                     onSelectThread(threadId);
-                    // Close the sheet after selecting a thread
                     setSheetOpen(false);
                   }}
                   showHeader={false}
@@ -575,7 +572,7 @@ export default function MobileChatInterface({
         </div>
       </div>
       
-      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col pb-24">
+      <div className="mobile-chat-content flex-1 overflow-y-auto px-2 py-3 space-y-3 flex flex-col pb-20">
         {initialLoading ? (
           <div className="flex items-center justify-center py-10">
             <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
@@ -644,7 +641,8 @@ export default function MobileChatInterface({
         <div ref={messagesEndRef} />
       </div>
       
-      <div className="mobile-chat-input-container fixed bottom-16 left-0 right-0 bg-background border-t">
+      {/* Updated positioning to avoid overlap with nav bar */}
+      <div className="fixed bottom-14 left-0 right-0 z-50">
         <MobileChatInput 
           onSendMessage={handleSendMessage} 
           isLoading={loading}

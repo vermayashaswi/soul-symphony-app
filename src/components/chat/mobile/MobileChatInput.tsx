@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -153,15 +152,15 @@ export default function MobileChatInput({
   return (
     <div 
       ref={inputContainerRef}
-      className={`p-2 bg-background border-t border-border flex items-center gap-2 mb-1 ${
+      className={`p-2 bg-background border-t border-border flex items-center gap-2 ${
         isKeyboardVisible ? 'input-keyboard-active' : ''
       }`}
       style={{
         position: 'fixed',
-        bottom: isKeyboardVisible ? 0 : '3.6rem', // Adjusted from 69px to 3.6rem (to match the new navbar height)
+        bottom: isKeyboardVisible ? 0 : '54px', // Adjusted to be right above navbar
         left: 0,
         right: 0,
-        paddingBottom: isKeyboardVisible ? '5px' : 'env(safe-area-inset-bottom, 8px)',
+        paddingBottom: isKeyboardVisible ? '5px' : '8px',
         marginBottom: 0,
         zIndex: 60,
         boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
