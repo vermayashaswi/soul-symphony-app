@@ -116,6 +116,13 @@ body.tutorial-active {
   background-color: #444444 !important;
 }
 
+/* Navigation bar styling during active tutorial */
+.mobile-navigation-bar.tutorial-active {
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+  touch-action: none !important;
+}
+
 /* Animation keyframes - pulsating effects */
 @keyframes button-pulse {
   0% { box-shadow: 0 0 25px 12px var(--color-theme); }

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -6,6 +7,7 @@ import { cn } from '@/lib/utils';
 import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -16,6 +18,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
+  const { isActive: isTutorialActive } = useTutorial();
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
@@ -67,11 +70,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       isNativeApp: isNativeApp(),
       path: location.pathname,
       isKeyboardVisible,
-      isOnboardingOrAuth
+      isOnboardingOrAuth,
+      isTutorialActive
     });
     
     setIsVisible(shouldShowNav);
-  }, [location.pathname, isMobile, isKeyboardVisible]);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive]);
   
   if (!isVisible) {
     return null;
@@ -101,9 +105,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   
   return (
     <motion.div 
-      className="fixed bottom-0 left-0 right-0 bg-background border-t border-muted"
+      className={cn(
+        "fixed bottom-0 left-0 right-0 bg-background border-t border-muted",
+        isTutorialActive && "opacity-30 pointer-events-none" // Fade out and disable interaction during tutorial
+      )}
       style={{
-        zIndex: 9999, // Increased z-index to ensure it stays above other elements
+        zIndex: 9998, // Lower z-index than tutorial overlay (9999)
         paddingTop: '0.40rem',
         paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))',
         height: 'calc(3.6rem + env(safe-area-inset-bottom))'

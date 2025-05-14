@@ -6,6 +6,7 @@ import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react
 import { cn } from '@/lib/utils';
 import { isNativeApp, isAppRoute } from './RouteHelpers';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -17,6 +18,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const location = useLocation();
   const isMobile = useIsMobile();
   const [isVisible, setIsVisible] = useState(false);
+  const { isActive: isTutorialActive } = useTutorial();
   
   useEffect(() => {
     // We're no longer using this component, direct to the new one

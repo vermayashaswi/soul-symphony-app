@@ -10,10 +10,13 @@ import {
   LineChart 
 } from 'lucide-react';
 import SouloLogo from '@/components/SouloLogo';
+import { cn } from '@/lib/utils';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 const MobileNavbar = () => {
   const navigate = useNavigate();
   const location = useLocation();
+  const { isActive: isTutorialActive } = useTutorial();
 
   // Don't show the navbar on onboarding or auth screens
   const isOnboardingOrAuth = location.pathname === '/app/onboarding' || 
@@ -28,7 +31,13 @@ const MobileNavbar = () => {
 
   return (
     <motion.nav
-      className="fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t px-4 py-2 z-[9999]"
+      className={cn(
+        "fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t px-4 py-2",
+        isTutorialActive && "opacity-30 pointer-events-none" // Fade out and disable interaction during tutorial
+      )}
+      style={{
+        zIndex: 9998, // Lower z-index than tutorial overlay (9999)
+      }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
