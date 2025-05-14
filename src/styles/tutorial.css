@@ -42,7 +42,6 @@ body.tutorial-active {
   border: 3px solid var(--color-theme) !important;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.7) !important;
   pointer-events: auto !important;
-  /* Removed top/left positioning as it's now handled by JS */
 }
 
 /* Force all tutorial step content to be visible */
@@ -144,7 +143,9 @@ body.tutorial-active {
     max-width: 280px;
     padding: 12px !important;
     font-size: 0.9rem;
-    /* Removed fixed positioning since we handle it in JS now */
+    top: 50% !important;
+    left: 50% !important;
+    transform: translate(-50%, -50%) !important;
   }
   
   .tutorial-step-container p {
