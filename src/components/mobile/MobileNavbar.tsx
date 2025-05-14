@@ -18,14 +18,18 @@ const MobileNavbar = () => {
   const location = useLocation();
   const { isActive: isTutorialActive } = useTutorial();
 
-  // Don't show the navbar on onboarding or auth screens
-  const isOnboardingOrAuth = location.pathname === '/app/onboarding' || 
-                             location.pathname === '/app/auth' ||
-                             location.pathname === '/onboarding' ||
-                             location.pathname === '/auth' ||
-                             location.pathname === '/app';
+  // Enhanced check for onboarding or auth routes - make consistent with other components
+  const isOnboardingOrAuth = 
+    location.pathname === '/app/onboarding' || 
+    location.pathname === '/app/auth' ||
+    location.pathname === '/onboarding' ||
+    location.pathname === '/auth' ||
+    location.pathname === '/app' ||
+    location.pathname === '/'; // Don't show on root path either
   
+  // Don't render if we're on onboarding/auth screens
   if (isOnboardingOrAuth) {
+    console.log('MobileNavbar: Not rendering on onboarding/auth route:', location.pathname);
     return null;
   }
 

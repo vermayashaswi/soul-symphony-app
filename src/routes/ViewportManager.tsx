@@ -13,19 +13,26 @@ const ViewportManager: React.FC = () => {
   const isMobile = useIsMobile();
   const { onboardingComplete } = useOnboarding();
   
-  // Don't show nav on onboarding or auth screens
-  const isOnboardingOrAuth = location.pathname === '/app/onboarding' || 
-                             location.pathname === '/app/auth' ||
-                             location.pathname === '/onboarding' || 
-                             location.pathname === '/auth' ||
-                             location.pathname === '/app';
+  // Expanded list of routes where navigation should be hidden
+  const onboardingOrAuthPaths = [
+    '/app/onboarding',
+    '/app/auth',
+    '/onboarding',
+    '/auth',
+    '/app',
+    '/' // Also hide on root path
+  ];
+  
+  // Check if current path is in the list of paths where navigation should be hidden
+  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
   
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
     user: !!user,
-    isOnboardingOrAuth
+    isOnboardingOrAuth,
+    onboardingCompletePath: location.pathname === '/app' && !onboardingComplete
   });
   
   // Render the appropriate layout based on route and device
@@ -35,8 +42,15 @@ const ViewportManager: React.FC = () => {
         <Outlet />
       </div>
       
-      {/* Display mobile navigation ONLY on actual app routes, when user is logged in, and not on onboarding/auth */}
-      {isAppRoute(location.pathname) && user && !isOnboardingOrAuth && (
+      {/* Only display mobile navigation when:
+          1. We're on an app route
+          2. User is logged in
+          3. We're not on onboarding/auth screens
+          4. If we're on /app, we also check if onboarding is complete */}
+      {isAppRoute(location.pathname) && 
+       user && 
+       !isOnboardingOrAuth && 
+       !(location.pathname === '/app' && !onboardingComplete) && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </>

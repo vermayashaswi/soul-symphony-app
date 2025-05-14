@@ -21,11 +21,25 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
   const location = useLocation();
   const { currentLanguage } = useTranslation();
   
+  // Expanded list of onboarding/auth paths
+  const onboardingOrAuthPaths = [
+    '/app/onboarding',
+    '/app/auth',
+    '/onboarding',
+    '/auth',
+    '/app',
+    '/' // Also consider root path
+  ];
+  
+  // Check if current path is in the list
+  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+  
   console.log('OnboardingCheck rendering at path:', location.pathname, {
     user: !!user, 
     onboardingComplete,
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
+    isOnboardingOrAuth,
     language: currentLanguage
   });
   

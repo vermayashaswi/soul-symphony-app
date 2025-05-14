@@ -53,13 +53,23 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }, []);
   
   useEffect(() => {
-    // Don't show navigation on onboarding, auth, or root /app screens
-    const isOnboardingOrAuth = location.pathname === '/app/onboarding' || 
-                               location.pathname === '/app/auth' ||
-                               location.pathname === '/onboarding' || 
-                               location.pathname === '/auth' ||
-                               location.pathname === '/app';
+    // Comprehensive list of paths where navigation should be hidden
+    const onboardingOrAuthPaths = [
+      '/app/onboarding',
+      '/app/auth',
+      '/onboarding',
+      '/auth',
+      '/app',
+      '/' // Also hide on root path
+    ];
     
+    // Check if current path is in the list of paths where navigation should be hidden
+    const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+    
+    // Only show navigation if:
+    // 1. We're on mobile or in native app
+    // 2. Keyboard is not visible
+    // 3. We're not on an onboarding/auth screen
     const shouldShowNav = (isMobile || isNativeApp()) && 
                           !isKeyboardVisible && 
                           !isOnboardingOrAuth;
@@ -81,13 +91,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
-  const hiddenRoutes = ['/app/auth', '/app/onboarding'];
-  
+  // Additional safety check - don't show if onboarding is not complete
   if (!onboardingComplete && location.pathname === '/app') {
-    return null;
-  }
-  
-  if (hiddenRoutes.includes(location.pathname)) {
     return null;
   }
   
