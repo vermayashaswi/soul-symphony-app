@@ -60,7 +60,7 @@ body.tutorial-active {
 /* Step 5: Fully opaque background for step 5 */
 .tutorial-step-container[data-step="5"] {
   background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 5 */
-  top: 10% !important; /* Move even higher to avoid overlapping with chat questions */
+  top: 5% !important; /* Move even higher to avoid overlapping with chat questions */
 }
 
 /* Steps 2-4: Semi-transparent with blur */
@@ -113,7 +113,13 @@ body.tutorial-active {
 }
 
 /* Step 5: Chat question highlight styling - Enhanced for maximum visibility */
-.chat-question-highlight.tutorial-target {
+.chat-question-highlight.tutorial-target,
+.chat-suggestion-button.tutorial-target,
+.suggestion-button.tutorial-target,
+.empty-chat-suggestion.tutorial-target,
+.chat-example-button.tutorial-target,
+.question-button.tutorial-target,
+.chat-question-suggestion.tutorial-target {
   z-index: 10000 !important;
   position: relative !important;
   box-shadow: 0 0 35px 20px var(--color-theme) !important;
@@ -125,13 +131,19 @@ body.tutorial-active {
   border: 2px solid white !important;
   pointer-events: auto !important;
   cursor: pointer !important;
-  display: block !important;
+  display: block !important; 
   max-height: none !important;
   overflow: visible !important;
 }
 
 /* Special additional highlight for chat questions to make them more visible */
-.chat-question-highlight.tutorial-target::before {
+.chat-question-highlight.tutorial-target::before,
+.chat-suggestion-button.tutorial-target::before,
+.suggestion-button.tutorial-target::before,
+.empty-chat-suggestion.tutorial-target::before,
+.chat-example-button.tutorial-target::before,
+.question-button.tutorial-target::before,
+.chat-question-suggestion.tutorial-target::before {
   content: '';
   position: absolute;
   inset: -8px;
@@ -142,21 +154,43 @@ body.tutorial-active {
   z-index: -1;
 }
 
-/* Make chat suggestions visible during tutorial */
-.tutorial-active .chat-question-highlight {
+/* Make chat suggestions visible during tutorial - this is critical */
+.tutorial-active .chat-suggestion-button,
+.tutorial-active .suggestion-button,
+.tutorial-active .empty-chat-suggestion,
+.tutorial-active .suggestion-question,
+.tutorial-active .chat-example-button,
+.tutorial-active .question-button,
+.tutorial-active .chat-question-suggestion {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
   pointer-events: auto !important;
+  height: auto !important;
+  width: auto !important;
+  position: relative !important;
+  z-index: 20000 !important;
+  margin-bottom: 12px !important;
+  transform: none !important;
 }
 
 /* Enhanced styling for step 5 to ensure chat suggestions are prominently visible */
-.tutorial-active[data-current-step="5"] .chat-question-highlight {
+.tutorial-active[data-current-step="5"] .chat-suggestion-button,
+.tutorial-active[data-current-step="5"] .suggestion-button,
+.tutorial-active[data-current-step="5"] .empty-chat-suggestion,
+.tutorial-active[data-current-step="5"] .suggestion-question,
+.tutorial-active[data-current-step="5"] .chat-example-button,
+.tutorial-active[data-current-step="5"] .question-button,
+.tutorial-active[data-current-step="5"] .chat-question-suggestion {
   z-index: 20000 !important; /* Extremely high z-index for chat suggestions during step 5 */
   position: relative !important;
   box-shadow: 0 0 40px 25px var(--color-theme) !important; /* Even stronger glow */
   animation: ultra-strong-pulse 1.5s infinite alternate !important; /* Enhanced animation */
   transform: translateZ(0) scale(1.1) !important; /* Bigger scale */
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  max-height: none !important;
 }
 
 /* Tutorial navigation buttons */
@@ -195,7 +229,8 @@ body.tutorial-active[data-current-step="5"] .relative button[type="button"]:has(
 body.tutorial-active[data-current-step="5"] button:has(.lucide-mic),
 body.tutorial-active[data-current-step="5"] [class*="VoiceRecording"],
 body.tutorial-active[data-current-step="5"] [class*="Recording"],
-body.tutorial-active[data-current-step="5"] [class*="voice-recorder"] {
+body.tutorial-active[data-current-step="5"] [class*="voice-recorder"],
+body.tutorial-active[data-current-step="5"] .relative button:has(.h-4.w-4) {
   opacity: 0 !important;
   visibility: hidden !important;
   display: none !important;
@@ -212,10 +247,12 @@ body.tutorial-active[data-current-step="5"] [class*="voice-recorder"] {
 
 /* Ultra aggressive hiding of chat inputs during step 5 */
 body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,
-body.tutorial-active[data-current-step="5"] form,
+body.tutorial-active[data-current-step="5"] form:has(textarea),
 body.tutorial-active[data-current-step="5"] input,
 body.tutorial-active[data-current-step="5"] textarea,
-body.tutorial-active[data-current-step="5"] button[type="submit"] {
+body.tutorial-active[data-current-step="5"] button[type="submit"],
+body.tutorial-active[data-current-step="5"] [style*="position: fixed"],
+body.tutorial-active[data-current-step="5"] [style*="bottom:"] {
   opacity: 0 !important;
   visibility: hidden !important;
   display: none !important;
@@ -234,8 +271,23 @@ body.tutorial-active[data-current-step="5"] button[type="submit"] {
 .smart-chat-container,
 .mobile-chat-interface,
 .chat-messages-container,
-.p-2.border-t.border-border {
+.p-2.border-t.border-border,
+.flex.flex-col.h-full,
+.flex-1.flex.flex-col {
   background-color: #000000 !important;
+}
+
+/* Make sure chat suggestion buttons are visible in step 5 */
+body.tutorial-active[data-current-step="5"] .chat-suggestion-button,
+body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
+  display: block !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  transform: none !important;
+  position: relative !important;
+  z-index: 20000 !important;
+  margin-bottom: 8px !important;
+  box-shadow: 0 0 15px var(--color-theme) !important;
 }
 
 /* Animation keyframes - pulsating effects */
@@ -278,7 +330,7 @@ body.tutorial-active[data-current-step="5"] button[type="submit"] {
   
   /* Special override for step 5 on mobile */
   .tutorial-step-container[data-step="5"] {
-    top: 10% !important; /* Force to be higher on mobile */
+    top: 5% !important; /* Force to be higher on mobile */
     transform: translate(-50%, 0) !important; /* Adjust transform for top position */
   }
 }
@@ -306,6 +358,6 @@ body.tutorial-active[data-current-step="5"] button[type="submit"] {
   
   /* Special override for step 5 on small mobile */
   .tutorial-step-container[data-step="5"] {
-    top: 10% !important; /* Force to be even higher on small mobile */
+    top: 5% !important; /* Force to be even higher on small mobile */
   }
 }

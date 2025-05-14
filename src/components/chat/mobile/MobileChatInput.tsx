@@ -28,6 +28,12 @@ export default function MobileChatInput({
   // Check if we're in step 5 (chat question step)
   const isInChatTutorialStep = isActive && isInStep(5);
 
+  // If we're in step 5 of the tutorial, don't render anything at all
+  if (isInChatTutorialStep) {
+    console.log("In tutorial step 5 - not rendering mobile chat input at all");
+    return null;
+  }
+
   // Effect to ensure input stays visible and detect keyboard
   useEffect(() => {
     // Function to detect keyboard visibility with multiple signals
@@ -141,12 +147,6 @@ export default function MobileChatInput({
       }
     }
   };
-
-  // If we're in step 5 of the tutorial, don't render anything at all
-  if (isInChatTutorialStep) {
-    console.log("In tutorial step 5 - not rendering chat input at all");
-    return null;
-  }
 
   return (
     <div 
