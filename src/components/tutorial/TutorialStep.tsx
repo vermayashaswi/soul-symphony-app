@@ -282,68 +282,81 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   }, [step.id, renderKey]);
   
-  // Enhanced Next button click handling with multiple approaches
+  // Enhanced Next button click handling with direct event capture
   const handleNext = (e: React.MouseEvent) => {
-    console.log(`[DEBUG] Next button clicked for step ${step.id}, applying stopPropagation`);
+    // First log the click event
+    console.log(`[DEBUG] Next button clicked for step ${step.id}`);
     
-    // Enhanced event handling - stop propagation and prevent default more aggressively
-    if (e && e.stopPropagation) {
+    // Stop propagation more aggressively
+    if (e) {
       e.preventDefault();
       e.stopPropagation();
+      
+      // Force immediate propagation stop
+      if (e.nativeEvent) {
+        e.nativeEvent.stopImmediatePropagation();
+      }
     }
     
-    // Make the click more reliable by preventing other handlers from interfering
-    e.nativeEvent.stopImmediatePropagation();
+    // Log the full onNext function
+    console.log('onNext function:', onNext);
     
-    console.log(`Tutorial: Next button clicked for step ${step.id}, calling onNext function`);
+    // Call onNext directly and immediately
+    onNext();
     
-    // Directly call onNext with a small timeout to ensure event loop is clear
-    setTimeout(() => {
-      onNext();
-      console.log(`onNext function called for step ${step.id}`);
-    }, 10);
+    // Log completion of the next action
+    console.log(`Tutorial: Next button clicked and onNext called for step ${step.id}`);
   };
   
+  // Ensure the handlePrev function has the same aggressive event handling
   const handlePrev = (e: React.MouseEvent) => {
-    if (e && e.stopPropagation) {
+    if (e) {
       e.preventDefault();
       e.stopPropagation();
+      if (e.nativeEvent) {
+        e.nativeEvent.stopImmediatePropagation();
+      }
     }
-    e.nativeEvent.stopImmediatePropagation();
     console.log(`Tutorial: Previous button clicked for step ${step.id}`);
     onPrev();
   };
   
+  // Ensure the handleSkip function has the same aggressive event handling
   const handleSkip = (e: React.MouseEvent) => {
-    if (e && e.stopPropagation) {
+    if (e) {
       e.preventDefault();
       e.stopPropagation();
+      if (e.nativeEvent) {
+        e.nativeEvent.stopImmediatePropagation();
+      }
     }
-    e.nativeEvent.stopImmediatePropagation();
     console.log("Tutorial: Skip button clicked");
     onSkip();
   };
   
-  // Check if next button is ready to be clicked and log its properties
+  // Add direct DOM click handler as backup to ensure button clicks are captured
   useEffect(() => {
-    if (nextButtonRef.current && step.id === 1) {
-      const rect = nextButtonRef.current.getBoundingClientRect();
-      console.log('Next button position:', rect);
-      console.log('Next button computed style:', window.getComputedStyle(nextButtonRef.current));
-      
-      // Add direct click listener as an alternative approach
-      const handleDirectClick = () => {
-        console.log('Direct click listener fired');
+    if (nextButtonRef.current) {
+      const handleDirectClick = (e: Event) => {
+        e.preventDefault();
+        e.stopPropagation();
+        console.log('Direct DOM click handler fired on next button');
         onNext();
       };
       
-      nextButtonRef.current.addEventListener('click', handleDirectClick);
+      // Add the direct event listener
+      nextButtonRef.current.addEventListener('click', handleDirectClick, { capture: true });
+      
+      // Log that we've set up the direct handler
+      console.log('Direct click handler added to next button');
       
       return () => {
-        nextButtonRef.current?.removeEventListener('click', handleDirectClick);
+        if (nextButtonRef.current) {
+          nextButtonRef.current.removeEventListener('click', handleDirectClick, { capture: true });
+        }
       };
     }
-  }, [step.id, onNext]);
+  }, [onNext]);
   
   // Apply all position styles directly
   const getPositionStyle = () => {
@@ -441,6 +454,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             onMouseDown={(e) => e.stopPropagation()}
             className="flex items-center gap-1 bg-theme hover:bg-theme/80 pointer-events-auto z-50"
             data-testid="tutorial-next-button"
+            style={{ cursor: 'pointer', position: 'relative', zIndex: 30001 }}
           >
             {isLast ? 'Finish' : 'Next'}
             {!isLast && <ChevronRight className="h-4 w-4" />}

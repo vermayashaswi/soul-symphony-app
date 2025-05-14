@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -113,7 +112,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
     const checkTutorialStatus = async () => {
-      if (!user || tutorialChecked || !isAppRoute(location.pathname)) return;
+      if (!user || tutorialChecked) return;
       
       try {
         const { data, error } = await supabase
@@ -127,9 +126,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           return;
         }
         
-        // Only activate tutorial on home page and if tutorial is not completed
-        const isHomePage = location.pathname === '/app/home';
-        const shouldActivate = data?.tutorial_completed === 'NO' && isHomePage;
+        // Only activate tutorial if tutorial is not completed
+        // Made the path check more general to work from any route
+        const shouldActivate = data?.tutorial_completed === 'NO';
         
         // Set the current tutorial step (default to 0 if null)
         const startingStep = data?.tutorial_step || 0;
@@ -138,6 +137,12 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           console.log('Activating tutorial at step:', startingStep);
           setCurrentStep(startingStep);
           setIsActive(true);
+          
+          // If we're not on an app route, navigate to the app home
+          if (!isAppRoute(location.pathname)) {
+            console.log('Not on app route, will navigate to /app/home');
+            navigate('/app/home');
+          }
         }
         
         setTutorialChecked(true);
@@ -147,7 +152,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     };
     
     checkTutorialStatus();
-  }, [user, location.pathname, tutorialChecked]);
+  }, [user, location.pathname, tutorialChecked, navigate]);
   
   // Check tutorial completion status on initial load
   useEffect(() => {
@@ -294,13 +299,15 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Move to the next step with enhanced navigation handling
+  // Move to the next step with enhanced logic to handle any navigation state
   const nextStep = () => {
     if (currentStep < steps.length - 1) {
       const newStep = currentStep + 1;
       const nextTutorialStep = steps[newStep];
       
       console.log(`Moving to tutorial step ${newStep} (ID: ${nextTutorialStep.id})`);
+      
+      // First update the step in state BEFORE any navigation
       setCurrentStep(newStep);
       updateTutorialStep(newStep);
       
@@ -308,8 +315,12 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (nextTutorialStep.navigateTo && location.pathname !== nextTutorialStep.navigateTo) {
         console.log(`Navigation needed for step ${nextTutorialStep.id} to ${nextTutorialStep.navigateTo}`);
         setNavigationComplete(false);
-        setIsNavigating(true); // Set navigating state to true
-        navigate(nextTutorialStep.navigateTo);
+        setIsNavigating(true);
+        
+        // Add a small delay before navigation to ensure state updates first
+        setTimeout(() => {
+          navigate(nextTutorialStep.navigateTo);
+        }, 50);
       }
     } else {
       console.log('Completing tutorial - reached the end');
