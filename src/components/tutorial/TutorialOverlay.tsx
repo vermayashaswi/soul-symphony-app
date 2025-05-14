@@ -10,7 +10,8 @@ import {
   ENTRIES_TAB_SELECTORS,
   CHAT_QUESTION_SELECTORS,
   findAndHighlightElement,
-  logPotentialTutorialElements
+  logPotentialTutorialElements,
+  applyTutorialHighlight
 } from '@/utils/tutorial/tutorial-elements-finder';
 
 const TutorialOverlay: React.FC = () => {
