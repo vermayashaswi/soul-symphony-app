@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -20,7 +21,7 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChatMessage } from "@/services/chat";
+import { ChatMessage } from "@/types/chat";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
@@ -115,7 +116,13 @@ const SmartChatInterface = () => {
       if (messages && messages.length > 0) {
         debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
         console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
-        setChatHistory(messages);
+        // Convert the messages to the correct type
+        const typedMessages: ChatMessage[] = messages.map(msg => ({
+          ...msg,
+          sender: msg.sender as 'user' | 'assistant' | 'error',
+          role: msg.role as 'user' | 'assistant' | 'error'
+        }));
+        setChatHistory(typedMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = threadId;
       } else {
@@ -188,7 +195,11 @@ const SmartChatInterface = () => {
         if (savedUserMessage) {
           debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
           setChatHistory(prev => prev.map(msg => 
-            msg.id === tempUserMessage.id ? savedUserMessage! : msg
+            msg.id === tempUserMessage.id ? {
+              ...savedUserMessage!,
+              sender: savedUserMessage!.sender as 'user' | 'assistant' | 'error',
+              role: savedUserMessage!.role as 'user' | 'assistant' | 'error'
+            } : msg
           ));
         } else {
           debugLog.addEvent("Database", "Failed to save user message - null response", "error");
@@ -253,7 +264,14 @@ const SmartChatInterface = () => {
           
           if (savedResponse) {
             debugLog.addEvent("Database", `Interactive message saved with ID: ${savedResponse.id}`, "success");
-            setChatHistory(prev => [...prev, savedResponse]);
+            const typedSavedResponse: ChatMessage = {
+              ...savedResponse,
+              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
+              role: savedResponse.role as 'user' | 'assistant' | 'error',
+              isInteractive: true,
+              interactiveOptions: response.interactiveOptions
+            };
+            setChatHistory(prev => [...prev, typedSavedResponse]);
           } else {
             throw new Error("Failed to save interactive message");
           }
@@ -308,7 +326,12 @@ const SmartChatInterface = () => {
         
         if (savedResponse) {
           debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
-          setChatHistory(prev => [...prev, savedResponse]);
+          const typedSavedResponse: ChatMessage = {
+            ...savedResponse,
+            sender: savedResponse.sender as 'user' | 'assistant' | 'error',
+            role: savedResponse.role as 'user' | 'assistant' | 'error'
+          };
+          setChatHistory(prev => [...prev, typedSavedResponse]);
         } else {
           throw new Error("Failed to save assistant response");
         }
@@ -354,7 +377,12 @@ const SmartChatInterface = () => {
         
         if (savedErrorMessage) {
           debugLog.addEvent("UI Update", "Adding error message to chat history", "warning");
-          setChatHistory(prev => [...prev, savedErrorMessage]);
+          const typedErrorMessage: ChatMessage = {
+            ...savedErrorMessage,
+            sender: 'assistant',
+            role: 'assistant'
+          };
+          setChatHistory(prev => [...prev, typedErrorMessage]);
         } else {
           const errorMessage: ChatMessage = {
             id: `error-${Date.now()}`,

@@ -1,106 +1,128 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { v4 as uuidv4 } from "uuid";
+import { ChatMessage } from "@/types/chat";
+import { InteractiveOption } from "@/types/chat";
 
-export const getThreadMessages = async (threadId: string) => {
+/**
+ * Gets the user's timezone offset in minutes
+ */
+export const getUserTimezoneOffset = (): number => {
+  return new Date().getTimezoneOffset();
+};
+
+/**
+ * Gets all messages for a thread, ordered by creation time
+ */
+export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]> => {
   try {
     const { data, error } = await supabase
       .from('chat_messages')
       .select('*')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: true });
-
+      
     if (error) throw error;
-    return data;
+    
+    // Process data to ensure types are correct
+    return (data || []).map((msg) => ({
+      ...msg,
+      sender: msg.sender as 'user' | 'assistant' | 'error',
+      role: msg.role as 'user' | 'assistant' | 'error'
+    }));
   } catch (error) {
-    console.error('Error fetching thread messages:', error);
+    console.error("Error fetching thread messages:", error);
     return [];
   }
 };
 
+/**
+ * Saves a message to the database
+ */
 export const saveMessage = async (
-  threadId: string,
-  content: string,
+  threadId: string, 
+  content: string, 
   sender: 'user' | 'assistant',
-  references: any[] | null = null,
-  analysis: any = null,
-  hasNumericResult: boolean = false,
-  isInteractive: boolean = false,
-  interactiveOptions: any[] = []
-) => {
+  references?: any[],
+  analysis?: any,
+  hasNumericResult?: boolean,
+  isInteractive?: boolean,
+  interactiveOptions?: InteractiveOption[]
+): Promise<ChatMessage | null> => {
   try {
-    const messageId = uuidv4();
+    // Create the base message object
+    const messageData = {
+      thread_id: threadId,
+      content,
+      sender,
+      role: sender, // Role and sender should match for now
+      reference_entries: references || null,
+      analysis_data: analysis || null,
+      has_numeric_result: hasNumericResult || false,
+    };
     
+    // Insert the message
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert({
-        id: messageId,
-        thread_id: threadId,
-        content,
-        sender,
-        role: sender, // Role is the same as sender for compatibility
-        reference_entries: references,
-        analysis_data: analysis,
-        has_numeric_result: hasNumericResult,
-        isInteractive,
-        interactiveOptions
-      })
+      .insert(messageData)
       .select()
       .single();
-
+      
     if (error) throw error;
     
-    // Update the thread's updated_at timestamp to sort by recent activity
+    if (!data) {
+      throw new Error("No data returned from message insert");
+    }
+    
+    // Convert the database response to our ChatMessage type
+    const chatMessage: ChatMessage = {
+      ...data,
+      sender: data.sender as 'user' | 'assistant' | 'error',
+      role: data.role as 'user' | 'assistant' | 'error'
+    };
+    
+    // If this is an interactive message with options, add those properties
+    if (isInteractive && interactiveOptions) {
+      chatMessage.isInteractive = true;
+      chatMessage.interactiveOptions = interactiveOptions;
+    }
+    
+    // Update the thread's updated_at timestamp
     await supabase
       .from('chat_threads')
       .update({ updated_at: new Date().toISOString() })
       .eq('id', threadId);
       
-    // Dispatch event for external listeners
-    window.dispatchEvent(
-      new CustomEvent('messageCreated', {
-        detail: {
-          threadId,
-          messageId,
-          content,
-          sender,
-          isFirstMessage: false // This will be updated by checking in the component
-        }
-      })
-    );
-
-    return data;
+    return chatMessage;
   } catch (error) {
-    console.error('Error saving message:', error);
+    console.error("Error saving message:", error);
     return null;
   }
 };
 
-export const getUserMessages = async (userId: string, limit: number = 20) => {
+/**
+ * Creates a new thread
+ */
+export const createThread = async (
+  userId: string,
+  title: string = "New Conversation"
+): Promise<string | null> => {
   try {
-    const { data: threads, error: threadsError } = await supabase
-      .from('chat_threads')
-      .select('id')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
-      
-    if (threadsError) throw threadsError;
-    
-    if (!threads || threads.length === 0) return [];
-    
-    const threadIds = threads.map(t => t.id);
-    
     const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .in('thread_id', threadIds)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+      .from('chat_threads')
+      .insert({
+        user_id: userId,
+        title,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .select('id')
+      .single();
       
     if (error) throw error;
-    return data;
+    
+    return data?.id || null;
   } catch (error) {
-    console.error('Error fetching user messages:', error);
-    return [];
+    console.error("Error creating thread:", error);
+    return null;
   }
 };

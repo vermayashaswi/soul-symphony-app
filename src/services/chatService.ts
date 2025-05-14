@@ -1,23 +1,8 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { createFallbackQueryPlan, convertGptPlanToQueryPlan } from "./chat/queryPlannerService";
 import { getUserTimezoneOffset } from "./chat";
 import { toast } from "@/hooks/use-toast";
-
-export type ChatMessage = {
-  role: string;
-  content: string;
-  references?: any[];
-  analysis?: any;
-  diagnostics?: any;
-  hasNumericResult?: boolean;
-  isInteractive?: boolean;
-  interactiveOptions?: {
-    text: string;
-    action: string;
-    parameters: Record<string, any>;
-  }[];
-};
+import { ChatMessage } from "@/types/chat";
 
 // Helper function to store user queries in the user_queries table using an edge function instead
 const logUserQuery = async (
@@ -128,8 +113,12 @@ export const processChatMessage = async (
     if (plannerData.needsClarification && plannerData.clarificationQuestions) {
       console.log("Query needs clarification, returning interactive message");
       return {
+        id: `clarification-${Date.now()}`,
+        thread_id: threadId || '',
         role: "assistant",
+        sender: "assistant",
         content: "I'd like to understand the scope of your question better. Are you looking for insights from:",
+        created_at: new Date().toISOString(),
         isInteractive: true,
         interactiveOptions: plannerData.clarificationQuestions
       };
@@ -139,8 +128,12 @@ export const processChatMessage = async (
     if (plannerData.queryType !== 'journal_specific' && plannerData.directResponse) {
       console.log(`Returning direct response for ${plannerData.queryType} query`);
       return {
+        id: `direct-response-${Date.now()}`,
+        thread_id: threadId || '',
         role: "assistant",
-        content: plannerData.directResponse
+        sender: "assistant",
+        content: plannerData.directResponse,
+        created_at: new Date().toISOString()
       };
     }
     
@@ -156,11 +149,15 @@ export const processChatMessage = async (
     
     // Process with the query plan
     return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset);
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error processing chat message:", error);
     return {
+      id: `error-${Date.now()}`,
+      thread_id: threadId || '',
       role: "error",
-      content: `I encountered an unexpected error. Please try again or rephrase your question. Technical details: ${error.message}`
+      sender: "error",
+      content: `I encountered an unexpected error. Please try again or rephrase your question. Technical details: ${error.message}`,
+      created_at: new Date().toISOString()
     };
   }
 };
@@ -317,7 +314,10 @@ async function processWithQueryPlan(
         }
         
         return {
+          id: `response-${Date.now()}`,
+          thread_id: threadId || '',
           role: "assistant",
+          sender: "assistant",
           content: segmentResults[0].response,
           references: segmentResults[0].references,
           diagnostics
@@ -355,7 +355,10 @@ async function processWithQueryPlan(
         
         // Fallback: Use the first segment result
         return {
+          id: `response-${Date.now()}`,
+          thread_id: threadId || '',
           role: "assistant",
+          sender: "assistant",
           content: segmentResults[0].response + "\n\n(Note: There was an error combining all parts of your question. This is a partial answer.)",
           references: segmentResults[0].references,
           diagnostics
@@ -386,7 +389,10 @@ async function processWithQueryPlan(
       });
       
       return {
+        id: `response-${Date.now()}`,
+        thread_id: threadId || '',
         role: "assistant",
+        sender: "assistant",
         content: combinedData.response,
         references: allReferences,
         diagnostics
@@ -428,8 +434,12 @@ async function processWithQueryPlan(
     if (error) {
       console.error("Edge function error:", error);
       return {
+        id: `error-${Date.now()}`,
+        thread_id: threadId || '',
         role: "error",
+        sender: "error",
         content: `I'm having trouble processing your request. Technical details: ${error.message}`,
+        created_at: new Date().toISOString(),
         diagnostics: enableDiagnostics ? { 
           steps: [{ name: "Edge Function Error", status: "error", details: error.message }]
         } : undefined
@@ -439,8 +449,12 @@ async function processWithQueryPlan(
     if (!data) {
       console.error("No data returned from edge function");
       return {
+        id: `error-${Date.now()}`,
+        thread_id: threadId || '',
         role: "error",
+        sender: "error",
         content: "I'm having trouble retrieving a response. Please try again in a moment.",
+        created_at: new Date().toISOString(),
         diagnostics: enableDiagnostics ? { 
           steps: [{ name: "No Data Returned", status: "error", details: "Empty response from edge function" }]
         } : undefined
@@ -451,8 +465,12 @@ async function processWithQueryPlan(
     if (data.error) {
       console.error("Error in data:", data.error);
       return {
+        id: `error-${Date.now()}`,
+        thread_id: threadId || '',
         role: "error",
+        sender: "error",
         content: data.response || `There was an issue retrieving information: ${data.error}`,
+        created_at: new Date().toISOString(),
         diagnostics: enableDiagnostics ? data.diagnostics || {
           steps: [{ name: "Processing Error", status: "error", details: data.error }]
         } : undefined
@@ -461,23 +479,27 @@ async function processWithQueryPlan(
 
     // Prepare the response
     const chatResponse: ChatMessage = {
+      id: `response-${Date.now()}`,
+      thread_id: threadId || '',
+      content: data.response,
+      sender: "assistant",
       role: "assistant",
-      content: data.response
+      created_at: new Date().toISOString()
     };
 
     // Include references if available
     if (data.references && data.references.length > 0) {
-      chatResponse.references = data.references;
+      chatResponse.reference_entries = data.references;
     }
 
     // Include analysis if available
     if (data.analysis) {
-      chatResponse.analysis = data.analysis;
+      chatResponse.analysis_data = data.analysis;
       if (data.analysis.type === 'quantitative_emotion' || 
           data.analysis.type === 'top_emotions' ||
           data.analysis.type === 'time_patterns' ||
           data.analysis.type === 'combined_analysis') {
-        chatResponse.hasNumericResult = true;
+        chatResponse.has_numeric_result = true;
       }
     }
     
@@ -487,11 +509,15 @@ async function processWithQueryPlan(
     }
 
     return chatResponse;
-  } catch (error) {
+  } catch (error: any) {
     console.error("Error in processWithQueryPlan:", error);
     return {
+      id: `error-${Date.now()}`,
+      thread_id: threadId || '',
       role: "error",
-      content: `I encountered an unexpected error. Please try again or rephrase your question. Technical details: ${error.message}`
+      sender: "error",
+      content: `I encountered an unexpected error. Please try again or rephrase your question. Technical details: ${error.message}`,
+      created_at: new Date().toISOString()
     };
   }
 }

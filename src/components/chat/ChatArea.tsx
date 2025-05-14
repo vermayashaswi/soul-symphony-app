@@ -1,6 +1,5 @@
 
 import React, { useRef, useEffect } from "react";
-import { ChatMessage } from "@/components/chat/ChatInput";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
@@ -11,6 +10,7 @@ import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import AnalyticsDisplay from "./AnalyticsDisplay";
 import EmotionRadarChart from "./EmotionRadarChart";
+import { ChatMessage } from "@/types/chat";
 
 interface ChatAreaProps {
   chatMessages: ChatMessage[];
@@ -94,7 +94,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   )}
 
                   {/* References */}
-                  {message.reference_entries && message.reference_entries.length > 0 && (
+                  {message.reference_entries && Array.isArray(message.reference_entries) && message.reference_entries.length > 0 && (
                     <ReferencesDisplay 
                       references={message.reference_entries} 
                       threadId={threadId || undefined}
