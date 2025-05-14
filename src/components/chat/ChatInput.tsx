@@ -5,6 +5,7 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { motion } from "framer-motion";
+import { useTutorial } from "@/contexts/TutorialContext";
 
 interface ChatInputProps {
   onSendMessage: (message: string) => void;
@@ -21,13 +22,24 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const isMobile = useIsMobile();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
+  const { isActive, isInStep } = useTutorial();
+  
+  // Check if we're in the chat tutorial step
+  const isInTutorial = isActive && isInStep(5);
 
   // Effect to ensure input stays visible
   useEffect(() => {
     const ensureInputVisibility = () => {
       if (inputContainerRef.current) {
-        inputContainerRef.current.style.visibility = 'visible';
-        inputContainerRef.current.style.opacity = '1';
+        if (isInTutorial) {
+          // Hide during tutorial step 5
+          inputContainerRef.current.style.visibility = 'hidden';
+          inputContainerRef.current.style.opacity = '0';
+        } else {
+          // Show normally
+          inputContainerRef.current.style.visibility = 'visible';
+          inputContainerRef.current.style.opacity = '1';
+        }
       }
     };
 
@@ -40,7 +52,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
     return () => {
       clearInterval(visibilityInterval);
     };
-  }, [isLoading]);
+  }, [isLoading, isInTutorial]);
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
@@ -66,10 +78,20 @@ const ChatInput: React.FC<ChatInputProps> = ({
     adjustTextareaHeight(e.target);
   };
 
+  // Don't render during tutorial step 5
+  if (isInTutorial) {
+    return null;
+  }
+
   return (
     <div 
       className="w-full" 
-      style={{ marginBottom: '5px', position: 'relative', zIndex: 20 }}
+      style={{ 
+        marginBottom: '5px', 
+        position: 'relative', 
+        zIndex: 20,
+        backgroundColor: '#000000' // Added black background
+      }}
       ref={inputContainerRef}
     >
       <form onSubmit={handleSubmit} className="relative flex items-center w-full">
@@ -79,7 +101,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             value={message}
             onChange={handleTextareaChange}
             placeholder="Type your message..."
-            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background overflow-hidden"
+            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-black text-white overflow-hidden"
             disabled={isLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {

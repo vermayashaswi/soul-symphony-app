@@ -180,7 +180,8 @@ body.tutorial-active {
 }
 
 /* Enhanced aggressive hiding of chat input during step 5 */
-.tutorial-active .mobile-chat-interface .p-2.bg-background.border-t.border-border {
+.tutorial-active .mobile-chat-interface .p-2.border-t.border-border,
+.tutorial-active[data-current-step="5"] .mobile-chat-interface .p-2.border-t.border-border {
   opacity: 0 !important; /* Make fully invisible */
   visibility: hidden !important;
   z-index: -1 !important; /* Push it below everything */
@@ -199,7 +200,7 @@ body.tutorial-active {
 .tutorial-active[data-current-step="5"] .mobile-chat-interface textarea,
 .tutorial-active[data-current-step="5"] .mobile-chat-interface button[type="submit"],
 .tutorial-active[data-current-step="5"] .mobile-chat-interface .input-container,
-.tutorial-active[data-current-step="5"] .p-2.bg-background.border-t.border-border {
+.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
   display: none !important;
   opacity: 0 !important;
   visibility: hidden !important;

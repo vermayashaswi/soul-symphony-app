@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -184,7 +185,7 @@ export default function MobileChatInput({
   return (
     <div 
       ref={inputContainerRef}
-      className={`p-2 bg-background border-t border-border flex items-center gap-2 ${
+      className={`p-2 border-t border-border flex items-center gap-2 ${
         isKeyboardVisible ? 'input-keyboard-active' : ''
       }`}
       style={{
@@ -203,6 +204,7 @@ export default function MobileChatInput({
         opacity: 1,
         transform: 'translateZ(0)',
         willChange: 'transform, bottom',
+        backgroundColor: '#000000',  // Changed to black background color
       }}
     >
       <div className="flex-1 relative">
@@ -213,7 +215,7 @@ export default function MobileChatInput({
           onChange={handleInputChange}
           onKeyDown={handleKeyPress}
           placeholder="Type your message..."
-          className="w-full pr-10 focus:outline-none focus:ring-2 focus:ring-primary border-2 border-primary/40 shadow-[0_0_8px_rgba(155,135,245,0.5)] bg-background"
+          className="w-full pr-10 focus:outline-none focus:ring-2 focus:ring-primary border-2 border-primary/40 shadow-[0_0_8px_rgba(155,135,245,0.5)] bg-black text-white"
           disabled={isLoading || isSubmitting}
         />
       </div>
