@@ -2,14 +2,15 @@
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
-  createChatThread, 
+  createThread, 
   getUserChatThreads, 
   getThreadMessages,
   saveMessage,
   updateThreadTitle
-} from "@/services/chat";
+} from "@/services/chat/messageService";
 import { v4 as uuidv4 } from "uuid";
 import { useToast } from "@/hooks/use-toast";
+import { ChatMessage } from "@/types/chat";
 
 export interface ChatThread {
   id: string;
@@ -23,7 +24,7 @@ export interface ChatMessagePersistence {
   id: string;
   thread_id: string;
   content: string;
-  sender: 'user' | 'assistant';
+  sender: 'user' | 'assistant' | 'error';
   role?: string;
   created_at: string;
   reference_entries?: any[];
@@ -31,6 +32,9 @@ export interface ChatMessagePersistence {
   has_numeric_result?: boolean;
   isInteractive?: boolean;
   interactiveOptions?: any[];
+  references?: any[];
+  analysis?: any;
+  hasNumericResult?: boolean;
 }
 
 export const useChatPersistence = (userId: string | undefined) => {
@@ -78,7 +82,14 @@ export const useChatPersistence = (userId: string | undefined) => {
       try {
         const threadMessages = await getThreadMessages(activeThread);
         if (threadMessages) {
-          setMessages(threadMessages);
+          // Convert ChatMessage to ChatMessagePersistence
+          const persistenceMessages: ChatMessagePersistence[] = threadMessages.map(msg => ({
+            ...msg,
+            references: msg.reference_entries as any[],
+            analysis: msg.analysis_data,
+            hasNumericResult: msg.has_numeric_result
+          }));
+          setMessages(persistenceMessages);
         }
       } catch (error) {
         console.error("Error loading thread messages:", error);
@@ -102,8 +113,16 @@ export const useChatPersistence = (userId: string | undefined) => {
         table: 'chat_messages',
         filter: `thread_id=eq.${activeThread}` 
       }, (payload) => {
-        const newMessage = payload.new as ChatMessagePersistence;
-        setMessages(prev => [...prev, newMessage]);
+        const newMessage = payload.new as any;
+        // Convert to ChatMessagePersistence
+        const persistenceMessage: ChatMessagePersistence = {
+          ...newMessage,
+          sender: newMessage.sender as 'user' | 'assistant' | 'error',
+          references: newMessage.reference_entries,
+          analysis: newMessage.analysis_data,
+          hasNumericResult: newMessage.has_numeric_result
+        };
+        setMessages(prev => [...prev, persistenceMessage]);
       })
       .subscribe();
       
@@ -127,12 +146,21 @@ export const useChatPersistence = (userId: string | undefined) => {
     }
     
     try {
-      const newThread = await createChatThread(userId, title);
+      const newThreadId = await createThread(userId, title);
       
-      if (newThread) {
+      if (newThreadId) {
+        // Get the new thread details
+        const { data: newThread, error } = await supabase
+          .from('chat_threads')
+          .select('*')
+          .eq('id', newThreadId)
+          .single();
+          
+        if (error || !newThread) throw new Error("Failed to retrieve new thread");
+        
         setThreads(prev => [newThread, ...prev]);
-        setActiveThread(newThread.id);
-        return newThread.id;
+        setActiveThread(newThreadId);
+        return newThreadId;
       }
       return null;
     } catch (error) {
@@ -175,11 +203,19 @@ export const useChatPersistence = (userId: string | undefined) => {
       const savedMessage = await saveMessage(activeThread, content, 'user');
       
       if (savedMessage) {
+        // Convert to ChatMessagePersistence to avoid type mismatch
+        const persistenceMessage: ChatMessagePersistence = {
+          ...savedMessage,
+          references: savedMessage.reference_entries as any[],
+          analysis: savedMessage.analysis_data,
+          hasNumericResult: savedMessage.has_numeric_result as boolean
+        };
+        
         // Replace temp message with saved one
         setMessages(prev => 
-          prev.map(msg => msg.id === tempId ? savedMessage : msg)
+          prev.map(msg => msg.id === tempId ? persistenceMessage : msg)
         );
-        return savedMessage;
+        return persistenceMessage;
       }
       return null;
     } catch (error) {

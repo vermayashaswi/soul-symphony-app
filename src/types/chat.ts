@@ -16,11 +16,11 @@ export interface ChatMessage {
   sub_query3?: string | null;
   sub_query_responses?: any[] | null;
   isInteractive?: boolean;
-  interactiveOptions?: {
-    text: string;
-    action: string;
-    parameters?: Record<string, any>;
-  }[];
+  interactiveOptions?: InteractiveOption[];
+  references?: any[]; // Alias for reference_entries for backward compatibility
+  analysis?: any; // Alias for analysis_data for backward compatibility
+  hasNumericResult?: boolean; // Alias for has_numeric_result for backward compatibility
+  diagnostics?: any; // For debug diagnostics
 }
 
 export interface InteractiveOption {

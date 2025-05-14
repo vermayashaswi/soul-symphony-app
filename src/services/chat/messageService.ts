@@ -1,7 +1,6 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { ChatMessage } from "@/types/chat";
-import { InteractiveOption } from "@/types/chat";
+import { ChatMessage, InteractiveOption } from "@/types/chat";
 
 /**
  * Gets the user's timezone offset in minutes
@@ -27,7 +26,11 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
     return (data || []).map((msg) => ({
       ...msg,
       sender: msg.sender as 'user' | 'assistant' | 'error',
-      role: msg.role as 'user' | 'assistant' | 'error'
+      role: msg.role as 'user' | 'assistant' | 'error',
+      // Add aliases for backward compatibility
+      references: msg.reference_entries,
+      analysis: msg.analysis_data,
+      hasNumericResult: msg.has_numeric_result
     }));
   } catch (error) {
     console.error("Error fetching thread messages:", error);
@@ -77,7 +80,11 @@ export const saveMessage = async (
     const chatMessage: ChatMessage = {
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
-      role: data.role as 'user' | 'assistant' | 'error'
+      role: data.role as 'user' | 'assistant' | 'error',
+      // Add aliases for backward compatibility
+      references: data.reference_entries,
+      analysis: data.analysis_data,
+      hasNumericResult: data.has_numeric_result
     };
     
     // If this is an interactive message with options, add those properties
@@ -124,5 +131,44 @@ export const createThread = async (
   } catch (error) {
     console.error("Error creating thread:", error);
     return null;
+  }
+};
+
+/**
+ * Gets all threads for a user, ordered by update time
+ */
+export const getUserChatThreads = async (userId: string): Promise<any[] | null> => {
+  try {
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+      
+    if (error) throw error;
+    
+    return data || null;
+  } catch (error) {
+    console.error("Error getting user threads:", error);
+    return null;
+  }
+};
+
+/**
+ * Updates the title of a thread
+ */
+export const updateThreadTitle = async (threadId: string, title: string): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('chat_threads')
+      .update({ title, updated_at: new Date().toISOString() })
+      .eq('id', threadId);
+      
+    if (error) throw error;
+    
+    return true;
+  } catch (error) {
+    console.error("Error updating thread title:", error);
+    return false;
   }
 };

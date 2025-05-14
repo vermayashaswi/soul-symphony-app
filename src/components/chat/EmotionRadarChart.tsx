@@ -1,49 +1,45 @@
 
-import React from "react";
-import { ResponsiveContainer, RadarChart, PolarGrid, PolarAngleAxis, Radar, Tooltip } from "recharts";
-import { Card } from "@/components/ui/card";
+import React from 'react';
+import { Card } from '@/components/ui/card';
 import { TranslatableText } from "@/components/translation/TranslatableText";
 
 interface EmotionRadarChartProps {
-  emotions: {
+  emotions: Array<{
     name: string;
-    value: number;
-  }[];
-  title?: string;
+    score: number;
+  }>;
+  size?: 'small' | 'medium' | 'large';
 }
 
-const EmotionRadarChart: React.FC<EmotionRadarChartProps> = ({ emotions, title }) => {
+const EmotionRadarChart: React.FC<EmotionRadarChartProps> = ({ 
+  emotions,
+  size = 'medium'
+}) => {
   if (!emotions || emotions.length === 0) return null;
   
-  // Normalize values to make sure they're all within reasonable range for visualization
-  const maxValue = Math.max(...emotions.map(e => e.value));
-  const normalizedEmotions = emotions.map(emotion => ({
-    ...emotion,
-    value: maxValue > 0 ? (emotion.value / maxValue) * 100 : emotion.value
-  }));
-  
+  // This is a placeholder component for now
+  // In the future, implement a real radar chart using recharts
   return (
-    <Card className="p-4 mt-4">
-      {title && (
-        <h4 className="text-sm font-medium mb-2">
-          <TranslatableText text={title} />
-        </h4>
-      )}
-      <div className="h-64">
-        <ResponsiveContainer width="100%" height="100%">
-          <RadarChart cx="50%" cy="50%" outerRadius="80%" data={normalizedEmotions}>
-            <PolarGrid />
-            <PolarAngleAxis dataKey="name" />
-            <Radar
-              name="Emotion Intensity"
-              dataKey="value"
-              stroke="#8884d8"
-              fill="#8884d8"
-              fillOpacity={0.6}
-            />
-            <Tooltip />
-          </RadarChart>
-        </ResponsiveContainer>
+    <Card className="p-4">
+      <h4 className="font-medium mb-2">
+        <TranslatableText text="Emotion Analysis" forceTranslate={true} />
+      </h4>
+      
+      <div className="space-y-2">
+        {emotions.map((emotion, idx) => (
+          <div key={idx} className="flex items-center">
+            <span className="w-24 text-sm">{emotion.name}</span>
+            <div className="flex-1 h-2 bg-muted rounded-full overflow-hidden">
+              <div 
+                className="h-full bg-primary" 
+                style={{width: `${emotion.score * 100}%`}}
+              />
+            </div>
+            <span className="w-12 text-right text-sm">
+              {Math.round(emotion.score * 100)}%
+            </span>
+          </div>
+        ))}
       </div>
     </Card>
   );

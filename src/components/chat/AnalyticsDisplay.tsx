@@ -1,8 +1,7 @@
 
-import React from "react";
-import { Card } from "@/components/ui/card";
+import React from 'react';
+import { Card } from '@/components/ui/card';
 import { TranslatableText } from "@/components/translation/TranslatableText";
-import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from "recharts";
 
 interface AnalyticsDisplayProps {
   analysisData: any;
@@ -10,54 +9,64 @@ interface AnalyticsDisplayProps {
 
 const AnalyticsDisplay: React.FC<AnalyticsDisplayProps> = ({ analysisData }) => {
   if (!analysisData) return null;
-
-  // Simple chart data visualization if data is in the right format
-  if (analysisData.chartData && Array.isArray(analysisData.chartData)) {
-    return (
-      <div className="mt-4">
-        <Card className="p-4">
-          <h4 className="text-sm font-medium mb-2">
-            <TranslatableText text={analysisData.chartTitle || "Analysis Results"} />
-          </h4>
-          <div className="h-64">
-            <ResponsiveContainer width="100%" height="100%">
-              <LineChart data={analysisData.chartData}>
-                <CartesianGrid strokeDasharray="3 3" />
-                <XAxis dataKey="name" />
-                <YAxis />
-                <Tooltip />
-                <Line 
-                  type="monotone" 
-                  dataKey="value" 
-                  stroke="#8884d8" 
-                  activeDot={{ r: 8 }} 
-                  name={analysisData.valueName || "Value"}
-                />
-              </LineChart>
-            </ResponsiveContainer>
-          </div>
-          {analysisData.chartDescription && (
-            <p className="text-xs text-muted-foreground mt-2">
-              <TranslatableText text={analysisData.chartDescription} />
-            </p>
-          )}
-        </Card>
-      </div>
-    );
-  }
-
-  // Fallback for when the data structure doesn't match expected format
+  
   return (
-    <div className="mt-4">
-      <Card className="p-3">
-        <div className="text-sm">
-          <div className="font-medium mb-1">
-            <TranslatableText text="Analysis Summary" />
+    <div className="mt-3 text-sm">
+      <Card className="p-3 bg-muted/50">
+        <h4 className="font-medium mb-2">
+          <TranslatableText text="Analysis Results" forceTranslate={true} />
+        </h4>
+        
+        {analysisData.type === 'quantitative_emotion' && (
+          <div>
+            <p>
+              <TranslatableText 
+                text={`Emotion strength: ${analysisData.score.toFixed(1)}/10`}
+                forceTranslate={true} 
+              />
+            </p>
           </div>
-          <div className="text-xs text-muted-foreground">
-            <TranslatableText text={analysisData.summary || JSON.stringify(analysisData)} />
+        )}
+        
+        {analysisData.type === 'top_emotions' && (
+          <div>
+            <p>
+              <TranslatableText 
+                text="Top emotions detected:"
+                forceTranslate={true} 
+              />
+            </p>
+            <ul className="list-disc list-inside">
+              {analysisData.emotions?.map((emotion: any, idx: number) => (
+                <li key={idx}>
+                  <TranslatableText 
+                    text={`${emotion.name}: ${(emotion.score * 100).toFixed(0)}%`}
+                    forceTranslate={true} 
+                  />
+                </li>
+              ))}
+            </ul>
           </div>
-        </div>
+        )}
+        
+        {analysisData.type === 'time_patterns' && (
+          <div>
+            <p>
+              <TranslatableText 
+                text="Time pattern analysis:"
+                forceTranslate={true} 
+              />
+            </p>
+            <p>
+              <TranslatableText 
+                text={analysisData.summary || "No clear patterns detected."}
+                forceTranslate={true} 
+              />
+            </p>
+          </div>
+        )}
+        
+        {/* Add more analysis types as needed */}
       </Card>
     </div>
   );

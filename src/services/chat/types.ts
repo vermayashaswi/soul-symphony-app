@@ -14,16 +14,16 @@ export type ChatMessage = {
   id: string;
   thread_id: string;
   content: string;
-  sender: 'user' | 'assistant';
+  sender: 'user' | 'assistant' | 'error';
   created_at: string;
   reference_entries?: Json | null;
   analysis_data?: Json | null;
   has_numeric_result?: boolean | null;
-  role: 'user' | 'assistant';
+  role: 'user' | 'assistant' | 'error';
   sub_query1?: string | null;
   sub_query2?: string | null;
   sub_query3?: string | null;
-  sub_query_responses?: SubQueryResponse[] | null;
+  sub_query_responses?: any[] | null;
 };
 
 export type SubQueryResponse = {

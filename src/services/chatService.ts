@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { createFallbackQueryPlan, convertGptPlanToQueryPlan } from "./chat/queryPlannerService";
 import { getUserTimezoneOffset } from "./chat";
@@ -419,62 +420,77 @@ async function processWithQueryPlan(
         includeDiagnostics: enableDiagnostics,
         timezoneOffset, // Pass timezone offset
         vectorSearch: {
-          matchThreshold,
-          matchCount
+          matchThreshold: 0.5,
+          matchCount: queryPlan.matchCount || 10
         },
-        isEmotionQuery,
-        isWhyEmotionQuery,
-        isTimePatternQuery,
-        isTemporalQuery,
-        requiresTimeAnalysis,
-        timeRange
+        isEmotionQuery: queryTypes && queryTypes.isEmotionFocused ? true : false,
+        isWhyEmotionQuery: queryTypes && queryTypes.isWhyQuestion && queryTypes.isEmotionFocused ? true : false,
+        isTimePatternQuery: queryTypes && queryTypes.isTimePatternQuery ? true : false,
+        isTemporalQuery: queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) ? true : false,
+        requiresTimeAnalysis: queryTypes && queryTypes.requiresTimeAnalysis ? true : false,
+        timeRange: queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) ? queryTypes.timeRange || null : null
       }
     });
 
     if (error) {
       console.error("Edge function error:", error);
-      return {
+      const errorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         thread_id: threadId || '',
         role: "error",
         sender: "error",
         content: `I'm having trouble processing your request. Technical details: ${error.message}`,
-        created_at: new Date().toISOString(),
-        diagnostics: enableDiagnostics ? { 
-          steps: [{ name: "Edge Function Error", status: "error", details: error.message }]
-        } : undefined
+        created_at: new Date().toISOString()
       };
+      
+      if (enableDiagnostics) {
+        errorMessage.diagnostics = { 
+          steps: [{ name: "Edge Function Error", status: "error", details: error.message }]
+        };
+      }
+      
+      return errorMessage;
     }
 
     if (!data) {
       console.error("No data returned from edge function");
-      return {
+      const noDataMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         thread_id: threadId || '',
         role: "error",
         sender: "error",
         content: "I'm having trouble retrieving a response. Please try again in a moment.",
-        created_at: new Date().toISOString(),
-        diagnostics: enableDiagnostics ? { 
-          steps: [{ name: "No Data Returned", status: "error", details: "Empty response from edge function" }]
-        } : undefined
+        created_at: new Date().toISOString()
       };
+      
+      if (enableDiagnostics) {
+        noDataMessage.diagnostics = { 
+          steps: [{ name: "No Data Returned", status: "error", details: "Empty response from edge function" }]
+        };
+      }
+      
+      return noDataMessage;
     }
 
     // Handle error responses that come with status 200
     if (data.error) {
       console.error("Error in data:", data.error);
-      return {
+      const dataErrorMessage: ChatMessage = {
         id: `error-${Date.now()}`,
         thread_id: threadId || '',
         role: "error",
         sender: "error",
         content: data.response || `There was an issue retrieving information: ${data.error}`,
-        created_at: new Date().toISOString(),
-        diagnostics: enableDiagnostics ? data.diagnostics || {
-          steps: [{ name: "Processing Error", status: "error", details: data.error }]
-        } : undefined
+        created_at: new Date().toISOString()
       };
+      
+      if (enableDiagnostics) {
+        dataErrorMessage.diagnostics = data.diagnostics || {
+          steps: [{ name: "Processing Error", status: "error", details: data.error }]
+        };
+      }
+      
+      return dataErrorMessage;
     }
 
     // Prepare the response
@@ -490,16 +506,19 @@ async function processWithQueryPlan(
     // Include references if available
     if (data.references && data.references.length > 0) {
       chatResponse.reference_entries = data.references;
+      chatResponse.references = data.references; // For backward compatibility
     }
 
     // Include analysis if available
     if (data.analysis) {
       chatResponse.analysis_data = data.analysis;
+      chatResponse.analysis = data.analysis; // For backward compatibility
       if (data.analysis.type === 'quantitative_emotion' || 
           data.analysis.type === 'top_emotions' ||
           data.analysis.type === 'time_patterns' ||
           data.analysis.type === 'combined_analysis') {
         chatResponse.has_numeric_result = true;
+        chatResponse.hasNumericResult = true; // For backward compatibility
       }
     }
     

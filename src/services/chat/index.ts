@@ -1,13 +1,5 @@
-
-import { getUserTimezoneOffset } from "./messageService";
-import { getThreadMessages, saveMessage, createThread } from "./messageService";
-import { ChatMessage } from "@/types/chat";
-
-export { 
-  getUserTimezoneOffset,
-  getThreadMessages,
-  saveMessage,
-  createThread 
-};
-
-export type { ChatMessage };
+// Re-export all chat service functions for easier imports
+export * from './messageService';
+export * from './types';
+export * from './useChatPersistence';
+// Export any other chat services here
