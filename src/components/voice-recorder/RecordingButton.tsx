@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Mic, Square } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useTutorial } from '@/contexts/TutorialContext';
+import { showToast } from '@/utils/journal/toast-helper';
 
 interface RecordingButtonProps {
   isRecording: boolean;
@@ -32,9 +33,8 @@ export function RecordingButton({
   const isInTutorialStep3 = isInStep(3);
   const isInTutorialStep5 = isActive && isInStep(5);
   
-  // Don't render during tutorial step 5 at all
+  // Don't render during tutorial step 5
   if (isInTutorialStep5) {
-    console.log("In tutorial step 5 - not rendering recording button at all");
     return null;
   }
   

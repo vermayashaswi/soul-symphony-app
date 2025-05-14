@@ -125,12 +125,12 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // For step 5 - position much higher to avoid overlapping the chat input or questions
+    // For step 5 - position higher to avoid the chat input box at bottom
     if (step.id === 5) {
       return {
-        top: '10%',  // Positioned very high to leave room for chat suggestions below
+        top: '15%',  // Positioned much higher (changed from 30% to 15%)
         left: '50%',
-        transform: 'translate(-50%, 0)', // No vertical centering
+        transform: 'translate(-50%, 0)', // Changed from -50% for y to avoid centering
         position: 'fixed' as const,
         zIndex: 30000
       };

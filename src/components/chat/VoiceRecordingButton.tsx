@@ -39,7 +39,6 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   
   // If we're in tutorial step 5, don't render the component at all
   if (isInTutorialStep) {
-    console.log("In tutorial step 5 - not rendering voice recording button at all");
     return null;
   }
 
