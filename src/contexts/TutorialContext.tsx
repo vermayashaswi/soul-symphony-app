@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -255,7 +254,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setTutorialCompleted(true);
       toast({
         title: "Tutorial completed!",
-        description: "You can reset it any time in settings."
+        description: "You can reset it any time in settings.",
+        duration: 500 // Changed from default to 500ms (0.5 seconds)
       });
       console.log('Tutorial marked as completed');
       
@@ -400,7 +400,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setTutorialCompleted(true);
       toast({
         title: "Tutorial skipped",
-        description: "You can always find help in the settings."
+        description: "You can always find help in the settings.",
+        duration: 500 // Changed from default to 500ms (0.5 seconds)
       });
       
       // Clean up any lingering tutorial classes
@@ -443,7 +444,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         toast({
           title: "Error",
           description: "Failed to reset tutorial. Please try again.",
-          variant: "destructive"
+          variant: "destructive",
+          duration: 500 // Changed from default to 500ms (0.5 seconds)
         });
         return;
       }
@@ -466,7 +468,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         if (isAppRoute(location.pathname)) {
           toast({
             title: "Tutorial reset successfully!",
-            description: "Redirecting to app home page..."
+            description: "Redirecting to app home page...",
+            duration: 500 // Changed from default to 500ms (0.5 seconds)
           });
         }
         
@@ -475,7 +478,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         // If already on /app/home, just show toast and activate tutorial
         toast({
           title: "Tutorial reset successfully!",
-          description: "Restart from step 1"
+          description: "Restart from step 1",
+          duration: 500 // Changed from default to 500ms (0.5 seconds)
         });
         setIsActive(true);
       }
@@ -484,7 +488,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       toast({
         title: "Error",
         description: "Something went wrong. Please try again.",
-        variant: "destructive"
+        variant: "destructive",
+        duration: 500 // Changed from default to 500ms (0.5 seconds)
       });
     }
   };

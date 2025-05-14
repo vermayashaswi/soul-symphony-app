@@ -4,7 +4,7 @@ import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTutorial } from '@/contexts/TutorialContext';
-import { showToast } from '@/utils/journal/toast-helper';
+import { showToast, showTutorialToast } from '@/utils/journal/toast-helper';
 
 const JournalNavigationButton: React.FC = () => {
   const navigate = useNavigate();
@@ -19,12 +19,19 @@ const JournalNavigationButton: React.FC = () => {
       console.log('Navigating to journal page');
       navigate('/app/journal');
       
-      // Show a success toast
-      showToast(
-        "Journal", 
-        "Opening your journal space", 
-        3000
-      );
+      // Show a success toast - use tutorial toast if in tutorial mode
+      if (isActive) {
+        showTutorialToast(
+          "Journal", 
+          "Opening your journal space"
+        );
+      } else {
+        showToast(
+          "Journal", 
+          "Opening your journal space", 
+          3000
+        );
+      }
     } catch (error) {
       console.error("Navigation error:", error);
       
