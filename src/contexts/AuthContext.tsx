@@ -161,6 +161,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const updateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
     logProfile(`Updating user profile metadata`, 'AuthContext', { metadataKeys: Object.keys(metadata) });
     
+    // Always include timezone in updates if not explicitly provided
+    if (!metadata.timezone) {
+      try {
+        metadata.timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+        logProfile(`Adding detected timezone to metadata: ${metadata.timezone}`, 'AuthContext');
+      } catch (error) {
+        logError('Could not detect timezone', 'AuthContext', error);
+      }
+    }
+    
     const result = await updateUserProfileService(user, metadata);
     if (result) {
       const { data } = await supabase.auth.getUser();

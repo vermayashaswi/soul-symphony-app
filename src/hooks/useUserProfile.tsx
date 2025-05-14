@@ -5,13 +5,16 @@ import { supabase } from '@/integrations/supabase/client';
 
 export interface UserProfileData {
   displayName: string | null;
+  timezone: string | null;
 }
 
 export const useUserProfile = (): UserProfileData & { 
-  updateDisplayName: (name: string) => Promise<void> 
+  updateDisplayName: (name: string) => Promise<void>,
+  updateTimezone: (timezone: string) => Promise<void>
 } => {
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState<string | null>(null);
+  const [timezone, setTimezone] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -22,7 +25,7 @@ export const useUserProfile = (): UserProfileData & {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, full_name')
+          .select('display_name, full_name, timezone')
           .eq('id', user.id)
           .single();
 
@@ -40,6 +43,18 @@ export const useUserProfile = (): UserProfileData & {
         } else if (data && data.full_name) {
           setDisplayName(data.full_name);
         }
+
+        // Set timezone from profile data
+        if (data && data.timezone) {
+          setTimezone(data.timezone);
+        } else if (user) {
+          // If profile exists but no timezone, update with browser timezone
+          const browserTimezone = getBrowserTimezone();
+          if (browserTimezone) {
+            await updateTimezone(browserTimezone);
+            setTimezone(browserTimezone);
+          }
+        }
       } catch (error) {
         console.error('Error in profile fetching', error);
       }
@@ -47,6 +62,15 @@ export const useUserProfile = (): UserProfileData & {
 
     fetchUserProfile();
   }, [user]);
+
+  const getBrowserTimezone = (): string | null => {
+    try {
+      return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    } catch (error) {
+      console.error('Error detecting timezone:', error);
+      return null;
+    }
+  };
 
   const updateDisplayName = async (name: string) => {
     if (!user) return;
@@ -70,5 +94,27 @@ export const useUserProfile = (): UserProfileData & {
     }
   };
 
-  return { displayName, updateDisplayName };
+  const updateTimezone = async (tz: string) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          timezone: tz,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+      
+      setTimezone(tz);
+    } catch (error) {
+      console.error('Error updating timezone', error);
+    }
+  };
+
+  return { displayName, timezone, updateDisplayName, updateTimezone };
 };

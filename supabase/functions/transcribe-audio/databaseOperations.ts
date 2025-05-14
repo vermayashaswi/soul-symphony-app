@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -15,13 +16,22 @@ export function createSupabaseAdmin(supabaseUrl: string, supabaseServiceKey: str
 }
 
 /**
+ * Gets timezone from request headers or defaults to UTC
+ */
+export function getTimezoneFromRequest(req: Request): string {
+  // Try to get timezone from headers if available
+  const timezone = req.headers.get('x-timezone') || 'UTC';
+  return timezone;
+}
+
+/**
  * Checks if a user profile exists and creates one if it doesn't
  */
-export async function createProfileIfNeeded(supabase: SupabaseClient, userId: string) {
+export async function createProfileIfNeeded(supabase: SupabaseClient, userId: string, timezone?: string) {
   try {
     const { data, error } = await supabase
       .from('profiles')
-      .select('id')
+      .select('id, timezone')
       .eq('id', userId)
       .single();
 
@@ -30,6 +40,7 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
       throw error;
     }
 
+    // If profile doesn't exist, create one
     if (!data) {
       console.log('Creating profile for user:', userId);
       const { data: userData, error: userError } = await supabase.auth.getUser();
@@ -44,6 +55,7 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
           email: userData.user?.email,
           full_name: userData.user?.user_metadata?.full_name || '',
           avatar_url: userData.user?.user_metadata?.avatar_url || '',
+          timezone: timezone || 'UTC', // Use provided timezone or default to UTC
           onboarding_completed: false
         }]);
 
@@ -55,6 +67,25 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
       console.log('Profile created successfully');
     } else {
       console.log('Profile already exists for user:', userId);
+      
+      // Update timezone if provided and different from current
+      if (timezone && (!data.timezone || data.timezone !== timezone)) {
+        console.log(`Updating timezone for user ${userId} from ${data.timezone || 'none'} to ${timezone}`);
+        
+        const { error: updateError } = await supabase
+          .from('profiles')
+          .update({
+            timezone: timezone,
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', userId);
+          
+        if (updateError) {
+          console.error('Error updating timezone:', updateError);
+        } else {
+          console.log('Timezone updated successfully');
+        }
+      }
     }
   } catch (error) {
     console.error('Error in createProfileIfNeeded:', error);
