@@ -140,15 +140,23 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       else if (currentStepData?.id === 4) {
-        // Step 4: Past Entries Tab
+        // Step 4: Past Entries Tab - Enhanced with same glow effect as record entry
         let foundElement = false;
         
         for (const selector of ENTRIES_TAB_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            element.classList.add('tutorial-target', 'entries-tab');
+            element.classList.add('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
+            
+            // Apply enhanced styling similar to record entry button
+            const elementStyle = element as HTMLElement;
+            elementStyle.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+            elementStyle.style.animation = "button-pulse 1.5s infinite alternate";
+            elementStyle.style.border = "2px solid white";
+            elementStyle.style.transform = "scale(1.05)";
+            
             foundElement = true;
-            console.log(`Applied highlighting to entries tab using selector: ${selector}`);
+            console.log(`Applied enhanced highlighting to entries tab using selector: ${selector}`);
             break;
           }
         }

@@ -80,7 +80,7 @@ body.tutorial-active {
   transform: scale(1.05) !important;
 }
 
-/* Steps 3 & 4: Tab highlighting styling */
+/* Steps 3 & 4: Tab highlighting styling - Consistent styling for both record and entries tabs */
 .record-entry-tab.tutorial-target,
 .entries-tab.tutorial-target {
   z-index: 10000 !important;
