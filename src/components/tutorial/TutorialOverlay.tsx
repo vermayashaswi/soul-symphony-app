@@ -44,7 +44,7 @@ const TutorialOverlay: React.FC = () => {
     });
   }, [isActive, currentStep, steps, navigationState, shouldShowTutorial]);
   
-  // Enhanced scrolling prevention
+  // Enhanced scrolling prevention with data attribute for current step
   useEffect(() => {
     if (!shouldShowTutorial) return;
     
@@ -58,17 +58,21 @@ const TutorialOverlay: React.FC = () => {
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
     
+    // Add data attribute for current step to enable more specific CSS targeting
+    document.body.setAttribute('data-current-step', String(steps[currentStep]?.id || ''));
+    
     // Clean up when tutorial is deactivated
     return () => {
       document.body.classList.remove('tutorial-active');
       document.body.style.overflow = '';
       document.body.style.touchAction = '';
+      document.body.removeAttribute('data-current-step');
       
       // Restore scroll position
       window.scrollTo(0, scrollPos);
       console.log('Tutorial inactive, restored page scrolling');
     };
-  }, [shouldShowTutorial]);
+  }, [shouldShowTutorial, currentStep, steps]);
 
   // Step-specific element highlighting
   useEffect(() => {

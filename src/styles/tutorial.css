@@ -179,13 +179,36 @@ body.tutorial-active {
   touch-action: none !important;
 }
 
-/* Completely hide the chat input container during tutorial step 5 */
+/* Enhanced aggressive hiding of chat input during step 5 */
 .tutorial-active .mobile-chat-interface .p-2.bg-background.border-t.border-border {
   opacity: 0 !important; /* Make fully invisible */
   visibility: hidden !important;
   z-index: -1 !important; /* Push it below everything */
   display: none !important; /* Don't render it at all */
   pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  transform: translateY(1000px) !important; /* Move it far away */
+}
+
+/* Hide chat input completely for step 5 tutorial - even more aggressive styles */
+.tutorial-active[data-current-step="5"] .mobile-chat-interface form,
+.tutorial-active[data-current-step="5"] .mobile-chat-interface input,
+.tutorial-active[data-current-step="5"] .mobile-chat-interface textarea,
+.tutorial-active[data-current-step="5"] .mobile-chat-interface button[type="submit"],
+.tutorial-active[data-current-step="5"] .mobile-chat-interface .input-container,
+.tutorial-active[data-current-step="5"] .p-2.bg-background.border-t.border-border {
+  display: none !important;
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  transform: translateY(1000px) !important;
+  position: absolute !important;
+  z-index: -999 !important;
 }
 
 /* Animation keyframes - pulsating effects */
@@ -220,6 +243,11 @@ body.tutorial-active {
     line-height: 1.4 !important;
     margin-bottom: 0.75rem !important;
   }
+  
+  /* Special override for step 5 on mobile */
+  .tutorial-step-container[data-step="5"] {
+    top: 30% !important; /* Force to be higher on mobile */
+  }
 }
 
 @media (max-width: 360px) {
@@ -241,5 +269,10 @@ body.tutorial-active {
   .tutorial-step-container button {
     padding: 4px 8px !important;
     font-size: 0.8rem !important;
+  }
+  
+  /* Special override for step 5 on small mobile */
+  .tutorial-step-container[data-step="5"] {
+    top: 25% !important; /* Force to be even higher on small mobile */
   }
 }

@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Button } from "@/components/ui/button";
 import { Send, Loader2 } from "lucide-react";
@@ -90,21 +89,38 @@ export default function MobileChatInput({
       inputElement.addEventListener('focus', handleFocus);
     }
     
-    // Ensure input visibility with a periodic check - but not during tutorial step 5
+    // Ensure input visibility based on tutorial state
     const ensureInputVisibility = () => {
-      if (inputContainerRef.current && !isInChatTutorialStep) {
-        inputContainerRef.current.style.visibility = 'visible';
-        inputContainerRef.current.style.opacity = '1';
-      } else if (inputContainerRef.current && isInChatTutorialStep) {
-        inputContainerRef.current.style.visibility = 'hidden';
-        inputContainerRef.current.style.opacity = '0';
-        inputContainerRef.current.style.display = 'none';
+      if (inputContainerRef.current) {
+        if (isInChatTutorialStep) {
+          // Completely hide during tutorial step 5
+          inputContainerRef.current.style.visibility = 'hidden';
+          inputContainerRef.current.style.opacity = '0';
+          inputContainerRef.current.style.display = 'none';
+          inputContainerRef.current.style.height = '0';
+          inputContainerRef.current.style.width = '0';
+          inputContainerRef.current.style.pointerEvents = 'none';
+          inputContainerRef.current.style.position = 'absolute';
+          inputContainerRef.current.style.zIndex = '-999';
+          inputContainerRef.current.style.transform = 'translateY(1000px)';
+        } else {
+          // Show normally otherwise
+          inputContainerRef.current.style.visibility = 'visible';
+          inputContainerRef.current.style.opacity = '1';
+          inputContainerRef.current.style.display = 'flex';
+          inputContainerRef.current.style.height = '';
+          inputContainerRef.current.style.width = '';
+          inputContainerRef.current.style.pointerEvents = '';
+          inputContainerRef.current.style.position = '';
+          inputContainerRef.current.style.zIndex = '60';
+          inputContainerRef.current.style.transform = '';
+        }
       }
     };
     
-    // Run immediately and set interval
+    // Run immediately and set interval for consistent checking
     ensureInputVisibility();
-    const visibilityInterval = setInterval(ensureInputVisibility, 500);
+    const visibilityInterval = setInterval(ensureInputVisibility, 300);
     
     return () => {
       if (window.visualViewport) {
@@ -159,8 +175,9 @@ export default function MobileChatInput({
     }
   };
 
-  // If we're in step 5 of the tutorial, don't render the input at all
+  // If we're in step 5 of the tutorial, don't render anything at all
   if (isInChatTutorialStep) {
+    console.log("In tutorial step 5 - not rendering chat input at all");
     return null;
   }
 

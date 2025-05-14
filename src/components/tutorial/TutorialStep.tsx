@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -127,7 +128,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     // For step 5 - position higher to avoid the chat input box at bottom
     if (step.id === 5) {
       return {
-        top: '40%',  // Position higher up on the screen (40% from the top)
+        top: '30%',  // Positioned much higher (changed from 40% to 30%)
         left: '50%',
         transform: 'translate(-50%, -50%)',
         position: 'fixed' as const,
