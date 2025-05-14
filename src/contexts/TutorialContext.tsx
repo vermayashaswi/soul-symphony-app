@@ -5,6 +5,12 @@ import { supabase } from '@/integrations/supabase/client';
 import { toast } from '@/hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAppRoute } from '@/routes/RouteHelpers';
+import { 
+  RECORD_ENTRY_SELECTORS, 
+  ENTRIES_TAB_SELECTORS,
+  findAndHighlightElement,
+  logPotentialTutorialElements
+} from '@/utils/tutorial/tutorial-elements-finder';
 
 // Define the interface for a tutorial step
 export interface TutorialStep {
@@ -69,12 +75,7 @@ const initialTutorialSteps: TutorialStep[] = [
     title: 'Multilingual Recording',
     content: 'The New Entry button lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
     targetElement: '.tutorial-record-entry-button',
-    alternativeSelectors: [
-      '[data-value="record"]',
-      '.record-entry-tab',
-      'button[data-tutorial-target="record-entry"]',
-      '#new-entry-button'
-    ],
+    alternativeSelectors: RECORD_ENTRY_SELECTORS,
     position: 'bottom',
     showNextButton: true,
     showSkipButton: true,
@@ -86,11 +87,7 @@ const initialTutorialSteps: TutorialStep[] = [
     title: 'Your Journal History',
     content: 'View and explore all your past journal entries here. You can search, filter, and reflect on your emotional journey over time.',
     targetElement: '[value="entries"]', // Target the Past Entries tab
-    alternativeSelectors: [
-      '.entries-tab',
-      'button[data-tutorial-target="past-entries"]',
-      '#past-entries-button'
-    ],
+    alternativeSelectors: ENTRIES_TAB_SELECTORS,
     position: 'bottom',
     showNextButton: true,
     showSkipButton: true,
@@ -199,29 +196,19 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       ...(stepData.alternativeSelectors || [])
     ].filter(Boolean) as string[];
     
-    let targetElement: Element | null = null;
-    
-    // Try each selector until we find a match
-    for (const selector of selectors) {
-      const element = document.querySelector(selector);
-      if (element) {
-        targetElement = element;
-        console.log(`Found target element using selector: ${selector}`);
-        break;
-      }
+    // Log potential elements in the DOM to help with debugging
+    if (stepData.id === 3 || stepData.id === 4) {
+      logPotentialTutorialElements();
     }
     
-    if (targetElement) {
-      console.log(`Applying highlighting to element for step ${stepData.id}`);
-      targetElement.classList.add('tutorial-target');
-      
-      // Add special classes based on step
-      if (stepData.id === 3) {
-        targetElement.classList.add('record-entry-tab');
-      } else if (stepData.id === 4) {
-        targetElement.classList.add('entries-tab');
-      }
-    } else {
+    // Attempt to find and highlight the element
+    const found = findAndHighlightElement(
+      selectors, 
+      stepData.id === 3 ? 'record-entry-tab' : 
+      stepData.id === 4 ? 'entries-tab' : ''
+    );
+    
+    if (!found) {
       console.warn(`Could not find any target element for step ${stepData.id}`);
     }
   };
@@ -274,8 +261,19 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Clean up any lingering tutorial classes
       document.body.classList.remove('tutorial-active');
-      const targetElements = document.querySelectorAll('.tutorial-target');
-      targetElements.forEach(el => el.classList.remove('tutorial-target'));
+      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
+      targetElements.forEach(el => {
+        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
+        
+        // Also clear any inline styles
+        if (el instanceof HTMLElement) {
+          el.style.boxShadow = '';
+          el.style.animation = '';
+          el.style.border = '';
+          el.style.transform = '';
+          el.style.zIndex = '';
+        }
+      });
     } catch (error) {
       console.error('Error completing tutorial:', error);
     }
@@ -294,9 +292,18 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       updateTutorialStep(newStep);
       
       // Clean up any existing highlight classes
-      const targetElements = document.querySelectorAll('.tutorial-target, .record-entry-tab, .entries-tab');
+      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
       targetElements.forEach(el => {
-        el.classList.remove('tutorial-target', 'record-entry-tab', 'entries-tab');
+        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
+        
+        // Also clear any inline styles
+        if (el instanceof HTMLElement) {
+          el.style.boxShadow = '';
+          el.style.animation = '';
+          el.style.border = '';
+          el.style.transform = '';
+          el.style.zIndex = '';
+        }
       });
       
       // Handle navigation if needed
@@ -338,9 +345,18 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       updateTutorialStep(newStep);
       
       // Clean up any existing highlight classes
-      const targetElements = document.querySelectorAll('.tutorial-target, .record-entry-tab, .entries-tab');
+      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
       targetElements.forEach(el => {
-        el.classList.remove('tutorial-target', 'record-entry-tab', 'entries-tab');
+        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
+        
+        // Also clear any inline styles
+        if (el instanceof HTMLElement) {
+          el.style.boxShadow = '';
+          el.style.animation = '';
+          el.style.border = '';
+          el.style.transform = '';
+          el.style.zIndex = '';
+        }
       });
       
       // Handle navigation if needed
@@ -389,9 +405,18 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Clean up any lingering tutorial classes
       document.body.classList.remove('tutorial-active');
-      const targetElements = document.querySelectorAll('.tutorial-target, .record-entry-tab, .entries-tab');
+      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
       targetElements.forEach(el => {
-        el.classList.remove('tutorial-target', 'record-entry-tab', 'entries-tab');
+        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
+        
+        // Also clear any inline styles
+        if (el instanceof HTMLElement) {
+          el.style.boxShadow = '';
+          el.style.animation = '';
+          el.style.border = '';
+          el.style.transform = '';
+          el.style.zIndex = '';
+        }
       });
       
       console.log('Tutorial skipped by user');

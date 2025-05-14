@@ -87,9 +87,18 @@ const TutorialOverlay: React.FC = () => {
     console.log(`Setting up highlighting for step ${currentStepData?.id}`);
     
     // Remove any existing highlight classes first
-    const existingHighlights = document.querySelectorAll('.tutorial-target, .record-entry-tab, .entries-tab');
+    const existingHighlights = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
     existingHighlights.forEach(el => {
-      el.classList.remove('tutorial-target', 'record-entry-tab', 'entries-tab');
+      el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
+      
+      // Clear any inline styles that might have been applied
+      if (el instanceof HTMLElement) {
+        el.style.boxShadow = '';
+        el.style.animation = '';
+        el.style.border = '';
+        el.style.transform = '';
+        el.style.zIndex = '';
+      }
     });
     
     // Apply the appropriate highlighting based on step ID
@@ -128,9 +137,19 @@ const TutorialOverlay: React.FC = () => {
         for (const selector of RECORD_ENTRY_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            element.classList.add('tutorial-target', 'record-entry-tab');
+            element.classList.add('tutorial-target', 'record-entry-tab', 'tutorial-button-highlight');
+            
+            // Apply enhanced styling
+            if (element instanceof HTMLElement) {
+              element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+              element.style.animation = "button-pulse 1.5s infinite alternate";
+              element.style.border = "2px solid white";
+              element.style.transform = "scale(1.05)";
+              element.style.zIndex = "10000";
+            }
+            
             foundElement = true;
-            console.log(`Applied highlighting to record entry element using selector: ${selector}`);
+            console.log(`Applied enhanced highlighting to record entry element using selector: ${selector}`);
             break;
           }
         }
@@ -140,7 +159,7 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       else if (currentStepData?.id === 4) {
-        // Step 4: Past Entries Tab - Enhanced with same glow effect as record entry
+        // Step 4: Past Entries Tab - Enhanced with identical styling as record entry
         let foundElement = false;
         
         for (const selector of ENTRIES_TAB_SELECTORS) {
@@ -148,12 +167,19 @@ const TutorialOverlay: React.FC = () => {
           if (element) {
             element.classList.add('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
             
-            // Apply enhanced styling similar to record entry button
-            const elementStyle = element as HTMLElement;
-            elementStyle.style.boxShadow = "0 0 35px 20px var(--color-theme)";
-            elementStyle.style.animation = "button-pulse 1.5s infinite alternate";
-            elementStyle.style.border = "2px solid white";
-            elementStyle.style.transform = "scale(1.05)";
+            // Apply identical styling to record entry button
+            if (element instanceof HTMLElement) {
+              element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+              element.style.animation = "button-pulse 1.5s infinite alternate";
+              element.style.border = "2px solid white";
+              element.style.transform = "scale(1.05)";
+              element.style.zIndex = "10000";
+              
+              // Make sure it's fully visible with high opacity
+              element.style.opacity = "1";
+              element.style.visibility = "visible";
+              element.style.position = "relative";
+            }
             
             foundElement = true;
             console.log(`Applied enhanced highlighting to entries tab using selector: ${selector}`);
@@ -163,6 +189,13 @@ const TutorialOverlay: React.FC = () => {
         
         if (!foundElement) {
           console.warn('Entries tab element not found with any selector');
+          
+          // Additional debugging to find the element
+          console.log('Available elements in DOM:');
+          document.querySelectorAll('button, [role="tab"]').forEach(el => {
+            console.log(`Element: ${el.tagName}, classes: ${el.className}, attributes:`, 
+              Array.from(el.attributes).map(attr => `${attr.name}="${attr.value}"`).join(', '));
+          });
         }
       }
     }, 300);
