@@ -84,23 +84,14 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [onNext, step.id]);
   
-  // Get background color based on step ID - make step 2 transparent
+  // Get background color based on step ID - UPDATED: all steps now have transparent background
   const getBackgroundStyle = () => {
-    // Special styling for step 2 - transparent background to see the arrow behind
-    if (step.id === 2) {
-      return {
-        backgroundColor: 'rgba(26, 31, 44, 0.2)', // 20% opacity for the background
-        backdropFilter: 'blur(2px)', // Slight blur to improve text readability
-        color: 'white',
-        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow to ensure readability
-      };
-    }
-    
-    // Default styling for other steps - CHANGED: from solid color to transparent with gradient
+    // All steps now have a fully transparent background with a slight backdrop blur for readability
     return {
-      background: 'linear-gradient(to bottom, rgba(26, 31, 44, 0.85), rgba(26, 31, 44, 0.95))',
-      backgroundColor: 'transparent',
-      color: 'white'
+      backgroundColor: 'rgba(26, 31, 44, 0.2)', // Very light background for all steps
+      backdropFilter: 'blur(2px)', // Slight blur to improve text readability for all steps
+      color: 'white',
+      textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow to ensure readability for all steps
     };
   };
   
@@ -138,7 +129,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      className="tutorial-step-container rounded-xl p-4 max-w-[320px]" // REMOVED: bg-card border border-theme shadow-lg
+      className="tutorial-step-container rounded-xl p-4 max-w-[320px]"
       style={{
         ...getPositionStyle(),
         ...getBackgroundStyle(),
@@ -186,7 +177,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             className="flex items-center gap-1 pointer-events-auto bg-gray-800 border-white/50 text-white hover:text-white hover:bg-gray-700"
             style={{
               color: "#FFFFFF !important", // Ensure text is visible in light mode
-              backgroundColor: step.id === 2 ? "rgba(51,51,51,0.8)" : "#333333",  // More opaque for step 2
+              backgroundColor: "rgba(51,51,51,0.8)",  // More opaque background for all steps
               borderColor: "rgba(255,255,255,0.5)"
             }}
           >

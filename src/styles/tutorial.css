@@ -1,3 +1,4 @@
+
 /* Tutorial Overlay Styles - Revised for better z-index hierarchy and visibility */
 
 /* Base Tutorial Classes */
@@ -36,17 +37,12 @@ body.tutorial-active {
   z-index: 30000 !important;
   max-width: 320px;
   width: calc(100% - 40px);
-  background-color: transparent !important; /* CHANGED: from #1A1F2C to transparent */
+  background-color: rgba(26, 31, 44, 0.2) !important; /* UPDATED: all steps now semi-transparent */
+  backdrop-filter: blur(2px) !important; /* UPDATED: blur for all steps */
   color: white !important;
   border: 3px solid var(--color-theme) !important;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.7) !important;
   pointer-events: auto !important;
-}
-
-/* Special styling for step 2 to make it semi-transparent */
-.tutorial-step-container[data-step="2"] {
-  background-color: rgba(26, 31, 44, 0.2) !important;
-  backdrop-filter: blur(2px) !important;
 }
 
 /* Force all tutorial step content to be visible */
@@ -55,12 +51,7 @@ body.tutorial-active {
   color: white !important;
   opacity: 1 !important;
   visibility: visible !important;
-}
-
-/* Add text shadow for better readability on transparent backgrounds */
-.tutorial-step-container[data-step="2"] h3,
-.tutorial-step-container[data-step="2"] p {
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important; /* UPDATED: text shadow for all steps */
 }
 
 /* Step 1: Journal header styling */
@@ -159,18 +150,12 @@ body.tutorial-active {
 /* Specifically style the back button to have good contrast in all themes */
 .tutorial-buttons button[variant="outline"] {
   color: white !important;
-  background-color: #333333 !important;
+  background-color: rgba(51,51,51,0.8) !important; /* More opaque for all buttons */
   border-color: rgba(255,255,255,0.5) !important;
 }
 
 .tutorial-buttons button[variant="outline"]:hover {
   background-color: #444444 !important;
-}
-
-/* Special styling for step 2 - more opaque buttons for visibility */
-.tutorial-step-container[data-step="2"] .tutorial-buttons button[variant="outline"] {
-  background-color: rgba(51,51,51,0.8) !important;
-  border-color: rgba(255,255,255,0.7) !important;
 }
 
 /* Navigation bar styling during active tutorial */
