@@ -23,6 +23,16 @@ const ENTRIES_TAB_SELECTORS = [
   '#past-entries-button'
 ];
 
+const CHAT_QUESTION_SELECTORS = [
+  '.chat-suggestion-button',
+  '.suggestion-button',
+  '.empty-chat-suggestion',
+  '[data-tutorial-target="chat-suggestion"]',
+  '.suggestion-question',
+  '.chat-example-button',
+  '.question-button'
+];
+
 const TutorialOverlay: React.FC = () => {
   const { 
     isActive, 
@@ -87,9 +97,9 @@ const TutorialOverlay: React.FC = () => {
     console.log(`Setting up highlighting for step ${currentStepData?.id}`);
     
     // Remove any existing highlight classes first
-    const existingHighlights = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
+    const existingHighlights = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, .chat-question-highlight');
     existingHighlights.forEach(el => {
-      el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
+      el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab', 'chat-question-highlight');
       
       // Clear any inline styles that might have been applied
       if (el instanceof HTMLElement) {
@@ -195,6 +205,49 @@ const TutorialOverlay: React.FC = () => {
           document.querySelectorAll('button, [role="tab"]').forEach(el => {
             console.log(`Element: ${el.tagName}, classes: ${el.className}, attributes:`, 
               Array.from(el.attributes).map(attr => `${attr.name}="${attr.value}"`).join(', '));
+          });
+        }
+      }
+      else if (currentStepData?.id === 5) {
+        // Step 5: Chat Question - Enhanced with identical styling as other tutorial elements
+        let foundElement = false;
+        
+        // Try to find a chat suggestion element
+        for (const selector of CHAT_QUESTION_SELECTORS) {
+          const elements = document.querySelectorAll(selector);
+          
+          // If there are multiple elements, take the first one (most visible)
+          if (elements && elements.length > 0) {
+            const element = elements[0];
+            element.classList.add('tutorial-target', 'chat-question-highlight', 'tutorial-button-highlight');
+            
+            // Apply enhanced styling to make it stand out
+            if (element instanceof HTMLElement) {
+              element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+              element.style.animation = "button-pulse 1.5s infinite alternate";
+              element.style.border = "2px solid white";
+              element.style.transform = "scale(1.05)";
+              element.style.zIndex = "10000";
+              
+              // Ensure high visibility
+              element.style.opacity = "1";
+              element.style.visibility = "visible";
+              element.style.position = "relative";
+            }
+            
+            foundElement = true;
+            console.log(`Applied enhanced highlighting to chat question using selector: ${selector}`);
+            break;
+          }
+        }
+        
+        if (!foundElement) {
+          console.warn('Chat question element not found with any selector');
+          
+          // Additional debugging to find potential chat elements
+          console.log('Looking for potential chat question elements:');
+          document.querySelectorAll('button, .chat-suggestion, .suggestion').forEach(el => {
+            console.log(`Element: ${el.tagName}, classes: ${el.className}, text: ${el.textContent?.trim()}`);
           });
         }
       }

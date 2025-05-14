@@ -23,6 +23,18 @@ export const ENTRIES_TAB_SELECTORS = [
   '[role="tab"][value="entries"]'
 ];
 
+// All potential selectors for chat question suggestion elements
+export const CHAT_QUESTION_SELECTORS = [
+  '.chat-suggestion-button',
+  '.suggestion-button',
+  '.empty-chat-suggestion',
+  '[data-tutorial-target="chat-suggestion"]',
+  '.suggestion-question',
+  '.chat-example-button',
+  '.question-button',
+  '.chat-question-suggestion'
+];
+
 /**
  * Apply tutorial highlight styling to an HTML element
  * @param element The element to apply highlighting to
@@ -83,7 +95,10 @@ export const logPotentialTutorialElements = (): void => {
     '.record-entry-tab',
     '.entries-tab',
     '#new-entry-button',
-    '#past-entries-button'
+    '#past-entries-button',
+    '.chat-suggestion-button',
+    '.suggestion-button',
+    '.empty-chat-suggestion'
   ];
   
   selectors.forEach(selector => {

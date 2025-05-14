@@ -95,6 +95,32 @@ body.tutorial-active {
   border: 2px solid white !important;
 }
 
+/* Step 5: Chat question highlight styling */
+.chat-question-highlight.tutorial-target {
+  z-index: 10000 !important;
+  position: relative !important;
+  box-shadow: 0 0 35px 20px var(--color-theme) !important;
+  animation: strong-tab-pulse 1.5s infinite alternate !important;
+  outline: 2px solid white !important;
+  opacity: 1 !important;
+  transform: translateZ(0) scale(1.05) !important;
+  border: 2px solid white !important;
+  pointer-events: auto !important;
+  cursor: pointer !important;
+}
+
+/* Special additional highlight for chat questions to make them more visible */
+.chat-question-highlight.tutorial-target::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--color-theme) 0%, transparent 70%);
+  opacity: 0.3;
+  animation: chat-pulse 2s infinite alternate;
+  z-index: -1;
+}
+
 /* Tutorial navigation buttons */
 .tutorial-buttons {
   z-index: 30001 !important; /* Above everything else */
@@ -135,6 +161,11 @@ body.tutorial-active {
 @keyframes strong-tab-pulse {
   0% { box-shadow: 0 0 20px 8px var(--color-theme); }
   100% { box-shadow: 0 0 35px 15px var(--color-theme); }
+}
+
+@keyframes chat-pulse {
+  0% { opacity: 0.2; transform: scale(1); }
+  100% { opacity: 0.4; transform: scale(1.15); }
 }
 
 /* Responsive styling for different screen sizes */

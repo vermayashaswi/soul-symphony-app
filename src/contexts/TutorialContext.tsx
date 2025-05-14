@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -7,6 +8,7 @@ import { isAppRoute } from '@/routes/RouteHelpers';
 import { 
   RECORD_ENTRY_SELECTORS, 
   ENTRIES_TAB_SELECTORS,
+  CHAT_QUESTION_SELECTORS,
   findAndHighlightElement,
   logPotentialTutorialElements
 } from '@/utils/tutorial/tutorial-elements-finder';
@@ -91,6 +93,18 @@ const initialTutorialSteps: TutorialStep[] = [
     showNextButton: true,
     showSkipButton: true,
     navigateTo: '/app/journal',
+    waitForElement: true
+  },
+  {
+    id: 5,
+    title: 'Chat with Your Journal',
+    content: 'Ask questions about your journal entries and track your wellbeing across all areas of life. Our AI can analyze patterns and provide insights from your emotional journey.',
+    targetElement: '.chat-suggestion-button',
+    alternativeSelectors: CHAT_QUESTION_SELECTORS,
+    position: 'top',
+    showNextButton: true,
+    showSkipButton: true,
+    navigateTo: '/app/chat',
     waitForElement: true
   }
 ];
@@ -196,7 +210,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     ].filter(Boolean) as string[];
     
     // Log potential elements in the DOM to help with debugging
-    if (stepData.id === 3 || stepData.id === 4) {
+    if (stepData.id === 3 || stepData.id === 4 || stepData.id === 5) {
       logPotentialTutorialElements();
     }
     
@@ -204,7 +218,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     const found = findAndHighlightElement(
       selectors, 
       stepData.id === 3 ? 'record-entry-tab' : 
-      stepData.id === 4 ? 'entries-tab' : ''
+      stepData.id === 4 ? 'entries-tab' :
+      stepData.id === 5 ? 'chat-question-highlight' : ''
     );
     
     if (!found) {
