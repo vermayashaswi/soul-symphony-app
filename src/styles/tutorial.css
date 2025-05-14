@@ -57,8 +57,13 @@ body.tutorial-active {
   background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 1 */
 }
 
-/* Steps 2-5: Semi-transparent with blur */
-.tutorial-step-container:not([data-step="1"]) {
+/* Step 5: Fully opaque background for step 5 */
+.tutorial-step-container[data-step="5"] {
+  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 5 */
+}
+
+/* Steps 2-4: Semi-transparent with blur */
+.tutorial-step-container:not([data-step="1"]):not([data-step="5"]) {
   background-color: rgba(26, 31, 44, 0.2) !important;
   backdrop-filter: blur(2px) !important;
 }
@@ -174,10 +179,13 @@ body.tutorial-active {
   touch-action: none !important;
 }
 
-/* NEW: Hide the chat input container during tutorial step 5 */
+/* Completely hide the chat input container during tutorial step 5 */
 .tutorial-active .mobile-chat-interface .p-2.bg-background.border-t.border-border {
-  opacity: 0.1 !important;
-  z-index: 1 !important; /* Push it below the tutorial overlay */
+  opacity: 0 !important; /* Make fully invisible */
+  visibility: hidden !important;
+  z-index: -1 !important; /* Push it below everything */
+  display: none !important; /* Don't render it at all */
+  pointer-events: none !important;
 }
 
 /* Animation keyframes - pulsating effects */

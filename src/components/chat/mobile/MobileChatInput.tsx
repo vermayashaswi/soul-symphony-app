@@ -90,11 +90,15 @@ export default function MobileChatInput({
       inputElement.addEventListener('focus', handleFocus);
     }
     
-    // Ensure input visibility with a periodic check
+    // Ensure input visibility with a periodic check - but not during tutorial step 5
     const ensureInputVisibility = () => {
-      if (inputContainerRef.current) {
+      if (inputContainerRef.current && !isInChatTutorialStep) {
         inputContainerRef.current.style.visibility = 'visible';
         inputContainerRef.current.style.opacity = '1';
+      } else if (inputContainerRef.current && isInChatTutorialStep) {
+        inputContainerRef.current.style.visibility = 'hidden';
+        inputContainerRef.current.style.opacity = '0';
+        inputContainerRef.current.style.display = 'none';
       }
     };
     
@@ -115,7 +119,7 @@ export default function MobileChatInput({
       document.body.classList.remove('keyboard-visible');
       clearInterval(visibilityInterval);
     };
-  }, [isKeyboardVisible]);
+  }, [isKeyboardVisible, isInChatTutorialStep]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
@@ -155,12 +159,17 @@ export default function MobileChatInput({
     }
   };
 
+  // If we're in step 5 of the tutorial, don't render the input at all
+  if (isInChatTutorialStep) {
+    return null;
+  }
+
   return (
     <div 
       ref={inputContainerRef}
       className={`p-2 bg-background border-t border-border flex items-center gap-2 ${
         isKeyboardVisible ? 'input-keyboard-active' : ''
-      } ${isInChatTutorialStep ? 'chat-input-tutorial-hidden' : ''}`}
+      }`}
       style={{
         position: 'fixed',
         bottom: isKeyboardVisible ? 0 : '54px', // Adjusted to be right above navbar
@@ -168,13 +177,13 @@ export default function MobileChatInput({
         right: 0,
         paddingBottom: isKeyboardVisible ? '5px' : '8px',
         marginBottom: 0,
-        zIndex: isInChatTutorialStep ? 10 : 60, // Lower z-index during tutorial step 5
+        zIndex: 60,
         boxShadow: '0 -1px 3px rgba(0, 0, 0, 0.07)',
         transition: 'all 0.2s ease',
         borderTop: isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
         borderBottom: !isKeyboardVisible ? '1px solid rgba(0, 0, 0, 0.1)' : 'none',
-        visibility: isInChatTutorialStep ? 'hidden' : 'visible', // Hide during tutorial step 5
-        opacity: isInChatTutorialStep ? 0 : 1, // Transparent during tutorial
+        visibility: 'visible',
+        opacity: 1,
         transform: 'translateZ(0)',
         willChange: 'transform, bottom',
       }}
@@ -188,7 +197,7 @@ export default function MobileChatInput({
           onKeyDown={handleKeyPress}
           placeholder="Type your message..."
           className="w-full pr-10 focus:outline-none focus:ring-2 focus:ring-primary border-2 border-primary/40 shadow-[0_0_8px_rgba(155,135,245,0.5)] bg-background"
-          disabled={isLoading || isSubmitting || isInChatTutorialStep}
+          disabled={isLoading || isSubmitting}
         />
       </div>
       
@@ -198,7 +207,7 @@ export default function MobileChatInput({
           size="icon"
           className="h-8 w-8 rounded-full flex items-center justify-center"
           onClick={handleSendMessage}
-          disabled={isLoading || isSubmitting || !inputValue.trim() || isInChatTutorialStep}
+          disabled={isLoading || isSubmitting || !inputValue.trim()}
         >
           {isSubmitting || isLoading ? (
             <Loader2 className="h-4 w-4 animate-spin" />
