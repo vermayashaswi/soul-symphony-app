@@ -136,15 +136,48 @@ Examples:
       console.log("Detected rating or analysis request, ensuring journal_specific classification");
     }
     
+    // Check if we need to clarify time scope
+    const needsHistoricalData = /trait|character|personality|who am i|analyze me|behavior pattern|consistent|historical|always|ever|throughout|overall/i.test(message);
+    const isExplicitlyRecent = /recent|lately|past few|last \d+ days|this week|today|yesterday/i.test(message);
+    const needsClarification = queryType === 'journal_specific' && 
+                               needsHistoricalData && 
+                               !isExplicitlyRecent && 
+                               !lowerMessage.includes('all time') &&
+                               !lowerMessage.includes('historically') &&
+                               !lowerMessage.includes('all entries') &&
+                               !lowerMessage.includes('all journal entries') &&
+                               !lowerMessage.includes('all my entries');
+    
+    if (needsClarification) {
+      console.log("Query needs clarification about time scope");
+    }
+    
     // Build the search plan
     let plan = null;
     let directResponse = null;
+    let clarificationQuestions = null;
 
     if (queryType === 'mental_health_general' && !isRatingOrAnalysisRequest) {
       console.log("Query classified as general mental health question");
       directResponse = null; // Process general queries with our standard chat flow
     } else {
       console.log("Query classified as journal-specific or rating request");
+      
+      if (needsClarification) {
+        // Build clarification questions
+        clarificationQuestions = [
+          {
+            text: "Search all my journal entries (historical data)",
+            action: "expand_search",
+            parameters: { useHistoricalData: true }
+          },
+          {
+            text: "Search recent entries only (last 30 days)",
+            action: "default_search",
+            parameters: { useHistoricalData: false }
+          }
+        ];
+      }
       
       // Build a plan for journal-specific queries
       const planResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -190,6 +223,8 @@ For the following user query, create a JSON search plan with these components:
    - Also set to true for any pattern analysis, trait assessment, or statistic requests
 
 5. "needs_more_context": Boolean (true if query relates to previous messages)
+
+6. ${needsClarification ? '"needs_historical_data": Boolean (true for comprehensive trait/personality analysis or for reviewing all user history)' : ''}
 
 Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
 
@@ -238,6 +273,11 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
           plan.needs_data_aggregation = true;
           plan.match_count = Math.max(plan.match_count || 15, 30); // Ensure we get enough data
         }
+
+        // If query needs historical data and clarification
+        if (needsClarification && needsHistoricalData) {
+          plan.needs_historical_data = true;
+        }
       } catch (e) {
         console.error('Error parsing plan JSON:', e);
         console.error('Raw plan text:', planText);
@@ -267,7 +307,9 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
       JSON.stringify({ 
         plan, 
         queryType: isRatingOrAnalysisRequest ? 'journal_specific' : queryType,
-        directResponse 
+        directResponse,
+        needsClarification,
+        clarificationQuestions
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );

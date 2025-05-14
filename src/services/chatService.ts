@@ -2,6 +2,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { createFallbackQueryPlan, convertGptPlanToQueryPlan } from "./chat/queryPlannerService";
 import { getUserTimezoneOffset } from "./chat";
+import { toast } from "@/hooks/use-toast";
 
 export type ChatMessage = {
   role: string;
@@ -10,6 +11,12 @@ export type ChatMessage = {
   analysis?: any;
   diagnostics?: any;
   hasNumericResult?: boolean;
+  isInteractive?: boolean;
+  interactiveOptions?: {
+    text: string;
+    action: string;
+    parameters: Record<string, any>;
+  }[];
 };
 
 // Helper function to store user queries in the user_queries table using an edge function instead
@@ -70,9 +77,11 @@ export const processChatMessage = async (
   userId: string, 
   queryTypes: any, 
   threadId: string | null = null,
-  enableDiagnostics: boolean = false
+  enableDiagnostics: boolean = false,
+  parameters: Record<string, any> = {}
 ): Promise<ChatMessage> => {
   console.log("Processing chat message:", message.substring(0, 30) + "...");
+  console.log("Parameters:", parameters);
   
   try {
     // Get user's timezone offset for accurate time-based queries
@@ -115,6 +124,17 @@ export const processChatMessage = async (
     
     console.log("Received response from smart-query-planner:", plannerData);
     
+    // Check if clarification is needed
+    if (plannerData.needsClarification && plannerData.clarificationQuestions) {
+      console.log("Query needs clarification, returning interactive message");
+      return {
+        role: "assistant",
+        content: "I'd like to understand the scope of your question better. Are you looking for insights from:",
+        isInteractive: true,
+        interactiveOptions: plannerData.clarificationQuestions
+      };
+    }
+    
     // Handle direct responses for non-journal-specific queries
     if (plannerData.queryType !== 'journal_specific' && plannerData.directResponse) {
       console.log(`Returning direct response for ${plannerData.queryType} query`);
@@ -127,6 +147,12 @@ export const processChatMessage = async (
     // Convert GPT plan to our internal format
     const queryPlan = convertGptPlanToQueryPlan(plannerData.plan);
     console.log("Generated query plan:", queryPlan);
+    
+    // If useHistoricalData parameter is set, remove date filters
+    if (parameters.useHistoricalData === true && queryPlan.filters.dateRange) {
+      console.log("Removing date filters to search all historical data");
+      delete queryPlan.filters.dateRange;
+    }
     
     // Process with the query plan
     return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset);

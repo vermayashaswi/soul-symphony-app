@@ -139,7 +139,7 @@ const SmartChatInterface = () => {
     }
   };
 
-  const handleSendMessage = async (message: string) => {
+  const handleSendMessage = async (message: string, parameters: Record<string, any> = {}) => {
     if (!message.trim()) return;
     if (!user?.id) {
       toast({
@@ -232,8 +232,53 @@ const SmartChatInterface = () => {
         user.id, 
         queryTypes, 
         threadId,
-        false
+        false,
+        parameters
       );
+      
+      // Handle interactive clarification messages
+      if (response.isInteractive && response.interactiveOptions) {
+        debugLog.addEvent("AI Processing", "Received interactive clarification message", "info");
+        try {
+          const savedResponse = await saveMessage(
+            threadId,
+            response.content,
+            'assistant',
+            undefined,
+            undefined,
+            false,
+            true,
+            response.interactiveOptions
+          );
+          
+          if (savedResponse) {
+            debugLog.addEvent("Database", `Interactive message saved with ID: ${savedResponse.id}`, "success");
+            setChatHistory(prev => [...prev, savedResponse]);
+          } else {
+            throw new Error("Failed to save interactive message");
+          }
+        } catch (saveError: any) {
+          debugLog.addEvent("Database", `Error saving interactive message: ${saveError.message}`, "error");
+          
+          // Fallback to displaying the message without saving it
+          const interactiveMessage: ChatMessage = {
+            id: `temp-interactive-${Date.now()}`,
+            thread_id: threadId,
+            content: response.content,
+            sender: 'assistant',
+            role: 'assistant',
+            created_at: new Date().toISOString(),
+            isInteractive: true,
+            interactiveOptions: response.interactiveOptions
+          };
+          
+          setChatHistory(prev => [...prev, interactiveMessage]);
+        }
+        
+        setLoading(false);
+        setProcessingStage(null);
+        return;
+      }
       
       const responseInfo = {
         role: response.role,
@@ -345,6 +390,41 @@ const SmartChatInterface = () => {
     } finally {
       setLoading(false);
       setProcessingStage(null);
+    }
+  };
+
+  const handleInteractiveOptionClick = (option: any) => {
+    if (!option || !option.action) return;
+    
+    debugLog.addEvent("Interactive Option", `User clicked: ${option.text}`, "info");
+    
+    switch (option.action) {
+      case 'expand_search':
+        // Re-run the last message with historical data parameter
+        const lastUserMessage = [...chatHistory]
+          .reverse()
+          .find(msg => msg.role === 'user' || msg.sender === 'user');
+        
+        if (lastUserMessage?.content) {
+          debugLog.addEvent("Search Expansion", "Re-running query with expanded historical scope", "info");
+          handleSendMessage(`${lastUserMessage.content} (searching all historical data)`, { useHistoricalData: true });
+        }
+        break;
+        
+      case 'default_search':
+        // Re-run with default parameters
+        const lastMsg = [...chatHistory]
+          .reverse()
+          .find(msg => msg.role === 'user' || msg.sender === 'user');
+          
+        if (lastMsg?.content) {
+          debugLog.addEvent("Search Default", "Re-running query with default time scope", "info");
+          handleSendMessage(`${lastMsg.content} (recent entries only)`, { useHistoricalData: false });
+        }
+        break;
+        
+      default:
+        console.warn("Unknown interactive action:", option.action);
     }
   };
 
@@ -474,6 +554,7 @@ const SmartChatInterface = () => {
             isLoading={loading}
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
+            onInteractiveOptionClick={handleInteractiveOptionClick}
           />
         )}
       </div>
