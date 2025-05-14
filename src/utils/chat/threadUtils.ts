@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 
 /**
@@ -132,5 +131,115 @@ export const ensureThreadExists = async (threadId: string, userId: string): Prom
   } catch (error) {
     console.error("Failed to ensure thread exists:", error);
     throw error;
+  }
+};
+
+/**
+ * Updates the processing status of a chat thread
+ */
+export const updateThreadProcessingStatus = async (
+  threadId: string, 
+  status: 'idle' | 'processing' | 'failed'
+): Promise<boolean> => {
+  try {
+    const { error } = await supabase
+      .from('chat_threads')
+      .update({ 
+        processing_status: status,
+        updated_at: new Date().toISOString() 
+      })
+      .eq('id', threadId);
+      
+    if (error) {
+      console.error("Error updating thread processing status:", error);
+      return false;
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error in updateThreadProcessingStatus:", error);
+    return false;
+  }
+};
+
+/**
+ * Creates a processing message placeholder
+ */
+export const createProcessingMessage = async (
+  threadId: string,
+  initialContent: string = "Processing your request..."
+): Promise<string | null> => {
+  try {
+    // Create a placeholder message that shows we're processing
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert({
+        thread_id: threadId,
+        sender: 'assistant',
+        role: 'assistant',
+        content: initialContent,
+        is_processing: true,
+        created_at: new Date().toISOString()
+      })
+      .select('id')
+      .single();
+      
+    if (error) {
+      console.error("Error creating processing message:", error);
+      return null;
+    }
+    
+    return data?.id || null;
+  } catch (error) {
+    console.error("Error in createProcessingMessage:", error);
+    return null;
+  }
+};
+
+/**
+ * Updates a processing message with final content or removes it
+ */
+export const updateProcessingMessage = async (
+  messageId: string,
+  finalContent: string | null,
+  references?: any[],
+  analysis?: any,
+  hasNumericResult?: boolean
+): Promise<boolean> => {
+  try {
+    if (finalContent === null) {
+      // Delete the processing message if we don't have final content
+      const { error } = await supabase
+        .from('chat_messages')
+        .delete()
+        .eq('id', messageId);
+        
+      if (error) {
+        console.error("Error deleting processing message:", error);
+        return false;
+      }
+    } else {
+      // Update the processing message with the final content
+      const { error } = await supabase
+        .from('chat_messages')
+        .update({
+          content: finalContent,
+          is_processing: false,
+          reference_entries: references || null,
+          analysis_data: analysis || null,
+          has_numeric_result: hasNumericResult || false
+        })
+        .eq('id', messageId);
+        
+      if (error) {
+        console.error("Error updating processing message:", error);
+        return false;
+      }
+    }
+    
+    return true;
+  } catch (error) {
+    console.error("Error in updateProcessingMessage:", error);
+    return false;
   }
 };

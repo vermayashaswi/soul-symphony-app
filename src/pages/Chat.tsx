@@ -45,6 +45,8 @@ const Chat = () => {
           await translate("Analyzing patterns in your journal...", "en");
           await translate("Planning search strategy...", "en");
           await translate("Searching for insights...", "en");
+          await translate("Processing your request...", "en");
+          await translate("Retrieving information...", "en");
           
           console.log("Chat strings pre-translated successfully");
         } catch (e) {
@@ -86,6 +88,50 @@ const Chat = () => {
       checkConnection();
     }
   }, [user, toast]);
+  
+  // Check and clean up any stale 'processing' threads
+  useEffect(() => {
+    const cleanupStaleSessions = async () => {
+      if (!user?.id) return;
+      
+      try {
+        // Find any threads that might be stuck in processing status
+        const { data: staleSessions, error } = await supabase
+          .from('chat_threads')
+          .select('id')
+          .eq('user_id', user.id)
+          .eq('processing_status', 'processing');
+          
+        if (error) {
+          console.error("Error checking for stale sessions:", error);
+          return;
+        }
+        
+        // Reset any threads that were left in processing status
+        if (staleSessions && staleSessions.length > 0) {
+          console.log(`Found ${staleSessions.length} stale processing sessions, cleaning up...`);
+          
+          for (const session of staleSessions) {
+            await supabase
+              .from('chat_threads')
+              .update({ processing_status: 'idle' })
+              .eq('id', session.id);
+              
+            // Also clean up any processing messages
+            await supabase
+              .from('chat_messages')
+              .delete()
+              .eq('thread_id', session.id)
+              .eq('is_processing', true);
+          }
+        }
+      } catch (err) {
+        console.error("Error cleaning up stale sessions:", err);
+      }
+    };
+    
+    cleanupStaleSessions();
+  }, [user?.id]);
 
   // Add CSS override to hide duplicate close button in chat sidebar
   useEffect(() => {

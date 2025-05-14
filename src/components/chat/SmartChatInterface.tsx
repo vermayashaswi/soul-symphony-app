@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -26,13 +25,13 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useTranslation } from "@/contexts/TranslationContext";
+import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage } from "@/utils/chat/threadUtils";
 
 const SmartChatInterface = () => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [processingStage, setProcessingStage] = useState<string | null>(null);
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [showDebugPanel, setShowDebugPanel] = useState(false);
@@ -42,6 +41,17 @@ const SmartChatInterface = () => {
   const chatBottomRef = useRef<HTMLDivElement>(null);
   const loadedThreadRef = useRef<string | null>(null);
   const debugLog = useDebugLog();
+  
+  // State for the current thread
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
+  
+  // Use our new realtime hook to track processing status
+  const {
+    isProcessing,
+    processingStage,
+    processingStatus,
+    updateProcessingStage
+  } = useChatRealtime(currentThreadId);
 
   useEffect(() => {
     const onThreadChange = (event: CustomEvent) => {
@@ -71,7 +81,7 @@ const SmartChatInterface = () => {
 
   useEffect(() => {
     scrollToBottom();
-  }, [chatHistory, loading]);
+  }, [chatHistory, loading, isProcessing]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -96,7 +106,7 @@ const SmartChatInterface = () => {
     try {
       const { data: threadData, error: threadError } = await supabase
         .from('chat_threads')
-        .select('id')
+        .select('id, processing_status')
         .eq('id', threadId)
         .eq('user_id', user.id)
         .single();
@@ -116,15 +126,24 @@ const SmartChatInterface = () => {
       if (messages && messages.length > 0) {
         debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
         console.log(`Loaded ${messages.length} messages for thread ${threadId}`);
+        
         // Convert the messages to the correct type
         const typedMessages: ChatMessage[] = messages.map(msg => ({
           ...msg,
           sender: msg.sender as 'user' | 'assistant' | 'error',
           role: msg.role as 'user' | 'assistant' | 'error'
         }));
+        
         setChatHistory(typedMessages);
         setShowSuggestions(false);
         loadedThreadRef.current = threadId;
+        
+        // If the thread is in processing state, update the local state accordingly
+        if (threadData.processing_status === 'processing') {
+          debugLog.addEvent("Thread Loading", `Thread ${threadId} is in processing state`, "info");
+          setLoading(true);
+          updateProcessingStage("Retrieving information...");
+        }
       } else {
         debugLog.addEvent("Thread Loading", `No messages found for thread ${threadId}`, "info");
         console.log(`No messages found for thread ${threadId}`);
@@ -182,9 +201,13 @@ const SmartChatInterface = () => {
     debugLog.addEvent("User Message", `Adding temporary message to UI: ${tempUserMessage.id}`, "info");
     setChatHistory(prev => [...prev, tempUserMessage]);
     setLoading(true);
-    setProcessingStage("Analyzing your question...");
+    updateProcessingStage("Analyzing your question...");
     
     try {
+      // Update thread processing status to 'processing'
+      await updateThreadProcessingStatus(threadId, 'processing');
+      
+      // Save the user message
       let savedUserMessage: ChatMessage | null = null;
       try {
         debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
@@ -216,9 +239,17 @@ const SmartChatInterface = () => {
         });
       }
       
+      // Create a processing message placeholder
+      const processingMessageId = await createProcessingMessage(threadId, "Processing your request...");
+      
+      if (processingMessageId) {
+        debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
+        // We don't need to add it to the UI since it will come through the realtime subscription
+      }
+      
       debugLog.addEvent("Query Analysis", `Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
       console.log("Performing comprehensive query analysis for:", message);
-      setProcessingStage("Analyzing patterns in your journal...");
+      updateProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
       
       const analysisDetails = {
@@ -233,10 +264,10 @@ const SmartChatInterface = () => {
       debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
       console.log("Query analysis result:", queryTypes);
       
-      setProcessingStage("Planning search strategy...");
+      updateProcessingStage("Planning search strategy...");
       debugLog.addEvent("Query Planning", "Breaking down complex query into sub-queries if needed", "info");
       
-      setProcessingStage("Searching for insights...");
+      updateProcessingStage("Searching for insights...");
       debugLog.addEvent("AI Processing", "Sending query to AI for processing", "info");
       const response = await processChatMessage(
         message, 
@@ -246,6 +277,20 @@ const SmartChatInterface = () => {
         false,
         parameters
       );
+      
+      // Update or delete the processing message
+      if (processingMessageId) {
+        await updateProcessingMessage(
+          processingMessageId,
+          response.content,
+          response.references,
+          response.analysis,
+          response.hasNumericResult
+        );
+      }
+      
+      // Update thread processing status to 'idle'
+      await updateThreadProcessingStatus(threadId, 'idle');
       
       // Handle interactive clarification messages
       if (response.isInteractive && response.interactiveOptions) {
@@ -292,77 +337,78 @@ const SmartChatInterface = () => {
           
           setChatHistory(prev => [...prev, interactiveMessage]);
         }
-        
-        setLoading(false);
-        setProcessingStage(null);
-        return;
-      }
-      
-      const responseInfo = {
-        role: response.role,
-        hasReferences: !!response.references?.length,
-        refCount: response.references?.length || 0,
-        hasAnalysis: !!response.analysis,
-        hasNumericResult: response.hasNumericResult,
-        errorState: response.role === 'error'
-      };
-      
-      debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
-      console.log("Response received:", responseInfo);
-      
-      try {
-        debugLog.addEvent("Database", "Saving assistant response to database", "info");
-        const savedResponse = await saveMessage(
-          threadId,
-          response.content,
-          'assistant',
-          response.references,
-          response.analysis,
-          response.hasNumericResult
-        );
-        
-        debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
-        console.log("Assistant response saved with ID:", savedResponse?.id);
-        
-        if (savedResponse) {
-          debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
-          const typedSavedResponse: ChatMessage = {
-            ...savedResponse,
-            sender: savedResponse.sender as 'user' | 'assistant' | 'error',
-            role: savedResponse.role as 'user' | 'assistant' | 'error'
-          };
-          setChatHistory(prev => [...prev, typedSavedResponse]);
-        } else {
-          throw new Error("Failed to save assistant response");
-        }
-      } catch (saveError: any) {
-        debugLog.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
-        console.error("Error saving assistant response:", saveError);
-        const assistantMessage: ChatMessage = {
-          id: `temp-response-${Date.now()}`,
-          thread_id: threadId,
-          content: response.content,
-          sender: 'assistant',
-          role: 'assistant',
-          created_at: new Date().toISOString(),
-          reference_entries: response.references,
-          analysis_data: response.analysis,
-          has_numeric_result: response.hasNumericResult
+      } else {
+        const responseInfo = {
+          role: response.role,
+          hasReferences: !!response.references?.length,
+          refCount: response.references?.length || 0,
+          hasAnalysis: !!response.analysis,
+          hasNumericResult: response.hasNumericResult,
+          errorState: response.role === 'error'
         };
         
-        debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
-        setChatHistory(prev => [...prev, assistantMessage]);
-        console.error("Failed to save assistant response to database, using temporary message");
+        debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
+        console.log("Response received:", responseInfo);
         
-        toast({
-          title: "Warning",
-          description: "Response displayed but couldn't be saved to your conversation history",
-          variant: "default"
-        });
+        try {
+          debugLog.addEvent("Database", "Saving assistant response to database", "info");
+          const savedResponse = await saveMessage(
+            threadId,
+            response.content,
+            'assistant',
+            response.references,
+            response.analysis,
+            response.hasNumericResult
+          );
+          
+          debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
+          console.log("Assistant response saved with ID:", savedResponse?.id);
+          
+          if (savedResponse) {
+            debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
+            const typedSavedResponse: ChatMessage = {
+              ...savedResponse,
+              sender: savedResponse.sender as 'user' | 'assistant' | 'error',
+              role: savedResponse.role as 'user' | 'assistant' | 'error'
+            };
+            setChatHistory(prev => [...prev, typedSavedResponse]);
+          } else {
+            throw new Error("Failed to save assistant response");
+          }
+        } catch (saveError: any) {
+          debugLog.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
+          console.error("Error saving assistant response:", saveError);
+          const assistantMessage: ChatMessage = {
+            id: `temp-response-${Date.now()}`,
+            thread_id: threadId,
+            content: response.content,
+            sender: 'assistant',
+            role: 'assistant',
+            created_at: new Date().toISOString(),
+            reference_entries: response.references,
+            analysis_data: response.analysis,
+            has_numeric_result: response.hasNumericResult
+          };
+          
+          debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
+          setChatHistory(prev => [...prev, assistantMessage]);
+          console.error("Failed to save assistant response to database, using temporary message");
+          
+          toast({
+            title: "Warning",
+            description: "Response displayed but couldn't be saved to your conversation history",
+            variant: "default"
+          });
+        }
       }
     } catch (error: any) {
       debugLog.addEvent("Error", `Error in message handling: ${error?.message || "Unknown error"}`, "error");
       console.error("Error sending message:", error);
+      
+      // Update thread status to failed
+      if (threadId) {
+        await updateThreadProcessingStatus(threadId, 'failed');
+      }
       
       const errorContent = "I'm having trouble processing your request. Please try again later. " + 
                (error?.message ? `Error: ${error.message}` : "");
@@ -417,7 +463,7 @@ const SmartChatInterface = () => {
       }
     } finally {
       setLoading(false);
-      setProcessingStage(null);
+      updateProcessingStage(null);
     }
   };
 
@@ -558,9 +604,9 @@ const SmartChatInterface = () => {
             <Button 
               variant="ghost" 
               size="icon" 
-              className="h-9 w-9 text-muted-foreground hover:text-destructive" 
+              className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20" 
               onClick={() => setShowDeleteDialog(true)}
-              title="Delete current conversation"
+              aria-label="Delete conversation"
             >
               <Trash className="h-5 w-5" />
             </Button>
@@ -579,7 +625,7 @@ const SmartChatInterface = () => {
         ) : (
           <ChatArea 
             chatMessages={chatHistory}
-            isLoading={loading}
+            isLoading={loading || isProcessing}
             processingStage={processingStage || undefined}
             threadId={currentThreadId}
             onInteractiveOptionClick={handleInteractiveOptionClick}
@@ -592,12 +638,12 @@ const SmartChatInterface = () => {
           <div className="flex-1">
             <ChatInput 
               onSendMessage={handleSendMessage} 
-              isLoading={loading} 
+              isLoading={loading || isProcessing} 
               userId={user?.id}
             />
           </div>
           <VoiceRecordingButton 
-            isLoading={loading}
+            isLoading={loading || isProcessing}
             isRecording={false}
             recordingTime={0}
             onStartRecording={() => {}}
