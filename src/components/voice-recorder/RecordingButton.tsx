@@ -29,8 +29,14 @@ export function RecordingButton({
   showAnimation = true,
   audioBlob = null
 }: RecordingButtonProps) {
-  const { isInStep, tutorialCompleted } = useTutorial();
+  const { isInStep, tutorialCompleted, isActive } = useTutorial();
   const isInTutorialStep3 = isInStep(3);
+  const isInTutorialStep5 = isActive && isInStep(5);
+  
+  // Don't render during tutorial step 5
+  if (isInTutorialStep5) {
+    return null;
+  }
   
   if (hasPermission === false) {
     return (
@@ -72,7 +78,8 @@ export function RecordingButton({
         style={{
           // Only apply glow effect if recording or in tutorial step 3 AND tutorial not completed
           boxShadow: (isRecording || shouldShowGlow) ? 
-                     `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined
+                     `0 0 ${glowSize}px ${glowSize/2}px rgba(239, 68, 68, 0.8)` : undefined,
+          backgroundColor: "#000000" // Ensure black background                 
         }}
         whileTap={{ scale: 0.95 }}
         disabled={audioBlob !== null}

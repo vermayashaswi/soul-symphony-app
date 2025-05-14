@@ -32,10 +32,18 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
-  const { isInStep, tutorialCompleted } = useTutorial();
+  const { isInStep, tutorialCompleted, isActive } = useTutorial();
+  
+  // Check if we're in tutorial step 5
+  const isInTutorialStep5 = isActive && isInStep(5);
   
   // Only show glow when in tutorial step 3 AND tutorial is not completed
   const shouldAddTutorialClass = isInStep(3) && !tutorialCompleted;
+  
+  // If we're in tutorial step 5, don't render the component at all
+  if (isInTutorialStep5) {
+    return null;
+  }
   
   useEffect(() => {
     let cleanup = () => {};
@@ -176,7 +184,8 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           width: size === "sm" ? "48px" : "64px",
           height: size === "sm" ? "48px" : "64px",
           transition: "all 0.3s ease",
-          boxShadow: shouldAddTutorialClass ? "0 0 20px 10px var(--color-theme)" : undefined
+          boxShadow: shouldAddTutorialClass ? "0 0 20px 10px var(--color-theme)" : undefined,
+          backgroundColor: "#000000" // Ensure black background
         }}
         data-tutorial-target={shouldAddTutorialClass ? "record-entry" : undefined}
       >

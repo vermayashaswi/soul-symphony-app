@@ -60,7 +60,7 @@ body.tutorial-active {
 /* Step 5: Fully opaque background for step 5 */
 .tutorial-step-container[data-step="5"] {
   background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 5 */
-  top: 15% !important; /* Move even higher to avoid overlapping with chat questions */
+  top: 10% !important; /* Move even higher to avoid overlapping with chat questions */
 }
 
 /* Steps 2-4: Semi-transparent with blur */
@@ -190,6 +190,26 @@ body.tutorial-active {
   touch-action: none !important;
 }
 
+/* ULTRA AGGRESSIVE hiding of ANY microphone button or input during step 5 */
+body.tutorial-active[data-current-step="5"] .relative button[type="button"]:has(.lucide-mic),
+body.tutorial-active[data-current-step="5"] button:has(.lucide-mic),
+body.tutorial-active[data-current-step="5"] [class*="VoiceRecording"],
+body.tutorial-active[data-current-step="5"] [class*="Recording"],
+body.tutorial-active[data-current-step="5"] [class*="voice-recorder"] {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  display: none !important;
+  height: 0 !important;
+  width: 0 !important;
+  position: absolute !important;
+  z-index: -9999 !important;
+  transform: translateY(9999px) !important;
+  pointer-events: none !important;
+  clip: rect(0, 0, 0, 0) !important;
+  clip-path: inset(100%) !important;
+  overflow: hidden !important;
+}
+
 /* Ultra aggressive hiding of chat inputs during step 5 */
 body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,
 body.tutorial-active[data-current-step="5"] form,
@@ -208,6 +228,14 @@ body.tutorial-active[data-current-step="5"] button[type="submit"] {
   clip: rect(0, 0, 0, 0) !important;
   clip-path: inset(100%) !important;
   overflow: hidden !important;
+}
+
+/* Force black background on all chat containers */
+.smart-chat-container,
+.mobile-chat-interface,
+.chat-messages-container,
+.p-2.border-t.border-border {
+  background-color: #000000 !important;
 }
 
 /* Animation keyframes - pulsating effects */
@@ -250,7 +278,7 @@ body.tutorial-active[data-current-step="5"] button[type="submit"] {
   
   /* Special override for step 5 on mobile */
   .tutorial-step-container[data-step="5"] {
-    top: 15% !important; /* Force to be higher on mobile */
+    top: 10% !important; /* Force to be higher on mobile */
     transform: translate(-50%, 0) !important; /* Adjust transform for top position */
   }
 }
@@ -278,6 +306,6 @@ body.tutorial-active[data-current-step="5"] button[type="submit"] {
   
   /* Special override for step 5 on small mobile */
   .tutorial-step-container[data-step="5"] {
-    top: 15% !important; /* Force to be even higher on small mobile */
+    top: 10% !important; /* Force to be even higher on small mobile */
   }
 }

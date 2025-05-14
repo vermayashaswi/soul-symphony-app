@@ -8,6 +8,7 @@ import { useToast } from "@/hooks/use-toast";
 import { cn } from "@/lib/utils";
 import { LanguageBackground } from "@/components/voice-recorder/MultilingualTextAnimation";
 import { getAudioConfig, getRecorderOptions, RECORDING_LIMITS } from "@/utils/audio/recording-config";
+import { useTutorial } from "@/contexts/TutorialContext";
 
 interface VoiceRecordingButtonProps {
   isLoading: boolean;
@@ -31,6 +32,15 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   const [recorder, setRecorder] = useState<RecordRTC | null>(null);
   const [stream, setStream] = useState<MediaStream | null>(null);
   const { toast } = useToast();
+  const { isActive, isInStep } = useTutorial();
+  
+  // Check if we're in tutorial step 5
+  const isInTutorialStep = isActive && isInStep(5);
+  
+  // If we're in tutorial step 5, don't render the component at all
+  if (isInTutorialStep) {
+    return null;
+  }
 
   useEffect(() => {
     let cleanup = () => {};
@@ -170,7 +180,8 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
         style={{
           width: size === "sm" ? "48px" : "64px",
           height: size === "sm" ? "48px" : "64px",
-          transition: "all 0.3s ease"
+          transition: "all 0.3s ease",
+          backgroundColor: "#000000" // Ensure black background
         }}
       >
         {isRecording ? (
