@@ -5,33 +5,13 @@ import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialStep from './TutorialStep';
 import { useLocation } from 'react-router-dom';
 import { isAppRoute } from '@/routes/RouteHelpers';
-
-// Define possible selectors for different tutorial steps
-const RECORD_ENTRY_SELECTORS = [
-  '[data-value="record"]',
-  '.record-entry-tab',
-  '.tutorial-record-entry-button',
-  'button[data-tutorial-target="record-entry"]',
-  '#new-entry-button',
-  '.record-entry-button'
-];
-
-const ENTRIES_TAB_SELECTORS = [
-  '[value="entries"]',
-  '.entries-tab',
-  'button[data-tutorial-target="past-entries"]',
-  '#past-entries-button'
-];
-
-const CHAT_QUESTION_SELECTORS = [
-  '.chat-suggestion-button',
-  '.suggestion-button',
-  '.empty-chat-suggestion',
-  '[data-tutorial-target="chat-suggestion"]',
-  '.suggestion-question',
-  '.chat-example-button',
-  '.question-button'
-];
+import { 
+  RECORD_ENTRY_SELECTORS, 
+  ENTRIES_TAB_SELECTORS,
+  CHAT_QUESTION_SELECTORS,
+  findAndHighlightElement,
+  logPotentialTutorialElements
+} from '@/utils/tutorial/tutorial-elements-finder';
 
 const TutorialOverlay: React.FC = () => {
   const { 
@@ -209,45 +189,37 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       else if (currentStepData?.id === 5) {
-        // Step 5: Chat Question - Enhanced with identical styling as other tutorial elements
-        let foundElement = false;
+        // Step 5: Chat Question - Enhanced with more robust element finding
+        console.log('Setting up highlight for chat question (step 5)');
         
-        // Try to find a chat suggestion element
-        for (const selector of CHAT_QUESTION_SELECTORS) {
-          const elements = document.querySelectorAll(selector);
+        // Log all potential targets for debugging
+        logPotentialTutorialElements();
+        
+        // Try to find and highlight using our helper function
+        const found = findAndHighlightElement(CHAT_QUESTION_SELECTORS, 'chat-question-highlight');
+        
+        if (!found) {
+          console.warn('Failed to find chat question element with any selector');
           
-          // If there are multiple elements, take the first one (most visible)
-          if (elements && elements.length > 0) {
-            const element = elements[0];
-            element.classList.add('tutorial-target', 'chat-question-highlight', 'tutorial-button-highlight');
-            
-            // Apply enhanced styling to make it stand out
-            if (element instanceof HTMLElement) {
-              element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
-              element.style.animation = "button-pulse 1.5s infinite alternate";
-              element.style.border = "2px solid white";
-              element.style.transform = "scale(1.05)";
-              element.style.zIndex = "10000";
+          // Last resort - try to find any button that might be a suggestion
+          const buttons = document.querySelectorAll('button');
+          let suggestionsFound = false;
+          
+          buttons.forEach((button, index) => {
+            if (button instanceof HTMLElement && 
+                button.textContent && 
+                (button.textContent.includes('emotion') || 
+                 button.textContent.includes('feel') || 
+                 button.textContent.includes('mood'))) {
               
-              // Ensure high visibility
-              element.style.opacity = "1";
-              element.style.visibility = "visible";
-              element.style.position = "relative";
+              console.log(`Found potential chat suggestion (button ${index}):`, button.textContent);
+              
+              if (!suggestionsFound) {
+                console.log('Applying highlighting to first matching suggestion button');
+                applyTutorialHighlight(button, 'chat-question-highlight');
+                suggestionsFound = true;
+              }
             }
-            
-            foundElement = true;
-            console.log(`Applied enhanced highlighting to chat question using selector: ${selector}`);
-            break;
-          }
-        }
-        
-        if (!foundElement) {
-          console.warn('Chat question element not found with any selector');
-          
-          // Additional debugging to find potential chat elements
-          console.log('Looking for potential chat question elements:');
-          document.querySelectorAll('button, .chat-suggestion, .suggestion').forEach(el => {
-            console.log(`Element: ${el.tagName}, classes: ${el.className}, text: ${el.textContent?.trim()}`);
           });
         }
       }

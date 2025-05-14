@@ -25,6 +25,15 @@ export const ENTRIES_TAB_SELECTORS = [
 
 // All potential selectors for chat question suggestion elements
 export const CHAT_QUESTION_SELECTORS = [
+  '.chat-suggestion-button:first-child',
+  '.suggestion-button:first-child',
+  '.empty-chat-suggestion:first-child',
+  '[data-tutorial-target="chat-suggestion"]:first-child',
+  '.suggestion-question:first-child',
+  '.chat-example-button:first-child',
+  '.question-button:first-child',
+  '.chat-question-suggestion:first-child',
+  // Generic non-first-child selectors as fallbacks
   '.chat-suggestion-button',
   '.suggestion-button',
   '.empty-chat-suggestion',
@@ -68,6 +77,37 @@ export const findAndHighlightElement = (
   selectors: string[],
   className: string
 ): boolean => {
+  // If this is for chat questions, try to find all elements and select the first one
+  if (className === 'chat-question-highlight') {
+    // Try to find all chat question elements
+    const allElements: HTMLElement[] = [];
+    
+    for (const selector of selectors) {
+      const elements = document.querySelectorAll(selector);
+      if (elements.length > 0) {
+        elements.forEach(el => {
+          if (el instanceof HTMLElement) {
+            allElements.push(el);
+          }
+        });
+      }
+    }
+    
+    // If we found any elements, highlight the first one
+    if (allElements.length > 0) {
+      console.log(`Found ${allElements.length} potential chat questions, highlighting the first one`);
+      const firstElement = allElements[0];
+      applyTutorialHighlight(firstElement, className);
+      console.log(`Applied chat question highlighting to element:`, {
+        text: firstElement.textContent?.trim(),
+        classes: firstElement.className,
+        tag: firstElement.tagName
+      });
+      return true;
+    }
+  }
+  
+  // Default behavior for other elements
   for (const selector of selectors) {
     const element = document.querySelector(selector);
     if (element instanceof HTMLElement) {
@@ -115,6 +155,17 @@ export const logPotentialTutorialElements = (): void => {
           .join(', '),
         text: el.textContent?.trim()
       });
+    });
+  });
+  
+  // Specifically log chat question elements for debugging
+  console.log('Looking specifically for chat question elements:');
+  document.querySelectorAll('.chat-suggestion-button, .suggestion-button, .empty-chat-suggestion, .question-button').forEach((el, i) => {
+    console.log(`Chat question ${i + 1}:`, {
+      text: el.textContent?.trim(),
+      classes: el.className,
+      visible: el.getBoundingClientRect().height > 0,
+      position: el.getBoundingClientRect()
     });
   });
 };

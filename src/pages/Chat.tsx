@@ -171,6 +171,21 @@ const Chat = () => {
       .sheet-content .mt-5 {
         margin-top: 0.5rem !important;
       }
+      
+      /* Ensure chat suggestions are visible during tutorial */
+      body.tutorial-active .empty-chat-suggestion,
+      body.tutorial-active .chat-suggestion-button {
+        opacity: 1 !important;
+        visibility: visible !important;
+        display: block !important;
+        pointer-events: auto !important;
+      }
+      
+      /* Add extra styling to first suggestion button for tutorial */
+      .chat-suggestion-button:first-child,
+      .empty-chat-suggestion:first-child {
+        position: relative;
+      }
     `;
     document.head.appendChild(style);
     
