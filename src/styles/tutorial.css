@@ -31,14 +31,12 @@ body.tutorial-active {
   height: 100% !important;
 }
 
-/* Tutorial step container - consistent styling for all steps */
+/* Tutorial step container - styling customized per step */
 .tutorial-step-container {
   position: fixed !important;
   z-index: 30000 !important;
   max-width: 320px;
   width: calc(100% - 40px);
-  background-color: rgba(26, 31, 44, 0.2) !important; /* UPDATED: all steps now semi-transparent */
-  backdrop-filter: blur(2px) !important; /* UPDATED: blur for all steps */
   color: white !important;
   border: 3px solid var(--color-theme) !important;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.7) !important;
@@ -51,7 +49,18 @@ body.tutorial-active {
   color: white !important;
   opacity: 1 !important;
   visibility: visible !important;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important; /* UPDATED: text shadow for all steps */
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important; /* Text shadow for all steps */
+}
+
+/* Step 1: Special styling for first step - fully opaque */
+.tutorial-step-container[data-step="1"] {
+  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 1 */
+}
+
+/* Steps 2-5: Semi-transparent with blur */
+.tutorial-step-container:not([data-step="1"]) {
+  background-color: rgba(26, 31, 44, 0.2) !important;
+  backdrop-filter: blur(2px) !important;
 }
 
 /* Step 1: Journal header styling */

@@ -84,14 +84,23 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [onNext, step.id]);
   
-  // Get background color based on step ID - UPDATED: all steps now have transparent background
+  // Get background color based on step ID
   const getBackgroundStyle = () => {
-    // All steps now have a fully transparent background with a slight backdrop blur for readability
+    // Step 1 should be fully opaque
+    if (step.id === 1) {
+      return {
+        backgroundColor: 'rgba(26, 31, 44, 1)', // Fully opaque background for step 1
+        color: 'white',
+        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow for readability
+      };
+    }
+    
+    // All other steps have transparent background with blur as previously implemented
     return {
-      backgroundColor: 'rgba(26, 31, 44, 0.2)', // Very light background for all steps
-      backdropFilter: 'blur(2px)', // Slight blur to improve text readability for all steps
+      backgroundColor: 'rgba(26, 31, 44, 0.2)', // Very light background for other steps
+      backdropFilter: 'blur(2px)', // Slight blur to improve text readability
       color: 'white',
-      textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow to ensure readability for all steps
+      textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow to ensure readability
     };
   };
   
