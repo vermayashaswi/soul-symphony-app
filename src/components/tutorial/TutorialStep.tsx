@@ -84,35 +84,33 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [onNext, step.id]);
   
-  // Improved modal positioning based on step ID - use fixed positioning for consistency
+  // Updated positioning style to place all popups near the top of the screen
   const getPositionStyle = () => {
-    // Special positioning for step 2 to move it slightly higher so it doesn't cover the arrow
-    if (step.id === 2) {
-      return {
-        top: '35%',  // Moved higher (from 50% to 35%)
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        position: 'fixed' as const
-      };
-    }
-    
-    // For steps 3 and 4 - position in center for consistency
-    if (step.id === 3 || step.id === 4) {
-      return {
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        position: 'fixed' as const
-      };
-    }
-    
-    // For other steps, attempt to position based on target elements
-    return {
-      top: '50%',
+    // Base positioning at top of screen for all steps
+    const baseStyle = {
+      top: '80px',  // Position near the top of the screen (with some spacing)
       left: '50%',
-      transform: 'translate(-50%, -50%)',
+      transform: 'translate(-50%, 0)', // Only transform X axis to center horizontally
       position: 'fixed' as const
     };
+    
+    // Responsive adjustments for smaller screens
+    if (window.innerWidth <= 640) {
+      return {
+        ...baseStyle,
+        top: '60px', // Less spacing on mobile devices
+      };
+    }
+    
+    // Additional adjustments for very small screens
+    if (window.innerWidth <= 360) {
+      return {
+        ...baseStyle,
+        top: '40px', // Even less spacing on very small devices
+      };
+    }
+    
+    return baseStyle;
   };
   
   return (
