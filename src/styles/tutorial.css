@@ -1,4 +1,3 @@
-
 /* Tutorial Overlay Styles - Revised for better visibility and cleanup */
 
 /* Base Tutorial Classes */
@@ -118,11 +117,13 @@ body.tutorial-active {
   opacity: 1 !important;
   transform: translateZ(0) scale(1.05) !important; /* Force a new stacking context and scale */
   border: 2px solid white !important;
+  background-color: white !important; /* Add explicit white background */
 }
 
-/* NEW: Ensure proper text coloring for entries tab in light mode */
+/* Ensure proper text coloring for entries tab in light mode */
 .entries-tab.tutorial-target {
   color: #000 !important; /* Black text in light mode */
+  background-color: white !important; /* Explicit white background */
 }
 
 /* Specific fix for Step 4 text visibility in light mode */
@@ -130,11 +131,13 @@ body:not(.dark) .entries-tab.tutorial-target span,
 body:not(.dark) .entries-tab.tutorial-target div {
   color: #000 !important; /* Black text for light mode */
   text-shadow: none !important; /* Remove text shadow in light mode */
+  background-color: white !important; /* Explicit white background */
 }
 
 body.dark .entries-tab.tutorial-target span,
 body.dark .entries-tab.tutorial-target div {
   color: #fff !important; /* White text for dark mode */
+  background-color: transparent !important; /* No background in dark mode */
 }
 
 /* Step 5: Chat question highlight styling - Enhanced for maximum visibility */

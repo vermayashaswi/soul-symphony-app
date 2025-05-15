@@ -239,7 +239,10 @@ const TutorialOverlay: React.FC = () => {
               element.style.visibility = "visible";
               element.style.position = "relative";
               
-              // NEW: Fix text color for light mode
+              // Explicit white background
+              element.style.backgroundColor = "white";
+              
+              // Fix text color for light mode
               const isDarkMode = document.body.classList.contains('dark');
               if (!isDarkMode) {
                 element.style.color = "#000";
@@ -250,6 +253,7 @@ const TutorialOverlay: React.FC = () => {
                   if (textEl instanceof HTMLElement) {
                     textEl.style.color = "#000";
                     textEl.style.textShadow = "none";
+                    textEl.style.backgroundColor = "white";
                   }
                 });
               }
