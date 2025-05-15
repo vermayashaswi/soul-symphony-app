@@ -1,5 +1,4 @@
-
-/* Tutorial Overlay Styles - Revised for better visibility and cleanup */
+/* Tutorial Overlay Styles - Revised for better visibility and improved infographics display */
 
 /* Base Tutorial Classes */
 .tutorial-target {
@@ -63,21 +62,25 @@ body.tutorial-active {
   top: 10% !important; /* Move even higher to avoid overlapping with chat questions */
 }
 
-/* Insights steps: Fully opaque background for steps 6-9 */
+/* Insights steps: Fully opaque background for steps 6-9 with infographics */
 .tutorial-step-container[data-step="6"],
 .tutorial-step-container[data-step="7"],
 .tutorial-step-container[data-step="8"],
 .tutorial-step-container[data-step="9"] {
   background-color: rgba(26, 31, 44, 1) !important;
   max-width: 350px !important; /* Wider for steps with images */
+  transform: translate(-50%, -50%) !important; /* Ensure these are centered properly */
+  top: 50% !important;
+  left: 50% !important;
 }
 
-/* Image styling for tutorial steps 6-9 */
-.tutorial-step-container[data-step="6"] img,
-.tutorial-step-container[data-step="7"] img,
-.tutorial-step-container[data-step="8"] img,
-.tutorial-step-container[data-step="9"] img {
+/* Ensure infographic containers are properly displayed */
+.tutorial-step-container[data-step="6"] .tutorial-infographic,
+.tutorial-step-container[data-step="7"] .tutorial-infographic,
+.tutorial-step-container[data-step="8"] .tutorial-infographic,
+.tutorial-step-container[data-step="9"] .tutorial-infographic {
   border-radius: 6px !important;
+  overflow: hidden !important;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
 }
 
@@ -373,7 +376,7 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
     margin-bottom: 0.75rem !important;
   }
   
-  /* Special width override for image-containing steps on mobile */
+  /* Special width override for infographic-containing steps on mobile */
   .tutorial-step-container[data-step="6"],
   .tutorial-step-container[data-step="7"],
   .tutorial-step-container[data-step="8"],
@@ -389,27 +392,13 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
     transform: translate(-50%, 0) !important; /* Adjust transform for top position */
   }
   
-  /* Special override for insights steps positioning on mobile */
-  .tutorial-step-container[data-step="6"] {
-    top: 30% !important;
-    transform: translate(-50%, 0) !important;
-  }
-  
-  .tutorial-step-container[data-step="7"] {
-    top: 40% !important;
-    transform: translate(-50%, 0) !important;
-  }
-  
+  /* Ensure proper centering of infographic steps on mobile */
+  .tutorial-step-container[data-step="6"],
+  .tutorial-step-container[data-step="7"],
   .tutorial-step-container[data-step="8"],
   .tutorial-step-container[data-step="9"] {
-    top: 50% !important; /* Center vertically for steps 8 and 9 */
+    top: 50% !important; /* Center vertically for infographic steps */
     transform: translate(-50%, -50%) !important;
-  }
-  
-  /* Scale down images on small screens */
-  .tutorial-step-container img {
-    max-height: 150px !important;
-    object-fit: cover !important;
   }
 }
 
@@ -439,12 +428,7 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
     top: 10% !important; /* Force to be even higher on small mobile */
   }
   
-  /* Further scale down images on very small screens */
-  .tutorial-step-container img {
-    max-height: 120px !important;
-  }
-  
-  /* Smaller images for steps 6-9 on very small screens */
+  /* Adjust size for infographic containers on very small screens */
   .tutorial-step-container[data-step="6"],
   .tutorial-step-container[data-step="7"],
   .tutorial-step-container[data-step="8"],

@@ -1,10 +1,10 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { TutorialStep as TutorialStepType } from '@/contexts/TutorialContext';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
+import TutorialInfographic from './TutorialInfographic';
 
 interface TutorialStepProps {
   step: TutorialStepType;
@@ -117,7 +117,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   // Adjust container width if it has an image
   const getContainerWidth = () => {
     // Make steps with images wider
-    if (step.imageUrl && (step.id >= 6 && step.id <= 9)) {
+    if (step.infographicType && (step.id >= 6 && step.id <= 9)) {
       return {
         maxWidth: '350px', // Wider for steps with images
         width: 'calc(100% - 40px)'
@@ -153,8 +153,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // For steps with images (6-9) - centered but with adjusted vertical position
-    if (step.imageUrl && (step.id >= 6 && step.id <= 9)) {
+    // For steps with infographics (6-9) - centered to ensure they're visible
+    if (step.infographicType && (step.id >= 6 && step.id <= 9)) {
       return {
         top: '50%',
         left: '50%',
@@ -182,6 +182,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       position: 'fixed' as const
     };
   };
+  
+  // Determine whether to show the infographic and which type
+  const shouldShowInfographic = !!step.infographicType && step.id >= 6 && step.id <= 9;
   
   return (
     <motion.div
@@ -225,17 +228,10 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       {/* Content */}
       <p className="text-sm text-white/80 mb-4">{step.content}</p>
       
-      {/* Image - only show for steps that include images */}
-      {step.imageUrl && (
-        <div className="mb-4 rounded-md overflow-hidden border border-white/30 shadow-md">
-          <AspectRatio ratio={16/9} className="bg-gray-800/50">
-            <img 
-              src={step.imageUrl} 
-              alt={`Tutorial step ${step.id}: ${step.title}`}
-              className="w-full h-full object-cover rounded-md"
-              loading="eager"
-            />
-          </AspectRatio>
+      {/* Custom Infographic - only show for steps that include infographics */}
+      {shouldShowInfographic && step.infographicType && (
+        <div className="mb-4">
+          <TutorialInfographic type={step.infographicType} />
         </div>
       )}
       
