@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -239,6 +238,21 @@ const TutorialOverlay: React.FC = () => {
               element.style.opacity = "1";
               element.style.visibility = "visible";
               element.style.position = "relative";
+              
+              // NEW: Fix text color for light mode
+              const isDarkMode = document.body.classList.contains('dark');
+              if (!isDarkMode) {
+                element.style.color = "#000";
+                
+                // Also apply to child elements
+                const textElements = element.querySelectorAll('span, div');
+                textElements.forEach(textEl => {
+                  if (textEl instanceof HTMLElement) {
+                    textEl.style.color = "#000";
+                    textEl.style.textShadow = "none";
+                  }
+                });
+              }
             }
             
             foundElement = true;

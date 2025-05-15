@@ -120,6 +120,23 @@ body.tutorial-active {
   border: 2px solid white !important;
 }
 
+/* NEW: Ensure proper text coloring for entries tab in light mode */
+.entries-tab.tutorial-target {
+  color: #000 !important; /* Black text in light mode */
+}
+
+/* Specific fix for Step 4 text visibility in light mode */
+body:not(.dark) .entries-tab.tutorial-target span,
+body:not(.dark) .entries-tab.tutorial-target div {
+  color: #000 !important; /* Black text for light mode */
+  text-shadow: none !important; /* Remove text shadow in light mode */
+}
+
+body.dark .entries-tab.tutorial-target span,
+body.dark .entries-tab.tutorial-target div {
+  color: #fff !important; /* White text for dark mode */
+}
+
 /* Step 5: Chat question highlight styling - Enhanced for maximum visibility */
 .chat-question-highlight.tutorial-target {
   z-index: 10000 !important;
