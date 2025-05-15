@@ -4,6 +4,7 @@ import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { TutorialStep as TutorialStepType } from '@/contexts/TutorialContext';
+import { AspectRatio } from '@/components/ui/aspect-ratio';
 
 interface TutorialStepProps {
   step: TutorialStepType;
@@ -113,6 +114,22 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   };
   
+  // Adjust container width if it has an image
+  const getContainerWidth = () => {
+    // Make steps with images wider
+    if (step.imageUrl && (step.id >= 6 && step.id <= 9)) {
+      return {
+        maxWidth: '350px', // Wider for steps with images
+        width: 'calc(100% - 40px)'
+      };
+    }
+    
+    return {
+      maxWidth: '320px',
+      width: 'calc(100% - 40px)'
+    };
+  };
+  
   // Improved modal positioning based on step ID - use fixed positioning for consistency
   const getPositionStyle = () => {
     // Special positioning for step 2 to move it slightly higher so it doesn't cover the arrow
@@ -131,6 +148,17 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         top: '10%',  // Positioned much higher (changed from 15% to 10%)
         left: '50%',
         transform: 'translate(-50%, 0)', // Changed from -50% for y to avoid centering
+        position: 'fixed' as const,
+        zIndex: 30000
+      };
+    }
+    
+    // For steps with images (6-9) - centered but with adjusted vertical position
+    if (step.imageUrl && (step.id >= 6 && step.id <= 9)) {
+      return {
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
         position: 'fixed' as const,
         zIndex: 30000
       };
@@ -158,10 +186,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   return (
     <motion.div
       ref={stepRef}
-      className="tutorial-step-container rounded-xl p-4 max-w-[320px]"
+      className="tutorial-step-container rounded-xl p-4"
       style={{
         ...getPositionStyle(),
         ...getBackgroundStyle(),
+        ...getContainerWidth(),
         border: '3px solid var(--color-theme)',
         boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)',
         zIndex: 30000, // Consistently high z-index for all steps
@@ -195,6 +224,20 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       
       {/* Content */}
       <p className="text-sm text-white/80 mb-4">{step.content}</p>
+      
+      {/* Image - only show for steps that include images */}
+      {step.imageUrl && (
+        <div className="mb-4 rounded-md overflow-hidden border border-white/30 shadow-md">
+          <AspectRatio ratio={16/9} className="bg-gray-800/50">
+            <img 
+              src={step.imageUrl} 
+              alt={`Tutorial step ${step.id}: ${step.title}`}
+              className="w-full h-full object-cover rounded-md"
+              loading="eager"
+            />
+          </AspectRatio>
+        </div>
+      )}
       
       {/* Navigation buttons with enhanced click handling and improved back button contrast */}
       <div className="flex justify-between mt-2 tutorial-buttons">

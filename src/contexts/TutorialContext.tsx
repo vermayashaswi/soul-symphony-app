@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -28,6 +27,7 @@ export interface TutorialStep {
   showSkipButton?: boolean;
   navigateTo?: string; // Property for navigation
   waitForElement?: boolean; // Whether to wait for the element to be present before proceeding
+  imageUrl?: string; // Optional image URL for tutorial steps
 }
 
 // Define the interface for the tutorial context
@@ -52,7 +52,7 @@ interface TutorialContextType {
 // Create the context with a default undefined value
 const TutorialContext = createContext<TutorialContextType | undefined>(undefined);
 
-// Define the initial tutorial steps with enhanced robustness
+// Define the initial tutorial steps with enhanced robustness and mockup images
 const initialTutorialSteps: TutorialStep[] = [
   {
     id: 1,
@@ -110,7 +110,7 @@ const initialTutorialSteps: TutorialStep[] = [
     navigateTo: '/app/chat',
     waitForElement: true
   },
-  // New steps for Insights page
+  // Enhanced steps 6-9 with mockup images
   {
     id: 6,
     title: 'Your Emotional Insights',
@@ -121,7 +121,8 @@ const initialTutorialSteps: TutorialStep[] = [
     showNextButton: true,
     showSkipButton: true,
     navigateTo: '/app/insights',
-    waitForElement: true
+    waitForElement: true,
+    imageUrl: '/lovable-uploads/241062d6-3971-492c-aaeb-a110d1256c7a.png'
   },
   {
     id: 7,
@@ -133,7 +134,8 @@ const initialTutorialSteps: TutorialStep[] = [
     showNextButton: true,
     showSkipButton: true,
     navigateTo: '/app/insights',
-    waitForElement: true
+    waitForElement: true,
+    imageUrl: '/lovable-uploads/586c1ed2-eaed-4063-a18d-500e7085909d.png'
   },
   {
     id: 8,
@@ -145,7 +147,8 @@ const initialTutorialSteps: TutorialStep[] = [
     showNextButton: true,
     showSkipButton: true,
     navigateTo: '/app/insights',
-    waitForElement: true
+    waitForElement: true,
+    imageUrl: '/lovable-uploads/624f7365-8259-44e3-9c0f-baa65d0b9776.png'
   },
   {
     id: 9,
@@ -157,7 +160,8 @@ const initialTutorialSteps: TutorialStep[] = [
     showNextButton: true,
     showSkipButton: true,
     navigateTo: '/app/insights',
-    waitForElement: true
+    waitForElement: true,
+    imageUrl: '/lovable-uploads/d61c0a45-1846-4bde-b495-f6b8c58a2951.png'
   }
 ];
 

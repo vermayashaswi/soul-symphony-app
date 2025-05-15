@@ -69,6 +69,16 @@ body.tutorial-active {
 .tutorial-step-container[data-step="8"],
 .tutorial-step-container[data-step="9"] {
   background-color: rgba(26, 31, 44, 1) !important;
+  max-width: 350px !important; /* Wider for steps with images */
+}
+
+/* Image styling for tutorial steps 6-9 */
+.tutorial-step-container[data-step="6"] img,
+.tutorial-step-container[data-step="7"] img,
+.tutorial-step-container[data-step="8"] img,
+.tutorial-step-container[data-step="9"] img {
+  border-radius: 6px !important;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
 }
 
 /* Steps 2-4: Semi-transparent with blur */
@@ -175,15 +185,15 @@ body.dark .entries-tab.tutorial-target div {
   pointer-events: none !important;
 }
 
-/* Specific positioning for steps 6-9 */
+/* Specific positioning for steps 6-9 with better centering for the image-containing tutorial steps */
 .tutorial-step-container[data-step="6"] {
-  top: 20% !important;
+  top: 30% !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
 }
 
 .tutorial-step-container[data-step="7"] {
-  top: 30% !important;
+  top: 40% !important;
   left: 50% !important;
   transform: translateX(-50%) !important;
 }
@@ -191,15 +201,14 @@ body.dark .entries-tab.tutorial-target div {
 .tutorial-step-container[data-step="8"] {
   top: 50% !important;
   left: 50% !important;
-  transform: translateX(-50%) !important;
+  transform: translate(-50%, -50%) !important;
 }
 
-/* Adjusted positioning for step 9 to be more centered and not go off-screen */
+/* Adjusted positioning for step 9 to be properly centered and not go off-screen */
 .tutorial-step-container[data-step="9"] {
-  top: 50% !important; /* Changed from 70% to 50% to center vertically */
+  top: 50% !important;
   left: 50% !important;
-  transform: translate(-50%, -50%) !important; /* Added translateY to fully center */
-  max-width: 300px !important; /* Slightly narrower to ensure it fits */
+  transform: translate(-50%, -50%) !important;
 }
 
 /* Special additional highlight for chat questions to make them more visible */
@@ -364,31 +373,43 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
     margin-bottom: 0.75rem !important;
   }
   
+  /* Special width override for image-containing steps on mobile */
+  .tutorial-step-container[data-step="6"],
+  .tutorial-step-container[data-step="7"],
+  .tutorial-step-container[data-step="8"],
+  .tutorial-step-container[data-step="9"] {
+    max-width: 300px !important;
+    width: 90% !important;
+    padding: 10px !important;
+  }
+  
   /* Special override for step 5 on mobile */
   .tutorial-step-container[data-step="5"] {
     top: 10% !important; /* Force to be higher on mobile */
     transform: translate(-50%, 0) !important; /* Adjust transform for top position */
   }
   
-  /* Special override for insights steps on mobile */
-  .tutorial-step-container[data-step="6"],
-  .tutorial-step-container[data-step="7"],
-  .tutorial-step-container[data-step="8"],
-  .tutorial-step-container[data-step="9"] {
-    transform: translate(-50%, -50%) !important; /* Center both horizontally and vertically */
-  }
-  
+  /* Special override for insights steps positioning on mobile */
   .tutorial-step-container[data-step="6"] {
     top: 30% !important;
+    transform: translate(-50%, 0) !important;
   }
   
   .tutorial-step-container[data-step="7"] {
     top: 40% !important;
+    transform: translate(-50%, 0) !important;
   }
   
   .tutorial-step-container[data-step="8"],
   .tutorial-step-container[data-step="9"] {
     top: 50% !important; /* Center vertically for steps 8 and 9 */
+    transform: translate(-50%, -50%) !important;
+  }
+  
+  /* Scale down images on small screens */
+  .tutorial-step-container img {
+    max-height: 150px !important;
+    object-fit: cover !important;
   }
 }
 
@@ -416,5 +437,18 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
   /* Special override for step 5 on small mobile */
   .tutorial-step-container[data-step="5"] {
     top: 10% !important; /* Force to be even higher on small mobile */
+  }
+  
+  /* Further scale down images on very small screens */
+  .tutorial-step-container img {
+    max-height: 120px !important;
+  }
+  
+  /* Smaller images for steps 6-9 on very small screens */
+  .tutorial-step-container[data-step="6"],
+  .tutorial-step-container[data-step="7"],
+  .tutorial-step-container[data-step="8"],
+  .tutorial-step-container[data-step="9"] {
+    padding: 8px !important;
   }
 }
