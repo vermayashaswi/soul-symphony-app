@@ -255,19 +255,26 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // First, clean up any lingering tutorial classes and styling before database update
       const cleanupTutorialElements = () => {
-        // Remove tutorial active class from body
+        console.log('Running thorough tutorial cleanup');
+        
+        // Remove tutorial active class from body and data attribute
         document.body.classList.remove('tutorial-active');
-        
-        // Remove data-current-step attribute
         document.body.removeAttribute('data-current-step');
+        document.body.style.overflow = '';
+        document.body.style.touchAction = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
         
-        console.log('Cleaning up tutorial target elements');
-        
-        // Get all tutorial-related elements with ANY potential classes
+        // Get all tutorial-related elements with ANY potential classes - extensive list for thorough cleanup
         const targetElements = document.querySelectorAll(
           '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, ' +
-          '.entries-tab, .chat-question-highlight, .tutorial-overlay'
+          '.entries-tab, .chat-question-highlight, .tutorial-overlay, ' + 
+          '.empty-chat-suggestion, .chat-suggestion-button, ' +
+          '[class*="tutorial-"]'
         );
+        
+        console.log(`Found ${targetElements.length} tutorial elements to clean up`);
         
         // Remove all tutorial-related classes from elements
         targetElements.forEach(el => {
@@ -277,7 +284,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
             'record-entry-tab', 
             'entries-tab',
             'chat-question-highlight',
-            'tutorial-overlay'
+            'tutorial-overlay',
+            'empty-chat-suggestion'
           );
           
           // Clear any inline styles
@@ -291,12 +299,18 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
             el.style.visibility = '';
             el.style.opacity = '';
             el.style.pointerEvents = '';
+            el.style.display = '';
+            el.style.backgroundColor = '';
           }
         });
         
-        // Reset any visibility styles on chat input containers
-        const chatInputs = document.querySelectorAll('[class*="chat-input"], form, .mobile-chat-input-container');
-        chatInputs.forEach(el => {
+        // Reset any visibility styles on chat elements
+        const chatElements = document.querySelectorAll(
+          '[class*="chat-"], .chat-messages-container, .mobile-chat-interface, .smart-chat-container, ' +
+          'form, input, textarea, .p-2.border-t.border-border, .flex.flex-col.items-center.justify-center.p-6.text-center.h-full'
+        );
+        
+        chatElements.forEach(el => {
           if (el instanceof HTMLElement) {
             el.style.display = '';
             el.style.visibility = '';
@@ -305,12 +319,29 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
             el.style.position = '';
             el.style.zIndex = '';
             el.style.transform = '';
+            el.style.pointerEvents = '';
+            el.style.cursor = '';
+            el.style.backgroundColor = '';
           }
         });
+        
+        // Force update the EmptyChatState component if present
+        const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
+        if (emptyChatState) {
+          console.log('Refreshing EmptyChatState visibility');
+          if (emptyChatState instanceof HTMLElement) {
+            emptyChatState.style.visibility = 'visible';
+            emptyChatState.style.display = 'flex';
+            emptyChatState.style.opacity = '1';
+          }
+        }
       };
       
       // Clean up DOM elements first
       cleanupTutorialElements();
+      
+      // Update state before database update to prevent UI flickering
+      setIsActive(false);
       
       // Then update database
       const { error } = await supabase
@@ -327,20 +358,34 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       }
       
       // Update state after database update
-      setIsActive(false);
       setTutorialCompleted(true);
       
       // Short toast message
       toast({
         title: "Tutorial completed!",
         description: "You can reset it any time in settings.",
-        duration: 500
+        duration: 1500
       });
       
       console.log('Tutorial marked as completed');
       
-      // Final cleanup after a short delay to ensure UI has time to refresh
+      // Run multiple cleanup passes to ensure everything is properly reset
       setTimeout(cleanupTutorialElements, 100);
+      setTimeout(cleanupTutorialElements, 500);
+      
+      // Force a UI refresh after tutorial completion
+      setTimeout(() => {
+        console.log('Triggering UI refresh after tutorial');
+        window.dispatchEvent(new Event('resize'));
+        
+        // Force page to re-render if needed
+        const currentPath = window.location.pathname;
+        if (currentPath === '/app/chat') {
+          console.log('On chat page, forcing re-render');
+          const event = new CustomEvent('chatRefreshNeeded');
+          window.dispatchEvent(event);
+        }
+      }, 200);
     } catch (error) {
       console.error('Error completing tutorial:', error);
     }

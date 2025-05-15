@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -63,13 +62,41 @@ const TutorialOverlay: React.FC = () => {
     
     // Special handling for step 5 - ensure chat background is visible
     if (steps[currentStep]?.id === 5) {
-      // Set black background for chat containers
+      // Prepare the chat container for better visibility
       const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
       chatContainers.forEach(container => {
         if (container instanceof HTMLElement) {
           container.style.backgroundColor = '#000000';
+          container.style.opacity = '0.9';
+          container.style.visibility = 'visible';
         }
       });
+      
+      // Make sure EmptyChatState is visible
+      const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
+      if (emptyChatState && emptyChatState instanceof HTMLElement) {
+        emptyChatState.style.visibility = 'visible';
+        emptyChatState.style.opacity = '1';
+        emptyChatState.style.zIndex = '5000';
+        emptyChatState.style.display = 'flex';
+      }
+      
+      // Run another check after a short delay to catch dynamically loaded elements
+      setTimeout(() => {
+        if (steps[currentStep]?.id === 5) {
+          const chatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
+          chatSuggestions.forEach(suggestion => {
+            if (suggestion instanceof HTMLElement) {
+              suggestion.style.visibility = 'visible';
+              suggestion.style.display = 'block';
+              suggestion.style.opacity = '1';
+              
+              // Add tutorial classes for highlighting
+              suggestion.classList.add('chat-question-highlight', 'tutorial-target');
+            }
+          });
+        }
+      }, 500);
     }
     
     // Clean up when tutorial is deactivated
@@ -86,11 +113,17 @@ const TutorialOverlay: React.FC = () => {
       // Small delay to ensure chat interface re-renders properly
       setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
+        
+        // Force chat interface to refresh
+        if (location.pathname === '/app/chat') {
+          console.log('Triggering chat refresh after tutorial');
+          window.dispatchEvent(new CustomEvent('chatRefreshNeeded'));
+        }
       }, 300);
     };
-  }, [shouldShowTutorial, currentStep, steps]);
+  }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // Step-specific element highlighting
+  // Step-specific element highlighting with chat step improvements
   useEffect(() => {
     if (!shouldShowTutorial || navigationState.inProgress) return;
     
@@ -200,37 +233,55 @@ const TutorialOverlay: React.FC = () => {
         
         if (!foundElement) {
           console.warn('Entries tab element not found with any selector');
-          
-          // Additional debugging to find the element
-          console.log('Available elements in DOM:');
-          document.querySelectorAll('button, [role="tab"]').forEach(el => {
-            console.log(`Element: ${el.tagName}, classes: ${el.className}, attributes:`, 
-              Array.from(el.attributes).map(attr => `${attr.name}="${attr.value}"`).join(', '));
-          });
         }
       }
+      // Improved Step 5 handling for better visibility
       else if (currentStepData?.id === 5) {
-        // Step 5: Chat Question - Enhanced with more robust element finding and improved background display
         console.log('Setting up highlight for chat question (step 5)');
         
-        // Set black background for better visibility
+        // Set black background for better visibility with opacity
         const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
         chatContainers.forEach(container => {
           if (container instanceof HTMLElement) {
             container.style.backgroundColor = '#000000';
+            container.style.opacity = '0.9';
+            container.style.visibility = 'visible';
           }
         });
+        
+        // Make sure EmptyChatState is visible
+        const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
+        if (emptyChatState && emptyChatState instanceof HTMLElement) {
+          emptyChatState.style.visibility = 'visible';
+          emptyChatState.style.opacity = '1';
+          emptyChatState.style.zIndex = '5000';
+          emptyChatState.style.display = 'flex';
+        }
         
         // Log all potential targets for debugging
         logPotentialTutorialElements();
         
-        // Look for chat suggestions in EmptyChatState first
+        // First try to highlight existing chat suggestions in EmptyChatState
         const emptyChatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
         if (emptyChatSuggestions.length > 0) {
           console.log(`Found ${emptyChatSuggestions.length} chat suggestions in EmptyChatState`);
           emptyChatSuggestions.forEach((element, index) => {
             if (index === 0) { // Only highlight the first one
               element.classList.add('chat-question-highlight', 'tutorial-target');
+              
+              // Apply enhanced visibility
+              if (element instanceof HTMLElement) {
+                element.style.display = 'block';
+                element.style.visibility = 'visible';
+                element.style.opacity = '1';
+                element.style.zIndex = '20000';
+                element.style.position = 'relative';
+                element.style.boxShadow = '0 0 40px 25px var(--color-theme)';
+                element.style.animation = 'ultra-strong-pulse 1.5s infinite alternate';
+                element.style.border = '2px solid white';
+                element.style.transform = 'scale(1.1)';
+              }
+              
               console.log('Applied highlighting to first chat suggestion in EmptyChatState');
             }
           });
@@ -256,19 +307,51 @@ const TutorialOverlay: React.FC = () => {
               }
               
               if (suggestionsContainer && suggestionsContainer instanceof HTMLElement) {
-                const suggestionButton = document.createElement('button');
-                suggestionButton.className = 'w-full justify-start px-4 py-3 h-auto bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md chat-question-highlight tutorial-target empty-chat-suggestion';
-                suggestionButton.textContent = 'How am I feeling today based on my journal entries?';
-                suggestionButton.style.display = 'block';
-                suggestionButton.style.visibility = 'visible';
-                suggestionButton.style.opacity = '1';
-                
-                suggestionsContainer.appendChild(suggestionButton);
-                applyTutorialHighlight(suggestionButton, 'chat-question-highlight');
+                // If we already have buttons in the container, don't add more
+                const existingButtons = suggestionsContainer.querySelectorAll('button');
+                if (existingButtons.length === 0) {
+                  const suggestionButton = document.createElement('button');
+                  suggestionButton.className = 'w-full justify-start px-4 py-3 h-auto bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md chat-question-highlight tutorial-target empty-chat-suggestion';
+                  suggestionButton.textContent = 'How am I feeling today based on my journal entries?';
+                  suggestionButton.style.display = 'block';
+                  suggestionButton.style.visibility = 'visible';
+                  suggestionButton.style.opacity = '1';
+                  
+                  suggestionsContainer.appendChild(suggestionButton);
+                  applyTutorialHighlight(suggestionButton, 'chat-question-highlight');
+                } else {
+                  // Apply highlighting to the first existing button
+                  const firstButton = existingButtons[0];
+                  firstButton.classList.add('chat-question-highlight', 'tutorial-target', 'empty-chat-suggestion');
+                  
+                  if (firstButton instanceof HTMLElement) {
+                    firstButton.style.display = 'block';
+                    firstButton.style.visibility = 'visible';
+                    firstButton.style.opacity = '1';
+                    firstButton.style.zIndex = '20000';
+                    applyTutorialHighlight(firstButton, 'chat-question-highlight');
+                  }
+                }
               }
             }
           }
         }
+        
+        // Try one more time after a short delay
+        setTimeout(() => {
+          const chatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
+          if (chatSuggestions.length > 0 && currentStepData?.id === 5) {
+            console.log('Found chat suggestions after delay, highlighting first one');
+            const firstSuggestion = chatSuggestions[0];
+            firstSuggestion.classList.add('chat-question-highlight', 'tutorial-target');
+            
+            if (firstSuggestion instanceof HTMLElement) {
+              firstSuggestion.style.display = 'block';
+              firstSuggestion.style.visibility = 'visible';
+              firstSuggestion.style.opacity = '1';
+            }
+          }
+        }, 800);
       }
     }, 300);
     

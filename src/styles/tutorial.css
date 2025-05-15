@@ -206,19 +206,18 @@ body.tutorial-active[data-current-step="5"] button:has(.lucide-mic) {
   cursor: default !important;
 }
 
-/* Force black background on all chat containers - but keep them visible */
-.smart-chat-container,
-.mobile-chat-interface,
-.chat-messages-container,
-.p-2.border-t.border-border {
-  background-color: #000000 !important;
+/* IMPORTANT: Make the chat UI more visible in step 5 */
+body.tutorial-active[data-current-step="5"] .chat-messages-container {
+  opacity: 0.9 !important; /* Make chat messages more visible */
+  background-color: rgba(0, 0, 0, 0.85) !important; /* Dark background for better contrast */
 }
 
-/* Make sure EmptyChatState stays visible during step 5 */
+/* Make sure empty chat state is visible during tutorial */
 body.tutorial-active[data-current-step="5"] .flex.flex-col.items-center.justify-center.p-6.text-center.h-full {
   display: flex !important;
   visibility: visible !important;
   opacity: 1 !important;
+  z-index: 5000 !important; /* Higher z-index to ensure visibility */
 }
 
 /* Animation keyframes - pulsating effects */

@@ -1,5 +1,5 @@
 
-import React, { useEffect } from "react";
+import React, { useEffect, useRef } from "react";
 import { motion } from "framer-motion";
 import { MessageSquare } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -8,9 +8,18 @@ import { useTutorial } from "@/contexts/TutorialContext";
 
 const EmptyChatState: React.FC = () => {
   const { isActive, isInStep, tutorialCompleted } = useTutorial();
+  const componentMounted = useRef(true);
   
   // Check if we're in the chat tutorial step
   const isInTutorialStep5 = isActive && isInStep(5);
+
+  // Track when component unmounts to avoid state updates
+  useEffect(() => {
+    componentMounted.current = true;
+    return () => {
+      componentMounted.current = false;
+    };
+  }, []);
 
   // Special styling effect when tutorial step 5 is active
   useEffect(() => {
@@ -18,17 +27,40 @@ const EmptyChatState: React.FC = () => {
       console.log("EmptyChatState: In tutorial step 5, ensuring visibility");
       // Tutorial is active and we're in step 5, ensure this component is visible
       const checkVisibility = () => {
+        if (!componentMounted.current) return;
+        
         const container = document.querySelector(".chat-messages-container");
         if (container && container instanceof HTMLElement) {
           container.style.backgroundColor = "#000000";
         }
+        
+        // Make sure this component is visible
+        const emptyChatState = document.querySelector(".flex.flex-col.items-center.justify-center.p-6.text-center.h-full");
+        if (emptyChatState && emptyChatState instanceof HTMLElement) {
+          emptyChatState.style.visibility = "visible";
+          emptyChatState.style.display = "flex";
+          emptyChatState.style.opacity = "1";
+          emptyChatState.style.zIndex = "5000";
+        }
+        
+        // Make chat suggestions visible
+        const suggestions = document.querySelectorAll(".chat-suggestion-button, .empty-chat-suggestion");
+        suggestions.forEach(suggestion => {
+          if (suggestion instanceof HTMLElement) {
+            suggestion.style.display = "block";
+            suggestion.style.visibility = "visible";
+            suggestion.style.opacity = "1";
+          }
+        });
       };
       
-      // Check immediately and after a short delay to ensure visibility
+      // Check immediately and repeatedly to ensure visibility
       checkVisibility();
-      const timeoutId = setTimeout(checkVisibility, 200);
+      const intervalId = setInterval(checkVisibility, 500);
       
-      return () => clearTimeout(timeoutId);
+      return () => {
+        clearInterval(intervalId);
+      };
     }
   }, [isInTutorialStep5]);
 
@@ -36,13 +68,38 @@ const EmptyChatState: React.FC = () => {
   useEffect(() => {
     if (tutorialCompleted) {
       console.log("EmptyChatState: Tutorial completed, refreshing UI");
-      // Small delay to ensure all tutorial cleanup is done
-      const timeoutId = setTimeout(() => {
+      
+      // Listen for chat refresh events
+      const handleChatRefresh = () => {
+        if (!componentMounted.current) return;
+        
+        console.log("EmptyChatState: Chat refresh event received");
         // Force a rerender by triggering a window resize event
         window.dispatchEvent(new Event('resize'));
-      }, 300);
+        
+        // Reset any lingering styles
+        const emptyChatState = document.querySelector(".flex.flex-col.items-center.justify-center.p-6.text-center.h-full");
+        if (emptyChatState && emptyChatState instanceof HTMLElement) {
+          emptyChatState.style.visibility = "visible";
+          emptyChatState.style.display = "flex";
+          emptyChatState.style.opacity = "1";
+        }
+      };
       
-      return () => clearTimeout(timeoutId);
+      window.addEventListener('chatRefreshNeeded', handleChatRefresh);
+      
+      // Initial refresh
+      handleChatRefresh();
+      
+      // Multiple refresh attempts to ensure UI is properly reset
+      const timeoutId = setTimeout(handleChatRefresh, 300);
+      const timeoutId2 = setTimeout(handleChatRefresh, 1000);
+      
+      return () => {
+        window.removeEventListener('chatRefreshNeeded', handleChatRefresh);
+        clearTimeout(timeoutId);
+        clearTimeout(timeoutId2);
+      };
     }
   }, [tutorialCompleted]);
   
@@ -85,24 +142,22 @@ const EmptyChatState: React.FC = () => {
       )}
       
       {/* Add chat suggestions that are more visible during tutorial */}
-      {isInTutorialStep5 && (
-        <div className="mt-8 space-y-3 w-full max-w-md">
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full justify-start px-4 py-3 h-auto chat-question-highlight empty-chat-suggestion"
-          >
-            <TranslatableText text="How am I feeling today based on my journal entries?" />
-          </Button>
-          <Button
-            variant="secondary"
-            size="sm"
-            className="w-full justify-start px-4 py-3 h-auto chat-question-highlight empty-chat-suggestion"
-          >
-            <TranslatableText text="What emotions have I experienced most frequently?" />
-          </Button>
-        </div>
-      )}
+      <div className={`mt-8 space-y-3 w-full max-w-md ${isInTutorialStep5 ? 'block' : ''}`}>
+        <Button
+          variant="secondary"
+          size="sm"
+          className={`w-full justify-start px-4 py-3 h-auto ${isInTutorialStep5 ? 'chat-question-highlight empty-chat-suggestion' : ''}`}
+        >
+          <TranslatableText text="How am I feeling today based on my journal entries?" />
+        </Button>
+        <Button
+          variant="secondary"
+          size="sm"
+          className={`w-full justify-start px-4 py-3 h-auto ${isInTutorialStep5 ? 'chat-question-highlight empty-chat-suggestion' : ''}`}
+        >
+          <TranslatableText text="What emotions have I experienced most frequently?" />
+        </Button>
+      </div>
     </motion.div>
   );
 };
