@@ -1,3 +1,4 @@
+
 /* Tutorial Overlay Styles - Revised for better visibility and cleanup */
 
 /* Base Tutorial Classes */
@@ -193,10 +194,12 @@ body.dark .entries-tab.tutorial-target div {
   transform: translateX(-50%) !important;
 }
 
+/* Adjusted positioning for step 9 to be more centered and not go off-screen */
 .tutorial-step-container[data-step="9"] {
-  top: 70% !important;
+  top: 50% !important; /* Changed from 70% to 50% to center vertically */
   left: 50% !important;
-  transform: translateX(-50%) !important;
+  transform: translate(-50%, -50%) !important; /* Added translateY to fully center */
+  max-width: 300px !important; /* Slightly narrower to ensure it fits */
 }
 
 /* Special additional highlight for chat questions to make them more visible */
@@ -372,23 +375,20 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
   .tutorial-step-container[data-step="7"],
   .tutorial-step-container[data-step="8"],
   .tutorial-step-container[data-step="9"] {
-    transform: translateX(-50%) !important;
+    transform: translate(-50%, -50%) !important; /* Center both horizontally and vertically */
   }
   
   .tutorial-step-container[data-step="6"] {
-    top: 20% !important;
+    top: 30% !important;
   }
   
   .tutorial-step-container[data-step="7"] {
     top: 40% !important;
   }
   
-  .tutorial-step-container[data-step="8"] {
-    top: 60% !important; 
-  }
-  
+  .tutorial-step-container[data-step="8"],
   .tutorial-step-container[data-step="9"] {
-    top: 75% !important;
+    top: 50% !important; /* Center vertically for steps 8 and 9 */
   }
 }
 

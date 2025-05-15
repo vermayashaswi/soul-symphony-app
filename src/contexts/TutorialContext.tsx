@@ -2,7 +2,6 @@
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from '@/hooks/use-toast';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { 
@@ -304,7 +303,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced function to mark tutorial as completed with better cleanup
+  // Enhanced function to mark tutorial as completed with better cleanup - REMOVED TOAST
   const completeTutorial = async () => {
     if (!user) return;
     
@@ -424,12 +423,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       // Update state after database update
       setTutorialCompleted(true);
       
-      // Short toast message
-      toast({
-        title: "Tutorial completed!",
-        description: "You can reset it any time in settings.",
-        duration: 1500
-      });
+      // REMOVED TOAST NOTIFICATION
       
       console.log('Tutorial marked as completed');
       
@@ -557,7 +551,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced skip tutorial function
+  // Enhanced skip tutorial function - REMOVED TOAST
   const skipTutorial = async () => {
     if (!user) return;
     
@@ -574,11 +568,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       setIsActive(false);
       setTutorialCompleted(true);
-      toast({
-        title: "Tutorial skipped",
-        description: "You can always find help in the settings.",
-        duration: 500
-      });
+      
+      // REMOVED TOAST NOTIFICATION
       
       // Clean up any lingering tutorial classes
       document.body.classList.remove('tutorial-active');
@@ -602,7 +593,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced reset tutorial function
+  // Enhanced reset tutorial function - REMOVED TOAST
   const resetTutorial = async () => {
     if (!user) return;
     
@@ -617,12 +608,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         
       if (error) {
         console.error('Error resetting tutorial:', error);
-        toast({
-          title: "Error",
-          description: "Failed to reset tutorial. Please try again.",
-          variant: "destructive",
-          duration: 500
-        });
         return;
       }
       
@@ -639,34 +624,15 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         // First navigate to app home - use replace to prevent back navigation
         console.log('Tutorial reset - redirecting to app home');
         
-        // Display toast only if we're already on an app route
-        // This prevents toast from appearing on website routes
-        if (isAppRoute(location.pathname)) {
-          toast({
-            title: "Tutorial reset successfully!",
-            description: "Redirecting to app home page...",
-            duration: 500
-          });
-        }
+        // REMOVED TOAST NOTIFICATION
         
         navigate('/app/home', { replace: true });
       } else {
-        // If already on /app/home, just show toast and activate tutorial
-        toast({
-          title: "Tutorial reset successfully!",
-          description: "Restart from step 1",
-          duration: 500
-        });
+        // If already on /app/home, just set active tutorial without toast
         setIsActive(true);
       }
     } catch (error) {
       console.error('Error resetting tutorial:', error);
-      toast({
-        title: "Error",
-        description: "Something went wrong. Please try again.",
-        variant: "destructive",
-        duration: 500
-      });
     }
   };
   
