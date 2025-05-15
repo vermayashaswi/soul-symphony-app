@@ -94,7 +94,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
         marginBottom: '5px', 
         position: 'relative', 
         zIndex: 20,
-        backgroundColor: '#000000' // Black background
       }}
       ref={inputContainerRef}
     >
@@ -105,7 +104,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
             value={message}
             onChange={handleTextareaChange}
             placeholder="Type your message..."
-            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-black text-white overflow-hidden"
+            className="min-h-[24px] h-[32px] text-sm md:text-base resize-none rounded-full pl-4 pr-12 py-0 shadow-sm border-muted bg-background text-foreground overflow-hidden"
             disabled={isLoading}
             onKeyDown={(e) => {
               if (e.key === 'Enter' && !e.shiftKey) {
