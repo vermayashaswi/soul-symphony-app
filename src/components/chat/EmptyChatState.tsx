@@ -31,7 +31,11 @@ const EmptyChatState: React.FC = () => {
         
         const container = document.querySelector(".chat-messages-container");
         if (container && container instanceof HTMLElement) {
-          container.style.backgroundColor = "#000000";
+          container.style.backgroundColor = '#1A1F2C'; // Dark purple background
+          container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)'; // Gradient background
+          container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)'; // Inner purple glow
+          container.style.borderRadius = '10px'; // Rounded corners
+          container.style.opacity = '1';
         }
         
         // Make sure this component is visible

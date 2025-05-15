@@ -60,14 +60,16 @@ const TutorialOverlay: React.FC = () => {
     // Add data attribute for current step to enable more specific CSS targeting
     document.body.setAttribute('data-current-step', String(steps[currentStep]?.id || ''));
     
-    // Special handling for step 5 - ensure chat background is visible
+    // Special handling for step 5 - ensure chat background is visible with proper styling
     if (steps[currentStep]?.id === 5) {
-      // Prepare the chat container for better visibility
+      // Prepare the chat container for better visibility - Use purple background
       const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
       chatContainers.forEach(container => {
         if (container instanceof HTMLElement) {
-          container.style.backgroundColor = '#000000';
-          container.style.opacity = '0.9';
+          container.style.backgroundColor = '#1A1F2C'; // Dark purple background
+          container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)'; // Gradient background
+          container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)'; // Inner purple glow
+          container.style.opacity = '1';
           container.style.visibility = 'visible';
         }
       });
@@ -235,17 +237,20 @@ const TutorialOverlay: React.FC = () => {
           console.warn('Entries tab element not found with any selector');
         }
       }
-      // Improved Step 5 handling for better visibility
+      // Improved Step 5 handling for better visibility with purple background
       else if (currentStepData?.id === 5) {
-        console.log('Setting up highlight for chat question (step 5)');
+        console.log('Setting up highlight for chat question (step 5) with purple background');
         
-        // Set black background for better visibility with opacity
+        // Set purple background for better visibility with opacity
         const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
         chatContainers.forEach(container => {
           if (container instanceof HTMLElement) {
-            container.style.backgroundColor = '#000000';
-            container.style.opacity = '0.9';
+            container.style.backgroundColor = '#1A1F2C'; // Dark purple background
+            container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)'; // Gradient background
+            container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)'; // Inner purple glow
+            container.style.opacity = '1';
             container.style.visibility = 'visible';
+            container.style.borderRadius = '10px'; // Rounded corners
           }
         });
         

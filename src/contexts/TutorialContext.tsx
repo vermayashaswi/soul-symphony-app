@@ -301,6 +301,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
             el.style.pointerEvents = '';
             el.style.display = '';
             el.style.backgroundColor = '';
+            el.style.backgroundImage = '';
+            el.style.borderRadius = '';
+            el.style.boxShadow = '';
           }
         });
         
@@ -322,6 +325,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
             el.style.pointerEvents = '';
             el.style.cursor = '';
             el.style.backgroundColor = '';
+            el.style.backgroundImage = '';
+            el.style.borderRadius = '';
+            el.style.boxShadow = '';
           }
         });
         
