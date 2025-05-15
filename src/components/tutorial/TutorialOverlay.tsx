@@ -61,6 +61,17 @@ const TutorialOverlay: React.FC = () => {
     // Add data attribute for current step to enable more specific CSS targeting
     document.body.setAttribute('data-current-step', String(steps[currentStep]?.id || ''));
     
+    // Special handling for step 5 - ensure chat background is visible
+    if (steps[currentStep]?.id === 5) {
+      // Set black background for chat containers
+      const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
+      chatContainers.forEach(container => {
+        if (container instanceof HTMLElement) {
+          container.style.backgroundColor = '#000000';
+        }
+      });
+    }
+    
     // Clean up when tutorial is deactivated
     return () => {
       document.body.classList.remove('tutorial-active');
@@ -71,6 +82,11 @@ const TutorialOverlay: React.FC = () => {
       // Restore scroll position
       window.scrollTo(0, scrollPos);
       console.log('Tutorial inactive, restored page scrolling');
+      
+      // Small delay to ensure chat interface re-renders properly
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 300);
     };
   }, [shouldShowTutorial, currentStep, steps]);
 
@@ -194,38 +210,64 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       else if (currentStepData?.id === 5) {
-        // Step 5: Chat Question - Enhanced with more robust element finding
+        // Step 5: Chat Question - Enhanced with more robust element finding and improved background display
         console.log('Setting up highlight for chat question (step 5)');
+        
+        // Set black background for better visibility
+        const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
+        chatContainers.forEach(container => {
+          if (container instanceof HTMLElement) {
+            container.style.backgroundColor = '#000000';
+          }
+        });
         
         // Log all potential targets for debugging
         logPotentialTutorialElements();
         
-        // Try to find and highlight using our helper function
-        const found = findAndHighlightElement(CHAT_QUESTION_SELECTORS, 'chat-question-highlight');
-        
-        if (!found) {
-          console.warn('Failed to find chat question element with any selector');
-          
-          // Last resort - try to find any button that might be a suggestion
-          const buttons = document.querySelectorAll('button');
-          let suggestionsFound = false;
-          
-          buttons.forEach((button, index) => {
-            if (button instanceof HTMLElement && 
-                button.textContent && 
-                (button.textContent.includes('emotion') || 
-                 button.textContent.includes('feel') || 
-                 button.textContent.includes('mood'))) {
-              
-              console.log(`Found potential chat suggestion (button ${index}):`, button.textContent);
-              
-              if (!suggestionsFound) {
-                console.log('Applying highlighting to first matching suggestion button');
-                applyTutorialHighlight(button, 'chat-question-highlight');
-                suggestionsFound = true;
-              }
+        // Look for chat suggestions in EmptyChatState first
+        const emptyChatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
+        if (emptyChatSuggestions.length > 0) {
+          console.log(`Found ${emptyChatSuggestions.length} chat suggestions in EmptyChatState`);
+          emptyChatSuggestions.forEach((element, index) => {
+            if (index === 0) { // Only highlight the first one
+              element.classList.add('chat-question-highlight', 'tutorial-target');
+              console.log('Applied highlighting to first chat suggestion in EmptyChatState');
             }
           });
+        } else {
+          // Try to find and highlight using our helper function
+          const found = findAndHighlightElement(CHAT_QUESTION_SELECTORS, 'chat-question-highlight');
+          
+          if (!found) {
+            console.warn('Failed to find chat question element with any selector');
+            
+            // Create a fallback chat suggestion if none exists
+            const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
+            if (emptyChatState && emptyChatState instanceof HTMLElement) {
+              console.log('Creating fallback chat suggestions');
+              
+              // Check if suggestions container already exists
+              let suggestionsContainer = emptyChatState.querySelector('.mt-8.space-y-3.w-full.max-w-md');
+              
+              if (!suggestionsContainer) {
+                suggestionsContainer = document.createElement('div');
+                suggestionsContainer.className = 'mt-8 space-y-3 w-full max-w-md';
+                emptyChatState.appendChild(suggestionsContainer);
+              }
+              
+              if (suggestionsContainer && suggestionsContainer instanceof HTMLElement) {
+                const suggestionButton = document.createElement('button');
+                suggestionButton.className = 'w-full justify-start px-4 py-3 h-auto bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md chat-question-highlight tutorial-target empty-chat-suggestion';
+                suggestionButton.textContent = 'How am I feeling today based on my journal entries?';
+                suggestionButton.style.display = 'block';
+                suggestionButton.style.visibility = 'visible';
+                suggestionButton.style.opacity = '1';
+                
+                suggestionsContainer.appendChild(suggestionButton);
+                applyTutorialHighlight(suggestionButton, 'chat-question-highlight');
+              }
+            }
+          }
         }
       }
     }, 300);

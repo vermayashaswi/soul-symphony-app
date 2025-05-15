@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -247,11 +246,73 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Function to mark tutorial as completed
+  // Enhanced function to mark tutorial as completed with better cleanup
   const completeTutorial = async () => {
     if (!user) return;
     
     try {
+      console.log('Starting tutorial completion cleanup process');
+      
+      // First, clean up any lingering tutorial classes and styling before database update
+      const cleanupTutorialElements = () => {
+        // Remove tutorial active class from body
+        document.body.classList.remove('tutorial-active');
+        
+        // Remove data-current-step attribute
+        document.body.removeAttribute('data-current-step');
+        
+        console.log('Cleaning up tutorial target elements');
+        
+        // Get all tutorial-related elements with ANY potential classes
+        const targetElements = document.querySelectorAll(
+          '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, ' +
+          '.entries-tab, .chat-question-highlight, .tutorial-overlay'
+        );
+        
+        // Remove all tutorial-related classes from elements
+        targetElements.forEach(el => {
+          el.classList.remove(
+            'tutorial-target', 
+            'tutorial-button-highlight', 
+            'record-entry-tab', 
+            'entries-tab',
+            'chat-question-highlight',
+            'tutorial-overlay'
+          );
+          
+          // Clear any inline styles
+          if (el instanceof HTMLElement) {
+            el.style.boxShadow = '';
+            el.style.animation = '';
+            el.style.border = '';
+            el.style.transform = '';
+            el.style.zIndex = '';
+            el.style.position = '';
+            el.style.visibility = '';
+            el.style.opacity = '';
+            el.style.pointerEvents = '';
+          }
+        });
+        
+        // Reset any visibility styles on chat input containers
+        const chatInputs = document.querySelectorAll('[class*="chat-input"], form, .mobile-chat-input-container');
+        chatInputs.forEach(el => {
+          if (el instanceof HTMLElement) {
+            el.style.display = '';
+            el.style.visibility = '';
+            el.style.opacity = '';
+            el.style.height = '';
+            el.style.position = '';
+            el.style.zIndex = '';
+            el.style.transform = '';
+          }
+        });
+      };
+      
+      // Clean up DOM elements first
+      cleanupTutorialElements();
+      
+      // Then update database
       const { error } = await supabase
         .from('profiles')
         .update({ 
@@ -265,30 +326,21 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         return;
       }
       
+      // Update state after database update
       setIsActive(false);
       setTutorialCompleted(true);
+      
+      // Short toast message
       toast({
         title: "Tutorial completed!",
         description: "You can reset it any time in settings.",
-        duration: 500 // Changed from default to 500ms (0.5 seconds)
+        duration: 500
       });
+      
       console.log('Tutorial marked as completed');
       
-      // Clean up any lingering tutorial classes
-      document.body.classList.remove('tutorial-active');
-      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
-      targetElements.forEach(el => {
-        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
-        
-        // Also clear any inline styles
-        if (el instanceof HTMLElement) {
-          el.style.boxShadow = '';
-          el.style.animation = '';
-          el.style.border = '';
-          el.style.transform = '';
-          el.style.zIndex = '';
-        }
-      });
+      // Final cleanup after a short delay to ensure UI has time to refresh
+      setTimeout(cleanupTutorialElements, 100);
     } catch (error) {
       console.error('Error completing tutorial:', error);
     }
@@ -416,7 +468,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       toast({
         title: "Tutorial skipped",
         description: "You can always find help in the settings.",
-        duration: 500 // Changed from default to 500ms (0.5 seconds)
+        duration: 500
       });
       
       // Clean up any lingering tutorial classes
@@ -460,7 +512,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           title: "Error",
           description: "Failed to reset tutorial. Please try again.",
           variant: "destructive",
-          duration: 500 // Changed from default to 500ms (0.5 seconds)
+          duration: 500
         });
         return;
       }
@@ -484,7 +536,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           toast({
             title: "Tutorial reset successfully!",
             description: "Redirecting to app home page...",
-            duration: 500 // Changed from default to 500ms (0.5 seconds)
+            duration: 500
           });
         }
         
@@ -494,7 +546,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         toast({
           title: "Tutorial reset successfully!",
           description: "Restart from step 1",
-          duration: 500 // Changed from default to 500ms (0.5 seconds)
+          duration: 500
         });
         setIsActive(true);
       }
@@ -504,7 +556,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         title: "Error",
         description: "Something went wrong. Please try again.",
         variant: "destructive",
-        duration: 500 // Changed from default to 500ms (0.5 seconds)
+        duration: 500
       });
     }
   };

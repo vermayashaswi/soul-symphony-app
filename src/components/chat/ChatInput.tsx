@@ -1,4 +1,3 @@
-
 import React, { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -22,52 +21,47 @@ const ChatInput: React.FC<ChatInputProps> = ({
   const isMobile = useIsMobile();
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const inputContainerRef = useRef<HTMLDivElement>(null);
-  const { isActive, isInStep } = useTutorial();
+  const { isActive, isInStep, tutorialCompleted } = useTutorial();
   
   // Check if we're in the chat tutorial step
   const isInTutorial = isActive && isInStep(5);
 
-  // Don't render anything at all during tutorial step 5
-  if (isInTutorial) {
-    return null;
-  }
-
-  // Effect to ensure input stays visible
+  // Effect to manage visibility during and after tutorial
   useEffect(() => {
     const ensureInputVisibility = () => {
       if (inputContainerRef.current) {
         if (isInTutorial) {
-          // Completely hide during tutorial step 5
-          inputContainerRef.current.style.display = 'none';
-          inputContainerRef.current.style.visibility = 'hidden';
-          inputContainerRef.current.style.opacity = '0';
-          inputContainerRef.current.style.height = '0';
-          inputContainerRef.current.style.position = 'absolute';
-          inputContainerRef.current.style.zIndex = '-999';
-          inputContainerRef.current.style.transform = 'translateY(1000px)';
+          // Make input visible but non-interactive during tutorial step 5
+          inputContainerRef.current.style.opacity = '0.15';
+          inputContainerRef.current.style.pointerEvents = 'none';
+          inputContainerRef.current.style.cursor = 'default';
         } else {
-          // Show normally
+          // Show normally when not in tutorial or when tutorial completed
+          inputContainerRef.current.style.opacity = '1';
+          inputContainerRef.current.style.pointerEvents = 'auto';
+          inputContainerRef.current.style.cursor = 'text';
           inputContainerRef.current.style.display = 'block';
           inputContainerRef.current.style.visibility = 'visible';
-          inputContainerRef.current.style.opacity = '1';
-          inputContainerRef.current.style.height = '';
-          inputContainerRef.current.style.position = '';
           inputContainerRef.current.style.zIndex = '20';
-          inputContainerRef.current.style.transform = '';
         }
       }
     };
 
-    // Run on initial render and whenever isLoading changes
+    // Run on initial render and whenever relevant states change
     ensureInputVisibility();
-
-    // Also set up an interval to periodically check visibility
-    const visibilityInterval = setInterval(ensureInputVisibility, 500);
+    
+    // Recheck visibility after a delay to handle any DOM updates
+    const visibilityTimeout = setTimeout(ensureInputVisibility, 300);
     
     return () => {
-      clearInterval(visibilityInterval);
+      clearTimeout(visibilityTimeout);
     };
-  }, [isLoading, isInTutorial]);
+  }, [isLoading, isInTutorial, tutorialCompleted]);
+
+  // If completely hidden during step 5, return an empty div but keep in DOM
+  if (isInTutorial) {
+    return <div ref={inputContainerRef} className="w-full opacity-15 pointer-events-none" style={{ height: '40px' }}></div>;
+  }
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();

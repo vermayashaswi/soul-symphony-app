@@ -1,5 +1,5 @@
 
-/* Tutorial Overlay Styles - Revised for better z-index hierarchy and visibility */
+/* Tutorial Overlay Styles - Revised for better visibility and cleanup */
 
 /* Base Tutorial Classes */
 .tutorial-target {
@@ -143,7 +143,9 @@ body.tutorial-active {
 }
 
 /* Make chat suggestions visible during tutorial */
-.tutorial-active .chat-question-highlight {
+.tutorial-active .chat-question-highlight,
+body.tutorial-active .empty-chat-suggestion,
+body.tutorial-active .chat-suggestion-button {
   display: block !important;
   visibility: visible !important;
   opacity: 1 !important;
@@ -151,7 +153,9 @@ body.tutorial-active {
 }
 
 /* Enhanced styling for step 5 to ensure chat suggestions are prominently visible */
-.tutorial-active[data-current-step="5"] .chat-question-highlight {
+.tutorial-active[data-current-step="5"] .chat-question-highlight,
+body.tutorial-active[data-current-step="5"] .chat-suggestion-button,
+body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
   z-index: 20000 !important; /* Extremely high z-index for chat suggestions during step 5 */
   position: relative !important;
   box-shadow: 0 0 40px 25px var(--color-theme) !important; /* Even stronger glow */
@@ -190,55 +194,31 @@ body.tutorial-active {
   touch-action: none !important;
 }
 
-/* ULTRA AGGRESSIVE hiding of ANY microphone button or input during step 5 */
-body.tutorial-active[data-current-step="5"] .relative button[type="button"]:has(.lucide-mic),
-body.tutorial-active[data-current-step="5"] button:has(.lucide-mic),
-body.tutorial-active[data-current-step="5"] [class*="VoiceRecording"],
-body.tutorial-active[data-current-step="5"] [class*="Recording"],
-body.tutorial-active[data-current-step="5"] [class*="voice-recorder"],
-body.tutorial-active[data-current-step="5"] .mb-6 {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  display: none !important;
-  height: 0 !important;
-  width: 0 !important;
-  position: absolute !important;
-  z-index: -9999 !important;
-  transform: translateY(9999px) !important;
-  pointer-events: none !important;
-  clip: rect(0, 0, 0, 0) !important;
-  clip-path: inset(100%) !important;
-  overflow: hidden !important;
-}
-
-/* Ultra aggressive hiding of chat inputs during step 5 */
+/* LESS AGGRESSIVE input hiding - we want the UI to still be visible in step 5 */
 body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,
 body.tutorial-active[data-current-step="5"] form,
 body.tutorial-active[data-current-step="5"] input,
 body.tutorial-active[data-current-step="5"] textarea,
 body.tutorial-active[data-current-step="5"] button[type="submit"],
-body.tutorial-active[data-current-step="5"] .w-full[style*="z-index: 20"],
-body.tutorial-active[data-current-step="5"] [class*="EmptyChatState"] button {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  display: none !important;
-  height: 0 !important;
-  width: 0 !important;
-  position: absolute !important;
-  z-index: -9999 !important;
-  transform: translateY(9999px) !important;
-  pointer-events: none !important;
-  clip: rect(0, 0, 0, 0) !important;
-  clip-path: inset(100%) !important;
-  overflow: hidden !important;
+body.tutorial-active[data-current-step="5"] button:has(.lucide-mic) {
+  opacity: 0.15 !important; /* Slightly visible but not functional */
+  pointer-events: none !important; /* No interaction */
+  cursor: default !important;
 }
 
-/* Force black background on all chat containers */
+/* Force black background on all chat containers - but keep them visible */
 .smart-chat-container,
 .mobile-chat-interface,
 .chat-messages-container,
 .p-2.border-t.border-border {
   background-color: #000000 !important;
+}
+
+/* Make sure EmptyChatState stays visible during step 5 */
+body.tutorial-active[data-current-step="5"] .flex.flex-col.items-center.justify-center.p-6.text-center.h-full {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
 
 /* Animation keyframes - pulsating effects */
