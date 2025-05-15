@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Send } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -31,10 +32,17 @@ const ChatInput: React.FC<ChatInputProps> = ({
     const ensureInputVisibility = () => {
       if (inputContainerRef.current) {
         if (isInTutorial) {
-          // Make input visible but non-interactive during tutorial step 5
-          inputContainerRef.current.style.opacity = '0.15';
+          // Completely hide input during tutorial step 5
+          inputContainerRef.current.style.opacity = '0';
           inputContainerRef.current.style.pointerEvents = 'none';
-          inputContainerRef.current.style.cursor = 'default';
+          inputContainerRef.current.style.height = '0';
+          inputContainerRef.current.style.visibility = 'hidden';
+          inputContainerRef.current.style.overflow = 'hidden';
+          inputContainerRef.current.style.margin = '0';
+          inputContainerRef.current.style.padding = '0';
+          inputContainerRef.current.style.backgroundColor = 'transparent';
+          inputContainerRef.current.style.border = 'none';
+          inputContainerRef.current.style.boxShadow = 'none';
         } else {
           // Show normally when not in tutorial or when tutorial completed
           inputContainerRef.current.style.opacity = '1';
@@ -42,7 +50,13 @@ const ChatInput: React.FC<ChatInputProps> = ({
           inputContainerRef.current.style.cursor = 'text';
           inputContainerRef.current.style.display = 'block';
           inputContainerRef.current.style.visibility = 'visible';
+          inputContainerRef.current.style.height = 'auto';
           inputContainerRef.current.style.zIndex = '20';
+          inputContainerRef.current.style.margin = '';
+          inputContainerRef.current.style.padding = '';
+          inputContainerRef.current.style.backgroundColor = '';
+          inputContainerRef.current.style.border = '';
+          inputContainerRef.current.style.boxShadow = '';
         }
       }
     };
@@ -58,9 +72,9 @@ const ChatInput: React.FC<ChatInputProps> = ({
     };
   }, [isLoading, isInTutorial, tutorialCompleted]);
 
-  // If completely hidden during step 5, return an empty div but keep in DOM
+  // If completely hidden during step 5, return an empty div with height 0 (not 40px)
   if (isInTutorial) {
-    return <div ref={inputContainerRef} className="w-full opacity-15 pointer-events-none" style={{ height: '40px' }}></div>;
+    return <div ref={inputContainerRef} className="chat-input-container opacity-0 h-0 overflow-hidden" style={{ height: '0', padding: 0, margin: 0, border: 'none', backgroundColor: 'transparent' }}></div>;
   }
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -89,7 +103,7 @@ const ChatInput: React.FC<ChatInputProps> = ({
 
   return (
     <div 
-      className="w-full" 
+      className="chat-input-container w-full" 
       style={{ 
         marginBottom: '5px', 
         position: 'relative', 

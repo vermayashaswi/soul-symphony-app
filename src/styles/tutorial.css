@@ -230,6 +230,30 @@ body.tutorial-active[data-current-step="5"] .flex.flex-col.items-center.justify-
   z-index: 5000 !important; /* Higher z-index to ensure visibility */
 }
 
+/* NEW: Hide the white chat input container box in step 5 */
+body.tutorial-active[data-current-step="5"] .chat-input-container,
+body.tutorial-active[data-current-step="5"] [class*="chat"] form,
+body.tutorial-active[data-current-step="5"] .relative.flex.items-center.w-full,
+body.tutorial-active[data-current-step="5"] .w-full.relative div[ref="inputContainerRef"] {
+  background-color: transparent !important; 
+  border: none !important;
+  box-shadow: none !important;
+  opacity: 0 !important; /* Make completely invisible */
+  height: 0 !important; /* Take no space */
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+/* NEW: Specific fix for white rectangle input container */
+body.tutorial-active[data-current-step="5"] .flex-1.p-4.relative > div:last-child,
+body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
 /* Animation keyframes - pulsating effects */
 @keyframes button-pulse {
   0% { box-shadow: 0 0 25px 12px var(--color-theme); }
