@@ -128,7 +128,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     // For step 5 - position higher to avoid the chat input box at bottom
     if (step.id === 5) {
       return {
-        top: '15%',  // Positioned much higher (changed from 30% to 15%)
+        top: '10%',  // Positioned much higher (changed from 15% to 10%)
         left: '50%',
         transform: 'translate(-50%, 0)', // Changed from -50% for y to avoid centering
         position: 'fixed' as const,

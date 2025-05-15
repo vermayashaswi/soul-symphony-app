@@ -28,6 +28,12 @@ export default function MobileChatInput({
   // Check if we're in step 5 (chat question step)
   const isInChatTutorialStep = isActive && isInStep(5);
 
+  // If we're in step 5 of the tutorial, don't render anything at all
+  if (isInChatTutorialStep) {
+    console.log("In tutorial step 5 - not rendering chat input at all");
+    return null;
+  }
+
   // Effect to ensure input stays visible and detect keyboard
   useEffect(() => {
     // Function to detect keyboard visibility with multiple signals
@@ -63,46 +69,51 @@ export default function MobileChatInput({
       }
     };
 
-    // Run immediately and set up listeners
-    handleVisualViewportResize();
-    
-    if (window.visualViewport) {
-      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
-      window.addEventListener('resize', handleVisualViewportResize);
-    }
-    
-    // Also listen for focus events on the input
-    const handleFocus = () => {
-      // Assume keyboard will be visible soon after focus
-      document.body.classList.add('keyboard-visible');
-      document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
+    // Only set up effects if we're not in tutorial step 5
+    if (!isInChatTutorialStep) {
+      // Run immediately and set up listeners
+      handleVisualViewportResize();
       
-      // Short delay to ensure keyboard has time to appear
-      setTimeout(() => {
-        if (inputRef.current) {
-          inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-        }
-      }, 300);
-    };
-    
-    const inputElement = inputRef.current;
-    if (inputElement) {
-      inputElement.addEventListener('focus', handleFocus);
-    }
-    
-    return () => {
       if (window.visualViewport) {
-        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
-        window.removeEventListener('resize', handleVisualViewportResize);
+        window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+        window.addEventListener('resize', handleVisualViewportResize);
       }
       
+      // Also listen for focus events on the input
+      const handleFocus = () => {
+        // Assume keyboard will be visible soon after focus
+        document.body.classList.add('keyboard-visible');
+        document.querySelector('.mobile-chat-interface')?.classList.add('keyboard-visible');
+        
+        // Short delay to ensure keyboard has time to appear
+        setTimeout(() => {
+          if (inputRef.current) {
+            inputRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
+          }
+        }, 300);
+      };
+      
+      const inputElement = inputRef.current;
       if (inputElement) {
-        inputElement.removeEventListener('focus', handleFocus);
+        inputElement.addEventListener('focus', handleFocus);
       }
       
-      document.body.classList.remove('keyboard-visible');
-    };
-  }, [isKeyboardVisible]);
+      return () => {
+        if (window.visualViewport) {
+          window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
+          window.removeEventListener('resize', handleVisualViewportResize);
+        }
+        
+        if (inputElement) {
+          inputElement.removeEventListener('focus', handleFocus);
+        }
+        
+        document.body.classList.remove('keyboard-visible');
+      };
+    }
+    
+    return undefined;
+  }, [isKeyboardVisible, isInChatTutorialStep]);
 
   const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     setInputValue(e.target.value);
@@ -141,12 +152,6 @@ export default function MobileChatInput({
       }
     }
   };
-
-  // If we're in step 5 of the tutorial, don't render anything at all
-  if (isInChatTutorialStep) {
-    console.log("In tutorial step 5 - not rendering chat input at all");
-    return null;
-  }
 
   return (
     <div 

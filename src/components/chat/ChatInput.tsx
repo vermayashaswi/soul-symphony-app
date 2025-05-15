@@ -27,6 +27,11 @@ const ChatInput: React.FC<ChatInputProps> = ({
   // Check if we're in the chat tutorial step
   const isInTutorial = isActive && isInStep(5);
 
+  // Don't render anything at all during tutorial step 5
+  if (isInTutorial) {
+    return null;
+  }
+
   // Effect to ensure input stays visible
   useEffect(() => {
     const ensureInputVisibility = () => {
@@ -87,11 +92,6 @@ const ChatInput: React.FC<ChatInputProps> = ({
     setMessage(e.target.value);
     adjustTextareaHeight(e.target);
   };
-
-  // Don't render during tutorial step 5
-  if (isInTutorial) {
-    return null;
-  }
 
   return (
     <div 

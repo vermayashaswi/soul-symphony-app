@@ -4,8 +4,14 @@ import { motion } from "framer-motion";
 import { MessageSquare, ArrowRight } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
+import { useTutorial } from "@/contexts/TutorialContext";
 
 const EmptyChatState: React.FC = () => {
+  const { isActive, isInStep } = useTutorial();
+  
+  // Check if we're in the chat tutorial step
+  const isInTutorialStep5 = isActive && isInStep(5);
+  
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -24,17 +30,20 @@ const EmptyChatState: React.FC = () => {
         <TranslatableText text="Ask me anything about your thoughts, feelings, or daily life. I'm here to help!" />
       </p>
       
-      <Button 
-        variant="outline" 
-        size="sm" 
-        className="mt-6"
-        onClick={() => {
-          const newChatButton = document.querySelector('[data-testid="new-chat-button"]') as HTMLButtonElement;
-          if (newChatButton) newChatButton.click();
-        }}
-      >
-        <TranslatableText text="New Chat" />
-      </Button>
+      {/* Only show the button if we're not in tutorial step 5 */}
+      {!isInTutorialStep5 && (
+        <Button 
+          variant="outline" 
+          size="sm" 
+          className="mt-6"
+          onClick={() => {
+            const newChatButton = document.querySelector('[data-testid="new-chat-button"]') as HTMLButtonElement;
+            if (newChatButton) newChatButton.click();
+          }}
+        >
+          <TranslatableText text="New Chat" />
+        </Button>
+      )}
     </motion.div>
   );
 };

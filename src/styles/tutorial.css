@@ -195,7 +195,8 @@ body.tutorial-active[data-current-step="5"] .relative button[type="button"]:has(
 body.tutorial-active[data-current-step="5"] button:has(.lucide-mic),
 body.tutorial-active[data-current-step="5"] [class*="VoiceRecording"],
 body.tutorial-active[data-current-step="5"] [class*="Recording"],
-body.tutorial-active[data-current-step="5"] [class*="voice-recorder"] {
+body.tutorial-active[data-current-step="5"] [class*="voice-recorder"],
+body.tutorial-active[data-current-step="5"] .mb-6 {
   opacity: 0 !important;
   visibility: hidden !important;
   display: none !important;
@@ -215,7 +216,9 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,
 body.tutorial-active[data-current-step="5"] form,
 body.tutorial-active[data-current-step="5"] input,
 body.tutorial-active[data-current-step="5"] textarea,
-body.tutorial-active[data-current-step="5"] button[type="submit"] {
+body.tutorial-active[data-current-step="5"] button[type="submit"],
+body.tutorial-active[data-current-step="5"] .w-full[style*="z-index: 20"],
+body.tutorial-active[data-current-step="5"] [class*="EmptyChatState"] button {
   opacity: 0 !important;
   visibility: hidden !important;
   display: none !important;
