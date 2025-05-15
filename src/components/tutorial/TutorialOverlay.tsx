@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -8,6 +9,10 @@ import {
   RECORD_ENTRY_SELECTORS, 
   ENTRIES_TAB_SELECTORS,
   CHAT_QUESTION_SELECTORS,
+  INSIGHTS_HEADER_SELECTORS,
+  EMOTION_CHART_SELECTORS,
+  MOOD_CALENDAR_SELECTORS,
+  SOULNET_SELECTORS,
   findAndHighlightElement,
   logPotentialTutorialElements,
   applyTutorialHighlight
@@ -133,9 +138,18 @@ const TutorialOverlay: React.FC = () => {
     console.log(`Setting up highlighting for step ${currentStepData?.id}`);
     
     // Remove any existing highlight classes first
-    const existingHighlights = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, .chat-question-highlight');
+    const existingHighlights = document.querySelectorAll(
+      '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, ' +
+      '.entries-tab, .chat-question-highlight, .insights-header-highlight, ' +
+      '.emotion-chart-highlight, .mood-calendar-highlight, .soul-net-highlight'
+    );
+    
     existingHighlights.forEach(el => {
-      el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab', 'chat-question-highlight');
+      el.classList.remove(
+        'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab',
+        'entries-tab', 'chat-question-highlight', 'insights-header-highlight',
+        'emotion-chart-highlight', 'mood-calendar-highlight', 'soul-net-highlight'
+      );
       
       // Clear any inline styles that might have been applied
       if (el instanceof HTMLElement) {
@@ -357,6 +371,42 @@ const TutorialOverlay: React.FC = () => {
             }
           }
         }, 800);
+      }
+      // NEW: Step 6 - Insights Header Highlight
+      else if (currentStepData?.id === 6) {
+        console.log('Setting up highlight for insights header (step 6)');
+        const found = findAndHighlightElement(INSIGHTS_HEADER_SELECTORS, 'insights-header-highlight');
+        
+        if (!found) {
+          console.warn('Failed to find insights header with any selector');
+        }
+      }
+      // NEW: Step 7 - Emotion Chart Highlight
+      else if (currentStepData?.id === 7) {
+        console.log('Setting up highlight for emotion chart (step 7)');
+        const found = findAndHighlightElement(EMOTION_CHART_SELECTORS, 'emotion-chart-highlight');
+        
+        if (!found) {
+          console.warn('Failed to find emotion chart with any selector');
+        }
+      }
+      // NEW: Step 8 - Mood Calendar Highlight
+      else if (currentStepData?.id === 8) {
+        console.log('Setting up highlight for mood calendar (step 8)');
+        const found = findAndHighlightElement(MOOD_CALENDAR_SELECTORS, 'mood-calendar-highlight');
+        
+        if (!found) {
+          console.warn('Failed to find mood calendar with any selector');
+        }
+      }
+      // NEW: Step 9 - Soul-Net Highlight
+      else if (currentStepData?.id === 9) {
+        console.log('Setting up highlight for soul-net visualization (step 9)');
+        const found = findAndHighlightElement(SOULNET_SELECTORS, 'soul-net-highlight');
+        
+        if (!found) {
+          console.warn('Failed to find soul-net visualization with any selector');
+        }
       }
     }, 300);
     

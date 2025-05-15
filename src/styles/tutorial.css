@@ -63,8 +63,16 @@ body.tutorial-active {
   top: 10% !important; /* Move even higher to avoid overlapping with chat questions */
 }
 
+/* Insights steps: Fully opaque background for steps 6-9 */
+.tutorial-step-container[data-step="6"],
+.tutorial-step-container[data-step="7"],
+.tutorial-step-container[data-step="8"],
+.tutorial-step-container[data-step="9"] {
+  background-color: rgba(26, 31, 44, 1) !important;
+}
+
 /* Steps 2-4: Semi-transparent with blur */
-.tutorial-step-container:not([data-step="1"]):not([data-step="5"]) {
+.tutorial-step-container:not([data-step="1"]):not([data-step="5"]):not([data-step="6"]):not([data-step="7"]):not([data-step="8"]):not([data-step="9"]) {
   background-color: rgba(26, 31, 44, 0.2) !important;
   backdrop-filter: blur(2px) !important;
 }
@@ -128,6 +136,47 @@ body.tutorial-active {
   display: block !important;
   max-height: none !important;
   overflow: visible !important;
+}
+
+/* Steps 6-9: Insights pages highlight styling */
+.insights-header-highlight.tutorial-target,
+.emotion-chart-highlight.tutorial-target,
+.mood-calendar-highlight.tutorial-target,
+.soul-net-highlight.tutorial-target {
+  z-index: 10000 !important;
+  position: relative !important;
+  box-shadow: 0 0 35px 20px var(--color-theme) !important; 
+  animation: strong-tab-pulse 1.5s infinite alternate !important;
+  outline: 2px solid white !important;
+  opacity: 1 !important;
+  transform: translateZ(0) scale(1.01) !important;
+  border: 2px solid white !important;
+  pointer-events: none !important;
+}
+
+/* Specific positioning for steps 6-9 */
+.tutorial-step-container[data-step="6"] {
+  top: 20% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.tutorial-step-container[data-step="7"] {
+  top: 30% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.tutorial-step-container[data-step="8"] {
+  top: 50% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
+}
+
+.tutorial-step-container[data-step="9"] {
+  top: 70% !important;
+  left: 50% !important;
+  transform: translateX(-50%) !important;
 }
 
 /* Special additional highlight for chat questions to make them more visible */
@@ -296,6 +345,30 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
   .tutorial-step-container[data-step="5"] {
     top: 10% !important; /* Force to be higher on mobile */
     transform: translate(-50%, 0) !important; /* Adjust transform for top position */
+  }
+  
+  /* Special override for insights steps on mobile */
+  .tutorial-step-container[data-step="6"],
+  .tutorial-step-container[data-step="7"],
+  .tutorial-step-container[data-step="8"],
+  .tutorial-step-container[data-step="9"] {
+    transform: translateX(-50%) !important;
+  }
+  
+  .tutorial-step-container[data-step="6"] {
+    top: 20% !important;
+  }
+  
+  .tutorial-step-container[data-step="7"] {
+    top: 40% !important;
+  }
+  
+  .tutorial-step-container[data-step="8"] {
+    top: 60% !important; 
+  }
+  
+  .tutorial-step-container[data-step="9"] {
+    top: 75% !important;
   }
 }
 

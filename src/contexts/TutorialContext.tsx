@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -8,6 +9,10 @@ import {
   RECORD_ENTRY_SELECTORS, 
   ENTRIES_TAB_SELECTORS,
   CHAT_QUESTION_SELECTORS,
+  INSIGHTS_HEADER_SELECTORS,
+  EMOTION_CHART_SELECTORS,
+  MOOD_CALENDAR_SELECTORS,
+  SOULNET_SELECTORS,
   findAndHighlightElement,
   logPotentialTutorialElements
 } from '@/utils/tutorial/tutorial-elements-finder';
@@ -104,6 +109,55 @@ const initialTutorialSteps: TutorialStep[] = [
     showNextButton: true,
     showSkipButton: true,
     navigateTo: '/app/chat',
+    waitForElement: true
+  },
+  // New steps for Insights page
+  {
+    id: 6,
+    title: 'Your Emotional Insights',
+    content: 'Welcome to the Insights page! Here you\'ll find visual representations of your emotional journey and patterns over time.',
+    targetElement: '.insights-container h1',
+    alternativeSelectors: INSIGHTS_HEADER_SELECTORS,
+    position: 'bottom',
+    showNextButton: true,
+    showSkipButton: true,
+    navigateTo: '/app/insights',
+    waitForElement: true
+  },
+  {
+    id: 7,
+    title: 'Emotion Trends',
+    content: 'This chart shows how your emotions trend over time. See which emotions appear most frequently in your journal and how they change.',
+    targetElement: '.recharts-responsive-container',
+    alternativeSelectors: EMOTION_CHART_SELECTORS,
+    position: 'top',
+    showNextButton: true,
+    showSkipButton: true,
+    navigateTo: '/app/insights',
+    waitForElement: true
+  },
+  {
+    id: 8,
+    title: 'Mood Calendar',
+    content: 'The Mood Calendar visualizes your daily sentiment changes. Spot patterns in how your mood fluctuates throughout weeks and months.',
+    targetElement: '[class*="MoodCalendar"]',
+    alternativeSelectors: MOOD_CALENDAR_SELECTORS,
+    position: 'top',
+    showNextButton: true,
+    showSkipButton: true,
+    navigateTo: '/app/insights',
+    waitForElement: true
+  },
+  {
+    id: 9,
+    title: 'Soul-Net Visualization',
+    content: 'This neural visualization shows connections between life areas and emotions. Explore how different aspects of your life influence your emotional state.',
+    targetElement: 'canvas',
+    alternativeSelectors: SOULNET_SELECTORS,
+    position: 'top',
+    showNextButton: true,
+    showSkipButton: true,
+    navigateTo: '/app/insights',
     waitForElement: true
   }
 ];
@@ -209,7 +263,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     ].filter(Boolean) as string[];
     
     // Log potential elements in the DOM to help with debugging
-    if (stepData.id === 3 || stepData.id === 4 || stepData.id === 5) {
+    if (stepData.id >= 3) {
       logPotentialTutorialElements();
     }
     
@@ -218,7 +272,11 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       selectors, 
       stepData.id === 3 ? 'record-entry-tab' : 
       stepData.id === 4 ? 'entries-tab' :
-      stepData.id === 5 ? 'chat-question-highlight' : ''
+      stepData.id === 5 ? 'chat-question-highlight' :
+      stepData.id === 6 ? 'insights-header-highlight' :
+      stepData.id === 7 ? 'emotion-chart-highlight' :
+      stepData.id === 8 ? 'mood-calendar-highlight' :
+      stepData.id === 9 ? 'soul-net-highlight' : ''
     );
     
     if (!found) {

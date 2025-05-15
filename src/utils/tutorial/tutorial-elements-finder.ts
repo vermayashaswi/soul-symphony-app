@@ -44,6 +44,32 @@ export const CHAT_QUESTION_SELECTORS = [
   '.chat-question-suggestion'
 ];
 
+// Selectors for Insights page elements
+export const INSIGHTS_HEADER_SELECTORS = [
+  '.insights-page-content h1',
+  '.insights-container h1',
+  '.insights-sticky-header'
+];
+
+export const EMOTION_CHART_SELECTORS = [
+  '.insights-container .recharts-responsive-container',
+  '.bg-background:has(.recharts-responsive-container)',
+  '.insights-container .EmotionChart',
+  'div:has(>.recharts-wrapper)'
+];
+
+export const MOOD_CALENDAR_SELECTORS = [
+  '.insights-container [class*="MoodCalendar"]',
+  '.insights-container div:has(.mood-calendar-grid)',
+  '.insights-container div:has(.calendar-day)'
+];
+
+export const SOULNET_SELECTORS = [
+  '.insights-container canvas',
+  '.insights-container [class*="SoulNet"]',
+  '.insights-container div:has(canvas)'
+];
+
 /**
  * Apply tutorial highlight styling to an HTML element
  * @param element The element to apply highlighting to
