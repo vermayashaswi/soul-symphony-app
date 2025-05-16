@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -5,6 +6,7 @@ import { ChevronRight, ChevronLeft, X } from 'lucide-react';
 import { TutorialStep as TutorialStepType } from '@/contexts/TutorialContext';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import TutorialInfographic from './TutorialInfographic';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface TutorialStepProps {
   step: TutorialStepType;
@@ -210,7 +212,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       {/* Step indicator */}
       <div className="flex justify-between items-center mb-2">
         <div className="bg-theme text-white text-xs px-2 py-1 rounded-md">
-          Step {stepNumber} of {totalSteps}
+          <TranslatableText 
+            text={`Step ${stepNumber} of ${totalSteps}`} 
+            forceTranslate={true}
+            className="text-white" 
+          />
         </div>
         <Button 
           variant="ghost" 
@@ -223,10 +229,24 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       </div>
       
       {/* Title */}
-      <h3 className="text-lg font-semibold mb-1 text-white">{step.title}</h3>
+      <h3 className="text-lg font-semibold mb-1 text-white">
+        <TranslatableText 
+          text={step.title} 
+          forceTranslate={true}
+          className="text-white font-semibold"
+          style={{ textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' }}
+        />
+      </h3>
       
       {/* Content */}
-      <p className="text-sm text-white/80 mb-4">{step.content}</p>
+      <p className="text-sm text-white/80 mb-4">
+        <TranslatableText 
+          text={step.content} 
+          forceTranslate={true}
+          className="text-white/80"
+          style={{ textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' }}
+        />
+      </p>
       
       {/* Custom Infographic - only show for steps that include infographics */}
       {shouldShowInfographic && step.infographicType && (
@@ -250,7 +270,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             }}
           >
             <ChevronLeft className="h-4 w-4" />
-            Back
+            <TranslatableText 
+              text="Back" 
+              forceTranslate={true} 
+              className="text-white"
+            />
           </Button>
         )}
         
@@ -272,7 +296,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
               opacity: 1  // Ensure buttons remain fully opaque
             }}
           >
-            {isLast ? 'Finish' : 'Next'}
+            <TranslatableText 
+              text={isLast ? 'Finish' : 'Next'} 
+              forceTranslate={true}
+              className="text-white" 
+            />
             {!isLast && <ChevronRight className="h-4 w-4" />}
           </Button>
         )}

@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -448,6 +449,10 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
           const event = new CustomEvent('chatRefreshNeeded');
           window.dispatchEvent(event);
         }
+        
+        // Navigate to home page after tutorial completion
+        console.log('Tutorial complete, navigating to home page');
+        navigate('/app/home', { replace: true });
       }, 200);
     } catch (error) {
       console.error('Error completing tutorial:', error);
@@ -556,7 +561,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     }
   };
   
-  // Enhanced skip tutorial function - REMOVED TOAST
+  // Enhanced skip tutorial function with navigation to home
   const skipTutorial = async () => {
     if (!user) return;
     
@@ -574,8 +579,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       setIsActive(false);
       setTutorialCompleted(true);
       
-      // REMOVED TOAST NOTIFICATION
-      
       // Clean up any lingering tutorial classes
       document.body.classList.remove('tutorial-active');
       const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
@@ -592,7 +595,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         }
       });
       
-      console.log('Tutorial skipped by user');
+      console.log('Tutorial skipped by user, navigating to home');
+      // Navigate to home page after skipping the tutorial
+      navigate('/app/home', { replace: true });
     } catch (error) {
       console.error('Error skipping tutorial:', error);
     }
@@ -628,8 +633,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (location.pathname !== '/app/home') {
         // First navigate to app home - use replace to prevent back navigation
         console.log('Tutorial reset - redirecting to app home');
-        
-        // REMOVED TOAST NOTIFICATION
         
         navigate('/app/home', { replace: true });
       } else {

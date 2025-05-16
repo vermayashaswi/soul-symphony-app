@@ -1,3 +1,4 @@
+
 /* Tutorial Overlay Styles - Revised for better visibility and improved infographics display */
 
 /* Base Tutorial Classes */
@@ -44,7 +45,9 @@ body.tutorial-active {
 
 /* Force all tutorial step content to be visible */
 .tutorial-step-container h3,
-.tutorial-step-container p {
+.tutorial-step-container p,
+.tutorial-step-container span,
+.tutorial-step-container div {
   color: white !important;
   opacity: 1 !important;
   visibility: visible !important;
@@ -132,6 +135,35 @@ body.tutorial-active {
   transform: translateZ(0) scale(1.05) !important; /* Force a new stacking context and scale */
   border: 2px solid white !important;
   background-color: white !important; /* Add explicit white background */
+}
+
+/* Fix for Record Entry tab text visibility in both modes */
+.record-entry-tab.tutorial-target * {
+  color: #000 !important; /* Black text for better visibility */
+  text-shadow: none !important; /* Remove text shadow */
+  font-weight: bold !important; /* Make text bold */
+}
+
+/* Special fix for record entry tab span/div elements in dark mode to increase visibility */
+body.dark .record-entry-tab.tutorial-target span,
+body.dark .record-entry-tab.tutorial-target div {
+  color: #ffffff !important; /* Force white in dark mode */
+  text-shadow: 0 1px 2px rgba(0,0,0,0.9) !important; /* Add shadow for contrast */
+  background-color: rgba(26, 31, 44, 0.7) !important; /* Dark semi-transparent background */
+  padding: 2px 5px !important; /* Add padding */
+  border-radius: 4px !important; /* Rounded corners */
+  font-weight: bold !important;
+}
+
+/* Fix specifically for "Record Entry" text label */
+body.dark [value="record"] span:contains("Record") {
+  color: #ffffff !important;
+  background-color: var(--color-theme) !important;
+  padding: 2px 5px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 10px rgba(155, 135, 245, 0.6) !important;
+  text-shadow: none !important;
+  font-weight: bold !important;
 }
 
 /* Ensure proper text coloring for entries tab in light mode */
@@ -269,6 +301,12 @@ body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
 
 .tutorial-buttons button[variant="outline"]:hover {
   background-color: #444444 !important;
+}
+
+/* All button texts must be white */
+.tutorial-buttons button span {
+  color: white !important;
+  text-shadow: 0 0 2px rgba(0,0,0,0.5) !important;
 }
 
 /* Navigation bar styling during active tutorial */
