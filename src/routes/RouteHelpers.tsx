@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -16,14 +17,20 @@ export const isAppRoute = (pathname: string): boolean => {
 };
 
 export const isWebsiteRoute = (pathname: string): boolean => {
-  // Explicitly define website routes
-  const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
-  
   // If it has an app prefix, it's not a website route
   if (isAppRoute(pathname)) {
     console.log(`${pathname} is an app route, so not a website route`);
     return false;
   }
+  
+  // For root URL (/), consider it as a website route
+  if (pathname === '/') {
+    console.log(`${pathname} is root, treating as website route`);
+    return true;
+  }
+  
+  // Explicitly define website routes
+  const websitePrefixes = ['/', '/about', '/pricing', '/terms', '/privacy', '/blog', '/contact', '/faq', '/download'];
   
   // Check for specific website routes
   const isWebsite = websitePrefixes.some(prefix => 

@@ -31,12 +31,12 @@ const HeroSection: React.FC<HeroSectionProps> = ({ openAppStore, openPlayStore }
         style={{ backgroundImage: "url('/lovable-uploads/32abc730-009c-4901-912c-a16e7c2c1ec6.png')" }}
       ></div>
       
-      {/* 3D Background animation */}
-      <Suspense fallback={null}>
+      {/* 3D Background animation - Removed the bubble animation by commenting it out */}
+      {/* <Suspense fallback={null}>
         <div className="absolute inset-0 z-0 opacity-30">
           <ThreeDBackground />
         </div>
-      </Suspense>
+      </Suspense> */}
       
       <div className="container mx-auto px-4 relative z-10">
         <div className="flex flex-col lg:flex-row items-center gap-8 lg:gap-12">

@@ -25,23 +25,25 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
-  // Check if the user is trying to access app features directly from root
+  // Only redirect to app if explicitly requested with a URL parameter
   useEffect(() => {
-    // If user is logged in, redirect them to the app home page
-    if (user) {
-      console.log('Index - User is logged in, redirecting to /app/home', {
-        onboardingComplete,
-        user: !!user
-      });
+    // Only redirect to app features if specifically requested
+    if (urlParams.has('app')) {
+      console.log('Index - User explicitly requested app with ?app parameter');
       
-      if (onboardingComplete) {
-        navigate('/app/home');
+      if (user) {
+        console.log('User is logged in, redirecting to appropriate app page');
+        if (onboardingComplete) {
+          navigate('/app/home');
+        } else {
+          navigate('/app/onboarding');
+        }
       } else {
-        navigate('/app/onboarding');
+        navigate('/app/auth');
       }
     }
     
-    // Check URL parameters for specific redirects
+    // Check URL parameters for specific app features redirects
     if (urlParams.has('insights')) {
       navigate('/app/insights');
     }
@@ -77,7 +79,7 @@ const Index = () => {
     onboardingComplete
   });
 
-  // This should only render the website home page component
+  // Always render the website homepage component when at root URL
   return (
     <>
       <NetworkAwareContent
