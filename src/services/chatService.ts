@@ -112,15 +112,43 @@ export const processChatMessage = async (
     // Check if clarification is needed
     if (plannerData.needsClarification && plannerData.clarificationQuestions) {
       console.log("Query needs clarification, returning interactive message");
+      
+      // Use the specific ambiguity analysis to create a dynamic clarification message
+      let clarificationMessage = "I'd like to understand your question better.";
+      
+      if (plannerData.ambiguityAnalysis && plannerData.ambiguityAnalysis.reasoning) {
+        // Use the reasoning from the ambiguity analysis as the clarification message
+        clarificationMessage = plannerData.ambiguityAnalysis.reasoning;
+      }
+      
+      // Based on ambiguity type, add a more specific prompt
+      if (plannerData.ambiguityAnalysis) {
+        switch(plannerData.ambiguityAnalysis.ambiguityType) {
+          case 'TIME':
+            clarificationMessage = "I'm not sure which time period you're referring to. " + clarificationMessage;
+            break;
+          case 'ENTITY_REFERENCE':
+            clarificationMessage = "I'm not sure which specific items you're referring to. " + clarificationMessage;
+            break;
+          case 'INTENT':
+            clarificationMessage = "I'm not completely clear on what you're asking for. " + clarificationMessage;
+            break;
+          case 'SCOPE':
+            clarificationMessage = "I'm not sure about the scope of your question. " + clarificationMessage;
+            break;
+        }
+      }
+      
       return {
         id: `clarification-${Date.now()}`,
         thread_id: threadId || '',
         role: "assistant",
         sender: "assistant",
-        content: "I'd like to understand the scope of your question better. Are you looking for insights from:",
+        content: clarificationMessage,
         created_at: new Date().toISOString(),
         isInteractive: true,
-        interactiveOptions: plannerData.clarificationQuestions
+        interactiveOptions: plannerData.clarificationQuestions,
+        ambiguityInfo: plannerData.ambiguityAnalysis // Include the full ambiguity analysis
       };
     }
     
