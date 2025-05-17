@@ -130,7 +130,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                     <span className="font-medium">Type:</span> {message.ambiguityInfo.ambiguityType}
                   </div>
                   <div className="mt-1">
-                    <span className="font-medium">Reasoning:</span> {message.ambiguityInfo.reasoning}
+                    <span className="font-medium">Original Reasoning:</span> {message.ambiguityInfo.reasoning}
                   </div>
                   {message.ambiguityInfo.suggestedClarificationQuestions && (
                     <div className="mt-1">
