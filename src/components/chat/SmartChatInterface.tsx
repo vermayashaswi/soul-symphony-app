@@ -268,7 +268,8 @@ const SmartChatInterface = () => {
       debugLog.addEvent("Query Planning", "Breaking down complex query into sub-queries if needed", "info");
       
       updateProcessingStage("Searching for insights...");
-      debugLog.addEvent("AI Processing", "Sending query to AI for processing", "info");
+      debugLog.addEvent("Context-Aware Processing", "Sending query with conversation context", "info");
+      
       const response = await processChatMessage(
         message, 
         user.id, 

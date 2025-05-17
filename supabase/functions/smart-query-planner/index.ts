@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -35,12 +34,85 @@ serve(async (req) => {
 
     console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
     console.log(`User timezone offset: ${timezoneOffset} minutes`);
+    console.log(`Received ${conversationContext.length} conversation context messages`);
     
     // Get the user's local time based on timezone offset
     const userLocalTime = new Date(Date.now() - (timezoneOffset || 0) * 60 * 1000);
     const formattedLocalTime = userLocalTime.toISOString();
     
     console.log(`User's local time: ${formattedLocalTime}`);
+    
+    // Format conversation context for the API request
+    const formattedContext = conversationContext.map(msg => ({
+      role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
+      content: msg.content
+    }));
+    
+    // Enhanced query analysis that considers conversation context
+    // This will analyze if the query is ambiguous in the current context
+    const ambiguityAnalysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [
+          {
+            role: 'system',
+            content: `You are an AI context analyst for a journaling application. Your task is to analyze the user's current query and determine if it requires clarification based on the conversation context.
+
+Analyze the user's query for the following types of ambiguity:
+
+1. TIME AMBIGUITY: Does the query refer to a specific time period that's not clearly defined? (e.g., "How was I feeling?", "What are my mood patterns?")
+
+2. ENTITY REFERENCE AMBIGUITY: Does the query contain pronouns or references to entities mentioned in previous messages? (e.g., "Tell me more about that", "How does it affect me?")
+
+3. INTENT AMBIGUITY: Is the user's intention unclear from the query alone? (e.g., "Analyze my journal", "What do you see?")
+
+4. SCOPE AMBIGUITY: Is it unclear whether the user wants analysis of recent entries or their entire journal history? (e.g., "What are my top emotions?", "How would you describe my personality?")
+
+Consider the conversation context when determining if clarification is needed. If recent messages provide enough context, the query may not need clarification.
+
+Respond with a JSON object like this:
+{
+  "needsClarification": boolean,
+  "ambiguityType": "TIME"|"ENTITY_REFERENCE"|"INTENT"|"SCOPE"|"NONE",
+  "reasoning": "Brief explanation of why clarification is needed or not",
+  "suggestedClarificationQuestions": ["Question 1", "Question 2"]  // If clarification is needed
+}
+
+If no clarification is needed, set needsClarification to false and ambiguityType to "NONE".`
+          },
+          ...formattedContext.slice(-5), // Include up to 5 most recent messages for context
+          { role: 'user', content: message }
+        ],
+        temperature: 0.1,
+        max_tokens: 500
+      }),
+    });
+
+    if (!ambiguityAnalysisResponse.ok) {
+      console.error('Failed to analyze ambiguity:', await ambiguityAnalysisResponse.text());
+      throw new Error('Failed to analyze query ambiguity');
+    }
+
+    const ambiguityAnalysis = await ambiguityAnalysisResponse.json();
+    console.log("Ambiguity analysis completed");
+    
+    let ambiguityResult;
+    try {
+      // Extract the JSON from the response
+      const analysisContent = ambiguityAnalysis.choices[0].message.content.trim();
+      ambiguityResult = JSON.parse(analysisContent);
+      console.log("Parsed ambiguity analysis:", ambiguityResult);
+    } catch (error) {
+      console.error("Error parsing ambiguity analysis:", error);
+      console.log("Raw analysis content:", ambiguityAnalysis.choices[0].message.content);
+      // Default to no ambiguity if parsing fails
+      ambiguityResult = { needsClarification: false, ambiguityType: "NONE", reasoning: "Failed to parse analysis" };
+    }
     
     // Check message types and planQuery
     const messageTypesResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -136,48 +208,88 @@ Examples:
       console.log("Detected rating or analysis request, ensuring journal_specific classification");
     }
     
-    // Check if we need to clarify time scope
-    const needsHistoricalData = /trait|character|personality|who am i|analyze me|behavior pattern|consistent|historical|always|ever|throughout|overall/i.test(message);
-    const isExplicitlyRecent = /recent|lately|past few|last \d+ days|this week|today|yesterday/i.test(message);
-    const needsClarification = queryType === 'journal_specific' && 
-                               needsHistoricalData && 
-                               !isExplicitlyRecent && 
-                               !lowerMessage.includes('all time') &&
-                               !lowerMessage.includes('historically') &&
-                               !lowerMessage.includes('all entries') &&
-                               !lowerMessage.includes('all journal entries') &&
-                               !lowerMessage.includes('all my entries');
+    // Check if we need to clarify based on ambiguity analysis
+    const needsClarification = ambiguityResult.needsClarification || false;
+    
+    // Generate dynamic clarification questions based on ambiguity type
+    let clarificationQuestions = null;
     
     if (needsClarification) {
-      console.log("Query needs clarification about time scope");
+      console.log(`Query needs clarification, ambiguity type: ${ambiguityResult.ambiguityType}`);
+      
+      switch(ambiguityResult.ambiguityType) {
+        case "TIME":
+          clarificationQuestions = [
+            {
+              text: "Search all my journal entries (historical data)",
+              action: "expand_search",
+              parameters: { useHistoricalData: true }
+            },
+            {
+              text: "Search recent entries only (last 30 days)",
+              action: "default_search",
+              parameters: { useHistoricalData: false }
+            }
+          ];
+          break;
+          
+        case "SCOPE":
+          clarificationQuestions = [
+            {
+              text: "Analyze my entire journal history",
+              action: "expand_search",
+              parameters: { useHistoricalData: true }
+            },
+            {
+              text: "Focus on recent patterns only",
+              action: "default_search",
+              parameters: { useHistoricalData: false }
+            }
+          ];
+          break;
+          
+        case "INTENT":
+          // Generate questions dynamically based on detected possible intents
+          clarificationQuestions = [
+            {
+              text: "I want to understand trends in my journal",
+              action: "expand_search",
+              parameters: { analysisType: "trends" }
+            },
+            {
+              text: "I want specific insights from recent entries",
+              action: "default_search",
+              parameters: { analysisType: "specific" }
+            }
+          ];
+          break;
+          
+        default:
+          // Default time-based clarification
+          clarificationQuestions = [
+            {
+              text: "Search all my journal entries",
+              action: "expand_search",
+              parameters: { useHistoricalData: true }
+            },
+            {
+              text: "Search recent entries only",
+              action: "default_search",
+              parameters: { useHistoricalData: false }
+            }
+          ];
+      }
     }
     
     // Build the search plan
     let plan = null;
     let directResponse = null;
-    let clarificationQuestions = null;
 
     if (queryType === 'mental_health_general' && !isRatingOrAnalysisRequest) {
       console.log("Query classified as general mental health question");
       directResponse = null; // Process general queries with our standard chat flow
     } else {
       console.log("Query classified as journal-specific or rating request");
-      
-      if (needsClarification) {
-        // Build clarification questions
-        clarificationQuestions = [
-          {
-            text: "Search all my journal entries (historical data)",
-            action: "expand_search",
-            parameters: { useHistoricalData: true }
-          },
-          {
-            text: "Search recent entries only (last 30 days)",
-            action: "default_search",
-            parameters: { useHistoricalData: false }
-          }
-        ];
-      }
       
       // Build a plan for journal-specific queries
       const planResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -198,6 +310,9 @@ IMPORTANT DATABASE INFORMATION:
 - The user's current local time is: ${formattedLocalTime} 
 - The user's timezone offset from UTC is: ${timezoneOffset || 0} minutes
 - When filtering by date ranges, you need to consider the user's timezone
+
+CONVERSATION CONTEXT:
+${formattedContext.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n')}
 
 For the following user query, create a JSON search plan with these components:
 
@@ -224,13 +339,18 @@ For the following user query, create a JSON search plan with these components:
 
 5. "needs_more_context": Boolean (true if query relates to previous messages)
 
-6. ${needsClarification ? '"needs_historical_data": Boolean (true for comprehensive trait/personality analysis or for reviewing all user history)' : ''}
+6. "is_segmented": Boolean (true if the query should be broken into sub-questions)
+
+7. "subqueries": [] (array of sub-questions if the query is complex and needs to be segmented)
+
+8. "reasoning": String explanation of your planning decisions
 
 Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
 
 Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
               `
             },
+            ...formattedContext.slice(-3), // Include the 3 most recent context messages
             { role: 'user', content: message }
           ],
           temperature: 0.3,
@@ -273,11 +393,6 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
           plan.needs_data_aggregation = true;
           plan.match_count = Math.max(plan.match_count || 15, 30); // Ensure we get enough data
         }
-
-        // If query needs historical data and clarification
-        if (needsClarification && needsHistoricalData) {
-          plan.needs_historical_data = true;
-        }
       } catch (e) {
         console.error('Error parsing plan JSON:', e);
         console.error('Raw plan text:', planText);
@@ -309,7 +424,8 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
         queryType: isRatingOrAnalysisRequest ? 'journal_specific' : queryType,
         directResponse,
         needsClarification,
-        clarificationQuestions
+        clarificationQuestions,
+        ambiguityAnalysis: ambiguityResult
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
