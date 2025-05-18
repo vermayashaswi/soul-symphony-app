@@ -58,6 +58,54 @@ const getRecentThreadMessages = async (
   }
 };
 
+// Helper function to detect if a response to a clarification question indicates user wants historical data
+const isRequestingHistoricalData = (
+  message: string, 
+  recentMessages: any[]
+): boolean => {
+  // Check if this message is responding to a clarification request
+  const hasPreviousClarification = recentMessages.some(msg => 
+    msg.sender === 'assistant' && 
+    (msg.content || '').includes('understand your question better')
+  );
+  
+  if (!hasPreviousClarification) {
+    return false;
+  }
+  
+  // Check for keywords that indicate historical data request
+  const historicalKeywords = [
+    'entire journal', 'all time', 'all my entries', 'complete history',
+    'everything', 'all of it', 'full history', 'all historical',
+    'overall', 'always', 'in general'
+  ];
+  
+  const messageLower = message.toLowerCase();
+  return historicalKeywords.some(keyword => messageLower.includes(keyword));
+};
+
+// Helper function to detect if a message is affirming a suggested analysis
+const isAffirmingAnalysis = (message: string, recentMessages: any[]): boolean => {
+  // Check if there's a prior clarification question
+  const hasPreviousClarification = recentMessages.some(msg => 
+    msg.sender === 'assistant' && 
+    (msg.content || '').includes('understand your question better')
+  );
+  
+  if (!hasPreviousClarification) {
+    return false;
+  }
+  
+  // Check for affirmative expressions
+  const affirmativeKeywords = [
+    'yes', 'sure', 'okay', 'ok', 'go ahead', 'please do', 'that works',
+    'sounds good', 'definitely', 'absolutely', 'proceed', 'continue', 'yep', 'yup'
+  ];
+  
+  const messageLower = message.toLowerCase();
+  return affirmativeKeywords.some(keyword => messageLower.includes(keyword));
+};
+
 // Helper function to convert third-person reasoning to second-person (direct address)
 const convertToDirectAddress = (text: string): string => {
   if (!text) return "";
@@ -131,6 +179,21 @@ export const processChatMessage = async (
     const recentMessages = await getRecentThreadMessages(threadId, 10);
     console.log(`Got ${recentMessages.length} recent messages for context`);
     
+    // Check if this message is responding to a previous clarification request
+    const isHistoricalRequest = isRequestingHistoricalData(message, recentMessages);
+    const isAffirmative = isAffirmingAnalysis(message, recentMessages);
+    
+    // If user is affirming or indicating historical data, set parameters accordingly
+    if (isHistoricalRequest) {
+      parameters.useHistoricalData = true;
+      console.log("User is requesting historical data analysis based on message content");
+    }
+    
+    if (isAffirmative || isHistoricalRequest) {
+      parameters.skipClarification = true;
+      console.log("User is affirming previous suggestion, skipping further clarification");
+    }
+    
     // Step 1: Use smart-query-planner to classify and plan the query
     console.log("Calling smart-query-planner for query analysis and planning");
     const { data: plannerData, error: plannerError } = await supabase.functions.invoke(
@@ -141,7 +204,9 @@ export const processChatMessage = async (
           userId,
           threadId,
           timezoneOffset,
-          conversationContext: recentMessages.reverse() // Reverse to get chronological order
+          conversationContext: recentMessages.reverse(), // Reverse to get chronological order
+          skipClarification: parameters.skipClarification || false,
+          useHistoricalData: parameters.useHistoricalData || false
         }
       }
     );
@@ -154,42 +219,29 @@ export const processChatMessage = async (
       console.log("Generated fallback query plan:", queryPlan);
       
       // Continue with the local query plan
-      return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset);
+      return await processWithQueryPlan(
+        message, 
+        userId, 
+        queryTypes, 
+        threadId, 
+        queryPlan, 
+        enableDiagnostics, 
+        timezoneOffset,
+        parameters.useHistoricalData || false
+      );
     }
     
     console.log("Received response from smart-query-planner:", plannerData);
     
-    // Check if clarification is needed
-    if (plannerData.needsClarification && plannerData.clarificationQuestions) {
+    // Check if clarification is still needed after context evaluation
+    if (plannerData.needsClarification && 
+        plannerData.clarificationQuestions && 
+        !parameters.skipClarification) {
+      
       console.log("Query needs clarification, returning interactive message");
       
       // Use the specific ambiguity analysis to create a dynamic clarification message
       let clarificationMessage = generateClarificationMessage(plannerData.ambiguityAnalysis);
-      
-      // Check if this is a follow-up to a previous ambiguous query
-      const isFollowUp = recentMessages.some(msg => 
-        msg.sender === 'assistant' && 
-        (msg.content || '').includes('understand your question better')
-      );
-      
-      // If this appears to be answering our clarification and mentions "entire journal"
-      if (isFollowUp && message.toLowerCase().includes('entire journal')) {
-        console.log("User is requesting entire journal history, setting historical data flag");
-        parameters.useHistoricalData = true;
-        
-        // Create a new query plan based on the original with no date constraints
-        if (plannerData.plan) {
-          const queryPlan = convertGptPlanToQueryPlan(plannerData.plan);
-          // Remove date filters for historical data
-          if (queryPlan.filters && queryPlan.filters.dateRange) {
-            console.log("Removing date filters for historical data search");
-            delete queryPlan.filters.dateRange;
-          }
-          
-          // Process with the updated query plan
-          return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset, true);
-        }
-      }
       
       return {
         id: `clarification-${Date.now()}`,
@@ -222,13 +274,22 @@ export const processChatMessage = async (
     console.log("Generated query plan:", queryPlan);
     
     // If useHistoricalData parameter is set, remove date filters
-    if (parameters.useHistoricalData === true && queryPlan.filters.dateRange) {
+    if ((parameters.useHistoricalData === true || isHistoricalRequest) && queryPlan.filters && queryPlan.filters.dateRange) {
       console.log("Removing date filters to search all historical data");
       delete queryPlan.filters.dateRange;
     }
     
     // Process with the query plan
-    return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset);
+    return await processWithQueryPlan(
+      message, 
+      userId, 
+      queryTypes, 
+      threadId, 
+      queryPlan, 
+      enableDiagnostics, 
+      timezoneOffset,
+      parameters.useHistoricalData || isHistoricalRequest
+    );
   } catch (error: any) {
     console.error("Error processing chat message:", error);
     return {
