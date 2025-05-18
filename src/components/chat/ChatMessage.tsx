@@ -1,4 +1,3 @@
-
 import React, { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -14,7 +13,7 @@ import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkd
 
 interface ChatMessageProps {
   message: {
-    role: 'user' | 'assistant';
+    role: 'user' | 'assistant' | 'error';
     content: string;
     analysis?: any;
     references?: any[];
@@ -42,9 +41,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return message.content;
   }, [message]);
   
-  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
-  const hasAmbiguityInfo = message.role === 'assistant' && message.ambiguityInfo && message.ambiguityInfo.needsClarification;
-  const hasInteractiveOptions = message.role === 'assistant' && message.isInteractive && message.interactiveOptions && message.interactiveOptions.length > 0;
+  // Determine if it's an assistant message, handling error role as assistant for UI purposes
+  const isAssistantMessage = message.role === 'assistant' || message.role === 'error';
+  
+  const hasReferences = isAssistantMessage && message.references && message.references.length > 0;
+  const hasAmbiguityInfo = isAssistantMessage && message.ambiguityInfo && message.ambiguityInfo.needsClarification;
+  const hasInteractiveOptions = isAssistantMessage && message.isInteractive && message.interactiveOptions && message.interactiveOptions.length > 0;
   
   return (
     <motion.div 
@@ -53,7 +55,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       transition={{ duration: 0.3 }}
       className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
     >
-      {message.role === 'assistant' && (
+      {isAssistantMessage && (
         <Avatar className="h-10 w-10 border border-primary/20">
           <AvatarImage 
             src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png" 
@@ -76,7 +78,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
         data-role={message.role}
       >
-        {message.role === 'assistant' ? (
+        {isAssistantMessage ? (
           <TranslatableMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none" forceTranslate={true}>
             {formattedContent}
           </TranslatableMarkdown>
@@ -101,7 +103,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
         
-        {showAnalysis && message.role === 'assistant' && message.analysis && (
+        {showAnalysis && isAssistantMessage && message.analysis && (
           <div className="mt-3 text-xs md:text-sm opacity-80">
             <Separator className="my-2" />
             <div className="font-semibold">
@@ -124,7 +126,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
         
         {/* Display ambiguity info when in debug/analysis mode */}
-        {showAnalysis && message.role === 'assistant' && hasAmbiguityInfo && (
+        {showAnalysis && isAssistantMessage && hasAmbiguityInfo && (
           <div className="mt-3">
             <Button
               variant="ghost"
@@ -173,7 +175,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
         
-        {showAnalysis && message.role === 'assistant' && message.diagnostics && renderDiagnostics(message.diagnostics, isMobile)}
+        {showAnalysis && isAssistantMessage && message.diagnostics && renderDiagnostics(message.diagnostics, isMobile)}
         
         {message.role === 'assistant' && message.references && message.references.length > 0 && (
           <div className="mt-3">

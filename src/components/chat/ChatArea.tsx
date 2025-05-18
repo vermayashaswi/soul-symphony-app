@@ -37,7 +37,17 @@ const ChatArea = ({
         {chatMessages.map((message, index) => (
           <ChatMessage 
             key={`${message.id || index}`} 
-            message={message} 
+            message={{
+              role: message.role === 'error' ? 'assistant' : message.role, // Handle error role
+              content: message.content,
+              references: message.references || message.reference_entries,
+              analysis: message.analysis || message.analysis_data,
+              hasNumericResult: message.hasNumericResult || message.has_numeric_result,
+              ambiguityInfo: message.ambiguityInfo,
+              isInteractive: message.isInteractive,
+              interactiveOptions: message.interactiveOptions,
+              diagnostics: message.diagnostics
+            }}
             showAnalysis={debugMode} 
             onInteractiveOptionClick={onInteractiveOptionClick}
           />

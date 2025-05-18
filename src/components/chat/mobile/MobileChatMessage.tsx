@@ -8,7 +8,7 @@ import { Button } from "@/components/ui/button";
 
 interface MobileChatMessageProps {
   message: {
-    role: 'user' | 'assistant';
+    role: 'user' | 'assistant' | 'error';
     content: string;
     references?: any[];
     analysis?: any;
@@ -26,14 +26,17 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
   onInteractiveOptionClick
 }) => {
   const { user } = useAuth();
-
+  
   // Create memoized content to avoid re-renders
   const formattedContent = React.useMemo(() => {
     return message.content;
   }, [message.content]);
+  
+  // Determine if it's an assistant message, handling error role as assistant
+  const isAssistantMessage = message.role === 'assistant' || message.role === 'error';
 
   const hasInteractiveOptions = 
-    message.role === 'assistant' && 
+    isAssistantMessage && 
     message.isInteractive && 
     message.interactiveOptions && 
     message.interactiveOptions.length > 0;
@@ -44,7 +47,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
         message.role === "user" ? "justify-end" : "justify-start"
       }`}
     >
-      {message.role === "assistant" && (
+      {isAssistantMessage && (
         <Avatar className="h-8 w-8 border border-primary/20 mt-1">
           <AvatarImage
             src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png"
