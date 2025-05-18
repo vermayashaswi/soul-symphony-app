@@ -33,6 +33,24 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, isLoading]);
 
+  // Helper function to check if the message is a direct response to a clarification
+  const isDirectClarificationResponse = (index: number): boolean => {
+    if (index <= 0) return false;
+    
+    const prevMessage = chatMessages[index - 1];
+    const currentMessage = chatMessages[index];
+    
+    // Check if previous message was from assistant and contained a clarification question
+    const isPrevClarification = prevMessage.sender === 'assistant' && 
+      (prevMessage.content.toLowerCase().includes('clarify') || 
+       prevMessage.isInteractive);
+       
+    // Check if current message is from user
+    const isUserResponse = currentMessage.sender === 'user' || currentMessage.role === 'user';
+    
+    return isPrevClarification && isUserResponse;
+  };
+
   return (
     <div className="flex flex-col p-4 overflow-y-auto h-full pb-20">
       {chatMessages.map((message, index) => (
@@ -85,11 +103,28 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                           key={idx}
                           variant="outline"
                           className="text-left justify-start"
-                          onClick={() => onInteractiveOptionClick(option)}
+                          onClick={() => {
+                            // Mark this as a clarification response for special handling
+                            const enhancedOption = {
+                              ...option,
+                              isClarificationResponse: true,
+                              originalQuery: chatMessages.find(msg => 
+                                msg.sender === 'user' || msg.role === 'user'
+                              )?.content || ''
+                            };
+                            onInteractiveOptionClick(enhancedOption);
+                          }}
                         >
                           {option.text}
                         </Button>
                       ))}
+                    </div>
+                  )}
+
+                  {/* Add special handling for clarification responses */}
+                  {isDirectClarificationResponse(index) && message.sender === 'user' && (
+                    <div className="mt-2 text-xs opacity-70 italic">
+                      <p>Clarification response detected. Analyzing...</p>
                     </div>
                   )}
 
