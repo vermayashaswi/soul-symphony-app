@@ -59,7 +59,8 @@ serve(async (req) => {
       threadId, 
       includeDiagnostics, 
       queryPlan,
-      timezoneOffset 
+      timezoneOffset,
+      isHistoricalDataRequest 
     } = await req.json();
 
     if (!message) {
@@ -304,6 +305,13 @@ serve(async (req) => {
     // Handle the search strategy from the query plan
     if (queryPlan) {
       console.log(`Using search strategy: ${queryPlan.searchStrategy}`);
+      
+      // For historical data requests, use a wider date range or no date filter
+      if (isHistoricalDataRequest && queryPlan.filters && queryPlan.filters.dateRange) {
+        console.log("Historical data request detected, removing date filters");
+        delete queryPlan.filters.dateRange;
+      }
+      
       diagnostics.steps.push(createDiagnosticStep(
         "Search Strategy", 
         "success", 
@@ -335,15 +343,17 @@ serve(async (req) => {
     console.log(`Found ${entries.length} relevant entries`);
     diagnostics.steps.push(createDiagnosticStep("Knowledge Base Search", "success", `Found ${entries.length} entries`));
 
-    // Check if we found any entries when using date filters
-    if (queryPlan?.filters?.dateRange && entries.length === 0) {
-      console.log("No entries found for the specified time range");
-      diagnostics.steps.push(createDiagnosticStep("Time Range Check", "warning", "No entries found in specified time range"));
+    // Check if we found any entries
+    if (entries.length === 0) {
+      console.log("No entries found");
+      diagnostics.steps.push(createDiagnosticStep("Entry Check", "warning", "No entries found"));
       
       // Return a response with no entries but proper message
       return new Response(
         JSON.stringify({ 
-          response: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
+          response: isHistoricalDataRequest 
+            ? "I don't see any journal entries that match what you're asking about in your entire journal history."
+            : "I don't see any journal entries that match what you're asking about for the specified time period.",
           diagnostics: includeDiagnostics ? diagnostics : undefined,
           references: [],
           noEntriesForTimeRange: true

@@ -21,10 +21,19 @@ export interface ChatMessage {
   analysis?: any; // Alias for analysis_data for backward compatibility
   hasNumericResult?: boolean; // Alias for has_numeric_result for backward compatibility
   diagnostics?: any; // For debug diagnostics
+  ambiguityInfo?: AmbiguityAnalysis; // New field for ambiguity information
 }
 
 export interface InteractiveOption {
   text: string;
   action: string;
   parameters?: Record<string, any>;
+}
+
+// New interface for ambiguity analysis results
+export interface AmbiguityAnalysis {
+  needsClarification: boolean;
+  ambiguityType: 'TIME' | 'ENTITY_REFERENCE' | 'INTENT' | 'SCOPE' | 'NONE';
+  reasoning: string;
+  suggestedClarificationQuestions?: string[];
 }

@@ -20,6 +20,7 @@ interface ChatMessageProps {
     references?: any[];
     diagnostics?: any;
     hasNumericResult?: boolean;
+    ambiguityInfo?: any; // Add support for ambiguity info
   };
   showAnalysis: boolean;
 }
@@ -27,6 +28,7 @@ interface ChatMessageProps {
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis }) => {
   const { isMobile } = useIsMobile();
   const [showReferences, setShowReferences] = useState(false);
+  const [showAmbiguityInfo, setShowAmbiguityInfo] = useState(false);
   const { user } = useAuth();
   
   const formattedContent = React.useMemo(() => {
@@ -34,6 +36,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
   }, [message]);
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
+  const hasAmbiguityInfo = message.role === 'assistant' && message.ambiguityInfo && message.ambiguityInfo.needsClarification;
   
   return (
     <motion.div 
@@ -92,6 +95,56 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                 </pre>
               </>
             )}
+          </div>
+        )}
+        
+        {/* Display ambiguity info when in debug/analysis mode */}
+        {showAnalysis && message.role === 'assistant' && hasAmbiguityInfo && (
+          <div className="mt-3">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-7 text-xs md:text-sm font-medium flex items-center gap-1 text-muted-foreground"
+              onClick={() => setShowAmbiguityInfo(!showAmbiguityInfo)}
+            >
+              <TranslatableText 
+                text={`Ambiguity Analysis (${message.ambiguityInfo.ambiguityType})`}
+                forceTranslate={true}
+              />
+              {showAmbiguityInfo ? (
+                <ChevronUp className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+              ) : (
+                <ChevronDown className="h-3 w-3 md:h-4 md:w-4 ml-1" />
+              )}
+            </Button>
+            
+            <AnimatePresence>
+              {showAmbiguityInfo && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-2 border-l-2 border-primary/30 pl-3 pr-1 text-xs"
+                >
+                  <div>
+                    <span className="font-medium">Type:</span> {message.ambiguityInfo.ambiguityType}
+                  </div>
+                  <div className="mt-1">
+                    <span className="font-medium">Original Reasoning:</span> {message.ambiguityInfo.reasoning}
+                  </div>
+                  {message.ambiguityInfo.suggestedClarificationQuestions && (
+                    <div className="mt-1">
+                      <span className="font-medium">Suggested Questions:</span>
+                      <ul className="pl-4 mt-1 list-disc">
+                        {message.ambiguityInfo.suggestedClarificationQuestions.map((q: string, idx: number) => (
+                          <li key={idx}>{q}</li>
+                        ))}
+                      </ul>
+                    </div>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         )}
         
