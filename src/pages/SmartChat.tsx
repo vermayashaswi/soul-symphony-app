@@ -383,10 +383,6 @@ export default function SmartChat() {
       >
         <div className="flex-1 flex flex-col">
           <MobileChatInterface 
-            chatMessages={[]} // Provide default empty array for chatMessages
-            isLoading={false} // Default isLoading to false
-            showAnalysis={false} // Default showAnalysis to false
-            onSend={async () => {}} // Default empty function for onSend
             currentThreadId={currentThreadId}
             onSelectThread={handleSelectThread}
             onCreateNewThread={createNewThread}
