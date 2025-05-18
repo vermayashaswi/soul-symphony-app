@@ -20,12 +20,19 @@ interface ChatMessageProps {
     references?: any[];
     diagnostics?: any;
     hasNumericResult?: boolean;
-    ambiguityInfo?: any; // Add support for ambiguity info
+    ambiguityInfo?: any; 
+    isInteractive?: boolean;
+    interactiveOptions?: any[];
   };
   showAnalysis: boolean;
+  onInteractiveOptionClick?: (option: any) => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis }) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ 
+  message, 
+  showAnalysis, 
+  onInteractiveOptionClick 
+}) => {
   const { isMobile } = useIsMobile();
   const [showReferences, setShowReferences] = useState(false);
   const [showAmbiguityInfo, setShowAmbiguityInfo] = useState(false);
@@ -37,6 +44,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
   const hasAmbiguityInfo = message.role === 'assistant' && message.ambiguityInfo && message.ambiguityInfo.needsClarification;
+  const hasInteractiveOptions = message.role === 'assistant' && message.isInteractive && message.interactiveOptions && message.interactiveOptions.length > 0;
   
   return (
     <motion.div 
@@ -74,6 +82,23 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
           </TranslatableMarkdown>
         ) : (
           <TranslatableText text={message.content} forceTranslate={true} />
+        )}
+        
+        {/* Interactive options for clarification questions */}
+        {hasInteractiveOptions && (
+          <div className="mt-4 flex flex-col gap-2">
+            {message.interactiveOptions.map((option, idx) => (
+              <Button
+                key={idx}
+                variant="outline"
+                size="sm"
+                className="text-left justify-start h-auto py-2"
+                onClick={() => onInteractiveOptionClick && onInteractiveOptionClick(option)}
+              >
+                <TranslatableText text={option.text} forceTranslate={true} />
+              </Button>
+            ))}
+          </div>
         )}
         
         {showAnalysis && message.role === 'assistant' && message.analysis && (

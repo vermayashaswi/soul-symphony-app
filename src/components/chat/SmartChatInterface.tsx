@@ -499,7 +499,9 @@ const SmartChatInterface = () => {
         break;
         
       default:
-        console.warn("Unknown interactive action:", option.action);
+        // If no specific action is defined, send the text as a user message
+        handleSendMessage(option.text);
+        break;
     }
   };
 

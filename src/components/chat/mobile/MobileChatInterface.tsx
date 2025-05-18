@@ -202,7 +202,44 @@ export default function MobileChatInterface({
     }
   };
 
-  const handleSendMessage = async (message: string) => {
+  const handleInteractiveOptionClick = (option: any) => {
+    if (!option || !option.action) return;
+    
+    debugLog.addEvent("Interactive Option", `User clicked: ${option.text}`, "info");
+    
+    switch (option.action) {
+      case 'expand_search':
+        // Re-run the last message with historical data parameter
+        const lastUserMessage = [...messages]
+          .reverse()
+          .find(msg => msg.role === 'user');
+        
+        if (lastUserMessage?.content) {
+          debugLog.addEvent("Search Expansion", "[Mobile] Re-running query with expanded historical scope", "info");
+          handleSendMessage(lastUserMessage.content, { useHistoricalData: true });
+        }
+        break;
+        
+      case 'default_search':
+        // Re-run with default parameters
+        const lastMsg = [...messages]
+          .reverse()
+          .find(msg => msg.role === 'user');
+          
+        if (lastMsg?.content) {
+          debugLog.addEvent("Search Default", "[Mobile] Re-running query with default time scope", "info");
+          handleSendMessage(lastMsg.content, { useHistoricalData: false });
+        }
+        break;
+        
+      default:
+        // If no specific action is defined, send the text as a user message
+        handleSendMessage(option.text);
+        break;
+    }
+  };
+
+  const handleSendMessage = async (message: string, parameters: Record<string, any> = {}) => {
     if (!message.trim()) return;
     if (!user?.id) {
       toast({
@@ -317,9 +354,43 @@ export default function MobileChatInterface({
         user.id, 
         queryTypes, 
         currentThreadId,
-        false
+        false,
+        parameters
       );
       
+      // Handle interactive messages
+      if (response.isInteractive && response.interactiveOptions) {
+        debugLog.addEvent("AI Processing", "[Mobile] Received interactive clarification message", "info");
+        setMessages(prev => [
+          ...prev, 
+          { 
+            role: 'assistant', 
+            content: response.content,
+            isInteractive: true,
+            interactiveOptions: response.interactiveOptions
+          }
+        ]);
+        
+        // Save the interactive message to the database
+        try {
+          const savedResponse = await saveMessage(
+            currentThreadId,
+            response.content,
+            'assistant',
+            undefined,
+            undefined,
+            false,
+            true,
+            response.interactiveOptions
+          );
+          debugLog.addEvent("Database", `[Mobile] Interactive message saved with ID: ${savedResponse?.id}`, "success");
+        } catch (e) {
+          debugLog.addEvent("Database", `[Mobile] Error saving interactive message: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
+        }
+        
+        return;
+      }
+
       const responseInfo = {
         role: response.role,
         hasReferences: !!response.references?.length,
@@ -624,6 +695,7 @@ export default function MobileChatInterface({
                 key={index} 
                 message={message} 
                 showAnalysis={false}
+                onInteractiveOptionClick={handleInteractiveOptionClick}
               />
             ))}
           </div>
