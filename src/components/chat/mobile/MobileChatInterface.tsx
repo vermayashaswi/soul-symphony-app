@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { cn } from "@/lib/utils";
 import { Mic, Send, X } from "lucide-react";
@@ -16,6 +17,11 @@ interface MobileChatInterfaceProps {
   onSend: (message: string, isAudio: boolean) => Promise<void>;
   onInteractiveOptionClick?: (option: any) => void;
   showAnalysis: boolean;
+  // Add the missing properties
+  currentThreadId?: string | null;
+  onSelectThread?: (threadId: string) => void;
+  onCreateNewThread?: () => Promise<string | null>;
+  userId?: string;
 }
 
 const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
@@ -24,7 +30,12 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
   processingStage,
   onSend,
   onInteractiveOptionClick,
-  showAnalysis
+  showAnalysis,
+  // Add the new properties to the destructured props
+  currentThreadId,
+  onSelectThread,
+  onCreateNewThread,
+  userId
 }) => {
   const [message, setMessage] = useState("");
   const [isRecording, setIsRecording] = useState(false);
