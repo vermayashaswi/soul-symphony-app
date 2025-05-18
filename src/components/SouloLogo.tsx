@@ -70,14 +70,16 @@ const SouloLogo = ({
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>S</span>
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>O</span>
       <span className={cn("relative inline-block", sizeClasses[size], smileyClassName)}>
-        {/* U-shaped character instead of circle */}
+        {/* Circular face instead of U-shaped character */}
         <span className="absolute inset-0 flex items-center justify-center">
           <span className="relative w-full h-full flex items-center justify-center">
-            {/* U shape */}
-            <div className="w-full h-3/4 border-2 border-current rounded-b-full border-t-0 flex items-end pb-[2px]">
+            {/* Circle shape */}
+            <div className="w-full h-full rounded-full border-2 border-current flex items-center justify-center">
               {/* Eyes */}
-              <span className="absolute top-[25%] left-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
-              <span className="absolute top-[25%] right-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
+              <span className="absolute top-[30%] left-[30%] w-[10%] h-[10%] rounded-full bg-current"></span>
+              <span className="absolute top-[30%] right-[30%] w-[10%] h-[10%] rounded-full bg-current"></span>
+              {/* Smile */}
+              <span className="absolute bottom-[30%] w-[60%] h-[30%] border-b-2 border-current rounded-b-full"></span>
             </div>
           </span>
         </span>

@@ -10,8 +10,10 @@ function App() {
   return (
     <DebugModeProvider>
       <TranslationProvider>
-        <AppRoutes />
-        <Toaster />
+        <div className="app-root">
+          <AppRoutes />
+          <Toaster />
+        </div>
       </TranslationProvider>
     </DebugModeProvider>
   );
