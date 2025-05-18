@@ -57,123 +57,6 @@ const getRecentThreadMessages = async (
   }
 };
 
-// Helper function to convert third-person reasoning to second-person (direct address)
-const convertToDirectAddress = (text: string): string => {
-  if (!text) return "";
-  
-  // Replace common third-person phrases with second-person equivalents
-  return text
-    .replace(/the user is/gi, "you are")
-    .replace(/the user has/gi, "you have")
-    .replace(/the user wants/gi, "you want")
-    .replace(/the user needs/gi, "you need")
-    .replace(/the user's/gi, "your")
-    .replace(/the user/gi, "you")
-    .replace(/they are/gi, "you are")
-    .replace(/their/gi, "your")
-    .replace(/them/gi, "you")
-    .replace(/it's unclear whether/gi, "I'm not clear if")
-    .replace(/it is unclear whether/gi, "I'm not clear if")
-    .replace(/it is not clear/gi, "I'm not clear")
-    .replace(/it's not clear/gi, "I'm not clear");
-};
-
-// Helper function to generate a personalized clarification message based on ambiguity type
-const generateClarificationMessage = (ambiguityAnalysis: any): string => {
-  if (!ambiguityAnalysis) return "I'd like to understand your question better.";
-  
-  let personalizedReasoning = convertToDirectAddress(ambiguityAnalysis.reasoning);
-  let introPhrase = "";
-  
-  // Add a type-specific introduction
-  switch(ambiguityAnalysis.ambiguityType) {
-    case 'TIME':
-      introPhrase = "I need to clarify which time period you're interested in. ";
-      break;
-    case 'ENTITY_REFERENCE':
-      introPhrase = "I want to make sure I understand which specific items you're referring to. ";
-      break;
-    case 'INTENT':
-      introPhrase = "I'd like to better understand what you're looking for. ";
-      break;
-    case 'SCOPE':
-      introPhrase = "I need to clarify the scope of your question. ";
-      break;
-    default:
-      introPhrase = "I'd like to understand your question better. ";
-  }
-  
-  return introPhrase + personalizedReasoning;
-};
-
-// New helper function to create a simplified query plan from conversation context
-function createSimplifiedQueryPlanFromContext(
-  message: string,
-  recentMessages: any[],
-  queryTypes: any
-): any {
-  // Start with a default query plan
-  const defaultPlan = {
-    filters: {},
-    matchCount: 10,
-    timeRange: null
-  };
-  
-  // Try to extract time information from conversation context
-  const timeKeywords = ['overall', 'last week', 'last month', 'yesterday', 'today', 'last year', 'entire journal'];
-  let timeContext = null;
-  
-  // Look for time-related context in the recent messages
-  for (const msg of recentMessages) {
-    const content = msg.content.toLowerCase();
-    for (const keyword of timeKeywords) {
-      if (content.includes(keyword)) {
-        timeContext = keyword;
-        break;
-      }
-    }
-    if (timeContext) break;
-  }
-  
-  // Current message may provide time context
-  if (!timeContext) {
-    const currentMsg = message.toLowerCase();
-    for (const keyword of timeKeywords) {
-      if (currentMsg.includes(keyword)) {
-        timeContext = keyword;
-        break;
-      }
-    }
-  }
-  
-  // Apply time context to the query plan
-  if (timeContext) {
-    if (timeContext === 'overall' || timeContext === 'entire journal') {
-      // No date filters for overall analysis
-      console.log("Using entire journal for analysis based on context");
-    } else if (timeContext === 'last week') {
-      defaultPlan.filters.dateRange = {
-        periodName: 'last week',
-        startDate: new Date(Date.now() - 7 * 24 * 60 * 60 * 1000).toISOString(),
-        endDate: new Date().toISOString()
-      };
-    } else if (timeContext === 'last month') {
-      defaultPlan.filters.dateRange = {
-        periodName: 'last month',
-        startDate: new Date(Date.now() - 30 * 24 * 60 * 60 * 1000).toISOString(),
-        endDate: new Date().toISOString()
-      };
-    }
-  }
-  
-  // If queryTypes contains emotion information, add it to the plan
-  if (queryTypes && queryTypes.emotion) {
-    defaultPlan.filters.emotion = queryTypes.emotion;
-  }
-  
-  return defaultPlan;
-}
-
 export const processChatMessage = async (
   message: string, 
   userId: string, 
@@ -191,51 +74,12 @@ export const processChatMessage = async (
     console.log(`User timezone offset: ${timezoneOffset} minutes`);
     
     // Log the user query to the user_queries table
+    // We'll pass the message ID once we get it from the chat_messages table
     await logUserQuery(userId, message, threadId);
     
-    // Get recent messages from the thread for context (increased to 15 for better context)
-    const recentMessages = await getRecentThreadMessages(threadId, 15);
+    // Get recent messages from the thread for context
+    const recentMessages = await getRecentThreadMessages(threadId, 10);
     console.log(`Got ${recentMessages.length} recent messages for context`);
-    
-    // Enhanced logging for conversation context
-    if (recentMessages.length > 0) {
-      console.log("Conversation context summary:");
-      recentMessages.slice(0, 5).forEach((msg, idx) => {
-        console.log(`[${idx}] ${msg.sender}: ${msg.content.substring(0, 50)}...`);
-      });
-    }
-    
-    // Determine if this is a clarification response based on parameters
-    const isClarificationResponse = parameters.isClarificationResponse === true;
-    const useHistoricalData = parameters.useHistoricalData === true;
-    
-    if (isClarificationResponse) {
-      console.log("Detected clarification response, treating specially");
-    }
-    
-    if (useHistoricalData) {
-      console.log("User requested historical data analysis");
-    }
-    
-    // Special handling for clarification responses that indicate user wants to proceed
-    const isConfirmationToAnalyze = isClarificationResponse && (
-      message.toLowerCase().includes('overall') ||
-      message.toLowerCase().includes('sure') ||
-      message.toLowerCase().includes('go ahead') ||
-      message.toLowerCase().includes('yes') ||
-      message.toLowerCase().includes('analyze')
-    );
-    
-    // For confirmation responses, we'll skip the planner and go straight to analysis
-    if (isConfirmationToAnalyze) {
-      console.log("User confirmed to analyze, bypassing clarification checks");
-      // Create a simple query plan based on available context
-      const queryPlan = createSimplifiedQueryPlanFromContext(message, recentMessages, queryTypes);
-      console.log("Created simplified query plan from context:", queryPlan);
-      
-      // Process with this query plan
-      return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset, useHistoricalData);
-    }
     
     // Step 1: Use smart-query-planner to classify and plan the query
     console.log("Calling smart-query-planner for query analysis and planning");
@@ -247,8 +91,7 @@ export const processChatMessage = async (
           userId,
           threadId,
           timezoneOffset,
-          conversationContext: recentMessages.reverse(), // Reverse to get chronological order
-          isClarificationResponse
+          conversationContext: recentMessages.reverse() // Reverse to get chronological order
         }
       }
     );
@@ -267,47 +110,17 @@ export const processChatMessage = async (
     console.log("Received response from smart-query-planner:", plannerData);
     
     // Check if clarification is needed
-    if (plannerData.needsClarification && plannerData.clarificationQuestions && !isClarificationResponse) {
+    if (plannerData.needsClarification && plannerData.clarificationQuestions) {
       console.log("Query needs clarification, returning interactive message");
-      
-      // Use the specific ambiguity analysis to create a dynamic clarification message
-      let clarificationMessage = generateClarificationMessage(plannerData.ambiguityAnalysis);
-      
-      // Check if this is a follow-up to a previous ambiguous query
-      const isFollowUp = recentMessages.some(msg => 
-        msg.sender === 'assistant' && 
-        (msg.content || '').includes('understand your question better')
-      );
-      
-      // If this appears to be answering our clarification and mentions "entire journal"
-      if (isFollowUp && message.toLowerCase().includes('entire journal')) {
-        console.log("User is requesting entire journal history, setting historical data flag");
-        parameters.useHistoricalData = true;
-        
-        // Create a new query plan based on the original with no date constraints
-        if (plannerData.plan) {
-          const queryPlan = convertGptPlanToQueryPlan(plannerData.plan);
-          // Remove date filters for historical data
-          if (queryPlan.filters && queryPlan.filters.dateRange) {
-            console.log("Removing date filters for historical data search");
-            delete queryPlan.filters.dateRange;
-          }
-          
-          // Process with the updated query plan
-          return await processWithQueryPlan(message, userId, queryTypes, threadId, queryPlan, enableDiagnostics, timezoneOffset, true);
-        }
-      }
-      
       return {
         id: `clarification-${Date.now()}`,
         thread_id: threadId || '',
         role: "assistant",
         sender: "assistant",
-        content: clarificationMessage,
+        content: "I'd like to understand the scope of your question better. Are you looking for insights from:",
         created_at: new Date().toISOString(),
         isInteractive: true,
-        interactiveOptions: plannerData.clarificationQuestions,
-        ambiguityInfo: plannerData.ambiguityAnalysis // Include the full ambiguity analysis
+        interactiveOptions: plannerData.clarificationQuestions
       };
     }
     
@@ -357,8 +170,7 @@ async function processWithQueryPlan(
   threadId: string | null,
   queryPlan: any,
   enableDiagnostics: boolean,
-  timezoneOffset: number,
-  isHistoricalDataRequest: boolean = false
+  timezoneOffset: number
 ): Promise<ChatMessage> {
   try {
     // Use fixed parameters for vector search - let the retriever handle the filtering
@@ -618,8 +430,7 @@ async function processWithQueryPlan(
         isTimePatternQuery: queryTypes && queryTypes.isTimePatternQuery ? true : false,
         isTemporalQuery: queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) ? true : false,
         requiresTimeAnalysis: queryTypes && queryTypes.requiresTimeAnalysis ? true : false,
-        timeRange: queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) ? queryTypes.timeRange || null : null,
-        isHistoricalDataRequest // Pass flag to indicate historical data request
+        timeRange: queryTypes && (queryTypes.isTemporalQuery || queryTypes.isWhenQuestion) ? queryTypes.timeRange || null : null
       }
     });
 
@@ -661,30 +472,6 @@ async function processWithQueryPlan(
       }
       
       return noDataMessage;
-    }
-
-    // Handle no entries found for time range with better message
-    if (data.noEntriesForTimeRange) {
-      let timeRangeDescription = "the specified time period";
-      if (queryPlan.filters && queryPlan.filters.dateRange) {
-        const { periodName } = queryPlan.filters.dateRange;
-        if (periodName) {
-          timeRangeDescription = periodName;
-        }
-      }
-      
-      const noEntriesMessage: ChatMessage = {
-        id: `no-entries-${Date.now()}`,
-        thread_id: threadId || '',
-        role: "assistant",
-        sender: "assistant",
-        content: isHistoricalDataRequest 
-          ? "I don't see any journal entries that match what you're asking about in your entire journal history." 
-          : `I don't see any journal entries for ${timeRangeDescription} that match what you're asking about.`,
-        created_at: new Date().toISOString()
-      };
-      
-      return noEntriesMessage;
     }
 
     // Handle error responses that come with status 200

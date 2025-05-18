@@ -293,26 +293,10 @@ export default function MobileChatInterface({
         })
       );
       
-      // Check if this is a response to a clarification request
-      const isClarificationResponse = checkIfClarificationResponse(message, messages);
-      
       debugLog.addEvent("Query Analysis", `[Mobile] Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
       setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
-      
-      // Add information about clarification response to parameters
-      const parameters: Record<string, any> = {
-        isClarificationResponse,
-        useHistoricalData: message.toLowerCase().includes('entire journal') || 
-                           message.toLowerCase().includes('all time') || 
-                           message.toLowerCase().includes('overall')
-      };
-      
-      // If this is a clarification response, include the previous conversation
-      if (isClarificationResponse) {
-        debugLog.addEvent("Clarification", "[Mobile] Detected clarification response, processing with context", "info");
-      }
       
       const analysisDetails = {
         isEmotionFocused: queryTypes.isEmotionFocused,
@@ -320,8 +304,7 @@ export default function MobileChatInterface({
         isWhyQuestion: queryTypes.isWhyQuestion,
         isTemporalQuery: queryTypes.isTemporalQuery,
         timeRange: queryTypes.timeRange.periodName,
-        emotion: queryTypes.emotion || 'none detected',
-        isClarification: isClarificationResponse
+        emotion: queryTypes.emotion || 'none detected'
       };
       
       debugLog.addEvent("Query Analysis", `[Mobile] Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
@@ -334,8 +317,7 @@ export default function MobileChatInterface({
         user.id, 
         queryTypes, 
         currentThreadId,
-        false,
-        parameters
+        false
       );
       
       const responseInfo = {
@@ -432,32 +414,6 @@ export default function MobileChatInterface({
       setLoading(false);
       setProcessingStage(null);
     }
-  };
-
-  // Helper function to determine if the message is responding to a clarification request
-  const checkIfClarificationResponse = (message: string, prevMessages: UIChatMessage[]): boolean => {
-    if (prevMessages.length < 1) return false;
-    
-    const lastAssistantMessage = [...prevMessages].reverse().find(msg => msg.role === 'assistant');
-    if (!lastAssistantMessage) return false;
-    
-    // Check if the last assistant message was asking for clarification
-    const isLastMessageClarification = 
-      lastAssistantMessage.content.toLowerCase().includes('clarify') ||
-      lastAssistantMessage.content.toLowerCase().includes('which time period') ||
-      lastAssistantMessage.content.toLowerCase().includes('scope of your question');
-    
-    // Check if the user's response indicates they're providing clarification
-    const isUserClarifying = 
-      message.toLowerCase().includes('overall') ||
-      message.toLowerCase().includes('entire') ||
-      message.toLowerCase().includes('all time') ||
-      message.toLowerCase().includes('recent') ||
-      message.toLowerCase().includes('go ahead') ||
-      message.toLowerCase().includes('sure') ||
-      message.toLowerCase().trim().length < 15; // Short responses are likely clarifications
-      
-    return isLastMessageClarification && isUserClarifying;
   };
 
   const handleSelectThread = (threadId: string) => {
