@@ -51,18 +51,23 @@ serve(async (req) => {
     
     console.log(`User's local time: ${formattedLocalTime}`);
     
-    // Format conversation context for the API request
+    // Format conversation context for the API request - use ALL conversation history
     const formattedContext = conversationContext.map(msg => ({
       role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
       content: msg.content
     }));
     
-    // Check if the current message is answering a previous clarification question
-    const isRespondingToClarification = checkIfResponseToClarification(message, formattedContext);
-    console.log(`Is responding to clarification: ${isRespondingToClarification}`);
+    // Enhanced detection of responses to clarification questions
+    let isRespondingToClarification = checkIfResponseToClarification(message, formattedContext);
     
-    // Enhanced query analysis that considers conversation context
-    // This will analyze if the query is ambiguous in the current context
+    // Add better contextual understanding by checking for topic continuation
+    const isTopicContinuation = checkIfTopicContinuation(message, formattedContext);
+    
+    console.log(`Is responding to clarification: ${isRespondingToClarification}`);
+    console.log(`Is topic continuation: ${isTopicContinuation}`);
+    
+    // Enhanced context-aware query analysis
+    // This analyzes if the query is ambiguous while considering the COMPLETE conversation context
     const ambiguityAnalysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -86,11 +91,14 @@ Analyze the user's query for the following types of ambiguity:
 
 4. SCOPE AMBIGUITY: Is it unclear whether the user wants analysis of recent entries or their entire journal history? (e.g., "What are my top emotions?", "How would you describe my personality?")
 
-IMPORTANT: Consider the FULL conversation context when determining if clarification is needed:
-- If the user is clearly responding to a previous clarification request, DO NOT mark as needing clarification
-- If the conversation history already contains the information needed, DO NOT mark as needing clarification
-- If the user says something like "entire journal", "all entries", "everything", etc., assume they want historical data
-- If a short response follows a specific question you asked, interpret it in context of your question
+CRITICAL: You must carefully examine the FULL conversation history to determine if clarification is actually needed:
+- If the conversation already contains enough context to understand the current query, DO NOT request clarification
+- If the user is directly responding to a previous clarification request, DO NOT mark as needing further clarification
+- If the user says something like "entire journal", "all entries", "everything", assume they want comprehensive historical data
+- If a query is a follow-up to a previous question/answer, interpret it in that context
+- If the user asks for a rating or score (like "rate me out of 100"), DO NOT ask for clarification if the topic is clear from conversation history
+- Pay special attention to pronouns like "this", "it", "that" and determine their referents from context
+- Short responses following a specific question should be interpreted in context of that question
 
 Respond with a JSON object like this:
 {
@@ -102,7 +110,7 @@ Respond with a JSON object like this:
 
 If no clarification is needed, set needsClarification to false and ambiguityType to "NONE".`
           },
-          ...formattedContext, // Include ALL conversation context, not just recent messages
+          ...formattedContext, // Include ALL conversation context
           { role: 'user', content: message }
         ],
         temperature: 0.1,
@@ -131,7 +139,15 @@ If no clarification is needed, set needsClarification to false and ambiguityType
       ambiguityResult = { needsClarification: false, ambiguityType: "NONE", reasoning: "Failed to parse analysis" };
     }
     
-    // Check message types and planQuery
+    // Override ambiguity check if we detect a direct response to a clarification
+    if (isRespondingToClarification || isTopicContinuation) {
+      console.log("Overriding ambiguity check due to detected response to clarification or topic continuation");
+      ambiguityResult.needsClarification = false;
+      ambiguityResult.ambiguityType = "NONE";
+      ambiguityResult.reasoning = "User is responding to a previous clarification or continuing a topic with clear context";
+    }
+    
+    // Improved message type classification that considers conversation context
     const messageTypesResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -155,20 +171,12 @@ Specifically, if the user is asking for ANY of the following, classify as "journ
 - Analysis of specific emotions or sentiment patterns in their entries
 
 Consider the FULL conversation context. If the user is clearly referring to their journal data, classify as "journal_specific".
+If the user is continuing a previous topic that was journal-specific, maintain that classification.
+If the user mentions ratings, scores, or analysis of any personal characteristic, classify as "journal_specific".
 
-Respond with ONLY "mental_health_general" or "journal_specific".
-
-Examples:
-- "How are you doing?" -> "mental_health_general"
-- "What is journaling?" -> "mental_health_general"
-- "Rate my productivity" -> "journal_specific"
-- "What are my top 3 negative traits?" -> "journal_specific"
-- "Analyze my emotional patterns" -> "journal_specific"
-- "Score my happiness level" -> "journal_specific"
-- "How was I feeling last week?" -> "journal_specific"
-- "What patterns do you see in my anxiety?" -> "journal_specific"`
+Respond with ONLY "mental_health_general" or "journal_specific".`
           },
-          ...formattedContext.slice(-5), // Include recent context for this classification
+          ...formattedContext, // Include ALL context, not just recent messages
           { role: 'user', content: message }
         ],
         temperature: 0.1,
@@ -208,7 +216,7 @@ Examples:
     // Check for replies to time-based questions in context
     if (!hasTimeFilter && formattedContext.length > 0) {
       // Look for the last assistant message that asked about time
-      const lastTimeQuestion = formattedContext.reverse().find(msg => 
+      const lastTimeQuestion = [...formattedContext].reverse().find(msg => 
         msg.role === 'assistant' && 
         (msg.content.includes('time period') || 
          msg.content.includes('what period') || 
@@ -251,18 +259,10 @@ Examples:
       console.log("Detected rating or analysis request, ensuring journal_specific classification");
     }
     
-    // Check if we need to clarify based on ambiguity analysis
-    // But ONLY if we haven't determined this is a response to a previous clarification
-    const needsClarification = ambiguityResult.needsClarification && !isRespondingToClarification;
-    
-    if (!needsClarification && isRespondingToClarification) {
-      console.log("Determined user is responding to a previous clarification - proceeding without further clarification");
-    }
-    
     // Generate dynamic clarification questions based on ambiguity type
     let clarificationQuestions = null;
     
-    if (needsClarification) {
+    if (ambiguityResult.needsClarification) {
       console.log(`Query needs clarification, ambiguity type: ${ambiguityResult.ambiguityType}`);
       
       // Enhanced clarification - use a more contextual approach to generate questions
@@ -332,13 +332,13 @@ Ensure each option has:
     let plan = null;
     let directResponse = null;
 
-    if (queryType === 'mental_health_general' && !isRatingOrAnalysisRequest && !isRespondingToClarification) {
+    if (queryType === 'mental_health_general' && !isRatingOrAnalysisRequest) {
       console.log("Query classified as general mental health question");
       directResponse = null; // Process general queries with our standard chat flow
     } else {
       console.log("Query classified as journal-specific or rating request");
       
-      // Build a plan for journal-specific queries
+      // Build a plan for journal-specific queries with FULL context awareness
       const planResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -394,6 +394,8 @@ For the following user query, create a JSON search plan with these components:
 
 IMPORTANT: If the user's message is a direct response to a clarification question (like "all entries" or "recent only"), 
 interpret this in context and create an appropriate plan based on their response.
+If the user is continuing a conversation about a specific topic (e.g. happiness, productivity), maintain context.
+When a user says something like "rate me out of 100 on this", look at the previous messages to determine what "this" refers to.
 
 Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
 
@@ -486,7 +488,7 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
         plan, 
         queryType: isRatingOrAnalysisRequest ? 'journal_specific' : queryType,
         directResponse,
-        needsClarification,
+        needsClarification: ambiguityResult.needsClarification,
         clarificationQuestions,
         ambiguityAnalysis: ambiguityResult
       }),
@@ -502,17 +504,21 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
 });
 
 /**
- * Helper function to check if the current message is responding to a previous clarification
+ * Enhanced helper function to check if the current message is responding to a previous clarification
+ * Now considers the full conversation context and better detects clarification responses
  */
 function checkIfResponseToClarification(message: string, conversationContext: Array<{role: string, content: string}>): boolean {
   if (conversationContext.length === 0) return false;
   
-  // Get the most recent messages
-  const recentMessages = conversationContext.slice(-3);
+  // Get the most recent messages with more context
+  const recentMessages = conversationContext.slice(-4);
   
-  // Check if the most recent assistant message was asking for clarification
-  const lastAssistantMessage = recentMessages.find(msg => msg.role === 'assistant');
-  if (!lastAssistantMessage) return false;
+  // Check if any of the recent assistant messages was asking for clarification
+  const assistantMessages = recentMessages.filter(msg => msg.role === 'assistant');
+  if (assistantMessages.length === 0) return false;
+  
+  // Get the most recent assistant message
+  const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
   
   const clarificationIndicators = [
     'I need to clarify',
@@ -522,17 +528,63 @@ function checkIfResponseToClarification(message: string, conversationContext: Ar
     'can you clarify',
     'recent entries',
     'all entries',
-    'entire journal'
+    'entire journal',
+    'understand your question better',
+    'need to understand',
+    'not clear',
+    'need more information',
+    'what do you mean',
+    'what are you referring to',
+    'want me to focus on'
   ];
   
   const isLastMessageClarification = clarificationIndicators.some(
     indicator => lastAssistantMessage.content.toLowerCase().includes(indicator.toLowerCase())
   );
   
-  // If last assistant message was a clarification and user message is short, likely a response
-  const isShortResponse = message.split(' ').length <= 7;
+  // If last assistant message was a clarification, check if user's message is a likely response
+  if (isLastMessageClarification) {
+    // Check for short response (likely a direct reply to a clarification question)
+    const isShortResponse = message.split(' ').length <= 10;
+    
+    // Check for common clarification responses
+    const commonResponses = [
+      'all', 'everything', 'entire', 'recent', 'just', 'yes', 'no', 'correct',
+      'today', 'yesterday', 'last week', 'this month', 'happiness', 'mood', 
+      'emotions', 'productivity', 'sleep', 'health', 'work', 'relationship'
+    ];
+    
+    const containsCommonResponse = commonResponses.some(
+      response => message.toLowerCase().includes(response.toLowerCase())
+    );
+    
+    return isShortResponse || containsCommonResponse;
+  }
   
-  return isLastMessageClarification && isShortResponse;
+  return false;
+}
+
+/**
+ * New helper function to detect if a message is continuing a previous topic
+ */
+function checkIfTopicContinuation(message: string, conversationContext: Array<{role: string, content: string}>): boolean {
+  if (conversationContext.length < 2) return false;
+  
+  // Check for pronouns and references that usually indicate continuing a topic
+  const referenceTerms = ['it', 'this', 'that', 'them', 'these', 'those', 'their', 'its'];
+  const messageWords = message.toLowerCase().split(/\s+/);
+  
+  const containsReference = referenceTerms.some(term => 
+    messageWords.includes(term) || messageWords.includes(term + '?')
+  );
+  
+  // Check if the message is very short (likely a follow-up)
+  const isShortMessage = message.split(' ').length <= 7;
+  
+  // Check if the message just asks for a rating/score without specifying context
+  const isRatingWithoutContext = /^(rate|score|evaluate|assess|analyze).*\d+(\s*(\/|out of)\s*\d+)?$/i.test(message.trim());
+  
+  return containsReference || isShortMessage || isRatingWithoutContext;
 }
 
 /**

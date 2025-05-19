@@ -38,8 +38,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     if (chatMessages.length > 0) {
       console.log(`ChatArea: Rendering ${chatMessages.length} messages`);
       console.log("Last message:", chatMessages[chatMessages.length - 1]?.content.substring(0, 50) + "...");
+      
+      // Log the full thread conversation for context analysis
+      if (threadId) {
+        console.log("Full conversation context:", 
+          chatMessages.map(msg => `[${msg.sender || msg.role}]: ${msg.content.substring(0, 30)}...`));
+      }
     }
-  }, [chatMessages]);
+  }, [chatMessages, threadId]);
 
   return (
     <div className="flex flex-col p-4 overflow-y-auto h-full pb-20">

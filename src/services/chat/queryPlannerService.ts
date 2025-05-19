@@ -23,6 +23,7 @@ export interface QueryPlan {
   isSegmented?: boolean;
   subqueries?: string[];
   reasoning?: string;
+  topicContext?: string; // Add a field to store the topic context
 }
 
 /**
@@ -95,7 +96,8 @@ export function convertGptPlanToQueryPlan(gptPlan: any): QueryPlan {
       needsMoreContext: gptPlan.needs_more_context || false,
       isSegmented: gptPlan.is_segmented || false,
       subqueries: gptPlan.subqueries || [],
-      reasoning: gptPlan.reasoning || ''
+      reasoning: gptPlan.reasoning || '',
+      topicContext: gptPlan.topic_context || null
     };
 
     // For rating or analysis requests, ensure we need data aggregation
