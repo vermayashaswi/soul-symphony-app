@@ -137,14 +137,35 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
   }
 
   try {
-    // Add enhanced system context for the AI
+    // Enhanced system context for the AI with detailed app information
     const enhancedContext = {
       appInfo: {
         name: "SOULo",
         type: "Voice Journaling App",
-        role: "Mental Health Assistant"
+        purpose: "Mental Health Support and Self-Reflection",
+        role: "Mental Health Assistant",
+        features: ["Journal Analysis", "Emotion Tracking", "Pattern Detection", "Self-Reflection Support"],
+        capabilities: {
+          canAnalyzeJournals: true,
+          canDetectPatterns: true,
+          canProvideRatings: true,
+          canSegmentQueries: true
+        }
+      },
+      userContext: {
+        hasJournalEntries: true, // This is a placeholder - ideally would be dynamic
+        timezoneOffset: timezoneOffset,
+        conversationHistory: conversationContext.length
       }
     };
+
+    // Add detailed logging
+    console.log(`Calling smart-query-planner with enhanced app context:`, 
+                JSON.stringify(enhancedContext, null, 2).substring(0, 200) + "...");
+    console.log(`Conversation context length: ${conversationContext.length}`);
+    if (conversationContext.length > 0) {
+      console.log(`Latest context message: ${conversationContext[conversationContext.length - 1].content.substring(0, 50)}...`);
+    }
 
     // Call the edge function with enhanced context
     const { data, error } = await supabase.functions.invoke('smart-query-planner', {
@@ -153,13 +174,22 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
         userId,
         conversationContext,
         timezoneOffset,
-        appContext: enhancedContext // Add app context to help the AI understand the domain
+        appContext: enhancedContext, // Pass the enhanced app context
+        checkForMultiQuestions: true // New flag to indicate we want to check for multiple questions
       }
     });
 
     if (error) {
       console.error('Error planning query:', error);
       throw error;
+    }
+
+    // Log the returned plan for debugging
+    console.log(`Received query plan: ${JSON.stringify(data?.plan || {}, null, 2).substring(0, 200)}...`);
+
+    // If the plan indicates multiple questions, we might want to segment them
+    if (data?.plan?.isSegmented) {
+      console.log('Query plan indicates this is a segmented query - should process as multi-question');
     }
 
     return {

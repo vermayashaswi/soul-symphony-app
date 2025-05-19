@@ -104,12 +104,36 @@ export function convertGptPlanToQueryPlan(gptPlan: any): QueryPlan {
     const hasRatingKeywords = gptPlan.reasoning?.toLowerCase().includes('rate') || 
                             gptPlan.reasoning?.toLowerCase().includes('score') ||
                             gptPlan.reasoning?.toLowerCase().includes('analyze') ||
-                            gptPlan.reasoning?.toLowerCase().includes('evaluate');
+                            gptPlan.reasoning?.toLowerCase().includes('evaluate') ||
+                            gptPlan.reasoning?.toLowerCase().includes('introvert') ||
+                            gptPlan.reasoning?.toLowerCase().includes('extrovert') ||
+                            gptPlan.reasoning?.toLowerCase().includes('personality');
                             
     if (hasRatingKeywords && !queryPlan.needsDataAggregation) {
+      console.log("Rating keywords detected, forcing data aggregation");
       queryPlan.needsDataAggregation = true;
       queryPlan.matchCount = Math.max(queryPlan.matchCount, 30); // Ensure we get enough data
     }
+    
+    // Check for multi-question indicators
+    const hasMultiQuestionIndicators = 
+      gptPlan.reasoning?.toLowerCase().includes('multiple questions') ||
+      gptPlan.reasoning?.toLowerCase().includes('multi-part') ||
+      gptPlan.reasoning?.toLowerCase().includes('several aspects') ||
+      (Array.isArray(gptPlan.subqueries) && gptPlan.subqueries.length > 1);
+      
+    if (hasMultiQuestionIndicators && !queryPlan.isSegmented) {
+      console.log("Multi-question indicators detected, marking as segmented");
+      queryPlan.isSegmented = true;
+    }
+    
+    // Log the complete conversion results
+    console.log(`Converted GPT plan to query plan:
+      Strategy: ${queryPlan.searchStrategy}
+      Match Count: ${queryPlan.matchCount}
+      Needs Aggregation: ${queryPlan.needsDataAggregation}
+      Is Segmented: ${queryPlan.isSegmented}
+      Topic Context: ${queryPlan.topicContext}`);
     
     return queryPlan;
   } catch (error) {
@@ -135,10 +159,27 @@ export function createDefaultQueryPlan(): QueryPlan {
  * Creates a fallback query plan based on the user's question
  */
 export function createFallbackQueryPlan(query: string): QueryPlan {
+  console.log(`Creating fallback query plan for: ${query}`);
+  
   const queryTypes = analyzeQueryTypes(query);
   
-  // Check if this is a rating or evaluation request
-  const isRatingRequest = /rate|score|analyze|evaluate|assess|rank|review/i.test(query);
+  // Enhanced detection for rating or evaluation requests
+  const ratingPatterns = /rate|score|analyze|evaluate|assess|rank|review|am i|introvert|extrovert|my personality/i;
+  const isRatingRequest = ratingPatterns.test(query.toLowerCase());
+  
+  if (isRatingRequest) {
+    console.log("Rating/evaluation request detected in fallback plan creation");
+  }
+  
+  // Better detection for multi-part questions
+  const isMultiPartQuestion = 
+    (query.match(/\?/g) || []).length > 1 || // Multiple question marks
+    /\band\b|\balso\b|\balong with\b|\bas well as\b|\bin addition\b/i.test(query) || // Conjunction words
+    /(\bfirst\b.*\bsecond\b|\bone\b.*\btwo\b)/i.test(query); // Enumeration indicators
+    
+  if (isMultiPartQuestion) {
+    console.log("Multi-part question detected in fallback plan creation");
+  }
   
   // Default plan uses vector search
   const plan: QueryPlan = {
@@ -146,20 +187,25 @@ export function createFallbackQueryPlan(query: string): QueryPlan {
     filters: {},
     needsDataAggregation: queryTypes.needsDataAggregation || isRatingRequest,
     needsMoreContext: queryTypes.needsMoreContext,
-    matchCount: 15
+    matchCount: 15,
+    isSegmented: isMultiPartQuestion
   };
   
   // Add time range if detected
   if (queryTypes.timeRange) {
     plan.filters.dateRange = queryTypes.timeRange;
+    console.log(`Time range detected in fallback plan: ${plan.filters.dateRange.periodName}`);
   }
   
   // Adjust match count for aggregation queries or rating requests
   if (queryTypes.needsDataAggregation || 
       isRatingRequest ||
       query.toLowerCase().includes('all') || 
-      query.toLowerCase().includes('every')) {
+      query.toLowerCase().includes('every') ||
+      query.toLowerCase().includes('overall') ||
+      query.toLowerCase().includes('entire')) {
     plan.matchCount = 30; // Return more entries for comprehensive analysis
+    console.log("Increasing match count to 30 for comprehensive analysis");
   }
   
   return plan;
@@ -184,8 +230,10 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
   console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
   console.log(`User's local time: ${now.toISOString()}`);
   
-  const lowerTimePeriod = timePeriod.toLowerCase();
+  // Normalize time period for better matching
+  const lowerTimePeriod = timePeriod.toLowerCase().trim();
   
+  // Enhanced pattern matching with more variations
   if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
     // Today: Start at midnight, end at 23:59:59
     startDate = startOfDay(now);
@@ -197,7 +245,31 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
     startDate = startOfDay(subDays(now, 1));
     endDate = endOfDay(subDays(now, 1));
     periodName = 'yesterday';
-  } 
+  }
+  else if (lowerTimePeriod.match(/past (\d+) days?/)) {
+    // Past X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/past (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `past ${days} days`;
+  }
+  else if (lowerTimePeriod.match(/last (\d+) days?/)) {
+    // Last X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/last (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `last ${days} days`;
+  }
+  else if (lowerTimePeriod.match(/recent (\d+) days?/)) {
+    // Recent X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/recent (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `recent ${days} days`;
+  }
   else if (lowerTimePeriod.includes('this week')) {
     // This week: Start at current week Monday, end at Sunday 23:59:59
     startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
@@ -210,7 +282,13 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
     startDate = startOfWeek(prevWeek, { weekStartsOn: 1 }); // Start on Monday
     endDate = endOfWeek(prevWeek, { weekStartsOn: 1 }); // End on Sunday
     periodName = 'last week';
-  } 
+  }
+  else if (lowerTimePeriod.includes('past week') || lowerTimePeriod.includes('previous week')) {
+    // Past/previous week: Start at 7 days ago, end at today
+    startDate = startOfDay(subDays(now, 7));
+    endDate = endOfDay(now);
+    periodName = 'past week';
+  }
   else if (lowerTimePeriod.includes('this month')) {
     // This month: Start at 1st of current month, end at last day of month 23:59:59
     startDate = startOfMonth(now);
@@ -223,7 +301,13 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
     startDate = startOfMonth(prevMonth);
     endDate = endOfMonth(prevMonth);
     periodName = 'last month';
-  } 
+  }
+  else if (lowerTimePeriod.includes('past month') || lowerTimePeriod.includes('previous month')) {
+    // Past/previous month: Start at 30 days ago, end at today
+    startDate = startOfDay(subDays(now, 30));
+    endDate = endOfDay(now);
+    periodName = 'past month';
+  }
   else if (lowerTimePeriod.includes('this year')) {
     // This year: Start at January 1st, end at December 31st 23:59:59
     startDate = startOfYear(now);
@@ -237,11 +321,22 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
     endDate = endOfYear(prevYear);
     periodName = 'last year';
   } 
-  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || lowerTimePeriod === 'everything' || lowerTimePeriod === 'overall') {
+  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || 
+           lowerTimePeriod === 'everything' || lowerTimePeriod === 'overall' ||
+           lowerTimePeriod === 'all time' || lowerTimePeriod === 'always' ||
+           lowerTimePeriod === 'all my entries' || lowerTimePeriod === 'all entries') {
     // Special case for "entire" - use a very broad date range (5 years back)
     startDate = startOfYear(subYears(now, 5));
     endDate = endOfDay(now);
-    periodName = 'entire';
+    periodName = 'all time';
+  }
+  else if (lowerTimePeriod === 'yes' || lowerTimePeriod === 'sure' || 
+           lowerTimePeriod === 'ok' || lowerTimePeriod === 'okay' ||
+           lowerTimePeriod === 'yep' || lowerTimePeriod === 'yeah') {
+    // Special handling for affirmative responses - use a broad date range
+    startDate = startOfYear(subYears(now, 5));
+    endDate = endOfDay(now);
+    periodName = 'all time'; // Use "all time" for affirmative responses
   }
   else {
     // Default to last 30 days if no specific period matched
@@ -280,4 +375,41 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
     endDate: utcEndDate.toISOString(),
     periodName
   };
+}
+
+/**
+ * Detects if a user message is likely responding to a clarification request
+ * This helps handle short responses like "yes", "this month", etc.
+ * @param message - The user's message
+ * @returns boolean indicating if this is likely a response to clarification
+ */
+export function isResponseToClarification(message: string): boolean {
+  if (!message) return false;
+  
+  const normalizedMessage = message.toLowerCase().trim();
+  
+  // Check for very short responses
+  if (normalizedMessage.length < 15) {
+    // Common affirmative responses
+    if (/^(yes|yeah|yep|sure|ok|okay|correct|right|exactly|confirm|confirmed|true|yup|affirmative|indeed)\.?$/.test(normalizedMessage)) {
+      return true;
+    }
+    
+    // Common negative responses
+    if (/^(no|nope|nah|not|negative|don't|dont|doesn't|doesnt|nothing|false)\.?$/.test(normalizedMessage)) {
+      return true;
+    }
+    
+    // Time period responses
+    if (/^(today|yesterday|this week|last week|this month|last month|this year|last year|all time|entire|everything|all)\.?$/.test(normalizedMessage)) {
+      return true;
+    }
+    
+    // Number responses
+    if (/^(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\.?$/.test(normalizedMessage)) {
+      return true;
+    }
+  }
+  
+  return false;
 }

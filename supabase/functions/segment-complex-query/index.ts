@@ -31,7 +31,8 @@ serve(async (req) => {
       query: userQuery, 
       userId, 
       timeRange,
-      vectorSearch = { matchThreshold: 0.5, matchCount: 10 } // Default values for vector search
+      vectorSearch = { matchThreshold: 0.5, matchCount: 10 }, // Default values for vector search
+      appContext // New parameter for app context
     } = await req.json();
 
     if (!userQuery || !userId) {
@@ -43,6 +44,20 @@ serve(async (req) => {
     }
 
     console.log(`Received query: ${userQuery} for user ID: ${userId}`);
+    console.log(`App context provided: ${JSON.stringify(appContext || {}).substring(0, 100)}...`);
+
+    // Detect if this might already be a single, focused question
+    const isSingleQuestion = await checkIfSingleFocusedQuestion(userQuery);
+    if (isSingleQuestion) {
+      console.log('Detected as a single focused question - no need for segmentation');
+      return new Response(JSON.stringify({ 
+        data: JSON.stringify([userQuery]),
+        isSingleQuestion: true 
+      }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders },
+      });
+    }
 
     // 1. Generate embedding for the user query
     console.log('Generating embedding for the user query');
@@ -96,11 +111,11 @@ serve(async (req) => {
 
     // 3. Segment the complex query based on journal entries
     console.log('Segmenting the complex query based on journal entries');
-    const segmentedQuery = await segmentComplexQuery(userQuery, processedEntries, apiKey);
+    const segmentedQuery = await segmentComplexQuery(userQuery, processedEntries, apiKey, appContext);
 
     // 4. Return the segmented query
     console.log('Returning the segmented query');
-    return new Response(JSON.stringify({ data: segmentedQuery }), {
+    return new Response(JSON.stringify({ data: segmentedQuery, isSingleQuestion: false }), {
       status: 200,
       headers: { 'Content-Type': 'application/json', ...corsHeaders },
     });
@@ -148,26 +163,94 @@ async function searchJournalEntries(
   }
 }
 
-async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: string) {
+// New function to check if this is a single focused question
+async function checkIfSingleFocusedQuestion(userQuery: string): Promise<boolean> {
+  try {
+    const prompt = `Analyze if the following user query is a single, focused question or if it contains multiple questions or complex parts that should be segmented.
+      
+User Query: "${userQuery}"
+
+Instructions:
+1. Identify if the query contains multiple distinct questions or topics that would be better answered separately.
+2. Look for conjunction words like "and", "also", or multiple question marks indicating multiple questions.
+3. Consider if the query asks for different types of analysis (e.g., emotion analysis AND pattern recognition).
+4. Respond with just "true" if it's a single focused question, or "false" if it contains multiple questions or complex parts.`;
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'system', content: prompt }],
+        temperature: 0.1,
+        max_tokens: 10
+      }),
+    });
+
+    if (!response.ok) {
+      console.error('Error checking if query is single focused');
+      return false; // Default to false (treat as complex) if error
+    }
+
+    const data = await response.json();
+    const result = data.choices[0].message.content.trim().toLowerCase();
+    
+    console.log(`Single question check result: ${result}`);
+    return result === 'true';
+  } catch (error) {
+    console.error('Error in checkIfSingleFocusedQuestion:', error);
+    return false; // Default to false (treat as complex) if error
+  }
+}
+
+async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: string, appContext?: any) {
   try {
     console.log('Starting query segmentation');
 
-    const prompt = `You are an AI assistant that segments complex user queries into simpler questions based on provided journal entries.
+    // Enhanced prompt with SOULo app context
+    const appContextInfo = appContext ? 
+      `App Information: This is SOULo, a voice journaling app focused on mental health support and self-reflection. 
+      The app helps users track emotions, detect patterns, and gain insights from their journal entries.` : 
+      'This is a journaling app that helps users track their emotions and thoughts.';
+    
+    const prompt = `You are an AI assistant for SOULo, a voice journaling app focused on mental health. 
+      Your task is to segment complex user queries into simpler questions that can be answered independently.
+      ${appContextInfo}
+      
       User Query: ${userQuery}
-      Relevant Journal Entries: ${JSON.stringify(entries)}
+      
+      Relevant Journal Entries: ${JSON.stringify(entries.slice(0, 3))}
+      
       Instructions:
-      1. Analyze the user query and identify its main components.
-      2. Break down the complex query into simpler, more specific questions that can be answered using the journal entries.
-      3. Ensure each segmented question is clear, concise, and directly related to the original query.
-      4. Provide the segmented questions in a JSON array format.
-      Example:
+      1. Break down the complex query into simpler, more specific questions that can be answered separately.
+      2. Focus on mental health aspects and introspection, which is the purpose of SOULo.
+      3. If the user is asking about their personality traits (like "Am I introverted?"), create a specific segment focused on rating/scoring that trait.
+      4. Include specific questions about patterns, emotions, and insights from the journal entries.
+      5. Return the segments in JSON array format.
+      
+      Examples of good segmentation:
+      
+      Complex query: "Am I introverted and how do I feel about social events?"
+      Segmented as:
       [
-        "What were the main topics discussed in the journal entries?",
-        "How did the user feel about these topics?",
-        "Were there any specific actions or decisions made regarding these topics?"
-      ]`;
+        "Based on my journal entries, would you rate me as more introverted or extroverted? Give a rating on a scale of 1-10.",
+        "How do I typically feel before, during, and after social events according to my journal entries?"
+      ]
+      
+      Complex query: "What are my main stressors and how can I manage them better?"
+      Segmented as:
+      [
+        "What are the most common sources of stress mentioned in my journal entries?",
+        "Based on my journal entries, what coping mechanisms have I found effective for managing stress?",
+        "Are there any patterns in when my stress levels increase according to my journal?"
+      ]
+      
+      Now segment the user query into an array of focused questions:`;
 
-    console.log('Calling OpenAI to segment the query');
+    console.log('Calling OpenAI to segment the query with enhanced prompting');
     const completion = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
       headers: {
@@ -175,7 +258,7 @@ async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: st
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
-        model: 'gpt-3.5-turbo',
+        model: 'gpt-4o-mini',
         messages: [{ role: 'system', content: prompt }],
         temperature: 0.7,
       }),
@@ -184,20 +267,46 @@ async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: st
     if (!completion.ok) {
       const error = await completion.text();
       console.error('Failed to segment the query:', error);
-      return 'Failed to segment the query';
+      return JSON.stringify([userQuery]); // Fall back to original query
     }
 
     const completionData = await completion.json();
     if (!completionData.choices || completionData.choices.length === 0) {
       console.error('Failed to segment the query');
-      return 'Failed to segment the query';
+      return JSON.stringify([userQuery]); // Fall back to original query
     }
 
     const segmentedQuery = completionData.choices[0].message.content;
     console.log(`Segmented query: ${segmentedQuery}`);
-    return segmentedQuery;
+    
+    // Try to parse the response as JSON
+    try {
+      // The response might be wrapped in ```json ``` or have text before/after
+      const jsonMatch = segmentedQuery.match(/\[[\s\S]*\]/);
+      if (jsonMatch) {
+        const parsedSegments = JSON.parse(jsonMatch[0]);
+        if (Array.isArray(parsedSegments) && parsedSegments.length > 0) {
+          console.log(`Successfully parsed ${parsedSegments.length} segments`);
+          return JSON.stringify(parsedSegments);
+        }
+      }
+      
+      // If we couldn't extract a valid JSON array, try to parse the whole response
+      const parsedResponse = JSON.parse(segmentedQuery);
+      if (Array.isArray(parsedResponse) && parsedResponse.length > 0) {
+        console.log(`Successfully parsed ${parsedResponse.length} segments from full response`);
+        return JSON.stringify(parsedResponse);
+      }
+      
+      throw new Error("Couldn't parse segments as array");
+    } catch (parseError) {
+      console.error('Error parsing segmented query as JSON:', parseError);
+      console.log('Falling back to using the raw segmented text');
+      // If parsing fails, just return the raw segmented text
+      return segmentedQuery;
+    }
   } catch (error) {
     console.error('Error segmenting complex query:', error);
-    throw error;
+    return JSON.stringify([userQuery]); // Fall back to original query in case of error
   }
 }
