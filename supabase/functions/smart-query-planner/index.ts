@@ -1,964 +1,508 @@
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { serve } from '@supabase/functions-js'
+import OpenAI from 'openai';
 
-// Define Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
+// Initialize Supabase client
+const openai = new OpenAI({
+  apiKey: process.env['OPENAI_API_KEY'],
+});
 
-// Get OpenAI API key from environment variable
-const apiKey = Deno.env.get('OPENAI_API_KEY');
-if (!apiKey) {
-  console.error('OPENAI_API_KEY is not set');
-  Deno.exit(1);
-}
-
-// Define CORS headers directly in the function
+// Enable CORS
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-};
-
-// Define the requestData interface to include referenceDate
-interface RequestData {
-  message: string;
-  userId: string;
-  conversationContext?: any[];
-  timezoneOffset?: number;
-  appContext?: any;
-  checkForMultiQuestions?: boolean;
-  isFollowUp?: boolean;
-  referenceDate?: string; // Add reference date parameter
+  'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// We're updating just the main handler function to better handle temporal context
+// and to pass the reference date and topic preservation information correctly
+
+// Main function
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
-
+  
   try {
-    const requestData = await req.json();
+    const { message, userId, conversationContext = [], timezoneOffset = 0, appContext = {}, checkForMultiQuestions = false, isFollowUp = false, referenceDate, preserveTopicContext = false } = await req.json();
     
-    // Extract the referenceDate from the requestData
-    const { 
-      message, 
-      userId, 
-      conversationContext = [], 
-      timezoneOffset = 0,
-      appContext,
-      checkForMultiQuestions = false,
-      isFollowUp = false,
-      referenceDate  // Extract reference date
-    } = requestData;
-
-    console.log(`Local timezone offset: ${timezoneOffset} minutes`);
-    if (referenceDate) {
-      console.log(`Reference date provided: ${referenceDate}`);
-    }
-
-    // Log conversation context for debugging
-    if (conversationContext.length > 0) {
-      console.log("Conversation context summary:");
-      conversationContext.forEach((msg, idx) => {
-        console.log(`[${idx}] ${msg.role || msg.sender}: ${msg.content.substring(0, 30)}...`);
-      });
-    }
+    console.log(`Request received:
+      Message: ${message}
+      User ID: ${userId}
+      Context length: ${conversationContext.length}
+      Is follow-up: ${isFollowUp}
+      Reference date provided: ${referenceDate ? 'yes' : 'no'}
+      Preserve topic context: ${preserveTopicContext}
+    `);
     
-    // Get the user's local time based on timezone offset
-    const userLocalTime = new Date(Date.now() - (timezoneOffset || 0) * 60 * 1000);
-    const formattedLocalTime = userLocalTime.toISOString();
-    
-    console.log(`User's local time: ${formattedLocalTime}`);
-    
-    // Format conversation context for the API request - use ALL conversation history
-    const formattedContext = conversationContext.map(msg => ({
-      role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
-      content: msg.content,
-      isClarity: msg.isClarity || false  // Track if this was part of a clarification flow
-    }));
-    
-    // Enhanced detection of responses to clarification questions with more patterns
-    let isRespondingToClarification = checkIfResponseToClarification(message, formattedContext);
-    
-    // Add better contextual understanding by checking for topic continuation
-    const isTopicContinuation = checkIfTopicContinuation(message, formattedContext);
-    
-    // Check for direct time period specification
-    const hasDirectTimePeriod = checkForDirectTimePeriod(message);
-    
-    console.log(`Is responding to clarification: ${isRespondingToClarification}`);
-    console.log(`Is topic continuation: ${isTopicContinuation}`);
-    console.log(`Has direct time period: ${hasDirectTimePeriod ? hasDirectTimePeriod : 'none'}`);
-
-    // Check if this is a short response that likely implies "all data"
-    const isShortResponse = message.split(' ').length <= 5;
-    const commonAffirmativeWords = ['yes', 'sure', 'ok', 'okay', 'all', 'entire', 'everything', 'overall', 'yep', 'yeah', 'total', 'absolutely'];
-    const isCommonAffirmative = commonAffirmativeWords.some(word => message.toLowerCase().includes(word));
-    
-    // If it's a short response with affirmative words, assume the user wants comprehensive data
-    const isLikelyWantingAllData = isShortResponse && isCommonAffirmative;
-    console.log(`Is likely wanting all data: ${isLikelyWantingAllData}`);
-    
-    // Enhanced context-aware query analysis
-    // This analyzes if the query is ambiguous while considering the COMPLETE conversation context
-    const ambiguityAnalysisResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are an AI context analyst for a journaling application called SOULo, a Voice Journaling App focused on mental health assistance. Your task is to analyze the user's current query and determine if it requires clarification based on the conversation context.
-
-Analyze the user's query for the following types of ambiguity:
-
-1. TIME AMBIGUITY: Does the query refer to a specific time period that's not clearly defined? (e.g., "How was I feeling?", "What are my mood patterns?")
-
-2. ENTITY REFERENCE AMBIGUITY: Does the query contain pronouns or references to entities mentioned in previous messages? (e.g., "Tell me more about that", "How does it affect me?")
-
-3. INTENT AMBIGUITY: Is the user's intention unclear from the query alone? (e.g., "Analyze my journal", "What do you see?")
-
-4. SCOPE AMBIGUITY: Is it unclear whether the user wants analysis of recent entries or their entire journal history? (e.g., "What are my top emotions?", "How would you describe my personality?")
-
-IMPORTANT GUIDANCE - AVOID UNNECESSARY CLARIFICATIONS:
-- If the conversation already contains ANY context to understand the current query, DO NOT request clarification
-- If the user is directly responding to a previous clarification request, DO NOT mark as needing further clarification
-- If the user says something like "entire journal", "all entries", "everything", "all", "entire", "yes", "overall", assume they want comprehensive historical data
-- Short responses like "yes", "all", "entire", "overall", "sure", "ok" strongly imply the user wants comprehensive data analysis
-- If a query is a follow-up to a previous question/answer, interpret it in that context
-- For questions about personality traits, self-assessment, or ratings (like "am I creative?"), assume ALL entries unless specified
-- Pay special attention to pronouns like "this", "it", "that" and determine their referents from context
-- Short responses following a specific question should be interpreted in context of that question
-- If the most recent assistant message asked about time period or scope, and the user responds with a short answer, assume they provided their preference
-- For mental health related questions and personality traits, default to using all available data unless otherwise specified
-
-DEFAULT TO NO CLARIFICATION WHEN:
-- The query is about personality traits or characteristics (e.g. "Am I anxious?", "Rate my creativity")
-- The query asks for patterns or trends without specifying a timeframe
-- The query is a follow-up or continuation of a previous query
-- The query contains a specific timeframe already
-
-Respond with a JSON object like this:
-{
-  "needsClarification": boolean,  // In general, lean towards false unless absolutely necessary
-  "ambiguityType": "TIME"|"ENTITY_REFERENCE"|"INTENT"|"SCOPE"|"NONE",
-  "reasoning": "Brief explanation of why clarification is needed or not",
-  "suggestedClarificationQuestions": ["Question 1", "Question 2"]  // If clarification is needed
-}
-
-If no clarification is needed, set needsClarification to false and ambiguityType to "NONE".`
-          },
-          ...formattedContext, // Include ALL conversation context
-          { role: 'user', content: message }
-        ],
-        temperature: 0.1,
-        max_tokens: 500
-      }),
-    });
-
-    if (!ambiguityAnalysisResponse.ok) {
-      console.error('Failed to analyze ambiguity:', await ambiguityAnalysisResponse.text());
-      throw new Error('Failed to analyze query ambiguity');
-    }
-
-    const ambiguityAnalysis = await ambiguityAnalysisResponse.json();
-    console.log("Ambiguity analysis completed");
-    
-    let ambiguityResult;
-    try {
-      // Extract the JSON from the response
-      const analysisContent = ambiguityAnalysis.choices[0].message.content.trim();
-      ambiguityResult = JSON.parse(analysisContent);
-      console.log("Parsed ambiguity analysis:", ambiguityResult);
-    } catch (error) {
-      console.error("Error parsing ambiguity analysis:", error);
-      console.log("Raw analysis content:", ambiguityAnalysis.choices[0].message.content);
-      // Default to no ambiguity if parsing fails
-      ambiguityResult = { needsClarification: false, ambiguityType: "NONE", reasoning: "Failed to parse analysis" };
-    }
-    
-    // Override ambiguity check if we detect any of these conditions
-    if (isRespondingToClarification || isTopicContinuation || hasDirectTimePeriod || isLikelyWantingAllData || isFollowUp) {
-      console.log("Overriding ambiguity check due to detected context or user response pattern");
-      ambiguityResult.needsClarification = false;
-      ambiguityResult.ambiguityType = "NONE";
-      ambiguityResult.reasoning = "User is responding to a previous clarification, continuing a topic with clear context, using a direct time period, or indicating comprehensive data analysis";
-    }
-    
-    // For personality trait questions, assume all data and don't ask for clarification
-    if (/am I\s|\brate me\b|\brate my\b|\bscore me\b|\bscore my\b|\bevaluate me\b|\bevaluate my\b|\bhow \w+ am I\b/i.test(message)) {
-      console.log("Detected personality trait or self-assessment question, assuming comprehensive data");
-      ambiguityResult.needsClarification = false;
-      ambiguityResult.ambiguityType = "NONE";
-      ambiguityResult.reasoning = "User is asking about personality traits or self-assessment, assuming comprehensive data analysis";
-    }
-    
-    // Additional detection for multi-part questions that should be segmented
-    const isComplexQuestion = checkIfComplexQuestion(message);
-    console.log(`Is complex multi-part question: ${isComplexQuestion}`);
-    
-    // Improved message type classification that considers conversation context
-    const messageTypesResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: [
-          {
-            role: 'system',
-            content: `You are a classification tool for SOULo, a Voice Journaling App focused on mental health. You determine if a user's query is a general question about mental health (respond with "mental_health_general") OR if it's a question seeking insights from the user's journal entries (respond with "journal_specific"). 
-
-Specifically, if the user is asking for ANY of the following, classify as "journal_specific":
-- Personal ratings, scores, or evaluations based on their journal entries
-- Analysis of their traits, behaviors, or patterns
-- Reviews or assessments of their personal characteristics
-- Any query asking to "rate me", "analyze me", "evaluate me", or similar
-- Questions seeking quantitative or qualitative assessment of the user
-- Any request for statistics or metrics about their journaling data
-- Analysis of specific emotions or sentiment patterns in their entries
-- Any question that is clearly a follow-up to a previous journal-specific query
-
-Consider the FULL conversation context. If the user is clearly referring to their journal data, classify as "journal_specific".
-If the user is continuing a previous topic that was journal-specific, maintain that classification.
-If the user mentions ratings, scores, or analysis of any personal characteristic, classify as "journal_specific".
-Short responses like "yes", "all", "entire", "overall", "everything" following a question about journal data should be classified as "journal_specific".
-
-Respond with ONLY "mental_health_general" or "journal_specific".`
-          },
-          ...formattedContext, // Include ALL context, not just recent messages
-          { role: 'user', content: message }
-        ],
-        temperature: 0.1,
-        max_tokens: 10
-      }),
-    });
-
-    if (!messageTypesResponse.ok) {
-      console.error('Failed to get message types:', await messageTypesResponse.text());
-      throw new Error('Failed to classify message type');
-    }
-
-    const response = await messageTypesResponse.json();
-
-    // Process time-based queries more accurately
-    let hasTimeFilter = false;
-    let timeRangeMentioned = hasDirectTimePeriod || null;
-
-    // Enhanced time detection - look for time expressions in the query if not already detected
-    if (!timeRangeMentioned) {
-      const timeKeywords = [
-        'today', 'yesterday', 'this week', 'last week', 
-        'this month', 'last month', 'this year', 'last year',
-        'recent', 'latest', 'current', 'past', 'all', 'entire', 'everything'
-      ];
-      
-      const lowerMessage = message.toLowerCase();
-      
-      for (const keyword of timeKeywords) {
-        if (lowerMessage.includes(keyword)) {
-          console.log(`Detected time keyword: ${keyword}`);
-          timeRangeMentioned = keyword;
-          hasTimeFilter = true;
-          break;
-        }
-      }
-    } else {
-      // We already detected a direct time period
-      hasTimeFilter = true;
-    }
-    
-    // Check for replies to time-based questions in context
-    if (!hasTimeFilter && formattedContext.length > 0) {
-      // Look for the last assistant message that asked about time
-      const lastTimeQuestion = [...formattedContext].reverse().find(msg => 
-        msg.role === 'assistant' && 
-        (msg.content.includes('time period') || 
-         msg.content.includes('what period') || 
-         msg.content.includes('which time') ||
-         msg.content.includes('recent entries') ||
-         msg.content.includes('entire journal'))
+    if (!message || !userId) {
+      return new Response(
+        JSON.stringify({ error: 'Missing required parameters' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 400 }
       );
-      
-      // If user message is short and follows a time question, it might be specifying a time period
-      if (lastTimeQuestion && message.split(' ').length <= 5) {
-        // Check for common responses like "yes", "all", "entire", "overall"
-        const shortResponses = ['yes', 'sure', 'ok', 'okay', 'all', 'entire', 'everything', 'overall'];
-        const lowerMessage = message.toLowerCase();
-        
-        if (shortResponses.some(resp => lowerMessage.includes(resp))) {
-          console.log(`Detected short response to time question: ${message}`);
-          
-          if (lastTimeQuestion.content.includes('entire journal') || 
-              lastTimeQuestion.content.includes('all entries')) {
-            timeRangeMentioned = 'all';
-            hasTimeFilter = true;
-          } else {
-            timeRangeMentioned = 'recent';
-            hasTimeFilter = true;
-          }
-        }
-        
-        // Check for standard time keywords as well
-        for (const keyword of ['today', 'yesterday', 'this week', 'last week', 
-                               'this month', 'last month', 'this year', 'last year']) {
-          if (lowerMessage.includes(keyword)) {
-            console.log(`Detected time keyword in response to time question: ${keyword}`);
-            timeRangeMentioned = keyword;
-            hasTimeFilter = true;
-            break;
-          }
-        }
-      }
     }
 
-    // If the user is asking about a specific date, extract it
-    let specificDate = null;
-    const dateRegex = /(\d{4}[-./]\d{2}[-./]\d{2})|(\d{2}[-./]\d{2}[-./]\d{4})/;
-    const dateMatch = message.match(dateRegex);
-    if (dateMatch) {
-      try {
-        specificDate = new Date(dateMatch[0]).toISOString().split('T')[0];
-        console.log(`Detected specific date: ${specificDate}`);
-      } catch (error) {
-        console.error("Error parsing specific date:", error);
-      }
+    // Check for direct responses that don't need AI processing
+    const directResponse = checkForDirectResponse(message);
+    if (directResponse) {
+      console.log(`Direct response detected: ${directResponse}`);
+      return new Response(
+        JSON.stringify({ directResponse }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
     }
 
-    // Determine the queryType (mental_health_general or journal_specific)
-    const queryType = response.choices[0]?.message?.content?.trim() || 'journal_specific';
-    console.log("Query classified as:", queryType);
+    // Improved handling of time expressions
+    const timeExpression = detectTimeExpression(message);
+    console.log(`Time expression detected: ${timeExpression || 'none'}`);
     
-    // Check for rating/analysis requests specifically
-    const isRatingOrAnalysisRequest = /rate|analyze|evaluate|assess|score|rank|review/i.test(message);
-    if (isRatingOrAnalysisRequest) {
-      console.log("Detected rating or analysis request, ensuring journal_specific classification");
+    let calculatedDateRange = null;
+    let extractedTimeContext = null;
+    
+    // If we have a time expression, calculate the date range
+    if (timeExpression) {
+      const parsedReferenceDate = referenceDate ? new Date(referenceDate) : undefined;
+      calculatedDateRange = calculateDateRange(timeExpression, timezoneOffset, parsedReferenceDate);
+      extractedTimeContext = timeExpression;
+      console.log(`Calculated date range for "${timeExpression}": ${JSON.stringify(calculatedDateRange)}`);
+    }
+
+    // Create the query analysis request
+    const queryAnalysisRequest = {
+      role: "system",
+      content: generateSystemPrompt(appContext, calculatedDateRange, extractedTimeContext, preserveTopicContext)
+    };
+    
+    // Prepare the conversation context for the query analysis
+    const queryAnalysisMessages = prepareQueryAnalysisMessages(queryAnalysisRequest, message, conversationContext);
+    
+    // Get query plan from OpenAI
+    const plan = await getQueryPlanFromOpenAI(queryAnalysisMessages);
+    if (!plan) {
+      throw new Error('Failed to generate query plan');
     }
     
-    // Generate dynamic clarification questions based on ambiguity type
-    let clarificationQuestions = null;
-    
-    if (ambiguityResult.needsClarification) {
-      console.log(`Query needs clarification, ambiguity type: ${ambiguityResult.ambiguityType}`);
-      
-      // Enhanced clarification - use a more contextual approach to generate questions
-      const clarificationContext = [
-        ...formattedContext,
-        { role: 'user', content: message },
-        { 
-          role: 'assistant', 
-          content: `Based on your query, I need to clarify something before I can provide a helpful answer. The ambiguity is related to: ${ambiguityResult.ambiguityType.toLowerCase()}. ${ambiguityResult.reasoning}`
-        }
-      ];
-      
-      // Generate personalized clarification questions based on the specific ambiguity
-      const clarificationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an AI assistant for SOULo, a Voice Journaling App helping users analyze their journal entries. 
-              
-The user has asked a question that needs clarification. Based on the conversation history and ambiguity type, generate TWO clear, concise clarification options that the user can choose from.
-
-Make these options VERY brief (5 words or less if possible) and highly specific to the ambiguity identified.
-
-Return your response as a JSON array with exactly two objects: 
-[
-  { "text": "First option text", "action": "expand_search", "parameters": {"useHistoricalData": true} },
-  { "text": "Second option text", "action": "default_search", "parameters": {"useHistoricalData": false} }
-]
-
-Ensure each option has:
-1. "text" - The option text (keep it under 5 words)
-2. "action" - Either "expand_search" or "default_search"
-3. "parameters" - Include appropriate parameters based on the ambiguity`
-            },
-            ...clarificationContext
-          ],
-          temperature: 0.3,
-          max_tokens: 250
-        }),
-      });
-      
-      if (!clarificationResponse.ok) {
-        console.error('Failed to generate clarification questions:', await clarificationResponse.text());
-        // Fallback to default questions if generation fails
-        clarificationQuestions = getDefaultClarificationQuestions(ambiguityResult.ambiguityType);
-      } else {
-        try {
-          const clarificationData = await clarificationResponse.json();
-          const questionsContent = clarificationData.choices[0].message.content;
-          clarificationQuestions = JSON.parse(questionsContent);
-          console.log("Generated dynamic clarification questions:", clarificationQuestions);
-        } catch (error) {
-          console.error("Error parsing clarification questions:", error);
-          clarificationQuestions = getDefaultClarificationQuestions(ambiguityResult.ambiguityType);
-        }
-      }
-    }
-    
-    // Build the search plan for journal-specific queries
-    let plan = null;
-    let directResponse = null;
-
-    if (queryType === 'mental_health_general' && !isRatingOrAnalysisRequest) {
-      console.log("Query classified as general mental health question");
-      directResponse = null; // Process general queries with our standard chat flow
-    } else {
-      console.log("Query classified as journal-specific or rating request");
-      
-      // Build a plan for journal-specific queries with FULL context awareness
-      const planResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `You are an AI query planner for SOULo, a Voice Journaling application focused on mental health. Your task is to analyze user questions and create search plans that efficiently retrieve relevant journal entries.
-
-APPLICATION CONTEXT:
-- SOULo is a mental health assistance app that helps users track and analyze their emotions through voice journaling
-- Users speak their thoughts and the app transcribes, analyzes, and helps them gain insights
-- The AI assistant (you) helps users understand patterns in their emotional well-being
-- The app can analyze personality traits, emotional patterns, and provide self-reflection support
-
-IMPORTANT DATABASE INFORMATION:
-- All journal entries are stored with UTC timestamps in the database
-- The user's current local time is: ${formattedLocalTime} 
-- The user's timezone offset from UTC is: ${timezoneOffset || 0} minutes
-- When filtering by date ranges, you need to consider the user's timezone
-
-FULL CONVERSATION CONTEXT:
-${formattedContext.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n')}
-
-For the following user query, create a JSON search plan with these components:
-
-1. "strategy": Choose the most appropriate search method:
-   - "vector" (semantic search, default for conceptual queries)
-   - "sql" (direct filtering, best for time/attribute-based queries)
-   - "hybrid" (combines both approaches)
-
-2. "filters": Add relevant filters based on the query:
-   - "date_range": {startDate, endDate, periodName} (for time-based queries)
-     - IMPORTANT: Make sure these dates are in ISO format with timezone (UTC)
-     - For relative periods like "last week", compute actual date ranges
-     - Account for the user's timezone offset when calculating dates
-   - "emotions": [] (array of emotions to filter for)
-   - "sentiment": [] (array of sentiments: "positive", "negative", "neutral")
-   - "themes": [] (array of themes to filter for)
-   - "entities": [{type, name}] (people, places, etc. mentioned)
-
-3. "match_count": Number of entries to retrieve (default 15, use 30+ for aggregations)
-
-4. "needs_data_aggregation": Boolean (true if statistical analysis needed)
-   - IMPORTANT: Set this to true for ALL rating, scoring, or evaluation requests
-   - Also set to true for any pattern analysis, trait assessment, or statistic requests
-
-5. "needs_more_context": Boolean (true if query relates to previous messages)
-
-6. "is_segmented": Boolean (true if the query contains multiple distinct sub-questions)
-   - Set to true for questions containing "and", "also", multiple question marks, or distinct components
-
-7. "subqueries": [] (array of sub-questions if the query is complex and needs to be segmented)
-
-8. "reasoning": String explanation of your planning decisions
-
-9. "topic_context": String (capture what topic this query is about for future reference)
-
-IMPORTANT GUIDELINES:
-- Default to assuming the user wants comprehensive historical data for personality assessments
-- For short responses like "yes", "all", "entire", "overall", make sure to use all historical data
-- Bias towards setting "needs_data_aggregation" to true for any analysis, pattern, or insight questions
-- Always look for complex multi-part questions and set "is_segmented" appropriately
-- When a user asks about traits or characteristics (e.g., "am I introverted?"), set match_count to 30+
-- Single word responses should be interpreted in context of the previous question
-
-Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
-              `
-            },
-            ...formattedContext, // Include ALL conversation context
-            { role: 'user', content: message }
-          ],
-          temperature: 0.3,
-        }),
-      });
-
-      if (!planResponse.ok) {
-        console.error('Failed to get query plan:', await planResponse.text());
-        throw new Error('Failed to generate query plan');
-      }
-
-      const planData = await planResponse.json();
-      const planText = planData.choices[0]?.message?.content || '';
-      
-      try {
-        // Extract just the JSON part if there's any explanatory text
-        const jsonMatch = planText.match(/```json\s*([\s\S]*?)\s*```/) || planText.match(/\{[\s\S]*\}/);
-        const jsonStr = jsonMatch ? jsonMatch[0] : planText;
-        console.log("Generated raw plan:", jsonStr);
-        
-        // Handle special case for time-based queries
-        if (timeRangeMentioned && !jsonStr.includes('"date_range"')) {
-          // Add time range to the plan
-          const tempPlan = JSON.parse(jsonStr);
-          console.log("Adding time range to plan for:", timeRangeMentioned);
-          tempPlan.filters = tempPlan.filters || {};
-          
-          // Use our service to calculate the proper date range based on timezone
-          const dateRange = calculateRelativeDateRange(timeRangeMentioned, timezoneOffset);
-          tempPlan.filters.date_range = dateRange;
-          
-          plan = tempPlan;
-        } else {
-          plan = JSON.parse(jsonStr);
-        }
-        
-        // Force data aggregation for rating/analysis requests
-        if (isRatingOrAnalysisRequest && !plan.needs_data_aggregation) {
-          console.log("Forcing data aggregation for rating/analysis request");
-          plan.needs_data_aggregation = true;
-          plan.match_count = Math.max(plan.match_count || 15, 30); // Ensure we get enough data
-        }
-        
-        // Check if this is a complex question that should be segmented
-        if (isComplexQuestion && !plan.is_segmented) {
-          console.log("Marking as segmented question based on complexity detection");
-          plan.is_segmented = true;
-          // Note: subqueries will be filled in by the segment-complex-query function later
-        }
-        
-      } catch (e) {
-        console.error('Error parsing plan JSON:', e);
-        console.error('Raw plan text:', planText);
-        plan = {
-          strategy: 'vector',
-          filters: hasTimeFilter ? { date_range: calculateRelativeDateRange(timeRangeMentioned || 'recent', timezoneOffset) } : {},
-          match_count: isRatingOrAnalysisRequest ? 30 : 15,
-          needs_data_aggregation: isRatingOrAnalysisRequest || message.includes('how many') || message.includes('count') || message.includes('statistics'),
-          needs_more_context: false,
-          is_segmented: isComplexQuestion
+    // Enhance the plan with our calculated date range if we have one
+    if (calculatedDateRange && plan.plan) {
+      if (!plan.plan.filters) plan.plan.filters = {};
+      if (!plan.plan.filters.date_range) {
+        plan.plan.filters.date_range = {
+          startDate: calculatedDateRange.startDate,
+          endDate: calculatedDateRange.endDate,
+          periodName: calculatedDateRange.periodName
         };
       }
     }
-
-    // If a specific date was detected, ensure it's used in the plan
-    if (specificDate && plan) {
-      plan.filters = plan.filters || {};
-      plan.filters.date_range = {
-        startDate: specificDate,
-        endDate: specificDate,
-        periodName: 'specific date'
-      };
-      console.log("Forcing date range in plan to:", specificDate);
+    
+    // If we need to preserve topic context, make sure it's included
+    if (preserveTopicContext && plan.plan && appContext?.userContext?.previousTopicContext) {
+      plan.plan.topic_context = appContext.userContext.previousTopicContext;
+      console.log(`Preserved topic context in plan: ${appContext.userContext.previousTopicContext}`);
     }
     
-    // Special case handling for historical data requests
-    // Look for keywords that indicate the user wants all historical data
-    const historicalDataKeywords = ['all entries', 'entire journal', 'all my journal', 'historical data', 'all time', 'all', 'entire', 'everything', 'overall'];
-    const wantsHistoricalData = historicalDataKeywords.some(keyword => 
-      message.toLowerCase().includes(keyword.toLowerCase())
-    ) || isLikelyWantingAllData;
+    // Add the time context to the plan
+    if (extractedTimeContext && plan.plan) {
+      plan.plan.previous_time_context = extractedTimeContext;
+    }
     
-    // If the user wants historical data, remove date filters
-    if (wantsHistoricalData && plan && plan.filters && plan.filters.date_range) {
-      console.log("User explicitly requested historical data - removing date filters");
-      delete plan.filters.date_range;
+    // Check if this might be a multi-part question
+    if (checkForMultiQuestions && shouldSegmentQuery(message)) {
+      plan.plan.is_segmented = true;
     }
-
-    // For personality trait questions, ensure we use all available data and have high match count
-    if (/am I\s|\brate me\b|\brate my\b|\bscore me\b|\bscore my\b|\bevaluate me\b|\bevaluate my\b|\bhow \w+ am I\b/i.test(message) && plan) {
-      console.log("Personality trait question detected - ensuring comprehensive data analysis");
-      if (plan.filters) delete plan.filters.date_range;
-      plan.match_count = Math.max(plan.match_count || 15, 30);
-      plan.needs_data_aggregation = true;
-    }
-
-    // Return the plan
+    
     return new Response(
-      JSON.stringify({ 
-        plan, 
-        queryType: isRatingOrAnalysisRequest ? 'journal_specific' : queryType,
-        directResponse,
-        needsClarification: ambiguityResult.needsClarification,
-        clarificationQuestions,
-        ambiguityAnalysis: ambiguityResult
-      }),
-      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      JSON.stringify(plan),
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error in query planner:', error);
+    console.error('Error in smart-query-planner:', error.message);
     return new Response(
       JSON.stringify({ error: error.message }),
-      { status: 500, headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
     );
   }
 });
 
-/**
- * Enhanced helper function to check if the current message is responding to a previous clarification
- * Considers the full conversation context and better detects clarification responses
- */
-function checkIfResponseToClarification(message: string, conversationContext: Array<{role: string, content: string}>): boolean {
-  if (conversationContext.length === 0) return false;
+// Helper function to generate system prompt with better temporal and topic context
+function generateSystemPrompt(appContext: any, dateRange: any, timeContext: string | null, preserveTopicContext: boolean): string {
+  // Get app information from the context
+  const appInfo = appContext?.appInfo || {
+    name: "Journal Analysis App",
+    type: "Voice Journaling App",
+    features: ["Journal Analysis", "Emotion Tracking"]
+  };
   
-  // Get the most recent messages with more context
-  const recentMessages = conversationContext.slice(-4);
+  // Get user context
+  const userContext = appContext?.userContext || {};
+  const previousTimeContext = userContext.previousTimeContext || null;
+  const previousTopicContext = userContext.previousTopicContext || null;
   
-  // Check if any of the recent assistant messages was asking for clarification
-  const assistantMessages = recentMessages.filter(msg => msg.role === 'assistant');
-  if (assistantMessages.length === 0) return false;
-  
-  // Get the most recent assistant message
-  const lastAssistantMessage = assistantMessages[assistantMessages.length - 1];
-  
-  const clarificationIndicators = [
-    'I need to clarify',
-    'which time period',
-    'what period',
-    'could you specify',
-    'can you clarify',
-    'recent entries',
-    'all entries',
-    'entire journal',
-    'understand your question better',
-    'need to understand',
-    'not clear',
-    'need more information',
-    'what do you mean',
-    'what are you referring to',
-    'want me to focus on',
-    'do you want me to analyze',
-    'would you like me to',
-    'are you asking about',
-    'do you mean',
-    'would you prefer',
-    'should I focus on',
-    'entire history or just recent entries',
-    'specific timeframe or all entries',
-    'more recent journal entries or your entire history',
-    'clarify what you',
-    'help me understand',
-    'first option or second option',
-    'which option would you prefer'
-  ];
-  
-  const isLastMessageClarification = clarificationIndicators.some(
-    indicator => lastAssistantMessage.content.toLowerCase().includes(indicator.toLowerCase())
-  );
-  
-  // If last assistant message was a clarification, check if user's message is a likely response
-  if (isLastMessageClarification) {
-    // Check for short response (likely a direct reply to a clarification question)
-    const isShortResponse = message.split(' ').length <= 10;
-    
-    // Check for common clarification responses
-    const commonResponses = [
-      'all', 'everything', 'entire', 'recent', 'just', 'yes', 'no', 'correct', 'overall',
-      'today', 'yesterday', 'last week', 'this month', 'happiness', 'mood', 
-      'emotions', 'productivity', 'sleep', 'health', 'work', 'relationship',
-      'sure', 'ok', 'okay', 'please', 'thanks', 'thank you', 'yep', 'yeah',
-      'first option', 'second option', 'option 1', 'option 2', 'first', 'second'
-    ];
-    
-    const containsCommonResponse = commonResponses.some(
-      response => message.toLowerCase().includes(response.toLowerCase())
-    );
-    
-    return isShortResponse || containsCommonResponse;
-  }
-  
-  return false;
-}
+  let basePrompt = `You are an AI assistant for ${appInfo.name}, a ${appInfo.type} focused on mental health and self-reflection. 
+Your task is to analyze user queries about their journal entries and create a structured plan for searching and retrieving relevant information.`;
 
-/**
- * Helper function to detect if a message is continuing a previous topic
- */
-function checkIfTopicContinuation(message: string, conversationContext: Array<{role: string, content: string}>): boolean {
-  if (conversationContext.length < 2) return false;
-  
-  // Check for pronouns and references that usually indicate continuing a topic
-  const referenceTerms = ['it', 'this', 'that', 'them', 'these', 'those', 'their', 'its'];
-  const messageWords = message.toLowerCase().split(/\s+/);
-  
-  const containsReference = referenceTerms.some(term => 
-    messageWords.includes(term) || messageWords.includes(term + '?')
-  );
-  
-  // Check if the message is very short (likely a follow-up)
-  const isShortMessage = message.split(' ').length <= 7;
-  
-  // Check if the message just asks for a rating/score without specifying context
-  const isRatingWithoutContext = /^(rate|score|evaluate|assess|analyze).*\d+(\s*(\/|out of)\s*\d+)?$/i.test(message.trim());
-  
-  // Check if the message is a follow-up question about a previous answer
-  const isFollowUpQuestion = /^(why|how|tell me more|explain|elaborate|what about|and|also|what else)/i.test(message.trim());
-  
-  return containsReference || isShortMessage || isRatingWithoutContext || isFollowUpQuestion;
-}
-
-/**
- * Helper function to check if the message is a complex multi-part question
- */
-function checkIfComplexQuestion(message: string): boolean {
-  // Check for conjunction words that often indicate multiple questions
-  const hasConjunctions = /\band\b|\balso\b|\badditionally\b|\bplus\b|\bmoreover\b|\bfurthermore\b/i.test(message);
-  
-  // Check for multiple question marks
-  const questionMarks = (message.match(/\?/g) || []).length;
-  const hasMultipleQuestions = questionMarks > 1;
-  
-  // Check for question starters within the message (not at the beginning)
-  const questionStarters = ['what', 'who', 'when', 'where', 'why', 'how', 'can you', 'could you', 'would you'];
-  const hasMultipleQuestionStarters = questionStarters.filter(starter => {
-    const regex = new RegExp(`\\b${starter}\\b`, 'gi');
-    const matches = message.match(regex) || [];
-    return matches.length > 0;
-  }).length > 1;
-  
-  // Check for lists (e.g., "1. ... 2. ..." or bullet points)
-  const hasList = /(\d+\s*[\.\):])|(\*|\-|\+)\s+/m.test(message);
-  
-  // Check if the message is generally complex (quite long)
-  const isLongMessage = message.length > 100;
-  
-  return (hasConjunctions || hasMultipleQuestions || hasMultipleQuestionStarters || hasList) && isLongMessage;
-}
-
-/**
- * New helper function to check if the message directly specifies a time period
- */
-function checkForDirectTimePeriod(message: string): string | null {
-  const lowerMsg = message.toLowerCase();
-  
-  // Direct time period expressions
-  const directTimeExpressions = [
-    { regex: /\b(all|entire|everything)\b/, period: 'all' },
-    { regex: /\brecent (only|entries|days|history)\b/, period: 'recent' },
-    { regex: /\btoday\b/, period: 'today' },
-    { regex: /\byesterday\b/, period: 'yesterday' },
-    { regex: /\bthis week\b/, period: 'this week' },
-    { regex: /\blast week\b/, period: 'last week' },
-    { regex: /\bthis month\b/, period: 'this month' },
-    { regex: /\blast month\b/, period: 'last month' },
-    { regex: /\bthis year\b/, period: 'this year' },
-    { regex: /\blast year\b/, period: 'last year' }
-  ];
-  
-  for (const expr of directTimeExpressions) {
-    if (expr.regex.test(lowerMsg)) {
-      return expr.period;
+  // Add information about previous context if available
+  if (previousTimeContext || previousTopicContext) {
+    basePrompt += `\n\nIMPORTANT CONTEXT FROM PREVIOUS CONVERSATION:`;
+    
+    if (previousTimeContext) {
+      basePrompt += `\n- User's previous question was about time period: "${previousTimeContext}"`;
+    }
+    
+    if (previousTopicContext) {
+      basePrompt += `\n- User's previous question was about topic: "${previousTopicContext}"`;
+      
+      // If we're preserving topic context (meaning this is just a time-based follow-up),
+      // emphasize that the topic should be maintained
+      if (preserveTopicContext) {
+        basePrompt += `\n\nTHIS IS A TIME-BASED FOLLOW-UP QUESTION. The user is asking about a different time period but is still interested in the SAME TOPIC ("${previousTopicContext}").`;
+      }
     }
   }
   
-  // Simple cases where the entire message is just a time period
-  if (['all', 'everything', 'entire', 'recent', 'today', 'yesterday'].includes(lowerMsg)) {
-    return lowerMsg;
+  // Add date range information if available from a time expression
+  if (dateRange) {
+    basePrompt += `\n\nI've detected a time expression "${timeContext}" in the query. 
+Time range already calculated: 
+- Start date: ${dateRange.startDate}
+- End date: ${dateRange.endDate}
+- Period name: ${dateRange.periodName}`;
+  }
+
+  // Add complete instructions
+  basePrompt += `\n\nYour task:
+1. Analyze the query to understand what type of information the user is seeking from their journal entries.
+2. Create a structured plan for searching and retrieving the relevant information.
+3. Return your analysis in a structured JSON format.`;
+  
+  // Add specific temporal context handling
+  basePrompt += `\n\nWhen handling follow-up questions about different time periods:
+- If the user is asking about a new time period (e.g. "What about last month?") but their previous question was about a specific topic, MAINTAIN THE SAME TOPIC while changing just the time period.
+- Do not switch to a general analysis when the user is simply changing the time frame.`;
+
+  // Add output format instructions
+  basePrompt += `\n\nOutput your plan as a JSON object with the following structure:
+{
+  "plan": {
+    "strategy": "vector" | "sql" | "hybrid",
+    "filters": {
+      "date_range": {
+        "startDate": "ISO string or null",
+        "endDate": "ISO string or null",
+        "periodName": "description of the time period"
+      },
+      "emotions": ["emotion1", "emotion2"],
+      "themes": ["theme1", "theme2"],
+      "entities": [{"type": "PERSON", "name": "name"}]
+    },
+    "match_count": number,
+    "needs_data_aggregation": boolean,
+    "needs_more_context": boolean,
+    "is_segmented": boolean,
+    "topic_context": "the main topic of the query",
+    "reasoning": "explanation of the plan"
+  },
+  "queryType": "journal_specific" | "general_analysis" | "emotional_analysis" | "pattern_detection" | "personality_reflection"
+}`;
+
+  return basePrompt;
+}
+
+/**
+ * Prepare conversation context for query analysis
+ */
+function prepareQueryAnalysisMessages(queryAnalysisRequest: any, message: string, conversationContext: any[]): any[] {
+  const userMessage = { role: "user", content: message };
+  
+  // Add the system prompt
+  const messages = [queryAnalysisRequest];
+  
+  // Add previous conversation context
+  for (const contextMessage of conversationContext) {
+    messages.push(contextMessage);
   }
   
-  // If a number of days/weeks/months/years is mentioned
-  const timeRangeMatch = lowerMsg.match(/\b(\d+)\s*(day|week|month|year)s?\b/);
-  if (timeRangeMatch) {
-    return `last ${timeRangeMatch[1]} ${timeRangeMatch[2]}s`;
+  // Add the user's message
+  messages.push(userMessage);
+  
+  return messages;
+}
+
+/**
+ * Get query plan from OpenAI
+ */
+async function getQueryPlanFromOpenAI(messages: any): Promise<any> {
+  try {
+    console.log(`Calling OpenAI with messages: ${JSON.stringify(messages).substring(0, 200)}...`);
+    
+    const completion = await openai.chat.completions.create({
+      model: 'gpt-4-1106-preview',
+      messages: messages,
+      temperature: 0.0,
+      // max_tokens: 500,
+      response_format: { type: "json_object" }
+    });
+    
+    const response = completion.choices[0].message?.content;
+    console.log(`Received from OpenAI: ${response?.substring(0, 200)}...`);
+    
+    if (!response) {
+      throw new Error('No response from OpenAI');
+    }
+    
+    try {
+      const plan = JSON.parse(response);
+      return plan;
+    } catch (error) {
+      console.error('Failed to parse JSON response from OpenAI:', error);
+      console.log('Raw response from OpenAI:', response);
+      return { plan: null, queryType: 'journal_specific' };
+    }
+  } catch (error) {
+    console.error('Error calling OpenAI:', error);
+    return { plan: null, queryType: 'journal_specific' };
+  }
+}
+
+/**
+ * Check for direct responses that don't need AI processing
+ */
+function checkForDirectResponse(message: string): string | null {
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes("hello") || lowerMessage.includes("hi")) {
+    return "Hello! How can I help you today?";
+  }
+  
+  if (lowerMessage.includes("thank you") || lowerMessage.includes("thanks")) {
+    return "You're welcome!";
   }
   
   return null;
 }
 
 /**
- * Returns default clarification questions based on ambiguity type
+ * Should we segment the query?
  */
-function getDefaultClarificationQuestions(ambiguityType: string): Array<{text: string, action: string, parameters: Record<string, any>}> {
-  switch(ambiguityType) {
-    case "TIME":
-      return [
-        {
-          text: "All journal entries",
-          action: "expand_search",
-          parameters: { useHistoricalData: true }
-        },
-        {
-          text: "Recent entries only",
-          action: "default_search",
-          parameters: { useHistoricalData: false }
-        }
-      ];
-    case "SCOPE":
-      return [
-        {
-          text: "Analyze entire journal",
-          action: "expand_search",
-          parameters: { useHistoricalData: true }
-        },
-        {
-          text: "Focus on recent patterns",
-          action: "default_search",
-          parameters: { useHistoricalData: false }
-        }
-      ];
-    case "INTENT":
-      return [
-        {
-          text: "Analyze trends",
-          action: "expand_search",
-          parameters: { analysisType: "trends" }
-        },
-        {
-          text: "Get specific insights",
-          action: "default_search",
-          parameters: { analysisType: "specific" }
-        }
-      ];
-    default:
-      return [
-        {
-          text: "All journal entries",
-          action: "expand_search",
-          parameters: { useHistoricalData: true }
-        },
-        {
-          text: "Recent entries only",
-          action: "default_search",
-          parameters: { useHistoricalData: false }
-        }
-      ];
+function shouldSegmentQuery(message: string): boolean {
+  const lowerMessage = message.toLowerCase();
+  
+  // Check for multiple questions
+  if ((lowerMessage.match(/\?/g) || []).length > 1) {
+    return true;
   }
+  
+  // Check for conjunctions
+  if (lowerMessage.includes(" and ") || lowerMessage.includes(" also ")) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
- * Calculates relative date ranges based on time expressions
- * @param timePeriod - The time period expression (e.g., "this month", "last week")
- * @param timezoneOffset - User's timezone offset in minutes
- * @returns Date range with start and end dates
+ * Detect time expressions in the query
  */
-function calculateRelativeDateRange(
-  timePeriod: string,
-  timezoneOffset: number = 0,
-  referenceDate?: Date
-): { startDate: string, endDate: string, periodName: string } {
+function detectTimeExpression(query: string): string | null {
+  if (!query) return null;
+  
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // First check for specific follow-up patterns 
+  if (/^(what|how) about (last|this|previous|past|recent)/i.test(lowerQuery)) {
+    const match = lowerQuery.match(/(last|this|previous|past|recent)(\s+\w+)+/i);
+    if (match) return match[0];
+  }
+  
+  // Then check for specific time expressions
+  const timeExpressions = [
+    // Days
+    { regex: /\btoday\b/i, value: 'today' },
+    { regex: /\byesterday\b/i, value: 'yesterday' },
+    { regex: /\bthis day\b/i, value: 'today' },
+    
+    // Weeks
+    { regex: /\blast week\b/i, value: 'last week' },
+    { regex: /\bthis week\b/i, value: 'this week' },
+    { regex: /\bprevious week\b/i, value: 'last week' },
+    { regex: /\bpast week\b/i, value: 'past week' },
+    
+    // Months
+    { regex: /\blast month\b/i, value: 'last month' },
+    { regex: /\bthis month\b/i, value: 'this month' },
+    { regex: /\bprevious month\b/i, value: 'last month' },
+    { regex: /\bpast month\b/i, value: 'past month' },
+    
+    // Years
+    { regex: /\blast year\b/i, value: 'last year' },
+    { regex: /\bthis year\b/i, value: 'this year' },
+    { regex: /\bprevious year\b/i, value: 'last year' },
+    
+    // Multiple days
+    { regex: /\bpast (\d+) days?\b/i, getValue: (match: any) => `past ${match[1]} days` },
+    { regex: /\blast (\d+) days?\b/i, getValue: (match: any) => `last ${match[1]} days` },
+    
+    // Special cases
+    { regex: /\ball time\b/i, value: 'all time' },
+    { regex: /\bentire\b/i, value: 'all time' },
+    { regex: /\beverything\b/i, value: 'all time' },
+  ];
+  
+  // Check each expression
+  for (const expr of timeExpressions) {
+    const match = lowerQuery.match(expr.regex);
+    if (match) {
+      // Return either the fixed value or the calculated value
+      return expr.getValue ? expr.getValue(match) : expr.value;
+    }
+  }
+  
+  // Special case for standalone time expressions as follow-ups
+  if (/^(today|yesterday|this week|last week|this month|last month|this year|last year)(\?|\.|$)/i.test(lowerQuery)) {
+    return lowerQuery.match(/^(today|yesterday|this week|last week|this month|last month|this year|last year)/i)![0];
+  }
+  
+  return null;
+}
+
+/**
+ * Calculate date range based on time expression
+ */
+function calculateDateRange(timePeriod: string, timezoneOffset: number = 0, referenceDate?: Date): { startDate: string, endDate: string, periodName: string } {
   // Convert timezone offset to milliseconds
   const offsetMs = timezoneOffset * 60 * 1000;
   
   // Use provided reference date or get current date in user's timezone
   const now = referenceDate ? new Date(referenceDate) : new Date(Date.now() - offsetMs);
+  let startDate: Date;
+  let endDate: Date;
+  let periodName = timePeriod;
   
-  console.log(`Calculating date range for "${timePeriod}" with offset ${timezoneOffset}`);
-  console.log(`Reference date: ${referenceDate ? referenceDate.toISOString() : 'none'}`);
+  console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
+  console.log(`User's local time: ${now.toISOString()}`);
+  console.log(`Reference date provided: ${referenceDate ? 'yes' : 'no'}`);
   
-  const lowerTimePeriod = timePeriod.toLowerCase();
+  // If referenceDate is provided, log it for debugging
+  if (referenceDate) {
+    console.log(`Using reference date for date calculation: ${referenceDate.toISOString()}`);
+  }
   
+  // Normalize time period for better matching
+  const lowerTimePeriod = timePeriod.toLowerCase().trim();
+  
+  // Enhanced pattern matching with more variations
   if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
     // Today: Start at midnight, end at 23:59:59
-    startDate = new Date(now);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
+    startDate = startOfDay(now);
+    endDate = endOfDay(now);
     periodName = 'today';
   } 
   else if (lowerTimePeriod.includes('yesterday')) {
     // Yesterday: Start at previous day midnight, end at previous day 23:59:59
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 1);
-    startDate.setHours(0, 0, 0, 0);
-    
-    endDate = new Date(startDate);
-    endDate.setHours(23, 59, 59, 999);
+    startDate = startOfDay(subDays(now, 1));
+    endDate = endOfDay(subDays(now, 1));
     periodName = 'yesterday';
-  } 
+  }
+  else if (lowerTimePeriod.match(/past (\d+) days?/)) {
+    // Past X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/past (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `past ${days} days`;
+  }
+  else if (lowerTimePeriod.match(/last (\d+) days?/)) {
+    // Last X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/last (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `last ${days} days`;
+  }
+  else if (lowerTimePeriod.match(/recent (\d+) days?/)) {
+    // Recent X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/recent (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `recent ${days} days`;
+  }
   else if (lowerTimePeriod.includes('this week')) {
     // This week: Start at current week Monday, end at Sunday 23:59:59
-    startDate = new Date(now);
-    const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7 to make Monday (1) the first day
-    startDate.setDate(now.getDate() - (dayOfWeek - 1)); // Go back to Monday
-    startDate.setHours(0, 0, 0, 0);
-    
-    endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
-    endDate.setHours(23, 59, 59, 999);
+    startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
+    endDate = endOfWeek(now, { weekStartsOn: 1 }); // End on Sunday
     periodName = 'this week';
   } 
   else if (lowerTimePeriod.includes('last week')) {
-    // Last week: Start at previous week Monday, end at previous week Sunday
-    startDate = new Date(now);
-    const dayOfWeek = now.getDay() || 7; // Convert Sunday (0) to 7
-    startDate.setDate(now.getDate() - (dayOfWeek - 1) - 7); // Go back to previous Monday
-    startDate.setHours(0, 0, 0, 0);
-    
-    endDate = new Date(startDate);
-    endDate.setDate(startDate.getDate() + 6); // Go forward 6 days to Sunday
-    endDate.setHours(23, 59, 59, 999);
+    // Last week: Start at previous week Monday, end at previous week Sunday 23:59:59
+    const prevWeek = subWeeks(now, 1);
+    startDate = startOfWeek(prevWeek, { weekStartsOn: 1 }); // Start on Monday
+    endDate = endOfWeek(prevWeek, { weekStartsOn: 1 }); // End on Sunday
     periodName = 'last week';
-  } 
+  }
+  else if (lowerTimePeriod.includes('past week') || lowerTimePeriod.includes('previous week')) {
+    // Past/previous week: Start at 7 days ago, end at today
+    startDate = startOfDay(subDays(now, 7));
+    endDate = endOfDay(now);
+    periodName = 'past week';
+  }
   else if (lowerTimePeriod.includes('this month')) {
-    // This month: Start at 1st of current month, end at last day of month
-    startDate = new Date(now.getFullYear(), now.getMonth(), 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), now.getMonth() + 1, 0); // Last day of current month
-    endDate.setHours(23, 59, 59, 999);
+    // This month: Start at 1st of current month, end at last day of month 23:59:59
+    startDate = startOfMonth(now);
+    endDate = endOfMonth(now);
     periodName = 'this month';
   } 
-  else if (lowerTimePeriod.includes('last month')) {
-    // Last month: Start at 1st of previous month, end at last day of previous month
-    startDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), now.getMonth(), 0); // Last day of previous month
-    endDate.setHours(23, 59, 59, 999);
+  else if (lowerTimePeriod.includes('last month') || lowerTimePeriod === 'previous month') {
+    // Last month: Start at 1st of previous month, end at last day of previous month 23:59:59
+    const prevMonth = subMonths(now, 1);
+    startDate = startOfMonth(prevMonth);
+    endDate = endOfMonth(prevMonth);
     periodName = 'last month';
-  } 
+  }
+  else if (lowerTimePeriod.includes('past month')) {
+    // Past month: Start at 30 days ago, end at today
+    startDate = startOfDay(subDays(now, 30));
+    endDate = endOfDay(now);
+    periodName = 'past month';
+  }
   else if (lowerTimePeriod.includes('this year')) {
-    // This year: Start at January 1st, end at December 31st
-    startDate = new Date(now.getFullYear(), 0, 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now.getFullYear(), 11, 31);
-    endDate.setHours(23, 59, 59, 999);
+    // This year: Start at January 1st, end at December 31st 23:59:59
+    startDate = startOfYear(now);
+    endDate = endOfYear(now);
     periodName = 'this year';
   } 
   else if (lowerTimePeriod.includes('last year')) {
-    // Last year: Start at January 1st of previous year, end at December 31st of previous year
-    startDate = new Date(now.getFullYear() - 1, 0, 1);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now.getFullYear() - 1, 11, 31);
-    endDate.setHours(23, 59, 59, 999);
+    // Last year: Start at January 1st of previous year, end at December 31st of previous year 23:59:59
+    const prevYear = subYears(now, 1);
+    startDate = startOfYear(prevYear);
+    endDate = endOfYear(prevYear);
     periodName = 'last year';
   } 
-  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || lowerTimePeriod === 'everything' || lowerTimePeriod === 'overall') {
+  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || 
+           lowerTimePeriod === 'everything' || lowerTimePeriod === 'overall' ||
+           lowerTimePeriod === 'all time' || lowerTimePeriod === 'always' ||
+           lowerTimePeriod === 'all my entries' || lowerTimePeriod === 'all entries') {
     // Special case for "entire" - use a very broad date range (5 years back)
-    startDate = new Date(now);
-    startDate.setFullYear(now.getFullYear() - 5);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
-    periodName = 'entire';
+    startDate = startOfYear(subYears(now, 5));
+    endDate = endOfDay(now);
+    periodName = 'all time';
+  }
+  else if (lowerTimePeriod === 'yes' || lowerTimePeriod === 'sure' || 
+           lowerTimePeriod === 'ok' || lowerTimePeriod === 'okay' ||
+           lowerTimePeriod === 'yep' || lowerTimePeriod === 'yeah') {
+    // Special handling for affirmative responses - use a broad date range
+    startDate = startOfYear(subYears(now, 5));
+    endDate = endOfDay(now);
+    periodName = 'all time'; // Use "all time" for affirmative responses
   }
   else {
     // Default to last 30 days if no specific period matched
-    startDate = new Date(now);
-    startDate.setDate(now.getDate() - 30);
-    startDate.setHours(0, 0, 0, 0);
-    endDate = new Date(now);
-    endDate.setHours(23, 59, 59, 999);
+    startDate = startOfDay(subDays(now, 30));
+    endDate = endOfDay(now);
     periodName = 'last 30 days';
   }
 
   // Add back the timezone offset to convert to UTC for storage
+  // We need to explicitly create new Date objects to avoid modifying the originals
   const utcStartDate = new Date(startDate.getTime() + offsetMs);
   const utcEndDate = new Date(endDate.getTime() + offsetMs);
   
@@ -966,13 +510,8 @@ function calculateRelativeDateRange(
   if (utcEndDate < utcStartDate) {
     console.error("Invalid date range calculated: end date is before start date");
     // Fallback to last 7 days as a safe default
-    const fallbackStart = new Date(now);
-    fallbackStart.setDate(now.getDate() - 7);
-    fallbackStart.setHours(0, 0, 0, 0);
-    
-    const fallbackEnd = new Date(now);
-    fallbackEnd.setHours(23, 59, 59, 999);
-    
+    const fallbackStart = startOfDay(subDays(now, 7));
+    const fallbackEnd = endOfDay(now);
     return {
       startDate: new Date(fallbackStart.getTime() + offsetMs).toISOString(),
       endDate: new Date(fallbackEnd.getTime() + offsetMs).toISOString(),
@@ -992,4 +531,100 @@ function calculateRelativeDateRange(
     endDate: utcEndDate.toISOString(),
     periodName
   };
+}
+
+// Helper function to get start of day
+function startOfDay(date: Date): Date {
+  const newDate = new Date(date);
+  newDate.setHours(0, 0, 0, 0);
+  return newDate;
+}
+
+// Helper function to get end of day
+function endOfDay(date: Date): Date {
+  const newDate = new Date(date);
+  newDate.setHours(23, 59, 59, 999);
+  return newDate;
+}
+
+// Helper function to get start of week
+function startOfWeek(date: Date, options: { weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 }): Date {
+  const newDate = new Date(date);
+  const day = newDate.getDay();
+  const diff = newDate.getDate() - day + (day == (options.weekStartsOn + 7) ? -6: options.weekStartsOn);
+  newDate.setDate(diff);
+  newDate.setHours(0, 0, 0, 0);
+  return newDate;
+}
+
+// Helper function to get end of week
+function endOfWeek(date: Date, options: { weekStartsOn: 0 | 1 | 2 | 3 | 4 | 5 | 6 }): Date {
+  const newDate = new Date(date);
+  const day = newDate.getDay();
+  const diff = newDate.getDate() - day + (day == (options.weekStartsOn + 7) ? -6: options.weekStartsOn) + 6;
+  newDate.setDate(diff);
+  newDate.setHours(23, 59, 59, 999);
+  return newDate;
+}
+
+// Helper function to get start of month
+function startOfMonth(date: Date): Date {
+  const newDate = new Date(date);
+  newDate.setDate(1);
+  newDate.setHours(0, 0, 0, 0);
+  return newDate;
+}
+
+// Helper function to get end of month
+function endOfMonth(date: Date): Date {
+  const newDate = new Date(date);
+  newDate.setDate(new Date(newDate.getFullYear(), newDate.getMonth() + 1, 0).getDate());
+  newDate.setHours(23, 59, 59, 999);
+  return newDate;
+}
+
+// Helper function to get start of year
+function startOfYear(date: Date): Date {
+  const newDate = new Date(date);
+  newDate.setDate(1);
+  newDate.setMonth(0);
+  newDate.setHours(0, 0, 0, 0);
+  return newDate;
+}
+
+// Helper function to get end of year
+function endOfYear(date: Date): Date {
+  const newDate = new Date(date);
+  newDate.setDate(31);
+  newDate.setMonth(11);
+  newDate.setHours(23, 59, 59, 999);
+  return newDate;
+}
+
+// Helper function to subtract days from a date
+function subDays(date: Date, days: number): Date {
+  const newDate = new Date(date);
+  newDate.setDate(newDate.getDate() - days);
+  return newDate;
+}
+
+// Helper function to subtract weeks from a date
+function subWeeks(date: Date, weeks: number): Date {
+  const newDate = new Date(date);
+  newDate.setDate(newDate.getDate() - weeks * 7);
+  return newDate;
+}
+
+// Helper function to subtract months from a date
+function subMonths(date: Date, months: number): Date {
+  const newDate = new Date(date);
+  newDate.setMonth(newDate.getMonth() - months);
+  return newDate;
+}
+
+// Helper function to subtract years from a date
+function subYears(date: Date, years: number): Date {
+  const newDate = new Date(date);
+  newDate.setFullYear(newDate.getFullYear() - years);
+  return newDate;
 }

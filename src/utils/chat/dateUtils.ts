@@ -1,4 +1,3 @@
-
 import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
 
 /**
@@ -219,7 +218,7 @@ export function detectRelativeTimeExpression(query: string): string | null {
 
 /**
  * Extracts a reference date from a previous query plan
- * @param previousPlan - The previous query plan with date range
+ * @param previousDateRange - The previous date range with date
  * @returns Date object or undefined if no reference date found
  */
 export function extractReferenceDate(previousDateRange: any): Date | undefined {
@@ -262,6 +261,11 @@ export function isRelativeTimeQuery(query: string): boolean {
     if (pattern.test(lowerQuery)) {
       return true;
     }
+  }
+  
+  // Also check for standalone time periods that could be follow-ups
+  if (/^(today|yesterday|this week|last week|this month|last month|this year|last year)(\?|\.|$)/i.test(lowerQuery)) {
+    return true;
   }
   
   return false;

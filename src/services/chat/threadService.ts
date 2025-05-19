@@ -1,6 +1,7 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ChatThread } from './types';
-import { detectRelativeTimeExpression, calculateRelativeDateRange } from '@/utils/chat/dateUtils';
+import { detectRelativeTimeExpression, calculateRelativeDateRange, extractReferenceDate, isRelativeTimeQuery } from '@/utils/chat/dateUtils';
 
 export async function fetchChatThreads(userId: string | undefined) {
   if (!userId) {
@@ -193,34 +194,47 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
   try {
     // Get previous conversation context if available
     let previousTimeContext = null;
+    let previousTopicContext = null;
     let referenceDate = undefined;
     
     if (threadId) {
       const storedContext = await getConversationContext(threadId);
-      if (storedContext && storedContext.timeContext) {
+      if (storedContext) {
         previousTimeContext = storedContext.timeContext;
-        console.log(`Retrieved previous time context: ${previousTimeContext}`);
+        previousTopicContext = storedContext.topicContext;
+        console.log(`Retrieved previous context - Time: ${previousTimeContext}, Topic: ${previousTopicContext}`);
         
-        // If this is a follow-up with relative time expression, use the previous context
+        // Check if this is a time-based follow-up question
         const timeExpression = detectRelativeTimeExpression(query);
-        if (timeExpression) {
-          console.log(`Detected time expression in follow-up: "${timeExpression}"`);
+        const isTimeQuery = isRelativeTimeQuery(query);
+        
+        if ((timeExpression || isTimeQuery) && previousTimeContext) {
+          console.log(`Detected time expression in follow-up: "${timeExpression || query}"`);
           
-          // Try to extract a reference date from stored context
-          // For example, if previous context was "April 2025", 
-          // and current query is "what about last month?", we should use March 2025
-          const now = new Date();
-          if (previousTimeContext.includes("month")) {
-            // If previous context was about a month, adjust reference date accordingly
-            console.log(`Previous context was month-related: ${previousTimeContext}`);
-            if (previousTimeContext.includes("last month")) {
-              // If it was already "last month", go back another month
-              referenceDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
-            } else if (previousTimeContext.includes("this month")) {
-              // If it was "this month", go back one month for "last month"
-              referenceDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+          // If we have a previous time context, use it to calculate the reference date
+          if (previousTimeContext && storedContext.lastUpdated) {
+            // Use the date from last update as reference point
+            const lastUpdateDate = new Date(storedContext.lastUpdated);
+            
+            // Calculate a proper reference date based on previous time context
+            if (previousTimeContext.includes("month")) {
+              console.log(`Previous context was month-related: ${previousTimeContext}`);
+              
+              // For month-based references, adjust accordingly
+              if (previousTimeContext.includes("last month")) {
+                // If previous was "last month", reference should be 1 month before now
+                referenceDate = new Date(lastUpdateDate);
+                referenceDate.setMonth(referenceDate.getMonth() - 1);
+              } else if (previousTimeContext.includes("this month")) {
+                // If previous was "this month", reference should be current month
+                referenceDate = new Date(lastUpdateDate);
+              }
+              
+              console.log(`Using reference date for time calculation: ${referenceDate?.toISOString()}`);
+            } else {
+              // For other time periods, use the last update as reference
+              referenceDate = new Date(lastUpdateDate);
             }
-            console.log(`Using reference date for time calculation: ${referenceDate?.toISOString()}`);
           }
         }
       }
@@ -251,7 +265,8 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
         hasJournalEntries: true, // This is a placeholder - ideally would be dynamic
         timezoneOffset: timezoneOffset,
         conversationHistory: conversationContext.length,
-        previousTimeContext: previousTimeContext
+        previousTimeContext: previousTimeContext,
+        previousTopicContext: previousTopicContext
       }
     };
 
@@ -260,6 +275,7 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
                 JSON.stringify(enhancedContext, null, 2).substring(0, 200) + "...");
     console.log(`Conversation context length: ${conversationContext.length}`);
     console.log(`Previous time context: ${previousTimeContext || 'none'}`);
+    console.log(`Previous topic context: ${previousTopicContext || 'none'}`);
     console.log(`Reference date: ${referenceDate ? referenceDate.toISOString() : 'none'}`);
     
     if (conversationContext.length > 0) {
@@ -285,7 +301,8 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
         appContext: enhancedContext, // Pass the enhanced app context
         checkForMultiQuestions: true, // Always check for multiple questions
         isFollowUp: conversationContext.length > 0, // Indicate if this is a follow-up question
-        referenceDate: referenceDate?.toISOString()  // Pass reference date if available
+        referenceDate: referenceDate?.toISOString(),  // Pass reference date if available
+        preserveTopicContext: isRelativeTimeQuery(query) && previousTopicContext // Preserve topic from previous query if this is just a time change
       }
     });
 
@@ -308,7 +325,8 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
             query: query,
             userId,
             appContext: enhancedContext,
-            referenceDate: referenceDate?.toISOString()
+            referenceDate: referenceDate?.toISOString(),
+            previousTopicContext: previousTopicContext
           }
         });
         
@@ -326,6 +344,14 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
       } catch (segmentError) {
         console.error('Exception during query segmentation:', segmentError);
       }
+    }
+    
+    // If this is a time-based follow-up but preserving topic context,
+    // make sure the topic gets stored in the plan
+    if (isRelativeTimeQuery(query) && previousTopicContext && data?.plan) {
+      // Ensure the topic context is preserved
+      data.plan.topicContext = previousTopicContext;
+      console.log(`Preserved topic context in plan: ${previousTopicContext}`);
     }
     
     // Store context if threadId provided
