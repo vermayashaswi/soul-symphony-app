@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ChatThread } from './types';
+import { detectRelativeTimeExpression, calculateRelativeDateRange } from '@/utils/chat/dateUtils';
 
 export async function fetchChatThreads(userId: string | undefined) {
   if (!userId) {

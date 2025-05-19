@@ -7,6 +7,12 @@ export interface ChatThread {
   created_at: string;
   updated_at: string;
   processing_status?: 'idle' | 'processing' | 'failed';
+  metadata?: {
+    timeContext?: string | null;
+    topicContext?: string | null;
+    lastUpdated?: string;
+    [key: string]: any;
+  };
 }
 
 // Sub-query response type definition
