@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -13,25 +14,18 @@ import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkd
 
 interface ChatMessageProps {
   message: {
-    role: 'user' | 'assistant' | 'error';
+    role: 'user' | 'assistant';
     content: string;
     analysis?: any;
     references?: any[];
     diagnostics?: any;
     hasNumericResult?: boolean;
-    ambiguityInfo?: any; 
-    isInteractive?: boolean;
-    interactiveOptions?: any[];
+    ambiguityInfo?: any; // Add support for ambiguity info
   };
   showAnalysis: boolean;
-  onInteractiveOptionClick?: (option: any) => void;
 }
 
-export const ChatMessage: React.FC<ChatMessageProps> = ({ 
-  message, 
-  showAnalysis, 
-  onInteractiveOptionClick 
-}) => {
+export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis }) => {
   const { isMobile } = useIsMobile();
   const [showReferences, setShowReferences] = useState(false);
   const [showAmbiguityInfo, setShowAmbiguityInfo] = useState(false);
@@ -41,12 +35,8 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
     return message.content;
   }, [message]);
   
-  // Determine if it's an assistant message, handling error role as assistant for UI purposes
-  const isAssistantMessage = message.role === 'assistant' || message.role === 'error';
-  
-  const hasReferences = isAssistantMessage && message.references && message.references.length > 0;
-  const hasAmbiguityInfo = isAssistantMessage && message.ambiguityInfo && message.ambiguityInfo.needsClarification;
-  const hasInteractiveOptions = isAssistantMessage && message.isInteractive && message.interactiveOptions && message.interactiveOptions.length > 0;
+  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
+  const hasAmbiguityInfo = message.role === 'assistant' && message.ambiguityInfo && message.ambiguityInfo.needsClarification;
   
   return (
     <motion.div 
@@ -55,7 +45,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
       transition={{ duration: 0.3 }}
       className={`flex items-start gap-3 ${message.role === 'user' ? 'justify-end' : 'justify-start'} mb-4`}
     >
-      {isAssistantMessage && (
+      {message.role === 'assistant' && (
         <Avatar className="h-10 w-10 border border-primary/20">
           <AvatarImage 
             src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png" 
@@ -78,7 +68,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
         data-role={message.role}
       >
-        {isAssistantMessage ? (
+        {message.role === 'assistant' ? (
           <TranslatableMarkdown className="prose dark:prose-invert prose-sm md:prose-base max-w-none" forceTranslate={true}>
             {formattedContent}
           </TranslatableMarkdown>
@@ -86,24 +76,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           <TranslatableText text={message.content} forceTranslate={true} />
         )}
         
-        {/* Interactive options for clarification questions */}
-        {hasInteractiveOptions && (
-          <div className="mt-4 flex flex-col gap-2">
-            {message.interactiveOptions.map((option, idx) => (
-              <Button
-                key={idx}
-                variant="outline"
-                size="sm"
-                className="text-left justify-start h-auto py-2"
-                onClick={() => onInteractiveOptionClick && onInteractiveOptionClick(option)}
-              >
-                <TranslatableText text={option.text} forceTranslate={true} />
-              </Button>
-            ))}
-          </div>
-        )}
-        
-        {showAnalysis && isAssistantMessage && message.analysis && (
+        {showAnalysis && message.role === 'assistant' && message.analysis && (
           <div className="mt-3 text-xs md:text-sm opacity-80">
             <Separator className="my-2" />
             <div className="font-semibold">
@@ -126,7 +99,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
         )}
         
         {/* Display ambiguity info when in debug/analysis mode */}
-        {showAnalysis && isAssistantMessage && hasAmbiguityInfo && (
+        {showAnalysis && message.role === 'assistant' && hasAmbiguityInfo && (
           <div className="mt-3">
             <Button
               variant="ghost"
@@ -175,7 +148,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({
           </div>
         )}
         
-        {showAnalysis && isAssistantMessage && message.diagnostics && renderDiagnostics(message.diagnostics, isMobile)}
+        {showAnalysis && message.role === 'assistant' && message.diagnostics && renderDiagnostics(message.diagnostics, isMobile)}
         
         {message.role === 'assistant' && message.references && message.references.length > 0 && (
           <div className="mt-3">
