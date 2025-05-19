@@ -33,6 +33,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, isLoading]);
 
+  // Log messages for debugging to ensure context is being passed properly
+  useEffect(() => {
+    if (chatMessages.length > 0) {
+      console.log(`ChatArea: Rendering ${chatMessages.length} messages`);
+      console.log("Last message:", chatMessages[chatMessages.length - 1]?.content.substring(0, 50) + "...");
+    }
+  }, [chatMessages]);
+
   return (
     <div className="flex flex-col p-4 overflow-y-auto h-full pb-20">
       {chatMessages.map((message, index) => (
@@ -86,6 +94,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                           variant="outline"
                           className="text-left justify-start"
                           onClick={() => onInteractiveOptionClick(option)}
+                          data-test-id={`interactive-option-${idx}`} // Add test id for easier debugging
                         >
                           {option.text}
                         </Button>

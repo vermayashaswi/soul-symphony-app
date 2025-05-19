@@ -39,17 +39,20 @@ const getRecentThreadMessages = async (
   if (!threadId) return [];
   
   try {
+    // Get all messages to provide full context
     const { data, error } = await supabase
       .from('chat_messages')
       .select('content, sender, role, created_at')
       .eq('thread_id', threadId)
-      .order('created_at', { ascending: false })
-      .limit(limit);
+      .order('created_at', { ascending: true });
       
     if (error) {
       console.error("Error fetching thread messages:", error);
       return [];
     }
+    
+    // Log for debugging purposes
+    console.log(`Retrieved ${data?.length || 0} messages for context from thread ${threadId}`);
     
     return data || [];
   } catch (error) {
@@ -79,7 +82,7 @@ const convertToDirectAddress = (text: string): string => {
     .replace(/it's not clear/gi, "I'm not clear");
 };
 
-// Helper function to generate a personalized clarification message based on ambiguity type
+// Helper function to generate a personalized clarification message based on ambiguity analysis
 const generateClarificationMessage = (ambiguityAnalysis: any): string => {
   if (!ambiguityAnalysis) return "I'd like to understand your question better.";
   
@@ -127,12 +130,14 @@ export const processChatMessage = async (
     // We'll pass the message ID once we get it from the chat_messages table
     await logUserQuery(userId, message, threadId);
     
-    // Get recent messages from the thread for context
-    const recentMessages = await getRecentThreadMessages(threadId, 10);
-    console.log(`Got ${recentMessages.length} recent messages for context`);
+    // Get ALL messages from the thread for context (not just recent ones)
+    const threadMessages = await getRecentThreadMessages(threadId, 100); // Increase limit to get full history
+    console.log(`Got ${threadMessages.length} thread messages for context`);
     
     // Step 1: Use smart-query-planner to classify and plan the query
     console.log("Calling smart-query-planner for query analysis and planning");
+    console.log("Passing full conversation context to smart-query-planner");
+    
     const { data: plannerData, error: plannerError } = await supabase.functions.invoke(
       'smart-query-planner',
       {
@@ -141,7 +146,7 @@ export const processChatMessage = async (
           userId,
           threadId,
           timezoneOffset,
-          conversationContext: recentMessages.reverse() // Reverse to get chronological order
+          conversationContext: threadMessages // Pass ALL thread messages for context
         }
       }
     );
@@ -167,7 +172,7 @@ export const processChatMessage = async (
       let clarificationMessage = generateClarificationMessage(plannerData.ambiguityAnalysis);
       
       // Check if this is a follow-up to a previous ambiguous query
-      const isFollowUp = recentMessages.some(msg => 
+      const isFollowUp = threadMessages.some(msg => 
         msg.sender === 'assistant' && 
         (msg.content || '').includes('understand your question better')
       );
@@ -222,7 +227,7 @@ export const processChatMessage = async (
     console.log("Generated query plan:", queryPlan);
     
     // If useHistoricalData parameter is set, remove date filters
-    if (parameters.useHistoricalData === true && queryPlan.filters.dateRange) {
+    if (parameters.useHistoricalData === true && queryPlan.filters && queryPlan.filters.dateRange) {
       console.log("Removing date filters to search all historical data");
       delete queryPlan.filters.dateRange;
     }
@@ -621,10 +626,12 @@ async function processWithQueryPlan(
     if (data.analysis) {
       chatResponse.analysis_data = data.analysis;
       chatResponse.analysis = data.analysis; // For backward compatibility
-      if (data.analysis.type === 'quantitative_emotion' || 
+      if (data.analysis && 
+          data.analysis.type && (
+          data.analysis.type === 'quantitative_emotion' || 
           data.analysis.type === 'top_emotions' ||
           data.analysis.type === 'time_patterns' ||
-          data.analysis.type === 'combined_analysis') {
+          data.analysis.type === 'combined_analysis')) {
         chatResponse.has_numeric_result = true;
         chatResponse.hasNumericResult = true; // For backward compatibility
       }

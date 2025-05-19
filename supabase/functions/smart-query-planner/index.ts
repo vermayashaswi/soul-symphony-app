@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -36,6 +37,14 @@ serve(async (req) => {
     console.log(`User timezone offset: ${timezoneOffset} minutes`);
     console.log(`Received ${conversationContext.length} conversation context messages`);
     
+    // Log conversation context for debugging
+    if (conversationContext.length > 0) {
+      console.log("Conversation context summary:");
+      conversationContext.forEach((msg, idx) => {
+        console.log(`[${idx}] ${msg.role || msg.sender}: ${msg.content.substring(0, 30)}...`);
+      });
+    }
+    
     // Get the user's local time based on timezone offset
     const userLocalTime = new Date(Date.now() - (timezoneOffset || 0) * 60 * 1000);
     const formattedLocalTime = userLocalTime.toISOString();
@@ -47,6 +56,10 @@ serve(async (req) => {
       role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
       content: msg.content
     }));
+    
+    // Check if the current message is answering a previous clarification question
+    const isRespondingToClarification = checkIfResponseToClarification(message, formattedContext);
+    console.log(`Is responding to clarification: ${isRespondingToClarification}`);
     
     // Enhanced query analysis that considers conversation context
     // This will analyze if the query is ambiguous in the current context
@@ -73,7 +86,11 @@ Analyze the user's query for the following types of ambiguity:
 
 4. SCOPE AMBIGUITY: Is it unclear whether the user wants analysis of recent entries or their entire journal history? (e.g., "What are my top emotions?", "How would you describe my personality?")
 
-Consider the conversation context when determining if clarification is needed. If recent messages provide enough context, the query may not need clarification.
+IMPORTANT: Consider the FULL conversation context when determining if clarification is needed:
+- If the user is clearly responding to a previous clarification request, DO NOT mark as needing clarification
+- If the conversation history already contains the information needed, DO NOT mark as needing clarification
+- If the user says something like "entire journal", "all entries", "everything", etc., assume they want historical data
+- If a short response follows a specific question you asked, interpret it in context of your question
 
 Respond with a JSON object like this:
 {
@@ -85,7 +102,7 @@ Respond with a JSON object like this:
 
 If no clarification is needed, set needsClarification to false and ambiguityType to "NONE".`
           },
-          ...formattedContext.slice(-5), // Include up to 5 most recent messages for context
+          ...formattedContext, // Include ALL conversation context, not just recent messages
           { role: 'user', content: message }
         ],
         temperature: 0.1,
@@ -137,6 +154,8 @@ Specifically, if the user is asking for ANY of the following, classify as "journ
 - Any request for statistics or metrics about their journaling data
 - Analysis of specific emotions or sentiment patterns in their entries
 
+Consider the FULL conversation context. If the user is clearly referring to their journal data, classify as "journal_specific".
+
 Respond with ONLY "mental_health_general" or "journal_specific".
 
 Examples:
@@ -149,6 +168,7 @@ Examples:
 - "How was I feeling last week?" -> "journal_specific"
 - "What patterns do you see in my anxiety?" -> "journal_specific"`
           },
+          ...formattedContext.slice(-5), // Include recent context for this classification
           { role: 'user', content: message }
         ],
         temperature: 0.1,
@@ -184,6 +204,29 @@ Examples:
         break;
       }
     }
+    
+    // Check for replies to time-based questions in context
+    if (!hasTimeFilter && formattedContext.length > 0) {
+      // Look for the last assistant message that asked about time
+      const lastTimeQuestion = formattedContext.reverse().find(msg => 
+        msg.role === 'assistant' && 
+        (msg.content.includes('time period') || 
+         msg.content.includes('what period') || 
+         msg.content.includes('which time'))
+      );
+      
+      // If user message is short and follows a time question, it might be specifying a time period
+      if (lastTimeQuestion && message.split(' ').length <= 5) {
+        for (const keyword of timeKeywords) {
+          if (message.toLowerCase().includes(keyword)) {
+            console.log(`Detected time keyword in response to time question: ${keyword}`);
+            timeRangeMentioned = keyword;
+            hasTimeFilter = true;
+            break;
+          }
+        }
+      }
+    }
 
     // If the user is asking about a specific date, extract it
     let specificDate = null;
@@ -209,7 +252,12 @@ Examples:
     }
     
     // Check if we need to clarify based on ambiguity analysis
-    const needsClarification = ambiguityResult.needsClarification || false;
+    // But ONLY if we haven't determined this is a response to a previous clarification
+    const needsClarification = ambiguityResult.needsClarification && !isRespondingToClarification;
+    
+    if (!needsClarification && isRespondingToClarification) {
+      console.log("Determined user is responding to a previous clarification - proceeding without further clarification");
+    }
     
     // Generate dynamic clarification questions based on ambiguity type
     let clarificationQuestions = null;
@@ -217,75 +265,74 @@ Examples:
     if (needsClarification) {
       console.log(`Query needs clarification, ambiguity type: ${ambiguityResult.ambiguityType}`);
       
-      switch(ambiguityResult.ambiguityType) {
-        case "TIME":
-          clarificationQuestions = [
+      // Enhanced clarification - use a more contextual approach to generate questions
+      const clarificationContext = [
+        ...formattedContext,
+        { role: 'user', content: message },
+        { 
+          role: 'assistant', 
+          content: `Based on your query, I need to clarify something before I can provide a helpful answer. The ambiguity is related to: ${ambiguityResult.ambiguityType.toLowerCase()}. ${ambiguityResult.reasoning}`
+        }
+      ];
+      
+      // Generate personalized clarification questions based on the specific ambiguity
+      const clarificationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${apiKey}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          model: 'gpt-4o-mini',
+          messages: [
             {
-              text: "Search all my journal entries (historical data)",
-              action: "expand_search",
-              parameters: { useHistoricalData: true }
+              role: 'system',
+              content: `You are an AI assistant helping users analyze their journal entries. 
+              
+The user has asked a question that needs clarification. Based on the conversation history and ambiguity type, generate TWO clear, concise clarification options that the user can choose from.
+
+Make these options VERY brief (5 words or less if possible) and highly specific to the ambiguity identified.
+
+Return your response as a JSON array with exactly two objects: 
+[
+  { "text": "First option text", "action": "expand_search", "parameters": {"useHistoricalData": true} },
+  { "text": "Second option text", "action": "default_search", "parameters": {"useHistoricalData": false} }
+]
+
+Ensure each option has:
+1. "text" - The option text (keep it under 5 words)
+2. "action" - Either "expand_search" or "default_search"
+3. "parameters" - Include appropriate parameters based on the ambiguity`
             },
-            {
-              text: "Search recent entries only (last 30 days)",
-              action: "default_search",
-              parameters: { useHistoricalData: false }
-            }
-          ];
-          break;
-          
-        case "SCOPE":
-          clarificationQuestions = [
-            {
-              text: "Analyze my entire journal history",
-              action: "expand_search",
-              parameters: { useHistoricalData: true }
-            },
-            {
-              text: "Focus on recent patterns only",
-              action: "default_search",
-              parameters: { useHistoricalData: false }
-            }
-          ];
-          break;
-          
-        case "INTENT":
-          // Generate questions dynamically based on detected possible intents
-          clarificationQuestions = [
-            {
-              text: "I want to understand trends in my journal",
-              action: "expand_search",
-              parameters: { analysisType: "trends" }
-            },
-            {
-              text: "I want specific insights from recent entries",
-              action: "default_search",
-              parameters: { analysisType: "specific" }
-            }
-          ];
-          break;
-          
-        default:
-          // Default time-based clarification
-          clarificationQuestions = [
-            {
-              text: "Search all my journal entries",
-              action: "expand_search",
-              parameters: { useHistoricalData: true }
-            },
-            {
-              text: "Search recent entries only",
-              action: "default_search",
-              parameters: { useHistoricalData: false }
-            }
-          ];
+            ...clarificationContext
+          ],
+          temperature: 0.3,
+          max_tokens: 250
+        }),
+      });
+      
+      if (!clarificationResponse.ok) {
+        console.error('Failed to generate clarification questions:', await clarificationResponse.text());
+        // Fallback to default questions if generation fails
+        clarificationQuestions = getDefaultClarificationQuestions(ambiguityResult.ambiguityType);
+      } else {
+        try {
+          const clarificationData = await clarificationResponse.json();
+          const questionsContent = clarificationData.choices[0].message.content;
+          clarificationQuestions = JSON.parse(questionsContent);
+          console.log("Generated dynamic clarification questions:", clarificationQuestions);
+        } catch (error) {
+          console.error("Error parsing clarification questions:", error);
+          clarificationQuestions = getDefaultClarificationQuestions(ambiguityResult.ambiguityType);
+        }
       }
     }
     
-    // Build the search plan
+    // Build the search plan for journal-specific queries
     let plan = null;
     let directResponse = null;
 
-    if (queryType === 'mental_health_general' && !isRatingOrAnalysisRequest) {
+    if (queryType === 'mental_health_general' && !isRatingOrAnalysisRequest && !isRespondingToClarification) {
       console.log("Query classified as general mental health question");
       directResponse = null; // Process general queries with our standard chat flow
     } else {
@@ -311,7 +358,7 @@ IMPORTANT DATABASE INFORMATION:
 - The user's timezone offset from UTC is: ${timezoneOffset || 0} minutes
 - When filtering by date ranges, you need to consider the user's timezone
 
-CONVERSATION CONTEXT:
+FULL CONVERSATION CONTEXT:
 ${formattedContext.map(msg => `${msg.role.toUpperCase()}: ${msg.content}`).join('\n')}
 
 For the following user query, create a JSON search plan with these components:
@@ -345,12 +392,15 @@ For the following user query, create a JSON search plan with these components:
 
 8. "reasoning": String explanation of your planning decisions
 
+IMPORTANT: If the user's message is a direct response to a clarification question (like "all entries" or "recent only"), 
+interpret this in context and create an appropriate plan based on their response.
+
 Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
 
 Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
               `
             },
-            ...formattedContext.slice(-3), // Include the 3 most recent context messages
+            ...formattedContext, // Include ALL conversation context
             { role: 'user', content: message }
           ],
           temperature: 0.3,
@@ -416,6 +466,19 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
       };
       console.log("Forcing date range in plan to:", specificDate);
     }
+    
+    // Special case handling for historical data requests
+    // Look for keywords that indicate the user wants all historical data
+    const historicalDataKeywords = ['all entries', 'entire journal', 'all my journal', 'historical data', 'all time'];
+    const wantsHistoricalData = historicalDataKeywords.some(keyword => 
+      message.toLowerCase().includes(keyword.toLowerCase())
+    );
+    
+    // If the user wants historical data, remove date filters
+    if (wantsHistoricalData && plan && plan.filters && plan.filters.date_range) {
+      console.log("User explicitly requested historical data - removing date filters");
+      delete plan.filters.date_range;
+    }
 
     // Return the plan
     return new Response(
@@ -437,6 +500,100 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
     );
   }
 });
+
+/**
+ * Helper function to check if the current message is responding to a previous clarification
+ */
+function checkIfResponseToClarification(message: string, conversationContext: Array<{role: string, content: string}>): boolean {
+  if (conversationContext.length === 0) return false;
+  
+  // Get the most recent messages
+  const recentMessages = conversationContext.slice(-3);
+  
+  // Check if the most recent assistant message was asking for clarification
+  const lastAssistantMessage = recentMessages.find(msg => msg.role === 'assistant');
+  if (!lastAssistantMessage) return false;
+  
+  const clarificationIndicators = [
+    'I need to clarify',
+    'which time period',
+    'what period',
+    'could you specify',
+    'can you clarify',
+    'recent entries',
+    'all entries',
+    'entire journal'
+  ];
+  
+  const isLastMessageClarification = clarificationIndicators.some(
+    indicator => lastAssistantMessage.content.toLowerCase().includes(indicator.toLowerCase())
+  );
+  
+  // If last assistant message was a clarification and user message is short, likely a response
+  const isShortResponse = message.split(' ').length <= 7;
+  
+  return isLastMessageClarification && isShortResponse;
+}
+
+/**
+ * Returns default clarification questions based on ambiguity type
+ */
+function getDefaultClarificationQuestions(ambiguityType: string): Array<{text: string, action: string, parameters: Record<string, any>}> {
+  switch(ambiguityType) {
+    case "TIME":
+      return [
+        {
+          text: "All journal entries",
+          action: "expand_search",
+          parameters: { useHistoricalData: true }
+        },
+        {
+          text: "Recent entries only",
+          action: "default_search",
+          parameters: { useHistoricalData: false }
+        }
+      ];
+    case "SCOPE":
+      return [
+        {
+          text: "Analyze entire journal",
+          action: "expand_search",
+          parameters: { useHistoricalData: true }
+        },
+        {
+          text: "Focus on recent patterns",
+          action: "default_search",
+          parameters: { useHistoricalData: false }
+        }
+      ];
+    case "INTENT":
+      return [
+        {
+          text: "Analyze trends",
+          action: "expand_search",
+          parameters: { analysisType: "trends" }
+        },
+        {
+          text: "Get specific insights",
+          action: "default_search",
+          parameters: { analysisType: "specific" }
+        }
+      ];
+    default:
+      return [
+        {
+          text: "All journal entries",
+          action: "expand_search",
+          parameters: { useHistoricalData: true }
+        },
+        {
+          text: "Recent entries only",
+          action: "default_search",
+          parameters: { useHistoricalData: false }
+        }
+      ];
+  }
+}
 
 /**
  * Calculates relative date ranges based on time expressions
