@@ -144,12 +144,18 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
         type: "Voice Journaling App",
         purpose: "Mental Health Support and Self-Reflection",
         role: "Mental Health Assistant",
-        features: ["Journal Analysis", "Emotion Tracking", "Pattern Detection", "Self-Reflection Support"],
+        features: ["Journal Analysis", "Emotion Tracking", "Pattern Detection", "Self-Reflection Support", "Personality Insights"],
         capabilities: {
           canAnalyzeJournals: true,
           canDetectPatterns: true,
           canProvideRatings: true,
-          canSegmentQueries: true
+          canSegmentQueries: true,
+          canAnalyzePersonality: true,
+          canHandleMultiQuestions: true
+        },
+        preferenceDefaults: {
+          assumeHistoricalDataForMentalHealth: true, // Default to using all data for mental health insights
+          minimizeUnnecessaryClarifications: true    // Try to avoid unnecessary clarifications
         }
       },
       userContext: {
@@ -167,6 +173,15 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
       console.log(`Latest context message: ${conversationContext[conversationContext.length - 1].content.substring(0, 50)}...`);
     }
 
+    // Check if this might be a multi-part question that needs segmentation
+    const shouldCheckForMultiQuestions = 
+      query.includes(" and ") || 
+      query.includes(" also ") || 
+      (query.match(/\?/g) || []).length > 1 ||
+      query.length > 100;
+
+    console.log(`Query might contain multiple questions: ${shouldCheckForMultiQuestions}`);
+
     // Call the edge function with enhanced context
     const { data, error } = await supabase.functions.invoke('smart-query-planner', {
       body: {
@@ -175,7 +190,8 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
         conversationContext,
         timezoneOffset,
         appContext: enhancedContext, // Pass the enhanced app context
-        checkForMultiQuestions: true // New flag to indicate we want to check for multiple questions
+        checkForMultiQuestions: true, // Always check for multiple questions
+        isFollowUp: conversationContext.length > 0 // Indicate if this is a follow-up question
       }
     });
 
@@ -187,9 +203,34 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
     // Log the returned plan for debugging
     console.log(`Received query plan: ${JSON.stringify(data?.plan || {}, null, 2).substring(0, 200)}...`);
 
-    // If the plan indicates multiple questions, we might want to segment them
-    if (data?.plan?.isSegmented) {
-      console.log('Query plan indicates this is a segmented query - should process as multi-question');
+    // Check if we need to segment the query
+    if (data?.plan?.isSegmented && shouldCheckForMultiQuestions) {
+      console.log('Query plan indicates this is a segmented query - processing as multi-question');
+      
+      // Call segment-complex-query function to break down the complex question
+      try {
+        const segmentationResult = await supabase.functions.invoke('segment-complex-query', {
+          body: {
+            query: query,
+            userId,
+            appContext: enhancedContext
+          }
+        });
+        
+        if (segmentationResult.error) {
+          console.error('Error segmenting query:', segmentationResult.error);
+        } else if (segmentationResult.data) {
+          console.log('Successfully segmented query:', segmentationResult.data);
+          
+          // Update the plan with the segmented queries
+          if (data.plan) {
+            data.plan.subqueries = JSON.parse(segmentationResult.data.data);
+            console.log('Updated plan with segmented queries:', data.plan.subqueries);
+          }
+        }
+      } catch (segmentError) {
+        console.error('Exception during query segmentation:', segmentError);
+      }
     }
 
     return {

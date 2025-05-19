@@ -27,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, conversationContext = [], timezoneOffset, appContext = {} } = await req.json();
+    const { message, userId, conversationContext = [], timezoneOffset, appContext = {}, checkForMultiQuestions = true, isFollowUp = false } = await req.json();
     
     if (!message) {
       throw new Error('Message is required');
@@ -36,6 +36,7 @@ serve(async (req) => {
     console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
     console.log(`User timezone offset: ${timezoneOffset} minutes`);
     console.log(`Received ${conversationContext.length} conversation context messages`);
+    console.log(`Is this a follow-up question: ${isFollowUp}`);
     console.log(`App context provided: ${JSON.stringify(appContext)}`);
     
     // Log conversation context for debugging
@@ -71,6 +72,15 @@ serve(async (req) => {
     console.log(`Is responding to clarification: ${isRespondingToClarification}`);
     console.log(`Is topic continuation: ${isTopicContinuation}`);
     console.log(`Has direct time period: ${hasDirectTimePeriod ? hasDirectTimePeriod : 'none'}`);
+
+    // Check if this is a short response that likely implies "all data"
+    const isShortResponse = message.split(' ').length <= 5;
+    const commonAffirmativeWords = ['yes', 'sure', 'ok', 'okay', 'all', 'entire', 'everything', 'overall', 'yep', 'yeah', 'total', 'absolutely'];
+    const isCommonAffirmative = commonAffirmativeWords.some(word => message.toLowerCase().includes(word));
+    
+    // If it's a short response with affirmative words, assume the user wants comprehensive data
+    const isLikelyWantingAllData = isShortResponse && isCommonAffirmative;
+    console.log(`Is likely wanting all data: ${isLikelyWantingAllData}`);
     
     // Enhanced context-aware query analysis
     // This analyzes if the query is ambiguous while considering the COMPLETE conversation context
@@ -97,19 +107,27 @@ Analyze the user's query for the following types of ambiguity:
 
 4. SCOPE AMBIGUITY: Is it unclear whether the user wants analysis of recent entries or their entire journal history? (e.g., "What are my top emotions?", "How would you describe my personality?")
 
-CRITICAL: You must carefully examine the FULL conversation history to determine if clarification is actually needed:
-- If the conversation already contains enough context to understand the current query, DO NOT request clarification
+IMPORTANT GUIDANCE - AVOID UNNECESSARY CLARIFICATIONS:
+- If the conversation already contains ANY context to understand the current query, DO NOT request clarification
 - If the user is directly responding to a previous clarification request, DO NOT mark as needing further clarification
 - If the user says something like "entire journal", "all entries", "everything", "all", "entire", "yes", "overall", assume they want comprehensive historical data
+- Short responses like "yes", "all", "entire", "overall", "sure", "ok" strongly imply the user wants comprehensive data analysis
 - If a query is a follow-up to a previous question/answer, interpret it in that context
-- If the user asks for a rating or score (like "rate me out of 100"), DO NOT ask for clarification if the topic is clear from conversation history
+- For questions about personality traits, self-assessment, or ratings (like "am I creative?"), assume ALL entries unless specified
 - Pay special attention to pronouns like "this", "it", "that" and determine their referents from context
 - Short responses following a specific question should be interpreted in context of that question
 - If the most recent assistant message asked about time period or scope, and the user responds with a short answer, assume they provided their preference
+- For mental health related questions and personality traits, default to using all available data unless otherwise specified
+
+DEFAULT TO NO CLARIFICATION WHEN:
+- The query is about personality traits or characteristics (e.g. "Am I anxious?", "Rate my creativity")
+- The query asks for patterns or trends without specifying a timeframe
+- The query is a follow-up or continuation of a previous query
+- The query contains a specific timeframe already
 
 Respond with a JSON object like this:
 {
-  "needsClarification": boolean,
+  "needsClarification": boolean,  // In general, lean towards false unless absolutely necessary
   "ambiguityType": "TIME"|"ENTITY_REFERENCE"|"INTENT"|"SCOPE"|"NONE",
   "reasoning": "Brief explanation of why clarification is needed or not",
   "suggestedClarificationQuestions": ["Question 1", "Question 2"]  // If clarification is needed
@@ -146,14 +164,25 @@ If no clarification is needed, set needsClarification to false and ambiguityType
       ambiguityResult = { needsClarification: false, ambiguityType: "NONE", reasoning: "Failed to parse analysis" };
     }
     
-    // Override ambiguity check if we detect a direct response to a clarification
-    // or a direct time period specification
-    if (isRespondingToClarification || isTopicContinuation || hasDirectTimePeriod) {
-      console.log("Overriding ambiguity check due to detected response to clarification, topic continuation, or direct time period");
+    // Override ambiguity check if we detect any of these conditions
+    if (isRespondingToClarification || isTopicContinuation || hasDirectTimePeriod || isLikelyWantingAllData || isFollowUp) {
+      console.log("Overriding ambiguity check due to detected context or user response pattern");
       ambiguityResult.needsClarification = false;
       ambiguityResult.ambiguityType = "NONE";
-      ambiguityResult.reasoning = "User is responding to a previous clarification, continuing a topic with clear context, or specifying a direct time period";
+      ambiguityResult.reasoning = "User is responding to a previous clarification, continuing a topic with clear context, using a direct time period, or indicating comprehensive data analysis";
     }
+    
+    // For personality trait questions, assume all data and don't ask for clarification
+    if (/am I\s|\brate me\b|\brate my\b|\bscore me\b|\bscore my\b|\bevaluate me\b|\bevaluate my\b|\bhow \w+ am I\b/i.test(message)) {
+      console.log("Detected personality trait or self-assessment question, assuming comprehensive data");
+      ambiguityResult.needsClarification = false;
+      ambiguityResult.ambiguityType = "NONE";
+      ambiguityResult.reasoning = "User is asking about personality traits or self-assessment, assuming comprehensive data analysis";
+    }
+    
+    // Additional detection for multi-part questions that should be segmented
+    const isComplexQuestion = checkIfComplexQuestion(message);
+    console.log(`Is complex multi-part question: ${isComplexQuestion}`);
     
     // Improved message type classification that considers conversation context
     const messageTypesResponse = await fetch('https://api.openai.com/v1/chat/completions', {
@@ -392,6 +421,7 @@ APPLICATION CONTEXT:
 - SOULo is a mental health assistance app that helps users track and analyze their emotions through voice journaling
 - Users speak their thoughts and the app transcribes, analyzes, and helps them gain insights
 - The AI assistant (you) helps users understand patterns in their emotional well-being
+- The app can analyze personality traits, emotional patterns, and provide self-reflection support
 
 IMPORTANT DATABASE INFORMATION:
 - All journal entries are stored with UTC timestamps in the database
@@ -427,7 +457,8 @@ For the following user query, create a JSON search plan with these components:
 
 5. "needs_more_context": Boolean (true if query relates to previous messages)
 
-6. "is_segmented": Boolean (true if the query should be broken into sub-questions)
+6. "is_segmented": Boolean (true if the query contains multiple distinct sub-questions)
+   - Set to true for questions containing "and", "also", multiple question marks, or distinct components
 
 7. "subqueries": [] (array of sub-questions if the query is complex and needs to be segmented)
 
@@ -435,13 +466,13 @@ For the following user query, create a JSON search plan with these components:
 
 9. "topic_context": String (capture what topic this query is about for future reference)
 
-IMPORTANT: If the user's message is a direct response to a clarification question (like "all entries" or "recent only"), 
-interpret this in context and create an appropriate plan based on their response.
-If the user is continuing a conversation about a specific topic (e.g. happiness, productivity), maintain context.
-When a user says something like "rate me out of 100 on this", look at the previous messages to determine what "this" refers to.
-Single word responses like "yes", "entire", "all", "overall" should be interpreted in context of the previous question.
-
-Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
+IMPORTANT GUIDELINES:
+- Default to assuming the user wants comprehensive historical data for personality assessments
+- For short responses like "yes", "all", "entire", "overall", make sure to use all historical data
+- Bias towards setting "needs_data_aggregation" to true for any analysis, pattern, or insight questions
+- Always look for complex multi-part questions and set "is_segmented" appropriately
+- When a user asks about traits or characteristics (e.g., "am I introverted?"), set match_count to 30+
+- Single word responses should be interpreted in context of the previous question
 
 Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
               `
@@ -489,6 +520,14 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
           plan.needs_data_aggregation = true;
           plan.match_count = Math.max(plan.match_count || 15, 30); // Ensure we get enough data
         }
+        
+        // Check if this is a complex question that should be segmented
+        if (isComplexQuestion && !plan.is_segmented) {
+          console.log("Marking as segmented question based on complexity detection");
+          plan.is_segmented = true;
+          // Note: subqueries will be filled in by the segment-complex-query function later
+        }
+        
       } catch (e) {
         console.error('Error parsing plan JSON:', e);
         console.error('Raw plan text:', planText);
@@ -497,7 +536,8 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
           filters: hasTimeFilter ? { date_range: calculateRelativeDateRange(timeRangeMentioned || 'recent', timezoneOffset) } : {},
           match_count: isRatingOrAnalysisRequest ? 30 : 15,
           needs_data_aggregation: isRatingOrAnalysisRequest || message.includes('how many') || message.includes('count') || message.includes('statistics'),
-          needs_more_context: false
+          needs_more_context: false,
+          is_segmented: isComplexQuestion
         };
       }
     }
@@ -518,12 +558,20 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
     const historicalDataKeywords = ['all entries', 'entire journal', 'all my journal', 'historical data', 'all time', 'all', 'entire', 'everything', 'overall'];
     const wantsHistoricalData = historicalDataKeywords.some(keyword => 
       message.toLowerCase().includes(keyword.toLowerCase())
-    );
+    ) || isLikelyWantingAllData;
     
     // If the user wants historical data, remove date filters
     if (wantsHistoricalData && plan && plan.filters && plan.filters.date_range) {
       console.log("User explicitly requested historical data - removing date filters");
       delete plan.filters.date_range;
+    }
+
+    // For personality trait questions, ensure we use all available data and have high match count
+    if (/am I\s|\brate me\b|\brate my\b|\bscore me\b|\bscore my\b|\bevaluate me\b|\bevaluate my\b|\bhow \w+ am I\b/i.test(message) && plan) {
+      console.log("Personality trait question detected - ensuring comprehensive data analysis");
+      if (plan.filters) delete plan.filters.date_range;
+      plan.match_count = Math.max(plan.match_count || 15, 30);
+      plan.needs_data_aggregation = true;
     }
 
     // Return the plan
@@ -588,7 +636,11 @@ function checkIfResponseToClarification(message: string, conversationContext: Ar
     'should I focus on',
     'entire history or just recent entries',
     'specific timeframe or all entries',
-    'more recent journal entries or your entire history'
+    'more recent journal entries or your entire history',
+    'clarify what you',
+    'help me understand',
+    'first option or second option',
+    'which option would you prefer'
   ];
   
   const isLastMessageClarification = clarificationIndicators.some(
@@ -605,7 +657,8 @@ function checkIfResponseToClarification(message: string, conversationContext: Ar
       'all', 'everything', 'entire', 'recent', 'just', 'yes', 'no', 'correct', 'overall',
       'today', 'yesterday', 'last week', 'this month', 'happiness', 'mood', 
       'emotions', 'productivity', 'sleep', 'health', 'work', 'relationship',
-      'sure', 'ok', 'okay', 'please', 'thanks', 'thank you', 'yep', 'yeah'
+      'sure', 'ok', 'okay', 'please', 'thanks', 'thank you', 'yep', 'yeah',
+      'first option', 'second option', 'option 1', 'option 2', 'first', 'second'
     ];
     
     const containsCommonResponse = commonResponses.some(
@@ -638,7 +691,38 @@ function checkIfTopicContinuation(message: string, conversationContext: Array<{r
   // Check if the message just asks for a rating/score without specifying context
   const isRatingWithoutContext = /^(rate|score|evaluate|assess|analyze).*\d+(\s*(\/|out of)\s*\d+)?$/i.test(message.trim());
   
-  return containsReference || isShortMessage || isRatingWithoutContext;
+  // Check if the message is a follow-up question about a previous answer
+  const isFollowUpQuestion = /^(why|how|tell me more|explain|elaborate|what about|and|also|what else)/i.test(message.trim());
+  
+  return containsReference || isShortMessage || isRatingWithoutContext || isFollowUpQuestion;
+}
+
+/**
+ * Helper function to check if the message is a complex multi-part question
+ */
+function checkIfComplexQuestion(message: string): boolean {
+  // Check for conjunction words that often indicate multiple questions
+  const hasConjunctions = /\band\b|\balso\b|\badditionally\b|\bplus\b|\bmoreover\b|\bfurthermore\b/i.test(message);
+  
+  // Check for multiple question marks
+  const questionMarks = (message.match(/\?/g) || []).length;
+  const hasMultipleQuestions = questionMarks > 1;
+  
+  // Check for question starters within the message (not at the beginning)
+  const questionStarters = ['what', 'who', 'when', 'where', 'why', 'how', 'can you', 'could you', 'would you'];
+  const hasMultipleQuestionStarters = questionStarters.filter(starter => {
+    const regex = new RegExp(`\\b${starter}\\b`, 'gi');
+    const matches = message.match(regex) || [];
+    return matches.length > 0;
+  }).length > 1;
+  
+  // Check for lists (e.g., "1. ... 2. ..." or bullet points)
+  const hasList = /(\d+\s*[\.\):])|(\*|\-|\+)\s+/m.test(message);
+  
+  // Check if the message is generally complex (quite long)
+  const isLongMessage = message.length > 100;
+  
+  return (hasConjunctions || hasMultipleQuestions || hasMultipleQuestionStarters || hasList) && isLongMessage;
 }
 
 /**
@@ -889,4 +973,3 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
     periodName
   };
 }
-
