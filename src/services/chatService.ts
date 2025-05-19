@@ -274,9 +274,12 @@ export const processChatMessage = async (
     console.log("Generated query plan:", queryPlan);
     
     // If useHistoricalData parameter is set, remove date filters
-    if ((parameters.useHistoricalData === true || isHistoricalRequest) && queryPlan.filters && queryPlan.filters.dateRange) {
+    if ((parameters.useHistoricalData === true || isHistoricalRequest) && queryPlan.filters) {
       console.log("Removing date filters to search all historical data");
-      delete queryPlan.filters.dateRange;
+      // Fixed: Check if queryPlan.filters.dateRange exists before accessing it
+      if (queryPlan.filters.dateRange) {
+        delete queryPlan.filters.dateRange;
+      }
     }
     
     // Process with the query plan
@@ -620,6 +623,7 @@ async function processWithQueryPlan(
     // Handle no entries found for time range with better message
     if (data.noEntriesForTimeRange) {
       let timeRangeDescription = "the specified time period";
+      // Fixed: Check if queryPlan.filters exists and then if queryPlan.filters.dateRange exists before accessing it
       if (queryPlan.filters && queryPlan.filters.dateRange) {
         const { periodName } = queryPlan.filters.dateRange;
         if (periodName) {
@@ -682,10 +686,12 @@ async function processWithQueryPlan(
     if (data.analysis) {
       chatResponse.analysis_data = data.analysis;
       chatResponse.analysis = data.analysis; // For backward compatibility
-      if (data.analysis.type === 'quantitative_emotion' || 
-          data.analysis.type === 'top_emotions' ||
-          data.analysis.type === 'time_patterns' ||
-          data.analysis.type === 'combined_analysis') {
+      // Fixed: Check if data.analysis exists and if data.analysis.type exists before comparing it
+      const analysisType = data.analysis && data.analysis.type;
+      if (analysisType === 'quantitative_emotion' || 
+          analysisType === 'top_emotions' ||
+          analysisType === 'time_patterns' ||
+          analysisType === 'combined_analysis') {
         chatResponse.has_numeric_result = true;
         chatResponse.hasNumericResult = true; // For backward compatibility
       }
