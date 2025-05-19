@@ -1,218 +1,5 @@
 
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
-
-export type SearchStrategy = 'vector' | 'sql' | 'hybrid';
-
-export interface QueryPlan {
-  searchStrategy: SearchStrategy;
-  filters: {
-    dateRange?: {
-      startDate: string | null;
-      endDate: string | null;
-      periodName: string;
-    };
-    emotions?: string[];
-    sentiment?: string[];
-    themes?: string[];
-    entities?: Array<{type: string, name: string}>;
-  };
-  matchCount: number;
-  needsDataAggregation: boolean;
-  needsMoreContext: boolean;
-  isSegmented?: boolean;
-  subqueries?: string[];
-  reasoning?: string;
-  topicContext?: string; // Add a field to store the topic context
-  previousTimeContext?: string; // Add field to store previous time reference
-}
-
-/**
- * Converts a GPT-generated plan to our internal QueryPlan format
- */
-export function convertGptPlanToQueryPlan(gptPlan: any): QueryPlan {
-  if (!gptPlan) {
-    return createDefaultQueryPlan();
-  }
-
-  try {
-    // Map GPT strategy to our SearchStrategy
-    let searchStrategy: SearchStrategy = 'vector';
-    if (gptPlan.strategy) {
-      switch(gptPlan.strategy.toLowerCase()) {
-        case 'vector': 
-          searchStrategy = 'vector'; 
-          break;
-        case 'sql': 
-          searchStrategy = 'sql'; 
-          break;
-        case 'hybrid': 
-          searchStrategy = 'hybrid'; 
-          break;
-        default:
-          searchStrategy = 'vector'; // Default to vector for unknown strategies
-          break;
-      }
-    }
-
-    // Extract all filters
-    const filters: QueryPlan['filters'] = {};
-    
-    // Add date range if provided
-    if (gptPlan.filters?.date_range) {
-      // Ensure dates are properly formatted with timezone consideration
-      filters.dateRange = {
-        startDate: gptPlan.filters.date_range.startDate || null,
-        endDate: gptPlan.filters.date_range.endDate || null,
-        periodName: gptPlan.filters.date_range.periodName || ''
-      };
-    }
-    
-    // Add emotions if provided
-    if (gptPlan.filters?.emotions && Array.isArray(gptPlan.filters.emotions)) {
-      filters.emotions = gptPlan.filters.emotions;
-    }
-    
-    // Add sentiment if provided
-    if (gptPlan.filters?.sentiment && Array.isArray(gptPlan.filters.sentiment)) {
-      filters.sentiment = gptPlan.filters.sentiment;
-    }
-    
-    // Add themes if provided
-    if (gptPlan.filters?.themes && Array.isArray(gptPlan.filters.themes)) {
-      filters.themes = gptPlan.filters.themes;
-    }
-    
-    // Add entities if provided
-    if (gptPlan.filters?.entities && Array.isArray(gptPlan.filters.entities)) {
-      filters.entities = gptPlan.filters.entities;
-    }
-    
-    // Create our query plan
-    const queryPlan: QueryPlan = {
-      searchStrategy,
-      filters,
-      matchCount: gptPlan.match_count || 15,
-      needsDataAggregation: gptPlan.needs_data_aggregation || false,
-      needsMoreContext: gptPlan.needs_more_context || false,
-      isSegmented: gptPlan.is_segmented || false,
-      subqueries: gptPlan.subqueries || [],
-      reasoning: gptPlan.reasoning || '',
-      topicContext: gptPlan.topic_context || null,
-      previousTimeContext: gptPlan.previous_time_context || null
-    };
-
-    // For rating or analysis requests, ensure we need data aggregation
-    const hasRatingKeywords = gptPlan.reasoning?.toLowerCase().includes('rate') || 
-                            gptPlan.reasoning?.toLowerCase().includes('score') ||
-                            gptPlan.reasoning?.toLowerCase().includes('analyze') ||
-                            gptPlan.reasoning?.toLowerCase().includes('evaluate') ||
-                            gptPlan.reasoning?.toLowerCase().includes('introvert') ||
-                            gptPlan.reasoning?.toLowerCase().includes('extrovert') ||
-                            gptPlan.reasoning?.toLowerCase().includes('personality');
-                            
-    if (hasRatingKeywords && !queryPlan.needsDataAggregation) {
-      console.log("Rating keywords detected, forcing data aggregation");
-      queryPlan.needsDataAggregation = true;
-      queryPlan.matchCount = Math.max(queryPlan.matchCount, 30); // Ensure we get enough data
-    }
-    
-    // Check for multi-question indicators
-    const hasMultiQuestionIndicators = 
-      gptPlan.reasoning?.toLowerCase().includes('multiple questions') ||
-      gptPlan.reasoning?.toLowerCase().includes('multi-part') ||
-      gptPlan.reasoning?.toLowerCase().includes('several aspects') ||
-      (Array.isArray(gptPlan.subqueries) && gptPlan.subqueries.length > 1);
-      
-    if (hasMultiQuestionIndicators && !queryPlan.isSegmented) {
-      console.log("Multi-question indicators detected, marking as segmented");
-      queryPlan.isSegmented = true;
-    }
-    
-    // Log the complete conversion results
-    console.log(`Converted GPT plan to query plan:
-      Strategy: ${queryPlan.searchStrategy}
-      Match Count: ${queryPlan.matchCount}
-      Needs Aggregation: ${queryPlan.needsDataAggregation}
-      Is Segmented: ${queryPlan.isSegmented}
-      Topic Context: ${queryPlan.topicContext}
-      Time Context: ${queryPlan.previousTimeContext}`);
-    
-    return queryPlan;
-  } catch (error) {
-    console.error("Error converting GPT plan to query plan:", error);
-    return createDefaultQueryPlan();
-  }
-}
-
-/**
- * Creates a default query plan when none is provided
- */
-export function createDefaultQueryPlan(): QueryPlan {
-  return {
-    searchStrategy: 'vector',
-    filters: {},
-    matchCount: 15,
-    needsDataAggregation: false,
-    needsMoreContext: false
-  };
-}
-
-/**
- * Creates a fallback query plan based on the user's question
- */
-export function createFallbackQueryPlan(query: string): QueryPlan {
-  console.log(`Creating fallback query plan for: ${query}`);
-  
-  const queryTypes = analyzeQueryTypes(query);
-  
-  // Enhanced detection for rating or evaluation requests
-  const ratingPatterns = /rate|score|analyze|evaluate|assess|rank|review|am i|introvert|extrovert|my personality/i;
-  const isRatingRequest = ratingPatterns.test(query.toLowerCase());
-  
-  if (isRatingRequest) {
-    console.log("Rating/evaluation request detected in fallback plan creation");
-  }
-  
-  // Better detection for multi-part questions
-  const isMultiPartQuestion = 
-    (query.match(/\?/g) || []).length > 1 || // Multiple question marks
-    /\band\b|\balso\b|\balong with\b|\bas well as\b|\bin addition\b/i.test(query) || // Conjunction words
-    /(\bfirst\b.*\bsecond\b|\bone\b.*\btwo\b)/i.test(query); // Enumeration indicators
-    
-  if (isMultiPartQuestion) {
-    console.log("Multi-part question detected in fallback plan creation");
-  }
-  
-  // Default plan uses vector search
-  const plan: QueryPlan = {
-    searchStrategy: 'vector',
-    filters: {},
-    needsDataAggregation: queryTypes.needsDataAggregation || isRatingRequest,
-    needsMoreContext: queryTypes.needsMoreContext,
-    matchCount: 15,
-    isSegmented: isMultiPartQuestion
-  };
-  
-  // Add time range if detected
-  if (queryTypes.timeRange) {
-    plan.filters.dateRange = queryTypes.timeRange;
-    console.log(`Time range detected in fallback plan: ${plan.filters.dateRange.periodName}`);
-  }
-  
-  // Adjust match count for aggregation queries or rating requests
-  if (queryTypes.needsDataAggregation || 
-      isRatingRequest ||
-      query.toLowerCase().includes('all') || 
-      query.toLowerCase().includes('every') ||
-      query.toLowerCase().includes('overall') ||
-      query.toLowerCase().includes('entire')) {
-    plan.matchCount = 30; // Return more entries for comprehensive analysis
-    console.log("Increasing match count to 30 for comprehensive analysis");
-  }
-  
-  return plan;
-}
 
 /**
  * Calculates relative date ranges based on time expressions
@@ -390,43 +177,6 @@ export function calculateRelativeDateRange(
 }
 
 /**
- * Detects if a user message is likely responding to a clarification request
- * This helps handle short responses like "yes", "this month", etc.
- * @param message - The user's message
- * @returns boolean indicating if this is likely a response to clarification
- */
-export function isResponseToClarification(message: string): boolean {
-  if (!message) return false;
-  
-  const normalizedMessage = message.toLowerCase().trim();
-  
-  // Check for very short responses
-  if (normalizedMessage.length < 15) {
-    // Common affirmative responses
-    if (/^(yes|yeah|yep|sure|ok|okay|correct|right|exactly|confirm|confirmed|true|yup|affirmative|indeed)\.?$/.test(normalizedMessage)) {
-      return true;
-    }
-    
-    // Common negative responses
-    if (/^(no|nope|nah|not|negative|don't|dont|doesn't|doesnt|nothing|false)\.?$/.test(normalizedMessage)) {
-      return true;
-    }
-    
-    // Time period responses
-    if (/^(today|yesterday|this week|last week|this month|last month|this year|last year|all time|entire|everything|all)\.?$/.test(normalizedMessage)) {
-      return true;
-    }
-    
-    // Number responses
-    if (/^(\d+|one|two|three|four|five|six|seven|eight|nine|ten)\.?$/.test(normalizedMessage)) {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-/**
  * Detects relative time expressions in a query
  * @param query - The user's message
  * @returns string containing the detected time period or null if none found
@@ -469,19 +219,50 @@ export function detectRelativeTimeExpression(query: string): string | null {
 
 /**
  * Extracts a reference date from a previous query plan
- * @param previousPlan - The previous query plan
+ * @param previousPlan - The previous query plan with date range
  * @returns Date object or undefined if no reference date found
  */
-export function extractReferenceDate(previousPlan: QueryPlan | null): Date | undefined {
-  if (!previousPlan || !previousPlan.filters.dateRange) {
+export function extractReferenceDate(previousDateRange: any): Date | undefined {
+  if (!previousDateRange || !previousDateRange.endDate) {
     return undefined;
   }
   
   // Use the end date of the previous date range as reference
-  // This helps with relative calculations like "last month" relative to a specific month
-  if (previousPlan.filters.dateRange.endDate) {
-    return new Date(previousPlan.filters.dateRange.endDate);
+  try {
+    const referenceDate = new Date(previousDateRange.endDate);
+    if (isNaN(referenceDate.getTime())) {
+      return undefined;
+    }
+    return referenceDate;
+  } catch (error) {
+    console.error("Error extracting reference date:", error);
+    return undefined;
+  }
+}
+
+/**
+ * Determines if a query is asking about a relative time period compared to a previous context
+ * @param query - The user's query
+ * @returns boolean indicating if this is a relative time query
+ */
+export function isRelativeTimeQuery(query: string): boolean {
+  if (!query) return false;
+  
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // Check for patterns like "what about last month" or "show me last week"
+  const relativeTimePatterns = [
+    /^(what|how) about (last|this|previous|past|recent)/i,
+    /^(show|tell|give) me (last|this|previous|past|recent)/i,
+    /^(and|or|but) (last|this|previous|past|recent)/i,
+    /^(last|this|previous|past|recent)/i
+  ];
+  
+  for (const pattern of relativeTimePatterns) {
+    if (pattern.test(lowerQuery)) {
+      return true;
+    }
   }
   
-  return undefined;
+  return false;
 }

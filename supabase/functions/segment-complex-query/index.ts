@@ -32,7 +32,8 @@ serve(async (req) => {
       userId, 
       timeRange,
       vectorSearch = { matchThreshold: 0.5, matchCount: 10 }, // Default values for vector search
-      appContext // New parameter for app context
+      appContext, // New parameter for app context
+      referenceDate // New parameter for relative date references
     } = await req.json();
 
     if (!userQuery || !userId) {
@@ -45,6 +46,7 @@ serve(async (req) => {
 
     console.log(`Received query: ${userQuery} for user ID: ${userId}`);
     console.log(`App context provided: ${JSON.stringify(appContext || {}).substring(0, 100)}...`);
+    console.log(`Reference date provided: ${referenceDate || 'none'}`);
 
     // Enhanced detection to determine if this is already a single, focused question
     const isSingleQuestion = await checkIfSingleFocusedQuestion(userQuery);
@@ -100,7 +102,8 @@ serve(async (req) => {
       queryEmbedding, 
       vectorSearch.matchThreshold, 
       vectorSearch.matchCount,
-      timeRange
+      timeRange,
+      referenceDate // Pass along reference date
     );
 
     // Process entries to ensure valid dates
@@ -111,7 +114,7 @@ serve(async (req) => {
 
     // 3. Segment the complex query based on journal entries
     console.log('Segmenting the complex query based on journal entries');
-    const segmentedQuery = await segmentComplexQuery(userQuery, processedEntries, apiKey, appContext);
+    const segmentedQuery = await segmentComplexQuery(userQuery, processedEntries, apiKey, appContext, referenceDate);
 
     // 4. Return the segmented query
     console.log('Returning the segmented query');
@@ -133,11 +136,16 @@ async function searchJournalEntries(
   queryEmbedding: any[],
   matchThreshold: number = 0.5,
   matchCount: number = 10,
-  timeRange?: { startDate?: Date; endDate?: Date }
+  timeRange?: { startDate?: Date; endDate?: Date },
+  referenceDate?: string
 ) {
   try {
     console.log(`Searching journal entries for userId: ${userId}`);
     console.log(`Vector search parameters: threshold=${matchThreshold}, count=${matchCount}`);
+    
+    if (referenceDate) {
+      console.log(`Using reference date for search: ${referenceDate}`);
+    }
     
     // Use the fixed function with configurable parameters
     const { data, error } = await supabase.rpc(
@@ -216,9 +224,19 @@ Instructions:
   }
 }
 
-async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: string, appContext?: any) {
+async function segmentComplexQuery(
+  userQuery: string, 
+  entries: any[], 
+  apiKey: string, 
+  appContext?: any,
+  referenceDate?: string
+) {
   try {
     console.log('Starting query segmentation');
+    
+    if (referenceDate) {
+      console.log(`Using reference date for segmentation: ${referenceDate}`);
+    }
 
     // Enhanced prompt with SOULo app context and better examples
     const appContextInfo = appContext ? 
@@ -227,9 +245,16 @@ async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: st
       ask questions about their mental health, personality traits, and emotional patterns based on their journal data.` : 
       'This is a journaling app that helps users track their emotions and thoughts.';
     
+    // Include reference date information if available
+    const timeContextInfo = referenceDate ? 
+      `Time Context: The user previously asked about a specific time period. The reference date is ${referenceDate}.
+      If the current query contains relative time expressions like "last month", "this week", etc., interpret them
+      relative to this reference date rather than today's date.` : '';
+    
     const prompt = `You are an AI assistant for SOULo, a voice journaling app focused on mental health. 
       Your task is to segment complex user queries into simpler questions that can be answered independently.
       ${appContextInfo}
+      ${timeContextInfo}
       
       User Query: ${userQuery}
       
@@ -242,6 +267,7 @@ async function segmentComplexQuery(userQuery: string, entries: any[], apiKey: st
       4. Include specific questions about patterns, emotions, and insights from the journal entries.
       5. For rating requests, create segments that ask for both the numerical rating AND explanation.
       6. Return the segments in JSON array format.
+      7. If the query involves time references like "last month", preserve these time references in the segmented questions.
       
       Examples of good segmentation:
       

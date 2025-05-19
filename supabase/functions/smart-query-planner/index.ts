@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -20,6 +19,18 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
+// Define the requestData interface to include referenceDate
+interface RequestData {
+  message: string;
+  userId: string;
+  conversationContext?: any[];
+  timezoneOffset?: number;
+  appContext?: any;
+  checkForMultiQuestions?: boolean;
+  isFollowUp?: boolean;
+  referenceDate?: string; // Add reference date parameter
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -27,18 +38,25 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, conversationContext = [], timezoneOffset, appContext = {}, checkForMultiQuestions = true, isFollowUp = false } = await req.json();
+    const requestData = await req.json();
     
-    if (!message) {
-      throw new Error('Message is required');
+    // Extract the referenceDate from the requestData
+    const { 
+      message, 
+      userId, 
+      conversationContext = [], 
+      timezoneOffset = 0,
+      appContext,
+      checkForMultiQuestions = false,
+      isFollowUp = false,
+      referenceDate  // Extract reference date
+    } = requestData;
+
+    console.log(`Local timezone offset: ${timezoneOffset} minutes`);
+    if (referenceDate) {
+      console.log(`Reference date provided: ${referenceDate}`);
     }
 
-    console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
-    console.log(`User timezone offset: ${timezoneOffset} minutes`);
-    console.log(`Received ${conversationContext.length} conversation context messages`);
-    console.log(`Is this a follow-up question: ${isFollowUp}`);
-    console.log(`App context provided: ${JSON.stringify(appContext)}`);
-    
     // Log conversation context for debugging
     if (conversationContext.length > 0) {
       console.log("Conversation context summary:");
@@ -831,18 +849,19 @@ function getDefaultClarificationQuestions(ambiguityType: string): Array<{text: s
  * @param timezoneOffset - User's timezone offset in minutes
  * @returns Date range with start and end dates
  */
-function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number = 0): { startDate: string, endDate: string, periodName: string } {
+function calculateRelativeDateRange(
+  timePeriod: string,
+  timezoneOffset: number = 0,
+  referenceDate?: Date
+): { startDate: string, endDate: string, periodName: string } {
   // Convert timezone offset to milliseconds
   const offsetMs = timezoneOffset * 60 * 1000;
   
-  // Get current date in user's timezone
-  const now = new Date(Date.now() - offsetMs);
-  let startDate: Date;
-  let endDate: Date;
-  let periodName = timePeriod;
+  // Use provided reference date or get current date in user's timezone
+  const now = referenceDate ? new Date(referenceDate) : new Date(Date.now() - offsetMs);
   
-  console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
-  console.log(`User's local time: ${now.toISOString()}`);
+  console.log(`Calculating date range for "${timePeriod}" with offset ${timezoneOffset}`);
+  console.log(`Reference date: ${referenceDate ? referenceDate.toISOString() : 'none'}`);
   
   const lowerTimePeriod = timePeriod.toLowerCase();
   
@@ -859,6 +878,7 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
     startDate = new Date(now);
     startDate.setDate(now.getDate() - 1);
     startDate.setHours(0, 0, 0, 0);
+    
     endDate = new Date(startDate);
     endDate.setHours(23, 59, 59, 999);
     periodName = 'yesterday';

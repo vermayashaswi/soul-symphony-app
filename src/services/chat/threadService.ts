@@ -131,12 +131,101 @@ export async function updateThreadTitle(threadId: string, title: string): Promis
   }
 }
 
-export async function getPlanForQuery(query: string, userId: string, conversationContext: any[] = [], timezoneOffset: number = 0) {
+// Store and retrieve conversation context including time context
+export async function storeConversationContext(threadId: string, plan: any): Promise<boolean> {
+  if (!threadId || !plan) return false;
+
+  try {
+    // Extract key context data from the plan
+    const contextData = {
+      timeContext: plan.filters?.dateRange?.periodName || null,
+      topicContext: plan.topicContext || null,
+      lastUpdated: new Date().toISOString()
+    };
+
+    // Store the context in thread metadata
+    const { error } = await supabase
+      .from('chat_threads')
+      .update({
+        metadata: contextData
+      })
+      .eq('id', threadId);
+
+    if (error) {
+      console.error('Error storing conversation context:', error);
+      return false;
+    }
+
+    return true;
+  } catch (error) {
+    console.error('Error in storeConversationContext:', error);
+    return false;
+  }
+}
+
+export async function getConversationContext(threadId: string): Promise<any | null> {
+  if (!threadId) return null;
+
+  try {
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .select('metadata')
+      .eq('id', threadId)
+      .single();
+
+    if (error || !data) {
+      console.error('Error retrieving conversation context:', error);
+      return null;
+    }
+
+    return data.metadata;
+  } catch (error) {
+    console.error('Error in getConversationContext:', error);
+    return null;
+  }
+}
+
+export async function getPlanForQuery(query: string, userId: string, conversationContext: any[] = [], timezoneOffset: number = 0, threadId?: string) {
   if (!query || !userId) {
     return { plan: null, queryType: null, directResponse: null };
   }
 
   try {
+    // Get previous conversation context if available
+    let previousTimeContext = null;
+    let referenceDate = undefined;
+    
+    if (threadId) {
+      const storedContext = await getConversationContext(threadId);
+      if (storedContext && storedContext.timeContext) {
+        previousTimeContext = storedContext.timeContext;
+        console.log(`Retrieved previous time context: ${previousTimeContext}`);
+        
+        // If this is a follow-up with relative time expression, use the previous context
+        const timeExpression = detectRelativeTimeExpression(query);
+        if (timeExpression) {
+          console.log(`Detected time expression in follow-up: "${timeExpression}"`);
+          
+          // Try to extract a reference date from stored context
+          // For example, if previous context was "April 2025", 
+          // and current query is "what about last month?", we should use March 2025
+          const now = new Date();
+          if (previousTimeContext.includes("month")) {
+            // If previous context was about a month, adjust reference date accordingly
+            console.log(`Previous context was month-related: ${previousTimeContext}`);
+            if (previousTimeContext.includes("last month")) {
+              // If it was already "last month", go back another month
+              referenceDate = new Date(now.getFullYear(), now.getMonth() - 2, 1);
+            } else if (previousTimeContext.includes("this month")) {
+              // If it was "this month", go back one month for "last month"
+              referenceDate = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+            }
+            console.log(`Using reference date for time calculation: ${referenceDate?.toISOString()}`);
+          }
+        }
+      }
+    }
+
     // Enhanced system context for the AI with detailed app information
     const enhancedContext = {
       appInfo: {
@@ -161,7 +250,8 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
       userContext: {
         hasJournalEntries: true, // This is a placeholder - ideally would be dynamic
         timezoneOffset: timezoneOffset,
-        conversationHistory: conversationContext.length
+        conversationHistory: conversationContext.length,
+        previousTimeContext: previousTimeContext
       }
     };
 
@@ -169,6 +259,9 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
     console.log(`Calling smart-query-planner with enhanced app context:`, 
                 JSON.stringify(enhancedContext, null, 2).substring(0, 200) + "...");
     console.log(`Conversation context length: ${conversationContext.length}`);
+    console.log(`Previous time context: ${previousTimeContext || 'none'}`);
+    console.log(`Reference date: ${referenceDate ? referenceDate.toISOString() : 'none'}`);
+    
     if (conversationContext.length > 0) {
       console.log(`Latest context message: ${conversationContext[conversationContext.length - 1].content.substring(0, 50)}...`);
     }
@@ -191,7 +284,8 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
         timezoneOffset,
         appContext: enhancedContext, // Pass the enhanced app context
         checkForMultiQuestions: true, // Always check for multiple questions
-        isFollowUp: conversationContext.length > 0 // Indicate if this is a follow-up question
+        isFollowUp: conversationContext.length > 0, // Indicate if this is a follow-up question
+        referenceDate: referenceDate?.toISOString()  // Pass reference date if available
       }
     });
 
@@ -213,7 +307,8 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
           body: {
             query: query,
             userId,
-            appContext: enhancedContext
+            appContext: enhancedContext,
+            referenceDate: referenceDate?.toISOString()
           }
         });
         
@@ -231,6 +326,11 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
       } catch (segmentError) {
         console.error('Exception during query segmentation:', segmentError);
       }
+    }
+    
+    // Store context if threadId provided
+    if (threadId && data?.plan) {
+      await storeConversationContext(threadId, data.plan);
     }
 
     return {

@@ -48,6 +48,15 @@ const Chat = () => {
           await translate("Processing your request...", "en");
           await translate("Retrieving information...", "en");
           
+          // Time-related terms for better translation
+          await translate("today", "en");
+          await translate("yesterday", "en");
+          await translate("this week", "en");
+          await translate("last week", "en");
+          await translate("this month", "en");
+          await translate("last month", "en");
+          await translate("previous month", "en");
+          
           console.log("Chat strings pre-translated successfully");
         } catch (e) {
           console.error("Error pre-translating chat strings:", e);
@@ -131,6 +140,51 @@ const Chat = () => {
     };
     
     cleanupStaleSessions();
+  }, [user?.id]);
+
+  // Add column for storing temporal context if not exists
+  useEffect(() => {
+    const checkAndUpdateMetadata = async () => {
+      if (!user?.id) return;
+      
+      try {
+        // Check if metadata is being used in threads
+        const { data: threads, error } = await supabase
+          .from('chat_threads')
+          .select('id')
+          .eq('user_id', user.id)
+          .limit(5);
+          
+        if (error) {
+          console.error("Error checking thread metadata:", error);
+          return;
+        }
+        
+        // If threads exist, ensure they have metadata for storing context
+        if (threads && threads.length > 0) {
+          for (const thread of threads) {
+            // This will add a default metadata JSON if it doesn't exist
+            await supabase
+              .from('chat_threads')
+              .update({
+                metadata: { 
+                  timeContext: null,
+                  topicContext: null,
+                  lastUpdated: new Date().toISOString()
+                }
+              })
+              .eq('id', thread.id)
+              .is('metadata', null);
+          }
+          
+          console.log("Initialized metadata for threads if needed");
+        }
+      } catch (err) {
+        console.error("Error updating thread metadata:", err);
+      }
+    };
+    
+    checkAndUpdateMetadata();
   }, [user?.id]);
 
   // Add CSS override to hide duplicate close button in chat sidebar
