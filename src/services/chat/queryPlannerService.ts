@@ -138,7 +138,7 @@ export function createFallbackQueryPlan(query: string): QueryPlan {
   const queryTypes = analyzeQueryTypes(query);
   
   // Check if this is a rating or evaluation request
-  const isRatingRequest = /rate|score|analyze|evaluate|assess|rank/i.test(query);
+  const isRatingRequest = /rate|score|analyze|evaluate|assess|rank|review/i.test(query);
   
   // Default plan uses vector search
   const plan: QueryPlan = {
@@ -237,7 +237,7 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
     endDate = endOfYear(prevYear);
     periodName = 'last year';
   } 
-  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || lowerTimePeriod === 'everything') {
+  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || lowerTimePeriod === 'everything' || lowerTimePeriod === 'overall') {
     // Special case for "entire" - use a very broad date range (5 years back)
     startDate = startOfYear(subYears(now, 5));
     endDate = endOfDay(now);

@@ -27,7 +27,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message, userId, conversationContext = [], timezoneOffset } = await req.json();
+    const { message, userId, conversationContext = [], timezoneOffset, appContext = {} } = await req.json();
     
     if (!message) {
       throw new Error('Message is required');
@@ -36,6 +36,7 @@ serve(async (req) => {
     console.log(`Processing query planner request for user ${userId} with message: ${message.substring(0, 50)}...`);
     console.log(`User timezone offset: ${timezoneOffset} minutes`);
     console.log(`Received ${conversationContext.length} conversation context messages`);
+    console.log(`App context provided: ${JSON.stringify(appContext)}`);
     
     // Log conversation context for debugging
     if (conversationContext.length > 0) {
@@ -54,17 +55,22 @@ serve(async (req) => {
     // Format conversation context for the API request - use ALL conversation history
     const formattedContext = conversationContext.map(msg => ({
       role: msg.role || (msg.sender === 'user' ? 'user' : 'assistant'),
-      content: msg.content
+      content: msg.content,
+      isClarity: msg.isClarity || false  // Track if this was part of a clarification flow
     }));
     
-    // Enhanced detection of responses to clarification questions
+    // Enhanced detection of responses to clarification questions with more patterns
     let isRespondingToClarification = checkIfResponseToClarification(message, formattedContext);
     
     // Add better contextual understanding by checking for topic continuation
     const isTopicContinuation = checkIfTopicContinuation(message, formattedContext);
     
+    // Check for direct time period specification
+    const hasDirectTimePeriod = checkForDirectTimePeriod(message);
+    
     console.log(`Is responding to clarification: ${isRespondingToClarification}`);
     console.log(`Is topic continuation: ${isTopicContinuation}`);
+    console.log(`Has direct time period: ${hasDirectTimePeriod ? hasDirectTimePeriod : 'none'}`);
     
     // Enhanced context-aware query analysis
     // This analyzes if the query is ambiguous while considering the COMPLETE conversation context
@@ -79,7 +85,7 @@ serve(async (req) => {
         messages: [
           {
             role: 'system',
-            content: `You are an AI context analyst for a journaling application. Your task is to analyze the user's current query and determine if it requires clarification based on the conversation context.
+            content: `You are an AI context analyst for a journaling application called SOULo, a Voice Journaling App focused on mental health assistance. Your task is to analyze the user's current query and determine if it requires clarification based on the conversation context.
 
 Analyze the user's query for the following types of ambiguity:
 
@@ -94,11 +100,12 @@ Analyze the user's query for the following types of ambiguity:
 CRITICAL: You must carefully examine the FULL conversation history to determine if clarification is actually needed:
 - If the conversation already contains enough context to understand the current query, DO NOT request clarification
 - If the user is directly responding to a previous clarification request, DO NOT mark as needing further clarification
-- If the user says something like "entire journal", "all entries", "everything", assume they want comprehensive historical data
+- If the user says something like "entire journal", "all entries", "everything", "all", "entire", "yes", "overall", assume they want comprehensive historical data
 - If a query is a follow-up to a previous question/answer, interpret it in that context
 - If the user asks for a rating or score (like "rate me out of 100"), DO NOT ask for clarification if the topic is clear from conversation history
 - Pay special attention to pronouns like "this", "it", "that" and determine their referents from context
 - Short responses following a specific question should be interpreted in context of that question
+- If the most recent assistant message asked about time period or scope, and the user responds with a short answer, assume they provided their preference
 
 Respond with a JSON object like this:
 {
@@ -140,11 +147,12 @@ If no clarification is needed, set needsClarification to false and ambiguityType
     }
     
     // Override ambiguity check if we detect a direct response to a clarification
-    if (isRespondingToClarification || isTopicContinuation) {
-      console.log("Overriding ambiguity check due to detected response to clarification or topic continuation");
+    // or a direct time period specification
+    if (isRespondingToClarification || isTopicContinuation || hasDirectTimePeriod) {
+      console.log("Overriding ambiguity check due to detected response to clarification, topic continuation, or direct time period");
       ambiguityResult.needsClarification = false;
       ambiguityResult.ambiguityType = "NONE";
-      ambiguityResult.reasoning = "User is responding to a previous clarification or continuing a topic with clear context";
+      ambiguityResult.reasoning = "User is responding to a previous clarification, continuing a topic with clear context, or specifying a direct time period";
     }
     
     // Improved message type classification that considers conversation context
@@ -159,7 +167,7 @@ If no clarification is needed, set needsClarification to false and ambiguityType
         messages: [
           {
             role: 'system',
-            content: `You are a classification tool that determines if a user's query is a general question about mental health (respond with "mental_health_general") OR if it's a question seeking insights from the user's journal entries (respond with "journal_specific"). 
+            content: `You are a classification tool for SOULo, a Voice Journaling App focused on mental health. You determine if a user's query is a general question about mental health (respond with "mental_health_general") OR if it's a question seeking insights from the user's journal entries (respond with "journal_specific"). 
 
 Specifically, if the user is asking for ANY of the following, classify as "journal_specific":
 - Personal ratings, scores, or evaluations based on their journal entries
@@ -169,10 +177,12 @@ Specifically, if the user is asking for ANY of the following, classify as "journ
 - Questions seeking quantitative or qualitative assessment of the user
 - Any request for statistics or metrics about their journaling data
 - Analysis of specific emotions or sentiment patterns in their entries
+- Any question that is clearly a follow-up to a previous journal-specific query
 
 Consider the FULL conversation context. If the user is clearly referring to their journal data, classify as "journal_specific".
 If the user is continuing a previous topic that was journal-specific, maintain that classification.
 If the user mentions ratings, scores, or analysis of any personal characteristic, classify as "journal_specific".
+Short responses like "yes", "all", "entire", "overall", "everything" following a question about journal data should be classified as "journal_specific".
 
 Respond with ONLY "mental_health_general" or "journal_specific".`
           },
@@ -193,24 +203,29 @@ Respond with ONLY "mental_health_general" or "journal_specific".`
 
     // Process time-based queries more accurately
     let hasTimeFilter = false;
-    let timeRangeMentioned = null;
+    let timeRangeMentioned = hasDirectTimePeriod || null;
 
-    // Enhanced time detection - look for time expressions in the query
-    const timeKeywords = [
-      'today', 'yesterday', 'this week', 'last week', 
-      'this month', 'last month', 'this year', 'last year',
-      'recent', 'latest', 'current', 'past'
-    ];
-    
-    const lowerMessage = message.toLowerCase();
-    
-    for (const keyword of timeKeywords) {
-      if (lowerMessage.includes(keyword)) {
-        console.log(`Detected time keyword: ${keyword}`);
-        timeRangeMentioned = keyword;
-        hasTimeFilter = true;
-        break;
+    // Enhanced time detection - look for time expressions in the query if not already detected
+    if (!timeRangeMentioned) {
+      const timeKeywords = [
+        'today', 'yesterday', 'this week', 'last week', 
+        'this month', 'last month', 'this year', 'last year',
+        'recent', 'latest', 'current', 'past', 'all', 'entire', 'everything'
+      ];
+      
+      const lowerMessage = message.toLowerCase();
+      
+      for (const keyword of timeKeywords) {
+        if (lowerMessage.includes(keyword)) {
+          console.log(`Detected time keyword: ${keyword}`);
+          timeRangeMentioned = keyword;
+          hasTimeFilter = true;
+          break;
+        }
       }
+    } else {
+      // We already detected a direct time period
+      hasTimeFilter = true;
     }
     
     // Check for replies to time-based questions in context
@@ -220,13 +235,34 @@ Respond with ONLY "mental_health_general" or "journal_specific".`
         msg.role === 'assistant' && 
         (msg.content.includes('time period') || 
          msg.content.includes('what period') || 
-         msg.content.includes('which time'))
+         msg.content.includes('which time') ||
+         msg.content.includes('recent entries') ||
+         msg.content.includes('entire journal'))
       );
       
       // If user message is short and follows a time question, it might be specifying a time period
       if (lastTimeQuestion && message.split(' ').length <= 5) {
-        for (const keyword of timeKeywords) {
-          if (message.toLowerCase().includes(keyword)) {
+        // Check for common responses like "yes", "all", "entire", "overall"
+        const shortResponses = ['yes', 'sure', 'ok', 'okay', 'all', 'entire', 'everything', 'overall'];
+        const lowerMessage = message.toLowerCase();
+        
+        if (shortResponses.some(resp => lowerMessage.includes(resp))) {
+          console.log(`Detected short response to time question: ${message}`);
+          
+          if (lastTimeQuestion.content.includes('entire journal') || 
+              lastTimeQuestion.content.includes('all entries')) {
+            timeRangeMentioned = 'all';
+            hasTimeFilter = true;
+          } else {
+            timeRangeMentioned = 'recent';
+            hasTimeFilter = true;
+          }
+        }
+        
+        // Check for standard time keywords as well
+        for (const keyword of ['today', 'yesterday', 'this week', 'last week', 
+                               'this month', 'last month', 'this year', 'last year']) {
+          if (lowerMessage.includes(keyword)) {
             console.log(`Detected time keyword in response to time question: ${keyword}`);
             timeRangeMentioned = keyword;
             hasTimeFilter = true;
@@ -287,7 +323,7 @@ Respond with ONLY "mental_health_general" or "journal_specific".`
           messages: [
             {
               role: 'system',
-              content: `You are an AI assistant helping users analyze their journal entries. 
+              content: `You are an AI assistant for SOULo, a Voice Journaling App helping users analyze their journal entries. 
               
 The user has asked a question that needs clarification. Based on the conversation history and ambiguity type, generate TWO clear, concise clarification options that the user can choose from.
 
@@ -350,7 +386,12 @@ Ensure each option has:
           messages: [
             {
               role: 'system',
-              content: `You are an AI query planner for a journaling application. Your task is to analyze user questions and create search plans that efficiently retrieve relevant journal entries.
+              content: `You are an AI query planner for SOULo, a Voice Journaling application focused on mental health. Your task is to analyze user questions and create search plans that efficiently retrieve relevant journal entries.
+
+APPLICATION CONTEXT:
+- SOULo is a mental health assistance app that helps users track and analyze their emotions through voice journaling
+- Users speak their thoughts and the app transcribes, analyzes, and helps them gain insights
+- The AI assistant (you) helps users understand patterns in their emotional well-being
 
 IMPORTANT DATABASE INFORMATION:
 - All journal entries are stored with UTC timestamps in the database
@@ -392,10 +433,13 @@ For the following user query, create a JSON search plan with these components:
 
 8. "reasoning": String explanation of your planning decisions
 
+9. "topic_context": String (capture what topic this query is about for future reference)
+
 IMPORTANT: If the user's message is a direct response to a clarification question (like "all entries" or "recent only"), 
 interpret this in context and create an appropriate plan based on their response.
 If the user is continuing a conversation about a specific topic (e.g. happiness, productivity), maintain context.
 When a user says something like "rate me out of 100 on this", look at the previous messages to determine what "this" refers to.
+Single word responses like "yes", "entire", "all", "overall" should be interpreted in context of the previous question.
 
 Example time periods include "today", "yesterday", "this week", "last week", "this month", "last month", etc.
 
@@ -471,7 +515,7 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
     
     // Special case handling for historical data requests
     // Look for keywords that indicate the user wants all historical data
-    const historicalDataKeywords = ['all entries', 'entire journal', 'all my journal', 'historical data', 'all time'];
+    const historicalDataKeywords = ['all entries', 'entire journal', 'all my journal', 'historical data', 'all time', 'all', 'entire', 'everything', 'overall'];
     const wantsHistoricalData = historicalDataKeywords.some(keyword => 
       message.toLowerCase().includes(keyword.toLowerCase())
     );
@@ -505,7 +549,7 @@ Return ONLY the JSON plan, nothing else. Ensure it's valid JSON format.
 
 /**
  * Enhanced helper function to check if the current message is responding to a previous clarification
- * Now considers the full conversation context and better detects clarification responses
+ * Considers the full conversation context and better detects clarification responses
  */
 function checkIfResponseToClarification(message: string, conversationContext: Array<{role: string, content: string}>): boolean {
   if (conversationContext.length === 0) return false;
@@ -535,7 +579,16 @@ function checkIfResponseToClarification(message: string, conversationContext: Ar
     'need more information',
     'what do you mean',
     'what are you referring to',
-    'want me to focus on'
+    'want me to focus on',
+    'do you want me to analyze',
+    'would you like me to',
+    'are you asking about',
+    'do you mean',
+    'would you prefer',
+    'should I focus on',
+    'entire history or just recent entries',
+    'specific timeframe or all entries',
+    'more recent journal entries or your entire history'
   ];
   
   const isLastMessageClarification = clarificationIndicators.some(
@@ -549,9 +602,10 @@ function checkIfResponseToClarification(message: string, conversationContext: Ar
     
     // Check for common clarification responses
     const commonResponses = [
-      'all', 'everything', 'entire', 'recent', 'just', 'yes', 'no', 'correct',
+      'all', 'everything', 'entire', 'recent', 'just', 'yes', 'no', 'correct', 'overall',
       'today', 'yesterday', 'last week', 'this month', 'happiness', 'mood', 
-      'emotions', 'productivity', 'sleep', 'health', 'work', 'relationship'
+      'emotions', 'productivity', 'sleep', 'health', 'work', 'relationship',
+      'sure', 'ok', 'okay', 'please', 'thanks', 'thank you', 'yep', 'yeah'
     ];
     
     const containsCommonResponse = commonResponses.some(
@@ -565,7 +619,7 @@ function checkIfResponseToClarification(message: string, conversationContext: Ar
 }
 
 /**
- * New helper function to detect if a message is continuing a previous topic
+ * Helper function to detect if a message is continuing a previous topic
  */
 function checkIfTopicContinuation(message: string, conversationContext: Array<{role: string, content: string}>): boolean {
   if (conversationContext.length < 2) return false;
@@ -585,6 +639,46 @@ function checkIfTopicContinuation(message: string, conversationContext: Array<{r
   const isRatingWithoutContext = /^(rate|score|evaluate|assess|analyze).*\d+(\s*(\/|out of)\s*\d+)?$/i.test(message.trim());
   
   return containsReference || isShortMessage || isRatingWithoutContext;
+}
+
+/**
+ * New helper function to check if the message directly specifies a time period
+ */
+function checkForDirectTimePeriod(message: string): string | null {
+  const lowerMsg = message.toLowerCase();
+  
+  // Direct time period expressions
+  const directTimeExpressions = [
+    { regex: /\b(all|entire|everything)\b/, period: 'all' },
+    { regex: /\brecent (only|entries|days|history)\b/, period: 'recent' },
+    { regex: /\btoday\b/, period: 'today' },
+    { regex: /\byesterday\b/, period: 'yesterday' },
+    { regex: /\bthis week\b/, period: 'this week' },
+    { regex: /\blast week\b/, period: 'last week' },
+    { regex: /\bthis month\b/, period: 'this month' },
+    { regex: /\blast month\b/, period: 'last month' },
+    { regex: /\bthis year\b/, period: 'this year' },
+    { regex: /\blast year\b/, period: 'last year' }
+  ];
+  
+  for (const expr of directTimeExpressions) {
+    if (expr.regex.test(lowerMsg)) {
+      return expr.period;
+    }
+  }
+  
+  // Simple cases where the entire message is just a time period
+  if (['all', 'everything', 'entire', 'recent', 'today', 'yesterday'].includes(lowerMsg)) {
+    return lowerMsg;
+  }
+  
+  // If a number of days/weeks/months/years is mentioned
+  const timeRangeMatch = lowerMsg.match(/\b(\d+)\s*(day|week|month|year)s?\b/);
+  if (timeRangeMatch) {
+    return `last ${timeRangeMatch[1]} ${timeRangeMatch[2]}s`;
+  }
+  
+  return null;
 }
 
 /**
@@ -741,6 +835,15 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
     endDate.setHours(23, 59, 59, 999);
     periodName = 'last year';
   } 
+  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || lowerTimePeriod === 'everything' || lowerTimePeriod === 'overall') {
+    // Special case for "entire" - use a very broad date range (5 years back)
+    startDate = new Date(now);
+    startDate.setFullYear(now.getFullYear() - 5);
+    startDate.setHours(0, 0, 0, 0);
+    endDate = new Date(now);
+    endDate.setHours(23, 59, 59, 999);
+    periodName = 'entire';
+  }
   else {
     // Default to last 30 days if no specific period matched
     startDate = new Date(now);
@@ -786,3 +889,4 @@ function calculateRelativeDateRange(timePeriod: string, timezoneOffset: number =
     periodName
   };
 }
+
