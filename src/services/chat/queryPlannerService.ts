@@ -237,6 +237,12 @@ export function calculateRelativeDateRange(timePeriod: string, timezoneOffset: n
     endDate = endOfYear(prevYear);
     periodName = 'last year';
   } 
+  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || lowerTimePeriod === 'everything') {
+    // Special case for "entire" - use a very broad date range (5 years back)
+    startDate = startOfYear(subYears(now, 5));
+    endDate = endOfDay(now);
+    periodName = 'entire';
+  }
   else {
     // Default to last 30 days if no specific period matched
     startDate = startOfDay(subDays(now, 30));

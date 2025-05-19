@@ -137,12 +137,23 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
   }
 
   try {
+    // Add enhanced system context for the AI
+    const enhancedContext = {
+      appInfo: {
+        name: "SOULo",
+        type: "Voice Journaling App",
+        role: "Mental Health Assistant"
+      }
+    };
+
+    // Call the edge function with enhanced context
     const { data, error } = await supabase.functions.invoke('smart-query-planner', {
       body: {
         message: query,
         userId,
         conversationContext,
-        timezoneOffset
+        timezoneOffset,
+        appContext: enhancedContext // Add app context to help the AI understand the domain
       }
     });
 

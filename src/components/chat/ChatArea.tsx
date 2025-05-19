@@ -33,15 +33,22 @@ const ChatArea: React.FC<ChatAreaProps> = ({
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, [chatMessages, isLoading]);
 
-  // Log messages for debugging to ensure context is being passed properly
+  // Enhanced logging to ensure context is being passed properly
   useEffect(() => {
     if (chatMessages.length > 0) {
       console.log(`ChatArea: Rendering ${chatMessages.length} messages`);
       console.log("Last message:", chatMessages[chatMessages.length - 1]?.content.substring(0, 50) + "...");
       
-      // Log the full thread conversation for context analysis
+      // Enhanced context logging for better debugging
       if (threadId) {
-        console.log("Full conversation context:", 
+        const lastUserQuestion = chatMessages
+          .filter(msg => msg.sender === 'user' || msg.role === 'user')
+          .slice(-1)[0]?.content;
+          
+        console.log("Last user question:", lastUserQuestion);
+        
+        // Log the full thread conversation for context analysis
+        console.log("Full conversation context for analysis:", 
           chatMessages.map(msg => `[${msg.sender || msg.role}]: ${msg.content.substring(0, 30)}...`));
       }
     }
