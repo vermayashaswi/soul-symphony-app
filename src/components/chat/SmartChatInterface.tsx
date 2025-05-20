@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -698,6 +697,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   );
 };
 
-export default function SmartChatInterfaceWrapper() {
-  return <SmartChatInterface />;
+// Export both the raw component and a wrapper component
+export { SmartChatInterface };  // Named export for direct import by other components
+
+// Default export as a wrapper that doesn't require props
+export default function SmartChatInterfaceWrapper(props: SmartChatInterfaceProps) {
+  return <SmartChatInterface {...props} />;
 }
