@@ -17,11 +17,13 @@ export interface QueryTypes {
   isLocationalQuery: boolean;
   isPersonalInsightQuery: boolean;
   isMentalHealthQuery: boolean;
+  needsDataAggregation: boolean; // Added missing property
+  needsMoreContext: boolean;     // Added missing property
   emotion_keywords: string[];
   temporal_keywords: string[];
   timeRange: {
     periodName: string;
-    duration: number;
+    duration: number;           // This property already exists but was not correctly typed
     startDate: string | null;
     endDate: string | null;
   };
@@ -46,6 +48,8 @@ export function analyzeQueryTypes(query: string): QueryTypes {
     isLocationalQuery: false,
     isPersonalInsightQuery: false,
     isMentalHealthQuery: false,
+    needsDataAggregation: false, // Initialize new property
+    needsMoreContext: false,     // Initialize new property
     emotion_keywords: [],
     temporal_keywords: [],
     timeRange: {
@@ -238,6 +242,15 @@ export function analyzeQueryTypes(query: string): QueryTypes {
   ];
   
   result.isMentalHealthQuery = mentalHealthPatterns.some(pattern => pattern.test(lowerQuery));
+  
+  // Determine if this query needs data aggregation (like pattern analysis, statistics)
+  result.needsDataAggregation = result.isQuantitative || 
+                               result.isTimePatternQuery || 
+                               /\bpattern\b|\btrend\b|\boverall\b|\bsummary\b|\banalyze\b|\banalysis\b/i.test(lowerQuery);
+  
+  // Determine if the query needs more context (vague or ambiguous)
+  result.needsMoreContext = query.length < 10 || 
+                          (/\bit\b|\bthat\b|\bthem\b|\bthose\b|\bthis\b/i.test(lowerQuery) && query.split(' ').length < 5);
   
   return result;
 }
