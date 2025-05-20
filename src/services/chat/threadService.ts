@@ -1,6 +1,7 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { ChatThread } from './types';
+import { ConversationStateManager, IntentType } from '@/utils/chat/conversationStateManager';
 import { detectRelativeTimeExpression, calculateRelativeDateRange, extractReferenceDate, isRelativeTimeQuery } from '@/utils/chat/dateUtils';
 
 export async function fetchChatThreads(userId: string | undefined) {
@@ -132,115 +133,58 @@ export async function updateThreadTitle(threadId: string, title: string): Promis
   }
 }
 
-// Store and retrieve conversation context including time context
-export async function storeConversationContext(threadId: string, plan: any): Promise<boolean> {
-  if (!threadId || !plan) return false;
-
-  try {
-    // Extract key context data from the plan
-    const contextData = {
-      timeContext: plan.filters?.dateRange?.periodName || null,
-      topicContext: plan.topicContext || null,
-      lastUpdated: new Date().toISOString()
-    };
-
-    // Store the context in thread metadata
-    const { error } = await supabase
-      .from('chat_threads')
-      .update({
-        metadata: contextData
-      })
-      .eq('id', threadId);
-
-    if (error) {
-      console.error('Error storing conversation context:', error);
-      return false;
-    }
-
-    return true;
-  } catch (error) {
-    console.error('Error in storeConversationContext:', error);
-    return false;
-  }
-}
-
-export async function getConversationContext(threadId: string): Promise<any | null> {
-  if (!threadId) return null;
-
-  try {
-    const { data, error } = await supabase
-      .from('chat_threads')
-      .select('metadata')
-      .eq('id', threadId)
-      .single();
-
-    if (error || !data) {
-      console.error('Error retrieving conversation context:', error);
-      return null;
-    }
-
-    return data.metadata;
-  } catch (error) {
-    console.error('Error in getConversationContext:', error);
-    return null;
-  }
-}
-
-export async function getPlanForQuery(query: string, userId: string, conversationContext: any[] = [], timezoneOffset: number = 0, threadId?: string) {
+// Updated with enhanced context handling and conversation state management
+export async function getPlanForQuery(
+  query: string, 
+  userId: string, 
+  conversationContext: any[] = [], 
+  timezoneOffset: number = 0, 
+  threadId?: string
+) {
   if (!query || !userId) {
     return { plan: null, queryType: null, directResponse: null };
   }
 
   try {
-    // Get previous conversation context if available
-    let previousTimeContext = null;
-    let previousTopicContext = null;
-    let referenceDate = undefined;
+    console.log(`Processing query: "${query}"`);
+    
+    // Initialize conversation state manager if we have a thread ID
+    let stateManager: ConversationStateManager | null = null;
+    let intentType: IntentType = 'new_query';
+    let previousState = null;
     
     if (threadId) {
-      const storedContext = await getConversationContext(threadId);
-      if (storedContext) {
-        previousTimeContext = storedContext.timeContext;
-        previousTopicContext = storedContext.topicContext;
-        console.log(`Retrieved previous context - Time: ${previousTimeContext}, Topic: ${previousTopicContext}`);
-        
-        // Check if this is a time-based follow-up question
-        const timeExpression = detectRelativeTimeExpression(query);
-        const isTimeQuery = isRelativeTimeQuery(query);
-        
-        if ((timeExpression || isTimeQuery) && previousTimeContext) {
-          console.log(`Detected time expression in follow-up: "${timeExpression || query}"`);
-          
-          // If we have a previous time context, use it to calculate the reference date
-          if (previousTimeContext && storedContext.lastUpdated) {
-            // Use the date from last update as reference point
-            const lastUpdateDate = new Date(storedContext.lastUpdated);
-            
-            // Calculate a proper reference date based on previous time context
-            if (previousTimeContext.includes("month")) {
-              console.log(`Previous context was month-related: ${previousTimeContext}`);
-              
-              // For month-based references, adjust accordingly
-              if (previousTimeContext.includes("last month")) {
-                // If previous was "last month", reference should be 1 month before now
-                referenceDate = new Date(lastUpdateDate);
-                referenceDate.setMonth(referenceDate.getMonth() - 1);
-              } else if (previousTimeContext.includes("this month")) {
-                // If previous was "this month", reference should be current month
-                referenceDate = new Date(lastUpdateDate);
-              }
-              
-              console.log(`Using reference date for time calculation: ${referenceDate?.toISOString()}`);
-            } else {
-              // For other time periods, use the last update as reference
-              referenceDate = new Date(lastUpdateDate);
-            }
-          }
+      stateManager = new ConversationStateManager(threadId, userId);
+      previousState = await stateManager.loadState();
+      
+      // Analyze the intent of this query
+      intentType = await stateManager.analyzeIntent(query);
+      console.log(`Detected query intent: ${intentType}`);
+    }
+
+    // Prepare temporal context and reference date
+    let referenceDate = undefined;
+    let previousTimeContext = previousState?.timeContext || null;
+    let previousTopicContext = previousState?.topicContext || null;
+    let preserveTopicContext = false;
+    
+    // Special handling for time-based follow ups
+    if (intentType === 'followup_time') {
+      preserveTopicContext = true;
+      console.log(`Preserving topic context: "${previousTopicContext}" for time follow-up`);
+      
+      // Calculate reference date from previous time context
+      if (previousState?.timeContext) {
+        const lastUpdateMetadata = previousState as any;
+        if (lastUpdateMetadata.lastUpdated) {
+          const lastUpdateDate = new Date(lastUpdateMetadata.lastUpdated);
+          referenceDate = new Date(lastUpdateDate);
+          console.log(`Using reference date for time calculation: ${referenceDate.toISOString()}`);
         }
       }
     }
 
-    // Enhanced system context for the AI with detailed app information
+    // Enhanced system context for the AI
     const enhancedContext = {
       appInfo: {
         name: "SOULo",
@@ -257,39 +201,31 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
           canHandleMultiQuestions: true
         },
         preferenceDefaults: {
-          assumeHistoricalDataForMentalHealth: true, // Default to using all data for mental health insights
-          minimizeUnnecessaryClarifications: true    // Try to avoid unnecessary clarifications
+          assumeHistoricalDataForMentalHealth: true,
+          minimizeUnnecessaryClarifications: true
         }
       },
       userContext: {
-        hasJournalEntries: true, // This is a placeholder - ideally would be dynamic
+        hasJournalEntries: true,
         timezoneOffset: timezoneOffset,
         conversationHistory: conversationContext.length,
         previousTimeContext: previousTimeContext,
-        previousTopicContext: previousTopicContext
+        previousTopicContext: previousTopicContext,
+        intentType: intentType,
+        needsClarity: previousState?.needsClarity || false
       }
     };
 
-    // Add detailed logging
-    console.log(`Calling smart-query-planner with enhanced app context:`, 
-                JSON.stringify(enhancedContext, null, 2).substring(0, 200) + "...");
-    console.log(`Conversation context length: ${conversationContext.length}`);
-    console.log(`Previous time context: ${previousTimeContext || 'none'}`);
-    console.log(`Previous topic context: ${previousTopicContext || 'none'}`);
-    console.log(`Reference date: ${referenceDate ? referenceDate.toISOString() : 'none'}`);
-    
-    if (conversationContext.length > 0) {
-      console.log(`Latest context message: ${conversationContext[conversationContext.length - 1].content.substring(0, 50)}...`);
-    }
-
-    // Check if this might be a multi-part question that needs segmentation
-    const shouldCheckForMultiQuestions = 
-      query.includes(" and ") || 
-      query.includes(" also ") || 
-      (query.match(/\?/g) || []).length > 1 ||
-      query.length > 100;
-
-    console.log(`Query might contain multiple questions: ${shouldCheckForMultiQuestions}`);
+    // Log comprehensive debugging information
+    console.log(`Calling smart-query-planner with:
+      Query: "${query}"
+      Intent type: ${intentType}
+      Conversation context length: ${conversationContext.length}
+      Previous time context: ${previousTimeContext || 'none'}
+      Previous topic context: ${previousTopicContext || 'none'}
+      Preserve topic context: ${preserveTopicContext}
+      Reference date: ${referenceDate ? referenceDate.toISOString() : 'none'}
+    `);
 
     // Call the edge function with enhanced context
     const { data, error } = await supabase.functions.invoke('smart-query-planner', {
@@ -298,11 +234,11 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
         userId,
         conversationContext,
         timezoneOffset,
-        appContext: enhancedContext, // Pass the enhanced app context
-        checkForMultiQuestions: true, // Always check for multiple questions
-        isFollowUp: conversationContext.length > 0, // Indicate if this is a follow-up question
-        referenceDate: referenceDate?.toISOString(),  // Pass reference date if available
-        preserveTopicContext: isRelativeTimeQuery(query) && previousTopicContext // Preserve topic from previous query if this is just a time change
+        appContext: enhancedContext,
+        checkForMultiQuestions: true,
+        isFollowUp: intentType !== 'new_query',
+        referenceDate: referenceDate?.toISOString(),
+        preserveTopicContext: preserveTopicContext
       }
     });
 
@@ -311,14 +247,11 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
       throw error;
     }
 
-    // Log the returned plan for debugging
-    console.log(`Received query plan: ${JSON.stringify(data?.plan || {}, null, 2).substring(0, 200)}...`);
-
-    // Check if we need to segment the query
-    if (data?.plan?.isSegmented && shouldCheckForMultiQuestions) {
-      console.log('Query plan indicates this is a segmented query - processing as multi-question');
-      
-      // Call segment-complex-query function to break down the complex question
+    console.log(`Received query plan with strategy: ${data?.plan?.strategy || 'none'}`);
+    
+    // Handle multi-part questions
+    if (data?.plan && (intentType === 'multi_part' || data?.plan?.isSegmented)) {
+      console.log('Processing multi-part query...');
       try {
         const segmentationResult = await supabase.functions.invoke('segment-complex-query', {
           body: {
@@ -330,33 +263,23 @@ export async function getPlanForQuery(query: string, userId: string, conversatio
           }
         });
         
-        if (segmentationResult.error) {
-          console.error('Error segmenting query:', segmentationResult.error);
-        } else if (segmentationResult.data) {
-          console.log('Successfully segmented query:', segmentationResult.data);
-          
-          // Update the plan with the segmented queries
-          if (data.plan) {
-            data.plan.subqueries = JSON.parse(segmentationResult.data.data);
-            console.log('Updated plan with segmented queries:', data.plan.subqueries);
-          }
+        if (!segmentationResult.error && segmentationResult.data) {
+          data.plan.subqueries = JSON.parse(segmentationResult.data.data);
+          console.log(`Segmented into ${data.plan.subqueries.length} sub-queries`);
         }
       } catch (segmentError) {
-        console.error('Exception during query segmentation:', segmentError);
+        console.error('Error during query segmentation:', segmentError);
       }
     }
     
-    // If this is a time-based follow-up but preserving topic context,
-    // make sure the topic gets stored in the plan
-    if (isRelativeTimeQuery(query) && previousTopicContext && data?.plan) {
-      // Ensure the topic context is preserved
-      data.plan.topicContext = previousTopicContext;
-      console.log(`Preserved topic context in plan: ${previousTopicContext}`);
-    }
-    
-    // Store context if threadId provided
-    if (threadId && data?.plan) {
-      await storeConversationContext(threadId, data.plan);
+    // Save the conversation state if we have a state manager
+    if (stateManager && data?.plan) {
+      const newState = await stateManager.createState(query, data.plan, intentType);
+      await stateManager.saveState(newState);
+      console.log(`Saved conversation state with topic "${newState.topicContext}" and confidence ${newState.confidenceScore}`);
+      
+      // Add conversation state to the plan for the chat handler
+      data.plan.conversationState = newState;
     }
 
     return {

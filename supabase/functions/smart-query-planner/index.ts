@@ -1,10 +1,9 @@
-
 import { serve } from '@supabase/functions-js'
 import { OpenAI } from 'https://deno.land/x/openai@v4.20.1/mod.ts';
 
-// Initialize Supabase client
+// Initialize OpenAI client
 const openai = new OpenAI({
-  apiKey: process.env['OPENAI_API_KEY'],
+  apiKey: Deno.env.get('OPENAI_API_KEY'),
 });
 
 // Enable CORS
@@ -14,9 +13,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// We're updating just the main handler function to better handle temporal context
-// and to pass the reference date and topic preservation information correctly
-
 // Main function
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -25,7 +21,17 @@ serve(async (req) => {
   }
   
   try {
-    const { message, userId, conversationContext = [], timezoneOffset = 0, appContext = {}, checkForMultiQuestions = false, isFollowUp = false, referenceDate, preserveTopicContext = false } = await req.json();
+    const { 
+      message, 
+      userId, 
+      conversationContext = [], 
+      timezoneOffset = 0, 
+      appContext = {}, 
+      checkForMultiQuestions = false, 
+      isFollowUp = false, 
+      referenceDate, 
+      preserveTopicContext = false 
+    } = await req.json();
     
     console.log(`Request received:
       Message: ${message}
@@ -34,6 +40,7 @@ serve(async (req) => {
       Is follow-up: ${isFollowUp}
       Reference date provided: ${referenceDate ? 'yes' : 'no'}
       Preserve topic context: ${preserveTopicContext}
+      Intent type: ${appContext?.userContext?.intentType || 'not provided'}
     `);
     
     if (!message || !userId) {
@@ -68,17 +75,19 @@ serve(async (req) => {
       console.log(`Calculated date range for "${timeExpression}": ${JSON.stringify(calculatedDateRange)}`);
     }
 
-    // Create the query analysis request
+    // Enhanced system prompt with more intelligent conversation handling
     const queryAnalysisRequest = {
       role: "system",
-      content: generateSystemPrompt(appContext, calculatedDateRange, extractedTimeContext, preserveTopicContext)
+      content: generateEnhancedSystemPrompt(appContext, calculatedDateRange, extractedTimeContext, preserveTopicContext)
     };
     
     // Prepare the conversation context for the query analysis
     const queryAnalysisMessages = prepareQueryAnalysisMessages(queryAnalysisRequest, message, conversationContext);
     
-    // Get query plan from OpenAI
-    const plan = await getQueryPlanFromOpenAI(queryAnalysisMessages);
+    // Get query plan from OpenAI with enhanced temperature settings
+    const temperature = determineTemperature(appContext, isFollowUp);
+    const plan = await getQueryPlanFromOpenAI(queryAnalysisMessages, temperature);
+    
     if (!plan) {
       throw new Error('Failed to generate query plan');
     }
@@ -95,20 +104,26 @@ serve(async (req) => {
       }
     }
     
-    // If we need to preserve topic context, make sure it's included
+    // Handle topic context preservation
     if (preserveTopicContext && plan.plan && appContext?.userContext?.previousTopicContext) {
-      plan.plan.topic_context = appContext.userContext.previousTopicContext;
+      plan.plan.topicContext = appContext.userContext.previousTopicContext;
       console.log(`Preserved topic context in plan: ${appContext.userContext.previousTopicContext}`);
     }
     
     // Add the time context to the plan
     if (extractedTimeContext && plan.plan) {
-      plan.plan.previous_time_context = extractedTimeContext;
+      plan.plan.previousTimeContext = extractedTimeContext;
     }
     
     // Check if this might be a multi-part question
     if (checkForMultiQuestions && shouldSegmentQuery(message)) {
-      plan.plan.is_segmented = true;
+      plan.plan.isSegmented = true;
+    }
+    
+    // Check if we need clarification based on confidence score
+    if (plan.plan && !plan.plan.needsMoreContext && shouldRequestClarification(message, plan)) {
+      plan.plan.needsMoreContext = true;
+      plan.plan.clarificationReason = determineClarificationReason(message, plan);
     }
     
     return new Response(
@@ -124,8 +139,10 @@ serve(async (req) => {
   }
 });
 
-// Helper function to generate system prompt with better temporal and topic context
-function generateSystemPrompt(appContext: any, dateRange: any, timeContext: string | null, preserveTopicContext: boolean): string {
+/**
+ * Generate an enhanced system prompt with better conversation intelligence
+ */
+function generateEnhancedSystemPrompt(appContext: any, dateRange: any, timeContext: string | null, preserveTopicContext: boolean): string {
   // Get app information from the context
   const appInfo = appContext?.appInfo || {
     name: "Journal Analysis App",
@@ -133,54 +150,62 @@ function generateSystemPrompt(appContext: any, dateRange: any, timeContext: stri
     features: ["Journal Analysis", "Emotion Tracking"]
   };
   
-  // Get user context
+  // Get user context with enhanced properties
   const userContext = appContext?.userContext || {};
   const previousTimeContext = userContext.previousTimeContext || null;
   const previousTopicContext = userContext.previousTopicContext || null;
+  const intentType = userContext.intentType || 'new_query';
   
   let basePrompt = `You are an AI assistant for ${appInfo.name}, a ${appInfo.type} focused on mental health and self-reflection. 
 Your task is to analyze user queries about their journal entries and create a structured plan for searching and retrieving relevant information.`;
 
-  // Add information about previous context if available
+  // Add information about conversation intent and context
+  basePrompt += `\n\nCONVERSATION CONTEXT:`;
+  basePrompt += `\n- Query intent type: ${intentType}`;
+  
   if (previousTimeContext || previousTopicContext) {
-    basePrompt += `\n\nIMPORTANT CONTEXT FROM PREVIOUS CONVERSATION:`;
+    basePrompt += `\n- Previous conversation context:`;
     
     if (previousTimeContext) {
-      basePrompt += `\n- User's previous question was about time period: "${previousTimeContext}"`;
+      basePrompt += `\n  - Time period: "${previousTimeContext}"`;
     }
     
     if (previousTopicContext) {
-      basePrompt += `\n- User's previous question was about topic: "${previousTopicContext}"`;
+      basePrompt += `\n  - Topic: "${previousTopicContext}"`;
       
-      // If we're preserving topic context (meaning this is just a time-based follow-up),
-      // emphasize that the topic should be maintained
+      // Emphasize topic preservation for time follow-ups
       if (preserveTopicContext) {
-        basePrompt += `\n\nTHIS IS A TIME-BASED FOLLOW-UP QUESTION. The user is asking about a different time period but is still interested in the SAME TOPIC ("${previousTopicContext}").`;
+        basePrompt += `\n\nIMPORTANT: This appears to be a TIME-BASED FOLLOW-UP QUESTION. The user is asking about a different time period but is still interested in the SAME TOPIC ("${previousTopicContext}"). Maintain the topic context while updating the time reference.`;
       }
     }
   }
   
   // Add date range information if available from a time expression
   if (dateRange) {
-    basePrompt += `\n\nI've detected a time expression "${timeContext}" in the query. 
-Time range already calculated: 
+    basePrompt += `\n\nTIME EXPRESSION DETECTED: "${timeContext}"
+Time range calculated: 
 - Start date: ${dateRange.startDate}
 - End date: ${dateRange.endDate}
 - Period name: ${dateRange.periodName}`;
   }
 
+  // Add specific instructions based on intent type
+  if (intentType === 'new_query') {
+    basePrompt += `\n\nThis is a NEW QUERY without previous context. Focus on understanding the main question and identifying the required journal data.`;
+  } else if (intentType === 'clarification_response') {
+    basePrompt += `\n\nThis is a RESPONSE TO A CLARIFICATION request. Use this new information to refine the query understanding.`;
+  } else if (intentType === 'multi_part') {
+    basePrompt += `\n\nThis query contains MULTIPLE QUESTIONS or requests. Break it down into its component parts in your analysis.`;
+  }
+
   // Add complete instructions
   basePrompt += `\n\nYour task:
 1. Analyze the query to understand what type of information the user is seeking from their journal entries.
-2. Create a structured plan for searching and retrieving the relevant information.
-3. Return your analysis in a structured JSON format.`;
-  
-  // Add specific temporal context handling
-  basePrompt += `\n\nWhen handling follow-up questions about different time periods:
-- If the user is asking about a new time period (e.g. "What about last month?") but their previous question was about a specific topic, MAINTAIN THE SAME TOPIC while changing just the time period.
-- Do not switch to a general analysis when the user is simply changing the time frame.`;
+2. Identify if clarification is needed before proceeding with the search.
+3. Create a structured plan for searching and retrieving the relevant information.
+4. Return your analysis in a structured JSON format.`;
 
-  // Add output format instructions
+  // Add enhanced output format instructions
   basePrompt += `\n\nOutput your plan as a JSON object with the following structure:
 {
   "plan": {
@@ -196,10 +221,12 @@ Time range already calculated:
       "entities": [{"type": "PERSON", "name": "name"}]
     },
     "match_count": number,
-    "needs_data_aggregation": boolean,
-    "needs_more_context": boolean,
-    "is_segmented": boolean,
-    "topic_context": "the main topic of the query",
+    "needsMoreContext": boolean,
+    "clarificationReason": "string explaining why clarification is needed",
+    "ambiguities": ["list of ambiguous aspects of the query"],
+    "isSegmented": boolean,
+    "topicContext": "the main topic of the query",
+    "confidenceScore": number between 0 and 1,
     "reasoning": "explanation of the plan"
   },
   "queryType": "journal_specific" | "general_analysis" | "emotional_analysis" | "pattern_detection" | "personality_reflection"
@@ -209,7 +236,7 @@ Time range already calculated:
 }
 
 /**
- * Prepare conversation context for query analysis
+ * Prepare conversation context for query analysis with improved context handling
  */
 function prepareQueryAnalysisMessages(queryAnalysisRequest: any, message: string, conversationContext: any[]): any[] {
   const userMessage = { role: "user", content: message };
@@ -217,8 +244,20 @@ function prepareQueryAnalysisMessages(queryAnalysisRequest: any, message: string
   // Add the system prompt
   const messages = [queryAnalysisRequest];
   
-  // Add previous conversation context
-  for (const contextMessage of conversationContext) {
+  // Only include relevant previous conversation context
+  // For very long contexts, prioritize the most recent exchanges
+  let contextToInclude = conversationContext;
+  
+  if (conversationContext.length > 6) {
+    // Take first message (likely contains system info) and last 5 messages
+    contextToInclude = [
+      conversationContext[0],
+      ...conversationContext.slice(-5)
+    ];
+  }
+  
+  // Add filtered conversation context
+  for (const contextMessage of contextToInclude) {
     messages.push(contextMessage);
   }
   
@@ -229,17 +268,36 @@ function prepareQueryAnalysisMessages(queryAnalysisRequest: any, message: string
 }
 
 /**
- * Get query plan from OpenAI
+ * Determine appropriate temperature setting based on context
  */
-async function getQueryPlanFromOpenAI(messages: any): Promise<any> {
+function determineTemperature(appContext: any, isFollowUp: boolean): number {
+  const intentType = appContext?.userContext?.intentType || 'new_query';
+  const needsClarity = appContext?.userContext?.needsClarity || false;
+  
+  // Use higher temperature for clarification questions to be more creative
+  if (needsClarity) return 0.7;
+  
+  // Use lower temperature for time-based follow-ups to be more precise
+  if (intentType === 'followup_time') return 0.0;
+  
+  // Use lower temperature for factual analysis
+  if (intentType === 'journal_specific') return 0.2;
+  
+  // Default to moderate temperature
+  return 0.4;
+}
+
+/**
+ * Get query plan from OpenAI with enhanced parameters
+ */
+async function getQueryPlanFromOpenAI(messages: any, temperature: number = 0.2): Promise<any> {
   try {
-    console.log(`Calling OpenAI with messages: ${JSON.stringify(messages).substring(0, 200)}...`);
+    console.log(`Calling OpenAI with temperature ${temperature}`);
     
     const completion = await openai.chat.completions.create({
       model: 'gpt-4-1106-preview',
       messages: messages,
-      temperature: 0.0,
-      // max_tokens: 500,
+      temperature: temperature,
       response_format: { type: "json_object" }
     });
     
@@ -262,6 +320,46 @@ async function getQueryPlanFromOpenAI(messages: any): Promise<any> {
     console.error('Error calling OpenAI:', error);
     return { plan: null, queryType: 'journal_specific' };
   }
+}
+
+/**
+ * Check if clarification should be requested based on message and plan
+ */
+function shouldRequestClarification(message: string, plan: any): boolean {
+  // Check message characteristics
+  if (message.length < 10 && !message.includes('?')) return true;
+  
+  // Check if the plan has sufficient filters defined
+  const filters = plan?.plan?.filters || {};
+  if (Object.keys(filters).length === 0) {
+    return message.length < 15; // Only request clarification for short messages with no filters
+  }
+  
+  // Check confidence score if available
+  const confidenceScore = plan?.plan?.confidenceScore;
+  if (confidenceScore !== undefined && confidenceScore < 0.4) return true;
+  
+  return false;
+}
+
+/**
+ * Determine the reason clarification is needed
+ */
+function determineClarificationReason(message: string, plan: any): string {
+  if (message.length < 10 && !message.includes('?')) {
+    return "The query is very short and lacks specific details about what you're looking for.";
+  }
+  
+  const filters = plan?.plan?.filters || {};
+  if (Object.keys(filters).length === 0 && message.length < 15) {
+    return "I'm not sure what specific aspect of your journal entries you're interested in.";
+  }
+  
+  if (plan?.plan?.ambiguities && plan.plan.ambiguities.length > 0) {
+    return `There are some ambiguities in your question: ${plan.plan.ambiguities.join(', ')}.`;
+  }
+  
+  return "I need more details to provide a relevant answer to your question.";
 }
 
 /**

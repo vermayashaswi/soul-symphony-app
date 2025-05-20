@@ -1,16 +1,19 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { ConversationStateManager } from '@/utils/chat/conversationStateManager';
+import { extractConversationInsights } from '@/utils/chat/messageProcessor';
 
 const Chat = () => {
   const { user } = useAuth();
   const navigate = useNavigate();
   const { toast } = useToast();
   const { translate, currentLanguage } = useTranslation();
+  const [isInitialized, setIsInitialized] = useState(false);
 
   // Pre-translate common chat-related strings more comprehensively 
   useEffect(() => {
@@ -56,11 +59,20 @@ const Chat = () => {
           await translate("last month", "en");
           await translate("previous month", "en");
           
+          // New clarification-related phrases
+          await translate("I need more information", "en");
+          await translate("Could you clarify", "en");
+          await translate("Can you be more specific", "en");
+          await translate("Which time period", "en");
+          await translate("What aspect specifically", "en");
+          
           console.log("Chat strings pre-translated successfully");
         } catch (e) {
           console.error("Error pre-translating chat strings:", e);
         }
       }
+      
+      setIsInitialized(true);
     };
     
     initializeLanguageSupport();
@@ -97,13 +109,15 @@ const Chat = () => {
     }
   }, [user, toast]);
   
-  // Check and clean up any stale 'processing' threads
+  // Clean up stale processing sessions and initialize metadata for existing threads
   useEffect(() => {
-    const cleanupStaleSessions = async () => {
+    const initializeChat = async () => {
       if (!user?.id) return;
       
       try {
-        // Find any threads that might be stuck in processing status
+        console.log("Initializing chat system...");
+        
+        // Clean up stale sessions
         const { data: staleSessions, error } = await supabase
           .from('chat_threads')
           .select('id')
@@ -115,7 +129,6 @@ const Chat = () => {
           return;
         }
         
-        // Reset any threads that were left in processing status
         if (staleSessions && staleSessions.length > 0) {
           console.log(`Found ${staleSessions.length} stale processing sessions, cleaning up...`);
           
@@ -125,7 +138,6 @@ const Chat = () => {
               .update({ processing_status: 'idle' })
               .eq('id', session.id);
               
-            // Also clean up any processing messages
             await supabase
               .from('chat_messages')
               .delete()
@@ -133,62 +145,74 @@ const Chat = () => {
               .eq('is_processing', true);
           }
         }
-      } catch (err) {
-        console.error("Error cleaning up stale sessions:", err);
-      }
-    };
-    
-    cleanupStaleSessions();
-  }, [user?.id]);
-
-  // Add column for storing temporal context if not exists
-  useEffect(() => {
-    const checkAndUpdateMetadata = async () => {
-      if (!user?.id) return;
-      
-      try {
-        // Check if metadata is being used in threads
-        const { data: threads, error } = await supabase
+        
+        // Initialize metadata for existing threads without it
+        const { data: threads } = await supabase
           .from('chat_threads')
           .select('id')
           .eq('user_id', user.id)
-          .limit(5);
+          .is('metadata', null)
+          .limit(10);
           
-        if (error) {
-          console.error("Error checking thread metadata:", error);
-          return;
-        }
-        
-        // If threads exist, ensure they have metadata for storing context
         if (threads && threads.length > 0) {
+          console.log(`Initializing metadata for ${threads.length} threads`);
+          
           for (const thread of threads) {
-            // This will add a default metadata JSON if it doesn't exist
+            // Get messages to extract context
+            const { data: messages } = await supabase
+              .from('chat_messages')
+              .select('content, sender, created_at')
+              .eq('thread_id', thread.id)
+              .order('created_at', { ascending: true });
+              
+            let topicContext = null;
+            let timeContext = null;
+            
+            if (messages && messages.length > 0) {
+              // Try to extract insights from messages
+              const insights = extractConversationInsights(messages);
+              
+              if (insights.topics.length > 0) {
+                topicContext = insights.topics[0];
+              }
+              
+              if (insights.timeReferences.length > 0) {
+                timeContext = insights.timeReferences[0];
+              }
+            }
+            
+            // Initialize with default metadata
             await supabase
               .from('chat_threads')
               .update({
-                metadata: { 
-                  timeContext: null,
-                  topicContext: null,
+                metadata: {
+                  timeContext,
+                  topicContext,
+                  intentType: 'new_query',
+                  confidenceScore: 1.0,
+                  needsClarity: false,
+                  ambiguities: [],
+                  lastQueryType: 'journal_specific',
                   lastUpdated: new Date().toISOString()
                 }
               })
-              .eq('id', thread.id)
-              .is('metadata', null);
+              .eq('id', thread.id);
           }
-          
-          console.log("Initialized metadata for threads if needed");
         }
+        
+        console.log("Chat system initialization complete");
       } catch (err) {
-        console.error("Error updating thread metadata:", err);
+        console.error("Error initializing chat system:", err);
       }
     };
     
-    checkAndUpdateMetadata();
-  }, [user?.id]);
+    if (user?.id && isInitialized) {
+      initializeChat();
+    }
+  }, [user?.id, isInitialized]);
 
-  // Add CSS override to hide duplicate close button in chat sidebar
+  // Add CSS override to improve chat UI
   useEffect(() => {
-    // Create a style element to inject CSS
     const style = document.createElement('style');
     style.innerHTML = `
       .chat-sidebar-close-duplicate {
@@ -239,10 +263,31 @@ const Chat = () => {
       .empty-chat-suggestion:first-child {
         position: relative;
       }
+      
+      /* Add styling for clarification questions */
+      .assistant-clarification {
+        border-left: 3px solid var(--primary) !important;
+        background-color: rgba(var(--primary-rgb), 0.05) !important;
+        font-style: italic;
+      }
+      
+      /* Add special styling for follow-up context */
+      .context-preserved {
+        position: relative;
+      }
+      
+      .context-preserved::before {
+        content: '';
+        position: absolute;
+        top: -5px;
+        left: 0;
+        right: 0;
+        height: 2px;
+        background: linear-gradient(90deg, transparent, rgba(var(--primary-rgb), 0.3), transparent);
+      }
     `;
     document.head.appendChild(style);
     
-    // Clean up on unmount
     return () => {
       document.head.removeChild(style);
     };
