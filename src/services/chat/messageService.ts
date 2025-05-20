@@ -496,6 +496,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         // Add aliases for backward compatibility - ensure these are arrays even if the database returns them as strings
         references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [], 
         reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
+        // Ensure analysis_data is properly typed (it could be any JSON structure)
         analysis: msg.analysis_data,
         analysis_data: msg.analysis_data,
         // Convert sub_query_responses to proper type
