@@ -10,9 +10,22 @@ export interface ChatThread {
   metadata?: {
     timeContext?: string | null;
     topicContext?: string | null;
+    intentType?: string;
+    confidenceScore?: number;
+    needsClarity?: boolean;
+    ambiguities?: string[];
+    domainContext?: string | null;
     lastUpdated?: string;
     [key: string]: any;
   };
+}
+
+// MessageResponse type for sendMessage function
+export interface MessageResponse {
+  response: string;
+  status: string;
+  messageId?: string;
+  error?: string;
 }
 
 // Sub-query response type definition
@@ -28,7 +41,7 @@ export interface ChatMessage {
   thread_id: string;
   content: string;
   sender: 'user' | 'assistant' | 'error';
-  role?: 'user' | 'assistant' | 'error';
+  role: 'user' | 'assistant' | 'error';  // Make this required to match types/chat.ts
   created_at: string;
   reference_entries?: any[];
   references?: any[];

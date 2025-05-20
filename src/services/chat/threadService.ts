@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 import { ChatThread } from './types';
 import { ConversationStateManager, IntentType } from '@/utils/chat/conversationStateManager';
@@ -158,7 +157,7 @@ export async function getPlanForQuery(
       previousState = await stateManager.loadState();
       
       // Analyze the intent of this query
-      intentType = await stateManager.analyzeIntent(query);
+      intentType = stateManager.analyzeIntent(query);
       console.log(`Detected query intent: ${intentType}`);
     }
 

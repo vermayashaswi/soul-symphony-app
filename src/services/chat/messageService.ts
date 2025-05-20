@@ -1,6 +1,7 @@
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
+import { Json } from '@/integrations/supabase/types';
 
 /**
  * Send a message to the AI assistant and get a response
@@ -68,9 +69,12 @@ export async function sendMessage(
     
     const metadata = threadData?.metadata || {};
     
+    // Safely access metadata properties
+    const metadataObj = typeof metadata === 'object' && metadata !== null ? metadata : {};
+    
     // Check if this appears to be a follow-up query with a time reference
     const isTimeFollowUp = detectTimeFollowUp(message);
-    const preserveTopicContext = isTimeFollowUp && metadata?.topicContext;
+    const preserveTopicContext = isTimeFollowUp && metadataObj.topicContext;
     
     // Prepare function call parameter data with enhanced context
     const queryPlannerParams = {
@@ -85,12 +89,12 @@ export async function sendMessage(
           features: ["Journal Analysis", "Emotion Tracking", "Mental Wellbeing", "Pattern Recognition"]
         },
         userContext: {
-          previousTimeContext: metadata?.timeContext || null,
-          previousTopicContext: metadata?.topicContext || null,
-          intentType: metadata?.intentType || 'new_query',
-          needsClarity: metadata?.needsClarity || false,
-          confidenceScore: metadata?.confidenceScore || null,
-          ambiguities: metadata?.ambiguities || []
+          previousTimeContext: metadataObj.timeContext || null,
+          previousTopicContext: metadataObj.topicContext || null,
+          intentType: metadataObj.intentType || 'new_query',
+          needsClarity: metadataObj.needsClarity || false,
+          confidenceScore: metadataObj.confidenceScore || null,
+          ambiguities: metadataObj.ambiguities || []
         }
       },
       checkForMultiQuestions: true,
@@ -105,11 +109,11 @@ export async function sendMessage(
     await supabase.from('chat_messages').insert({
       id: processingMessageId,
       thread_id: threadId,
-      content: "Analyzing your question...",
       sender: 'assistant',
       role: 'assistant',
-      created_at: new Date().toISOString(),
-      is_processing: true
+      content: "Analyzing your question...",
+      is_processing: true,
+      created_at: new Date().toISOString()
     });
     
     // Step 1: Get query plan to determine search strategy
@@ -130,8 +134,8 @@ export async function sendMessage(
       // Update the thread metadata
       await updateThreadMetadata(threadId, {
         intentType: 'direct_response',
-        timeContext: metadata?.timeContext,
-        topicContext: metadata?.topicContext,
+        timeContext: metadataObj.timeContext,
+        topicContext: metadataObj.topicContext,
         confidenceScore: 1.0,
         needsClarity: false,
         lastQueryType: 'direct_response',
@@ -170,8 +174,8 @@ export async function sendMessage(
       // Update thread metadata to track that we need clarity
       await updateThreadMetadata(threadId, {
         intentType: 'needs_clarification',
-        timeContext: queryPlan.previousTimeContext || metadata?.timeContext,
-        topicContext: queryPlan.topicContext || metadata?.topicContext,
+        timeContext: queryPlan.previousTimeContext || metadataObj.timeContext,
+        topicContext: queryPlan.topicContext || metadataObj.topicContext,
         confidenceScore: queryPlan.confidenceScore || 0.3,
         needsClarity: true,
         ambiguities: queryPlan.ambiguities || [],
@@ -265,8 +269,8 @@ export async function sendMessage(
     // Update thread metadata
     const updatedMetadata = {
       intentType: 'answered',
-      timeContext: dateRange?.periodName || metadata?.timeContext,
-      topicContext: queryPlan.topicContext || metadata?.topicContext,
+      timeContext: dateRange?.periodName || metadataObj.timeContext,
+      topicContext: queryPlan.topicContext || metadataObj.topicContext,
       confidenceScore: queryPlan.confidenceScore || 0.8,
       needsClarity: false,
       lastQueryType: queryType,
@@ -345,7 +349,7 @@ async function processMultiPartQuery(
     }
     
     // Process each sub-query
-    const subQueryResponses = [];
+    const subQueryResponses: SubQueryResponse[] = [];
     for (const subQuery of subQueries) {
       const queryResponse = await supabase.functions.invoke('chat-with-rag', {
         body: {
@@ -464,17 +468,34 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
     if (error) throw error;
     
     // Process data to ensure types are correct
-    return (data || []).map((msg) => ({
-      ...msg,
-      sender: msg.sender as 'user' | 'assistant' | 'error',
-      role: msg.role as 'user' | 'assistant' | 'error',
-      // Add aliases for backward compatibility
-      references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
-      analysis: msg.analysis_data,
-      hasNumericResult: msg.has_numeric_result,
-      // Ensure sub_query_responses is always an array
-      sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
-    } as ChatMessage));
+    return (data || []).map((msg: any) => {
+      // Create a properly typed ChatMessage object
+      const chatMessage: ChatMessage = {
+        id: msg.id,
+        thread_id: msg.thread_id,
+        content: msg.content,
+        sender: msg.sender as 'user' | 'assistant' | 'error',
+        role: msg.role as 'user' | 'assistant' | 'error',
+        created_at: msg.created_at,
+        // Add aliases for backward compatibility
+        references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
+        reference_entries: msg.reference_entries,
+        analysis: msg.analysis_data,
+        analysis_data: msg.analysis_data,
+        hasNumericResult: msg.has_numeric_result,
+        has_numeric_result: msg.has_numeric_result,
+        // Ensure sub_query_responses is properly typed
+        sub_query_responses: Array.isArray(msg.sub_query_responses) 
+          ? msg.sub_query_responses.map((sqr: any) => ({
+              query: sqr.query || '',
+              response: sqr.response || ''
+            })) 
+          : [],
+        is_processing: msg.is_processing
+      };
+      
+      return chatMessage;
+    });
   } catch (error) {
     console.error("Error fetching thread messages:", error);
     return [];

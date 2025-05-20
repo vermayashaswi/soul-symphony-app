@@ -2,18 +2,23 @@
 import { ChatMessage } from '@/types/chat';
 import { analyzeMentalHealthContent, extractConversationInsights, isPersonalizedHealthQuery } from './messageProcessor';
 
+// Export the IntentType type
+export type IntentType = 'new_query' | 'followup_time' | 'multi_part' | 'mental_health' | 'clarification_response' | 'direct_response';
+
 export class ConversationStateManager {
   messages: ChatMessage[];
   timeContext: string | null;
   topicContext: string | null;
   confidenceScore: number;
   needsClarity: boolean;
-  intentType: string;
+  intentType: IntentType;
   ambiguities: string[];
   domainContext: string | null;
+  threadId: string | null;
+  userId: string | null;
   
-  constructor(messages: ChatMessage[] = []) {
-    this.messages = messages;
+  constructor(threadId?: string, userId?: string) {
+    this.messages = [];
     this.timeContext = null;
     this.topicContext = null;
     this.confidenceScore = 1.0;
@@ -21,10 +26,8 @@ export class ConversationStateManager {
     this.intentType = 'new_query';
     this.ambiguities = [];
     this.domainContext = null;
-    
-    if (messages.length > 0) {
-      this.analyzeConversationState();
-    }
+    this.threadId = threadId || null;
+    this.userId = userId || null;
   }
   
   /**
@@ -93,9 +96,9 @@ export class ConversationStateManager {
   }
   
   /**
-   * Analyze the intent of a message
+   * Analyze the intent of a message - Make it public for external use
    */
-  private analyzeIntent(message: string): void {
+  analyzeIntent(message: string): IntentType {
     const lowerMessage = message.toLowerCase();
     
     // Check if this is a clarification response
@@ -106,31 +109,32 @@ export class ConversationStateManager {
       if (prevAssistant && this.containsClarificationRequest(prevAssistant.content)) {
         this.intentType = 'clarification_response';
         this.needsClarity = false;
-        return;
+        return this.intentType;
       }
     }
     
     // Check if this is a time-based follow-up
     if (this.isTimeFollowUp(message)) {
       this.intentType = 'followup_time';
-      return;
+      return this.intentType;
     }
     
     // Check if this is a multi-part question
     if (this.isMultiPartQuestion(message)) {
       this.intentType = 'multi_part';
-      return;
+      return this.intentType;
     }
     
     // Check if this is a mental health query
     if (analyzeMentalHealthContent(message) > 0.4) {
       this.intentType = 'mental_health';
       this.domainContext = 'mental_health';
-      return;
+      return this.intentType;
     }
     
     // Default to new query
     this.intentType = 'new_query';
+    return this.intentType;
   }
   
   /**
@@ -217,5 +221,80 @@ export class ConversationStateManager {
     this.needsClarity = metadata.needsClarity || false;
     this.ambiguities = metadata.ambiguities || [];
     this.domainContext = metadata.domainContext || null;
+  }
+  
+  /**
+   * Load state from database - public method for threadService
+   */
+  async loadState(): Promise<Record<string, any> | null> {
+    if (!this.threadId || !this.userId) return null;
+    
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { data, error } = await supabase
+        .from('chat_threads')
+        .select('metadata')
+        .eq('id', this.threadId)
+        .eq('user_id', this.userId)
+        .single();
+        
+      if (error || !data) {
+        console.error('Error loading conversation state:', error);
+        return null;
+      }
+      
+      const metadata = data.metadata || {};
+      this.loadFromMetadata(metadata);
+      return metadata;
+    } catch (error) {
+      console.error('Error loading conversation state:', error);
+      return null;
+    }
+  }
+  
+  /**
+   * Create new state object from analysis
+   */
+  async createState(query: string, queryPlan: any, intentType: IntentType): Promise<Record<string, any>> {
+    // Combine existing state with new query plan insights
+    return {
+      timeContext: queryPlan.timeContext || this.timeContext,
+      topicContext: queryPlan.topicContext || this.topicContext,
+      intentType: intentType,
+      confidenceScore: queryPlan.confidenceScore || 0.8,
+      needsClarity: queryPlan.needsMoreContext || false,
+      ambiguities: queryPlan.ambiguities || [],
+      domainContext: queryPlan.domainContext || this.domainContext,
+      lastUpdated: new Date().toISOString()
+    };
+  }
+  
+  /**
+   * Save state to database
+   */
+  async saveState(state: Record<string, any>): Promise<boolean> {
+    if (!this.threadId || !this.userId) return false;
+    
+    try {
+      const { supabase } = await import('@/integrations/supabase/client');
+      const { error } = await supabase
+        .from('chat_threads')
+        .update({ 
+          metadata: state,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', this.threadId)
+        .eq('user_id', this.userId);
+        
+      if (error) {
+        console.error('Error saving conversation state:', error);
+        return false;
+      }
+      
+      return true;
+    } catch (error) {
+      console.error('Error saving conversation state:', error);
+      return false;
+    }
   }
 }
