@@ -1,5 +1,6 @@
+
 import { serve } from '@supabase/functions-js'
-import OpenAI from 'openai';
+import { OpenAI } from 'https://deno.land/x/openai@v4.20.1/mod.ts';
 
 // Initialize Supabase client
 const openai = new OpenAI({
