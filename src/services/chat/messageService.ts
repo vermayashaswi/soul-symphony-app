@@ -1,4 +1,3 @@
-
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -560,9 +559,9 @@ export const saveMessage = async (
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: data.role as 'user' | 'assistant' | 'error',
       created_at: data.created_at,
-      // Add safe aliases for backward compatibility
+      // Add safe aliases for backward compatibility - ensure these are arrays
       references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
-      reference_entries: data.reference_entries,
+      reference_entries: Array.isArray(data.reference_entries) ? data.reference_entries : [],
       analysis: data.analysis_data,
       analysis_data: data.analysis_data,
       hasNumericResult: data.has_numeric_result,
