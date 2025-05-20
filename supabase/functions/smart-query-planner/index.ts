@@ -1,4 +1,4 @@
-import { serve } from '@supabase/functions-js'
+import { serve } from 'https://deno.land/std@0.168.0/http/server.ts'
 import { OpenAI } from 'https://deno.land/x/openai@v4.20.1/mod.ts';
 
 // Initialize OpenAI client
@@ -614,7 +614,7 @@ function detectTimeExpression(query: string): string | null {
   
   // Special case for standalone time expressions as follow-ups
   if (/^(today|yesterday|this week|last week|this month|last month|this year|last year)(\?|\.|$)/i.test(lowerQuery)) {
-    return lowerQuery.match(/^(today|yesterday|this week|last week|this month|last month|this year|last year)/i)![0];
+    return lowerQuery.match(/^(today|yesterday|this week|last week|this month|last month|this year)/i)![0];
   }
   
   return null;
