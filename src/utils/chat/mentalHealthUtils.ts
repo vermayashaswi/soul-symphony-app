@@ -117,7 +117,7 @@ export async function analyzeMentalHealthEntries(userId: string, timeRange?: { s
     
     // Get entry samples for personalized context
     const entrySamples = entries.slice(0, 3).map(entry => ({
-      content: entry.refined_text || entry.transcription_text,
+      content: entry["refined text"] || entry["transcription text"],
       created_at: entry.created_at,
       sentiment: entry.sentiment,
       themes: entry.master_themes

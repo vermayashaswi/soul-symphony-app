@@ -1,6 +1,7 @@
+
 // This file contains functions to analyze the type of query a user is asking
 
-type QueryTypes = {
+export type QueryTypes = {
   isEmotionFocused: boolean;
   isQuantitative: boolean;
   isWhyQuestion: boolean;
