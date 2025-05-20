@@ -1,3 +1,4 @@
+
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -81,6 +82,9 @@ export async function sendMessage(
     const isTimeFollowUp = detectTimeFollowUp(message);
     const preserveTopicContext = isTimeFollowUp && metadataObj.topicContext;
     
+    // Check if the message appears to be mental health related
+    const isMentalHealthQuery = detectMentalHealthQuery(message);
+    
     // Prepare function call parameter data with enhanced context
     const queryPlannerParams = {
       message,
@@ -99,7 +103,8 @@ export async function sendMessage(
           intentType: metadataObj.intentType || 'new_query',
           needsClarity: metadataObj.needsClarity || false,
           confidenceScore: metadataObj.confidenceScore || null,
-          ambiguities: metadataObj.ambiguities || []
+          ambiguities: metadataObj.ambiguities || [],
+          isMentalHealthQuery: isMentalHealthQuery
         }
       },
       checkForMultiQuestions: true,
@@ -210,6 +215,8 @@ export async function sendMessage(
       processingContent = "Looking for patterns in your journal entries...";
     } else if (queryType === 'personality_reflection') {
       processingContent = "Reflecting on personality insights from your journal...";
+    } else if (queryType === 'mental_health_analysis') {
+      processingContent = "Analyzing your journal entries for mental health insights...";
     }
     
     // Update the processing message with the appropriate content
@@ -232,6 +239,43 @@ export async function sendMessage(
       };
     }
     
+    // First, verify that this user has journal entries in the database
+    const { count: entryCount, error: countError } = await supabase
+      .from('Journal Entries')
+      .select('id', { count: true, head: true })
+      .eq('user_id', userId);
+    
+    if (countError) {
+      console.error('Error checking for user journal entries:', countError);
+    }
+    
+    // If no entries found and this is a mental health query, provide a helpful response
+    if ((entryCount === 0 || !entryCount) && isMentalHealthQuery) {
+      const noEntriesResponse = 
+        "I don't see any journal entries in your account yet. To provide personalized mental health advice, " +
+        "I need to analyze your journal entries. Would you like to create a journal entry first? " +
+        "That will help me give you more tailored recommendations based on your experiences and emotions.";
+      
+      // Update the processing message with the response
+      await supabase.from('chat_messages')
+        .update({
+          content: noEntriesResponse,
+          is_processing: false
+        })
+        .eq('id', processingMessageId);
+      
+      // Update thread status
+      await supabase.from('chat_threads')
+        .update({ processing_status: 'idle' })
+        .eq('id', threadId);
+      
+      return {
+        response: noEntriesResponse,
+        status: 'success',
+        messageId: processingMessageId,
+      };
+    }
+    
     // Step 2: Send to chat-with-rag endpoint for processing (Enhanced)
     // First check if we should treat this as a multi-part query
     let finalResponse;
@@ -251,7 +295,8 @@ export async function sendMessage(
           timeRange: dateRange,
           referenceDate,
           conversationContext,
-          queryPlan
+          queryPlan,
+          isMentalHealthQuery
         }
       });
       
@@ -261,6 +306,13 @@ export async function sendMessage(
       }
       
       finalResponse = queryResponse.data.data;
+      
+      // If we got a response but it's empty or insufficient for mental health query
+      if (isMentalHealthQuery && (!finalResponse || finalResponse.trim() === '' || finalResponse.includes("I don't have enough information"))) {
+        finalResponse = "Based on the journal entries I have access to, I don't have enough information to provide specific mental health recommendations. " +
+          "To give you better personalized advice, could you add more journal entries about your feelings, challenges, and daily experiences? " +
+          "In the meantime, some general mental health practices include regular exercise, adequate sleep, mindfulness meditation, and connecting with others.";
+      }
     }
     
     // Replace the processing message with the final response
@@ -309,6 +361,26 @@ export async function sendMessage(
       error: error.message,
     };
   }
+}
+
+/**
+ * Detect if a message is mental health related
+ */
+function detectMentalHealthQuery(message: string): boolean {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // Mental health keywords and patterns
+  const mentalHealthPatterns = [
+    /mental\s+health/i,
+    /\b(anxiety|anxious|depress(ed|ion)|stress(ed)?|mood|emotion|therapy)\b/i,
+    /\b(self[\s-]care|well[\s-]being|wellbeing|coping)\b/i,
+    /\bhow\s+(to|can|do)\s+I\s+(feel|get|cope|manage|improve|handle)\b/i,
+    /what\s+(is|should)\s+(best|good|helpful|recommended)\s+for\s+my\s+(mental|emotional)/i,
+    /what\s+(should|can|must)\s+i\s+do/i
+  ];
+  
+  // Check if any pattern matches
+  return mentalHealthPatterns.some(pattern => pattern.test(lowerMessage));
 }
 
 /**

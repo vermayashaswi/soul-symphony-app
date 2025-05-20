@@ -4,6 +4,7 @@ import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
 import { motion } from "framer-motion";
 import { useIsMobile } from "@/hooks/use-mobile";
 import { useJournalEntries } from "@/hooks/use-journal-entries";
+import { useMentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { useNavigate } from "react-router-dom";
@@ -47,6 +48,9 @@ export default function SmartChat() {
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldRenderMobile = isMobile || mobileDemo;
+
+  // Add mental health insights
+  const { insights: mentalHealthInsights } = useMentalHealthInsights(user?.id);
 
   useEffect(() => {
     document.title = "Roha | SOULo";
@@ -347,7 +351,9 @@ export default function SmartChat() {
               </Button>
             </div>
           )}
-          <SmartChatInterface />
+          <SmartChatInterface 
+            mentalHealthInsights={mentalHealthInsights} 
+          />
         </div>
       </motion.div>
       
@@ -387,6 +393,7 @@ export default function SmartChat() {
             onSelectThread={handleSelectThread}
             onCreateNewThread={createNewThread}
             userId={user?.id}
+            mentalHealthInsights={mentalHealthInsights}
           />
         </div>
       </motion.div>
