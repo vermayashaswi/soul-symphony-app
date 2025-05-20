@@ -1,3 +1,4 @@
+
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -492,9 +493,9 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         sender: msg.sender as 'user' | 'assistant' | 'error',
         role: msg.role as 'user' | 'assistant' | 'error',
         created_at: msg.created_at,
-        // Add aliases for backward compatibility
-        references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
-        reference_entries: msg.reference_entries,
+        // Add aliases for backward compatibility - ensure these are arrays even if the database returns them as strings
+        references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [], 
+        reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
         analysis: msg.analysis_data,
         analysis_data: msg.analysis_data,
         hasNumericResult: msg.has_numeric_result,
