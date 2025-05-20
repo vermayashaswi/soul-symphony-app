@@ -1,4 +1,4 @@
-import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse } from './types';
+import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, isSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { Json } from '@/integrations/supabase/types';
@@ -69,8 +69,13 @@ export async function sendMessage(
     
     const metadata = threadData?.metadata || {};
     
-    // Safely access metadata properties
-    const metadataObj = typeof metadata === 'object' && metadata !== null ? metadata : {};
+    // Safely access metadata properties with type checking
+    let metadataObj: Record<string, any> = {};
+    if (isThreadMetadata(metadata)) {
+      metadataObj = metadata;
+    } else {
+      console.warn('Thread metadata is not in expected format:', metadata);
+    }
     
     // Check if this appears to be a follow-up query with a time reference
     const isTimeFollowUp = detectTimeFollowUp(message);
@@ -416,7 +421,7 @@ async function processMultiPartQuery(
 /**
  * Update thread metadata with new values
  */
-async function updateThreadMetadata(threadId: string, updates: any) {
+async function updateThreadMetadata(threadId: string, updates: Record<string, any>) {
   try {
     // First get existing metadata
     const { data, error } = await supabase
@@ -432,8 +437,18 @@ async function updateThreadMetadata(threadId: string, updates: any) {
     
     // Merge existing metadata with updates
     const currentMetadata = data?.metadata || {};
+    let metadataObj: Record<string, any> = {};
+    
+    // Ensure currentMetadata is an object before merging
+    if (isThreadMetadata(currentMetadata)) {
+      metadataObj = { ...currentMetadata };
+    } else {
+      console.warn('Thread metadata is not in expected format:', currentMetadata);
+    }
+    
+    // Merge with updates
     const updatedMetadata = {
-      ...currentMetadata,
+      ...metadataObj,
       ...updates
     };
     
@@ -526,7 +541,7 @@ export const saveMessage = async (
       analysis_data: analysis || null,
       has_numeric_result: hasNumericResult || false,
       // Ensure sub_query_responses is always an array if present
-      sub_query_responses: [] // Default empty array
+      sub_query_responses: [] as SubQueryResponse[] // Default empty array with correct type
     };
     
     // Insert the message
@@ -542,17 +557,23 @@ export const saveMessage = async (
       throw new Error("No data returned from message insert");
     }
     
-    // Convert the database response to our ChatMessage type
+    // Convert the database response to our ChatMessage type with proper type safety
     const chatMessage: ChatMessage = {
-      ...data,
+      id: data.id,
+      thread_id: data.thread_id,
+      content: data.content,
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: data.role as 'user' | 'assistant' | 'error',
-      // Add aliases for backward compatibility
+      created_at: data.created_at,
+      // Add safe aliases for backward compatibility
       references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
+      reference_entries: data.reference_entries,
       analysis: data.analysis_data,
+      analysis_data: data.analysis_data,
       hasNumericResult: data.has_numeric_result,
-      // Ensure sub_query_responses is always an array
-      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
+      has_numeric_result: data.has_numeric_result,
+      // Ensure sub_query_responses is always a properly typed array
+      sub_query_responses: processSubQueryResponses(data.sub_query_responses)
     };
     
     // If this is an interactive message with options, add those properties
@@ -573,6 +594,23 @@ export const saveMessage = async (
     return null;
   }
 };
+
+/**
+ * Process and convert sub-query responses to the correct type
+ */
+function processSubQueryResponses(data: any): SubQueryResponse[] {
+  if (!data) return [];
+  
+  if (Array.isArray(data)) {
+    return data.filter(item => isSubQueryResponse(item)).map(item => ({
+      query: item.query || '',
+      response: item.response || '',
+      references: item.references || []
+    }));
+  }
+  
+  return [];
+}
 
 /**
  * Creates a new thread

@@ -1,6 +1,8 @@
 
 import { ChatMessage } from '@/types/chat';
 import { analyzeMentalHealthContent, extractConversationInsights, isPersonalizedHealthQuery } from './messageProcessor';
+import { Json } from '@/integrations/supabase/types';
+import { isThreadMetadata } from '@/services/chat/types';
 
 // Export the IntentType type
 export type IntentType = 'new_query' | 'followup_time' | 'multi_part' | 'mental_health' | 'clarification_response' | 'direct_response';
@@ -98,7 +100,7 @@ export class ConversationStateManager {
   /**
    * Analyze the intent of a message - Make it public for external use
    */
-  analyzeIntent(message: string): IntentType {
+  public analyzeIntent(message: string): IntentType {
     const lowerMessage = message.toLowerCase();
     
     // Check if this is a clarification response
@@ -216,7 +218,7 @@ export class ConversationStateManager {
     
     this.timeContext = metadata.timeContext || null;
     this.topicContext = metadata.topicContext || null;
-    this.intentType = metadata.intentType || 'new_query';
+    this.intentType = (metadata.intentType as IntentType) || 'new_query';
     this.confidenceScore = metadata.confidenceScore || 1.0;
     this.needsClarity = metadata.needsClarity || false;
     this.ambiguities = metadata.ambiguities || [];
@@ -226,7 +228,7 @@ export class ConversationStateManager {
   /**
    * Load state from database - public method for threadService
    */
-  async loadState(): Promise<Record<string, any> | null> {
+  public async loadState(): Promise<Record<string, any> | null> {
     if (!this.threadId || !this.userId) return null;
     
     try {
@@ -243,9 +245,29 @@ export class ConversationStateManager {
         return null;
       }
       
+      // Safely handle metadata with type checking
       const metadata = data.metadata || {};
-      this.loadFromMetadata(metadata);
-      return metadata;
+      let metadataObj: Record<string, any> = {};
+      
+      if (isThreadMetadata(metadata)) {
+        metadataObj = metadata;
+        this.loadFromMetadata(metadataObj);
+      } else {
+        console.warn('Thread metadata is not in expected format:', metadata);
+        // Create default metadata
+        metadataObj = {
+          timeContext: null,
+          topicContext: null,
+          intentType: 'new_query',
+          confidenceScore: 1.0,
+          needsClarity: false,
+          ambiguities: [],
+          domainContext: null,
+          lastUpdated: new Date().toISOString()
+        };
+      }
+      
+      return metadataObj;
     } catch (error) {
       console.error('Error loading conversation state:', error);
       return null;
@@ -255,7 +277,7 @@ export class ConversationStateManager {
   /**
    * Create new state object from analysis
    */
-  async createState(query: string, queryPlan: any, intentType: IntentType): Promise<Record<string, any>> {
+  public async createState(query: string, queryPlan: any, intentType: IntentType): Promise<Record<string, any>> {
     // Combine existing state with new query plan insights
     return {
       timeContext: queryPlan.timeContext || this.timeContext,
@@ -272,7 +294,7 @@ export class ConversationStateManager {
   /**
    * Save state to database
    */
-  async saveState(state: Record<string, any>): Promise<boolean> {
+  public async saveState(state: Record<string, any>): Promise<boolean> {
     if (!this.threadId || !this.userId) return false;
     
     try {

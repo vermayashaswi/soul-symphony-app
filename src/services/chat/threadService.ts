@@ -1,7 +1,9 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { ChatThread } from './types';
-import { ConversationStateManager, IntentType } from '@/utils/chat/conversationStateManager';
+import { ConversationStateManager } from '@/utils/chat/conversationStateManager';
 import { detectRelativeTimeExpression, calculateRelativeDateRange, extractReferenceDate, isRelativeTimeQuery } from '@/utils/chat/dateUtils';
+import type { IntentType } from '@/utils/chat/conversationStateManager';
 
 export async function fetchChatThreads(userId: string | undefined) {
   if (!userId) {

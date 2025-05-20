@@ -55,3 +55,15 @@ export interface ChatMessage {
   diagnostics?: any;
   is_processing?: boolean;
 }
+
+// Type guard to check if an object has thread metadata
+export function isThreadMetadata(obj: any): obj is ChatThread['metadata'] {
+  return obj && typeof obj === 'object' && !Array.isArray(obj);
+}
+
+// Type guard to check if an object matches the SubQueryResponse interface
+export function isSubQueryResponse(value: any): value is SubQueryResponse {
+  return typeof value === 'object' && value !== null && 
+         typeof value.query === 'string' && 
+         typeof value.response === 'string';
+}
