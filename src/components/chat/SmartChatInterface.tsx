@@ -278,6 +278,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         isQuantitative: queryTypes.isQuantitative,
         isWhyQuestion: queryTypes.isWhyQuestion,
         isTemporalQuery: queryTypes.isTemporalQuery,
+        isPersonalInsightQuery: queryTypes.isPersonalInsightQuery, // New field
+        isMentalHealthQuery: queryTypes.isMentalHealthQuery,       // New field  
         timeRange: queryTypes.timeRange.periodName,
         emotion: queryTypes.emotion || 'none detected'
       };
@@ -290,6 +292,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       
       updateProcessingStage("Searching for insights...");
       debugLog.addEvent("Context-Aware Processing", "Sending query with conversation context", "info");
+      
+      // Always use personal insights for mental health and personality questions
+      const forcePersonalContext = queryTypes.isPersonalInsightQuery || queryTypes.isMentalHealthQuery;
+      if (forcePersonalContext) {
+        parameters.usePersonalContext = true;
+        debugLog.addEvent("Query Enhancement", "Forcing personal context for mental health or personality question", "info");
+      }
       
       const response = await processChatMessage(
         message, 

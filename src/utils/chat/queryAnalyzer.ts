@@ -1,4 +1,3 @@
-
 // This file contains functions to analyze the type of query a user is asking
 
 type QueryTypes = {
@@ -14,7 +13,9 @@ type QueryTypes = {
   isSpecificQuery: boolean;
   isThemeFocused: boolean;
   requiresTimeAnalysis: boolean;
-  isRatingRequest: boolean;  // New field to track rating requests
+  isRatingRequest: boolean;
+  isPersonalInsightQuery: boolean;  // New field for personal insight queries
+  isMentalHealthQuery: boolean;     // New field for mental health queries
   emotion?: string;
   theme?: string;
   timeRange: {
@@ -46,7 +47,9 @@ export function analyzeQueryTypes(query: string): QueryTypes {
     isSpecificQuery: false,
     isThemeFocused: false,
     requiresTimeAnalysis: false,
-    isRatingRequest: false,  // Initialize the new field
+    isRatingRequest: false,
+    isPersonalInsightQuery: false,  // Initialize new field
+    isMentalHealthQuery: false,     // Initialize new field
     timeRange: {
       startDate: null,
       endDate: null,
@@ -82,14 +85,45 @@ export function analyzeQueryTypes(query: string): QueryTypes {
                          lowerQuery.includes('top') ||
                          /\d+/.test(lowerQuery); // Contains numbers
                          
-  // Detect if this is a rating request - NEW check                     
+  // Detect if this is a rating request                    
   result.isRatingRequest = /\brate\b|\bscore\b|\bevaluate\b|\bassess\b|\banalyze\b|\breview\b|\brank\b/i.test(lowerQuery);
   
   // If this is a rating request, ensure we flag it as needing data aggregation
   if (result.isRatingRequest) {
     result.needsDataAggregation = true;
   }
+
+  // NEW: Detect personal insight questions about self-identity, personality, or traits
+  const personalInsightPatterns = [
+    /\bam i\b|\bdo i\b|\bhow am i\b|\bwhat am i\b/i,  // "Am I an introvert?", "Do I like people?"
+    /\bhave i been\b|\bhave i felt\b/i,                // "Have I been anxious lately?"
+    /\bmy personality\b|\bmy traits\b|\bmy character\b/i, // "What are my personality traits?"
+    /\bdoes my\b|\bhow does my\b/i,                    // "How does my anxiety affect me?"
+    /\bhow (do|would|did|should) i\b/i,                // "How do I handle stress?"
+    /\bwhat (do|should) i\b/i,                         // "What should I do?"
+    /\bi tend to\b|\bi usually\b|\bi often\b|\bi normally\b/i // "Do I tend to overthink?"
+  ];
   
+  result.isPersonalInsightQuery = personalInsightPatterns.some(pattern => pattern.test(lowerQuery));
+
+  // NEW: Detect mental health-related queries
+  const mentalHealthTerms = [
+    'mental health', 'wellbeing', 'well-being', 'wellness', 'self-care',
+    'anxiety', 'depression', 'stress', 'burnout', 'trauma',
+    'therapy', 'coping', 'healing', 'mindfulness', 'meditation',
+    'overwhelm', 'sleep', 'insomnia', 'rest', 'mood',
+    'overthinking', 'worry', 'rumination', 'mental state'
+  ];
+
+  result.isMentalHealthQuery = mentalHealthTerms.some(term => lowerQuery.includes(term));
+  
+  // If the query mentions the user specifically (I, me, my) and mental health,
+  // it's very likely a personal mental health question requiring journal analysis
+  if (result.isMentalHealthQuery && /\b(i|me|my|myself)\b/i.test(lowerQuery)) {
+    result.isPersonalInsightQuery = true;
+    result.needsMoreContext = true;
+  }
+
   // Enhanced theme detection
   // First check for explicit theme words
   const themeWords = [
@@ -195,7 +229,8 @@ export function analyzeQueryTypes(query: string): QueryTypes {
   
   // Detect if we need to aggregate data from multiple entries
   result.needsDataAggregation = result.isQuantitative || 
-                               result.isRatingRequest ||  // Add this check
+                               result.isRatingRequest ||
+                               result.isPersonalInsightQuery ||  // Personal insight usually needs data aggregation
                                lowerQuery.includes('pattern') ||
                                lowerQuery.includes('usually') ||
                                lowerQuery.includes('typically') ||
@@ -396,4 +431,3 @@ function extractTimeRange(query: string): { startDate: string | null, endDate: s
     periodName
   };
 }
-
