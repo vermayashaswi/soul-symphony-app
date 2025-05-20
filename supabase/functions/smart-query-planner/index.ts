@@ -1,4 +1,5 @@
-import { serve } from '@supabase/functions-js'
+
+import { serve } from 'https://deno.land/x/supabase_functions_js@1.3.0/mod.ts'
 import { OpenAI } from 'https://deno.land/x/openai@v4.20.1/mod.ts';
 
 // Initialize OpenAI client
