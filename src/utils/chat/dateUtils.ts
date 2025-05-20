@@ -1,4 +1,3 @@
-
 /**
  * Utilities for handling date and time operations in chat queries
  */
@@ -51,6 +50,34 @@ export function detectRelativeTimeExpression(query: string): string | null {
  */
 export function isRelativeTimeQuery(query: string): boolean {
   return !!detectRelativeTimeExpression(query);
+}
+
+/**
+ * Extracts a reference date from conversation context if applicable
+ * @param conversationContext - Previous messages in the conversation
+ * @returns Date object or undefined if no reference date found
+ */
+export function extractReferenceDate(conversationContext: any[]): Date | undefined {
+  if (!conversationContext || conversationContext.length === 0) {
+    return undefined;
+  }
+  
+  // Look for date references in recent messages, starting from the most recent
+  for (let i = conversationContext.length - 1; i >= 0; i--) {
+    const message = conversationContext[i];
+    
+    // Skip non-user messages
+    if (message.role !== 'user') continue;
+    
+    // Check for time expressions in the message
+    const timeExpression = detectRelativeTimeExpression(message.content);
+    if (timeExpression) {
+      // If we find a time expression, use the current date as reference
+      return new Date();
+    }
+  }
+  
+  return undefined;
 }
 
 /**
