@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 
 export interface ConversationState {
@@ -10,7 +11,7 @@ export interface ConversationState {
   referenceIds: string[];            // IDs of journal entries referenced
   entities: string[];                // Key entities mentioned
   lastQueryType: QueryType;          // Type of the last query
-  previousState?: ConversationState; // Previous state for tracking changes
+  previousState?: ConversationState | null; // Previous state for tracking changes
 }
 
 export type IntentType = 
@@ -58,7 +59,7 @@ export class ConversationStateManager {
       }
       
       // Convert stored metadata to conversation state format
-      const metadata = data.metadata;
+      const metadata = data.metadata as Record<string, any>;
       
       this.currentState = {
         topicContext: metadata.topicContext || null,
@@ -84,15 +85,25 @@ export class ConversationStateManager {
    */
   async saveState(state: ConversationState): Promise<boolean> {
     try {
-      const updatedState = {
-        ...state,
+      // Create a serializable version of the state without circular references
+      const serializableState = {
+        topicContext: state.topicContext,
+        timeContext: state.timeContext,
+        intentType: state.intentType,
+        ambiguities: state.ambiguities,
+        confidenceScore: state.confidenceScore,
+        needsClarity: state.needsClarity,
+        referenceIds: state.referenceIds,
+        entities: state.entities,
+        lastQueryType: state.lastQueryType,
         lastUpdated: new Date().toISOString()
+        // Note: We exclude the previousState to avoid circular references
       };
       
       const { error } = await supabase
         .from('chat_threads')
         .update({
-          metadata: updatedState
+          metadata: serializableState
         })
         .eq('id', this.threadId);
         
@@ -184,7 +195,7 @@ export class ConversationStateManager {
       referenceIds: [],
       entities: extractEntities(plan),
       lastQueryType: plan?.queryType || 'journal_specific',
-      previousState: previousState || undefined
+      previousState: previousState
     };
     
     // For time follow-ups, preserve the previous topic context

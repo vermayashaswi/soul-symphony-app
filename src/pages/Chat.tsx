@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,6 +8,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { ConversationStateManager } from '@/utils/chat/conversationStateManager';
 import { extractConversationInsights } from '@/utils/chat/messageProcessor';
+import { ChatMessage } from '@/types/chat';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -161,7 +163,7 @@ const Chat = () => {
             // Get messages to extract context
             const { data: messages } = await supabase
               .from('chat_messages')
-              .select('content, sender, created_at')
+              .select('content, sender, created_at, id, thread_id')
               .eq('thread_id', thread.id)
               .order('created_at', { ascending: true });
               
@@ -169,8 +171,18 @@ const Chat = () => {
             let timeContext = null;
             
             if (messages && messages.length > 0) {
+              // Convert to proper ChatMessage type before passing to extractConversationInsights
+              const typedMessages: ChatMessage[] = messages.map(msg => ({
+                id: msg.id,
+                thread_id: msg.thread_id,
+                content: msg.content,
+                sender: msg.sender as 'user' | 'assistant' | 'error',
+                role: msg.sender as 'user' | 'assistant' | 'error',
+                created_at: msg.created_at
+              }));
+              
               // Try to extract insights from messages
-              const insights = extractConversationInsights(messages);
+              const insights = extractConversationInsights(typedMessages);
               
               if (insights.topics.length > 0) {
                 topicContext = insights.topics[0];
