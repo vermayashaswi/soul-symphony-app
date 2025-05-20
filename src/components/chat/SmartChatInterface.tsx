@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -6,7 +7,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
 import { useAuth } from "@/contexts/AuthContext";
-import { ChatSuggestionButton } from "./ChatSuggestionButton";
+import ChatSuggestionButton from "./ChatSuggestionButton";
 import { Separator } from "@/components/ui/separator";
 import EmptyChatState from "@/components/chat/EmptyChatState";
 import { useDebouncedCallback } from 'use-debounce';
@@ -18,15 +19,32 @@ import {
   SheetTitle,
   SheetTrigger,
 } from "@/components/ui/sheet";
-import { ChatDiagnostics } from "./ChatDiagnostics";
+import ChatDiagnostics from "./ChatDiagnostics";
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
-import { BugIcon, HelpCircleIcon, InfoIcon, MessagesSquareIcon } from 'lucide-react';
-import { DebugPanel } from "@/components/debug/DebugPanel";
+import { BugIcon, HelpCircleIcon, InfoIcon, MessagesSquareIcon, Trash } from 'lucide-react';
+import DebugPanel from "@/components/debug/DebugPanel";
 import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage } from "@/utils/chat/threadUtils";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
+import VoiceRecordingButton from "./VoiceRecordingButton";
+import { ChatMessage } from "@/types/chat";
+import { getThreadMessages, saveMessage } from "@/services/chat";
+import { useDebugLog } from "@/utils/debug/DebugContext";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
+import { processChatMessage } from "@/services/chatService";
+import {
+  AlertDialog,
+  AlertDialogAction,
+  AlertDialogCancel,
+  AlertDialogContent,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogTitle,
+} from "@/components/ui/alert-dialog";
 
 interface SmartChatInterfaceProps {
   mentalHealthInsights?: MentalHealthInsights;
