@@ -1,369 +1,221 @@
 
-import { supabase } from "@/integrations/supabase/client";
+import { ChatMessage } from '@/types/chat';
+import { analyzeMentalHealthContent, extractConversationInsights, isPersonalizedHealthQuery } from './messageProcessor';
 
-export interface ConversationState {
-  topicContext: string | null;       // The current topic being discussed
-  timeContext: string | null;        // Current time reference
-  intentType: IntentType;            // Type of user intent
-  ambiguities: string[];             // Things that need clarification
-  confidenceScore: number;           // How confident we are about understanding
-  needsClarity: boolean;             // Whether we need to ask a clarifying question
-  referenceIds: string[];            // IDs of journal entries referenced
-  entities: string[];                // Key entities mentioned
-  lastQueryType: QueryType;          // Type of the last query
-  previousState?: ConversationState | null; // Previous state for tracking changes
-}
-
-export type IntentType = 
-  | 'new_query'               // Brand new topic
-  | 'followup_time'           // Follow-up changing time context only
-  | 'followup_topic'          // Follow-up changing topic
-  | 'followup_refinement'     // Follow-up asking for more details
-  | 'clarification_response'  // Response to a clarification request
-  | 'multi_part';             // Multiple questions in one
-
-export type QueryType =
-  | 'journal_specific'        // Query about journal entries
-  | 'general_analysis'        // General analysis request
-  | 'emotional_analysis'      // Analysis of emotions
-  | 'pattern_detection'       // Looking for patterns
-  | 'personality_reflection'; // Reflections on personality
-
-/**
- * Manages and persists conversation state for chat threads
- */
 export class ConversationStateManager {
-  private threadId: string;
-  private userId: string;
-  private currentState: ConversationState | null = null;
-
-  constructor(threadId: string, userId: string) {
-    this.threadId = threadId;
-    this.userId = userId;
-  }
-
-  /**
-   * Load existing conversation state from the database
-   */
-  async loadState(): Promise<ConversationState | null> {
-    try {
-      const { data, error } = await supabase
-        .from('chat_threads')
-        .select('metadata')
-        .eq('id', this.threadId)
-        .single();
-        
-      if (error || !data || !data.metadata) {
-        console.log('No existing conversation state found or error:', error);
-        return null;
-      }
-      
-      // Convert stored metadata to conversation state format
-      const metadata = data.metadata as Record<string, any>;
-      
-      this.currentState = {
-        topicContext: metadata.topicContext || null,
-        timeContext: metadata.timeContext || null,
-        intentType: metadata.intentType || 'new_query',
-        ambiguities: metadata.ambiguities || [],
-        confidenceScore: metadata.confidenceScore || 1.0,
-        needsClarity: metadata.needsClarity || false,
-        referenceIds: metadata.referenceIds || [],
-        entities: metadata.entities || [],
-        lastQueryType: metadata.lastQueryType || 'journal_specific'
-      };
-      
-      return this.currentState;
-    } catch (error) {
-      console.error('Error loading conversation state:', error);
-      return null;
+  messages: ChatMessage[];
+  timeContext: string | null;
+  topicContext: string | null;
+  confidenceScore: number;
+  needsClarity: boolean;
+  intentType: string;
+  ambiguities: string[];
+  domainContext: string | null;
+  
+  constructor(messages: ChatMessage[] = []) {
+    this.messages = messages;
+    this.timeContext = null;
+    this.topicContext = null;
+    this.confidenceScore = 1.0;
+    this.needsClarity = false;
+    this.intentType = 'new_query';
+    this.ambiguities = [];
+    this.domainContext = null;
+    
+    if (messages.length > 0) {
+      this.analyzeConversationState();
     }
   }
-
+  
   /**
-   * Save current conversation state to the database
+   * Add a new message to the conversation and update state
    */
-  async saveState(state: ConversationState): Promise<boolean> {
-    try {
-      // Create a serializable version of the state without circular references
-      const serializableState = {
-        topicContext: state.topicContext,
-        timeContext: state.timeContext,
-        intentType: state.intentType,
-        ambiguities: state.ambiguities,
-        confidenceScore: state.confidenceScore,
-        needsClarity: state.needsClarity,
-        referenceIds: state.referenceIds,
-        entities: state.entities,
-        lastQueryType: state.lastQueryType,
-        lastUpdated: new Date().toISOString()
-        // Note: We exclude the previousState to avoid circular references
-      };
+  addMessage(message: ChatMessage): void {
+    this.messages.push(message);
+    this.analyzeConversationState();
+  }
+  
+  /**
+   * Analyze the conversation to determine state
+   */
+  private analyzeConversationState(): void {
+    const insights = extractConversationInsights(this.messages);
+    
+    // Update time context if we have time references
+    if (insights.timeReferences.length > 0) {
+      this.timeContext = insights.timeReferences[0]; // Use most recent
+    }
+    
+    // Update topic context if we have topics
+    if (insights.topics.length > 0) {
+      this.topicContext = insights.topics[0]; // Use most recent
+    }
+    
+    // Check if the most recent user message needs clarity
+    const userMessages = this.messages.filter(m => m.role === 'user' || m.sender === 'user');
+    if (userMessages.length > 0) {
+      const latestUserMessage = userMessages[userMessages.length - 1];
+      this.needsClarity = this.checkIfNeedsClarification(latestUserMessage.content);
       
-      const { error } = await supabase
-        .from('chat_threads')
-        .update({
-          metadata: serializableState
-        })
-        .eq('id', this.threadId);
-        
-      if (error) {
-        console.error('Error saving conversation state:', error);
-        return false;
+      // Analyze intent for the latest message
+      this.analyzeIntent(latestUserMessage.content);
+    }
+    
+    // Determine domain context
+    if (insights.mentalHealthTopics.length > 0) {
+      this.domainContext = 'mental_health';
+    } else if (this.topicContext && this.messages.length > 0) {
+      const lastMessage = this.messages[this.messages.length - 1];
+      if (isPersonalizedHealthQuery(lastMessage.content)) {
+        this.domainContext = 'mental_health';
       }
-      
-      this.currentState = state;
+    }
+  }
+  
+  /**
+   * Check if a message needs clarification
+   */
+  private checkIfNeedsClarification(message: string): boolean {
+    // Very short queries without questions likely need clarification
+    if (message.length < 10 && !message.includes('?')) {
+      this.ambiguities = ["Very short query"];
       return true;
-    } catch (error) {
-      console.error('Error in saveState:', error);
-      return false;
-    }
-  }
-
-  /**
-   * Determine if this query is a follow-up based on content and previous state
-   */
-  isFollowUpQuery(query: string, previousState: ConversationState | null): boolean {
-    if (!previousState) return false;
-    
-    // Short queries are often follow-ups
-    if (query.length < 15 && !query.includes('?')) return true;
-    
-    // Check for follow-up indicators
-    const followUpIndicators = [
-      'what about', 'how about', 'and what', 'also', 'additionally',
-      'instead', 'rather', 'but what', 'but how', 'then what',
-      'show me', 'tell me more', 'could you', 'can you'
-    ];
-    
-    for (const indicator of followUpIndicators) {
-      if (query.toLowerCase().startsWith(indicator)) return true;
     }
     
-    // If query only mentions time change but not the topic, likely a follow-up
-    if (isTimeOnlyQuery(query) && previousState.topicContext) return true;
+    // Check for vague requests that don't specify what to analyze
+    if (/\b(analyze|check|tell me about)\b/i.test(message) && 
+        !/(my|about) ([a-z\s]{3,25})/i.test(message)) {
+      this.ambiguities = ["Vague request without specific topic"];
+      return true;
+    }
     
     return false;
   }
   
   /**
-   * Analyze intent type based on the query and previous state
+   * Analyze the intent of a message
    */
-  async analyzeIntent(query: string): Promise<IntentType> {
-    if (!this.currentState) await this.loadState();
-    const previousState = this.currentState;
+  private analyzeIntent(message: string): void {
+    const lowerMessage = message.toLowerCase();
     
-    // 1. Check if this is a multi-part query
-    if (isMultiPartQuery(query)) return 'multi_part';
-    
-    // 2. Check if this is a response to a previous clarification request
-    if (previousState?.needsClarity) return 'clarification_response';
-    
-    // 3. Check if this is a follow-up query
-    if (this.isFollowUpQuery(query, previousState)) {
-      // If only time reference changes, it's a time follow-up
-      if (isTimeOnlyQuery(query)) return 'followup_time';
+    // Check if this is a clarification response
+    if (this.needsClarity && this.messages.length > 1) {
+      const prevMessages = this.messages.slice(-3); // Last 3 messages
+      const prevAssistant = prevMessages.find(m => m.role === 'assistant' || m.sender === 'assistant');
       
-      // Check if this is asking for more details on the same topic
-      if (isRefinementQuery(query)) return 'followup_refinement';
-      
-      // Otherwise it's a topic change follow-up
-      return 'followup_topic';
+      if (prevAssistant && this.containsClarificationRequest(prevAssistant.content)) {
+        this.intentType = 'clarification_response';
+        this.needsClarity = false;
+        return;
+      }
+    }
+    
+    // Check if this is a time-based follow-up
+    if (this.isTimeFollowUp(message)) {
+      this.intentType = 'followup_time';
+      return;
+    }
+    
+    // Check if this is a multi-part question
+    if (this.isMultiPartQuestion(message)) {
+      this.intentType = 'multi_part';
+      return;
+    }
+    
+    // Check if this is a mental health query
+    if (analyzeMentalHealthContent(message) > 0.4) {
+      this.intentType = 'mental_health';
+      this.domainContext = 'mental_health';
+      return;
     }
     
     // Default to new query
-    return 'new_query';
+    this.intentType = 'new_query';
   }
-
+  
   /**
-   * Create a new state based on intent analysis and query plan
+   * Check if a message contains a clarification request
    */
-  async createState(
-    query: string, 
-    plan: any, 
-    intent: IntentType
-  ): Promise<ConversationState> {
-    const previousState = await this.loadState();
+  private containsClarificationRequest(message: string): boolean {
+    const clarificationPatterns = [
+      /could you (please )?(clarify|specify|provide more details)/i,
+      /i('m| am) not sure (exactly )?what you('re| are) (asking|looking for)/i,
+      /could you (please )?be more specific/i,
+      /i need more (information|details|context)/i
+    ];
     
-    let newState: ConversationState = {
-      topicContext: extractTopicContext(query, plan),
-      timeContext: plan?.filters?.date_range?.periodName || null,
-      intentType: intent,
-      ambiguities: plan?.ambiguities || [],
-      confidenceScore: calculateConfidence(plan, query),
-      needsClarity: determineIfClarificationNeeded(plan, query),
-      referenceIds: [],
-      entities: extractEntities(plan),
-      lastQueryType: plan?.queryType || 'journal_specific',
-      previousState: previousState
+    return clarificationPatterns.some(pattern => pattern.test(message));
+  }
+  
+  /**
+   * Check if a message is a time-based follow-up
+   */
+  private isTimeFollowUp(message: string): boolean {
+    const lowerMessage = message.toLowerCase().trim();
+    
+    // Time reference patterns
+    const timePatterns = [
+      /^(what|how) about (yesterday|today|this week|last week|this month|last month)/i,
+      /^(yesterday|today|this week|last week|this month|last month)(\?|\.)?$/i
+    ];
+    
+    // Check if any pattern matches
+    return timePatterns.some(pattern => pattern.test(lowerMessage));
+  }
+  
+  /**
+   * Check if a message is a multi-part question
+   */
+  private isMultiPartQuestion(message: string): boolean {
+    // Check for multiple question marks
+    if ((message.match(/\?/g) || []).length > 1) {
+      return true;
+    }
+    
+    // Check for conjunctions between different questions
+    const parts = message.split(/\.|\?/).filter(p => p.trim().length > 0);
+    if (parts.length > 1) {
+      // Check if multiple parts contain question words
+      const questionParts = parts.filter(p => 
+        /(what|how|when|where|why|who|is|are|do|does|did)/i.test(p.trim())
+      );
+      if (questionParts.length > 1) {
+        return true;
+      }
+    }
+    
+    // Check for "and" or "also" connecting different question topics
+    return /\b(and|also)\b.+\b(what|how|when|where|why|who|is|are|do|does|did)\b/i.test(message);
+  }
+  
+  /**
+   * Get metadata for thread storage
+   */
+  getMetadata(): Record<string, any> {
+    return {
+      timeContext: this.timeContext,
+      topicContext: this.topicContext,
+      intentType: this.intentType,
+      confidenceScore: this.confidenceScore,
+      needsClarity: this.needsClarity,
+      ambiguities: this.ambiguities,
+      domainContext: this.domainContext,
+      lastUpdated: new Date().toISOString()
     };
+  }
+  
+  /**
+   * Update state from stored metadata
+   */
+  loadFromMetadata(metadata: Record<string, any>): void {
+    if (!metadata) return;
     
-    // For time follow-ups, preserve the previous topic context
-    if (intent === 'followup_time' && previousState?.topicContext) {
-      newState.topicContext = previousState.topicContext;
-    }
-    
-    return newState;
+    this.timeContext = metadata.timeContext || null;
+    this.topicContext = metadata.topicContext || null;
+    this.intentType = metadata.intentType || 'new_query';
+    this.confidenceScore = metadata.confidenceScore || 1.0;
+    this.needsClarity = metadata.needsClarity || false;
+    this.ambiguities = metadata.ambiguities || [];
+    this.domainContext = metadata.domainContext || null;
   }
-}
-
-/**
- * Helper function to check if a query is only about time
- */
-function isTimeOnlyQuery(query: string): boolean {
-  const timeTerms = [
-    'yesterday', 'today', 'this week', 'last week', 
-    'this month', 'last month', 'this year', 'last year',
-    'early', 'late', 'morning', 'afternoon', 'evening',
-    'monday', 'tuesday', 'wednesday', 'thursday', 'friday', 'saturday', 'sunday',
-    'january', 'february', 'march', 'april', 'may', 'june', 'july', 'august', 
-    'september', 'october', 'november', 'december'
-  ];
-  
-  const lowerQuery = query.toLowerCase();
-  
-  // Check if the query contains mostly time terms
-  const words = lowerQuery.split(/\s+/);
-  let timeTermCount = 0;
-  
-  for (const word of words) {
-    if (timeTerms.some(term => word.includes(term))) {
-      timeTermCount++;
-    }
-  }
-  
-  // If more than half the query is time-related, or it's very short and contains time terms
-  return (timeTermCount / words.length > 0.5) || 
-         (words.length <= 4 && timeTermCount > 0);
-}
-
-/**
- * Helper function to check if a query is a refinement request
- */
-function isRefinementQuery(query: string): boolean {
-  const refinementPatterns = [
-    'more detail', 'tell me more', 'elaborate', 'explain',
-    'why', 'how', 'in what way', 'give me examples',
-    'can you expand', 'more information', 'specifically'
-  ];
-  
-  const lowerQuery = query.toLowerCase();
-  
-  for (const pattern of refinementPatterns) {
-    if (lowerQuery.includes(pattern)) return true;
-  }
-  
-  return false;
-}
-
-/**
- * Helper function to check if a query has multiple questions
- */
-function isMultiPartQuery(query: string): boolean {
-  // Check for multiple question marks
-  const questionMarks = (query.match(/\?/g) || []).length;
-  if (questionMarks > 1) return true;
-  
-  // Check for question conjunctions
-  const conjunctions = [
-    'and also', 'also', 'additionally', 'moreover', 
-    'furthermore', 'plus', 'in addition', 'besides',
-    'what about', 'how about', 'tell me about', 'and'
-  ];
-  
-  const lowerQuery = query.toLowerCase();
-  
-  for (const conjunction of conjunctions) {
-    // Only check if conjunction is not at the beginning of the query
-    if (lowerQuery.indexOf(conjunction) > 10) return true;
-  }
-  
-  return false;
-}
-
-/**
- * Helper function to extract topic context from query and plan
- */
-function extractTopicContext(query: string, plan: any): string | null {
-  // First look at plan's topic context
-  if (plan?.topicContext) return plan.topicContext;
-  if (plan?.topic_context) return plan.topic_context;
-  
-  // Try to extract from query themes
-  if (plan?.filters?.themes && plan.filters.themes.length > 0) {
-    return plan.filters.themes.join(', ');
-  }
-  
-  // Fall back to a simplified form of the query
-  const simplifiedQuery = query
-    .replace(/\b(what|how|when|where|why|can|could|would|show|tell|give|list)\b/gi, '')
-    .replace(/\babout\b/gi, '')
-    .replace(/\s+/g, ' ')
-    .trim();
-    
-  return simplifiedQuery.length > 5 ? simplifiedQuery : null;
-}
-
-/**
- * Helper function to extract entities from plan
- */
-function extractEntities(plan: any): string[] {
-  const entities: string[] = [];
-  
-  if (plan?.filters?.entities) {
-    for (const entity of plan.filters.entities) {
-      if (entity.name) entities.push(entity.name);
-    }
-  }
-  
-  return entities;
-}
-
-/**
- * Helper function to calculate confidence score
- */
-function calculateConfidence(plan: any, query: string): number {
-  // Start with a base score
-  let score = 1.0;
-  
-  // Reduce confidence if there are known ambiguities
-  if (plan?.ambiguities && plan.ambiguities.length > 0) {
-    score -= 0.1 * plan.ambiguities.length;
-  }
-  
-  // Reduce confidence for very short queries (under 5 words)
-  const wordCount = query.split(/\s+/).length;
-  if (wordCount < 5) {
-    score -= 0.1;
-  }
-  
-  // If query is extremely vague, further reduce confidence
-  if (wordCount <= 2 && !query.includes('?')) {
-    score -= 0.2;
-  }
-  
-  return Math.max(0.1, Math.min(score, 1.0)); // Keep between 0.1 and 1.0
-}
-
-/**
- * Helper function to determine if clarification is needed
- */
-function determineIfClarificationNeeded(plan: any, query: string): boolean {
-  // Check if the plan explicitly requests more context
-  if (plan?.needs_more_context) return true;
-  
-  // Check for ambiguities
-  if (plan?.ambiguities && plan.ambiguities.length > 0) return true;
-  
-  // Check for very vague queries
-  const wordCount = query.split(/\s+/).length;
-  if (wordCount <= 2 && !query.includes('?')) return true;
-  
-  // Check if no specific filters were identified
-  if ((!plan?.filters || Object.keys(plan.filters).length === 0) 
-      && query.length < 15) {
-    return true;
-  }
-  
-  return false;
 }

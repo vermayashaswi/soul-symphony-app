@@ -13,6 +13,26 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
+// Mental health and wellbeing term dictionary for domain recognition
+const MENTAL_HEALTH_TERMS = [
+  // Emotional states
+  'anxiety', 'anxious', 'depression', 'depressed', 'stress', 'stressed',
+  'mood', 'emotion', 'feeling', 'mental health', 'wellbeing', 'well-being',
+  'therapy', 'therapist', 'counseling', 'psychiatrist', 'psychologist',
+  // Common concerns
+  'sleep', 'insomnia', 'tired', 'exhaustion', 'burnout', 'overwhelm', 
+  'overthinking', 'ruminating', 'worry', 'worrying', 'trauma',
+  // Self-improvement
+  'self-care', 'self care', 'mindfulness', 'meditation', 'breathing',
+  'coping', 'cope', 'healing', 'recovery', 'growth', 'improve',
+  // Relationships
+  'relationship', 'friendship', 'family', 'partner', 'work-life',
+  'balance', 'boundaries', 'communication',
+  // Actions and requests
+  'help me', 'advice', 'suggestion', 'recommend', 'strategy', 'technique',
+  'improve', 'better', 'healthier', 'calm', 'relax', 'peace'
+];
+
 // Main function
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -50,6 +70,10 @@ serve(async (req) => {
       );
     }
 
+    // NEW: Check if this is a mental health or wellbeing related query
+    const domainContext = detectQueryDomain(message);
+    console.log(`Domain context detected: ${domainContext}`);
+    
     // Check for direct responses that don't need AI processing
     const directResponse = checkForDirectResponse(message);
     if (directResponse) {
@@ -78,14 +102,14 @@ serve(async (req) => {
     // Enhanced system prompt with more intelligent conversation handling
     const queryAnalysisRequest = {
       role: "system",
-      content: generateEnhancedSystemPrompt(appContext, calculatedDateRange, extractedTimeContext, preserveTopicContext)
+      content: generateEnhancedSystemPrompt(appContext, calculatedDateRange, extractedTimeContext, preserveTopicContext, domainContext)
     };
     
     // Prepare the conversation context for the query analysis
     const queryAnalysisMessages = prepareQueryAnalysisMessages(queryAnalysisRequest, message, conversationContext);
     
     // Get query plan from OpenAI with enhanced temperature settings
-    const temperature = determineTemperature(appContext, isFollowUp);
+    const temperature = determineTemperature(appContext, isFollowUp, domainContext);
     const plan = await getQueryPlanFromOpenAI(queryAnalysisMessages, temperature);
     
     if (!plan) {
@@ -115,15 +139,33 @@ serve(async (req) => {
       plan.plan.previousTimeContext = extractedTimeContext;
     }
     
+    // Add the domain context to the plan (NEW)
+    if (domainContext && plan.plan) {
+      plan.plan.domainContext = domainContext;
+      
+      // For mental health queries, set queryType to journal_specific if not already set
+      if (domainContext === 'mental_health' && !plan.queryType) {
+        plan.queryType = 'journal_specific';
+        console.log('Setting queryType to journal_specific for mental health domain');
+      }
+      
+      // For mental health queries, increase the confidence in searching journal data
+      if (domainContext === 'mental_health' && plan.plan.confidenceScore) {
+        // Boost confidence score for mental health queries
+        plan.plan.confidenceScore = Math.min(1.0, plan.plan.confidenceScore + 0.2);
+        console.log(`Boosted confidence score for mental health query to: ${plan.plan.confidenceScore}`);
+      }
+    }
+    
     // Check if this might be a multi-part question
     if (checkForMultiQuestions && shouldSegmentQuery(message)) {
       plan.plan.isSegmented = true;
     }
     
     // Check if we need clarification based on confidence score
-    if (plan.plan && !plan.plan.needsMoreContext && shouldRequestClarification(message, plan)) {
+    if (plan.plan && !plan.plan.needsMoreContext && shouldRequestClarification(message, plan, domainContext)) {
       plan.plan.needsMoreContext = true;
-      plan.plan.clarificationReason = determineClarificationReason(message, plan);
+      plan.plan.clarificationReason = determineClarificationReason(message, plan, domainContext);
     }
     
     return new Response(
@@ -140,9 +182,49 @@ serve(async (req) => {
 });
 
 /**
+ * NEW: Detect the domain of the query to provide better context
+ */
+function detectQueryDomain(query: string): string | null {
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for personal indicators combined with mental health terms
+  const hasPersonalIndicators = /\b(i|me|my|mine|myself|we|our|us)\b/i.test(lowerQuery);
+  
+  // Check if any mental health term appears in the query
+  const hasMentalHealthTerms = MENTAL_HEALTH_TERMS.some(term => 
+    lowerQuery.includes(term.toLowerCase())
+  );
+  
+  // Check for direct requests for help or advice
+  const isHelpRequest = /\b(help|advice|suggest|recommend|improve|better)\b/i.test(lowerQuery);
+  
+  // Check for questions about feelings or emotional states
+  const isEmotionalQuery = /\b(feel|feeling|felt|emotion|mood|happy|sad|angry|anxious)\b/i.test(lowerQuery);
+  
+  // If it contains personal indicators AND mental health terms OR emotional content, classify as mental_health
+  if ((hasPersonalIndicators && (hasMentalHealthTerms || isEmotionalQuery)) || 
+      (isHelpRequest && (hasMentalHealthTerms || isEmotionalQuery))) {
+    return 'mental_health';
+  }
+  
+  // Check for self-reflection or personal growth indicators
+  if (hasPersonalIndicators && /\b(grow|growth|improve|better|progress|develop|learn|goal|aim|objective)\b/i.test(lowerQuery)) {
+    return 'personal_growth';
+  }
+  
+  // Check for relationship-focused queries
+  if (/\b(relationship|friend|family|partner|colleague|coworker|boss|team)\b/i.test(lowerQuery) && 
+      hasPersonalIndicators) {
+    return 'relationships';
+  }
+  
+  return null;
+}
+
+/**
  * Generate an enhanced system prompt with better conversation intelligence
  */
-function generateEnhancedSystemPrompt(appContext: any, dateRange: any, timeContext: string | null, preserveTopicContext: boolean): string {
+function generateEnhancedSystemPrompt(appContext: any, dateRange: any, timeContext: string | null, preserveTopicContext: boolean, domainContext: string | null): string {
   // Get app information from the context
   const appInfo = appContext?.appInfo || {
     name: "Journal Analysis App",
@@ -162,6 +244,26 @@ Your task is to analyze user queries about their journal entries and create a st
   // Add information about conversation intent and context
   basePrompt += `\n\nCONVERSATION CONTEXT:`;
   basePrompt += `\n- Query intent type: ${intentType}`;
+  
+  // NEW: Add domain context if available
+  if (domainContext) {
+    basePrompt += `\n- Domain context: ${domainContext}`;
+    
+    // Enhanced guidance for mental health domains
+    if (domainContext === 'mental_health') {
+      basePrompt += `\n\nIMPORTANT: This query is related to MENTAL HEALTH. It should be treated as a request for PERSONAL INSIGHTS from the user's journal entries, even if not explicitly asking for journal data. For mental health queries, always:
+1. Prioritize analyzing the user's personal journal data
+2. Look for patterns in emotions, thoughts, and behaviors
+3. Connect insights to the user's specific experiences rather than giving generic advice
+4. Default to using journal entries as the primary data source`;
+    }
+    else if (domainContext === 'personal_growth') {
+      basePrompt += `\n\nThis query relates to PERSONAL GROWTH. Prioritize finding patterns in the user's journal entries that show progress, challenges, or areas for development.`;
+    }
+    else if (domainContext === 'relationships') {
+      basePrompt += `\n\nThis query focuses on RELATIONSHIPS. Search for journal entries that mention specific people, interactions, or feelings about relationships to provide personalized insights.`;
+    }
+  }
   
   if (previousTimeContext || previousTopicContext) {
     basePrompt += `\n- Previous conversation context:`;
@@ -227,7 +329,8 @@ Time range calculated:
     "isSegmented": boolean,
     "topicContext": "the main topic of the query",
     "confidenceScore": number between 0 and 1,
-    "reasoning": "explanation of the plan"
+    "reasoning": "explanation of the plan",
+    "domainContext": "the domain of the query (mental_health, personal_growth, etc.)"
   },
   "queryType": "journal_specific" | "general_analysis" | "emotional_analysis" | "pattern_detection" | "personality_reflection"
 }`;
@@ -270,9 +373,12 @@ function prepareQueryAnalysisMessages(queryAnalysisRequest: any, message: string
 /**
  * Determine appropriate temperature setting based on context
  */
-function determineTemperature(appContext: any, isFollowUp: boolean): number {
+function determineTemperature(appContext: any, isFollowUp: boolean, domainContext: string | null): number {
   const intentType = appContext?.userContext?.intentType || 'new_query';
   const needsClarity = appContext?.userContext?.needsClarity || false;
+  
+  // Use lower temperature for mental health queries to be more precise
+  if (domainContext === 'mental_health') return 0.2;
   
   // Use higher temperature for clarification questions to be more creative
   if (needsClarity) return 0.7;
@@ -325,7 +431,18 @@ async function getQueryPlanFromOpenAI(messages: any, temperature: number = 0.2):
 /**
  * Check if clarification should be requested based on message and plan
  */
-function shouldRequestClarification(message: string, plan: any): boolean {
+function shouldRequestClarification(message: string, plan: any, domainContext: string | null): boolean {
+  // For mental health queries, only ask for clarification if absolutely necessary
+  if (domainContext === 'mental_health') {
+    // Check confidence score if available - use a lower threshold for mental health
+    const confidenceScore = plan?.plan?.confidenceScore;
+    if (confidenceScore !== undefined && confidenceScore < 0.3) return true;
+    
+    // Skip clarification for short messages if they are mental health related
+    return false;
+  }
+  
+  // Standard checks for other queries
   // Check message characteristics
   if (message.length < 10 && !message.includes('?')) return true;
   
@@ -345,7 +462,12 @@ function shouldRequestClarification(message: string, plan: any): boolean {
 /**
  * Determine the reason clarification is needed
  */
-function determineClarificationReason(message: string, plan: any): string {
+function determineClarificationReason(message: string, plan: any, domainContext: string | null): string {
+  // Specialized clarification requests for mental health domain
+  if (domainContext === 'mental_health') {
+    return "To provide more personalized insights from your journal, could you share more details about what specific aspects of your mental wellbeing you'd like to explore?";
+  }
+  
   if (message.length < 10 && !message.includes('?')) {
     return "The query is very short and lacks specific details about what you're looking for.";
   }
