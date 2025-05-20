@@ -46,6 +46,86 @@ If it contains any abstract question unrelated to mental health or the app's pur
 // Maximum number of previous messages to include for context
 const MAX_CONTEXT_MESSAGES = 10;
 
+// Helper function for calling OpenAI API using fetch instead of SDK
+async function callOpenAI(messages: any[], model = 'gpt-4o-mini', temperature = 0.7) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: model,
+        messages: messages,
+        temperature: temperature,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI API error: ${response.status} ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    return await response.json();
+  } catch (error) {
+    console.error('Error calling OpenAI API:', error);
+    throw error;
+  }
+}
+
+// Helper function for creating OpenAI embeddings using fetch
+async function createEmbedding(input: string) {
+  try {
+    const response = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: input,
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      console.error(`OpenAI embedding API error: ${response.status} ${errorText}`);
+      throw new Error(`OpenAI embedding API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    return data.data[0].embedding;
+  } catch (error) {
+    console.error('Error creating embedding:', error);
+    throw error;
+  }
+}
+
+// Helper function to handle general questions
+async function handleGeneralQuestion(message: string, conversationContext: any[]) {
+  console.log("Processing as general question, skipping journal entry retrieval");
+  
+  try {
+    const messages = [
+      { role: 'system', content: GENERAL_QUESTION_PROMPT },
+      ...(conversationContext.length > 0 ? conversationContext : []),
+      { role: 'user', content: message }
+    ];
+    
+    const completionData = await callOpenAI(messages);
+    const generalResponse = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+    console.log("General response generated successfully");
+    
+    return generalResponse;
+  } catch (error) {
+    console.error("Error generating general response:", error);
+    throw error;
+  }
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -168,55 +248,43 @@ serve(async (req) => {
       questionType = "JOURNAL_SPECIFIC";
       diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", "Rating request detected: JOURNAL_SPECIFIC"));
     } else {
-      const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
-              
-              IMPORTANT: If the query contains ANY request for ratings, scores, or evaluations (e.g., "Rate my anxiety", "Score my happiness", etc.), you MUST classify it as "JOURNAL_SPECIFIC".
-              
-              If you remotely feel this question could be about the person's journal entries or an exploration of his/her specific mental health, classify it as "JOURNAL_SPECIFIC".
-              
-              Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
-              
-              Examples:
-              - "How are you doing?" -> "GENERAL"
-              - "What is journaling?" -> "GENERAL"
-              - "Who is the president of India?" -> "GENERAL"
-              - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-              - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
-              - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-              - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
-              - "Rate my happiness level" -> "JOURNAL_SPECIFIC"
-              - "Score my productivity" -> "JOURNAL_SPECIFIC"
-              - "Analyze my emotional patterns" -> "JOURNAL_SPECIFIC"`
-            },
-            { role: 'user', content: message }
-          ],
-          temperature: 0.1,
-          max_tokens: 10
-        }),
-      });
+      // Use the callOpenAI helper instead of the direct OpenAI SDK call
+      try {
+        const categorizationResponse = await callOpenAI([
+          {
+            role: 'system',
+            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
+            
+            IMPORTANT: If the query contains ANY request for ratings, scores, or evaluations (e.g., "Rate my anxiety", "Score my happiness", etc.), you MUST classify it as "JOURNAL_SPECIFIC".
+            
+            If you remotely feel this question could be about the person's journal entries or an exploration of his/her specific mental health, classify it as "JOURNAL_SPECIFIC".
+            
+            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
+            
+            Examples:
+            - "How are you doing?" -> "GENERAL"
+            - "What is journaling?" -> "GENERAL"
+            - "Who is the president of India?" -> "GENERAL"
+            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
+            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
+            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
+            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
+            - "Rate my happiness level" -> "JOURNAL_SPECIFIC"
+            - "Score my productivity" -> "JOURNAL_SPECIFIC"
+            - "Analyze my emotional patterns" -> "JOURNAL_SPECIFIC"`
+          },
+          { role: 'user', content: message }
+        ], 'gpt-4o-mini', 0.1);
 
-      if (!categorizationResponse.ok) {
-        const error = await categorizationResponse.text();
-        console.error('Failed to categorize question:', error);
-        diagnostics.steps.push(createDiagnosticStep("Question Categorization", "error", error));
-        throw new Error('Failed to categorize question');
+        questionType = categorizationResponse.choices[0]?.message?.content.trim();
+        console.log(`Question categorized as: ${questionType}`);
+        diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", `Classified as ${questionType}`));
+      } catch (error) {
+        console.error("Error classifying question:", error);
+        // Default to GENERAL on error
+        questionType = "GENERAL";
+        diagnostics.steps.push(createDiagnosticStep("Question Categorization", "error", `Error: ${error.message}, defaulting to GENERAL`));
       }
-
-      const categorization = await categorizationResponse.json();
-      questionType = categorization.choices[0]?.message?.content.trim();
-      console.log(`Question categorized as: ${questionType}`);
-      diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", `Classified as ${questionType}`));
     }
 
     // If it's a general question, respond directly without journal entry retrieval
@@ -224,76 +292,48 @@ serve(async (req) => {
       console.log("Processing as general question, skipping journal entry retrieval");
       diagnostics.steps.push(createDiagnosticStep("General Question Processing", "loading"));
       
-      const generalCompletionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-4o-mini',
-          messages: [
-            { role: 'system', content: GENERAL_QUESTION_PROMPT },
-            ...(conversationContext.length > 0 ? conversationContext : []),
-            { role: 'user', content: message }
-          ],
-        }),
-      });
+      try {
+        const generalResponse = await handleGeneralQuestion(message, conversationContext);
+        diagnostics.steps.push(createDiagnosticStep("General Question Processing", "success"));
 
-      if (!generalCompletionResponse.ok) {
-        const error = await generalCompletionResponse.text();
-        console.error('Failed to get general completion:', error);
-        diagnostics.steps.push(createDiagnosticStep("General Question Processing", "error", error));
-        throw new Error('Failed to generate response');
+        return new Response(
+          JSON.stringify({ 
+            response: generalResponse, 
+            diagnostics: includeDiagnostics ? diagnostics : undefined,
+            references: []
+          }),
+          { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
+      } catch (error) {
+        console.error("Error handling general question:", error);
+        diagnostics.steps.push(createDiagnosticStep("General Question Processing", "error", error.message));
+        
+        return new Response(
+          JSON.stringify({ 
+            response: "I'm having trouble answering that right now. Could you please try again?", 
+            diagnostics: includeDiagnostics ? diagnostics : undefined,
+            references: []
+          }),
+          { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+        );
       }
-
-      const generalCompletionData = await generalCompletionResponse.json();
-      const generalResponse = generalCompletionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-      console.log("General response generated successfully");
-      diagnostics.steps.push(createDiagnosticStep("General Question Processing", "success"));
-
-      return new Response(
-        JSON.stringify({ 
-          response: generalResponse, 
-          diagnostics: includeDiagnostics ? diagnostics : undefined,
-          references: []
-        }),
-        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-      );
     }
     
     // If it's a journal-specific question, continue with the enhanced RAG flow
     // 1. Generate embedding for the message
     console.log("Generating embedding for message");
     diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "loading"));
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'text-embedding-ada-002',
-        input: message,
-      }),
-    });
-
-    if (!embeddingResponse.ok) {
-      const error = await embeddingResponse.text();
-      console.error('Failed to generate embedding:', error);
-      diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "error", error));
+    
+    let queryEmbedding;
+    try {
+      queryEmbedding = await createEmbedding(message);
+      console.log("Embedding generated successfully");
+      diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "success"));
+    } catch (embeddingError) {
+      console.error('Failed to generate embedding:', embeddingError);
+      diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "error", embeddingError.message));
       throw new Error('Could not generate embedding for the message');
     }
-
-    const embeddingData = await embeddingResponse.json();
-    if (!embeddingData.data || embeddingData.data.length === 0) {
-      diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "error", "No embedding data returned"));
-      throw new Error('Could not generate embedding for the message');
-    }
-
-    const queryEmbedding = embeddingData.data[0].embedding;
-    console.log("Embedding generated successfully");
-    diagnostics.steps.push(createDiagnosticStep("Embedding Generation", "success"));
 
     // 2. Search for relevant entries based on the query plan
     console.log("Searching for relevant entries");
@@ -448,7 +488,7 @@ Example format (only to be used when you feel the need to) :
 
 Now generate your thoughtful, emotionally intelligent response:`;
 
-    // 4. Call OpenAI
+    // 4. Call OpenAI using our new helper function
     console.log("Calling OpenAI for completion");
     diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "loading"));
     
@@ -473,113 +513,110 @@ Now generate your thoughtful, emotionally intelligent response:`;
       
       // Add the current user message
       messages.push({ role: 'user', content: message });
-    } else {
-      // If no context, just use the system prompt
-      console.log("No conversation context available, using only system prompt");
     }
     
-    const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: prompt }],
-      }),
-    });
-
-    if (!completionResponse.ok) {
-      const error = await completionResponse.text();
-      console.error('Failed to get completion:', error);
-      diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "error", error));
-      throw new Error('Failed to generate response');
-    }
-
-    const completionData = await completionResponse.json();
-    let responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-    console.log("Response generated successfully");
-    diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "success"));
+    try {
+      // Use our helper instead of the direct call
+      const completionData = await callOpenAI(
+        conversationContext.length > 0 ? messages : [{ role: 'system', content: prompt }],
+        'gpt-4o-mini'
+      );
+      
+      let responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+      console.log("Response generated successfully");
+      diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "success"));
     
-    // Validate response for hallucinated dates
-    diagnostics.steps.push(createDiagnosticStep("Response Validation", "loading"));
-    
-    // Extract dates from the response using a regex pattern for dates
-    const dateRegex = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b/gi;
-    const mentionedDates = responseContent.match(dateRegex) || [];
-    
-    // Check if any mentioned dates are not in the available dates
-    const invalidDates = mentionedDates.filter(mentionedDate => {
-      // Normalize date formats for comparison (remove ordinal suffixes)
-      const normalizedDate = mentionedDate.replace(/(st|nd|rd|th)/g, '').trim();
-      // Check if this normalized date exists in availableDates
-      return !availableDates.some(availableDate => {
-        return normalizedDate.includes(availableDate.replace(/(\d+)(st|nd|rd|th)/, '$1')) || 
-               availableDate.includes(normalizedDate.replace(/(\d+)(st|nd|rd|th)/, '$1'));
+      // Validate response for hallucinated dates
+      diagnostics.steps.push(createDiagnosticStep("Response Validation", "loading"));
+      
+      // Extract dates from the response using a regex pattern for dates
+      const dateRegex = /\b(January|February|March|April|May|June|July|August|September|October|November|December)\s+\d{1,2}(?:st|nd|rd|th)?,?\s+\d{4}\b/gi;
+      const mentionedDates = responseContent.match(dateRegex) || [];
+      
+      // Check if any mentioned dates are not in the available dates
+      const invalidDates = mentionedDates.filter(mentionedDate => {
+        // Normalize date formats for comparison (remove ordinal suffixes)
+        const normalizedDate = mentionedDate.replace(/(st|nd|rd|th)/g, '').trim();
+        // Check if this normalized date exists in availableDates
+        return !availableDates.some(availableDate => {
+          return normalizedDate.includes(availableDate.replace(/(\d+)(st|nd|rd|th)/, '$1')) || 
+                availableDate.includes(normalizedDate.replace(/(\d+)(st|nd|rd|th)/, '$1'));
+        });
       });
-    });
-    
-    // Log any invalid dates found
-    if (invalidDates.length > 0) {
-      console.log("Found potentially hallucinated dates in response:", invalidDates);
-      diagnostics.steps.push(createDiagnosticStep(
-        "Response Validation", 
-        "warning", 
-        `Found ${invalidDates.length} potentially hallucinated dates: ${invalidDates.join(', ')}`
-      ));
       
-      // Add a disclaimer to the response
-      responseContent += `\n\n**Note:** This response may contain inaccuracies in the dates referenced. Please refer to your actual journal entries for precise dates.`;
-    } else {
-      console.log("No hallucinated dates detected in response");
-      diagnostics.steps.push(createDiagnosticStep("Response Validation", "success", "No date hallucinations detected"));
-    }
-
-    // Process entries to ensure valid dates
-    const processedEntries = entries.map(entry => {
-      // Make sure created_at is a valid date string
-      let createdAt = entry.created_at;
-      if (!createdAt || isNaN(new Date(createdAt).getTime())) {
-        createdAt = new Date().toISOString();
+      // Log any invalid dates found
+      if (invalidDates.length > 0) {
+        console.log("Found potentially hallucinated dates in response:", invalidDates);
+        diagnostics.steps.push(createDiagnosticStep(
+          "Response Validation", 
+          "warning", 
+          `Found ${invalidDates.length} potentially hallucinated dates: ${invalidDates.join(', ')}`
+        ));
+        
+        // Add a disclaimer to the response
+        responseContent += `\n\n**Note:** This response may contain inaccuracies in the dates referenced. Please refer to your actual journal entries for precise dates.`;
+      } else {
+        console.log("No hallucinated dates detected in response");
+        diagnostics.steps.push(createDiagnosticStep("Response Validation", "success", "No date hallucinations detected"));
       }
-      
-      return {
-        id: entry.id,
-        content: entry.content,
-        created_at: createdAt,
-        similarity: entry.similarity || 0,
-        sentiment: entry.sentiment || null,
-        emotions: entry.emotions || null,
-        themes: entry.master_themes || []
-      };
-    });
 
-    // 5. Return response
-    return new Response(
-      JSON.stringify({ 
-        response: responseContent, 
-        diagnostics: includeDiagnostics ? diagnostics : undefined,
-        references: processedEntries.map(entry => {
-          // Apply user's timezone offset for display
-          const localDate = new Date(new Date(entry.created_at).getTime() + (timezoneOffset || 0) * 60 * 1000);
-          
-          return {
-            id: entry.id,
-            content: entry.content,
-            date: entry.created_at,
-            localDate: localDate.toISOString(), // Add local date for client-side display
-            snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
-            similarity: entry.similarity,
-            themes: entry.themes || [],
-            sentiment: entry.sentiment,
-            emotions: entry.emotions
-          };
+      // Process entries to ensure valid dates
+      const processedEntries = entries.map(entry => {
+        // Make sure created_at is a valid date string
+        let createdAt = entry.created_at;
+        if (!createdAt || isNaN(new Date(createdAt).getTime())) {
+          createdAt = new Date().toISOString();
+        }
+        
+        return {
+          id: entry.id,
+          content: entry.content,
+          created_at: createdAt,
+          similarity: entry.similarity || 0,
+          sentiment: entry.sentiment || null,
+          emotions: entry.emotions || null,
+          themes: entry.master_themes || []
+        };
+      });
+
+      // 5. Return response
+      return new Response(
+        JSON.stringify({ 
+          response: responseContent, 
+          diagnostics: includeDiagnostics ? diagnostics : undefined,
+          references: processedEntries.map(entry => {
+            // Apply user's timezone offset for display
+            const localDate = new Date(new Date(entry.created_at).getTime() + (timezoneOffset || 0) * 60 * 1000);
+            
+            return {
+              id: entry.id,
+              content: entry.content,
+              date: entry.created_at,
+              localDate: localDate.toISOString(), // Add local date for client-side display
+              snippet: entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : ''),
+              similarity: entry.similarity,
+              themes: entry.themes || [],
+              sentiment: entry.sentiment,
+              emotions: entry.emotions
+            };
+          }),
+          entryDateRange: dateRangeInfo
         }),
-        entryDateRange: dateRangeInfo
-      }),
-      { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
-    );
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
+      );
+    } catch (error) {
+      console.error('Error generating response:', error);
+      diagnostics.steps.push(createDiagnosticStep("Language Model Processing", "error", error.message));
+      
+      return new Response(
+        JSON.stringify({ 
+          response: "I'm having trouble analyzing your journal entries right now. Please try again in a moment.", 
+          diagnostics: includeDiagnostics ? diagnostics : undefined,
+          error: error.message
+        }),
+        { headers: { 'Content-Type': 'application/json', ...corsHeaders }, status: 500 }
+      );
+    }
   } catch (error) {
     console.error('Error:', error);
     return new Response(
