@@ -11,6 +11,7 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import AnalyticsDisplay from "./AnalyticsDisplay";
 import EmotionRadarChart from "./EmotionRadarChart";
 import { ChatMessage } from "@/types/chat";
+import { TypingIndicator } from "./TypingIndicator";
 
 interface ChatAreaProps {
   chatMessages: ChatMessage[];
@@ -53,6 +54,22 @@ const ChatArea: React.FC<ChatAreaProps> = ({
       }
     }
   }, [chatMessages, threadId]);
+
+  // Define the typing indicator messages based on processing stage
+  const getTypingIndicatorMessages = () => {
+    if (!processingStage) {
+      return undefined; // Use default messages
+    }
+    
+    // Create array with current processing stage first, then add defaults
+    return [
+      processingStage,
+      "Thinking...",
+      "Analyzing journal entries...",
+      "Finding patterns...",
+      "Exploring connections..."
+    ];
+  };
 
   return (
     <div className="flex flex-col p-4 overflow-y-auto h-full pb-20">
@@ -107,7 +124,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                           variant="outline"
                           className="text-left justify-start"
                           onClick={() => onInteractiveOptionClick(option)}
-                          data-test-id={`interactive-option-${idx}`} // Add test id for easier debugging
+                          data-test-id={`interactive-option-${idx}`}
                         >
                           {option.text}
                         </Button>
@@ -144,16 +161,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
             <Card>
               <CardContent className="p-3">
-                <div className="flex items-center">
-                  <div className="animate-pulse flex space-x-2">
-                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
-                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
-                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
-                  </div>
-                  <span className="ml-3 text-sm text-muted-foreground">
-                    {processingStage || <TranslatableText text="Processing..." />}
-                  </span>
-                </div>
+                <TypingIndicator messages={getTypingIndicatorMessages()} />
               </CardContent>
             </Card>
           </div>
