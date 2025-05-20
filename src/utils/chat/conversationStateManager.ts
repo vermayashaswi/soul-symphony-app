@@ -11,8 +11,6 @@ export interface ConversationState {
   referenceIds: string[];            // IDs of journal entries referenced
   entities: string[];                // Key entities mentioned
   lastQueryType: QueryType;          // Type of the last query
-  isMentalHealthQuery?: boolean;     // IMPROVEMENT: Flag for mental health queries
-  isPersonalQuery?: boolean;         // IMPROVEMENT: Flag for personal queries
   previousState?: ConversationState | null; // Previous state for tracking changes
 }
 
@@ -29,7 +27,6 @@ export type QueryType =
   | 'general_analysis'        // General analysis request
   | 'emotional_analysis'      // Analysis of emotions
   | 'pattern_detection'       // Looking for patterns
-  | 'mental_health_support'   // IMPROVEMENT: Specific mental health support queries
   | 'personality_reflection'; // Reflections on personality
 
 /**
@@ -73,9 +70,7 @@ export class ConversationStateManager {
         needsClarity: metadata.needsClarity || false,
         referenceIds: metadata.referenceIds || [],
         entities: metadata.entities || [],
-        lastQueryType: metadata.lastQueryType || 'journal_specific',
-        isMentalHealthQuery: metadata.isMentalHealthQuery || false,
-        isPersonalQuery: metadata.isPersonalQuery || false
+        lastQueryType: metadata.lastQueryType || 'journal_specific'
       };
       
       return this.currentState;
@@ -101,8 +96,6 @@ export class ConversationStateManager {
         referenceIds: state.referenceIds,
         entities: state.entities,
         lastQueryType: state.lastQueryType,
-        isMentalHealthQuery: state.isMentalHealthQuery || false,
-        isPersonalQuery: state.isPersonalQuery || false,
         lastUpdated: new Date().toISOString()
         // Note: We exclude the previousState to avoid circular references
       };
@@ -155,7 +148,6 @@ export class ConversationStateManager {
   
   /**
    * Analyze intent type based on the query and previous state
-   * IMPROVEMENT: Enhanced intent analysis with mental health awareness
    */
   async analyzeIntent(query: string): Promise<IntentType> {
     if (!this.currentState) await this.loadState();
@@ -166,11 +158,6 @@ export class ConversationStateManager {
     
     // 2. Check if this is a response to a previous clarification request
     if (previousState?.needsClarity) return 'clarification_response';
-    
-    // IMPROVEMENT: Check if this is a mental health follow-up
-    if (previousState?.isMentalHealthQuery && isMentalHealthQuery(query)) {
-      return 'followup_refinement'; // Treat mental health follow-ups as refinement
-    }
     
     // 3. Check if this is a follow-up query
     if (this.isFollowUpQuery(query, previousState)) {
@@ -190,7 +177,6 @@ export class ConversationStateManager {
 
   /**
    * Create a new state based on intent analysis and query plan
-   * IMPROVEMENT: Preserve mental health context across states
    */
   async createState(
     query: string, 
@@ -209,24 +195,12 @@ export class ConversationStateManager {
       referenceIds: [],
       entities: extractEntities(plan),
       lastQueryType: plan?.queryType || 'journal_specific',
-      isMentalHealthQuery: plan?.isMentalHealthQuery || isMentalHealthQuery(query),
-      isPersonalQuery: plan?.isPersonalQuery || isPersonalQuery(query),
       previousState: previousState
     };
     
     // For time follow-ups, preserve the previous topic context
     if (intent === 'followup_time' && previousState?.topicContext) {
       newState.topicContext = previousState.topicContext;
-    }
-    
-    // IMPROVEMENT: For mental health follow-ups, preserve the mental health context
-    if (intent === 'followup_refinement' && previousState?.isMentalHealthQuery) {
-      newState.isMentalHealthQuery = true;
-      
-      // If no new topic is extracted, preserve the previous one
-      if (!newState.topicContext && previousState.topicContext) {
-        newState.topicContext = previousState.topicContext;
-      }
     }
     
     return newState;
@@ -368,30 +342,13 @@ function calculateConfidence(plan: any, query: string): number {
     score -= 0.2;
   }
   
-  // IMPROVEMENT: Increase confidence for mental health queries to ensure they get processed
-  if (isMentalHealthQuery(query)) {
-    score = Math.min(1.0, score + 0.1);
-  }
-  
   return Math.max(0.1, Math.min(score, 1.0)); // Keep between 0.1 and 1.0
 }
 
 /**
  * Helper function to determine if clarification is needed
- * IMPROVEMENT: More permissive for mental health queries
  */
 function determineIfClarificationNeeded(plan: any, query: string): boolean {
-  // Check if the query is mental health related
-  const mentalHealthRelated = isMentalHealthQuery(query) || plan?.isMentalHealthQuery;
-  
-  // Be more permissive with clarification for mental health queries
-  if (mentalHealthRelated) {
-    // For mental health queries, only require clarification for extremely vague queries
-    if (query.length <= 3) return true;
-    return false;
-  }
-  
-  // Standard clarification logic
   // Check if the plan explicitly requests more context
   if (plan?.needs_more_context) return true;
   
@@ -406,74 +363,6 @@ function determineIfClarificationNeeded(plan: any, query: string): boolean {
   if ((!plan?.filters || Object.keys(plan.filters).length === 0) 
       && query.length < 15) {
     return true;
-  }
-  
-  return false;
-}
-
-/**
- * IMPROVEMENT: Helper function to check if a query is mental health related
- */
-function isMentalHealthQuery(query: string): boolean {
-  const mentalHealthKeywords = [
-    'mental health', 'anxiety', 'depression', 'stress', 'mood', 'emotion', 
-    'feeling', 'therapy', 'therapist', 'psychiatrist', 'psychologist', 
-    'counselor', 'counseling', 'wellbeing', 'well-being', 'wellness',
-    'self-care', 'burnout', 'overwhelm', 'mindfulness', 'meditation',
-    'coping', 'psychological', 'emotional health', 'distress'
-  ];
-  
-  const lowerQuery = query.toLowerCase();
-  
-  // Check for mental health keywords
-  for (const keyword of mentalHealthKeywords) {
-    if (lowerQuery.includes(keyword)) {
-      return true;
-    }
-  }
-  
-  // Check for phrases commonly used in mental health contexts
-  const mentalHealthPatterns = [
-    /\b(?:i (?:feel|am feeling|have been feeling))\b/i,
-    /\b(?:help|improve) (?:my|with) (?:mental|emotional)/i,
-    /\b(?:my|with) (?:mental|emotional) (?:health|state|wellbeing)/i,
-    /\bhow (?:to|can i|should i) (?:feel better|improve|help)/i,
-    /\badvice (?:for|on|about) (?:my|dealing with|handling)/i
-  ];
-  
-  for (const pattern of mentalHealthPatterns) {
-    if (pattern.test(lowerQuery)) {
-      return true;
-    }
-  }
-  
-  return false;
-}
-
-/**
- * IMPROVEMENT: Helper function to check if a query is seeking personal advice
- */
-function isPersonalQuery(query: string): boolean {
-  const lowerQuery = query.toLowerCase();
-  
-  // Check for first-person pronouns and possessives
-  const personalIndicators = [
-    /\bmy\b.*\b(?:advice|help|suggest|how|what|should)/i,
-    /\bi\b.*\b(?:need|want|should|could|would|can)/i,
-    /\bshould i\b/i, 
-    /\bcan i\b/i, 
-    /\bcould i\b/i,
-    /\bwould i\b/i, 
-    /\bdo i\b/i,
-    /\badvice for me\b/i,
-    /\bhelp me\b/i,
-    /\b(?:advice|help|suggest|recommendation)s?\b.*\bfor\b.*\bme\b/i
-  ];
-  
-  for (const pattern of personalIndicators) {
-    if (pattern.test(lowerQuery)) {
-      return true;
-    }
   }
   
   return false;
