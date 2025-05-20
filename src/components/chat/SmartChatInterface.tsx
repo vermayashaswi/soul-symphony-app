@@ -1,30 +1,28 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
+import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '@/integrations/supabase/client';
+import { useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { processChatMessage } from "@/services/chatService";
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import EmptyChatState from "./EmptyChatState";
-import VoiceRecordingButton from "./VoiceRecordingButton";
-import { Trash } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ChatSuggestionButton } from "./ChatSuggestionButton";
+import { Separator } from "@/components/ui/separator";
+import EmptyChatState from "@/components/chat/EmptyChatState";
+import { useDebouncedCallback } from 'use-debounce';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
-import { ChatMessage } from "@/types/chat";
-import { getThreadMessages, saveMessage } from "@/services/chat";
-import { useDebugLog } from "@/utils/debug/DebugContext";
-import { TranslatableText } from "@/components/translation/TranslatableText";
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import { ChatDiagnostics } from "./ChatDiagnostics";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BugIcon, HelpCircleIcon, InfoIcon, MessagesSquareIcon } from 'lucide-react';
+import { DebugPanel } from "@/components/debug/DebugPanel";
+import { useToast } from "@/hooks/use-toast";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage } from "@/utils/chat/threadUtils";
