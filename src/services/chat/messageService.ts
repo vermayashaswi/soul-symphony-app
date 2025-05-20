@@ -498,11 +498,11 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
         analysis: msg.analysis_data,
         analysis_data: msg.analysis_data,
-        hasNumericResult: msg.has_numeric_result,
-        has_numeric_result: msg.has_numeric_result,
         // Convert sub_query_responses to proper type
         sub_query_responses: jsonToSubQueryResponse(msg.sub_query_responses),
-        is_processing: msg.is_processing
+        is_processing: msg.is_processing,
+        hasNumericResult: msg.has_numeric_result,
+        has_numeric_result: msg.has_numeric_result
       };
       
       return chatMessage;
