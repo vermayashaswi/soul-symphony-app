@@ -80,6 +80,26 @@ export function classifyUserQuery(message: string): {
     confidence += 0.3;
   }
   
+  // Personality trait questions - new and enhanced detection
+  const personalityTraits = [
+    'introvert', 'extrovert', 'ambivert', 'shy', 'outgoing', 'reserved',
+    'social', 'antisocial', 'talkative', 'quiet', 'people person', 'loner',
+  ];
+  
+  for (const trait of personalityTraits) {
+    if (message.toLowerCase().includes(trait)) {
+      journalSpecificReasons.push(`Query mentions personality trait: ${trait}`);
+      confidence += 0.4; // Higher confidence boost for personality traits
+      break;
+    }
+  }
+  
+  // Enhanced pattern detection for personality questions
+  if (/\bdo i like\b|\bam i\b.{0,25}\b(person|individual|introvert|extrovert)\b/i.test(message.toLowerCase())) {
+    journalSpecificReasons.push("Question about personal identity or preference");
+    confidence += 0.45; // Extra strong signal
+  }
+  
   // Indicators of general questions
   if (/\bwhat is\b|\bhow does\b|\bexplain\b|\bdescribe\b|\bdefine\b/i.test(message.toLowerCase()) &&
       !queryTypes.isPersonalInsightQuery && !queryTypes.isMentalHealthQuery) {
@@ -129,9 +149,16 @@ export function forceJournalSpecificMatching(message: string): boolean {
     /\bwhat should i do\b/i,            // "What should I do about my anxiety?"
     /\bwhat (makes|helps) me\b/i,       // "What makes me happy?"
     /\bhow (can|could|should) i\b/i,    // "How can I improve my sleep?"
-    /\bmy (mental health|wellbeing)\b/i // "Help my mental health"
+    /\bmy (mental health|wellbeing)\b/i, // "Help my mental health"
+    /\b(intro|extro)vert\b/i,           // "Am I an introvert/extrovert?"
+    /\b(like|enjoy).{0,10}\bpeople\b/i,  // "Do I like people?"
+    /\b(am|are|is)\b.{0,10}\b(social|shy|outgoing|reserved)\b/i, // "Am I social/shy/outgoing/reserved?"
+    /\b(personality|character|nature|temperament)\b/i, // "What's my personality like?"
+    /\bdo i prefer\b/i,                 // "Do I prefer being alone or in groups?"
+    /\bsocial (life|interaction|situation)/i, // "How do I handle social situations?"
   ];
   
+  // Check if any pattern matches
   return alwaysJournalPatterns.some(pattern => pattern.test(lowerMessage));
 }
 

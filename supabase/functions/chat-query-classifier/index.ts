@@ -98,7 +98,37 @@ function classifyMessage(message: string): {
     // Temporal questions about self
     { pattern: /\bhow (have|did) i\b.{1,20}\b(recently|lately|past|week|month|year)\b/i, 
       weight: 0.35, 
-      reason: "Question about personal changes over time" }
+      reason: "Question about personal changes over time" },
+      
+    // Personality trait specific questions
+    { pattern: /\b(intro|extro)vert\b/i,
+      weight: 0.5,
+      reason: "Question about introversion/extroversion personality traits" },
+      
+    // Social preference questions
+    { pattern: /\bdo i (like|enjoy|prefer)\b.{0,15}\bpeople\b/i,
+      weight: 0.5,
+      reason: "Question about social preferences" },
+      
+    // Personality type questions
+    { pattern: /\bwhat (type|kind) of person\b/i,
+      weight: 0.45,
+      reason: "Question about personality type" },
+      
+    // Character trait questions
+    { pattern: /\bmy (personality|character|nature|temperament)\b/i,
+      weight: 0.5,
+      reason: "Question about personal character traits" },
+      
+    // Social comfort questions
+    { pattern: /\b(how|do) i\b.{0,20}\b(handle|manage|deal with|approach) social\b/i,
+      weight: 0.45,
+      reason: "Question about handling social situations" },
+      
+    // Social energy questions
+    { pattern: /\b(energized|drained|tired)\b.{0,20}\b(after|by|from|when)\b.{0,20}\b(social|people|interaction|talking|conversation)\b/i,
+      weight: 0.5,
+      reason: "Question about social energy levels" }
   ];
   
   // Indicators that suggest this is a general question
@@ -160,7 +190,10 @@ function classifyMessage(message: string): {
     /\bdo i\b.{1,20}\b(like|enjoy|prefer|tend to|usually)\b/i,
     /\bhow (can|could|should) i\b/i,
     /\bwhat should i do\b/i,
-    /\bhelp (me|my)\b/i
+    /\bhelp (me|my)\b/i,
+    /\b(intro|extro)vert\b/i,
+    /\bdo i like people\b/i,
+    /\bwhat (kind|type) of person am i\b/i
   ];
   
   const hasStrongPersonalIndicator = strongPersonalPatterns.some(pattern => pattern.test(lowerMessage));

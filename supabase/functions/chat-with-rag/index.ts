@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -125,6 +126,30 @@ async function handleGeneralQuestion(message: string, conversationContext: any[]
   }
 }
 
+// Function to detect personality trait questions that should always use journal entries
+function isPersonalityQuestion(query: string): boolean {
+  const personalityPatterns = [
+    /\bam i\b/i,                      // "Am I an introvert?"
+    /\bintrovert\b/i,                 // Any mention of introvert
+    /\bextrovert\b/i,                 // Any mention of extrovert
+    /\bambivert\b/i,                  // Any mention of ambivert
+    /\bpersonality\b/i,               // "my personality"
+    /\bmy traits\b/i,                 // "my traits"
+    /\bmy characteristic/i,           // "my characteristics"
+    /\bmy nature\b/i,                 // "my nature"
+    /\bhow (am|do) i\b.{0,30}\b(like|feel about|think about|respond to)\b/i, // "How do I like people?"
+    /\bdo i\b.{0,20}\b(like|enjoy|prefer)\b/i, // "Do I like people?"
+    /\bwhat (kind|type) of person\b/i, // "What kind of person am I?"
+    /\bam i a\b.{0,20}\b(person|individual)\b/i, // "Am I a quiet person?"
+    /\bam i more\b/i,                 // "Am I more introverted or extroverted?"
+    /\bdo i tend to\b/i,              // "Do I tend to avoid social situations?"
+    /\bwhat does my\b.{0,20}\b(journal|entries)\b.{0,30}\b(say|reveal|indicate) about\b/i, // "What does my journal say about me?"
+    /\bwhat are my\b.{0,20}\b(traits|characteristics|tendencies)\b/i, // "What are my personality traits?"
+  ];
+
+  return personalityPatterns.some(pattern => pattern.test(query.toLowerCase()));
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -236,17 +261,24 @@ serve(async (req) => {
       }
     }
     
+    // First check if this is a personality question to bypass classification
+    const isPersonality = isPersonalityQuestion(message);
+    if (isPersonality) {
+      console.log("Detected personality question, bypassing classification");
+      diagnostics.steps.push(createDiagnosticStep("Request Analysis", "success", "Detected personality question"));
+    }
+    
     // First categorize if this is a general question or a journal-specific question
     diagnostics.steps.push(createDiagnosticStep("Question Categorization", "loading"));
     console.log("Categorizing question type");
     
-    // Force journal_specific for rating requests
+    // Force journal_specific for personality or rating requests
     let questionType = "GENERAL";
     
-    if (isRatingRequest) {
-      console.log("Rating request detected - forcing journal_specific classification");
+    if (isPersonality || isRatingRequest) {
+      console.log("Personality or rating request detected - forcing journal_specific classification");
       questionType = "JOURNAL_SPECIFIC";
-      diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", "Rating request detected: JOURNAL_SPECIFIC"));
+      diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", "Personality or rating request detected: JOURNAL_SPECIFIC"));
     } else {
       // Use the callOpenAI helper instead of the direct OpenAI SDK call
       try {
@@ -258,6 +290,12 @@ serve(async (req) => {
             IMPORTANT: If the query contains ANY request for ratings, scores, or evaluations (e.g., "Rate my anxiety", "Score my happiness", etc.), you MUST classify it as "JOURNAL_SPECIFIC".
             
             If you remotely feel this question could be about the person's journal entries or an exploration of his/her specific mental health, classify it as "JOURNAL_SPECIFIC".
+            
+            The following types of questions should ALWAYS be classified as "JOURNAL_SPECIFIC":
+            - Questions about the user's personality traits (e.g., "Am I an introvert?", "Am I extroverted?")
+            - Questions about the user's preferences (e.g., "Do I like people?", "What activities do I enjoy?")
+            - Questions about the user's patterns or tendencies (e.g., "Do I tend to avoid social situations?")
+            - Questions that use phrases like "my personality", "my traits", "my characteristics"
             
             Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
             
@@ -271,7 +309,11 @@ serve(async (req) => {
             - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
             - "Rate my happiness level" -> "JOURNAL_SPECIFIC"
             - "Score my productivity" -> "JOURNAL_SPECIFIC"
-            - "Analyze my emotional patterns" -> "JOURNAL_SPECIFIC"`
+            - "Analyze my emotional patterns" -> "JOURNAL_SPECIFIC"
+            - "Am I an introvert?" -> "JOURNAL_SPECIFIC"
+            - "Do I like people?" -> "JOURNAL_SPECIFIC"
+            - "What are my personality traits?" -> "JOURNAL_SPECIFIC"
+            - "Am I more social or reserved?" -> "JOURNAL_SPECIFIC"`
           },
           { role: 'user', content: message }
         ], 'gpt-4o-mini', 0.1);
@@ -281,14 +323,20 @@ serve(async (req) => {
         diagnostics.steps.push(createDiagnosticStep("Question Categorization", "success", `Classified as ${questionType}`));
       } catch (error) {
         console.error("Error classifying question:", error);
-        // Default to GENERAL on error
-        questionType = "GENERAL";
-        diagnostics.steps.push(createDiagnosticStep("Question Categorization", "error", `Error: ${error.message}, defaulting to GENERAL`));
+        // Default to JOURNAL_SPECIFIC on error for personality questions
+        if (isPersonalityQuestion(message)) {
+          questionType = "JOURNAL_SPECIFIC";
+          console.log("Classification error, but detected personality question - defaulting to JOURNAL_SPECIFIC");
+        } else {
+          // Default to GENERAL for other questions
+          questionType = "GENERAL";
+        }
+        diagnostics.steps.push(createDiagnosticStep("Question Categorization", "error", `Error: ${error.message}, defaulting to ${questionType}`));
       }
     }
 
     // If it's a general question, respond directly without journal entry retrieval
-    if (questionType === "GENERAL" && !isRatingRequest) {
+    if (questionType === "GENERAL" && !isRatingRequest && !isPersonality) {
       console.log("Processing as general question, skipping journal entry retrieval");
       diagnostics.steps.push(createDiagnosticStep("General Question Processing", "loading"));
       
@@ -352,6 +400,26 @@ serve(async (req) => {
         delete queryPlan.filters.dateRange;
       }
       
+      // For personality questions, ensure we have the right themes if not already specified
+      if (isPersonality && queryPlan.filters) {
+        if (!queryPlan.filters.themes || queryPlan.filters.themes.length === 0) {
+          console.log("Adding personality-related themes to filter");
+          queryPlan.filters.themes = [
+            "social interactions", 
+            "self-reflection", 
+            "personality traits",
+            "social gatherings",
+            "relationships"
+          ];
+        }
+        
+        // Use hybrid search for personality questions for best results
+        if (queryPlan.searchStrategy !== "hybrid") {
+          console.log("Switching to hybrid search strategy for personality question");
+          queryPlan.searchStrategy = "hybrid";
+        }
+      }
+      
       diagnostics.steps.push(createDiagnosticStep(
         "Search Strategy", 
         "success", 
@@ -377,7 +445,18 @@ serve(async (req) => {
       }
     } else {
       console.log("No query plan provided, using default vector search");
-      entries = await searchEntriesWithVector(userId, queryEmbedding, {}, 15, timezoneOffset);
+      
+      // For personality questions without a query plan, create a basic filter
+      let filters = {};
+      if (isPersonality) {
+        console.log("Creating personality-focused search without query plan");
+        filters = {
+          themes: ["social interactions", "self-reflection", "personality traits", "relationships"],
+          dateRange: { startDate: null, endDate: null, periodName: "all time" }
+        };
+      }
+      
+      entries = await searchEntriesWithVector(userId, queryEmbedding, filters, 15, timezoneOffset);
     }
 
     console.log(`Found ${entries.length} relevant entries`);
@@ -437,8 +516,8 @@ serve(async (req) => {
       return `- Entry from ${formattedDate}: ${entry.content}`;
     }).join('\n\n');
 
-    // 3. Prepare prompt with updated instructions
-    const prompt = `You are SOuLO, a personal mental well-being assistant designed to help users reflect on their emotions, understand patterns in their thoughts, and gain insight from their journaling practice and sometimes also give quantitative assessments, if asked to. If you are responding to an existing conversation thread, don't provide repetitive information.
+    // 3. Prepare prompt with updated instructions - enhance for personality questions
+    let prompt = `You are SOuLO, a personal mental well-being assistant designed to help users reflect on their emotions, understand patterns in their thoughts, and gain insight from their journaling practice and sometimes also give quantitative assessments, if asked to. If you are responding to an existing conversation thread, don't provide repetitive information.
 
 Below are excerpts from the user's journal entries, along with dates:
 ${entriesWithDates}
@@ -484,7 +563,26 @@ Example format (only to be used when you feel the need to) :
 - "Your entry on April 2, 2025, reflects a desire for deeper connection with others."
 - "Based on these entries, it seems you may lean toward introversion, but more context would help."
 
-**MAKE SURE YOUR RESPONSES ARE STRUCTURED WITH BULLETS, POINTERS, BOLD HEADERS, and other boldened information that's important. Don't need lengthy paragraphs that are difficult to read. Use headers and sub headers wisely**
+**MAKE SURE YOUR RESPONSES ARE STRUCTURED WITH BULLETS, POINTERS, BOLD HEADERS, and other boldened information that's important. Don't need lengthy paragraphs that are difficult to read. Use headers and sub headers wisely**`;
+
+    // Add special instructions for personality questions
+    if (isPersonality) {
+      prompt += `
+
+**SPECIAL INSTRUCTIONS FOR PERSONALITY QUESTIONS:**
+Since the user is asking about their personality traits or preferences (like whether they're an introvert or how they feel about people), please:
+1. Look for patterns in how they describe their social interactions and reactions to people
+2. Pay special attention to any mentions of:
+   - Feeling energized or drained by social situations
+   - Preferring alone time vs seeking out company
+   - Their comfort level in groups vs one-on-one interactions
+   - How they process thoughts (internally vs externally)
+3. If possible, provide a nuanced analysis rather than a binary label
+4. Use specific examples from their journal entries to support your conclusions
+5. For questions like "Am I an introvert?" or "Do I like people?", provide a clear answer based on the evidence, then support it with specifics`;
+    }
+
+    prompt += `
 
 Now generate your thoughtful, emotionally intelligent response:`;
 
@@ -936,3 +1034,4 @@ async function searchEntriesHybrid(
     return [];
   }
 }
+
