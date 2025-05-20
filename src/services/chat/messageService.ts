@@ -1,4 +1,3 @@
-
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -242,7 +241,7 @@ export async function sendMessage(
     // First, verify that this user has journal entries in the database
     const { count: entryCount, error: countError } = await supabase
       .from('Journal Entries')
-      .select('id', { count: true, head: true })
+      .select('id', { count: "exact", head: true })
       .eq('user_id', userId);
     
     if (countError) {

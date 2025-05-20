@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -27,6 +28,7 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage } from "@/utils/chat/threadUtils";
+import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 
 interface SmartChatInterfaceProps {
   mentalHealthInsights?: MentalHealthInsights;
