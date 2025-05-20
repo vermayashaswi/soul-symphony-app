@@ -1,4 +1,4 @@
-import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, isSubQueryResponse } from './types';
+import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { Json } from '@/integrations/supabase/types';
@@ -499,13 +499,8 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         analysis_data: msg.analysis_data,
         hasNumericResult: msg.has_numeric_result,
         has_numeric_result: msg.has_numeric_result,
-        // Ensure sub_query_responses is properly typed
-        sub_query_responses: Array.isArray(msg.sub_query_responses) 
-          ? msg.sub_query_responses.map((sqr: any) => ({
-              query: sqr.query || '',
-              response: sqr.response || ''
-            })) 
-          : [],
+        // Convert sub_query_responses to proper type
+        sub_query_responses: jsonToSubQueryResponse(msg.sub_query_responses),
         is_processing: msg.is_processing
       };
       
@@ -531,17 +526,15 @@ export const saveMessage = async (
   interactiveOptions?: any[]
 ): Promise<ChatMessage | null> => {
   try {
-    // Create the base message object
+    // Create the base message object with properly formatted fields for database
     const messageData = {
       thread_id: threadId,
       content,
       sender,
       role: sender, // Role and sender should match for now
-      reference_entries: references || null,
-      analysis_data: analysis || null,
-      has_numeric_result: hasNumericResult || false,
-      // Ensure sub_query_responses is always an array if present
-      sub_query_responses: [] as SubQueryResponse[] // Default empty array with correct type
+      reference_entries: references ? references : null,
+      analysis_data: analysis ? analysis : null,
+      has_numeric_result: !!hasNumericResult
     };
     
     // Insert the message
@@ -572,8 +565,8 @@ export const saveMessage = async (
       analysis_data: data.analysis_data,
       hasNumericResult: data.has_numeric_result,
       has_numeric_result: data.has_numeric_result,
-      // Ensure sub_query_responses is always a properly typed array
-      sub_query_responses: processSubQueryResponses(data.sub_query_responses)
+      // Ensure sub_query_responses is properly typed
+      sub_query_responses: jsonToSubQueryResponse(data.sub_query_responses)
     };
     
     // If this is an interactive message with options, add those properties
@@ -599,17 +592,7 @@ export const saveMessage = async (
  * Process and convert sub-query responses to the correct type
  */
 function processSubQueryResponses(data: any): SubQueryResponse[] {
-  if (!data) return [];
-  
-  if (Array.isArray(data)) {
-    return data.filter(item => isSubQueryResponse(item)).map(item => ({
-      query: item.query || '',
-      response: item.response || '',
-      references: item.references || []
-    }));
-  }
-  
-  return [];
+  return jsonToSubQueryResponse(data);
 }
 
 /**

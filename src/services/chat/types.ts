@@ -67,3 +67,35 @@ export function isSubQueryResponse(value: any): value is SubQueryResponse {
          typeof value.query === 'string' && 
          typeof value.response === 'string';
 }
+
+// Convert SubQueryResponse array to Json-compatible format
+export function subQueryResponseToJson(responses: SubQueryResponse[]): any[] {
+  if (!responses || !Array.isArray(responses)) return [];
+  
+  return responses.map(response => ({
+    query: response.query,
+    response: response.response,
+    references: response.references || []
+  }));
+}
+
+// Convert Json to SubQueryResponse array
+export function jsonToSubQueryResponse(json: any): SubQueryResponse[] {
+  if (!json) return [];
+  if (!Array.isArray(json)) {
+    try {
+      json = JSON.parse(json);
+      if (!Array.isArray(json)) return [];
+    } catch {
+      return [];
+    }
+  }
+  
+  return json
+    .filter(item => item && typeof item === 'object')
+    .map(item => ({
+      query: typeof item.query === 'string' ? item.query : '',
+      response: typeof item.response === 'string' ? item.response : '',
+      references: Array.isArray(item.references) ? item.references : []
+    }));
+}
