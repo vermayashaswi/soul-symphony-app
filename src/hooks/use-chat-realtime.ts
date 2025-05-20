@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from '@/types/chat';
@@ -11,18 +10,6 @@ export interface ChatRealtimeState {
   processingStage: string | null;
   processingStatus: ThreadProcessingStatus;
 }
-
-// Array of varied processing messages to make the chat feel more dynamic
-const processingMessages = [
-  "Thinking...",
-  "Analyzing your journal entries...",
-  "Finding patterns in your writing...",
-  "Exploring your emotions...",
-  "Connecting the dots...",
-  "Looking through your past entries...",
-  "Processing your question...",
-  "Reflecting on your journals..."
-];
 
 export function useChatRealtime(threadId: string | null) {
   const [realtimeState, setRealtimeState] = useState<ChatRealtimeState>({
@@ -56,10 +43,7 @@ export function useChatRealtime(threadId: string | null) {
             ...prev,
             isProcessing: processingStatus === 'processing',
             processingStatus: processingStatus,
-            // Select a random processing message instead of a fixed one
-            processingStage: processingStatus === 'processing' 
-              ? processingMessages[Math.floor(Math.random() * processingMessages.length)]
-              : null
+            processingStage: processingStatus === 'processing' ? 'Retrieving information...' : null
           }));
         }
       } catch (error) {
@@ -87,9 +71,9 @@ export function useChatRealtime(threadId: string | null) {
             ...prev,
             isProcessing: processingStatus === 'processing',
             processingStatus: processingStatus,
-            // Rotate through processing messages when in processing state
+            // Keep the current processing stage if we're still processing
             processingStage: processingStatus === 'processing' 
-              ? processingMessages[Math.floor(Math.random() * processingMessages.length)]
+              ? prev.processingStage || 'Retrieving information...'
               : null
           }));
         }
