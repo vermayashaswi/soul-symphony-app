@@ -45,7 +45,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-interface SmartChatInterfaceProps {
+export interface SmartChatInterfaceProps {
   mentalHealthInsights?: MentalHealthInsights;
 }
 
@@ -700,7 +700,5 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
 // Export both the raw component and a wrapper component
 export { SmartChatInterface };  // Named export for direct import by other components
 
-// Default export as a wrapper that doesn't require props
-export default function SmartChatInterfaceWrapper(props: SmartChatInterfaceProps) {
-  return <SmartChatInterface {...props} />;
-}
+// Default export as a wrapper component
+export default SmartChatInterface;
