@@ -138,7 +138,18 @@ function extractTimeReferences(content: string, timeArray: string[]): void {
     "night",
     "\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}", // Date patterns like 01/15/2023
     "january|february|march|april|may|june|july|august|september|october|november|december",
-    "monday|tuesday|wednesday|thursday|friday|saturday|sunday"
+    "monday|tuesday|wednesday|thursday|friday|saturday|sunday",
+    // New time-of-day patterns
+    "\\d{1,2}( )?([ap]m)",
+    "midnight",
+    "noon",
+    "dawn",
+    "dusk",
+    "sunrise",
+    "sunset",
+    "o'clock",
+    "hour",
+    "minute"
   ];
   
   const lowerContent = content.toLowerCase();
@@ -211,7 +222,10 @@ function extractUserPreferences(content: string, preferences: Record<string, any
     { regex: /I like when ([^.,]+)/, key: "likes" },
     { regex: /I don't like when ([^.,]+)/, key: "dislikes" },
     { regex: /don't (tell|show|give) me ([^.,]+)/, key: "dislikes" },
-    { regex: /I want (more|less) ([^.,]+)/, key: "contentPreference" }
+    { regex: /I want (more|less) ([^.,]+)/, key: "contentPreference" },
+    // New time preference patterns
+    { regex: /I (like|prefer) to journal in the (morning|afternoon|evening|night)/, key: "journalingTime" },
+    { regex: /I usually (write|journal|log) (at|in the) ([^.,]+)/, key: "journalingTime" }
   ];
   
   for (const pattern of preferencePatterns) {
@@ -298,4 +312,75 @@ export function generateClarificationQuestion(query: string, plan: any): string 
   
   // Default clarification question
   return "I want to make sure I understand your question correctly. Could you provide a bit more detail about what you're looking for?";
+}
+
+/**
+ * Analyze the mental health content of a message
+ * Returns a score from 0 to 1, where higher values indicate more mental health relevance
+ */
+export function analyzeMentalHealthContent(message: string): number {
+  if (!message) return 0;
+  
+  const lowerMessage = message.toLowerCase();
+  
+  // Mental health related terms
+  const mentalHealthTerms = [
+    "mental health", "wellbeing", "wellness", "therapy", "counseling", 
+    "anxiety", "depression", "stress", "mood", "emotion",
+    "feelings", "psychological", "psychiatric", "diagnosis",
+    "treatment", "medication", "self-care", "mindfulness",
+    "meditation", "coping", "trauma", "trigger", "crisis",
+    "burnout", "overwhelm", "healing", "recovery"
+  ];
+  
+  // Count the number of mental health terms in the message
+  let mentalHealthTermCount = 0;
+  for (const term of mentalHealthTerms) {
+    if (lowerMessage.includes(term)) {
+      mentalHealthTermCount++;
+    }
+  }
+  
+  // Count the number of personal pronouns
+  const personalPronouns = ["i", "me", "my", "mine", "myself"];
+  let personalPronounCount = 0;
+  
+  for (const pronoun of personalPronouns) {
+    const regex = new RegExp(`\\b${pronoun}\\b`, "ig");
+    const matches = lowerMessage.match(regex);
+    if (matches) {
+      personalPronounCount += matches.length;
+    }
+  }
+  
+  // Calculate a score based on the presence of terms and personal context
+  let score = 0;
+  
+  // Base score from mental health terms (max 0.6)
+  if (mentalHealthTermCount > 0) {
+    score += Math.min(0.6, mentalHealthTermCount * 0.15);
+  }
+  
+  // Additional score from personal pronouns (max 0.4)
+  if (personalPronounCount > 0) {
+    score += Math.min(0.4, personalPronounCount * 0.1);
+  }
+  
+  // Personal questions get a minimum score
+  if (lowerMessage.includes("am i") || 
+      lowerMessage.includes("do i") || 
+      lowerMessage.includes("should i")) {
+    score = Math.max(score, 0.3);
+  }
+  
+  // Strong personal mental health indicators get a high score
+  if ((lowerMessage.includes("my") || lowerMessage.includes("i")) && 
+      (lowerMessage.includes("mental health") || 
+       lowerMessage.includes("anxiety") || 
+       lowerMessage.includes("depression") || 
+       lowerMessage.includes("emotions"))) {
+    score = Math.max(score, 0.7);
+  }
+  
+  return Math.min(1, score);
 }
