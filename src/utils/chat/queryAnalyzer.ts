@@ -16,6 +16,7 @@ export type QueryTypes = {
   isRatingRequest: boolean;
   isPersonalInsightQuery: boolean;  // New field for personal insight queries
   isMentalHealthQuery: boolean;     // New field for mental health queries
+  isStatisticalQuery: boolean;      // Added missing property
   emotion?: string;
   theme?: string;
   timeRange: {
@@ -192,8 +193,9 @@ export function analyzeQueryTypes(message: string): QueryTypes {
     isThemeFocused: false,
     requiresTimeAnalysis: false,
     isRatingRequest: false,
-    isPersonalInsightQuery: false,  // Initialize new field
-    isMentalHealthQuery: false,     // Initialize new field
+    isPersonalInsightQuery: false,
+    isMentalHealthQuery: false,
+    isStatisticalQuery: false, // Initialize the new property
     timeRange: {
       startDate: null,
       endDate: null,
@@ -391,7 +393,7 @@ export function analyzeQueryTypes(message: string): QueryTypes {
 /**
  * Extracts time range from query text
  */
-function extractTimeRange(query: string): { startDate: string | null, endDate: string | null, periodName: string } {
+function extractTimeRange(query: string): { startDate: string | null, endDate: string | null, periodName: string, duration: number } {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -400,6 +402,7 @@ function extractTimeRange(query: string): { startDate: string | null, endDate: s
   let startDate: Date | null = null;
   let endDate: Date | null = null;
   let periodName = "recently";
+  let duration = 30; // Default duration in days
   
   const lowerQuery = query.toLowerCase();
   
@@ -568,11 +571,18 @@ function extractTimeRange(query: string): { startDate: string | null, endDate: s
     return index;
   }
   
-  console.log(`Time range extracted: ${startDate?.toISOString()} to ${endDate?.toISOString()} (${periodName})`);
+  // Calculate duration between startDate and endDate
+  if (startDate && endDate) {
+    const timeDiff = endDate.getTime() - startDate.getTime();
+    duration = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
+  }
+  
+  console.log(`Time range extracted: ${startDate?.toISOString()} to ${endDate?.toISOString()} (${periodName}), duration: ${duration} days`);
   
   return {
     startDate: startDate ? startDate.toISOString() : null,
     endDate: endDate ? endDate.toISOString() : null,
-    periodName
+    periodName,
+    duration
   };
 }

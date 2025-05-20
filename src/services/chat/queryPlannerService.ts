@@ -1,3 +1,4 @@
+
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
 
