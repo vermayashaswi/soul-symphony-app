@@ -13,26 +13,6 @@ const corsHeaders = {
   'Access-Control-Allow-Methods': 'POST, OPTIONS',
 }
 
-// Mental health and wellbeing term dictionary for domain recognition
-const MENTAL_HEALTH_TERMS = [
-  // Emotional states
-  'anxiety', 'anxious', 'depression', 'depressed', 'stress', 'stressed',
-  'mood', 'emotion', 'feeling', 'mental health', 'wellbeing', 'well-being',
-  'therapy', 'therapist', 'counseling', 'psychiatrist', 'psychologist',
-  // Common concerns
-  'sleep', 'insomnia', 'tired', 'exhaustion', 'burnout', 'overwhelm', 
-  'overthinking', 'ruminating', 'worry', 'worrying', 'trauma',
-  // Self-improvement
-  'self-care', 'self care', 'mindfulness', 'meditation', 'breathing',
-  'coping', 'cope', 'healing', 'recovery', 'growth', 'improve',
-  // Relationships
-  'relationship', 'friendship', 'family', 'partner', 'work-life',
-  'balance', 'boundaries', 'communication',
-  // Actions and requests
-  'help me', 'advice', 'suggestion', 'recommend', 'strategy', 'technique',
-  'improve', 'better', 'healthier', 'calm', 'relax', 'peace'
-];
-
 // Main function
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -70,10 +50,6 @@ serve(async (req) => {
       );
     }
 
-    // NEW: Check if this is a mental health or wellbeing related query
-    const domainContext = detectQueryDomain(message);
-    console.log(`Domain context detected: ${domainContext}`);
-    
     // Check for direct responses that don't need AI processing
     const directResponse = checkForDirectResponse(message);
     if (directResponse) {
@@ -82,6 +58,14 @@ serve(async (req) => {
         JSON.stringify({ directResponse }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
+    }
+    
+    // IMPROVEMENT: Check if this is a mental health or personal question
+    const isMentalHealthQuery = checkForMentalHealthQuery(message);
+    const isPersonalQuery = checkForPersonalQuery(message);
+    
+    if (isMentalHealthQuery || isPersonalQuery) {
+      console.log(`Detected ${isMentalHealthQuery ? 'mental health' : 'personal'} query, prioritizing journal analysis`);
     }
 
     // Improved handling of time expressions
@@ -97,23 +81,39 @@ serve(async (req) => {
       calculatedDateRange = calculateDateRange(timeExpression, timezoneOffset, parsedReferenceDate);
       extractedTimeContext = timeExpression;
       console.log(`Calculated date range for "${timeExpression}": ${JSON.stringify(calculatedDateRange)}`);
+    } else if (isMentalHealthQuery || isPersonalQuery) {
+      // IMPROVEMENT: For mental health queries without explicit time, default to recent period
+      calculatedDateRange = calculateDateRange('recent', timezoneOffset);
+      extractedTimeContext = 'recent';
+      console.log(`Using default recent time range for mental health query`);
     }
 
     // Enhanced system prompt with more intelligent conversation handling
+    // IMPROVEMENT: Add specialized prompting for mental health and personal queries
     const queryAnalysisRequest = {
       role: "system",
-      content: generateEnhancedSystemPrompt(appContext, calculatedDateRange, extractedTimeContext, preserveTopicContext, domainContext)
+      content: generateEnhancedSystemPrompt(appContext, calculatedDateRange, extractedTimeContext, preserveTopicContext, isMentalHealthQuery, isPersonalQuery)
     };
     
     // Prepare the conversation context for the query analysis
     const queryAnalysisMessages = prepareQueryAnalysisMessages(queryAnalysisRequest, message, conversationContext);
     
     // Get query plan from OpenAI with enhanced temperature settings
-    const temperature = determineTemperature(appContext, isFollowUp, domainContext);
+    // IMPROVEMENT: Use lower temperature for mental health queries for more reliability
+    const temperature = determineTemperature(appContext, isFollowUp, isMentalHealthQuery);
     const plan = await getQueryPlanFromOpenAI(queryAnalysisMessages, temperature);
     
     if (!plan) {
       throw new Error('Failed to generate query plan');
+    }
+    
+    // IMPROVEMENT: For mental health queries without a plan strategy, default to journal analysis
+    if (isMentalHealthQuery && (!plan.plan || !plan.plan.strategy)) {
+      if (!plan.plan) plan.plan = {};
+      plan.plan.strategy = 'hybrid';
+      plan.plan.needsJournalAnalysis = true;
+      plan.queryType = 'journal_specific';
+      console.log('Defaulting to journal analysis for mental health query');
     }
     
     // Enhance the plan with our calculated date range if we have one
@@ -128,6 +128,12 @@ serve(async (req) => {
       }
     }
     
+    // IMPROVEMENT: For personal mental health queries, ensure queryType is set correctly
+    if ((isMentalHealthQuery || isPersonalQuery) && plan.queryType === 'general') {
+      plan.queryType = 'journal_specific';
+      console.log('Corrected query type from general to journal_specific for mental health query');
+    }
+    
     // Handle topic context preservation
     if (preserveTopicContext && plan.plan && appContext?.userContext?.previousTopicContext) {
       plan.plan.topicContext = appContext.userContext.previousTopicContext;
@@ -139,33 +145,21 @@ serve(async (req) => {
       plan.plan.previousTimeContext = extractedTimeContext;
     }
     
-    // Add the domain context to the plan (NEW)
-    if (domainContext && plan.plan) {
-      plan.plan.domainContext = domainContext;
-      
-      // For mental health queries, set queryType to journal_specific if not already set
-      if (domainContext === 'mental_health' && !plan.queryType) {
-        plan.queryType = 'journal_specific';
-        console.log('Setting queryType to journal_specific for mental health domain');
-      }
-      
-      // For mental health queries, increase the confidence in searching journal data
-      if (domainContext === 'mental_health' && plan.plan.confidenceScore) {
-        // Boost confidence score for mental health queries
-        plan.plan.confidenceScore = Math.min(1.0, plan.plan.confidenceScore + 0.2);
-        console.log(`Boosted confidence score for mental health query to: ${plan.plan.confidenceScore}`);
-      }
-    }
-    
     // Check if this might be a multi-part question
     if (checkForMultiQuestions && shouldSegmentQuery(message)) {
       plan.plan.isSegmented = true;
     }
     
     // Check if we need clarification based on confidence score
-    if (plan.plan && !plan.plan.needsMoreContext && shouldRequestClarification(message, plan, domainContext)) {
+    if (plan.plan && !plan.plan.needsMoreContext && shouldRequestClarification(message, plan, isMentalHealthQuery)) {
       plan.plan.needsMoreContext = true;
-      plan.plan.clarificationReason = determineClarificationReason(message, plan, domainContext);
+      plan.plan.clarificationReason = determineClarificationReason(message, plan, isMentalHealthQuery);
+    }
+    
+    // IMPROVEMENT: Add personalization flags to the plan
+    if (plan.plan) {
+      plan.plan.isPersonalQuery = isPersonalQuery;
+      plan.plan.isMentalHealthQuery = isMentalHealthQuery;
     }
     
     return new Response(
@@ -182,49 +176,83 @@ serve(async (req) => {
 });
 
 /**
- * NEW: Detect the domain of the query to provide better context
+ * IMPROVEMENT: Check if this is a mental health related query
  */
-function detectQueryDomain(query: string): string | null {
+function checkForMentalHealthQuery(query: string): boolean {
+  const mentalHealthKeywords = [
+    'mental health', 'anxiety', 'depression', 'stress', 'mood', 'emotion', 
+    'feeling', 'therapy', 'therapist', 'psychiatrist', 'psychologist', 
+    'counselor', 'counseling', 'wellbeing', 'well-being', 'wellness',
+    'self-care', 'burnout', 'overwhelm', 'mindfulness', 'meditation',
+    'coping', 'psychological', 'emotional health', 'distress'
+  ];
+  
   const lowerQuery = query.toLowerCase();
   
-  // Check for personal indicators combined with mental health terms
-  const hasPersonalIndicators = /\b(i|me|my|mine|myself|we|our|us)\b/i.test(lowerQuery);
-  
-  // Check if any mental health term appears in the query
-  const hasMentalHealthTerms = MENTAL_HEALTH_TERMS.some(term => 
-    lowerQuery.includes(term.toLowerCase())
-  );
-  
-  // Check for direct requests for help or advice
-  const isHelpRequest = /\b(help|advice|suggest|recommend|improve|better)\b/i.test(lowerQuery);
-  
-  // Check for questions about feelings or emotional states
-  const isEmotionalQuery = /\b(feel|feeling|felt|emotion|mood|happy|sad|angry|anxious)\b/i.test(lowerQuery);
-  
-  // If it contains personal indicators AND mental health terms OR emotional content, classify as mental_health
-  if ((hasPersonalIndicators && (hasMentalHealthTerms || isEmotionalQuery)) || 
-      (isHelpRequest && (hasMentalHealthTerms || isEmotionalQuery))) {
-    return 'mental_health';
+  // Check for mental health keywords
+  for (const keyword of mentalHealthKeywords) {
+    if (lowerQuery.includes(keyword)) {
+      return true;
+    }
   }
   
-  // Check for self-reflection or personal growth indicators
-  if (hasPersonalIndicators && /\b(grow|growth|improve|better|progress|develop|learn|goal|aim|objective)\b/i.test(lowerQuery)) {
-    return 'personal_growth';
+  // Check for phrases commonly used in mental health contexts
+  const mentalHealthPatterns = [
+    /\b(?:i (?:feel|am feeling|have been feeling))\b/i,
+    /\b(?:help|improve) (?:my|with) (?:mental|emotional)/i,
+    /\b(?:my|with) (?:mental|emotional) (?:health|state|wellbeing)/i,
+    /\bhow (?:to|can i|should i) (?:feel better|improve|help)/i,
+    /\badvice (?:for|on|about) (?:my|dealing with|handling)/i
+  ];
+  
+  for (const pattern of mentalHealthPatterns) {
+    if (pattern.test(lowerQuery)) {
+      return true;
+    }
   }
   
-  // Check for relationship-focused queries
-  if (/\b(relationship|friend|family|partner|colleague|coworker|boss|team)\b/i.test(lowerQuery) && 
-      hasPersonalIndicators) {
-    return 'relationships';
+  return false;
+}
+
+/**
+ * IMPROVEMENT: Check if this is a personal query
+ */
+function checkForPersonalQuery(query: string): boolean {
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for first-person pronouns and possessives
+  const personalIndicators = [
+    /\bmy\b/i, /\bi\b/i, /\bme\b/i, /\bmine\b/i, /\bmyself\b/i,
+    /for me\b/i, /\bshould i\b/i, /\bcan i\b/i, /\bcould i\b/i,
+    /\bwould i\b/i, /\bdo i\b/i
+  ];
+  
+  for (const pattern of personalIndicators) {
+    if (pattern.test(lowerQuery)) {
+      return true;
+    }
   }
   
-  return null;
+  // Check for direct personal advice requests
+  if (/\b(?:advice|help|suggest|recommendation)s?\b.*\bfor\b/i.test(lowerQuery)) {
+    return true;
+  }
+  
+  return false;
 }
 
 /**
  * Generate an enhanced system prompt with better conversation intelligence
+ * IMPROVEMENT: Add mental health specific prompt enhancements
  */
-function generateEnhancedSystemPrompt(appContext: any, dateRange: any, timeContext: string | null, preserveTopicContext: boolean, domainContext: string | null): string {
+function generateEnhancedSystemPrompt(
+  appContext: any, 
+  dateRange: any, 
+  timeContext: string | null, 
+  preserveTopicContext: boolean,
+  isMentalHealthQuery: boolean = false,
+  isPersonalQuery: boolean = false
+): string {
   // Get app information from the context
   const appInfo = appContext?.appInfo || {
     name: "Journal Analysis App",
@@ -241,29 +269,26 @@ function generateEnhancedSystemPrompt(appContext: any, dateRange: any, timeConte
   let basePrompt = `You are an AI assistant for ${appInfo.name}, a ${appInfo.type} focused on mental health and self-reflection. 
 Your task is to analyze user queries about their journal entries and create a structured plan for searching and retrieving relevant information.`;
 
+  // IMPROVEMENT: Add specialized instructions for mental health queries
+  if (isMentalHealthQuery) {
+    basePrompt += `\n\nThis appears to be a MENTAL HEALTH RELATED QUERY. For mental health questions:
+1. PRIORITIZE analyzing the user's journal entries to provide personalized insights rather than generic advice.
+2. Look for patterns in emotions, behaviors, and thoughts across their journal entries.
+3. Focus on providing evidence-based, personalized suggestions based on their journaling history.
+4. Default to analyzing recent entries if no time period is specified.`;
+  }
+
+  // IMPROVEMENT: Add specialized instructions for personal queries
+  if (isPersonalQuery) {
+    basePrompt += `\n\nThis appears to be a PERSONAL QUERY where the user is asking for advice specific to their situation.
+1. ALWAYS analyze their journal entries to provide personalized insights rather than generic advice.
+2. Look for patterns and context in their own writing to make recommendations relevant to them.
+3. Avoid generic, one-size-fits-all advice that doesn't consider their personal context.`;
+  }
+
   // Add information about conversation intent and context
   basePrompt += `\n\nCONVERSATION CONTEXT:`;
   basePrompt += `\n- Query intent type: ${intentType}`;
-  
-  // NEW: Add domain context if available
-  if (domainContext) {
-    basePrompt += `\n- Domain context: ${domainContext}`;
-    
-    // Enhanced guidance for mental health domains
-    if (domainContext === 'mental_health') {
-      basePrompt += `\n\nIMPORTANT: This query is related to MENTAL HEALTH. It should be treated as a request for PERSONAL INSIGHTS from the user's journal entries, even if not explicitly asking for journal data. For mental health queries, always:
-1. Prioritize analyzing the user's personal journal data
-2. Look for patterns in emotions, thoughts, and behaviors
-3. Connect insights to the user's specific experiences rather than giving generic advice
-4. Default to using journal entries as the primary data source`;
-    }
-    else if (domainContext === 'personal_growth') {
-      basePrompt += `\n\nThis query relates to PERSONAL GROWTH. Prioritize finding patterns in the user's journal entries that show progress, challenges, or areas for development.`;
-    }
-    else if (domainContext === 'relationships') {
-      basePrompt += `\n\nThis query focuses on RELATIONSHIPS. Search for journal entries that mention specific people, interactions, or feelings about relationships to provide personalized insights.`;
-    }
-  }
   
   if (previousTimeContext || previousTopicContext) {
     basePrompt += `\n- Previous conversation context:`;
@@ -330,7 +355,9 @@ Time range calculated:
     "topicContext": "the main topic of the query",
     "confidenceScore": number between 0 and 1,
     "reasoning": "explanation of the plan",
-    "domainContext": "the domain of the query (mental_health, personal_growth, etc.)"
+    "isPersonalQuery": boolean,
+    "isMentalHealthQuery": boolean,
+    "needsJournalAnalysis": boolean
   },
   "queryType": "journal_specific" | "general_analysis" | "emotional_analysis" | "pattern_detection" | "personality_reflection"
 }`;
@@ -372,16 +399,17 @@ function prepareQueryAnalysisMessages(queryAnalysisRequest: any, message: string
 
 /**
  * Determine appropriate temperature setting based on context
+ * IMPROVEMENT: Use different temperature for mental health queries
  */
-function determineTemperature(appContext: any, isFollowUp: boolean, domainContext: string | null): number {
+function determineTemperature(appContext: any, isFollowUp: boolean, isMentalHealthQuery: boolean): number {
   const intentType = appContext?.userContext?.intentType || 'new_query';
   const needsClarity = appContext?.userContext?.needsClarity || false;
   
-  // Use lower temperature for mental health queries to be more precise
-  if (domainContext === 'mental_health') return 0.2;
-  
   // Use higher temperature for clarification questions to be more creative
   if (needsClarity) return 0.7;
+  
+  // Use lower temperature for mental health queries for consistency
+  if (isMentalHealthQuery) return 0.0;
   
   // Use lower temperature for time-based follow-ups to be more precise
   if (intentType === 'followup_time') return 0.0;
@@ -396,53 +424,55 @@ function determineTemperature(appContext: any, isFollowUp: boolean, domainContex
 /**
  * Get query plan from OpenAI with enhanced parameters
  */
-async function getQueryPlanFromOpenAI(messages: any, temperature: number = 0.2): Promise<any> {
+function getQueryPlanFromOpenAI(messages: any, temperature: number = 0.2): Promise<any> {
   try {
     console.log(`Calling OpenAI with temperature ${temperature}`);
     
-    const completion = await openai.chat.completions.create({
+    return openai.chat.completions.create({
       model: 'gpt-4-1106-preview',
       messages: messages,
       temperature: temperature,
       response_format: { type: "json_object" }
-    });
-    
-    const response = completion.choices[0].message?.content;
-    console.log(`Received from OpenAI: ${response?.substring(0, 200)}...`);
-    
-    if (!response) {
-      throw new Error('No response from OpenAI');
-    }
-    
-    try {
-      const plan = JSON.parse(response);
-      return plan;
-    } catch (error) {
-      console.error('Failed to parse JSON response from OpenAI:', error);
-      console.log('Raw response from OpenAI:', response);
+    })
+    .then(completion => {
+      const response = completion.choices[0].message?.content;
+      console.log(`Received from OpenAI: ${response?.substring(0, 200)}...`);
+      
+      if (!response) {
+        throw new Error('No response from OpenAI');
+      }
+      
+      try {
+        return JSON.parse(response);
+      } catch (error) {
+        console.error('Failed to parse JSON response from OpenAI:', error);
+        console.log('Raw response from OpenAI:', response);
+        return { plan: null, queryType: 'journal_specific' };
+      }
+    })
+    .catch(error => {
+      console.error('Error calling OpenAI:', error);
       return { plan: null, queryType: 'journal_specific' };
-    }
+    });
   } catch (error) {
-    console.error('Error calling OpenAI:', error);
-    return { plan: null, queryType: 'journal_specific' };
+    console.error('Error in getQueryPlanFromOpenAI:', error);
+    return Promise.resolve({ plan: null, queryType: 'journal_specific' });
   }
 }
 
 /**
  * Check if clarification should be requested based on message and plan
+ * IMPROVEMENT: Have different thresholds for mental health queries
  */
-function shouldRequestClarification(message: string, plan: any, domainContext: string | null): boolean {
-  // For mental health queries, only ask for clarification if absolutely necessary
-  if (domainContext === 'mental_health') {
-    // Check confidence score if available - use a lower threshold for mental health
-    const confidenceScore = plan?.plan?.confidenceScore;
-    if (confidenceScore !== undefined && confidenceScore < 0.3) return true;
-    
-    // Skip clarification for short messages if they are mental health related
+function shouldRequestClarification(message: string, plan: any, isMentalHealthQuery: boolean): boolean {
+  // For mental health queries, be more lenient with clarification requests
+  if (isMentalHealthQuery) {
+    // Only request clarification for extremely vague queries
+    if (message.length < 5) return true;
     return false;
   }
   
-  // Standard checks for other queries
+  // Regular clarification logic for non-mental health queries
   // Check message characteristics
   if (message.length < 10 && !message.includes('?')) return true;
   
@@ -461,11 +491,11 @@ function shouldRequestClarification(message: string, plan: any, domainContext: s
 
 /**
  * Determine the reason clarification is needed
+ * IMPROVEMENT: Provide more specific clarification requests for mental health queries
  */
-function determineClarificationReason(message: string, plan: any, domainContext: string | null): string {
-  // Specialized clarification requests for mental health domain
-  if (domainContext === 'mental_health') {
-    return "To provide more personalized insights from your journal, could you share more details about what specific aspects of your mental wellbeing you'd like to explore?";
+function determineClarificationReason(message: string, plan: any, isMentalHealthQuery: boolean): string {
+  if (isMentalHealthQuery) {
+    return "To provide personalized mental health insights, I need to know more about what specific aspects of your mental health you're concerned about.";
   }
   
   if (message.length < 10 && !message.includes('?')) {
@@ -524,6 +554,7 @@ function shouldSegmentQuery(message: string): boolean {
  * Detect time expressions in the query
  */
 function detectTimeExpression(query: string): string | null {
+  // ... keep existing code
   if (!query) return null;
   
   const lowerQuery = query.toLowerCase().trim();
@@ -566,6 +597,10 @@ function detectTimeExpression(query: string): string | null {
     { regex: /\ball time\b/i, value: 'all time' },
     { regex: /\bentire\b/i, value: 'all time' },
     { regex: /\beverything\b/i, value: 'all time' },
+    
+    // IMPROVEMENT: Add "recent" as a default time context
+    { regex: /\brecent\b/i, value: 'recent' },
+    { regex: /\blately\b/i, value: 'recent' }
   ];
   
   // Check each expression
@@ -579,7 +614,7 @@ function detectTimeExpression(query: string): string | null {
   
   // Special case for standalone time expressions as follow-ups
   if (/^(today|yesterday|this week|last week|this month|last month|this year|last year)(\?|\.|$)/i.test(lowerQuery)) {
-    return lowerQuery.match(/^(today|yesterday|this week|last week|this month|last month|this year|last year)/i)![0];
+    return lowerQuery.match(/^(today|yesterday|this week|last week|this month|last month|this year)/i)![0];
   }
   
   return null;
@@ -587,6 +622,7 @@ function detectTimeExpression(query: string): string | null {
 
 /**
  * Calculate date range based on time expression
+ * IMPROVEMENT: Add support for "recent" as a default time context
  */
 function calculateDateRange(timePeriod: string, timezoneOffset: number = 0, referenceDate?: Date): { startDate: string, endDate: string, periodName: string } {
   // Convert timezone offset to milliseconds
@@ -697,7 +733,14 @@ function calculateDateRange(timePeriod: string, timezoneOffset: number = 0, refe
     startDate = startOfYear(prevYear);
     endDate = endOfYear(prevYear);
     periodName = 'last year';
-  } 
+  }
+  // IMPROVEMENT: Add specific handler for "recent" time expressions
+  else if (lowerTimePeriod === 'recent' || lowerTimePeriod === 'lately') {
+    // For mental health or personal queries use last 2 weeks by default
+    startDate = startOfDay(subDays(now, 14)); // Last 14 days
+    endDate = endOfDay(now);
+    periodName = 'recent (last 2 weeks)';
+  }
   else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || 
            lowerTimePeriod === 'everything' || lowerTimePeriod === 'overall' ||
            lowerTimePeriod === 'all time' || lowerTimePeriod === 'always' ||
@@ -753,6 +796,8 @@ function calculateDateRange(timePeriod: string, timezoneOffset: number = 0, refe
     periodName
   };
 }
+
+// ... keep existing code (date helper functions)
 
 // Helper function to get start of day
 function startOfDay(date: Date): Date {
