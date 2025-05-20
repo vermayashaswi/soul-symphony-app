@@ -1,4 +1,3 @@
-
 // This file contains functions to analyze the type of query a user is asking
 
 export type QueryTypes = {
@@ -23,16 +22,160 @@ export type QueryTypes = {
     startDate: string | null;
     endDate: string | null;
     periodName: string;
+    duration: number;
   };
   startDate?: string;
   endDate?: string;
 };
 
 /**
+ * Calculate relative date range based on time expression
+ * @param timeExpression Time-related phrase from user query
+ * @returns Object containing start date, end date, period name, and duration in days
+ */
+export function calculateRelativeDateRange(timeExpression: string): { 
+  startDate: string; 
+  endDate: string; 
+  periodName: string;
+  duration: number;
+} {
+  const now = new Date();
+  let startDate = new Date();
+  let periodName = '';
+  let duration = 0;
+
+  // Default to current date
+  let endDate = new Date(now);
+  endDate.setHours(23, 59, 59, 999);
+  
+  // Convert to lowercase for easier matching
+  const lowercased = timeExpression.toLowerCase();
+  
+  // Process time expressions
+  if (lowercased.includes('today')) {
+    startDate = new Date(now);
+    startDate.setHours(0, 0, 0, 0);
+    periodName = 'today';
+    duration = 1;
+  }
+  else if (lowercased.includes('yesterday')) {
+    startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - 1);
+    startDate.setHours(0, 0, 0, 0);
+    
+    endDate = new Date(startDate);
+    endDate.setHours(23, 59, 59, 999);
+    
+    periodName = 'yesterday';
+    duration = 1;
+  }
+  else if (lowercased.match(/last\s+(\d+)\s+days?/)) {
+    const matches = lowercased.match(/last\s+(\d+)\s+days?/);
+    const days = parseInt(matches![1], 10);
+    
+    startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - days);
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = `last ${days} days`;
+    duration = days;
+  }
+  else if (lowercased.includes('last week') || lowercased.includes('past week')) {
+    startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - 7);
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = 'last week';
+    duration = 7;
+  }
+  else if (lowercased.includes('this week')) {
+    // Start of current week (Sunday or Monday, depending on locale)
+    startDate = new Date(now);
+    const day = startDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const diff = startDate.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday of current week
+    
+    startDate = new Date(startDate.setDate(diff));
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = 'this week';
+    duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  }
+  else if (lowercased.includes('last month') || lowercased.includes('past month')) {
+    startDate = new Date(now);
+    startDate.setMonth(startDate.getMonth() - 1);
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = 'last month';
+    duration = 30;
+  }
+  else if (lowercased.includes('this month')) {
+    startDate = new Date(now);
+    startDate.setDate(1); // First day of current month
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = 'this month';
+    duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  }
+  else if (lowercased.includes('last year') || lowercased.includes('past year')) {
+    startDate = new Date(now);
+    startDate.setFullYear(startDate.getFullYear() - 1);
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = 'last year';
+    duration = 365;
+  }
+  else if (lowercased.includes('this year')) {
+    startDate = new Date(now.getFullYear(), 0, 1); // January 1st of current year
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = 'this year';
+    duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
+  }
+  else if (lowercased.match(/past\s+(\d+)\s+months?/)) {
+    const matches = lowercased.match(/past\s+(\d+)\s+months?/);
+    const months = parseInt(matches![1], 10);
+    
+    startDate = new Date(now);
+    startDate.setMonth(startDate.getMonth() - months);
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = `past ${months} months`;
+    duration = months * 30; // approximation
+  }
+  else if (lowercased.match(/past\s+(\d+)\s+weeks?/)) {
+    const matches = lowercased.match(/past\s+(\d+)\s+weeks?/);
+    const weeks = parseInt(matches![1], 10);
+    
+    startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - (weeks * 7));
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = `past ${weeks} weeks`;
+    duration = weeks * 7;
+  }
+  else {
+    // Default to last 30 days if no specific time period is detected
+    startDate = new Date(now);
+    startDate.setDate(startDate.getDate() - 30);
+    startDate.setHours(0, 0, 0, 0);
+    
+    periodName = 'recent';
+    duration = 30;
+  }
+
+  return {
+    startDate: startDate.toISOString(),
+    endDate: endDate.toISOString(),
+    periodName,
+    duration
+  };
+}
+
+/**
  * Analyzes the user's query to determine what type of processing it needs
  */
-export function analyzeQueryTypes(query: string): QueryTypes {
-  const lowerQuery = query.toLowerCase();
+export function analyzeQueryTypes(message: string): QueryTypes {
+  const lowerQuery = message.toLowerCase();
   
   // Initialize result with default values
   const result: QueryTypes = {
@@ -54,7 +197,8 @@ export function analyzeQueryTypes(query: string): QueryTypes {
     timeRange: {
       startDate: null,
       endDate: null,
-      periodName: "recently"
+      periodName: "recently",
+      duration: 0
     }
   };
   
