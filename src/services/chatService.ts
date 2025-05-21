@@ -1,7 +1,7 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
 import { enhancedQueryClassification } from '../utils/chat/messageClassifier';
+import { analyzeTimePatterns } from '@/utils/chat/timePatternAnalyzer';
 
 type ProcessedResponse = {
   content: string;
@@ -17,13 +17,84 @@ type ProcessedResponse = {
  * Process a chat message with proper personal/general classification
  */
 export async function processChatMessage(
-  message: string,
-  userId: string,
-  queryTypes: QueryTypes,
+  message: string, 
+  userId: string, 
+  queryTypes: any, 
   threadId: string,
-  isFollowUp = false,
+  isFollowUp: boolean = false,
   parameters: Record<string, any> = {}
-): Promise<ProcessedResponse> {
+) {
+  // Check if this is a time pattern query
+  if (queryTypes.isTimePatternQuery || message.toLowerCase().includes('what time') || 
+      message.toLowerCase().includes('when do i usually')) {
+    try {
+      console.log("Executing time pattern analysis strategy");
+      
+      // Get time range from query or use default
+      const timeRange = queryTypes.timeRange || {
+        startDate: null,
+        endDate: null,
+        periodName: "all time",
+        duration: 0
+      };
+      
+      // Analyze time patterns in journal entries
+      const timePatternResults = await analyzeTimePatterns(userId, timeRange);
+      
+      if (!timePatternResults.hasEntries) {
+        return {
+          content: "I don't see any journal entries that match what you're asking about for the specified time period.",
+          role: "assistant"
+        };
+      }
+      
+      // Format the response based on time pattern analysis
+      let response = "";
+      
+      // Add information about when the user journals most frequently
+      const { timeDistribution } = timePatternResults;
+      const timeOfDayPreference = getTimeOfDayPreference(timeDistribution);
+      
+      response += `Based on your ${timePatternResults.entryCount} journal entries, `;
+      
+      if (timeOfDayPreference) {
+        response += `you typically prefer journaling during the ${timeOfDayPreference.period} (${timeOfDayPreference.percentage}% of your entries). `;
+      } else {
+        response += "I don't see a strong pattern in when you journal. ";
+      }
+      
+      // Add frequency information
+      const { frequencyPatterns } = timePatternResults;
+      if (frequencyPatterns && frequencyPatterns.consistency) {
+        response += `Your journaling pattern is ${frequencyPatterns.consistency}. `;
+        
+        if (frequencyPatterns.longestStreak > 1) {
+          response += `Your longest journaling streak was ${frequencyPatterns.longestStreak} consecutive days. `;
+        }
+      }
+      
+      // Add most active day information
+      if (timePatternResults.mostActiveDay && timePatternResults.mostActiveDay.date) {
+        const date = new Date(timePatternResults.mostActiveDay.date);
+        const formattedDate = date.toLocaleDateString('en-US', { weekday: 'long', month: 'long', day: 'numeric' });
+        response += `Your most active journaling day was ${formattedDate} with ${timePatternResults.mostActiveDay.entryCount} entries.`;
+      }
+      
+      return {
+        content: response,
+        role: "assistant",
+        analysis: timePatternResults
+      };
+    } catch (error) {
+      console.error("Error processing time pattern query:", error);
+      return {
+        content: "I encountered an error analyzing your journaling time patterns. Please try again later.",
+        role: "error"
+      };
+    }
+  }
+  
+  // Continue with the rest of the processing for other query types
   try {
     console.log("Processing chat message:", message.substring(0, 30) + "...");
     console.log("Parameters:", parameters);
@@ -115,4 +186,35 @@ export async function processChatMessage(
       role: 'error'
     };
   }
+}
+
+// Helper function to determine time of day preference
+function getTimeOfDayPreference(timeDistribution) {
+  if (!timeDistribution) return null;
+  
+  const total = timeDistribution.morning + timeDistribution.afternoon + 
+                timeDistribution.evening + timeDistribution.night;
+                
+  if (total === 0) return null;
+  
+  const periods = [
+    { period: "morning", count: timeDistribution.morning },
+    { period: "afternoon", count: timeDistribution.afternoon },
+    { period: "evening", count: timeDistribution.evening },
+    { period: "night", count: timeDistribution.night }
+  ];
+  
+  // Sort by count, descending
+  periods.sort((a, b) => b.count - a.count);
+  
+  // Return the highest count period
+  if (periods[0].count > 0) {
+    return {
+      period: periods[0].period,
+      count: periods[0].count,
+      percentage: Math.round((periods[0].count / total) * 100)
+    };
+  }
+  
+  return null;
 }
