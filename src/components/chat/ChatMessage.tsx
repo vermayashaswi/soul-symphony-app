@@ -160,7 +160,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
             >
               <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" />
               <TranslatableText 
-                text={`${message.references.length} journal entries`}
+                text={`Based on ${message.references.length} journal ${message.references.length === 1 ? 'entry' : 'entries'} (showing ${Math.min(message.references.length, isMobile ? 2 : 3)} sample${Math.min(message.references.length, isMobile ? 2 : 3) > 1 ? 's' : ''})`}
                 forceTranslate={true}
               />
               {showReferences ? (
@@ -193,7 +193,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                   {message.references.length > (isMobile ? 2 : 3) && (
                     <div className="text-xs text-muted-foreground">
                       <TranslatableText 
-                        text={`+${message.references.length - (isMobile ? 2 : 3)} more entries`}
+                        text={`+${message.references.length - (isMobile ? 2 : 3)} more entries analyzed`}
                         forceTranslate={true}
                       />
                     </div>

@@ -106,7 +106,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             >
               <FileText className="h-3 w-3 mr-1" />
               <TranslatableText 
-                text={`${message.references!.length} journal entries`}
+                text={`Based on ${message.references!.length} journal ${message.references!.length === 1 ? 'entry' : 'entries'} (showing ${Math.min(message.references!.length, 2)} sample${Math.min(message.references!.length, 2) > 1 ? 's' : ''})`}
                 forceTranslate={true}
               />
               {showReferences ? (
@@ -139,7 +139,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                   {message.references!.length > 2 && (
                     <div className="text-xs text-muted-foreground dark:text-white/60">
                       <TranslatableText 
-                        text={`+${message.references!.length - 2} more entries`}
+                        text={`+${message.references!.length - 2} more entries analyzed`}
                         forceTranslate={true}
                       />
                     </div>

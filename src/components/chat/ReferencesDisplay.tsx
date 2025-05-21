@@ -28,7 +28,7 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
         className="p-0 h-6 text-xs font-normal flex items-center gap-1 text-muted-foreground hover:text-foreground"
         onClick={() => setExpanded(!expanded)}
       >
-        <TranslatableText text={`Based on ${references.length} journal ${references.length === 1 ? 'entry' : 'entries'}`} />
+        <TranslatableText text={`Based on ${references.length} journal ${references.length === 1 ? 'entry' : 'entries'} (showing samples)`} />
         {expanded ? (
           <ChevronUp className="h-3 w-3 ml-1" />
         ) : (
@@ -48,7 +48,7 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
           ))}
           {references.length > 3 && (
             <div className="text-xs text-muted-foreground">
-              <TranslatableText text={`+ ${references.length - 3} more entries`} />
+              <TranslatableText text={`+ ${references.length - 3} more entries analyzed`} />
             </div>
           )}
         </div>
