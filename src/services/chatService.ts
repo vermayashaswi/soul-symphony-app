@@ -56,7 +56,8 @@ export async function processChatMessage(
       const { timeDistribution } = timePatternResults;
       const timeOfDayPreference = getTimeOfDayPreference(timeDistribution);
       
-      response += `Based on your ${timePatternResults.entryCount} journal entries, `;
+      // Clearly indicate how many entries were analyzed
+      response += `Based on analyzing all ${timePatternResults.entryCount} of your journal entries, `;
       
       if (timeOfDayPreference) {
         response += `you typically prefer journaling during the ${timeOfDayPreference.period} (${timeOfDayPreference.percentage}% of your entries). `;

@@ -33,6 +33,7 @@ export async function analyzeTimePatterns(
       query = query.gte('created_at', timeRange.startDate).lte('created_at', timeRange.endDate);
     }
 
+    console.log("Fetching all journal entries for time pattern analysis");
     // Do NOT limit entries for time pattern analysis - we want all entries
     const { data: entries, error } = await query;
 
@@ -53,7 +54,7 @@ export async function analyzeTimePatterns(
       };
     }
 
-    console.log(`Found ${entries.length} entries for time pattern analysis`);
+    console.log(`Found and analyzing all ${entries.length} entries for time pattern analysis`);
 
     // Analyze entry distribution by time
     const entriesByDate = groupEntriesByDate(entries);

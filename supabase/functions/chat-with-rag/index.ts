@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -25,7 +24,8 @@ const corsHeaders = {
 const MAX_ENTRIES = 10;
 
 // Don't limit entries for time pattern or special analysis queries
-const MAX_TIME_ANALYSIS_ENTRIES = 100;
+// Set to a higher value to ensure all entries are analyzed
+const MAX_TIME_ANALYSIS_ENTRIES = 1000; // Increased from 100 to handle more entries
 
 /**
  * Handle the request to chat with RAG (Retrieval-Augmented Generation)
