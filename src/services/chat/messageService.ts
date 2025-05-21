@@ -64,7 +64,7 @@ export const saveMessage = async (
       reference_entries: references || null,
       analysis_data: analysis || null,
       has_numeric_result: hasNumericResult || false,
-      // Ensure sub_query_responses is always an array if present
+      // Ensure sub_query_responses is always an array
       sub_query_responses: [] // Default empty array
     };
     
@@ -190,10 +190,15 @@ export const processWithStructuredPrompt = async (
   threadId?: string
 ): Promise<any> => {
   try {
-    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/structured-chat`, {
+    // Instead of directly accessing protected properties, use the Supabase URL from the environment
+    // or from where your Supabase client is initialized
+    const supabaseUrl = "https://kwnwhgucnzqxndzjayyq.supabase.co";
+    
+    const response = await fetch(`${supabaseUrl}/functions/v1/structured-chat`, {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${supabase.supabaseKey}`,
+        // Use a public anon key instead of directly accessing the protected property
+        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bndoZ3VjbnpxeG5kempheXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzMzk4ODMsImV4cCI6MjA1NzkxNTg4M30.UAB3e5b44iJa9kKT391xyJKoQmlUOtsAi-yp4UEqZrc`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
