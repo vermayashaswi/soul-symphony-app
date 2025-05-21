@@ -16,6 +16,7 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { getThreadMessages, saveMessage } from "@/services/chat";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
+import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -41,6 +42,7 @@ interface MobileChatInterfaceProps {
   onSelectThread: (threadId: string) => void;
   onCreateNewThread: () => Promise<string | null>;
   userId?: string;
+  mentalHealthInsights?: MentalHealthInsights;
 }
 
 export default function MobileChatInterface({
@@ -48,6 +50,7 @@ export default function MobileChatInterface({
   onSelectThread,
   onCreateNewThread,
   userId,
+  mentalHealthInsights,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
