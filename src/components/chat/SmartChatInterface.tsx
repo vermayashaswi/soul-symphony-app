@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -654,7 +653,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
           </div>
         ) : chatHistory.length === 0 ? (
-          <EmptyChatState />
+          <EmptyChatState onStarterPrompt={handleSendMessage} />
         ) : (
           <ChatArea 
             chatMessages={chatHistory}
