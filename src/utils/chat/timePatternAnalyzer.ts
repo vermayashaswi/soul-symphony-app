@@ -33,7 +33,7 @@ export async function analyzeTimePatterns(
       query = query.gte('created_at', timeRange.startDate).lte('created_at', timeRange.endDate);
     }
 
-    // Don't limit the number of entries for time pattern analysis
+    // Do NOT limit entries for time pattern analysis - we want all entries
     const { data: entries, error } = await query;
 
     if (error) {

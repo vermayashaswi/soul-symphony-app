@@ -81,10 +81,37 @@ export async function processChatMessage(
         response += `Your most active journaling day was ${formattedDate} with ${timePatternResults.mostActiveDay.entryCount} entries.`;
       }
       
+      // Get conversation history for better context in future follow-ups
+      let conversationHistory = [];
+      if (threadId) {
+        try {
+          const { data: chatMessages, error } = await supabase
+            .from('chat_messages')
+            .select('content, sender, role')
+            .eq('thread_id', threadId)
+            .order('created_at', { ascending: false })
+            .limit(10);
+
+          if (!error && chatMessages && chatMessages.length > 0) {
+            // Format messages for OpenAI context
+            conversationHistory = chatMessages
+              .reverse()
+              .map(msg => ({
+                role: msg.sender === 'user' ? 'user' : 'assistant',
+                content: msg.content
+              }));
+            console.log(`Found ${conversationHistory.length} previous messages for context in time analysis`);
+          }
+        } catch (error) {
+          console.error("Error fetching conversation history for time analysis:", error);
+        }
+      }
+      
       return {
         content: response,
         role: "assistant",
-        analysis: timePatternResults
+        analysis: timePatternResults,
+        conversationContext: conversationHistory
       };
     } catch (error) {
       console.error("Error processing time pattern query:", error);

@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -22,6 +23,9 @@ const corsHeaders = {
 // Maximum number of journal entries to retrieve for vector search
 // Keep this reasonable for vector search to ensure quality results
 const MAX_ENTRIES = 10;
+
+// Don't limit entries for time pattern or special analysis queries
+const MAX_TIME_ANALYSIS_ENTRIES = 100;
 
 /**
  * Handle the request to chat with RAG (Retrieval-Augmented Generation)
@@ -50,16 +54,28 @@ serve(async (req) => {
     let filters = {};
     let needsDataAggregation = false;
     let domainContext = null;
+    let isTimePatternQuery = false;
+    
+    // Check if this is a time pattern related query
+    if (message.toLowerCase().includes('time') || 
+        message.toLowerCase().includes('when') || 
+        message.toLowerCase().includes('pattern') ||
+        message.toLowerCase().includes('schedule') ||
+        message.toLowerCase().includes('frequent')) {
+      isTimePatternQuery = true;
+    }
 
     if (queryPlan) {
       searchStrategy = queryPlan.searchStrategy || 'hybrid';
       filters = queryPlan.filters || {};
       needsDataAggregation = queryPlan.needsDataAggregation || false;
       domainContext = queryPlan.domainContext || null;
+      isTimePatternQuery = queryPlan.isTimePatternQuery || isTimePatternQuery;
     }
 
     console.log(`Using search strategy: ${searchStrategy}`);
     console.log(`Domain context: ${domainContext}`);
+    console.log(`Is time pattern query: ${isTimePatternQuery}`);
     console.log(`Conversation history length: ${conversationHistory.length}`);
 
     // Generate an OpenAI embedding for the user's message
@@ -89,7 +105,7 @@ serve(async (req) => {
       console.log("Processing as journal-specific question");
       
       // Process the query with vector similarity search on journal entries
-      return await handleJournalQuestion(message, userId, embedding, filters, searchStrategy, needsDataAggregation, conversationHistory);
+      return await handleJournalQuestion(message, userId, embedding, filters, searchStrategy, needsDataAggregation, conversationHistory, isTimePatternQuery);
     } else {
       console.log("Processing as general question (no personal context)");
       
@@ -174,7 +190,7 @@ async function handleGeneralQuestion(message, userId, conversationHistory = []) 
 /**
  * Handle journal questions that require personal context
  */
-async function handleJournalQuestion(message, userId, embedding, filters = {}, searchStrategy = 'hybrid', needsDataAggregation = false, conversationHistory = []) {
+async function handleJournalQuestion(message, userId, embedding, filters = {}, searchStrategy = 'hybrid', needsDataAggregation = false, conversationHistory = [], isTimePatternQuery = false) {
   try {
     console.log("Handling journal question");
     
@@ -189,7 +205,7 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
     if (searchStrategy === 'text' || searchStrategy === 'hybrid') {
       try {
         console.log("Performing text search");
-        textSearchEntries = await searchEntriesWithSQL(userId, message, filters);
+        textSearchEntries = await searchEntriesWithSQL(userId, message, filters, isTimePatternQuery);
         console.log(`Found ${textSearchEntries.length} entries with text search`);
       } catch (error) {
         console.error("Error in text search:", error);
@@ -199,7 +215,7 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
     if (searchStrategy === 'vector' || searchStrategy === 'hybrid') {
       try {
         console.log("Performing vector search");
-        vectorSearchEntries = await searchEntriesWithVector(userId, embedding, filters);
+        vectorSearchEntries = await searchEntriesWithVector(userId, embedding, filters, isTimePatternQuery);
         console.log(`Found ${vectorSearchEntries.length} entries with vector search`);
       } catch (error) {
         console.error("Error in vector search:", error);
@@ -235,8 +251,8 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
     
     // Limit number of entries for vector search to keep context manageable
     // But don't limit for time pattern analysis - we want all entries for that
-    if (relevantEntries.length > MAX_ENTRIES && !message.toLowerCase().includes('time') && !message.toLowerCase().includes('pattern')) {
-      console.log(`Limiting entries from ${relevantEntries.length} to ${MAX_ENTRIES} for vector search`);
+    if (relevantEntries.length > MAX_ENTRIES && !isTimePatternQuery) {
+      console.log(`Limiting entries from ${relevantEntries.length} to ${MAX_ENTRIES} for regular query processing`);
       relevantEntries = relevantEntries.slice(0, MAX_ENTRIES);
     } else {
       console.log(`Using all ${relevantEntries.length} relevant entries for analysis`);
@@ -266,12 +282,17 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
     
     for (const entry of relevantEntries) {
       // Ensure we use the correct content field from journal entries
-      const entryContent = entry.content || COALESCE(entry["refined text"], entry["transcription text"]) || "";
+      const entryContent = entry.content || 
+                          (entry["refined text"] || entry["transcription text"]) || 
+                          "";
+                          
       const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
         weekday: 'long',
         month: 'long',
         day: 'numeric',
-        year: 'numeric'
+        year: 'numeric',
+        hour: 'numeric',
+        minute: 'numeric'
       });
       
       // Add entry to context
@@ -297,17 +318,25 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
     }
     
     // Step 3: Call OpenAI to process the query with journal context
-    const messages = [
-      {
-        role: "system",
-        content: `You are a helpful personal assistant that helps users reflect on and analyze their journal entries. You have access to the following journal entries from the user:
+    const systemPrompt = `You are a helpful personal assistant that helps users reflect on and analyze their journal entries. You have access to the following journal entries from the user:
 
 ${journalContext}
 
 ${conversationContextText}
 
-Based on these entries and conversation history, help the user by answering their question. If the information in the entries is not sufficient to answer the question completely, clearly state what is missing. Stay factual and only make conclusions that are directly supported by the journal entries. When references temporal information, try to be specific about dates. Be empathetic, personal, and thoughtful in your responses.`
-      },
+Based on these entries and conversation history, help the user by answering their question. 
+
+Formatting guidelines:
+1. Structure your response with clear sections using markdown formatting when appropriate
+2. For analytical responses, include bullet points to highlight key insights
+3. When referencing dates or timeframes, be specific 
+4. For personal advice or reflections, use a warm, empathetic tone
+5. If the information in the entries is not sufficient to answer completely, clearly state what is missing
+
+Stay factual and only make conclusions that are directly supported by the journal entries. Be empathetic, personal, and thoughtful in your responses.`;
+
+    const messages = [
+      { role: 'system', content: systemPrompt },
       // Don't add conversation history here since we've included it in the system prompt
       { role: "user", content: message }
     ];
@@ -368,9 +397,9 @@ function COALESCE(...args) {
 /**
  * Search journal entries using SQL-based text search with filters
  */
-async function searchEntriesWithSQL(userId, query, filters = {}) {
+async function searchEntriesWithSQL(userId, query, filters = {}, isTimePatternQuery = false) {
   try {
-    // Start building the query - don't limit for time pattern analysis
+    // Start building the query
     let queryBuilder = supabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text", created_at, master_themes, emotions')
@@ -393,9 +422,10 @@ async function searchEntriesWithSQL(userId, query, filters = {}) {
       queryBuilder = queryBuilder.or(`"refined text".ilike.%${searchTerms}%, "transcription text".ilike.%${searchTerms}%`);
     }
     
-    // Execute the query
+    // Execute the query - don't limit if it's a time pattern query
     const { data: entries, error } = await queryBuilder
-      .order('created_at', { ascending: false });
+      .order('created_at', { ascending: false })
+      .limit(isTimePatternQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES);
     
     if (error) {
       console.error("Error in SQL search:", error);
@@ -420,13 +450,13 @@ async function searchEntriesWithSQL(userId, query, filters = {}) {
 /**
  * Search journal entries using vector similarity with filters
  */
-async function searchEntriesWithVector(userId, embedding, filters = {}) {
+async function searchEntriesWithVector(userId, embedding, filters = {}, isTimePatternQuery = false) {
   try {
     let matchFn = 'match_journal_entries_fixed';
     const params = {
       query_embedding: embedding,
       match_threshold: 0.5,
-      match_count: MAX_ENTRIES, // Keep this limit for vector search for quality
+      match_count: isTimePatternQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES,
       user_id_filter: userId
     };
     
