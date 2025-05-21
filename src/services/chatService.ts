@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
 import { enhancedQueryClassification } from '../utils/chat/messageClassifier';
@@ -7,6 +8,7 @@ type ProcessedResponse = {
   content: string;
   role: 'assistant' | 'error';
   references?: any[];
+  totalEntriesAnalyzed?: number;  // New field for total entries analyzed
   analysis?: any;
   isInteractive?: boolean;
   interactiveOptions?: any[];
@@ -85,6 +87,7 @@ export async function processChatMessage(
         content: response,
         role: "assistant",
         analysis: timePatternResults,
+        totalEntriesAnalyzed: timePatternResults.entryCount,
         // Include all entries as references, though UI will only show samples
         references: Array(timePatternResults.entryCount).fill(null).map((_, i) => ({
           date: new Date().toISOString(),
@@ -134,11 +137,41 @@ export async function processChatMessage(
       }
     }
 
+    // Get previous messages from this thread to provide conversation context
+    let conversationHistory = [];
+    if (threadId) {
+      try {
+        const { data: previousMessages, error } = await supabase
+          .from('chat_messages')
+          .select('content, sender, created_at')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(10); // Get the last 10 messages
+          
+        if (error) {
+          console.error("Error fetching previous messages:", error);
+        } else if (previousMessages && previousMessages.length > 1) { // At least 1 previous message (not counting the current one)
+          // Convert to the format expected by the edge function
+          conversationHistory = previousMessages
+            .slice(1) // Skip the current user message which is already inserted
+            .map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.content
+            }))
+            .reverse(); // Put in chronological order
+            
+          console.log(`Added ${conversationHistory.length} previous messages as conversation context`);
+        }
+      } catch (error) {
+        console.error("Error processing conversation history:", error);
+      }
+    }
+
     // Set up the parameters for the query planner
     const queryPlanParams = {
       message,
       userId,
-      previousMessages: [], // We could add conversation context here
+      previousMessages: conversationHistory, // Add conversation context here
       isFollowUp,
       useHistoricalData: parameters.useHistoricalData || false
     };
@@ -163,7 +196,8 @@ export async function processChatMessage(
       threadId,
       usePersonalContext,
       queryPlan,
-      conversationHistory: [] // We could add full conversation history here
+      conversationHistory, // Add full conversation history here
+      timezoneOffset: new Date().getTimezoneOffset() // Add timezone offset for better time understanding
     };
 
     const { data: chatResponse, error: chatError } = await supabase.functions.invoke('chat-with-rag', {
@@ -175,11 +209,15 @@ export async function processChatMessage(
       throw new Error(`Failed to process chat: ${chatError.message}`);
     }
 
+    // Extract the total entries analyzed if available
+    const totalEntriesAnalyzed = chatResponse?.totalEntriesAnalyzed || chatResponse?.references?.length || 0;
+
     // Prepare the response
     return {
       content: chatResponse?.response || "I couldn't generate a response at this time.",
       role: 'assistant',
       references: chatResponse?.references || [],
+      totalEntriesAnalyzed: totalEntriesAnalyzed,
       analysis: chatResponse?.analysis || null,
       isInteractive: chatResponse?.isInteractive || false,
       interactiveOptions: chatResponse?.options || [],

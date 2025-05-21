@@ -18,6 +18,7 @@ interface MobileChatMessageProps {
     content: string;
     analysis?: any;
     references?: any[];
+    totalEntriesAnalyzed?: number; // Add support for totalEntriesAnalyzed
     diagnostics?: any;
     hasNumericResult?: boolean;
   };
@@ -36,6 +37,10 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
   
   // For UI purposes, treat 'error' role as 'assistant'
   const displayRole = message.role === 'error' ? 'assistant' : message.role;
+  
+  // Determine how many entries were actually analyzed
+  const totalEntriesAnalyzed = message.totalEntriesAnalyzed || (message.references?.length || 0);
+  const displayedEntries = Math.min(message.references?.length || 0, 2);
   
   return (
     <motion.div 
@@ -106,7 +111,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
             >
               <FileText className="h-3 w-3 mr-1" />
               <TranslatableText 
-                text={`Based on ${message.references!.length} journal ${message.references!.length === 1 ? 'entry' : 'entries'} (showing ${Math.min(message.references!.length, 2)} sample${Math.min(message.references!.length, 2) > 1 ? 's' : ''})`}
+                text={`Based on analyzing ${totalEntriesAnalyzed} journal ${totalEntriesAnalyzed === 1 ? 'entry' : 'entries'} (showing ${displayedEntries} sample${displayedEntries > 1 ? 's' : ''})`}
                 forceTranslate={true}
               />
               {showReferences ? (
@@ -139,7 +144,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                   {message.references!.length > 2 && (
                     <div className="text-xs text-muted-foreground dark:text-white/60">
                       <TranslatableText 
-                        text={`+${message.references!.length - 2} more entries analyzed`}
+                        text={`+${totalEntriesAnalyzed - displayedEntries} more entries analyzed`}
                         forceTranslate={true}
                       />
                     </div>

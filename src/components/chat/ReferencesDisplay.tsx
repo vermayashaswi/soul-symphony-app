@@ -8,17 +8,23 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 interface ReferencesDisplayProps {
   references: any[];
   threadId?: string;
+  totalEntriesAnalyzed?: number; // Add support for totalEntriesAnalyzed
 }
 
 const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({ 
   references,
-  threadId
+  threadId,
+  totalEntriesAnalyzed
 }) => {
   const [expanded, setExpanded] = useState(false);
 
   if (!references || references.length === 0) {
     return null;
   }
+  
+  // Use the provided total or fall back to references length
+  const totalEntries = totalEntriesAnalyzed || references.length;
+  const displayedEntries = Math.min(references.length, 3);
 
   return (
     <div className="mt-3 text-sm">
@@ -28,7 +34,7 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
         className="p-0 h-6 text-xs font-normal flex items-center gap-1 text-muted-foreground hover:text-foreground"
         onClick={() => setExpanded(!expanded)}
       >
-        <TranslatableText text={`Based on ${references.length} journal ${references.length === 1 ? 'entry' : 'entries'} (showing samples)`} />
+        <TranslatableText text={`Based on analyzing ${totalEntries} journal ${totalEntries === 1 ? 'entry' : 'entries'} (showing samples)`} />
         {expanded ? (
           <ChevronUp className="h-3 w-3 ml-1" />
         ) : (
@@ -46,9 +52,9 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
               <p className="text-muted-foreground">{ref.snippet}</p>
             </Card>
           ))}
-          {references.length > 3 && (
+          {totalEntries > 3 && (
             <div className="text-xs text-muted-foreground">
-              <TranslatableText text={`+ ${references.length - 3} more entries analyzed`} />
+              <TranslatableText text={`+ ${totalEntries - displayedEntries} more entries analyzed`} />
             </div>
           )}
         </div>

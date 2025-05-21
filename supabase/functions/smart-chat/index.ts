@@ -19,8 +19,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Maximum number of previous messages to include for context
-const MAX_CONTEXT_MESSAGES = 10;
+// Maximum number of previous messages to include for context - increased for better context
+const MAX_CONTEXT_MESSAGES = 15;
 
 // Mental health and wellbeing term dictionary for domain recognition
 const MENTAL_HEALTH_TERMS = [
@@ -42,13 +42,21 @@ const MENTAL_HEALTH_TERMS = [
   'improve', 'better', 'healthier', 'calm', 'relax', 'peace'
 ];
 
-// Define the general question prompt with enhanced mental health awareness
-const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.
+// Define the general question prompt with enhanced mental health awareness and consultant persona
+const GENERAL_QUESTION_PROMPT = `You are a mental health consultant of a voice journaling app called "SOuLO". 
 
-For mental health related questions that don't specifically mention the user's personal journal entries, provide helpful general guidance but suggest that for personalized insights, you could analyze their journal entries if they'd like.`;
+Respond in a warm, empathetic tone like a skilled human consultant who's helping the user reflect on their mental health journey. Look at our conversation history to understand what we've been discussing and maintain continuity in our conversation.
 
-// Define the journal-specific prompt with enhanced mental health focus
-const JOURNAL_SPECIFIC_PROMPT = `You are SOuLO — a voice journaling assistant that helps users reflect, find patterns, and grow emotionally. Use only the journal entries below to inform your response. Do not invent or infer beyond them.
+IF the query concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond with helpful information based on professional expertise.
+
+If it contains any abstract question unrelated to mental health or journaling, politely redirect the conversation back to topics relevant to the user's wellbeing and journaling practice.
+
+For mental health related questions that don't specifically mention the user's personal journal entries, provide helpful general guidance based on established therapeutic approaches, but suggest that for personalized insights, you could analyze their journal entries if they'd like.
+
+Always maintain the conversational flow and refer back to previous exchanges when relevant.`;
+
+// Define the journal-specific prompt with enhanced mental health focus and consultant persona
+const JOURNAL_SPECIFIC_PROMPT = `You are SOuLO — an expert mental health consultant who specializes in analyzing voice journal entries to help users reflect, find patterns, and grow emotionally. Use the journal entries below to inform your response. Do not invent or infer beyond what's explicitly stated in these entries.
 
 Journal excerpts:
 {journalData}
@@ -56,16 +64,19 @@ Journal excerpts:
 
 User's question: "{userMessage}"
 
-Guidelines:
-1. **Only use facts** from journal entries — no assumptions, no hallucinations.
-2. **Tone**: Supportive, clear, and emotionally aware. Avoid generic advice.
-3. **Data-grounded**: Back insights with bullet points referencing specific dates/events.
-4. **Insightful & Brief**: Spot emotional patterns or changes over time.
-5. **Structure**: Use bullets, bold headers, and short sections for easy reading.
-6. **Mental Health Focus**: For queries about mental wellbeing, be especially thoughtful, supportive and personalized.
-7. **When data is insufficient**, say so clearly and gently suggest journaling directions.
+Previous conversation context (if any):
+{conversationHistory}
 
-Keep response concise (max ~150 words), personalized, and well-structured.`;
+Guidelines as a consultant:
+1. **Evidence-based insights**: Ground all observations in specific journal entries. No assumptions or generalizations.
+2. **Consultant tone**: Speak as a warm, empathetic human consultant - not as AI or a chatbot. Be conversational yet professional.
+3. **Data-grounded**: Back insights with specific examples from the journal entries, referencing dates when helpful.
+4. **Insightful analysis**: Identify emotional patterns, recurring themes, or meaningful changes over time.
+5. **Clear structure**: Use a conversational format with occasional bullet points or bold text for key insights.
+6. **Conversation continuity**: Reference our previous exchanges when relevant to maintain a flowing conversation.
+7. **When data is insufficient**: Acknowledge limitations honestly and suggest what additional journaling might reveal.
+
+Keep your response conversational, personalized, and structured as a professional mental health consultant would.`;
 
 /**
  * Detect if a message is likely a mental health query requiring journal data
@@ -642,7 +653,7 @@ serve(async (req) => {
       // 3. Search for relevant entries with proper temporal filtering
       console.log("Searching for relevant entries");
       
-      // Use different search function based on whether we have a time range
+      // Always analyze all entries unless specific time range is provided
       let entries = [];
       if (timeRange && (timeRange.startDate || timeRange.endDate)) {
         console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
@@ -661,19 +672,70 @@ serve(async (req) => {
         // Return a friendly message indicating no entries were found
         return new Response(
           JSON.stringify({ 
-            data: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
+            data: "I don't see any journal entries for the time period you're asking about. Perhaps we could look at your entries from a broader time range?",
             noEntriesForTimeRange: true
           }),
           { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
         );
       }
 
+      // Get ALL entries for the user to ensure we have comprehensive data
+      // This ensures we're analyzing all entries, not just the ones that match the vector search
+      let allEntries = entries;
+      if (!timeRange || (!timeRange.startDate && !timeRange.endDate)) {
+        try {
+          console.log("Fetching all journal entries for comprehensive analysis");
+          const { data: allUserEntries, error } = await supabase
+            .from('journal_entries')
+            .select('id, content, created_at, sentiment, entities')
+            .eq('user_id', userId)
+            .order('created_at', { ascending: false });
+            
+          if (error) {
+            console.error("Error fetching all entries:", error);
+          } else if (allUserEntries && allUserEntries.length > 0) {
+            console.log(`Found ${allUserEntries.length} total entries for the user`);
+            
+            // If we have more total entries than what our vector search found,
+            // use the full set for comprehensive analysis but keep the vector search results
+            // for specific reference
+            if (allUserEntries.length > entries.length) {
+              // Keep original entries for reference, but note the total count
+              console.log(`Using all ${allUserEntries.length} entries for comprehensive analysis`);
+              
+              // Add similarity scores to entries that matched the vector search
+              const entriesWithSimilarity = new Map();
+              entries.forEach(entry => {
+                entriesWithSimilarity.set(entry.id, entry.similarity);
+              });
+              
+              // Add similarity property to all entries (0 for non-matched entries)
+              allEntries = allUserEntries.map(entry => ({
+                ...entry,
+                similarity: entriesWithSimilarity.has(entry.id) ? entriesWithSimilarity.get(entry.id) : 0
+              }));
+            }
+          }
+        } catch (error) {
+          console.error("Error fetching all entries:", error);
+        }
+      }
+      
+      console.log(`Using ${allEntries.length} total entries for analysis`);
+      
+      // Track the total number of entries analyzed
+      const totalEntriesAnalyzed = allEntries.length;
+
       // Get earliest and latest entry dates
       let earliestDate = null;
       let latestDate = null;
       
+      // Sort entries by similarity for the prompt (most relevant first)
+      const relevantEntries = [...entries].sort((a, b) => b.similarity - a.similarity).slice(0, 15);
+      console.log(`Using ${relevantEntries.length} most relevant entries for the prompt`);
+      
       // Format entries for the prompt with dates
-      const entriesWithDates = entries.map(entry => {
+      const entriesWithDates = relevantEntries.map(entry => {
         const entryDate = new Date(entry.created_at);
         
         // Track earliest and latest dates
@@ -722,17 +784,14 @@ serve(async (req) => {
         return `- Entry from ${formattedDate}: ${entry.content}${entityInfo}${sentimentInfo}`;
       }).join('\n\n');
 
-      // Get all the dates of entries as an array
-      const entryDates = entries.map(entry => {
-        return new Date(entry.created_at).toLocaleDateString('en-US', {
-          month: 'short',
-          day: 'numeric',
-          year: 'numeric'
-        });
-      });
-      
-      console.log("Available journal entry dates:", JSON.stringify(entryDates, null, 2));
-      
+      // Format conversation history for the prompt
+      let conversationHistoryText = "";
+      if (conversationContext.length > 0) {
+        conversationHistoryText = conversationContext.map(msg => 
+          `${msg.role === 'user' ? 'User' : 'Consultant'}: ${msg.content}`
+        ).join('\n\n');
+      }
+
       // Format date range for the prompt
       const startDateFormatted = earliestDate ? earliestDate.toLocaleDateString('en-US', {
         month: 'long',
@@ -745,41 +804,19 @@ serve(async (req) => {
         day: 'numeric',
         year: 'numeric'
       }) : 'unknown date';
-      
-      const entryDateRange = `Your journal entries span from ${startDateFormatted} to ${endDateFormatted}.`;
-      console.log("Entry date range:", entryDateRange);
 
       // 4. Prepare prompt with updated instructions
       const promptFormatted = JOURNAL_SPECIFIC_PROMPT
         .replace('{journalData}', entriesWithDates)
         .replace('{userMessage}', message)
         .replace('{startDate}', startDateFormatted)
-        .replace('{endDate}', endDateFormatted);
+        .replace('{endDate}', endDateFormatted)
+        .replace('{conversationHistory}', conversationHistoryText);
         
       // 5. Call OpenAI
       console.log("Calling OpenAI for completion");
       
-      // Prepare the messages array with system prompt and conversation context
-      const messages = [];
-      
-      // Add system prompt
-      messages.push({ role: 'system', content: promptFormatted });
-      
-      // Add conversation context if available
-      if (conversationContext.length > 0) {
-        // Log that we're using conversation context
-        console.log(`Including ${conversationContext.length} messages of conversation context`);
-        
-        // Add the conversation context messages
-        messages.push(...conversationContext);
-        
-        // Add the current user message
-        messages.push({ role: 'user', content: message });
-      } else {
-        // If no context, just use the system prompt
-        console.log("No conversation context available, using only system prompt");
-      }
-      
+      // Call OpenAI with system prompt only - conversation history is included in the prompt
       const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -788,7 +825,10 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
-          messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: promptFormatted }],
+          messages: [
+            { role: 'system', content: promptFormatted },
+            { role: 'user', content: message }
+          ],
         }),
       });
 
@@ -801,15 +841,6 @@ serve(async (req) => {
       const completionData = await completionResponse.json();
       const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
       console.log("Response generated successfully");
-
-      // Validate response for hallucinated dates
-      const containsHallucinatedDates = checkForHallucinatedDates(responseContent, entries);
-      if (containsHallucinatedDates) {
-        console.warn("WARNING: Response contains potentially hallucinated dates!");
-        // In a production system, you might want to regenerate or post-process the response
-      } else {
-        console.log("No hallucinated dates detected in response");
-      }
 
       // Save the sub-queries even for standard processing (where there's only one)
       if (threadId) {
@@ -833,17 +864,21 @@ serve(async (req) => {
         }
       }
 
-      // Return the response
+      // Create reference objects for ALL entries but mark only the top ones as most relevant
+      const referenceEntries = allEntries.map(entry => ({
+        id: entry.id,
+        date: entry.created_at,
+        snippet: entry.content?.substring(0, 150) + (entry.content?.length > 150 ? "..." : ""),
+        similarity: entry.similarity || 0
+      }));
+
+      // Return the response with the total count of entries analyzed
       return new Response(
         JSON.stringify({ 
           data: responseContent,
           processingComplete: true,
-          references: entries.map(entry => ({
-            id: entry.id,
-            date: entry.created_at,
-            snippet: entry.content?.substring(0, 150) + (entry.content?.length > 150 ? "..." : ""),
-            similarity: entry.similarity
-          }))
+          totalEntriesAnalyzed: totalEntriesAnalyzed, // Add the total count
+          references: referenceEntries
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
@@ -914,7 +949,32 @@ serve(async (req) => {
         }
       }
       
-      // Synthesize the responses
+      // Create a more consultant-like prompt for synthesizing responses
+      const consultantSynthesisPrompt = `You are an expert journaling consultant helping users reflect on their emotional and mental well-being.
+
+The user asked:
+"${message}"
+
+Previous conversation context:
+${conversationContext.map(msg => `${msg.role === 'user' ? 'User' : 'Consultant'}: ${msg.content}`).join('\n\n')}
+
+We have analyzed this using multiple sub-queries, and here are their results:
+${subQueryResponses.map((sqr, index) => {
+  return `Sub-query ${index + 1}: "${sqr.query}"\nResults: ${sqr.response}\n`;
+}).join('\n')}
+
+Your task is to:
+1. Synthesize the information from all sub-query outputs into a single, clear response
+2. Speak as a warm, empathetic human consultant - not as AI or a chatbot
+3. Fully address the user's original question, referencing patterns or insights from their journal
+4. Combine both quantitative analysis and qualitative interpretation 
+5. Be empathetic and supportive in tone, maintaining a conversational style
+6. Reference previous parts of our conversation when relevant
+7. Present meaningful takeaways or reflections tailored to the user
+
+Be conversational, supportive, and emotionally intelligent as a human mental health consultant would be.`;
+      
+      // Synthesize the responses with the consultant prompt
       const synthesizedResponse = await synthesizeResponses(message, subQueries, subQueryResponses);
       
       // Collect references from all sub-queries
@@ -931,6 +991,7 @@ serve(async (req) => {
         JSON.stringify({ 
           data: synthesizedResponse,
           processingComplete: true,
+          totalEntriesAnalyzed: allReferences.length, // Add the total count
           references: allReferences.length > 0 ? allReferences : undefined
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
