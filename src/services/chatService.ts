@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
 import { enhancedQueryClassification } from '../utils/chat/messageClassifier';
@@ -128,11 +129,38 @@ export async function processChatMessage(
       }
     }
 
+    // Get conversation history for better context
+    let conversationHistory = [];
+    if (threadId) {
+      try {
+        const { data: chatMessages, error } = await supabase
+          .from('chat_messages')
+          .select('content, sender, role')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(10);
+
+        if (!error && chatMessages && chatMessages.length > 0) {
+          // Format messages for OpenAI context
+          conversationHistory = chatMessages
+            .reverse()
+            .map(msg => ({
+              role: msg.sender === 'user' ? 'user' : 'assistant',
+              content: msg.content
+            }));
+          console.log(`Found ${conversationHistory.length} previous messages for context`);
+        }
+      } catch (error) {
+        console.error("Error fetching conversation history:", error);
+        // Continue with empty history if there's an error
+      }
+    }
+
     // Set up the parameters for the query planner
     const queryPlanParams = {
       message,
       userId,
-      previousMessages: [], // We could add conversation context here
+      previousMessages: conversationHistory,  // Pass previous messages for context
       isFollowUp,
       useHistoricalData: parameters.useHistoricalData || false
     };
@@ -157,7 +185,7 @@ export async function processChatMessage(
       threadId,
       usePersonalContext,
       queryPlan,
-      conversationHistory: [] // We could add full conversation history here
+      conversationHistory // Pass the conversation history to chat-with-rag
     };
 
     const { data: chatResponse, error: chatError } = await supabase.functions.invoke('chat-with-rag', {

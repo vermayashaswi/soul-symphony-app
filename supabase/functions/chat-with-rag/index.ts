@@ -19,7 +19,8 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Maximum number of journal entries to retrieve
+// Maximum number of journal entries to retrieve for vector search
+// Keep this reasonable for vector search to ensure quality results
 const MAX_ENTRIES = 10;
 
 /**
@@ -59,6 +60,7 @@ serve(async (req) => {
 
     console.log(`Using search strategy: ${searchStrategy}`);
     console.log(`Domain context: ${domainContext}`);
+    console.log(`Conversation history length: ${conversationHistory.length}`);
 
     // Generate an OpenAI embedding for the user's message
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -231,10 +233,13 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
       relevantEntries = textSearchEntries;
     }
     
-    // Limit number of entries to keep context manageable
-    if (relevantEntries.length > MAX_ENTRIES) {
-      console.log(`Limiting entries from ${relevantEntries.length} to ${MAX_ENTRIES}`);
+    // Limit number of entries for vector search to keep context manageable
+    // But don't limit for time pattern analysis - we want all entries for that
+    if (relevantEntries.length > MAX_ENTRIES && !message.toLowerCase().includes('time') && !message.toLowerCase().includes('pattern')) {
+      console.log(`Limiting entries from ${relevantEntries.length} to ${MAX_ENTRIES} for vector search`);
       relevantEntries = relevantEntries.slice(0, MAX_ENTRIES);
+    } else {
+      console.log(`Using all ${relevantEntries.length} relevant entries for analysis`);
     }
     
     console.log(`Total relevant entries found: ${relevantEntries.length}`);
@@ -280,6 +285,17 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
       });
     }
     
+    // Format conversation history for the prompt
+    let conversationContextText = "";
+    if (conversationHistory && conversationHistory.length > 0) {
+      conversationContextText = "\n\nRecent conversation history:\n";
+      conversationHistory.forEach((msg, i) => {
+        const role = msg.role === 'user' ? 'User' : 'Assistant';
+        conversationContextText += `${role}: ${msg.content}\n`;
+      });
+      conversationContextText += "\n";
+    }
+    
     // Step 3: Call OpenAI to process the query with journal context
     const messages = [
       {
@@ -288,9 +304,11 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
 
 ${journalContext}
 
-Based only on these entries, help the user by answering their question. If the information in the entries is not sufficient to answer the question completely, clearly state what is missing. Stay factual and only make conclusions that are directly supported by the journal entries. When references temporal information, try to be specific about dates. Be empathetic, personal, and thoughtful in your responses.`
+${conversationContextText}
+
+Based on these entries and conversation history, help the user by answering their question. If the information in the entries is not sufficient to answer the question completely, clearly state what is missing. Stay factual and only make conclusions that are directly supported by the journal entries. When references temporal information, try to be specific about dates. Be empathetic, personal, and thoughtful in your responses.`
       },
-      ...conversationHistory,
+      // Don't add conversation history here since we've included it in the system prompt
       { role: "user", content: message }
     ];
     
@@ -352,7 +370,7 @@ function COALESCE(...args) {
  */
 async function searchEntriesWithSQL(userId, query, filters = {}) {
   try {
-    // Start building the query
+    // Start building the query - don't limit for time pattern analysis
     let queryBuilder = supabase
       .from('Journal Entries')
       .select('id, "refined text", "transcription text", created_at, master_themes, emotions')
@@ -377,8 +395,7 @@ async function searchEntriesWithSQL(userId, query, filters = {}) {
     
     // Execute the query
     const { data: entries, error } = await queryBuilder
-      .order('created_at', { ascending: false })
-      .limit(20);
+      .order('created_at', { ascending: false });
     
     if (error) {
       console.error("Error in SQL search:", error);
@@ -409,7 +426,7 @@ async function searchEntriesWithVector(userId, embedding, filters = {}) {
     const params = {
       query_embedding: embedding,
       match_threshold: 0.5,
-      match_count: 10,
+      match_count: MAX_ENTRIES, // Keep this limit for vector search for quality
       user_id_filter: userId
     };
     

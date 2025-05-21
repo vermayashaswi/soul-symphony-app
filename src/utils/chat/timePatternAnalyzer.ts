@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { calculateRelativeDateRange } from './dateUtils';
 
@@ -32,6 +33,7 @@ export async function analyzeTimePatterns(
       query = query.gte('created_at', timeRange.startDate).lte('created_at', timeRange.endDate);
     }
 
+    // Don't limit the number of entries for time pattern analysis
     const { data: entries, error } = await query;
 
     if (error) {
@@ -50,6 +52,8 @@ export async function analyzeTimePatterns(
         timeRange: timeRange?.periodName || "all time"
       };
     }
+
+    console.log(`Found ${entries.length} entries for time pattern analysis`);
 
     // Analyze entry distribution by time
     const entriesByDate = groupEntriesByDate(entries);
