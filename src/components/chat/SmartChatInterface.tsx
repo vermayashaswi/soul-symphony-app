@@ -1,15 +1,39 @@
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
+import { v4 as uuidv4 } from 'uuid';
+import { supabase } from '@/integrations/supabase/client';
+import { useParams } from 'react-router-dom';
 import { Button } from "@/components/ui/button";
-import { processChatMessage } from "@/services/chatService";
-import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { useToast } from "@/hooks/use-toast";
 import { useAuth } from "@/contexts/AuthContext";
-import EmptyChatState from "./EmptyChatState";
+import ChatSuggestionButton from "./ChatSuggestionButton";
+import { Separator } from "@/components/ui/separator";
+import EmptyChatState from "@/components/chat/EmptyChatState";
+import { useDebouncedCallback } from 'use-debounce';
+import {
+  Sheet,
+  SheetContent,
+  SheetDescription,
+  SheetHeader,
+  SheetTitle,
+  SheetTrigger,
+} from "@/components/ui/sheet";
+import ChatDiagnostics from "./ChatDiagnostics";
+import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
+import { BugIcon, HelpCircleIcon, InfoIcon, MessagesSquareIcon, Trash } from 'lucide-react';
+import DebugPanel from "@/components/debug/DebugPanel";
+import { useToast } from "@/hooks/use-toast";
+import { useTranslation } from "@/contexts/TranslationContext";
+import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage } from "@/utils/chat/threadUtils";
+import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import VoiceRecordingButton from "./VoiceRecordingButton";
-import { Trash } from "lucide-react";
-import { supabase } from "@/integrations/supabase/client";
+import { ChatMessage } from "@/types/chat";
+import { getThreadMessages, saveMessage } from "@/services/chat";
+import { useDebugLog } from "@/utils/debug/DebugContext";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
+import { processChatMessage } from "@/services/chatService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -20,15 +44,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
-import { ChatMessage } from "@/types/chat";
-import { getThreadMessages, saveMessage, processWithStructuredPrompt, ServiceChatMessage } from "@/services/chat";
-import { useDebugLog } from "@/utils/debug/DebugContext";
-import { TranslatableText } from "@/components/translation/TranslatableText";
-import { useTranslation } from "@/contexts/TranslationContext";
-import { useChatRealtime } from "@/hooks/use-chat-realtime";
-import { updateThreadProcessingStatus, createProcessingMessage, updateProcessingMessage } from "@/utils/chat/threadUtils";
 
-const SmartChatInterface = () => {
+export interface SmartChatInterfaceProps {
+  mentalHealthInsights?: MentalHealthInsights;
+}
+
+const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthInsights }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -257,6 +278,8 @@ const SmartChatInterface = () => {
         isQuantitative: queryTypes.isQuantitative,
         isWhyQuestion: queryTypes.isWhyQuestion,
         isTemporalQuery: queryTypes.isTemporalQuery,
+        isPersonalInsightQuery: queryTypes.isPersonalInsightQuery, // New field
+        isMentalHealthQuery: queryTypes.isMentalHealthQuery,       // New field  
         timeRange: queryTypes.timeRange.periodName,
         emotion: queryTypes.emotion || 'none detected'
       };
@@ -270,48 +293,30 @@ const SmartChatInterface = () => {
       updateProcessingStage("Searching for insights...");
       debugLog.addEvent("Context-Aware Processing", "Sending query with conversation context", "info");
       
-      // Use the standard chat message processing to get journal entries
-      const searchResponse = await processChatMessage(
-        message,
-        user.id,
-        queryTypes,
+      // Always use personal insights for mental health and personality questions
+      const forcePersonalContext = queryTypes.isPersonalInsightQuery || queryTypes.isMentalHealthQuery;
+      if (forcePersonalContext) {
+        parameters.usePersonalContext = true;
+        debugLog.addEvent("Query Enhancement", "Forcing personal context for mental health or personality question", "info");
+      }
+      
+      const response = await processChatMessage(
+        message, 
+        user.id, 
+        queryTypes, 
         threadId,
-        true, // onlyFetchEntries = true, don't generate response yet
+        false,
         parameters
       );
-      
-      // If we have entries from search, use our new structured prompt approach
-      if (searchResponse.references && searchResponse.references.length > 0) {
-        updateProcessingStage("Generating insightful response...");
-        debugLog.addEvent("Structured Prompt", `Using structured prompt with ${searchResponse.references.length} journal entries`, "info");
-        
-        try {
-          // Process the message using our new structured prompt approach
-          const structuredResponse = await processWithStructuredPrompt(
-            message,
-            user.id,
-            searchResponse.references,
-            threadId
-          );
-          
-          // Update the response with the structuredResponse data
-          searchResponse.content = structuredResponse.data;
-          // Keep the references from the search
-        } catch (structuredError: any) {
-          debugLog.addEvent("Structured Prompt", `Error using structured prompt: ${structuredError.message}`, "error");
-          console.error("Error using structured prompt:", structuredError);
-          // Fall back to the original response if there was an error
-        }
-      }
       
       // Update or delete the processing message
       if (processingMessageId) {
         await updateProcessingMessage(
           processingMessageId,
-          searchResponse.content,
-          searchResponse.references,
-          searchResponse.analysis,
-          searchResponse.hasNumericResult
+          response.content,
+          response.references,
+          response.analysis,
+          response.hasNumericResult
         );
       }
       
@@ -319,18 +324,18 @@ const SmartChatInterface = () => {
       await updateThreadProcessingStatus(threadId, 'idle');
       
       // Handle interactive clarification messages
-      if (searchResponse.isInteractive && searchResponse.interactiveOptions) {
+      if (response.isInteractive && response.interactiveOptions) {
         debugLog.addEvent("AI Processing", "Received interactive clarification message", "info");
         try {
           const savedResponse = await saveMessage(
             threadId,
-            searchResponse.content,
+            response.content,
             'assistant',
             undefined,
             undefined,
             false,
             true,
-            searchResponse.interactiveOptions
+            response.interactiveOptions
           );
           
           if (savedResponse) {
@@ -340,7 +345,7 @@ const SmartChatInterface = () => {
               sender: savedResponse.sender as 'user' | 'assistant' | 'error',
               role: savedResponse.role as 'user' | 'assistant' | 'error',
               isInteractive: true,
-              interactiveOptions: searchResponse.interactiveOptions
+              interactiveOptions: response.interactiveOptions
             };
             setChatHistory(prev => [...prev, typedSavedResponse]);
           } else {
@@ -353,24 +358,24 @@ const SmartChatInterface = () => {
           const interactiveMessage: ChatMessage = {
             id: `temp-interactive-${Date.now()}`,
             thread_id: threadId,
-            content: searchResponse.content,
+            content: response.content,
             sender: 'assistant',
             role: 'assistant',
             created_at: new Date().toISOString(),
             isInteractive: true,
-            interactiveOptions: searchResponse.interactiveOptions
+            interactiveOptions: response.interactiveOptions
           };
           
           setChatHistory(prev => [...prev, interactiveMessage]);
         }
       } else {
         const responseInfo = {
-          role: searchResponse.role,
-          hasReferences: !!searchResponse.references?.length,
-          refCount: searchResponse.references?.length || 0,
-          hasAnalysis: !!searchResponse.analysis,
-          hasNumericResult: searchResponse.hasNumericResult,
-          errorState: searchResponse.role === 'error'
+          role: response.role,
+          hasReferences: !!response.references?.length,
+          refCount: response.references?.length || 0,
+          hasAnalysis: !!response.analysis,
+          hasNumericResult: response.hasNumericResult,
+          errorState: response.role === 'error'
         };
         
         debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
@@ -380,13 +385,11 @@ const SmartChatInterface = () => {
           debugLog.addEvent("Database", "Saving assistant response to database", "info");
           const savedResponse = await saveMessage(
             threadId,
-            searchResponse.content,
+            response.content,
             'assistant',
-            searchResponse.references,
-            searchResponse.analysis,
-            searchResponse.hasNumericResult,
-            true,
-            searchResponse.interactiveOptions
+            response.references,
+            response.analysis,
+            response.hasNumericResult
           );
           
           debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
@@ -409,13 +412,13 @@ const SmartChatInterface = () => {
           const assistantMessage: ChatMessage = {
             id: `temp-response-${Date.now()}`,
             thread_id: threadId,
-            content: searchResponse.content,
+            content: response.content,
             sender: 'assistant',
             role: 'assistant',
             created_at: new Date().toISOString(),
-            reference_entries: searchResponse.references,
-            analysis_data: searchResponse.analysis,
-            has_numeric_result: searchResponse.hasNumericResult
+            reference_entries: response.references,
+            analysis_data: response.analysis,
+            has_numeric_result: response.hasNumericResult
           };
           
           debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
@@ -703,6 +706,8 @@ const SmartChatInterface = () => {
   );
 };
 
-export default function SmartChatInterfaceWrapper() {
-  return <SmartChatInterface />;
-}
+// Export both the raw component and a wrapper component
+export { SmartChatInterface };  // Named export for direct import by other components
+
+// Default export as a wrapper component
+export default SmartChatInterface;
