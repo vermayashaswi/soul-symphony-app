@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ChatMessage } from "@/types/chat";
-import { getThreadMessages, saveMessage } from "@/services/chat";
+import { getThreadMessages, saveMessage, processWithStructuredPrompt } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useTranslation } from "@/contexts/TranslationContext";
@@ -270,23 +270,48 @@ const SmartChatInterface = () => {
       updateProcessingStage("Searching for insights...");
       debugLog.addEvent("Context-Aware Processing", "Sending query with conversation context", "info");
       
-      const response = await processChatMessage(
-        message, 
-        user.id, 
-        queryTypes, 
+      // Use the standard chat message processing to get journal entries
+      const searchResponse = await processChatMessage(
+        message,
+        user.id,
+        queryTypes,
         threadId,
-        false,
+        true, // onlyFetchEntries = true, don't generate response yet
         parameters
       );
+      
+      // If we have entries from search, use our new structured prompt approach
+      if (searchResponse.references && searchResponse.references.length > 0) {
+        updateProcessingStage("Generating insightful response...");
+        debugLog.addEvent("Structured Prompt", `Using structured prompt with ${searchResponse.references.length} journal entries`, "info");
+        
+        try {
+          // Process the message using our new structured prompt approach
+          const structuredResponse = await processWithStructuredPrompt(
+            message,
+            user.id,
+            searchResponse.references,
+            threadId
+          );
+          
+          // Update the response with the structuredResponse data
+          searchResponse.content = structuredResponse.data;
+          // Keep the references from the search
+        } catch (structuredError: any) {
+          debugLog.addEvent("Structured Prompt", `Error using structured prompt: ${structuredError.message}`, "error");
+          console.error("Error using structured prompt:", structuredError);
+          // Fall back to the original response if there was an error
+        }
+      }
       
       // Update or delete the processing message
       if (processingMessageId) {
         await updateProcessingMessage(
           processingMessageId,
-          response.content,
-          response.references,
-          response.analysis,
-          response.hasNumericResult
+          searchResponse.content,
+          searchResponse.references,
+          searchResponse.analysis,
+          searchResponse.hasNumericResult
         );
       }
       
@@ -294,18 +319,18 @@ const SmartChatInterface = () => {
       await updateThreadProcessingStatus(threadId, 'idle');
       
       // Handle interactive clarification messages
-      if (response.isInteractive && response.interactiveOptions) {
+      if (searchResponse.isInteractive && searchResponse.interactiveOptions) {
         debugLog.addEvent("AI Processing", "Received interactive clarification message", "info");
         try {
           const savedResponse = await saveMessage(
             threadId,
-            response.content,
+            searchResponse.content,
             'assistant',
             undefined,
             undefined,
             false,
             true,
-            response.interactiveOptions
+            searchResponse.interactiveOptions
           );
           
           if (savedResponse) {
@@ -315,7 +340,7 @@ const SmartChatInterface = () => {
               sender: savedResponse.sender as 'user' | 'assistant' | 'error',
               role: savedResponse.role as 'user' | 'assistant' | 'error',
               isInteractive: true,
-              interactiveOptions: response.interactiveOptions
+              interactiveOptions: searchResponse.interactiveOptions
             };
             setChatHistory(prev => [...prev, typedSavedResponse]);
           } else {
@@ -328,24 +353,24 @@ const SmartChatInterface = () => {
           const interactiveMessage: ChatMessage = {
             id: `temp-interactive-${Date.now()}`,
             thread_id: threadId,
-            content: response.content,
+            content: searchResponse.content,
             sender: 'assistant',
             role: 'assistant',
             created_at: new Date().toISOString(),
             isInteractive: true,
-            interactiveOptions: response.interactiveOptions
+            interactiveOptions: searchResponse.interactiveOptions
           };
           
           setChatHistory(prev => [...prev, interactiveMessage]);
         }
       } else {
         const responseInfo = {
-          role: response.role,
-          hasReferences: !!response.references?.length,
-          refCount: response.references?.length || 0,
-          hasAnalysis: !!response.analysis,
-          hasNumericResult: response.hasNumericResult,
-          errorState: response.role === 'error'
+          role: searchResponse.role,
+          hasReferences: !!searchResponse.references?.length,
+          refCount: searchResponse.references?.length || 0,
+          hasAnalysis: !!searchResponse.analysis,
+          hasNumericResult: searchResponse.hasNumericResult,
+          errorState: searchResponse.role === 'error'
         };
         
         debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
@@ -355,11 +380,11 @@ const SmartChatInterface = () => {
           debugLog.addEvent("Database", "Saving assistant response to database", "info");
           const savedResponse = await saveMessage(
             threadId,
-            response.content,
+            searchResponse.content,
             'assistant',
-            response.references,
-            response.analysis,
-            response.hasNumericResult
+            searchResponse.references,
+            searchResponse.analysis,
+            searchResponse.hasNumericResult
           );
           
           debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
@@ -382,13 +407,13 @@ const SmartChatInterface = () => {
           const assistantMessage: ChatMessage = {
             id: `temp-response-${Date.now()}`,
             thread_id: threadId,
-            content: response.content,
+            content: searchResponse.content,
             sender: 'assistant',
             role: 'assistant',
             created_at: new Date().toISOString(),
-            reference_entries: response.references,
-            analysis_data: response.analysis,
-            has_numeric_result: response.hasNumericResult
+            reference_entries: searchResponse.references,
+            analysis_data: searchResponse.analysis,
+            has_numeric_result: searchResponse.hasNumericResult
           };
           
           debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");

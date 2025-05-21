@@ -179,3 +179,40 @@ export const updateThreadTitle = async (threadId: string, title: string): Promis
     return false;
   }
 };
+
+/**
+ * Process a message using the structured chat approach
+ */
+export const processWithStructuredPrompt = async (
+  message: string,
+  userId: string,
+  entries: any[],
+  threadId?: string
+): Promise<any> => {
+  try {
+    const response = await fetch(`${supabase.supabaseUrl}/functions/v1/structured-chat`, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${supabase.supabaseKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        message,
+        userId,
+        entries,
+        threadId
+      }),
+    });
+
+    if (!response.ok) {
+      const errorText = await response.text();
+      throw new Error(`Error from structured-chat function: ${errorText}`);
+    }
+
+    const data = await response.json();
+    return data;
+  } catch (error) {
+    console.error("Error processing with structured prompt:", error);
+    throw error;
+  }
+};

@@ -4,3 +4,6 @@ project_id = "kwnwhgucnzqxndzjayyq"
 # Please don't add any other configurations to this file.
 # Add them to the function specific config files instead:
 # - supabase/functions/<function_name>/config.toml
+
+[functions.structured-chat]
+verify_jwt = true
