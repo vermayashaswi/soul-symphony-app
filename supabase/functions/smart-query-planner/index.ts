@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
-import { corsHeaders } from '../_shared/cors.ts';
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const apiKey = Deno.env.get('OPENAI_API_KEY');
@@ -13,6 +12,12 @@ if (!apiKey) {
 const config = new Configuration({
   apiKey: apiKey,
 });
+
+// Define corsHeaders directly in this file instead of importing
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 const openai = new OpenAIApi(config);
 
