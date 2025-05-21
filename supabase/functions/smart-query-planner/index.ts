@@ -63,7 +63,17 @@ function detectPersonalityQuestion(message) {
     'what kind of person am i',
     'what is my personality',
     'what do i like',
-    'what are my preferences'
+    'what are my preferences',
+    'what are my strengths',
+    'what are my weaknesses',
+    'what are my traits',
+    'my personality type',
+    'personality traits',
+    'introvert or extrovert',
+    'am i introvert',
+    'am i extrovert',
+    'do i prefer',
+    'what type of person am i'
   ];
   
   const isPersonalityQuestion = personalityPatterns.some(pattern => lowerMessage.includes(pattern));
@@ -356,6 +366,12 @@ Return a JSON object with the following structure:
       if (planObject && planObject.plan) {
         planObject.plan.totalEntryCount = entryCount;
       }
+      
+      // Add isPersonalityQuery if it might be missed
+      if (planObject && planObject.plan && isPersonalityQuestion && !planObject.plan.isPersonalityQuery) {
+        planObject.plan.isPersonalityQuery = true;
+        planObject.plan.domainContext = "personal_insights";
+      }
 
       console.log("Parsed Query Plan:", planObject);
 
@@ -384,7 +400,8 @@ Return a JSON object with the following structure:
         domainContext: domainContext || "general_insights",
         isTimeSummaryQuery: isTimeSummaryQuery,
         totalEntryCount: entryCount,
-        isErrorFallback: true
+        isErrorFallback: true,
+        isPersonalityQuery: isPersonalityQuestion
       };
       
       return new Response(
@@ -413,4 +430,3 @@ Return a JSON object with the following structure:
     });
   }
 });
-
