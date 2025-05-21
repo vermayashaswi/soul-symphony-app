@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { ChatMessage, ChatThread, SubQueryResponse, TimeAnalysis } from './types';
@@ -267,7 +266,7 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[]> 
       metadata: thread.metadata ? 
         (typeof thread.metadata === 'string' ? 
           JSON.parse(thread.metadata as string) : 
-          thread.metadata as ChatThread['metadata'])
+          thread.metadata) as ChatThread['metadata']
     })) : [];
   } catch (error) {
     console.error('Error fetching user chat threads:', error);
@@ -308,8 +307,8 @@ export async function getThreadMessages(threadId: string): Promise<ChatMessage[]
         sender: msg.sender as 'user' | 'assistant' | 'error',
         role: msg.role as 'user' | 'assistant' | 'error',
         reference_entries,
-        analysis_data,
         references: reference_entries,
+        analysis_data,
         analysis: analysis_data,
         hasNumericResult: msg.has_numeric_result,
         sub_query_responses
