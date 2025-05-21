@@ -8,11 +8,22 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 interface ReferencesDisplayProps {
   references: any[];
   threadId?: string;
+  timeAnalysis?: {
+    totalEntries: number;
+    peakHours: Array<{hour: number, label: string, count: number}>;
+    timePeriods: {
+      morning: number;
+      afternoon: number;
+      evening: number; 
+      night: number;
+    };
+  };
 }
 
 const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({ 
   references,
-  threadId
+  threadId,
+  timeAnalysis
 }) => {
   const [expanded, setExpanded] = useState(false);
 
@@ -23,6 +34,10 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
   // Display total number of references but only show a subset
   const visibleReferences = expanded ? references : references.slice(0, 3);
   const totalReferences = references.length;
+  
+  // Calculate total analyzed entries (shown + not shown)
+  // If timeAnalysis is present, use that as the source of truth for total entries analyzed
+  const totalEntriesAnalyzed = timeAnalysis?.totalEntries || totalReferences;
 
   // Extract date range if available
   const dates = references.map(ref => ref.date ? new Date(ref.date) : null).filter(Boolean);
@@ -33,6 +48,11 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
     `from ${earliestDate.toLocaleDateString()} to ${latestDate.toLocaleDateString()}` : 
     '';
 
+  // Format text differently if there are more entries analyzed than shown
+  const entryText = totalEntriesAnalyzed === totalReferences 
+    ? `Based on ${totalReferences} journal ${totalReferences === 1 ? 'entry' : 'entries'} ${dateRangeText}`
+    : `Based on ${totalEntriesAnalyzed} analyzed journal ${totalEntriesAnalyzed === 1 ? 'entry' : 'entries'} (showing ${totalReferences}) ${dateRangeText}`;
+
   return (
     <div className="mt-3 text-sm">
       <Button
@@ -41,7 +61,7 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
         className="p-0 h-6 text-xs font-normal flex items-center gap-1 text-muted-foreground hover:text-foreground"
         onClick={() => setExpanded(!expanded)}
       >
-        <TranslatableText text={`Based on ${totalReferences} journal ${totalReferences === 1 ? 'entry' : 'entries'} ${dateRangeText}`} />
+        <TranslatableText text={entryText} />
         {expanded ? (
           <ChevronUp className="h-3 w-3 ml-1" />
         ) : (
@@ -51,6 +71,34 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
       
       {expanded && (
         <div className="mt-2 space-y-2 border-l-2 border-primary/20 pl-3">
+          {timeAnalysis && (
+            <Card className="p-2 text-xs bg-muted/30">
+              <div className="font-medium">Time Pattern Analysis</div>
+              <div className="text-muted-foreground">
+                <p>Peak journaling times: {timeAnalysis.peakHours.map(p => p.label).join(', ')}</p>
+                <p className="mt-1">Journal entries by time of day:</p>
+                <div className="grid grid-cols-4 gap-1 mt-1">
+                  <div className="text-center">
+                    <div className="font-medium">Morning</div>
+                    <div>{timeAnalysis.timePeriods.morning}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium">Afternoon</div>
+                    <div>{timeAnalysis.timePeriods.afternoon}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium">Evening</div>
+                    <div>{timeAnalysis.timePeriods.evening}</div>
+                  </div>
+                  <div className="text-center">
+                    <div className="font-medium">Night</div>
+                    <div>{timeAnalysis.timePeriods.night}</div>
+                  </div>
+                </div>
+              </div>
+            </Card>
+          )}
+          
           {visibleReferences.map((ref, idx) => (
             <Card key={idx} className="p-2 text-xs">
               <div className="font-medium">

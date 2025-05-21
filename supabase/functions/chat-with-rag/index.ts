@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -283,6 +282,159 @@ function detectEmotionQuantitativeQuery(message: string) {
   };
 }
 
+// NEWLY ADDED: Function to detect time pattern queries
+function detectTimePatternQuery(message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Match patterns related to time, frequency, "when", etc.
+  const timePatterns = [
+    /when do i (usually|typically|normally|often|mostly|generally|habitually)/i,
+    /what time (of day|of the day|during the day)/i,
+    /(morning|afternoon|evening|night) vs (morning|afternoon|evening|night)/i,
+    /time of day .* (prefer|like|enjoy|do|practice|write|journal)/i,
+    /how often do i/i,
+    /frequency of/i,
+    /pattern of/i,
+    /regularity/i,
+    /schedule/i,
+    /routine/i,
+    /habit/i,
+    /when am i most likely to/i,
+  ];
+  
+  // Check if any time pattern matches
+  const isTimePatternQuery = timePatterns.some(pattern => pattern.test(lowerMessage));
+  
+  // Create a confidence score (simple version)
+  const personalTerms = [
+    'i ', "i'm", 'me', 'my', 'mine', 'myself', 'am i', 'do i', 'when i'
+  ];
+  
+  const hasPersonalTerms = personalTerms.some(term => lowerMessage.includes(term));
+  
+  // Higher confidence if personal terms are used
+  const confidence = isTimePatternQuery ? (hasPersonalTerms ? 90 : 70) : 0;
+  
+  console.log(`Time pattern query analysis:
+    - Message: "${message}"
+    - Is time pattern: ${isTimePatternQuery}
+    - Has personal terms: ${hasPersonalTerms}
+    - Confidence: ${confidence}%
+  `);
+  
+  return {
+    isTimePatternQuery,
+    confidence,
+    hasPersonalTerms
+  };
+}
+
+// NEWLY ADDED: Function to analyze time patterns in entries
+async function analyzeTimePatterns(userId: string, limit: number = 100) {
+  try {
+    console.log(`Analyzing time patterns for user ${userId} across up to ${limit} entries`);
+    
+    // Fetch a large number of entries
+    const { data: entries, error } = await supabase
+      .from('Journal Entries')
+      .select('id, created_at')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: false })
+      .limit(limit);
+    
+    if (error) {
+      console.error("Error fetching entries for time pattern analysis:", error);
+      return { error: error.message };
+    }
+    
+    if (!entries || entries.length === 0) {
+      return { hourDistribution: {}, entryCount: 0, error: 'No entries found' };
+    }
+    
+    // Create a histogram of hours
+    const hourDistribution: Record<number, number> = {};
+    const hourLabels: Record<number, string> = {
+      0: "12 AM (midnight)", 1: "1 AM", 2: "2 AM", 3: "3 AM", 4: "4 AM", 5: "5 AM",
+      6: "6 AM", 7: "7 AM", 8: "8 AM", 9: "9 AM", 10: "10 AM", 11: "11 AM",
+      12: "12 PM (noon)", 13: "1 PM", 14: "2 PM", 15: "3 PM", 16: "4 PM", 17: "5 PM",
+      18: "6 PM", 19: "7 PM", 20: "8 PM", 21: "9 PM", 22: "10 PM", 23: "11 PM"
+    };
+    
+    // Initialize all hours to 0
+    for (let i = 0; i < 24; i++) {
+      hourDistribution[i] = 0;
+    }
+    
+    // Count entries by hour
+    entries.forEach(entry => {
+      if (entry.created_at) {
+        const date = new Date(entry.created_at);
+        const hour = date.getHours();
+        hourDistribution[hour]++;
+      }
+    });
+    
+    // Find peak hours (hours with the most entries)
+    let maxCount = 0;
+    const peakHours = [];
+    
+    for (let hour = 0; hour < 24; hour++) {
+      if (hourDistribution[hour] > maxCount) {
+        maxCount = hourDistribution[hour];
+        // Reset peak hours with this new maximum
+        peakHours.length = 0;
+        peakHours.push(hour);
+      } else if (hourDistribution[hour] === maxCount && maxCount > 0) {
+        // Add another peak hour with the same count
+        peakHours.push(hour);
+      }
+    }
+    
+    // Convert to time periods for better understanding
+    const timePeriods = {
+      morning: 0, // 5 AM - 11 AM
+      afternoon: 0, // 12 PM - 5 PM
+      evening: 0, // 6 PM - 9 PM
+      night: 0 // 10 PM - 4 AM
+    };
+    
+    // Aggregate by time period
+    for (let hour = 5; hour <= 11; hour++) timePeriods.morning += hourDistribution[hour];
+    for (let hour = 12; hour <= 17; hour++) timePeriods.afternoon += hourDistribution[hour];
+    for (let hour = 18; hour <= 21; hour++) timePeriods.evening += hourDistribution[hour];
+    for (let hour = 22; hour <= 23; hour++) timePeriods.night += hourDistribution[hour];
+    for (let hour = 0; hour <= 4; hour++) timePeriods.night += hourDistribution[hour];
+    
+    // Format peak hours for easy reading
+    const formattedPeakHours = peakHours.map(hour => hourLabels[hour]).join(", ");
+    
+    console.log(`Time pattern analysis complete: 
+      - Analyzed ${entries.length} entries
+      - Peak hours: ${formattedPeakHours} 
+      - Entries at peak: ${maxCount}
+    `);
+    
+    return {
+      hourDistribution,
+      formattedHours: Object.fromEntries(
+        Object.entries(hourDistribution).map(([hour, count]) => 
+          [hourLabels[parseInt(hour)], count]
+        )
+      ),
+      peakHours: peakHours.map(hour => ({
+        hour,
+        label: hourLabels[hour],
+        count: hourDistribution[hour]
+      })),
+      timePeriods,
+      entryCount: entries.length
+    };
+  } catch (error) {
+    console.error("Error analyzing time patterns:", error);
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+}
+
 // Function to detect if a query is likely about mental health
 function isMentalHealthQuery(message: string) {
   // List of mental health related keywords
@@ -412,6 +564,63 @@ serve(async (req) => {
         details: "OpenAI API key is missing or invalid"
       });
       throw new Error("OpenAI API key is not configured");
+    }
+    
+    // NEWLY ADDED: Check if this is a time pattern query
+    const timePatternAnalysis = detectTimePatternQuery(message);
+    let timePatternData = null;
+    
+    if (timePatternAnalysis.isTimePatternQuery && timePatternAnalysis.confidence > 50) {
+      console.log("Detected time pattern query:", timePatternAnalysis);
+      diagnosticSteps.push({
+        name: "Time Pattern Query Detection", 
+        status: "success",
+        details: `Detected time pattern query with confidence ${timePatternAnalysis.confidence}%`
+      });
+      
+      // For time pattern queries, we do a specialized analysis
+      try {
+        diagnosticSteps.push({
+          name: "Analyze Time Patterns", 
+          status: "loading"
+        });
+        
+        // Analyze a large number of entries to find patterns
+        const startTime = Date.now();
+        timePatternData = await analyzeTimePatterns(userId, 200); // Analyze up to 200 entries
+        
+        functionExecutions.push({
+          name: "analyzeTimePatterns",
+          params: { userId: "***", limit: 200 },
+          result: timePatternData.error ? { error: timePatternData.error } : { 
+            entryCount: timePatternData.entryCount,
+            peakHoursCount: timePatternData.peakHours?.length || 0
+          },
+          executionTime: Date.now() - startTime,
+          success: !timePatternData.error
+        });
+        
+        if (timePatternData.error) {
+          diagnosticSteps.push({
+            name: "Analyze Time Patterns", 
+            status: "error",
+            details: timePatternData.error
+          });
+        } else {
+          diagnosticSteps.push({
+            name: "Analyze Time Patterns", 
+            status: "success",
+            details: `Analyzed ${timePatternData.entryCount} entries, found ${timePatternData.peakHours?.length || 0} peak hours`
+          });
+        }
+      } catch (error) {
+        console.error("Error analyzing time patterns:", error);
+        diagnosticSteps.push({
+          name: "Analyze Time Patterns", 
+          status: "error",
+          details: error instanceof Error ? error.message : String(error)
+        });
+      }
     }
     
     // Analyze if this is likely a mental health query that should use journal entries
@@ -786,6 +995,18 @@ serve(async (req) => {
         details: "No similar entries found, using recent entries instead"
       });
       
+      // Determine appropriate limit based on query type
+      let recentEntriesLimit = 8; // Default limit
+      
+      // For time pattern queries, use a much higher limit
+      if (timePatternAnalysis.isTimePatternQuery && timePatternAnalysis.confidence > 50) {
+        recentEntriesLimit = 50; // Increased limit for time pattern queries
+        console.log(`Using increased limit (${recentEntriesLimit}) for time pattern query`);
+      } else if (mentalHealthAnalysis.isMentalHealth && mentalHealthAnalysis.confidence > 40) {
+        recentEntriesLimit = 20; // Increased limit for mental health queries
+        console.log(`Using increased limit (${recentEntriesLimit}) for mental health query`);
+      }
+      
       // Fallback to recent entries if no similar ones found
       const startRecentTime = Date.now();
       const { data: recentEntries, error: recentError } = await supabase
@@ -793,11 +1014,11 @@ serve(async (req) => {
         .select('id, "refined text", created_at, emotions, master_themes')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(8); // Increased from 3 to 8 for more comprehensive analysis
+        .limit(recentEntriesLimit);
       
       const recentExecution: FunctionExecution = {
         name: "fetch_recent_journal_entries",
-        params: { user_id: "***", limit: 8 }, // Increased from 3 to 8
+        params: { user_id: "***", limit: recentEntriesLimit },
         result: recentError ? { error: recentError.message } : { count: recentEntries?.length || 0 },
         executionTime: Date.now() - startRecentTime,
         success: !recentError
@@ -816,7 +1037,7 @@ serve(async (req) => {
         diagnosticSteps.push({
           name: "Fallback to recent entries", 
           status: "success",
-          details: `Retrieved ${recentEntries.length} recent entries`
+          details: `Retrieved ${recentEntries.length} recent entries with limit ${recentEntriesLimit}`
         });
         
         contextEntries = recentEntries.map(entry => ({
@@ -910,6 +1131,21 @@ ${firstName ? `Always address the user by their first name (${firstName}) in you
       systemPrompt += `\nThis appears to be a personal query about mental health or personality (confidence: ${mentalHealthAnalysis.confidence}%). 
 Please analyze the journal entries carefully to provide insights about their specific mental health or personality patterns.
 Pay special attention to emotions, behaviors, and patterns that might inform your response.\n`;
+    }
+
+    // Add time pattern analysis data if available
+    if (timePatternData && !timePatternData.error) {
+      systemPrompt += `\nThis appears to be a query about time patterns in journaling. I've analyzed ${timePatternData.entryCount} journal entries and found the following patterns:
+
+Peak journaling hours: ${timePatternData.peakHours.map(p => p.label).join(', ')}
+
+Time of day distribution:
+- Morning (5 AM - 11 AM): ${timePatternData.timePeriods.morning} entries
+- Afternoon (12 PM - 5 PM): ${timePatternData.timePeriods.afternoon} entries
+- Evening (6 PM - 9 PM): ${timePatternData.timePeriods.evening} entries
+- Night (10 PM - 4 AM): ${timePatternData.timePeriods.night} entries
+
+Please incorporate this information into your response, explaining when they typically journal and any patterns you notice.\n`;
     }
 
     systemPrompt += `\nRESPONSE GUIDELINES:
@@ -1012,6 +1248,24 @@ Pay special attention to emotions, behaviors, and patterns that might inform you
             similarity: entry.similarity
           })) : null;
           
+          // For time pattern queries, include the time analysis data
+          let analysisData: any = {
+            mentalHealthAnalysis: mentalHealthAnalysis,
+            queryTypeDetection: emotionQueryAnalysis,
+            diagnosticSteps: diagnosticSteps
+          };
+          
+          if (timePatternData && !timePatternData.error) {
+            analysisData.timePatternAnalysis = {
+              ...timePatternAnalysis,
+              data: {
+                peakHours: timePatternData.peakHours,
+                timePeriods: timePatternData.timePeriods,
+                entryCount: timePatternData.entryCount
+              }
+            };
+          }
+          
           // Store both user message and AI response if this is a new or ongoing thread
           if (isNewThread) {
             const saveUserStartTime = Date.now();
@@ -1057,11 +1311,7 @@ Pay special attention to emotions, behaviors, and patterns that might inform you
               content: aiResponse,
               sender: 'assistant',
               reference_entries: references,
-              analysis_data: {
-                mentalHealthAnalysis: mentalHealthAnalysis,
-                queryTypeDetection: emotionQueryAnalysis,
-                diagnosticSteps: diagnosticSteps
-              },
+              analysis_data: analysisData,
               has_numeric_result: emotionQueryAnalysis.isQuantitativeEmotionQuery
             });
             
@@ -1130,6 +1380,9 @@ Pay special attention to emotions, behaviors, and patterns that might inform you
         }
       }
       
+      // Check if this is a time pattern query that needs additional context
+      const isTimeQuery = timePatternData && !timePatternData.error;
+      
       // Return the final response
       return new Response(
         JSON.stringify({ 
@@ -1143,6 +1396,11 @@ Pay special attention to emotions, behaviors, and patterns that might inform you
             similarity: entry.similarity,
             type: entry.type
           })),
+          timeAnalysis: isTimeQuery ? {
+            totalEntries: timePatternData.entryCount,
+            peakHours: timePatternData.peakHours,
+            timePeriods: timePatternData.timePeriods
+          } : undefined,
           diagnostics: includeDiagnostics ? {
             steps: diagnosticSteps,
             functionCalls: functionExecutions,
