@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -852,12 +851,16 @@ Based on the above context (if available) and the user's message, provide a thou
 ${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}
 
 RESPONSE GUIDELINES:
+- Keep responses under 150 words total
 - Be extremely concise and to the point
-- Use bullet points wherever possible
+- Use bullet points for listing information, advice, or steps
+- Format responses in short paragraphs (2-3 sentences max) or bullet points
 - Don't make assumptions about information not provided
-- Keep your tone warm but direct
+- Keep your tone warm but direct and conversational
 - Focus on being helpful rather than diagnostic
 - Avoid lengthy explanations unless specifically requested
+- For personality assessments or introspection questions, be especially brief and use bullet points
+- Never apologize for being concise
 `;
 
     console.log("Sending to GPT with RAG context...");
@@ -888,6 +891,7 @@ RESPONSE GUIDELINES:
               content: message
             }
           ],
+          max_tokens: 600, // Limiting token count to encourage brevity
         }),
       });
 
