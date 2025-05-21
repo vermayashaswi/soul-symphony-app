@@ -1,9 +1,9 @@
 
 import { supabase } from '@/integrations/supabase/client';
 import { ChatThread } from './types';
-import { ConversationStateManager } from '@/utils/chat/conversationStateManager';
-import { detectRelativeTimeExpression, calculateRelativeDateRange, extractReferenceDate, isRelativeTimeQuery } from '@/utils/chat/dateUtils';
-import type { IntentType } from '@/utils/chat/conversationStateManager';
+import { ConversationStateManager, IntentType } from '@/utils/chat/conversationStateManager';
+import { detectRelativeTimeExpression, calculateRelativeDateRange, isRelativeTimeQuery } from '@/utils/chat/dateUtils';
+import { enhanceQueryWithContext } from '@/utils/chat/messageProcessor';
 
 export async function fetchChatThreads(userId: string | undefined) {
   if (!userId) {
@@ -134,7 +134,7 @@ export async function updateThreadTitle(threadId: string, title: string): Promis
   }
 }
 
-// Updated with enhanced context handling and conversation state management
+// IMPROVEMENT: Updated with enhanced context handling and conversation state management, especially for mental health queries
 export async function getPlanForQuery(
   query: string, 
   userId: string, 
@@ -149,6 +149,18 @@ export async function getPlanForQuery(
   try {
     console.log(`Processing query: "${query}"`);
     
+    // Check if this is likely a mental health related query
+    const isMentalHealthQuery = checkForMentalHealthQuery(query);
+    const isPersonalQuery = checkForPersonalQuery(query);
+    
+    if (isMentalHealthQuery) {
+      console.log("Detected mental health related query");
+    }
+    
+    if (isPersonalQuery) {
+      console.log("Detected personal query requesting specific advice");
+    }
+    
     // Initialize conversation state manager if we have a thread ID
     let stateManager: ConversationStateManager | null = null;
     let intentType: IntentType = 'new_query';
@@ -159,7 +171,7 @@ export async function getPlanForQuery(
       previousState = await stateManager.loadState();
       
       // Analyze the intent of this query
-      intentType = stateManager.analyzeIntent(query);
+      intentType = await stateManager.analyzeIntent(query);
       console.log(`Detected query intent: ${intentType}`);
     }
 
@@ -185,7 +197,7 @@ export async function getPlanForQuery(
       }
     }
 
-    // Enhanced system context for the AI
+    // IMPROVEMENT: Enhanced system context for the AI with mental health indicators
     const enhancedContext = {
       appInfo: {
         name: "SOULo",
@@ -203,7 +215,8 @@ export async function getPlanForQuery(
         },
         preferenceDefaults: {
           assumeHistoricalDataForMentalHealth: true,
-          minimizeUnnecessaryClarifications: true
+          minimizeUnnecessaryClarifications: true,
+          prioritizeJournalAnalysisForMentalHealth: true
         }
       },
       userContext: {
@@ -213,7 +226,9 @@ export async function getPlanForQuery(
         previousTimeContext: previousTimeContext,
         previousTopicContext: previousTopicContext,
         intentType: intentType,
-        needsClarity: previousState?.needsClarity || false
+        needsClarity: previousState?.needsClarity || false,
+        isMentalHealthQuery: isMentalHealthQuery,
+        isPersonalQuery: isPersonalQuery
       }
     };
 
@@ -221,6 +236,8 @@ export async function getPlanForQuery(
     console.log(`Calling smart-query-planner with:
       Query: "${query}"
       Intent type: ${intentType}
+      Mental health query: ${isMentalHealthQuery}
+      Personal query: ${isPersonalQuery}
       Conversation context length: ${conversationContext.length}
       Previous time context: ${previousTimeContext || 'none'}
       Previous topic context: ${previousTopicContext || 'none'}
@@ -250,6 +267,31 @@ export async function getPlanForQuery(
 
     console.log(`Received query plan with strategy: ${data?.plan?.strategy || 'none'}`);
     
+    // IMPROVEMENT: If mental health query but no plan returned, create a default plan
+    if ((isMentalHealthQuery || isPersonalQuery) && (!data?.plan || !data?.plan.strategy)) {
+      console.log('Creating default plan for mental health query');
+      data.plan = {
+        strategy: 'hybrid',
+        filters: {
+          date_range: {
+            startDate: calculateDefaultDateRange().startDate,
+            endDate: calculateDefaultDateRange().endDate,
+            periodName: 'recent (last 30 days)'
+          }
+        },
+        match_count: 30,
+        needsDataAggregation: true,
+        needsMoreContext: false,
+        isMentalHealthQuery: isMentalHealthQuery,
+        isPersonalQuery: isPersonalQuery,
+        topicContext: isMentalHealthQuery ? 'mental health' : 'personal advice',
+        confidenceScore: 0.8,
+        reasoning: 'Using journal analysis for personalized insights.'
+      };
+      
+      data.queryType = 'journal_specific';
+    }
+    
     // Handle multi-part questions
     if (data?.plan && (intentType === 'multi_part' || data?.plan?.isSegmented)) {
       console.log('Processing multi-part query...');
@@ -275,12 +317,26 @@ export async function getPlanForQuery(
     
     // Save the conversation state if we have a state manager
     if (stateManager && data?.plan) {
+      // IMPROVEMENT: Ensure mental health context is preserved in conversation state
+      if (isMentalHealthQuery && !data.plan.isMentalHealthQuery) {
+        data.plan.isMentalHealthQuery = true;
+      }
+      if (isPersonalQuery && !data.plan.isPersonalQuery) {
+        data.plan.isPersonalQuery = true;
+      }
+    
       const newState = await stateManager.createState(query, data.plan, intentType);
       await stateManager.saveState(newState);
       console.log(`Saved conversation state with topic "${newState.topicContext}" and confidence ${newState.confidenceScore}`);
       
       // Add conversation state to the plan for the chat handler
       data.plan.conversationState = newState;
+    }
+
+    // IMPROVEMENT: Enforce journal-specific for mental health queries
+    if ((isMentalHealthQuery || isPersonalQuery) && data.queryType === 'general') {
+      console.log('Overriding query type from general to journal_specific for mental health query');
+      data.queryType = 'journal_specific';
     }
 
     return {
@@ -292,4 +348,80 @@ export async function getPlanForQuery(
     console.error('Error planning query:', error);
     return { plan: null, queryType: 'journal_specific', directResponse: null };
   }
+}
+
+// IMPROVEMENT: Helper function to check for mental health related queries
+function checkForMentalHealthQuery(query: string): boolean {
+  const mentalHealthKeywords = [
+    'mental health', 'anxiety', 'depression', 'stress', 'mood', 'emotion', 
+    'feeling', 'therapy', 'therapist', 'psychiatrist', 'psychologist', 
+    'counselor', 'counseling', 'wellbeing', 'well-being', 'wellness',
+    'self-care', 'burnout', 'overwhelm', 'mindfulness', 'meditation',
+    'coping', 'psychological', 'emotional health', 'distress'
+  ];
+  
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for mental health keywords
+  for (const keyword of mentalHealthKeywords) {
+    if (lowerQuery.includes(keyword)) {
+      return true;
+    }
+  }
+  
+  // Check for phrases commonly used in mental health contexts
+  const mentalHealthPatterns = [
+    /\b(?:i (?:feel|am feeling|have been feeling))\b/i,
+    /\b(?:help|improve) (?:my|with) (?:mental|emotional)/i,
+    /\b(?:my|with) (?:mental|emotional) (?:health|state|wellbeing)/i,
+    /\bhow (?:to|can i|should i) (?:feel better|improve|help)/i,
+    /\badvice (?:for|on|about) (?:my|dealing with|handling)/i
+  ];
+  
+  for (const pattern of mentalHealthPatterns) {
+    if (pattern.test(lowerQuery)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// IMPROVEMENT: Helper function to check for personal queries
+function checkForPersonalQuery(query: string): boolean {
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for first-person pronouns and possessives with advice-seeking language
+  const personalIndicators = [
+    /\bmy\b.*\b(?:advice|help|suggest|how|what|should)/i,
+    /\bi\b.*\b(?:need|want|should|could|would|can)/i,
+    /\bshould i\b/i, 
+    /\bcan i\b/i, 
+    /\bcould i\b/i,
+    /\bwould i\b/i, 
+    /\bdo i\b/i,
+    /\badvice for me\b/i,
+    /\bhelp me\b/i,
+    /\b(?:advice|help|suggest|recommendation)s?\b.*\bfor\b.*\bme\b/i
+  ];
+  
+  for (const pattern of personalIndicators) {
+    if (pattern.test(lowerQuery)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+// IMPROVEMENT: Helper function to calculate default date range for mental health queries
+function calculateDefaultDateRange() {
+  const now = new Date();
+  const thirtyDaysAgo = new Date(now);
+  thirtyDaysAgo.setDate(now.getDate() - 30);
+  
+  return {
+    startDate: thirtyDaysAgo.toISOString(),
+    endDate: now.toISOString()
+  };
 }

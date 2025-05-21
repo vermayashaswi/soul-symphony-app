@@ -1,182 +1,386 @@
 
+/**
+ * Utility functions for processing chat messages and enhancing conversation intelligence
+ */
+
 import { ChatMessage } from '@/types/chat';
 
 /**
- * Enhanced message processor to extract insights and context from conversations
+ * Extract key information from chat history for context enrichment
  */
-
-// Dictionary of mental health related terms and concepts
-const MENTAL_HEALTH_TERMS = [
-  // Emotional states
-  'anxiety', 'anxious', 'depression', 'depressed', 'stress', 'stressed',
-  'mood', 'emotion', 'feeling', 'mental health', 'wellbeing', 'well-being',
-  'therapy', 'therapist', 'counseling', 'psychiatrist', 'psychologist',
-  // Common concerns
-  'sleep', 'insomnia', 'tired', 'exhaustion', 'burnout', 'overwhelm', 
-  'overthinking', 'ruminating', 'worry', 'worrying', 'trauma',
-  // Self-improvement
-  'self-care', 'self care', 'mindfulness', 'meditation', 'breathing',
-  'coping', 'cope', 'healing', 'recovery', 'growth', 'improve',
-  // Relationships
-  'relationship', 'friendship', 'family', 'partner', 'work-life',
-  'balance', 'boundaries', 'communication'
-];
+export function extractConversationInsights(messages: ChatMessage[]): {
+  topics: string[];
+  emotions: string[];
+  timeReferences: string[];
+  entities: string[];
+  clarificationRequests: string[];
+  userPreferences: Record<string, any>;
+} {
+  const insights = {
+    topics: [],
+    emotions: [],
+    timeReferences: [],
+    entities: [],
+    clarificationRequests: [],
+    userPreferences: {}
+  };
+  
+  if (!messages || messages.length === 0) return insights;
+  
+  // Process each message to extract key information
+  for (let i = 0; i < messages.length; i++) {
+    const message = messages[i];
+    const content = message.content || '';
+    
+    // Skip processing messages without content
+    if (!content) continue;
+    
+    // Extract topics from assistant responses
+    if (message.sender === 'assistant') {
+      extractTopicsFromAssistantMessage(content, insights.topics);
+      extractEntitiesFromAssistantMessage(content, insights.entities);
+      
+      // Check if this was a clarification question
+      if (isClarificationQuestion(content)) {
+        insights.clarificationRequests.push(content);
+      }
+    }
+    
+    // Extract user preferences and information from user messages
+    if (message.sender === 'user') {
+      extractTimeReferences(content, insights.timeReferences);
+      extractEmotionsFromUserMessage(content, insights.emotions);
+      extractUserPreferences(content, insights.userPreferences);
+    }
+  }
+  
+  // Remove duplicates
+  insights.topics = Array.from(new Set(insights.topics));
+  insights.emotions = Array.from(new Set(insights.emotions));
+  insights.timeReferences = Array.from(new Set(insights.timeReferences));
+  insights.entities = Array.from(new Set(insights.entities));
+  
+  return insights;
+}
 
 /**
- * Extract key insights from conversation history
- * @param messages Array of chat messages
- * @returns Object containing extracted topics, times, and mental health content
+ * Extract main topics from assistant responses
  */
-export function extractConversationInsights(messages: ChatMessage[]) {
-  // Define patterns to look for
-  const timePatterns = [
-    /\b(today|yesterday|this week|last week|this month|last month|this year|last year)\b/i,
-    /\b(past|previous|recent) (\d+) (days?|weeks?|months?|years?)\b/i
+function extractTopicsFromAssistantMessage(content: string, topicsArray: string[]): void {
+  // Look for indicators of the main topic in the assistant response
+  const topicIndicators = [
+    "regarding your ([^,.]+)",
+    "about your ([^,.]+)",
+    "related to ([^,.]+)",
+    "concerning your ([^,.]+)",
+    "your ([^,.]+) shows",
+    "your journals about ([^,.]+)",
+    "your entries about ([^,.]+)"
   ];
   
-  // Results to accumulate
-  const topics: string[] = [];
-  const timeReferences: string[] = [];
-  const mentalHealthTopics: string[] = [];
-  
-  // Track which messages contain which insights (for debugging)
-  const topicSources: Record<string, number> = {};
-  const timeSources: Record<string, number> = {};
-  const mentalHealthSources: Record<string, number> = {};
-  
-  // Process each message
-  messages.forEach((message, index) => {
-    const content = message.content.toLowerCase();
-    
-    // Only process user messages for most insights
-    if (message.role === 'user' || message.sender === 'user') {
-      // Look for time references
-      timePatterns.forEach(pattern => {
-        const matches = content.match(pattern);
-        if (matches) {
-          const timeRef = matches[0];
-          if (!timeReferences.includes(timeRef)) {
-            timeReferences.push(timeRef);
-            timeSources[timeRef] = index;
-          }
-        }
-      });
-      
-      // Check for mental health terms
-      MENTAL_HEALTH_TERMS.forEach(term => {
-        if (content.includes(term.toLowerCase())) {
-          if (!mentalHealthTopics.includes(term)) {
-            mentalHealthTopics.push(term);
-            mentalHealthSources[term] = index;
-          }
-        }
-      });
+  for (const indicator of topicIndicators) {
+    const regex = new RegExp(indicator, "i");
+    const match = content.match(regex);
+    if (match && match[1]) {
+      const topic = match[1].trim();
+      if (topic.length > 3 && topic.length < 40) {
+        topicsArray.push(topic);
+      }
     }
-    
-    // For both user and assistant messages, look for key topics
-    // Focus on nouns and important concepts
-    const topicPatterns = [
-      // Look for patterns like "about X" or "regarding X" or "my X"
-      /\b(?:about|regarding|my|on) ([a-z\s]{3,25})\b/i,
-      // Look for capitalized terms (likely important)
-      /\b([A-Z][a-z]{2,25})\b/,
-      // Look for questions about specific topics
-      /\b(?:how|what|why|when).{1,10}(anxiety|depression|stress|sleep|relationship|job|work|family|friend)/i
-    ];
-    
-    topicPatterns.forEach(pattern => {
-      const matches = content.match(pattern);
-      if (matches && matches[1]) {
-        const topic = matches[1].trim();
-        if (topic.length > 2 && !topics.includes(topic)) {
-          topics.push(topic);
-          topicSources[topic] = index;
-        }
-      }
-    });
-  });
-  
-  // Process assistant messages specifically to look for topic summaries
-  // Assistant often categorizes or summarizes what the conversation is about
-  messages.filter(m => m.role === 'assistant' || m.sender === 'assistant').forEach((message, index) => {
-    const content = message.content;
-    
-    // Look for patterns where the assistant labels the conversation topic
-    const topicLabelPatterns = [
-      /based on your (journals?|entries?) about ([a-z\s]{3,25})/i,
-      /regarding your ([a-z\s]{3,25})/i,
-      /your ([a-z\s]{3,25}) (seems|appears|is|shows|indicates)/i
-    ];
-    
-    topicLabelPatterns.forEach(pattern => {
-      const matches = content.match(pattern);
-      if (matches && matches.length > 1) {
-        // The last capture group should be the topic
-        const lastIndex = matches.length - 1;
-        const topic = matches[lastIndex].trim();
-        if (topic.length > 2 && !topics.includes(topic)) {
-          topics.push(topic);
-          topicSources[topic] = index;
-        }
-      }
-    });
-  });
-  
-  // Sort results by relevance (most recent)
-  const sortByRecency = (a: string, b: string, sources: Record<string, number>) => {
-    return (sources[b] || 0) - (sources[a] || 0);
-  };
-  
-  return {
-    topics: topics.sort((a, b) => sortByRecency(a, b, topicSources)),
-    timeReferences: timeReferences.sort((a, b) => sortByRecency(a, b, timeSources)),
-    mentalHealthTopics: mentalHealthTopics.sort((a, b) => sortByRecency(a, b, mentalHealthSources))
-  };
+  }
 }
 
 /**
- * Analyze a user message for personal mental health content
- * @param message The message to analyze
- * @returns Score indicating likelihood this is a mental health related message
+ * Check if a message is a clarification question from the assistant
+ */
+function isClarificationQuestion(content: string): boolean {
+  const clarificationPatterns = [
+    "could you clarify",
+    "could you be more specific",
+    "I'm not sure what you mean",
+    "can you provide more details",
+    "what specifically",
+    "which time period",
+    "when exactly",
+    "can you tell me more about"
+  ];
+  
+  const lowerContent = content.toLowerCase();
+  
+  // Check for question marks and clarification patterns
+  if (content.includes("?")) {
+    for (const pattern of clarificationPatterns) {
+      if (lowerContent.includes(pattern)) {
+        return true;
+      }
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Extract time references from user messages
+ */
+function extractTimeReferences(content: string, timeArray: string[]): void {
+  const timePatterns = [
+    "today",
+    "yesterday",
+    "last week",
+    "this week",
+    "last month",
+    "this month",
+    "last year",
+    "this year",
+    "morning",
+    "afternoon",
+    "evening",
+    "night",
+    "\\d{1,2}[/-]\\d{1,2}[/-]\\d{2,4}", // Date patterns like 01/15/2023
+    "january|february|march|april|may|june|july|august|september|october|november|december",
+    "monday|tuesday|wednesday|thursday|friday|saturday|sunday",
+    // New time-of-day patterns
+    "\\d{1,2}( )?([ap]m)",
+    "midnight",
+    "noon",
+    "dawn",
+    "dusk",
+    "sunrise",
+    "sunset",
+    "o'clock",
+    "hour",
+    "minute"
+  ];
+  
+  const lowerContent = content.toLowerCase();
+  
+  for (const pattern of timePatterns) {
+    const regex = new RegExp(`\\b${pattern}\\b`, "i");
+    const match = lowerContent.match(regex);
+    if (match) {
+      timeArray.push(match[0]);
+    }
+  }
+}
+
+/**
+ * Extract entities (people, places) from assistant messages
+ */
+function extractEntitiesFromAssistantMessage(content: string, entitiesArray: string[]): void {
+  // Simple extraction based on common patterns
+  const entityPatterns = [
+    "([A-Z][a-z]+) mentioned",
+    "your ([A-Z][a-z]+)",
+    "with ([A-Z][a-z]+)",
+    "about ([A-Z][a-z]+)"
+  ];
+  
+  for (const pattern of entityPatterns) {
+    const regex = new RegExp(pattern);
+    const matches = content.match(new RegExp(regex, "g"));
+    if (matches) {
+      for (const match of matches) {
+        const entityMatch = match.match(new RegExp(pattern));
+        if (entityMatch && entityMatch[1]) {
+          const entity = entityMatch[1].trim();
+          if (entity.length > 1) {
+            entitiesArray.push(entity);
+          }
+        }
+      }
+    }
+  }
+}
+
+/**
+ * Extract emotional content from user messages
+ */
+function extractEmotionsFromUserMessage(content: string, emotionsArray: string[]): void {
+  const emotionWords = [
+    "happy", "sad", "angry", "anxious", "excited", "worried", 
+    "stressed", "relaxed", "frustrated", "content", "depressed",
+    "overwhelmed", "grateful", "lonely", "loved", "afraid",
+    "calm", "tired", "energetic", "confident", "insecure"
+  ];
+  
+  const lowerContent = content.toLowerCase();
+  
+  for (const emotion of emotionWords) {
+    if (lowerContent.includes(emotion)) {
+      emotionsArray.push(emotion);
+    }
+  }
+}
+
+/**
+ * Extract user preferences from messages
+ */
+function extractUserPreferences(content: string, preferences: Record<string, any>): void {
+  // Look for explicit preference indicators
+  const preferencePatterns = [
+    { regex: /I prefer ([^.,]+)/, key: "general" },
+    { regex: /I like when ([^.,]+)/, key: "likes" },
+    { regex: /I don't like when ([^.,]+)/, key: "dislikes" },
+    { regex: /don't (tell|show|give) me ([^.,]+)/, key: "dislikes" },
+    { regex: /I want (more|less) ([^.,]+)/, key: "contentPreference" },
+    // New time preference patterns
+    { regex: /I (like|prefer) to journal in the (morning|afternoon|evening|night)/, key: "journalingTime" },
+    { regex: /I usually (write|journal|log) (at|in the) ([^.,]+)/, key: "journalingTime" }
+  ];
+  
+  for (const pattern of preferencePatterns) {
+    const match = content.match(pattern.regex);
+    if (match) {
+      if (!preferences[pattern.key]) {
+        preferences[pattern.key] = [];
+      }
+      preferences[pattern.key].push(match[1]);
+    }
+  }
+}
+
+/**
+ * Construct a context-enhanced query for the AI based on message history
+ */
+export function enhanceQueryWithContext(
+  query: string, 
+  previousMessages: ChatMessage[],
+  conversationState: any
+): string {
+  // For short follow-up queries, add more context
+  if (query.length < 15 && !query.includes('?') && previousMessages.length > 0) {
+    const insights = extractConversationInsights(previousMessages);
+    
+    // Get the last topic discussed
+    const lastTopic = conversationState?.topicContext || 
+                     (insights.topics.length > 0 ? insights.topics[insights.topics.length - 1] : null);
+    
+    if (lastTopic) {
+      return `${query} (in the context of our conversation about ${lastTopic})`;
+    }
+  }
+  
+  return query;
+}
+
+/**
+ * Check if a new user message is a direct response to a clarification request
+ */
+export function isResponseToClarification(
+  newMessage: string,
+  previousMessages: ChatMessage[]
+): boolean {
+  if (previousMessages.length === 0) return false;
+  
+  // Get the last assistant message
+  let lastAssistantMessage: ChatMessage | null = null;
+  for (let i = previousMessages.length - 1; i >= 0; i--) {
+    if (previousMessages[i].sender === 'assistant') {
+      lastAssistantMessage = previousMessages[i];
+      break;
+    }
+  }
+  
+  // If last assistant message was a question, this is likely a response
+  if (lastAssistantMessage && 
+      lastAssistantMessage.content && 
+      lastAssistantMessage.content.includes('?')) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Generate a suitable clarification question based on the query and plan
+ */
+export function generateClarificationQuestion(query: string, plan: any): string {
+  // Check if the plan has a specific clarification reason
+  if (plan?.clarificationReason) {
+    return `${plan.clarificationReason} Could you provide more details about what you're looking for?`;
+  }
+  
+  // Handle very short queries
+  if (query.length < 10) {
+    return "I'd like to help you with that. Could you provide more details about what specifically you'd like to know from your journal entries?";
+  }
+  
+  // Handle ambiguous time references
+  if (!plan?.filters?.date_range) {
+    return "Which time period would you like me to focus on? For example, last week, this month, or a specific date?";
+  }
+  
+  // Default clarification question
+  return "I want to make sure I understand your question correctly. Could you provide a bit more detail about what you're looking for?";
+}
+
+/**
+ * Analyze the mental health content of a message
+ * Returns a score from 0 to 1, where higher values indicate more mental health relevance
  */
 export function analyzeMentalHealthContent(message: string): number {
+  if (!message) return 0;
+  
   const lowerMessage = message.toLowerCase();
+  
+  // Mental health related terms
+  const mentalHealthTerms = [
+    "mental health", "wellbeing", "wellness", "therapy", "counseling", 
+    "anxiety", "depression", "stress", "mood", "emotion",
+    "feelings", "psychological", "psychiatric", "diagnosis",
+    "treatment", "medication", "self-care", "mindfulness",
+    "meditation", "coping", "trauma", "trigger", "crisis",
+    "burnout", "overwhelm", "healing", "recovery"
+  ];
+  
+  // Count the number of mental health terms in the message
+  let mentalHealthTermCount = 0;
+  for (const term of mentalHealthTerms) {
+    if (lowerMessage.includes(term)) {
+      mentalHealthTermCount++;
+    }
+  }
+  
+  // Count the number of personal pronouns
+  const personalPronouns = ["i", "me", "my", "mine", "myself"];
+  let personalPronounCount = 0;
+  
+  for (const pronoun of personalPronouns) {
+    const regex = new RegExp(`\\b${pronoun}\\b`, "ig");
+    const matches = lowerMessage.match(regex);
+    if (matches) {
+      personalPronounCount += matches.length;
+    }
+  }
+  
+  // Calculate a score based on the presence of terms and personal context
   let score = 0;
   
-  // Check for personal pronouns (indicates personal query)
-  if (/\b(i|me|my|mine|myself)\b/i.test(lowerMessage)) {
-    score += 0.2;
+  // Base score from mental health terms (max 0.6)
+  if (mentalHealthTermCount > 0) {
+    score += Math.min(0.6, mentalHealthTermCount * 0.15);
   }
   
-  // Check for question patterns about personal wellbeing
-  if (/\b(how|what|why|when) (am|is|was|were|do|does|did) (i|me|my)\b/i.test(lowerMessage)) {
-    score += 0.3;
+  // Additional score from personal pronouns (max 0.4)
+  if (personalPronounCount > 0) {
+    score += Math.min(0.4, personalPronounCount * 0.1);
   }
   
-  // Look for mental health terms
-  let termCount = 0;
-  MENTAL_HEALTH_TERMS.forEach(term => {
-    if (lowerMessage.includes(term.toLowerCase())) {
-      termCount++;
-    }
-  });
+  // Personal questions get a minimum score
+  if (lowerMessage.includes("am i") || 
+      lowerMessage.includes("do i") || 
+      lowerMessage.includes("should i")) {
+    score = Math.max(score, 0.3);
+  }
   
-  // Add score based on mental health term count (max 0.5)
-  score += Math.min(0.5, termCount * 0.1);
+  // Strong personal mental health indicators get a high score
+  if ((lowerMessage.includes("my") || lowerMessage.includes("i")) && 
+      (lowerMessage.includes("mental health") || 
+       lowerMessage.includes("anxiety") || 
+       lowerMessage.includes("depression") || 
+       lowerMessage.includes("emotions"))) {
+    score = Math.max(score, 0.7);
+  }
   
-  return Math.min(1.0, score);
-}
-
-/**
- * Detect if a query is likely seeking personalized mental health insights
- */
-export function isPersonalizedHealthQuery(message: string): boolean {
-  // Get mental health content score
-  const score = analyzeMentalHealthContent(message);
-  
-  // Check for explicit help requests
-  const isExplicitHelp = /\b(help me|advice|suggestions?)\b/i.test(message.toLowerCase());
-  
-  // Either high mental health score or explicit help request
-  return score > 0.4 || isExplicitHelp;
+  return Math.min(1, score);
 }

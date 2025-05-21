@@ -22,32 +22,10 @@ const corsHeaders = {
 // Maximum number of previous messages to include for context
 const MAX_CONTEXT_MESSAGES = 10;
 
-// Mental health and wellbeing term dictionary for domain recognition
-const MENTAL_HEALTH_TERMS = [
-  // Emotional states
-  'anxiety', 'anxious', 'depression', 'depressed', 'stress', 'stressed',
-  'mood', 'emotion', 'feeling', 'mental health', 'wellbeing', 'well-being',
-  'therapy', 'therapist', 'counseling', 'psychiatrist', 'psychologist',
-  // Common concerns
-  'sleep', 'insomnia', 'tired', 'exhaustion', 'burnout', 'overwhelm', 
-  'overthinking', 'ruminating', 'worry', 'worrying', 'trauma',
-  // Self-improvement
-  'self-care', 'self care', 'mindfulness', 'meditation', 'breathing',
-  'coping', 'cope', 'healing', 'recovery', 'growth', 'improve',
-  // Relationships
-  'relationship', 'friendship', 'family', 'partner', 'work-life',
-  'balance', 'boundaries', 'communication',
-  // Actions and requests
-  'help me', 'advice', 'suggestion', 'recommend', 'strategy', 'technique',
-  'improve', 'better', 'healthier', 'calm', 'relax', 'peace'
-];
+// Define the general question prompt
+const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
 
-// Define the general question prompt with enhanced mental health awareness
-const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.
-
-For mental health related questions that don't specifically mention the user's personal journal entries, provide helpful general guidance but suggest that for personalized insights, you could analyze their journal entries if they'd like.`;
-
-// Define the journal-specific prompt with enhanced mental health focus
+// Define the journal-specific prompt with new format
 const JOURNAL_SPECIFIC_PROMPT = `You are SOuLO — a voice journaling assistant that helps users reflect, find patterns, and grow emotionally. Use only the journal entries below to inform your response. Do not invent or infer beyond them.
 
 Journal excerpts:
@@ -62,39 +40,9 @@ Guidelines:
 3. **Data-grounded**: Back insights with bullet points referencing specific dates/events.
 4. **Insightful & Brief**: Spot emotional patterns or changes over time.
 5. **Structure**: Use bullets, bold headers, and short sections for easy reading.
-6. **Mental Health Focus**: For queries about mental wellbeing, be especially thoughtful, supportive and personalized.
-7. **When data is insufficient**, say so clearly and gently suggest journaling directions.
+6. **When data is insufficient**, say so clearly and gently suggest journaling directions.
 
 Keep response concise (max ~150 words), personalized, and well-structured.`;
-
-/**
- * Detect if a message is likely a mental health query requiring journal data
- */
-function detectMentalHealthQuery(message: string): boolean {
-  const lowerMessage = message.toLowerCase();
-  
-  // Check for personal indicators combined with mental health terms
-  const hasPersonalIndicators = /\b(i|me|my|mine|myself|we|our|us)\b/i.test(lowerMessage);
-  
-  // Check if any mental health term appears in the query
-  const hasMentalHealthTerms = MENTAL_HEALTH_TERMS.some(term => 
-    lowerMessage.includes(term.toLowerCase())
-  );
-  
-  // Check for direct requests for help or advice
-  const isHelpRequest = /\b(help|advice|suggest|recommend|improve|better)\b/i.test(lowerMessage);
-  
-  // Check for questions about feelings or emotional states
-  const isEmotionalQuery = /\b(feel|feeling|felt|emotion|mood|happy|sad|angry|anxious)\b/i.test(lowerMessage);
-  
-  // If it contains personal indicators AND mental health terms OR emotional content, classify as mental_health
-  if ((hasPersonalIndicators && (hasMentalHealthTerms || isEmotionalQuery)) || 
-      (isHelpRequest && (hasMentalHealthTerms || isEmotionalQuery))) {
-    return true;
-  }
-  
-  return false;
-}
 
 // New function for query planning
 async function planQuery(query) {
@@ -424,7 +372,7 @@ serve(async (req) => {
     }
     
     // Normal chat processing flow
-    const { message, userId, timeRange, threadId, queryPlan } = reqBody;
+    const { message, userId, timeRange, threadId } = reqBody;
 
     if (!message) {
       throw new Error('Message is required');
@@ -436,15 +384,6 @@ serve(async (req) => {
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
     console.log("Time range received:", timeRange);
-    console.log("Query plan received:", queryPlan ? JSON.stringify(queryPlan, null, 2) : "No query plan provided");
-    
-    // Determine if this is a mental health query requiring personalized analysis
-    const isMentalHealthQuery = (queryPlan?.domainContext === 'mental_health') || 
-                               detectMentalHealthQuery(message);
-    
-    if (isMentalHealthQuery) {
-      console.log("Detected mental health query, forcing journal-specific processing");
-    }
     
     // Send an immediate response with processing status for long-running requests
     if (reqBody.acknowledgeRequest) {
@@ -464,8 +403,8 @@ serve(async (req) => {
     }
     
     // Fetch previous messages from this thread if a threadId is provided
-    let conversationContext = reqBody.conversationContext || [];
-    if (threadId && conversationContext.length === 0) {
+    let conversationContext = [];
+    if (threadId) {
       try {
         console.log(`Retrieving context from thread ${threadId}`);
         const { data: previousMessages, error } = await supabase
@@ -502,68 +441,47 @@ serve(async (req) => {
       }
     }
     
-    // Get local timezone offset for better time-based queries
-    const timezoneOffset = reqBody.timezoneOffset || new Date().getTimezoneOffset();
-    console.log(`Local timezone offset: ${timezoneOffset} minutes`);
-    
-    // Check if a query plan was provided
-    if (queryPlan) {
-      console.log(`Using provided query plan: ${JSON.stringify(queryPlan, null, 2)}`);
-    }
-    
     // NEW: First categorize if this is a general question or a journal-specific question
-    // unless this is a detected mental health query (always set to JOURNAL_SPECIFIC)
-    let questionType = isMentalHealthQuery ? "JOURNAL_SPECIFIC" : null;
-    
-    // Only categorize if we haven't already determined it's a mental health query
-    if (!questionType) {
-      console.log("Categorizing question type");
-      const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
-              Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
-              
-              IMPORTANT GUIDELINE: If the query is related to personal mental health, well-being, emotional states, or self-improvement and could benefit from analyzing personal journal data, classify it as "JOURNAL_SPECIFIC" even if it doesn't explicitly mention journals.
-              
-              Examples:
-              - "How are you doing?" -> "GENERAL"
-              - "What is journaling?" -> "GENERAL"
-              - "Who is the president of India?" -> "GENERAL"
-              - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-              - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
-              - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-              - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
-              - "How can I improve my mental health?" -> "JOURNAL_SPECIFIC"
-              - "Why do I feel anxious sometimes?" -> "JOURNAL_SPECIFIC"
-              - "What helps me sleep better?" -> "JOURNAL_SPECIFIC"
-              - "How can I manage stress?" -> "JOURNAL_SPECIFIC"`
-            },
-            { role: 'user', content: message }
-          ],
-          temperature: 0.1,
-          max_tokens: 10
-        }),
-      });
+    console.log("Categorizing question type");
+    const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
+            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
+            
+            Examples:
+            - "How are you doing?" -> "GENERAL"
+            - "What is journaling?" -> "GENERAL"
+            - "Who is the president of India?" -> "GENERAL"
+            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
+            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
+            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
+            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
+          },
+          { role: 'user', content: message }
+        ],
+        temperature: 0.1,
+        max_tokens: 10
+      }),
+    });
 
-      if (!categorizationResponse.ok) {
-        const error = await categorizationResponse.text();
-        console.error('Failed to categorize question:', error);
-        throw new Error('Failed to categorize question');
-      }
-
-      const categorization = await categorizationResponse.json();
-      questionType = categorization.choices[0]?.message?.content.trim();
-      console.log(`Question categorized as: ${questionType}`);
+    if (!categorizationResponse.ok) {
+      const error = await categorizationResponse.text();
+      console.error('Failed to categorize question:', error);
+      throw new Error('Failed to categorize question');
     }
+
+    const categorization = await categorizationResponse.json();
+    const questionType = categorization.choices[0]?.message?.content.trim();
+    console.log(`Question categorized as: ${questionType}`);
 
     // If it's a general question, respond directly without journal entry retrieval
     if (questionType === "GENERAL") {
@@ -603,9 +521,9 @@ serve(async (req) => {
     
     // If it's a journal-specific question, continue with the enhanced RAG flow
     // 1. Plan the query into sub-queries if needed
-    console.log("Processing as journal-specific question");
-    const subQueries = queryPlan?.subqueries || [message];
-    console.log(`Using ${subQueries.length} sub-queries:`, subQueries);
+    console.log("Planning query into sub-queries");
+    const subQueries = await planQuery(message);
+    console.log(`Generated ${subQueries.length} sub-queries:`, subQueries);
     
     // If only one sub-query that matches the original query, use standard processing
     if (subQueries.length === 1 && subQueries[0] === message) {
@@ -803,6 +721,10 @@ serve(async (req) => {
       console.log("Response generated successfully");
 
       // Validate response for hallucinated dates
+      const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+      console.log("Response generated successfully");
+      
+      // Check for hallucinated dates in the response
       const containsHallucinatedDates = checkForHallucinatedDates(responseContent, entries);
       if (containsHallucinatedDates) {
         console.warn("WARNING: Response contains potentially hallucinated dates!");
@@ -837,13 +759,7 @@ serve(async (req) => {
       return new Response(
         JSON.stringify({ 
           data: responseContent,
-          processingComplete: true,
-          references: entries.map(entry => ({
-            id: entry.id,
-            date: entry.created_at,
-            snippet: entry.content?.substring(0, 150) + (entry.content?.length > 150 ? "..." : ""),
-            similarity: entry.similarity
-          }))
+          processingComplete: true 
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
