@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MobileChatInterfaceProps } from '@/types/chat-interfaces';
-import ChatArea from '@/components/chat/ChatArea'; // Fix import
+import MobileChatMessage from './MobileChatMessage';
 import MobileChatInput from './MobileChatInput';
 import { useChatPersistence } from '@/services/chat/useChatPersistence';
 import { Menu, PlusCircle, ArrowLeft } from 'lucide-react';
@@ -28,6 +28,7 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSheetOpen, setIsSheetOpen] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
+  const messagesEndRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
 
   // Load messages for the current thread
@@ -115,6 +116,11 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
       supabase.removeChannel(subscription);
     };
   }, [currentThreadId, isLoading]);
+
+  // Scroll to bottom when messages change
+  useEffect(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+  }, [messages, isLoading]);
 
   // Handle sending new message
   const handleSendMessage = async (content: string) => {
@@ -226,14 +232,33 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
       </div>
       
       {/* Chat messages area */}
-      <div className="flex-1 overflow-hidden" ref={chatContainerRef}>
+      <div className="flex-1 overflow-y-auto p-4" ref={chatContainerRef}>
         {messages.length > 0 ? (
-          <ChatArea 
-            chatMessages={messages} 
-            isLoading={isLoading} 
-            processingStage={processingStage}
-            threadId={currentThreadId}
-          />
+          <div className="flex flex-col space-y-4">
+            {messages.map((message) => (
+              <MobileChatMessage
+                key={message.id}
+                message={message}
+                isLoading={false}
+              />
+            ))}
+            
+            {isLoading && (
+              <div className="flex justify-start mb-4">
+                <div className="flex items-center space-x-2 bg-muted p-3 rounded-lg max-w-[85%]">
+                  <div className="animate-pulse flex space-x-2">
+                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
+                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
+                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
+                  </div>
+                  <span className="ml-2 text-sm text-muted-foreground">
+                    {processingStage || <TranslatableText text="Processing..." />}
+                  </span>
+                </div>
+              </div>
+            )}
+            <div ref={messagesEndRef} />
+          </div>
         ) : (
           <EmptyChatState 
             onStarterPrompt={handleSendMessage} 

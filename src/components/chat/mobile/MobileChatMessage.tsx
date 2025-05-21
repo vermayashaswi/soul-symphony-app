@@ -5,9 +5,10 @@ import { Card, CardContent } from "@/components/ui/card";
 import ReactMarkdown from "react-markdown";
 import ReferencesDisplay from "../ReferencesDisplay";
 import AnalyticsDisplay from "../AnalyticsDisplay";
+import { ChatMessage } from "@/types/chat";
 
 interface MobileChatMessageProps {
-  message: any;
+  message: ChatMessage;
   isLoading?: boolean;
 }
 
