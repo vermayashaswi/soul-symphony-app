@@ -82,6 +82,31 @@ function detectPersonalityQuestion(message) {
   return isPersonalityQuestion;
 }
 
+/**
+ * Detect if query requires comprehensive journal analysis
+ * These are queries about journal patterns, habits, or preferences that
+ * should analyze all entries regardless of specific time mentions
+ */
+function detectComprehensiveAnalysisQuery(message) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Patterns suggesting the query is about overall journal insights
+  const analysisPatterns = [
+    'pattern', 'habit', 'routine', 'tendency', 
+    'typically', 'usually', 'often', 'frequently',
+    'my top', 'most common', 'most frequent', 'overall',
+    'in general', 'generally', 'typically', 'trends',
+    'how many times', 'how often', 'when do i usually',
+    'what do i normally', 'what do i mostly', 'what are my most',
+    'common themes', 'recurring', 'consistent'
+  ];
+  
+  const isComprehensiveQuery = analysisPatterns.some(pattern => lowerMessage.includes(pattern));
+  console.log(`Comprehensive analysis query detection: ${isComprehensiveQuery}`);
+  
+  return isComprehensiveQuery;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -112,6 +137,12 @@ serve(async (req) => {
     const isPersonalityQuestion = detectPersonalityQuestion(message);
     if (isPersonalityQuestion) {
       console.log("Detected personality-related question.");
+    }
+    
+    // Add comprehensive analysis query detection
+    const isComprehensiveAnalysisQuery = detectComprehensiveAnalysisQuery(message) || isPersonalityQuestion;
+    if (isComprehensiveAnalysisQuery) {
+      console.log("Detected query requiring comprehensive journal analysis.");
     }
 
     // Time expression detection and parsing
@@ -240,6 +271,7 @@ serve(async (req) => {
         domainContext: "personal_insights",
         isTimeSummaryQuery: false,
         isPersonalityQuery: true,
+        needsComprehensiveAnalysis: true,
         totalEntryCount: entryCount
       };
       
@@ -247,6 +279,35 @@ serve(async (req) => {
         JSON.stringify({
           queryPlan: personalityPlan,
           rawPlan: JSON.stringify({ plan: { ...personalityPlan } })
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    
+    // Provide direct plan for comprehensive analysis queries
+    if (isComprehensiveAnalysisQuery) {
+      console.log("Generating plan for comprehensive analysis query");
+      const analysisQueryPlan = {
+        strategy: "hybrid",
+        filters: {
+          date_range: dateRange || null,
+          emotions: null,
+          themes: null
+        },
+        isTimePatternQuery: true,
+        needsDataAggregation: true,
+        domainContext: domainContext || "general_insights",
+        isTimeSummaryQuery: false,
+        needsComprehensiveAnalysis: true,
+        totalEntryCount: entryCount
+      };
+      
+      return new Response(
+        JSON.stringify({
+          queryPlan: analysisQueryPlan,
+          rawPlan: JSON.stringify({ plan: { ...analysisQueryPlan } })
         }),
         {
           headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -286,6 +347,7 @@ Analyze the message and generate a search plan that includes:
 3. Whether this query requires time pattern analysis
 4. Whether this query requires data aggregation
 5. The domain context of the query (mental_health, productivity, relationships, general_insights)
+6. Whether this query requires comprehensive analysis of all journal entries (set needsComprehensiveAnalysis to true)
 
 Return a JSON object with the following structure:
 {
@@ -299,7 +361,8 @@ Return a JSON object with the following structure:
     "isTimePatternQuery": boolean,
     "needsDataAggregation": boolean,
     "domainContext": string | null,
-    "isTimeSummaryQuery": boolean
+    "isTimeSummaryQuery": boolean,
+    "needsComprehensiveAnalysis": boolean
   }
 }`;
 
@@ -343,10 +406,11 @@ Return a JSON object with the following structure:
               emotions: null,
               themes: null
             },
-            isTimePatternQuery: isTimeSummaryQuery,
+            isTimePatternQuery: isTimeSummaryQuery || isComprehensiveAnalysisQuery,
             needsDataAggregation: false,
             domainContext: domainContext || "general_insights",
-            isTimeSummaryQuery: isTimeSummaryQuery
+            isTimeSummaryQuery: isTimeSummaryQuery,
+            needsComprehensiveAnalysis: isComprehensiveAnalysisQuery
           }
         };
         console.log("Using fallback plan due to parsing error:", planObject);
@@ -355,6 +419,11 @@ Return a JSON object with the following structure:
       // Include isTimeSummaryQuery in the response
       if (planObject && !planObject.plan.isTimeSummaryQuery) {
         planObject.plan.isTimeSummaryQuery = isTimeSummaryQuery;
+      }
+      
+      // Include needsComprehensiveAnalysis in the response
+      if (planObject && !planObject.plan.needsComprehensiveAnalysis) {
+        planObject.plan.needsComprehensiveAnalysis = isComprehensiveAnalysisQuery;
       }
       
       // Add the date range information explicitly if we have it
@@ -399,6 +468,7 @@ Return a JSON object with the following structure:
         needsDataAggregation: false,
         domainContext: domainContext || "general_insights",
         isTimeSummaryQuery: isTimeSummaryQuery,
+        needsComprehensiveAnalysis: isComprehensiveAnalysisQuery,
         totalEntryCount: entryCount,
         isErrorFallback: true,
         isPersonalityQuery: isPersonalityQuestion

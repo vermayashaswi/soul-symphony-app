@@ -59,6 +59,27 @@ function isTimeSummaryQuery(message: string): boolean {
 }
 
 /**
+ * Detect if the query is about journal patterns, habits, or personality insights
+ * These queries should analyze all entries regardless of time mentions
+ */
+function isJournalAnalysisQuery(message: string): boolean {
+  const lowerQuery = message.toLowerCase();
+  
+  // Patterns suggesting the query is about overall journal insights or patterns
+  const analysisPatterns = [
+    'pattern', 'habit', 'routine', 'tendency', 'prefer', 
+    'typically', 'usually', 'often', 'frequently',
+    'what do i', 'how do i', 'am i', 'do i',
+    'personality', 'trait', 'characteristic',
+    'my top', 'most common', 'most frequent', 'overall',
+    'in general', 'generally', 'typically', 'trends',
+    'insights', 'analysis', 'reflect'
+  ];
+  
+  return analysisPatterns.some(pattern => lowerQuery.includes(pattern));
+}
+
+/**
  * Handle the request to chat with RAG (Retrieval-Augmented Generation)
  */
 serve(async (req) => {
@@ -87,6 +108,8 @@ serve(async (req) => {
     let domainContext = null;
     let isTimePatternQuery = false;
     let isTimeSummary = isTimeSummaryQuery(message);
+    let isPersonalityQuery = false;
+    let isJournalAnalysis = isJournalAnalysisQuery(message);
     
     // Check if this is a time pattern related query
     if (message.toLowerCase().includes('time') || 
@@ -98,17 +121,20 @@ serve(async (req) => {
     }
 
     if (queryPlan) {
-      searchStrategy = queryPlan.searchStrategy || 'hybrid';
+      searchStrategy = queryPlan.strategy || queryPlan.searchStrategy || 'hybrid';
       filters = queryPlan.filters || {};
       needsDataAggregation = queryPlan.needsDataAggregation || false;
       domainContext = queryPlan.domainContext || null;
       isTimePatternQuery = queryPlan.isTimePatternQuery || isTimePatternQuery;
+      isPersonalityQuery = queryPlan.isPersonalityQuery || false;
     }
 
     console.log(`Using search strategy: ${searchStrategy}`);
     console.log(`Domain context: ${domainContext}`);
     console.log(`Is time pattern query: ${isTimePatternQuery}`);
     console.log(`Is time summary query: ${isTimeSummary}`);
+    console.log(`Is personality query: ${isPersonalityQuery}`);
+    console.log(`Is journal analysis query: ${isJournalAnalysis}`);
     console.log(`Conversation history length: ${conversationHistory.length}`);
 
     // Generate an OpenAI embedding for the user's message
@@ -138,7 +164,17 @@ serve(async (req) => {
       console.log("Processing as journal-specific question");
       
       // Process the query with vector similarity search on journal entries
-      return await handleJournalQuestion(message, userId, embedding, filters, searchStrategy, needsDataAggregation, conversationHistory, isTimePatternQuery, isTimeSummary);
+      return await handleJournalQuestion(
+        message, 
+        userId, 
+        embedding, 
+        filters, 
+        searchStrategy, 
+        needsDataAggregation, 
+        conversationHistory, 
+        isTimePatternQuery || isJournalAnalysis || isPersonalityQuery, 
+        isTimeSummary
+      );
     } else {
       console.log("Processing as general question (no personal context)");
       
@@ -223,9 +259,10 @@ async function handleGeneralQuestion(message, userId, conversationHistory = []) 
 /**
  * Handle journal questions that require personal context
  */
-async function handleJournalQuestion(message, userId, embedding, filters = {}, searchStrategy = 'hybrid', needsDataAggregation = false, conversationHistory = [], isTimePatternQuery = false, isTimeSummary = false) {
+async function handleJournalQuestion(message, userId, embedding, filters = {}, searchStrategy = 'hybrid', needsDataAggregation = false, conversationHistory = [], isComprehensiveAnalysisQuery = false, isTimeSummary = false) {
   try {
     console.log("Handling journal question");
+    console.log(`Is comprehensive analysis query: ${isComprehensiveAnalysisQuery}`);
     
     // Step 1: Search for relevant journal entries using the appropriate strategy
     let relevantEntries = [];
@@ -238,7 +275,7 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
     if (searchStrategy === 'text' || searchStrategy === 'hybrid') {
       try {
         console.log("Performing text search");
-        textSearchEntries = await searchEntriesWithSQL(userId, message, filters, isTimePatternQuery);
+        textSearchEntries = await searchEntriesWithSQL(userId, message, filters, isComprehensiveAnalysisQuery);
         console.log(`Found ${textSearchEntries.length} entries with text search`);
       } catch (error) {
         console.error("Error in text search:", error);
@@ -248,7 +285,7 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
     if (searchStrategy === 'vector' || searchStrategy === 'hybrid') {
       try {
         console.log("Performing vector search");
-        vectorSearchEntries = await searchEntriesWithVector(userId, embedding, filters, isTimePatternQuery);
+        vectorSearchEntries = await searchEntriesWithVector(userId, embedding, filters, isComprehensiveAnalysisQuery);
         console.log(`Found ${vectorSearchEntries.length} entries with vector search`);
       } catch (error) {
         console.error("Error in vector search:", error);
@@ -282,9 +319,11 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
       relevantEntries = textSearchEntries;
     }
     
-    // Limit number of entries for vector search to keep context manageable
-    // But don't limit for time pattern analysis - we want all entries for that
-    if (relevantEntries.length > MAX_ENTRIES && !isTimePatternQuery) {
+    // Determine whether to limit entries based on query type
+    // For comprehensive analysis queries, we want all entries
+    const shouldLimitEntries = !isComprehensiveAnalysisQuery;
+    
+    if (relevantEntries.length > MAX_ENTRIES && shouldLimitEntries) {
       console.log(`Limiting entries from ${relevantEntries.length} to ${MAX_ENTRIES} for regular query processing`);
       relevantEntries = relevantEntries.slice(0, MAX_ENTRIES);
     } else {
@@ -457,7 +496,7 @@ function COALESCE(...args) {
 /**
  * Search journal entries using SQL-based text search with filters
  */
-async function searchEntriesWithSQL(userId, query, filters = {}, isTimePatternQuery = false) {
+async function searchEntriesWithSQL(userId, query, filters = {}, isComprehensiveAnalysisQuery = false) {
   try {
     // Start building the query
     let queryBuilder = supabase
@@ -482,10 +521,13 @@ async function searchEntriesWithSQL(userId, query, filters = {}, isTimePatternQu
       queryBuilder = queryBuilder.or(`"refined text".ilike.%${searchTerms}%, "transcription text".ilike.%${searchTerms}%`);
     }
     
-    // Execute the query - don't limit if it's a time pattern query
+    // Execute the query - don't limit if it's a comprehensive analysis query
+    const entryLimit = isComprehensiveAnalysisQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES;
+    console.log(`SQL search using entry limit: ${entryLimit} (comprehensive: ${isComprehensiveAnalysisQuery})`);
+    
     const { data: entries, error } = await queryBuilder
       .order('created_at', { ascending: false })
-      .limit(isTimePatternQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES);
+      .limit(entryLimit);
     
     if (error) {
       console.error("Error in SQL search:", error);
@@ -510,13 +552,18 @@ async function searchEntriesWithSQL(userId, query, filters = {}, isTimePatternQu
 /**
  * Search journal entries using vector similarity with filters
  */
-async function searchEntriesWithVector(userId, embedding, filters = {}, isTimePatternQuery = false) {
+async function searchEntriesWithVector(userId, embedding, filters = {}, isComprehensiveAnalysisQuery = false) {
   try {
     let matchFn = 'match_journal_entries_fixed';
+    
+    // Determine the appropriate match count based on the query type
+    const matchCount = isComprehensiveAnalysisQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES;
+    console.log(`Vector search using match count: ${matchCount} (comprehensive: ${isComprehensiveAnalysisQuery})`);
+    
     const params = {
       query_embedding: embedding,
       match_threshold: 0.5,
-      match_count: isTimePatternQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES,
+      match_count: matchCount,
       user_id_filter: userId
     };
     
