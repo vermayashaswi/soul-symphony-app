@@ -17,6 +17,23 @@ const Chat = () => {
   const { translate, currentLanguage } = useTranslation();
   const [isInitialized, setIsInitialized] = useState(false);
 
+  // Get user's timezone offset for proper date handling
+  const getUserTimezoneOffset = () => {
+    // Get minutes (positive for east of GMT, negative for west of GMT)
+    return new Date().getTimezoneOffset() * -1;
+  };
+  
+  // Detect and log timezone information - useful for debugging
+  useEffect(() => {
+    const timezoneOffset = getUserTimezoneOffset();
+    const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    console.log(`User timezone: ${timezone}, offset: ${timezoneOffset} minutes from UTC`);
+    
+    // Store in sessionStorage for use across the app
+    sessionStorage.setItem('userTimezoneOffset', timezoneOffset.toString());
+    sessionStorage.setItem('userTimezone', timezone);
+  }, []);
+
   // Pre-translate common chat-related strings more comprehensively 
   useEffect(() => {
     const initializeLanguageSupport = async () => {
@@ -297,6 +314,12 @@ const Chat = () => {
         height: 2px;
         background: linear-gradient(90deg, transparent, rgba(var(--primary-rgb), 0.3), transparent);
       }
+      
+      /* Format date references with consistency */
+      .date-reference {
+        font-weight: 500;
+        color: var(--primary);
+      }
     `;
     document.head.appendChild(style);
     
@@ -307,7 +330,9 @@ const Chat = () => {
 
   return (
     <div className="w-full h-full flex flex-col">
-      <SmartChatInterface />
+      <SmartChatInterface 
+        timezoneOffset={getUserTimezoneOffset()}
+      />
     </div>
   );
 };

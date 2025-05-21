@@ -50,6 +50,16 @@ export default function SmartChat() {
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   const shouldRenderMobile = isMobile || mobileDemo;
 
+  // Get user's timezone offset for proper date handling
+  const getUserTimezoneOffset = () => {
+    // Get minutes (positive for east of GMT, negative for west of GMT)
+    return new Date().getTimezoneOffset() * -1;
+  };
+  
+  // Store timezone info for the app to use
+  const timezoneOffset = getUserTimezoneOffset();
+  const timezone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+
   // Add mental health insights
   const { insights: mentalHealthInsights } = useMentalHealthInsights(user?.id);
 
@@ -60,6 +70,13 @@ export default function SmartChat() {
     if (metaViewport) {
       metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
+    
+    // Log timezone info for debugging purposes
+    console.log(`User timezone: ${timezone}, offset: ${timezoneOffset} minutes from UTC`);
+    
+    // Store in sessionStorage for use across the app
+    sessionStorage.setItem('userTimezoneOffset', timezoneOffset.toString());
+    sessionStorage.setItem('userTimezone', timezone);
     
     const checkOrCreateThread = async () => {
       if (!user?.id || threadCheckInProgressRef.current || hasInitializedRef.current) return;
@@ -164,7 +181,7 @@ export default function SmartChat() {
       window.removeEventListener('closeChatSidebar', handleCloseSidebar);
       window.removeEventListener('messageCreated' as any, handleMessageCreated);
     };
-  }, [isMobile, mobileDemo, user]);
+  }, [isMobile, mobileDemo, user, timezoneOffset, timezone]);
   
   useEffect(() => {
     const generateTitleForPreviousThread = async () => {
@@ -353,7 +370,9 @@ export default function SmartChat() {
             </div>
           )}
           <SmartChatInterface 
-            mentalHealthInsights={mentalHealthInsights} 
+            mentalHealthInsights={mentalHealthInsights}
+            timezoneOffset={timezoneOffset}
+            timezone={timezone}
           />
         </div>
       </motion.div>
@@ -395,6 +414,8 @@ export default function SmartChat() {
             onCreateNewThread={createNewThread}
             userId={user?.id}
             mentalHealthInsights={mentalHealthInsights}
+            timezoneOffset={timezoneOffset}
+            timezone={timezone}
           />
         </div>
       </motion.div>

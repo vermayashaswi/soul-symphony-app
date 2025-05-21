@@ -80,6 +80,31 @@ function isJournalAnalysisQuery(message: string): boolean {
 }
 
 /**
+ * Format a date in a user-friendly way accounting for timezone
+ * @param dateStr ISO date string
+ * @param timezoneOffset User's timezone offset in minutes
+ */
+function formatDate(dateStr: string, timezoneOffset: number = 0): string {
+  try {
+    const date = new Date(dateStr);
+    // Apply timezone offset to get local time
+    const localDate = new Date(date.getTime() + (timezoneOffset * 60 * 1000));
+    
+    return localDate.toLocaleDateString('en-US', {
+      weekday: 'long',
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+      hour: 'numeric',
+      minute: 'numeric'
+    });
+  } catch (e) {
+    console.error("Error formatting date:", e);
+    return dateStr || "Unknown date";
+  }
+}
+
+/**
  * Handle the request to chat with RAG (Retrieval-Augmented Generation)
  */
 serve(async (req) => {
@@ -96,10 +121,12 @@ serve(async (req) => {
       threadId,
       usePersonalContext = false,
       queryPlan = null,
-      conversationHistory = []
+      conversationHistory = [],
+      timezoneOffset = new Date().getTimezoneOffset() * -1 // Default to browser's timezone
     } = await req.json();
 
     console.log(`Processing request for user ${userId}: ${message}`);
+    console.log(`User timezone offset: ${timezoneOffset} minutes`);
 
     // Determine the appropriate query strategy based on usePersonalContext and queryPlan
     let searchStrategy = 'default';
@@ -173,7 +200,8 @@ serve(async (req) => {
         needsDataAggregation, 
         conversationHistory, 
         isTimePatternQuery || isJournalAnalysis || isPersonalityQuery, 
-        isTimeSummary
+        isTimeSummary,
+        timezoneOffset
       );
     } else {
       console.log("Processing as general question (no personal context)");
@@ -259,10 +287,22 @@ async function handleGeneralQuestion(message, userId, conversationHistory = []) 
 /**
  * Handle journal questions that require personal context
  */
-async function handleJournalQuestion(message, userId, embedding, filters = {}, searchStrategy = 'hybrid', needsDataAggregation = false, conversationHistory = [], isComprehensiveAnalysisQuery = false, isTimeSummary = false) {
+async function handleJournalQuestion(
+  message, 
+  userId, 
+  embedding, 
+  filters = {}, 
+  searchStrategy = 'hybrid', 
+  needsDataAggregation = false, 
+  conversationHistory = [], 
+  isComprehensiveAnalysisQuery = false, 
+  isTimeSummary = false,
+  timezoneOffset = 0
+) {
   try {
     console.log("Handling journal question");
     console.log(`Is comprehensive analysis query: ${isComprehensiveAnalysisQuery}`);
+    console.log(`Using timezone offset: ${timezoneOffset} minutes`);
     
     // Step 1: Search for relevant journal entries using the appropriate strategy
     let relevantEntries = [];
@@ -357,15 +397,9 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
       const entryContent = entry.content || 
                           (entry["refined text"] || entry["transcription text"]) || 
                           "";
-                          
-      const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric'
-      });
+      
+      // Format date with timezone consideration
+      const formattedDate = formatDate(entry.created_at, timezoneOffset);
       
       // Add entry to context
       journalContext += `Journal entry from ${formattedDate}:\n${entryContent}\n\n`;
@@ -374,6 +408,7 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
       references.push({
         id: entry.id,
         date: entry.created_at,
+        formattedDate: formattedDate,  // Add formatted date for display
         snippet: entryContent.substring(0, 150) + (entryContent.length > 150 ? "..." : "")
       });
     }
@@ -425,7 +460,7 @@ Based on these entries and conversation history, help the user by answering thei
 Formatting guidelines:
 1. Structure your response with clear sections using markdown formatting when appropriate
 2. For analytical responses, include bullet points to highlight key insights
-3. When referencing dates or timeframes, be specific 
+3. When referencing dates or timeframes, be specific and use the same date format shown in the journal entries 
 4. For personal advice or reflections, use a warm, empathetic tone
 5. If the information in the entries is not sufficient to answer completely, clearly state what is missing
 
@@ -466,7 +501,8 @@ Stay factual and only make conclusions that are directly supported by the journa
     return new Response(
       JSON.stringify({
         response: answer,
-        references: references
+        references: references,
+        timezoneOffset: timezoneOffset, // Return the timezone offset for client-side reference
       }),
       {
         headers: {
