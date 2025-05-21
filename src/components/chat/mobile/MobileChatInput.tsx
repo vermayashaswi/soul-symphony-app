@@ -1,10 +1,10 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { Button } from '@/components/ui/button';
-import { SendHorizonal, Mic } from 'lucide-react';
+import { SendHorizonal } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import VoiceRecordingButton from '@/components/chat/VoiceRecordingButton';
-import { useVoiceRecorder } from '@/hooks/use-voice-recorder';
+import { useAudioRecorder } from '@/hooks/use-audio-recorder';
 
 interface MobileChatInputProps {
   onSendMessage: (message: string) => void;
@@ -15,14 +15,24 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({ onSendMessage, disabl
   const [message, setMessage] = useState('');
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
-  const { startRecording, stopRecording, isRecording, transcript, resetTranscript } = useVoiceRecorder();
+  
+  // Use the audio recorder hook instead of voice recorder
+  const { 
+    isRecording, 
+    recordingTime, 
+    startRecording, 
+    stopRecording, 
+    audioBlob 
+  } = useAudioRecorder();
 
+  // When audio is recorded, we'll need to handle it
   useEffect(() => {
-    if (transcript) {
-      setMessage(prev => prev + (prev ? ' ' : '') + transcript);
-      resetTranscript();
+    if (audioBlob) {
+      // In a real implementation, we would process the audio blob here
+      // For now, we'll just log it
+      console.log("Audio recording completed:", audioBlob);
     }
-  }, [transcript, resetTranscript]);
+  }, [audioBlob]);
 
   // Auto-resize textarea as content grows
   useEffect(() => {
@@ -91,11 +101,12 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({ onSendMessage, disabl
         />
         <div className="absolute right-2 bottom-2">
           <VoiceRecordingButton
-            onRecordingStart={startRecording}
-            onRecordingStop={stopRecording}
+            isLoading={disabled}
             isRecording={isRecording}
+            recordingTime={recordingTime}
+            onStartRecording={startRecording}
+            onStopRecording={stopRecording}
             size="sm"
-            disabled={disabled}
           />
         </div>
       </div>

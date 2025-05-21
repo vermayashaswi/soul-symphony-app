@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useRef } from 'react';
 import { MobileChatInterfaceProps } from '@/types/chat-interfaces';
-import { ChatArea } from '@/components/chat/ChatArea';
+import ChatArea from '@/components/chat/ChatArea'; // Fix import
 import MobileChatInput from './MobileChatInput';
 import { useChatPersistence } from '@/services/chat/useChatPersistence';
 import { Menu, PlusCircle, ArrowLeft } from 'lucide-react';
@@ -49,12 +49,13 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
         if (error) throw error;
 
         if (data) {
+          // Ensure the sender property is mapped to the correct type
           const formattedMessages: ChatMessage[] = data.map((msg) => ({
             id: msg.id,
             thread_id: msg.thread_id,
             content: msg.content,
-            sender: msg.sender,
-            role: msg.sender,
+            sender: msg.sender as 'user' | 'assistant' | 'error',
+            role: msg.sender as 'user' | 'assistant' | 'error',
             created_at: msg.created_at,
             reference_entries: msg.reference_entries,
             analysis_data: msg.analysis_data,
@@ -94,8 +95,8 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
           id: newMessage.id,
           thread_id: newMessage.thread_id,
           content: newMessage.content,
-          sender: newMessage.sender,
-          role: newMessage.sender,
+          sender: newMessage.sender as 'user' | 'assistant' | 'error',
+          role: newMessage.sender as 'user' | 'assistant' | 'error',
           created_at: newMessage.created_at,
           reference_entries: newMessage.reference_entries,
           analysis_data: newMessage.analysis_data,
@@ -210,7 +211,6 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
                   activeThreadId={currentThreadId}
                   onSelectThread={handleSelectThread}
                   onCreateThread={handleCreateNewThread}
-                  compact={true}
                 />
               </div>
             </SheetContent>
@@ -235,7 +235,9 @@ const MobileChatInterface: React.FC<MobileChatInterfaceProps> = ({
             threadId={currentThreadId}
           />
         ) : (
-          <EmptyChatState onSuggestionClick={handleSendMessage} />
+          <EmptyChatState 
+            onStarterPrompt={handleSendMessage} 
+          />
         )}
       </div>
       
