@@ -21,7 +21,7 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 import { ChatMessage } from "@/types/chat";
-import { getThreadMessages, saveMessage, processWithStructuredPrompt } from "@/services/chat";
+import { getThreadMessages, saveMessage, processWithStructuredPrompt, ServiceChatMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useTranslation } from "@/contexts/TranslationContext";
@@ -384,7 +384,9 @@ const SmartChatInterface = () => {
             'assistant',
             searchResponse.references,
             searchResponse.analysis,
-            searchResponse.hasNumericResult
+            searchResponse.hasNumericResult,
+            true,
+            searchResponse.interactiveOptions
           );
           
           debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");

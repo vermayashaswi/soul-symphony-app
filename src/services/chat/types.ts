@@ -31,15 +31,15 @@ export interface ChatMessage {
   thread_id: string;
   content: string;
   sender: 'user' | 'assistant' | 'error';
-  role?: 'user' | 'assistant' | 'error';
+  role: 'user' | 'assistant' | 'error';  // Making 'role' required to match src/types/chat.ts
   created_at: string;
-  reference_entries?: any[];
+  reference_entries?: any[] | null;
   references?: any[];
-  analysis_data?: any;
+  analysis_data?: any | null;
   analysis?: any;
-  has_numeric_result?: boolean;
+  has_numeric_result?: boolean | null;
   hasNumericResult?: boolean;
-  sub_query_responses?: SubQueryResponse[];
+  sub_query_responses?: SubQueryResponse[] | null;
   isInteractive?: boolean;
   interactiveOptions?: any[];
   diagnostics?: any;

@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { ChatMessage, ChatThread, SubQueryResponse, TimeAnalysis } from './types';
@@ -258,9 +259,12 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[]> 
       .order('updated_at', { ascending: false });
       
     if (error) throw error;
+    
+    // Convert database response to ChatThread[] type with proper typing for metadata
     return data ? data.map(thread => ({
       ...thread,
-      processing_status: thread.processing_status as 'idle' | 'processing' | 'failed'
+      processing_status: thread.processing_status as 'idle' | 'processing' | 'failed',
+      metadata: thread.metadata as ChatThread['metadata']
     })) : [];
   } catch (error) {
     console.error('Error fetching user chat threads:', error);
@@ -277,10 +281,17 @@ export async function getThreadMessages(threadId: string): Promise<ChatMessage[]
       .order('created_at', { ascending: true });
       
     if (error) throw error;
+    
+    // Convert database response to ChatMessage[] type with proper type assertions
     return data ? data.map(msg => ({
       ...msg,
       sender: msg.sender as 'user' | 'assistant' | 'error',
-      role: msg.role as 'user' | 'assistant' | 'error'
+      role: msg.role as 'user' | 'assistant' | 'error',
+      reference_entries: msg.reference_entries as any[] | null,
+      analysis_data: msg.analysis_data as any | null,
+      references: msg.reference_entries as any[] | null,
+      analysis: msg.analysis_data as any | null,
+      hasNumericResult: msg.has_numeric_result,
     })) : [];
   } catch (error) {
     console.error('Error fetching thread messages:', error);
@@ -324,7 +335,7 @@ export async function saveMessage(
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: data.role as 'user' | 'assistant' | 'error',
-      references: data.reference_entries,
+      references: data.reference_entries as any[] | null,
       analysis: data.analysis_data,
       hasNumericResult: data.has_numeric_result,
       isInteractive: isInteractive || false,
@@ -358,9 +369,11 @@ export async function createThread(userId: string, title: string = 'New Conversa
       
     if (error) throw error;
     
+    // Convert the response to our ChatThread type
     return {
       ...data,
-      processing_status: data.processing_status as 'idle' | 'processing' | 'failed'
+      processing_status: data.processing_status as 'idle' | 'processing' | 'failed',
+      metadata: data.metadata as ChatThread['metadata']
     };
   } catch (error) {
     console.error('Error creating thread:', error);
