@@ -1,6 +1,6 @@
-
 import { supabase } from '@/integrations/supabase/client';
-import { calculateRelativeDateRange, getUserTimezoneOffset, debugTimezoneInfo } from './dateUtils';
+import { calculateRelativeDateRange, getUserTimezoneOffset, getUserTimezoneName, debugTimezoneInfo } from './dateUtils';
+import { format, formatInTimeZone } from 'date-fns-tz';
 
 /**
  * Analyzes journal entries based on time patterns in a user query
@@ -24,6 +24,9 @@ export async function analyzeTimePatterns(
     // Log timezone debug info to help diagnose issues
     debugTimezoneInfo();
     
+    const timezoneName = getUserTimezoneName() || 'UTC';
+    console.log(`Time pattern analysis using timezone: ${timezoneName}`);
+    
     // Build the query with time filters if provided
     let query = supabase
       .from('Journal Entries')
@@ -34,6 +37,13 @@ export async function analyzeTimePatterns(
     // Apply time range filters if provided
     if (timeRange?.startDate && timeRange?.endDate) {
       console.log(`Applying time filters: ${timeRange.startDate} to ${timeRange.endDate}`);
+      
+      // Parse dates for logging
+      const startDate = new Date(timeRange.startDate);
+      const endDate = new Date(timeRange.endDate);
+      console.log(`Time range dates (formatted): ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`);
+      console.log(`Time range details: ${timeRange.periodName || 'custom range'}`);
+      
       query = query.gte('created_at', timeRange.startDate).lte('created_at', timeRange.endDate);
     }
 
@@ -59,6 +69,13 @@ export async function analyzeTimePatterns(
     }
 
     console.log(`Found and analyzing all ${entries.length} entries for time pattern analysis`);
+    
+    // Log the date range of entries found
+    if (entries.length > 0) {
+      const oldestEntry = new Date(entries[entries.length - 1].created_at);
+      const newestEntry = new Date(entries[0].created_at);
+      console.log(`Entry date range: ${format(oldestEntry, 'yyyy-MM-dd')} to ${format(newestEntry, 'yyyy-MM-dd')}`);
+    }
 
     // Analyze entry distribution by time
     const entriesByDate = groupEntriesByDate(entries);
@@ -242,6 +259,9 @@ export async function analyzeTimeEmotionPatterns(
     // Log timezone debug info
     debugTimezoneInfo();
     
+    const timezoneName = getUserTimezoneName() || 'UTC';
+    console.log(`Time-emotion pattern analysis using timezone: ${timezoneName}`);
+    
     // Build the query with time filters if provided
     let query = supabase
       .from('Journal Entries')
@@ -252,6 +272,13 @@ export async function analyzeTimeEmotionPatterns(
     // Apply time range filters if provided
     if (timeRange?.startDate && timeRange?.endDate) {
       console.log(`Applying time emotion filters: ${timeRange.startDate} to ${timeRange.endDate}`);
+      
+      // Parse dates for logging
+      const startDate = new Date(timeRange.startDate);
+      const endDate = new Date(timeRange.endDate);
+      console.log(`Time range dates (formatted): ${format(startDate, 'yyyy-MM-dd')} to ${format(endDate, 'yyyy-MM-dd')}`);
+      console.log(`Time range details: ${timeRange.periodName || 'custom range'}`);
+      
       query = query.gte('created_at', timeRange.startDate).lte('created_at', timeRange.endDate);
     }
 
@@ -260,6 +287,15 @@ export async function analyzeTimeEmotionPatterns(
     if (error || !entries || entries.length === 0) {
       console.error("Error or no entries found for time-emotion analysis:", error);
       return null;
+    }
+    
+    console.log(`Found ${entries.length} entries for time-emotion pattern analysis`);
+    
+    // Log the date range of entries found
+    if (entries.length > 0) {
+      const oldestEntry = new Date(entries[0].created_at);
+      const newestEntry = new Date(entries[entries.length - 1].created_at);
+      console.log(`Entry date range: ${format(oldestEntry, 'yyyy-MM-dd')} to ${format(newestEntry, 'yyyy-MM-dd')}`);
     }
 
     // Analyze sentiment by time of day

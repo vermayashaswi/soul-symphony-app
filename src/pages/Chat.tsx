@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
@@ -10,6 +9,7 @@ import { ConversationStateManager } from '@/utils/chat/conversationStateManager'
 import { extractConversationInsights } from '@/utils/chat/messageProcessor';
 import { ChatMessage } from '@/types/chat';
 import { debugTimezoneInfo } from '@/utils/chat/dateUtils';
+import { format } from 'date-fns';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -22,6 +22,36 @@ const Chat = () => {
   useEffect(() => {
     console.log("Chat component mounted, debugging timezone info:");
     debugTimezoneInfo();
+    
+    // Additional current date debug
+    const now = new Date();
+    console.log("Current date details:");
+    console.log(`Date object: ${now}`);
+    console.log(`ISO string: ${now.toISOString()}`);
+    console.log(`Local string: ${now.toString()}`);
+    console.log(`Formatted: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+    console.log(`Date: ${now.getDate()}, Month: ${now.getMonth() + 1}, Year: ${now.getFullYear()}`);
+    console.log(`Day of week: ${now.getDay()} (0=Sunday, 1=Monday, ..., 6=Saturday)`);
+    
+    // Test "last week" calculation
+    const today = new Date();
+    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const daysToLastSunday = dayOfWeek === 0 ? 7 : dayOfWeek; // How many days to go back to reach last Sunday
+    
+    // Last Sunday at end of day
+    const lastSunday = new Date(today);
+    lastSunday.setDate(today.getDate() - daysToLastSunday);
+    
+    // Last Monday at start of day (7 days before last Sunday)
+    const lastMonday = new Date(lastSunday);
+    lastMonday.setDate(lastSunday.getDate() - 6);
+    
+    console.log("Manual 'last week' calculation:");
+    console.log(`Today: ${format(today, 'yyyy-MM-dd')} (day of week: ${dayOfWeek})`);
+    console.log(`Days to last Sunday: ${daysToLastSunday}`);
+    console.log(`Last Sunday: ${format(lastSunday, 'yyyy-MM-dd')}`);
+    console.log(`Last Monday: ${format(lastMonday, 'yyyy-MM-dd')}`);
+    console.log(`Last week: ${format(lastMonday, 'yyyy-MM-dd')} to ${format(lastSunday, 'yyyy-MM-dd')}`);
   }, []);
 
   // Pre-translate common chat-related strings more comprehensively 

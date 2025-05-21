@@ -1,5 +1,6 @@
 
 import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
+import { format, formatInTimeZone, toZonedTime } from "date-fns-tz";
 
 /**
  * Calculates relative date ranges based on time expressions
@@ -16,17 +17,25 @@ export function calculateRelativeDateRange(
   // Convert timezone offset to milliseconds
   const offsetMs = timezoneOffset * 60 * 1000;
   
+  // Get timezone name if available
+  const timezoneName = getUserTimezoneName() || 'UTC';
+  
   // Use provided reference date or get current date in user's timezone
-  const now = referenceDate ? new Date(referenceDate) : new Date();
+  const now = referenceDate ? 
+    toZonedTime(new Date(referenceDate), timezoneName) : 
+    toZonedTime(new Date(), timezoneName);
+    
   let startDate: Date;
   let endDate: Date;
   let periodName = timePeriod;
   
   console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
-  console.log(`User's local time: ${now.toISOString()}`);
-  console.log(`Reference date provided: ${referenceDate ? 'yes' : 'no'}`);
+  console.log(`User's timezone: ${timezoneName}`);
+  console.log(`Current date in user's timezone: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+  console.log(`Day of week: ${now.getDay()}, Date: ${now.getDate()}, Month: ${now.getMonth() + 1}, Year: ${now.getFullYear()}`);
+  
   if (referenceDate) {
-    console.log(`Reference date: ${referenceDate.toISOString()}`);
+    console.log(`Reference date provided: ${format(referenceDate, 'yyyy-MM-dd HH:mm:ss')}`);
   }
   
   // Normalize time period for better matching
@@ -76,10 +85,21 @@ export function calculateRelativeDateRange(
     periodName = 'this week';
   } 
   else if (lowerTimePeriod.includes('last week')) {
-    // Last week: Start at previous week Monday, end at previous week Sunday 23:59:59
-    const prevWeek = subWeeks(now, 1);
-    startDate = startOfWeek(prevWeek, { weekStartsOn: 1 }); // Start on Monday
-    endDate = endOfWeek(prevWeek, { weekStartsOn: 1 }); // End on Sunday
+    // Last calendar week: Start at previous week Monday, end at previous week Sunday
+    // This is the key fix - we need to get the previous calendar week
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const daysToLastSunday = dayOfWeek === 0 ? 7 : dayOfWeek; // How many days to go back to reach last Sunday
+    
+    // Last Sunday at end of day
+    const lastSunday = subDays(now, daysToLastSunday);
+    // Last Monday at start of day (7 days before last Sunday)
+    const lastMonday = subDays(lastSunday, 6);
+    
+    console.log(`Day of week: ${dayOfWeek}, days to last Sunday: ${daysToLastSunday}`);
+    console.log(`Last Sunday: ${format(lastSunday, 'yyyy-MM-dd')}, Last Monday: ${format(lastMonday, 'yyyy-MM-dd')}`);
+    
+    startDate = startOfDay(lastMonday);
+    endDate = endOfDay(lastSunday);
     periodName = 'last week';
   }
   else if (lowerTimePeriod.includes('past week') || lowerTimePeriod.includes('previous week')) {
@@ -144,22 +164,19 @@ export function calculateRelativeDateRange(
     periodName = 'last 30 days';
   }
 
-  // Format the dates as ISO strings without adjusting for timezone offset
-  // This ensures we get proper UTC dates for database queries
-  const utcStartDate = startDate;
-  const utcEndDate = endDate;
+  // Format dates as ISO strings
+  const isoStartDate = startDate.toISOString();
+  const isoEndDate = endDate.toISOString();
   
-  // Additional debug logging to help diagnose timezone issues
-  console.log("Date calculation debug info:");
-  console.log(`Current time: ${new Date().toISOString()}`);
-  console.log(`Input timezone offset: ${timezoneOffset} minutes`);
-  console.log(`Start date (local): ${startDate.toString()}`);
-  console.log(`End date (local): ${endDate.toString()}`);
-  console.log(`Start date (UTC): ${utcStartDate.toISOString()}`);
-  console.log(`End date (UTC): ${utcEndDate.toISOString()}`);
+  // Log date calculation details for debugging
+  console.log("Date calculation details:");
+  console.log(`Period: ${periodName}`);
+  console.log(`Start date: ${format(startDate, 'yyyy-MM-dd HH:mm:ss')} (${isoStartDate})`);
+  console.log(`End date: ${format(endDate, 'yyyy-MM-dd HH:mm:ss')} (${isoEndDate})`);
+  console.log(`Duration in days: ${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))}`);
   
   // Validate the date range
-  if (utcEndDate < utcStartDate) {
+  if (endDate < startDate) {
     console.error("Invalid date range calculated: end date is before start date");
     // Fallback to last 7 days as a safe default
     const fallbackStart = startOfDay(subDays(now, 7));
@@ -171,16 +188,9 @@ export function calculateRelativeDateRange(
     };
   }
   
-  // Log the calculated dates for debugging
-  console.log(`Date range calculated: 
-    Start: ${utcStartDate.toISOString()} (${utcStartDate.toLocaleDateString()})
-    End: ${utcEndDate.toISOString()} (${utcEndDate.toLocaleDateString()})
-    Period: ${periodName}
-    Duration in days: ${Math.round((utcEndDate.getTime() - utcStartDate.getTime()) / (1000 * 60 * 60 * 24))}`);
-  
   return {
-    startDate: utcStartDate.toISOString(),
-    endDate: utcEndDate.toISOString(),
+    startDate: isoStartDate,
+    endDate: isoEndDate,
     periodName
   };
 }
@@ -316,4 +326,18 @@ export function debugTimezoneInfo(): void {
   console.log(`Timezone offset: ${offset} minutes`);
   console.log(`Timezone name: ${timezoneName || "unknown"}`);
   console.log(`Local time: ${now.toLocaleTimeString()}`);
+  
+  // Additional debugging for specific dates
+  console.log("\nDate Calculation Tests:");
+  
+  // Test "last week" calculation
+  const lastWeekTest = calculateRelativeDateRange("last week");
+  console.log(`"last week" calculation result:`, lastWeekTest);
+  
+  // Parse the ISO dates for clearer output
+  const startDate = new Date(lastWeekTest.startDate);
+  const endDate = new Date(lastWeekTest.endDate);
+  
+  console.log(`Last week start: ${format(startDate, 'yyyy-MM-dd')} (${startDate.toDateString()})`);
+  console.log(`Last week end: ${format(endDate, 'yyyy-MM-dd')} (${endDate.toDateString()})`);
 }
