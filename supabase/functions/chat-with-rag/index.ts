@@ -1,6 +1,8 @@
 
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
+import { format, addDays, startOfWeek, endOfWeek } from "https://esm.sh/date-fns@3.3.1";
+import { toZonedTime } from "https://esm.sh/date-fns-tz@3.2.0";
 
 // Define Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -27,6 +29,47 @@ const MAX_ENTRIES = 10;
 // Don't limit entries for time pattern or special analysis queries
 // Set to a higher value to ensure all entries are analyzed
 const MAX_TIME_ANALYSIS_ENTRIES = 1000; // Increased from 100 to handle more entries
+
+/**
+ * Get the formatted date range for the current week
+ */
+function getCurrentWeekDates(timezone?: string): string {
+  // Default to UTC if no timezone specified
+  const tz = timezone || 'UTC';
+  console.log(`Getting current week dates for timezone: ${tz}`);
+  
+  try {
+    // Get the current date in the user's timezone
+    const now = toZonedTime(new Date(), tz);
+    console.log(`Current date in ${tz}: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+    
+    // Get the start of the week (Monday)
+    const startOfCurrentWeek = startOfWeek(now, { weekStartsOn: 1 });
+    // Get the end of the week (Sunday)
+    const endOfCurrentWeek = endOfWeek(now, { weekStartsOn: 1 });
+    
+    console.log(`Start of current week: ${format(startOfCurrentWeek, 'yyyy-MM-dd')}`);
+    console.log(`End of current week: ${format(endOfCurrentWeek, 'yyyy-MM-dd')}`);
+    
+    // Format the dates in a user-friendly way
+    const formattedStart = format(startOfCurrentWeek, 'MMMM d');
+    const formattedEnd = format(endOfCurrentWeek, 'MMMM d, yyyy');
+    
+    return `${formattedStart} to ${formattedEnd}`;
+  } catch (error) {
+    console.error("Error calculating current week dates:", error);
+    // Fallback calculation if there's an error with timezone handling
+    const now = new Date();
+    const dayOfWeek = now.getDay(); // 0 is Sunday
+    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust to get Monday
+    
+    const monday = new Date(now.setDate(diff));
+    const sunday = new Date(now);
+    sunday.setDate(monday.getDate() + 6);
+    
+    return `${format(monday, 'MMMM d')} to ${format(sunday, 'MMMM d, yyyy')}`;
+  }
+}
 
 /**
  * Detect if query appears to be a time-based summary query
@@ -80,6 +123,34 @@ function isJournalAnalysisQuery(message: string): boolean {
 }
 
 /**
+ * Check if query is asking about current dates
+ */
+function isDirectDateQuery(message: string): boolean {
+  const lowerQuery = message.toLowerCase();
+  
+  // Patterns for direct date inquiries
+  const dateQueryPatterns = [
+    /\bwhat\s+(is|are)\s+(the\s+)?(current|this)\s+week('s)?\s+dates\b/i,
+    /\bwhat\s+date\s+is\s+it\b/i,
+    /\bwhat\s+day\s+is\s+(it|today)\b/i,
+    /\bwhat\s+(is|are)\s+(the\s+)?dates?\s+for\s+(this|current)\s+week\b/i,
+    /\bcurrent\s+week\s+dates?\b/i,
+    /\bthis\s+week('s)?\s+dates?\b/i, 
+    /\bwhat\s+dates?\s+(is|are)\s+this\s+week\b/i,
+    /\btoday's\s+date\b/i
+  ];
+  
+  // Check if any of the patterns match
+  for (const pattern of dateQueryPatterns) {
+    if (pattern.test(lowerQuery)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
  * Handle the request to chat with RAG (Retrieval-Augmented Generation)
  */
 serve(async (req) => {
@@ -100,6 +171,51 @@ serve(async (req) => {
     } = await req.json();
 
     console.log(`Processing request for user ${userId}: ${message}`);
+
+    // Check if this is a direct date query that needs a simple calendar response
+    const isDateQuery = queryPlan?.isDirectDateQuery || isDirectDateQuery(message);
+    if (isDateQuery) {
+      console.log("Processing as direct date query");
+      
+      // Get user's timezone from their profile
+      let userTimezone;
+      try {
+        const { data, error } = await supabase
+          .from('profiles')
+          .select('timezone')
+          .eq('id', userId)
+          .single();
+          
+        if (data && !error) {
+          userTimezone = data.timezone;
+          console.log(`Found user timezone: ${userTimezone}`);
+        }
+      } catch (error) {
+        console.error("Error fetching user timezone:", error);
+      }
+      
+      // Get the current week's date range in user's timezone
+      const dateRange = getCurrentWeekDates(userTimezone);
+      console.log(`Current week date range: ${dateRange}`);
+
+      // Provide a direct answer with the date information
+      const today = new Date();
+      const response = `The current week dates are: ${dateRange}\n\nToday is ${format(today, 'EEEE, MMMM d, yyyy')}.`;
+      
+      return new Response(
+        JSON.stringify({
+          response: response,
+          references: [],
+          isDirectDateResponse: true
+        }),
+        {
+          headers: {
+            'Content-Type': 'application/json',
+            ...corsHeaders
+          }
+        }
+      );
+    }
 
     // Determine the appropriate query strategy based on usePersonalContext and queryPlan
     let searchStrategy = 'default';

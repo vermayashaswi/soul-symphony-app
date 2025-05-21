@@ -1,6 +1,7 @@
 
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
+import { isDirectDateQuery } from '@/utils/format-time';
 
 /**
  * Enhance query with thread context
@@ -50,6 +51,21 @@ async function enhanceWithThreadContext(message: string, threadId: string, query
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
     console.log("[Query Planner] Planning strategy for:", message);
+    
+    // Check if this is a direct date query
+    if (isDirectDateQuery(message)) {
+      console.log("[Query Planner] Detected direct date query");
+      return {
+        strategy: "direct_date",
+        isDirectDateQuery: true,
+        timeRange: null,
+        useHistoricalData: false,
+        usePersonalContext: false,
+        filterByEmotion: null,
+        enhancedQuery: message,
+        originalQuery: message
+      };
+    }
     
     // Analyze the query types
     const queryTypes = analyzeQueryTypes(message);

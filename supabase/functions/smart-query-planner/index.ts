@@ -107,6 +107,36 @@ function detectComprehensiveAnalysisQuery(message) {
   return isComprehensiveQuery;
 }
 
+/**
+ * Detect if query is a direct date request (like asking for current week dates)
+ * that should be answered directly without consulting the journal
+ */
+function detectDirectDateQuery(message) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Patterns for direct date inquiries
+  const dateQueryPatterns = [
+    /\bwhat\s+(is|are)\s+(the\s+)?(current|this)\s+week('s)?\s+dates\b/i,
+    /\bwhat\s+date\s+is\s+it\b/i,
+    /\bwhat\s+day\s+is\s+(it|today)\b/i,
+    /\bwhat\s+(is|are)\s+(the\s+)?dates?\s+for\s+(this|current)\s+week\b/i,
+    /\bcurrent\s+week\s+dates?\b/i,
+    /\bthis\s+week('s)?\s+dates?\b/i,
+    /\bwhat\s+dates?\s+(is|are)\s+this\s+week\b/i,
+    /\btoday's\s+date\b/i
+  ];
+  
+  // Check if any of the patterns match
+  for (const pattern of dateQueryPatterns) {
+    if (pattern.test(lowerMessage)) {
+      console.log(`Direct date query detected: ${lowerMessage}`);
+      return true;
+    }
+  }
+  
+  return false;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -126,6 +156,32 @@ serve(async (req) => {
       Preserve topic context: ${preserveTopicContext}
       Intent type: ${intentType || 'not provided'}
     `);
+    
+    // Check if this is a direct date query that can be answered without journal analysis
+    const isDateQuery = detectDirectDateQuery(message);
+    if (isDateQuery) {
+      console.log("Detected direct date query. Will handle specially.");
+      
+      return new Response(
+        JSON.stringify({
+          queryPlan: {
+            strategy: "direct_date",
+            isDirectDateQuery: true,
+            filters: { },
+            isTimePatternQuery: false,
+            needsDataAggregation: false,
+            domainContext: "date_information",
+            isTimeSummaryQuery: false,
+            hasEntriesInRange: true,
+            queryType: "date_request"
+          },
+          rawPlan: "Direct date information request detected."
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
     
     // Add time summary detection
     const isTimeSummaryQuery = detectTimeSummaryQuery(message);

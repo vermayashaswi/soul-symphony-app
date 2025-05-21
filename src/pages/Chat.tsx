@@ -8,8 +8,9 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { ConversationStateManager } from '@/utils/chat/conversationStateManager';
 import { extractConversationInsights } from '@/utils/chat/messageProcessor';
 import { ChatMessage } from '@/types/chat';
-import { debugTimezoneInfo } from '@/utils/chat/dateUtils';
+import { debugTimezoneInfo, getCurrentWeekDates } from '@/utils/chat/dateUtils';
 import { format } from 'date-fns';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -33,25 +34,22 @@ const Chat = () => {
     console.log(`Date: ${now.getDate()}, Month: ${now.getMonth() + 1}, Year: ${now.getFullYear()}`);
     console.log(`Day of week: ${now.getDay()} (0=Sunday, 1=Monday, ..., 6=Saturday)`);
     
-    // Test "last week" calculation
-    const today = new Date();
-    const dayOfWeek = today.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    const daysToLastSunday = dayOfWeek === 0 ? 7 : dayOfWeek; // How many days to go back to reach last Sunday
+    // Test current week calculation
+    console.log("Current week dates calculation:");
+    const currentWeek = getCurrentWeekDates();
+    console.log(`Current week dates: ${currentWeek}`);
     
-    // Last Sunday at end of day
-    const lastSunday = new Date(today);
-    lastSunday.setDate(today.getDate() - daysToLastSunday);
-    
-    // Last Monday at start of day (7 days before last Sunday)
-    const lastMonday = new Date(lastSunday);
-    lastMonday.setDate(lastSunday.getDate() - 6);
-    
-    console.log("Manual 'last week' calculation:");
-    console.log(`Today: ${format(today, 'yyyy-MM-dd')} (day of week: ${dayOfWeek})`);
-    console.log(`Days to last Sunday: ${daysToLastSunday}`);
-    console.log(`Last Sunday: ${format(lastSunday, 'yyyy-MM-dd')}`);
-    console.log(`Last Monday: ${format(lastMonday, 'yyyy-MM-dd')}`);
-    console.log(`Last week: ${format(lastMonday, 'yyyy-MM-dd')} to ${format(lastSunday, 'yyyy-MM-dd')}`);
+    // Get timezone from Intl API
+    try {
+      const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+      console.log(`Browser timezone: ${timeZone}`);
+      
+      // Format date in detected timezone
+      const zonedDate = toZonedTime(now, timeZone);
+      console.log(`Date in ${timeZone}: ${format(zonedDate, 'yyyy-MM-dd HH:mm:ss')}`);
+    } catch (e) {
+      console.error("Error getting timezone:", e);
+    }
   }, []);
 
   // Pre-translate common chat-related strings more comprehensively 

@@ -10,7 +10,8 @@ import { ja } from 'date-fns/locale/ja';
 import { ru } from 'date-fns/locale/ru';
 import { ar } from 'date-fns/locale/ar';
 import { pt } from 'date-fns/locale/pt';
-import { formatInTimeZone } from 'date-fns-tz';
+import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
 
 // Helper function to get locale based on language code
 const getLocale = (lang: string) => {
@@ -105,3 +106,410 @@ export const formatTime = (seconds: number): string => {
   const remainingSeconds = Math.floor(seconds % 60);
   return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
 };
+
+/**
+ * Get the formatted date range for the current week
+ * @returns Formatted string with the current week's date range
+ */
+export const getCurrentWeekDates = (timezone?: string): string => {
+  const tz = timezone || getUserTimezoneName() || 'UTC';
+  console.log(`Getting current week dates for timezone: ${tz}`);
+  
+  // Get the current date in the user's timezone
+  const now = toZonedTime(new Date(), tz);
+  console.log(`Current date in timezone (${tz}): ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+  
+  // Get the start of the week (Monday)
+  const startOfCurrentWeek = startOfWeek(now, { weekStartsOn: 1 });
+  // Get the end of the week (Sunday)
+  const endOfCurrentWeek = endOfWeek(now, { weekStartsOn: 1 });
+  
+  console.log(`Start of current week: ${format(startOfCurrentWeek, 'yyyy-MM-dd')}`);
+  console.log(`End of current week: ${format(endOfCurrentWeek, 'yyyy-MM-dd')}`);
+  
+  // Format the dates in a user-friendly way
+  const formattedStart = format(startOfCurrentWeek, 'MMMM d');
+  const formattedEnd = format(endOfCurrentWeek, 'MMMM d, yyyy');
+
+  return `${formattedStart} to ${formattedEnd}`;
+};
+
+/**
+ * Calculates relative date ranges based on time expressions
+ * @param timePeriod - The time period expression (e.g., "this month", "last week")
+ * @param timezoneOffset - User's timezone offset in minutes
+ * @param referenceDate - Optional reference date for relative calculations
+ * @returns Date range with start and end dates
+ */
+export function calculateRelativeDateRange(
+  timePeriod: string, 
+  timezoneOffset: number = 0, 
+  referenceDate?: Date
+): { startDate: string, endDate: string, periodName: string } {
+  // Convert timezone offset to milliseconds
+  const offsetMs = timezoneOffset * 60 * 1000;
+  
+  // Get timezone name if available
+  const timezoneName = getUserTimezoneName() || 'UTC';
+  
+  // Use provided reference date or get current date in user's timezone
+  const now = referenceDate ? 
+    toZonedTime(new Date(referenceDate), timezoneName) : 
+    toZonedTime(new Date(), timezoneName);
+    
+  let startDate: Date;
+  let endDate: Date;
+  let periodName = timePeriod;
+  
+  console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
+  console.log(`User's timezone: ${timezoneName}`);
+  console.log(`Current date in user's timezone: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+  console.log(`Day of week: ${now.getDay()}, Date: ${now.getDate()}, Month: ${now.getMonth() + 1}, Year: ${now.getFullYear()}`);
+  
+  if (referenceDate) {
+    console.log(`Reference date provided: ${format(referenceDate, 'yyyy-MM-dd HH:mm:ss')}`);
+  }
+  
+  // Normalize time period for better matching
+  const lowerTimePeriod = timePeriod.toLowerCase().trim();
+  
+  // Enhanced pattern matching with more variations
+  if (lowerTimePeriod.includes('today') || lowerTimePeriod.includes('this day')) {
+    // Today: Start at midnight, end at 23:59:59
+    startDate = startOfDay(now);
+    endDate = endOfDay(now);
+    periodName = 'today';
+  } 
+  else if (lowerTimePeriod.includes('yesterday')) {
+    // Yesterday: Start at previous day midnight, end at previous day 23:59:59
+    startDate = startOfDay(subDays(now, 1));
+    endDate = endOfDay(subDays(now, 1));
+    periodName = 'yesterday';
+  }
+  else if (lowerTimePeriod.match(/past (\d+) days?/)) {
+    // Past X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/past (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `past ${days} days`;
+  }
+  else if (lowerTimePeriod.match(/last (\d+) days?/)) {
+    // Last X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/last (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `last ${days} days`;
+  }
+  else if (lowerTimePeriod.match(/recent (\d+) days?/)) {
+    // Recent X days: Start X days ago at midnight, end at today 23:59:59
+    const matches = lowerTimePeriod.match(/recent (\d+) days?/);
+    const days = parseInt(matches![1], 10) || 7; // Default to 7 if parsing fails
+    startDate = startOfDay(subDays(now, days));
+    endDate = endOfDay(now);
+    periodName = `recent ${days} days`;
+  }
+  else if (lowerTimePeriod.includes('this week') || lowerTimePeriod.includes('current week')) {
+    // This week: Start at current week Monday, end at Sunday 23:59:59
+    startDate = startOfWeek(now, { weekStartsOn: 1 }); // Start on Monday
+    endDate = endOfWeek(now, { weekStartsOn: 1 }); // End on Sunday
+    periodName = 'this week';
+    
+    console.log(`This week calculation: startDate=${format(startDate, 'yyyy-MM-dd')}, endDate=${format(endDate, 'yyyy-MM-dd')}`);
+  } 
+  else if (lowerTimePeriod.includes('last week')) {
+    // Last calendar week: Start at previous week Monday, end at previous week Sunday
+    // This is the key fix - we need to get the previous calendar week
+    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
+    const daysToLastSunday = dayOfWeek === 0 ? 7 : dayOfWeek; // How many days to go back to reach last Sunday
+    
+    // Last Sunday at end of day
+    const lastSunday = subDays(now, daysToLastSunday);
+    // Last Monday at start of day (7 days before last Sunday)
+    const lastMonday = subDays(lastSunday, 6);
+    
+    console.log(`Day of week: ${dayOfWeek}, days to last Sunday: ${daysToLastSunday}`);
+    console.log(`Last Sunday: ${format(lastSunday, 'yyyy-MM-dd')}, Last Monday: ${format(lastMonday, 'yyyy-MM-dd')}`);
+    
+    startDate = startOfDay(lastMonday);
+    endDate = endOfDay(lastSunday);
+    periodName = 'last week';
+  }
+  else if (lowerTimePeriod.includes('past week') || lowerTimePeriod.includes('previous week')) {
+    // Past/previous week: Start at 7 days ago, end at today
+    startDate = startOfDay(subDays(now, 7));
+    endDate = endOfDay(now);
+    periodName = 'past week';
+  }
+  else if (lowerTimePeriod.includes('this month')) {
+    // This month: Start at 1st of current month, end at last day of month 23:59:59
+    startDate = startOfMonth(now);
+    endDate = endOfMonth(now);
+    periodName = 'this month';
+  } 
+  else if (lowerTimePeriod.includes('last month') || lowerTimePeriod === 'previous month') {
+    // Last month: Start at 1st of previous month, end at last day of previous month 23:59:59
+    const prevMonth = subMonths(now, 1);
+    startDate = startOfMonth(prevMonth);
+    endDate = endOfMonth(prevMonth);
+    periodName = 'last month';
+  }
+  else if (lowerTimePeriod.includes('past month')) {
+    // Past month: Start at 30 days ago, end at today
+    startDate = startOfDay(subDays(now, 30));
+    endDate = endOfDay(now);
+    periodName = 'past month';
+  }
+  else if (lowerTimePeriod.includes('this year')) {
+    // This year: Start at January 1st, end at December 31st 23:59:59
+    startDate = startOfYear(now);
+    endDate = endOfYear(now);
+    periodName = 'this year';
+  } 
+  else if (lowerTimePeriod.includes('last year')) {
+    // Last year: Start at January 1st of previous year, end at December 31st of previous year 23:59:59
+    const prevYear = subYears(now, 1);
+    startDate = startOfYear(prevYear);
+    endDate = endOfYear(prevYear);
+    periodName = 'last year';
+  } 
+  else if (lowerTimePeriod === 'entire' || lowerTimePeriod === 'all' || 
+           lowerTimePeriod === 'everything' || lowerTimePeriod === 'overall' ||
+           lowerTimePeriod === 'all time' || lowerTimePeriod === 'always' ||
+           lowerTimePeriod === 'all my entries' || lowerTimePeriod === 'all entries') {
+    // Special case for "entire" - use a very broad date range (5 years back)
+    startDate = startOfYear(subYears(now, 5));
+    endDate = endOfDay(now);
+    periodName = 'all time';
+  }
+  else if (lowerTimePeriod === 'yes' || lowerTimePeriod === 'sure' || 
+           lowerTimePeriod === 'ok' || lowerTimePeriod === 'okay' ||
+           lowerTimePeriod === 'yep' || lowerTimePeriod === 'yeah') {
+    // Special handling for affirmative responses - use a broad date range
+    startDate = startOfYear(subYears(now, 5));
+    endDate = endOfDay(now);
+    periodName = 'all time'; // Use "all time" for affirmative responses
+  }
+  else {
+    // Default to last 30 days if no specific period matched
+    startDate = startOfDay(subDays(now, 30));
+    endDate = endOfDay(now);
+    periodName = 'last 30 days';
+  }
+
+  // Format dates as ISO strings
+  const isoStartDate = startDate.toISOString();
+  const isoEndDate = endDate.toISOString();
+  
+  // Log date calculation details for debugging
+  console.log("Date calculation details:");
+  console.log(`Period: ${periodName}`);
+  console.log(`Start date: ${format(startDate, 'yyyy-MM-dd HH:mm:ss')} (${isoStartDate})`);
+  console.log(`End date: ${format(endDate, 'yyyy-MM-dd HH:mm:ss')} (${isoEndDate})`);
+  console.log(`Duration in days: ${Math.round((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24))}`);
+  
+  // Validate the date range
+  if (endDate < startDate) {
+    console.error("Invalid date range calculated: end date is before start date");
+    // Fallback to last 7 days as a safe default
+    const fallbackStart = startOfDay(subDays(now, 7));
+    const fallbackEnd = endOfDay(now);
+    return {
+      startDate: fallbackStart.toISOString(),
+      endDate: fallbackEnd.toISOString(),
+      periodName: 'last 7 days (fallback)'
+    };
+  }
+  
+  return {
+    startDate: isoStartDate,
+    endDate: isoEndDate,
+    periodName
+  };
+}
+
+/**
+ * Detects relative time expressions in a query
+ * @param query - The user's message
+ * @returns string containing the detected time period or null if none found
+ */
+export function detectRelativeTimeExpression(query: string): string | null {
+  if (!query) return null;
+  
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // Common time period expressions
+  const timePeriodPatterns = [
+    /\btoday\b/,
+    /\byesterday\b/,
+    /\bthis\s+(day|week|month|year)\b/,
+    /\bcurrent\s+(day|week|month|year)\b/,
+    /\blast\s+(day|week|month|year|(\d+)\s+days?|(\d+)\s+weeks?|(\d+)\s+months?|(\d+)\s+years?)\b/,
+    /\b(recent|past|previous)\s+(day|week|month|year|(\d+)\s+days?|(\d+)\s+weeks?|(\d+)\s+months?|(\d+)\s+years?)\b/,
+    /\ball(\s+time)?\b/,
+    /\bentire\b/,
+    /\beverything\b/,
+    /\boverall\b/
+  ];
+  
+  // Check for time expressions in the query
+  for (const pattern of timePeriodPatterns) {
+    const match = lowerQuery.match(pattern);
+    if (match) {
+      // Return the matched time expression
+      return match[0];
+    }
+  }
+  
+  // Special case for simple query like "last month?" or "what about last year?"
+  if (/^(what\s+about\s+)?(the\s+)?(last|this|previous|past|recent|current)\s+(day|week|month|year|(\d+)\s+days?|(\d+)\s+weeks?|(\d+)\s+months?|(\d+)\s+years?)(\?|\.|$)/i.test(lowerQuery)) {
+    const match = lowerQuery.match(/(last|this|previous|past|recent|current)\s+(day|week|month|year|(\d+)\s+days?|(\d+)\s+weeks?|(\d+)\s+months?|(\d+)\s+years?)/i);
+    if (match) return match[0];
+  }
+  
+  return null;
+}
+
+/**
+ * Checks if a query is specifically asking about current dates
+ * @param query - The user's message
+ * @returns boolean indicating if this is a direct date query
+ */
+export function isDirectDateQuery(query: string): boolean {
+  if (!query) return false;
+  
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // Patterns for direct date inquiries
+  const dateQueryPatterns = [
+    /\bwhat\s+(is|are)\s+(the\s+)?(current|this)\s+week('s)?\s+dates\b/i,
+    /\bwhat\s+date\s+is\s+it\b/i,
+    /\bwhat\s+day\s+is\s+(it|today)\b/i,
+    /\bwhat\s+(is|are)\s+(the\s+)?dates?\s+for\s+(this|current)\s+week\b/i,
+    /\bcurrent\s+week\s+dates?\b/i,
+    /\bthis\s+week('s)?\s+dates?\b/i,
+    /\bwhat\s+dates?\s+(is|are)\s+this\s+week\b/i,
+    /\btoday's\s+date\b/i
+  ];
+  
+  // Check if any of the patterns match
+  for (const pattern of dateQueryPatterns) {
+    if (pattern.test(lowerQuery)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Extracts a reference date from a previous query plan
+ * @param previousDateRange - The previous date range with date
+ * @returns Date object or undefined if no reference date found
+ */
+export function extractReferenceDate(previousDateRange: any): Date | undefined {
+  if (!previousDateRange || !previousDateRange.endDate) {
+    return undefined;
+  }
+  
+  // Use the end date of the previous date range as reference
+  try {
+    const referenceDate = new Date(previousDateRange.endDate);
+    if (isNaN(referenceDate.getTime())) {
+      return undefined;
+    }
+    return referenceDate;
+  } catch (error) {
+    console.error("Error extracting reference date:", error);
+    return undefined;
+  }
+}
+
+/**
+ * Determines if a query is asking about a relative time period compared to a previous context
+ * @param query - The user's query
+ * @returns boolean indicating if this is a relative time query
+ */
+export function isRelativeTimeQuery(query: string): boolean {
+  if (!query) return false;
+  
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // Check for patterns like "what about last month" or "show me last week"
+  const relativeTimePatterns = [
+    /^(what|how) about (last|this|previous|past|recent)/i,
+    /^(show|tell|give) me (last|this|previous|past|recent)/i,
+    /^(and|or|but) (last|this|previous|past|recent)/i,
+    /^(last|this|previous|past|recent)/i
+  ];
+  
+  for (const pattern of relativeTimePatterns) {
+    if (pattern.test(lowerQuery)) {
+      return true;
+    }
+  }
+  
+  // Also check for standalone time periods that could be follow-ups
+  if (/^(today|yesterday|this week|current week|last week|this month|last month|this year|last year)(\?|\.|$)/i.test(lowerQuery)) {
+    return true;
+  }
+  
+  return false;
+}
+
+/**
+ * Get the user's current timezone offset
+ * @returns User's timezone offset in minutes
+ */
+export function getUserTimezoneOffset(): number {
+  return new Date().getTimezoneOffset();
+}
+
+/**
+ * Get the user's timezone name if available
+ * @returns User's timezone name or undefined
+ */
+export function getUserTimezoneName(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (e) {
+    console.error("Unable to get user timezone name:", e);
+    return undefined;
+  }
+}
+
+/**
+ * Debug helper to log timezone information
+ */
+export function debugTimezoneInfo(): void {
+  const offset = getUserTimezoneOffset();
+  const timezoneName = getUserTimezoneName();
+  const now = new Date();
+  
+  console.log("Timezone Debug Information:");
+  console.log(`Current date (local): ${now.toString()}`);
+  console.log(`Current date (ISO): ${now.toISOString()}`);
+  console.log(`Timezone offset: ${offset} minutes`);
+  console.log(`Timezone name: ${timezoneName || "unknown"}`);
+  console.log(`Local time: ${now.toLocaleTimeString()}`);
+  
+  // Additional debugging for specific dates
+  console.log("\nDate Calculation Tests:");
+  
+  // Test "current week" calculation
+  console.log("Testing 'current week' calculation:");
+  const currentWeek = getCurrentWeekDates();
+  console.log(`Current week dates: ${currentWeek}`);
+  
+  // Test "last week" calculation
+  const lastWeekTest = calculateRelativeDateRange("last week");
+  console.log(`"last week" calculation result:`, lastWeekTest);
+  
+  // Parse the ISO dates for clearer output
+  const startDate = new Date(lastWeekTest.startDate);
+  const endDate = new Date(lastWeekTest.endDate);
+  
+  console.log(`Last week start: ${format(startDate, 'yyyy-MM-dd')} (${startDate.toDateString()})`);
+  console.log(`Last week end: ${format(endDate, 'yyyy-MM-dd')} (${endDate.toDateString()})`);
+}
