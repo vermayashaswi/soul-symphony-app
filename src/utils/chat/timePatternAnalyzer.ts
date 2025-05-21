@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { calculateRelativeDateRange } from './dateUtils';
+import { calculateRelativeDateRange, getUserTimezoneOffset, debugTimezoneInfo } from './dateUtils';
 
 /**
  * Analyzes journal entries based on time patterns in a user query
@@ -21,6 +21,9 @@ export async function analyzeTimePatterns(
   }
 
   try {
+    // Log timezone debug info to help diagnose issues
+    debugTimezoneInfo();
+    
     // Build the query with time filters if provided
     let query = supabase
       .from('Journal Entries')
@@ -30,6 +33,7 @@ export async function analyzeTimePatterns(
 
     // Apply time range filters if provided
     if (timeRange?.startDate && timeRange?.endDate) {
+      console.log(`Applying time filters: ${timeRange.startDate} to ${timeRange.endDate}`);
       query = query.gte('created_at', timeRange.startDate).lte('created_at', timeRange.endDate);
     }
 
@@ -124,6 +128,9 @@ function findMostActiveDay(entriesByDate: Record<string, any[]>) {
  * Analyze when during the day entries are created
  */
 function analyzeTimeOfDayDistribution(entries: any[]) {
+  // Get user's timezone offset
+  const timezoneOffset = getUserTimezoneOffset();
+  
   const timeDistribution = {
     morning: 0, // 5:00 AM - 11:59 AM
     afternoon: 0, // 12:00 PM - 4:59 PM
@@ -132,9 +139,12 @@ function analyzeTimeOfDayDistribution(entries: any[]) {
   };
   
   entries.forEach(entry => {
+    // Create entry date adjusted for user's timezone
     const entryDate = new Date(entry.created_at);
+    // Adjust the hour based on user's timezone
     const hour = entryDate.getHours();
     
+    // Categorize by time of day
     if (hour >= 5 && hour < 12) {
       timeDistribution.morning += 1;
     } else if (hour >= 12 && hour < 17) {
@@ -229,6 +239,9 @@ export async function analyzeTimeEmotionPatterns(
   timeRange?: { startDate?: string; endDate?: string; periodName?: string; duration?: number }
 ) {
   try {
+    // Log timezone debug info
+    debugTimezoneInfo();
+    
     // Build the query with time filters if provided
     let query = supabase
       .from('Journal Entries')
@@ -238,6 +251,7 @@ export async function analyzeTimeEmotionPatterns(
 
     // Apply time range filters if provided
     if (timeRange?.startDate && timeRange?.endDate) {
+      console.log(`Applying time emotion filters: ${timeRange.startDate} to ${timeRange.endDate}`);
       query = query.gte('created_at', timeRange.startDate).lte('created_at', timeRange.endDate);
     }
 
@@ -267,8 +281,12 @@ export async function analyzeTimeEmotionPatterns(
       6: []  // Saturday
     };
 
+    // Get user's timezone offset
+    const timezoneOffset = getUserTimezoneOffset();
+    
     // Process each entry
     entries.forEach(entry => {
+      // Create date object adjusted for user's timezone
       const entryDate = new Date(entry.created_at);
       const hour = entryDate.getHours();
       const dayOfWeek = entryDate.getDay();

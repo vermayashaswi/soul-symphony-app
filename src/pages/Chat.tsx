@@ -9,6 +9,7 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import { ConversationStateManager } from '@/utils/chat/conversationStateManager';
 import { extractConversationInsights } from '@/utils/chat/messageProcessor';
 import { ChatMessage } from '@/types/chat';
+import { debugTimezoneInfo } from '@/utils/chat/dateUtils';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -16,6 +17,12 @@ const Chat = () => {
   const { toast } = useToast();
   const { translate, currentLanguage } = useTranslation();
   const [isInitialized, setIsInitialized] = useState(false);
+
+  // Debug timezone information on load
+  useEffect(() => {
+    console.log("Chat component mounted, debugging timezone info:");
+    debugTimezoneInfo();
+  }, []);
 
   // Pre-translate common chat-related strings more comprehensively 
   useEffect(() => {

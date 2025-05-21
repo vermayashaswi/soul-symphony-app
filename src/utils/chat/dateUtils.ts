@@ -1,3 +1,4 @@
+
 import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
 
 /**
@@ -16,7 +17,7 @@ export function calculateRelativeDateRange(
   const offsetMs = timezoneOffset * 60 * 1000;
   
   // Use provided reference date or get current date in user's timezone
-  const now = referenceDate ? new Date(referenceDate) : new Date(Date.now() - offsetMs);
+  const now = referenceDate ? new Date(referenceDate) : new Date();
   let startDate: Date;
   let endDate: Date;
   let periodName = timePeriod;
@@ -143,10 +144,19 @@ export function calculateRelativeDateRange(
     periodName = 'last 30 days';
   }
 
-  // Add back the timezone offset to convert to UTC for storage
-  // We need to explicitly create new Date objects to avoid modifying the originals
-  const utcStartDate = new Date(startDate.getTime() + offsetMs);
-  const utcEndDate = new Date(endDate.getTime() + offsetMs);
+  // Format the dates as ISO strings without adjusting for timezone offset
+  // This ensures we get proper UTC dates for database queries
+  const utcStartDate = startDate;
+  const utcEndDate = endDate;
+  
+  // Additional debug logging to help diagnose timezone issues
+  console.log("Date calculation debug info:");
+  console.log(`Current time: ${new Date().toISOString()}`);
+  console.log(`Input timezone offset: ${timezoneOffset} minutes`);
+  console.log(`Start date (local): ${startDate.toString()}`);
+  console.log(`End date (local): ${endDate.toString()}`);
+  console.log(`Start date (UTC): ${utcStartDate.toISOString()}`);
+  console.log(`End date (UTC): ${utcEndDate.toISOString()}`);
   
   // Validate the date range
   if (utcEndDate < utcStartDate) {
@@ -155,8 +165,8 @@ export function calculateRelativeDateRange(
     const fallbackStart = startOfDay(subDays(now, 7));
     const fallbackEnd = endOfDay(now);
     return {
-      startDate: new Date(fallbackStart.getTime() + offsetMs).toISOString(),
-      endDate: new Date(fallbackEnd.getTime() + offsetMs).toISOString(),
+      startDate: fallbackStart.toISOString(),
+      endDate: fallbackEnd.toISOString(),
       periodName: 'last 7 days (fallback)'
     };
   }
@@ -269,4 +279,41 @@ export function isRelativeTimeQuery(query: string): boolean {
   }
   
   return false;
+}
+
+/**
+ * Get the user's current timezone offset
+ * @returns User's timezone offset in minutes
+ */
+export function getUserTimezoneOffset(): number {
+  return new Date().getTimezoneOffset();
+}
+
+/**
+ * Get the user's timezone name if available
+ * @returns User's timezone name or undefined
+ */
+export function getUserTimezoneName(): string | undefined {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (e) {
+    console.error("Unable to get user timezone name:", e);
+    return undefined;
+  }
+}
+
+/**
+ * Debug helper to log timezone information
+ */
+export function debugTimezoneInfo(): void {
+  const offset = getUserTimezoneOffset();
+  const timezoneName = getUserTimezoneName();
+  const now = new Date();
+  
+  console.log("Timezone Debug Information:");
+  console.log(`Current date (local): ${now.toString()}`);
+  console.log(`Current date (ISO): ${now.toISOString()}`);
+  console.log(`Timezone offset: ${offset} minutes`);
+  console.log(`Timezone name: ${timezoneName || "unknown"}`);
+  console.log(`Local time: ${now.toLocaleTimeString()}`);
 }
