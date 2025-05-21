@@ -4,11 +4,17 @@ import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
+import { useScrollRestoration, forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const HomePage = () => {
   // Restore scroll position on navigation
   useScrollRestoration();
+  
+  // Force enable scrolling for website pages
+  React.useEffect(() => {
+    console.log('HomePage: Forcing scroll enabling for website');
+    forceEnableScrolling();
+  }, []);
 
   const openAppStore = () => {
     const isIOS = /iPad|iPhone|iPod/.test(navigator.userAgent);

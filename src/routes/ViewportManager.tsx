@@ -6,6 +6,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
 import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const ViewportManager: React.FC = () => {
   const location = useLocation();
@@ -42,6 +43,15 @@ const ViewportManager: React.FC = () => {
       !user || 
       (location.pathname === '/app' && !onboardingComplete)
   });
+  
+  // Ensure proper scrolling behavior on route changes
+  useEffect(() => {
+    // Force enable scrolling on website routes
+    if (isWebsiteRoute(location.pathname)) {
+      console.log('ViewportManager: Website route detected, ensuring scrolling is enabled');
+      forceEnableScrolling();
+    }
+  }, [location.pathname]);
   
   // If we're at /app and the user is logged in, redirect to /app/home
   if (isAppRootWithUser && onboardingComplete) {

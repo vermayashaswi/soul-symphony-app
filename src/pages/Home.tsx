@@ -5,9 +5,12 @@ import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
+import { useScrollRestoration } from '@/hooks/use-scroll-restoration';
 
 const Home = () => {
   const { isActive, currentStep, steps, navigationState } = useTutorial();
+  // Restore scroll position
+  useScrollRestoration();
   
   // Check if we're in specific tutorial steps
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
@@ -21,7 +24,7 @@ const Home = () => {
       navigationInProgress: navigationState.inProgress
     });
     
-    // Prevent scrolling when tutorial is active
+    // Prevent scrolling ONLY when tutorial is active
     if (isActive) {
       document.body.style.overflow = 'hidden';
     }
@@ -36,15 +39,18 @@ const Home = () => {
     <div 
       className="min-h-screen bg-background text-foreground relative overflow-hidden"
       style={{ 
-        touchAction: 'none',
-        overflow: 'hidden',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100%',
-        height: '100%'
+        // Only apply fixed positioning when tutorial is active
+        ...(isActive ? {
+          touchAction: 'none',
+          overflow: 'hidden',
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          width: '100%',
+          height: '100%'
+        } : {})
       }}
     >
       {/* Background elements including animations */}

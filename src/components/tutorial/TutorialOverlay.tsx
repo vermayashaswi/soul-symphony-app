@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -43,9 +44,11 @@ const TutorialOverlay: React.FC = () => {
       currentStep,
       currentStepId: steps[currentStep]?.id,
       navigationState,
-      shouldShowTutorial
+      shouldShowTutorial,
+      pathname: location.pathname,
+      isAppRoute: isAppRouteCurrent
     });
-  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial]);
+  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent]);
   
   // Enhanced scrolling prevention with data attribute for current step
   useEffect(() => {
@@ -107,14 +110,39 @@ const TutorialOverlay: React.FC = () => {
     
     // Clean up when tutorial is deactivated
     return () => {
+      console.log('Cleaning up tutorial styles');
+      
+      // Enhanced cleanup for body element
       document.body.classList.remove('tutorial-active');
       document.body.style.overflow = '';
       document.body.style.touchAction = '';
+      document.body.style.position = '';
+      document.body.style.width = '';
+      document.body.style.height = '';
       document.body.removeAttribute('data-current-step');
       
       // Restore scroll position
       window.scrollTo(0, scrollPos);
       console.log('Tutorial inactive, restored page scrolling');
+      
+      // Thorough cleanup of tutorial target elements
+      const tutorialElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, .chat-question-highlight');
+      tutorialElements.forEach(el => {
+        if (el instanceof HTMLElement) {
+          // Remove classes
+          el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab', 'chat-question-highlight');
+          
+          // Reset inline styles
+          el.style.boxShadow = '';
+          el.style.animation = '';
+          el.style.border = '';
+          el.style.transform = '';
+          el.style.zIndex = '';
+          el.style.position = '';
+          el.style.visibility = '';
+          el.style.opacity = '';
+        }
+      });
       
       // Small delay to ensure chat interface re-renders properly
       setTimeout(() => {
