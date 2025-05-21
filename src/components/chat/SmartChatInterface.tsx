@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -34,6 +35,7 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
+import { SmartChatInterfaceProps } from "@/types/chat-interfaces";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -45,11 +47,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-export interface SmartChatInterfaceProps {
-  mentalHealthInsights?: MentalHealthInsights;
-}
-
-const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthInsights }) => {
+const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
+  mentalHealthInsights,
+  timezoneOffset,
+  timezone
+}) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
