@@ -1,3 +1,4 @@
+
 import React, { useState } from "react";
 import { Separator } from "@/components/ui/separator";
 import { useIsMobile } from "@/hooks/use-mobile";
@@ -17,10 +18,9 @@ interface ChatMessageProps {
     content: string;
     analysis?: any;
     references?: any[];
-    totalEntriesAnalyzed?: number; // Add support for totalEntriesAnalyzed
     diagnostics?: any;
     hasNumericResult?: boolean;
-    ambiguityInfo?: any;
+    ambiguityInfo?: any; // Add support for ambiguity info
   };
   showAnalysis: boolean;
 }
@@ -37,10 +37,6 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
   const hasAmbiguityInfo = message.role === 'assistant' && message.ambiguityInfo && message.ambiguityInfo.needsClarification;
-  
-  // Determine how many entries were actually analyzed
-  const totalEntriesAnalyzed = message.totalEntriesAnalyzed || (message.references?.length || 0);
-  const displayedEntries = Math.min(message.references?.length || 0, isMobile ? 2 : 3);
   
   return (
     <motion.div 
@@ -164,7 +160,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
             >
               <FileText className="h-3 w-3 md:h-4 md:w-4 mr-1" />
               <TranslatableText 
-                text={`Based on analyzing ${totalEntriesAnalyzed} journal ${totalEntriesAnalyzed === 1 ? 'entry' : 'entries'} (showing ${displayedEntries} sample${displayedEntries > 1 ? 's' : ''})`}
+                text={`${message.references.length} journal entries`}
                 forceTranslate={true}
               />
               {showReferences ? (
@@ -197,7 +193,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message, showAnalysis 
                   {message.references.length > (isMobile ? 2 : 3) && (
                     <div className="text-xs text-muted-foreground">
                       <TranslatableText 
-                        text={`+${totalEntriesAnalyzed - displayedEntries} more entries analyzed`}
+                        text={`+${message.references.length - (isMobile ? 2 : 3)} more entries`}
                         forceTranslate={true}
                       />
                     </div>

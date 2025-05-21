@@ -1,6 +1,7 @@
+
 // This file contains functions to analyze the type of query a user is asking
 
-export type QueryTypes = {
+type QueryTypes = {
   isEmotionFocused: boolean;
   isQuantitative: boolean;
   isWhyQuestion: boolean;
@@ -13,170 +14,23 @@ export type QueryTypes = {
   isSpecificQuery: boolean;
   isThemeFocused: boolean;
   requiresTimeAnalysis: boolean;
-  isRatingRequest: boolean;
-  isPersonalInsightQuery: boolean;  // New field for personal insight queries
-  isMentalHealthQuery: boolean;     // New field for mental health queries
-  isStatisticalQuery: boolean;      // Added missing property
+  isRatingRequest: boolean;  // New field to track rating requests
   emotion?: string;
   theme?: string;
   timeRange: {
     startDate: string | null;
     endDate: string | null;
     periodName: string;
-    duration: number;
   };
   startDate?: string;
   endDate?: string;
 };
 
 /**
- * Calculate relative date range based on time expression
- * @param timeExpression Time-related phrase from user query
- * @returns Object containing start date, end date, period name, and duration in days
- */
-export function calculateRelativeDateRange(timeExpression: string): { 
-  startDate: string; 
-  endDate: string; 
-  periodName: string;
-  duration: number;
-} {
-  const now = new Date();
-  let startDate = new Date();
-  let periodName = '';
-  let duration = 0;
-
-  // Default to current date
-  let endDate = new Date(now);
-  endDate.setHours(23, 59, 59, 999);
-  
-  // Convert to lowercase for easier matching
-  const lowercased = timeExpression.toLowerCase();
-  
-  // Process time expressions
-  if (lowercased.includes('today')) {
-    startDate = new Date(now);
-    startDate.setHours(0, 0, 0, 0);
-    periodName = 'today';
-    duration = 1;
-  }
-  else if (lowercased.includes('yesterday')) {
-    startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - 1);
-    startDate.setHours(0, 0, 0, 0);
-    
-    endDate = new Date(startDate);
-    endDate.setHours(23, 59, 59, 999);
-    
-    periodName = 'yesterday';
-    duration = 1;
-  }
-  else if (lowercased.match(/last\s+(\d+)\s+days?/)) {
-    const matches = lowercased.match(/last\s+(\d+)\s+days?/);
-    const days = parseInt(matches![1], 10);
-    
-    startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - days);
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = `last ${days} days`;
-    duration = days;
-  }
-  else if (lowercased.includes('last week') || lowercased.includes('past week')) {
-    startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - 7);
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = 'last week';
-    duration = 7;
-  }
-  else if (lowercased.includes('this week')) {
-    // Start of current week (Sunday or Monday, depending on locale)
-    startDate = new Date(now);
-    const day = startDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
-    const diff = startDate.getDate() - day + (day === 0 ? -6 : 1); // Adjust to Monday of current week
-    
-    startDate = new Date(startDate.setDate(diff));
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = 'this week';
-    duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  }
-  else if (lowercased.includes('last month') || lowercased.includes('past month')) {
-    startDate = new Date(now);
-    startDate.setMonth(startDate.getMonth() - 1);
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = 'last month';
-    duration = 30;
-  }
-  else if (lowercased.includes('this month')) {
-    startDate = new Date(now);
-    startDate.setDate(1); // First day of current month
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = 'this month';
-    duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  }
-  else if (lowercased.includes('last year') || lowercased.includes('past year')) {
-    startDate = new Date(now);
-    startDate.setFullYear(startDate.getFullYear() - 1);
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = 'last year';
-    duration = 365;
-  }
-  else if (lowercased.includes('this year')) {
-    startDate = new Date(now.getFullYear(), 0, 1); // January 1st of current year
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = 'this year';
-    duration = Math.ceil((endDate.getTime() - startDate.getTime()) / (1000 * 60 * 60 * 24));
-  }
-  else if (lowercased.match(/past\s+(\d+)\s+months?/)) {
-    const matches = lowercased.match(/past\s+(\d+)\s+months?/);
-    const months = parseInt(matches![1], 10);
-    
-    startDate = new Date(now);
-    startDate.setMonth(startDate.getMonth() - months);
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = `past ${months} months`;
-    duration = months * 30; // approximation
-  }
-  else if (lowercased.match(/past\s+(\d+)\s+weeks?/)) {
-    const matches = lowercased.match(/past\s+(\d+)\s+weeks?/);
-    const weeks = parseInt(matches![1], 10);
-    
-    startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - (weeks * 7));
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = `past ${weeks} weeks`;
-    duration = weeks * 7;
-  }
-  else {
-    // Default to last 30 days if no specific time period is detected
-    startDate = new Date(now);
-    startDate.setDate(startDate.getDate() - 30);
-    startDate.setHours(0, 0, 0, 0);
-    
-    periodName = 'recent';
-    duration = 30;
-  }
-
-  return {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    periodName,
-    duration
-  };
-}
-
-/**
  * Analyzes the user's query to determine what type of processing it needs
  */
-export function analyzeQueryTypes(message: string): QueryTypes {
-  const lowerQuery = message.toLowerCase();
+export function analyzeQueryTypes(query: string): QueryTypes {
+  const lowerQuery = query.toLowerCase();
   
   // Initialize result with default values
   const result: QueryTypes = {
@@ -192,15 +46,11 @@ export function analyzeQueryTypes(message: string): QueryTypes {
     isSpecificQuery: false,
     isThemeFocused: false,
     requiresTimeAnalysis: false,
-    isRatingRequest: false,
-    isPersonalInsightQuery: false,
-    isMentalHealthQuery: false,
-    isStatisticalQuery: false, // Initialize the new property
+    isRatingRequest: false,  // Initialize the new field
     timeRange: {
       startDate: null,
       endDate: null,
-      periodName: "recently",
-      duration: 0
+      periodName: "recently"
     }
   };
   
@@ -232,45 +82,14 @@ export function analyzeQueryTypes(message: string): QueryTypes {
                          lowerQuery.includes('top') ||
                          /\d+/.test(lowerQuery); // Contains numbers
                          
-  // Detect if this is a rating request                    
+  // Detect if this is a rating request - NEW check                     
   result.isRatingRequest = /\brate\b|\bscore\b|\bevaluate\b|\bassess\b|\banalyze\b|\breview\b|\brank\b/i.test(lowerQuery);
   
   // If this is a rating request, ensure we flag it as needing data aggregation
   if (result.isRatingRequest) {
     result.needsDataAggregation = true;
   }
-
-  // NEW: Detect personal insight questions about self-identity, personality, or traits
-  const personalInsightPatterns = [
-    /\bam i\b|\bdo i\b|\bhow am i\b|\bwhat am i\b/i,  // "Am I an introvert?", "Do I like people?"
-    /\bhave i been\b|\bhave i felt\b/i,                // "Have I been anxious lately?"
-    /\bmy personality\b|\bmy traits\b|\bmy character\b/i, // "What are my personality traits?"
-    /\bdoes my\b|\bhow does my\b/i,                    // "How does my anxiety affect me?"
-    /\bhow (do|would|did|should) i\b/i,                // "How do I handle stress?"
-    /\bwhat (do|should) i\b/i,                         // "What should I do?"
-    /\bi tend to\b|\bi usually\b|\bi often\b|\bi normally\b/i // "Do I tend to overthink?"
-  ];
   
-  result.isPersonalInsightQuery = personalInsightPatterns.some(pattern => pattern.test(lowerQuery));
-
-  // NEW: Detect mental health-related queries
-  const mentalHealthTerms = [
-    'mental health', 'wellbeing', 'well-being', 'wellness', 'self-care',
-    'anxiety', 'depression', 'stress', 'burnout', 'trauma',
-    'therapy', 'coping', 'healing', 'mindfulness', 'meditation',
-    'overwhelm', 'sleep', 'insomnia', 'rest', 'mood',
-    'overthinking', 'worry', 'rumination', 'mental state'
-  ];
-
-  result.isMentalHealthQuery = mentalHealthTerms.some(term => lowerQuery.includes(term));
-  
-  // If the query mentions the user specifically (I, me, my) and mental health,
-  // it's very likely a personal mental health question requiring journal analysis
-  if (result.isMentalHealthQuery && /\b(i|me|my|myself)\b/i.test(lowerQuery)) {
-    result.isPersonalInsightQuery = true;
-    result.needsMoreContext = true;
-  }
-
   // Enhanced theme detection
   // First check for explicit theme words
   const themeWords = [
@@ -376,8 +195,7 @@ export function analyzeQueryTypes(message: string): QueryTypes {
   
   // Detect if we need to aggregate data from multiple entries
   result.needsDataAggregation = result.isQuantitative || 
-                               result.isRatingRequest ||
-                               result.isPersonalInsightQuery ||  // Personal insight usually needs data aggregation
+                               result.isRatingRequest ||  // Add this check
                                lowerQuery.includes('pattern') ||
                                lowerQuery.includes('usually') ||
                                lowerQuery.includes('typically') ||
@@ -393,7 +211,7 @@ export function analyzeQueryTypes(message: string): QueryTypes {
 /**
  * Extracts time range from query text
  */
-function extractTimeRange(query: string): { startDate: string | null, endDate: string | null, periodName: string, duration: number } {
+function extractTimeRange(query: string): { startDate: string | null, endDate: string | null, periodName: string } {
   const now = new Date();
   const year = now.getFullYear();
   const month = now.getMonth();
@@ -402,7 +220,6 @@ function extractTimeRange(query: string): { startDate: string | null, endDate: s
   let startDate: Date | null = null;
   let endDate: Date | null = null;
   let periodName = "recently";
-  let duration = 30; // Default duration in days
   
   const lowerQuery = query.toLowerCase();
   
@@ -571,18 +388,12 @@ function extractTimeRange(query: string): { startDate: string | null, endDate: s
     return index;
   }
   
-  // Calculate duration between startDate and endDate
-  if (startDate && endDate) {
-    const timeDiff = endDate.getTime() - startDate.getTime();
-    duration = Math.ceil(timeDiff / (1000 * 60 * 60 * 24));
-  }
-  
-  console.log(`Time range extracted: ${startDate?.toISOString()} to ${endDate?.toISOString()} (${periodName}), duration: ${duration} days`);
+  console.log(`Time range extracted: ${startDate?.toISOString()} to ${endDate?.toISOString()} (${periodName})`);
   
   return {
     startDate: startDate ? startDate.toISOString() : null,
     endDate: endDate ? endDate.toISOString() : null,
-    periodName,
-    duration
+    periodName
   };
 }
+

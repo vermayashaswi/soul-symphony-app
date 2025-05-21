@@ -4,19 +4,21 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReactMarkdown from "react-markdown";
-import { XIcon, InfoIcon } from "lucide-react";
+import { XIcon, InfoIcon, AlertCircleIcon } from "lucide-react";
 import ReferencesDisplay from "./ReferencesDisplay";
 import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import AnalyticsDisplay from "./AnalyticsDisplay";
 import EmotionRadarChart from "./EmotionRadarChart";
 import { ChatMessage } from "@/types/chat";
+import { Alert, AlertDescription } from "@/components/ui/alert";
 
 interface ChatAreaProps {
   chatMessages: ChatMessage[];
   isLoading?: boolean;
   processingStage?: string;
   threadId?: string | null;
+  error?: string | null;
   onInteractiveOptionClick?: (option: any) => void;
 }
 
@@ -25,13 +27,14 @@ const ChatArea: React.FC<ChatAreaProps> = ({
   isLoading, 
   processingStage,
   threadId,
+  error,
   onInteractiveOptionClick
 }) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
-  }, [chatMessages, isLoading]);
+  }, [chatMessages, isLoading, error]);
 
   // Enhanced logging to ensure context is being passed properly
   useEffect(() => {
@@ -133,6 +136,18 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           </div>
         </div>
       ))}
+
+      {/* Display error message if present */}
+      {error && (
+        <div className="mb-4">
+          <Alert variant="destructive">
+            <AlertCircleIcon className="h-4 w-4" />
+            <AlertDescription>
+              {error}
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
 
       {isLoading && (
         <div className="flex justify-start mb-4">

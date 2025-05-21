@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { supabase } from '@/integrations/supabase/client';
 import { ChatMessage } from '@/types/chat';
@@ -9,6 +10,7 @@ export interface ChatRealtimeState {
   isProcessing: boolean;
   processingStage: string | null;
   processingStatus: ThreadProcessingStatus;
+  error: string | null;
 }
 
 export function useChatRealtime(threadId: string | null) {
@@ -16,7 +18,8 @@ export function useChatRealtime(threadId: string | null) {
     isLoading: false,
     isProcessing: false,
     processingStage: null,
-    processingStatus: 'idle'
+    processingStatus: 'idle',
+    error: null
   });
 
   useEffect(() => {
@@ -25,6 +28,11 @@ export function useChatRealtime(threadId: string | null) {
     // First, check the current processing status of the thread
     const fetchThreadStatus = async () => {
       try {
+        setRealtimeState(prev => ({
+          ...prev,
+          isLoading: true
+        }));
+        
         const { data: threadData, error } = await supabase
           .from('chat_threads')
           .select('processing_status')
@@ -33,6 +41,11 @@ export function useChatRealtime(threadId: string | null) {
           
         if (error) {
           console.error("Error fetching thread status:", error);
+          setRealtimeState(prev => ({
+            ...prev,
+            isLoading: false,
+            error: `Error fetching thread status: ${error.message}`
+          }));
           return;
         }
         
@@ -41,13 +54,24 @@ export function useChatRealtime(threadId: string | null) {
           
           setRealtimeState(prev => ({
             ...prev,
+            isLoading: false,
             isProcessing: processingStatus === 'processing',
             processingStatus: processingStatus,
             processingStage: processingStatus === 'processing' ? 'Retrieving information...' : null
           }));
+        } else {
+          setRealtimeState(prev => ({
+            ...prev,
+            isLoading: false
+          }));
         }
       } catch (error) {
         console.error("Error in fetchThreadStatus:", error);
+        setRealtimeState(prev => ({
+          ...prev,
+          isLoading: false,
+          error: `Unexpected error: ${error instanceof Error ? error.message : String(error)}`
+        }));
       }
     };
     
@@ -74,7 +98,10 @@ export function useChatRealtime(threadId: string | null) {
             // Keep the current processing stage if we're still processing
             processingStage: processingStatus === 'processing' 
               ? prev.processingStage || 'Retrieving information...'
-              : null
+              : processingStatus === 'failed'
+                ? 'An error occurred while processing your request.'
+                : null,
+            error: processingStatus === 'failed' ? 'Processing failed' : null
           }));
         }
       )
@@ -97,7 +124,16 @@ export function useChatRealtime(threadId: string | null) {
             setRealtimeState(prev => ({
               ...prev,
               isProcessing: false,
-              processingStage: null
+              processingStage: null,
+              error: null // Clear any errors when we get a successful response
+            }));
+          } else if (messageData.sender === 'error' || messageData.role === 'error') {
+            // Handle error messages
+            setRealtimeState(prev => ({
+              ...prev,
+              isProcessing: false,
+              processingStage: null,
+              error: messageData.content || 'An error occurred'
             }));
           }
         }
@@ -118,8 +154,17 @@ export function useChatRealtime(threadId: string | null) {
     }));
   };
 
+  // Clear any errors
+  const clearError = () => {
+    setRealtimeState(prev => ({
+      ...prev,
+      error: null
+    }));
+  };
+
   return {
     ...realtimeState,
-    updateProcessingStage
+    updateProcessingStage,
+    clearError
   };
 }

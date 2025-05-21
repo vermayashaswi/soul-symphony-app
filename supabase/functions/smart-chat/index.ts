@@ -19,44 +19,14 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Maximum number of previous messages to include for context - increased for better context
-const MAX_CONTEXT_MESSAGES = 15;
+// Maximum number of previous messages to include for context
+const MAX_CONTEXT_MESSAGES = 10;
 
-// Mental health and wellbeing term dictionary for domain recognition
-const MENTAL_HEALTH_TERMS = [
-  // Emotional states
-  'anxiety', 'anxious', 'depression', 'depressed', 'stress', 'stressed',
-  'mood', 'emotion', 'feeling', 'mental health', 'wellbeing', 'well-being',
-  'therapy', 'therapist', 'counseling', 'psychiatrist', 'psychologist',
-  // Common concerns
-  'sleep', 'insomnia', 'tired', 'exhaustion', 'burnout', 'overwhelm', 
-  'overthinking', 'ruminating', 'worry', 'worrying', 'trauma',
-  // Self-improvement
-  'self-care', 'self care', 'mindfulness', 'meditation', 'breathing',
-  'coping', 'cope', 'healing', 'recovery', 'growth', 'improve',
-  // Relationships
-  'relationship', 'friendship', 'family', 'partner', 'work-life',
-  'balance', 'boundaries', 'communication',
-  // Actions and requests
-  'help me', 'advice', 'suggestion', 'recommend', 'strategy', 'technique',
-  'improve', 'better', 'healthier', 'calm', 'relax', 'peace'
-];
+// Define the general question prompt
+const GENERAL_QUESTION_PROMPT = `You are a mental health assistant of a voice journaling app called "SOuLO". Here's a query from a user. Respond like a chatbot. IF it concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond accordingly. If it contains any other abstract question like "Who is the president of India" , "What is quantum physics" or anything that doesn't concern the app's purpose, feel free to deny politely.`;
 
-// Define the general question prompt with enhanced mental health awareness and consultant persona
-const GENERAL_QUESTION_PROMPT = `You are a mental health consultant of a voice journaling app called "SOuLO". 
-
-Respond in a warm, empathetic tone like a skilled human consultant who's helping the user reflect on their mental health journey. Look at our conversation history to understand what we've been discussing and maintain continuity in our conversation.
-
-IF the query concerns introductory messages or greetings, respond accordingly. If it concerns general curiosity questions related to mental health, journaling or related things, respond with helpful information based on professional expertise.
-
-If it contains any abstract question unrelated to mental health or journaling, politely redirect the conversation back to topics relevant to the user's wellbeing and journaling practice.
-
-For mental health related questions that don't specifically mention the user's personal journal entries, provide helpful general guidance based on established therapeutic approaches, but suggest that for personalized insights, you could analyze their journal entries if they'd like.
-
-Always maintain the conversational flow and refer back to previous exchanges when relevant.`;
-
-// Define the journal-specific prompt with enhanced mental health focus and consultant persona
-const JOURNAL_SPECIFIC_PROMPT = `You are SOuLO — an expert mental health consultant who specializes in analyzing voice journal entries to help users reflect, find patterns, and grow emotionally. Use the journal entries below to inform your response. Do not invent or infer beyond what's explicitly stated in these entries.
+// Define the journal-specific prompt with new format
+const JOURNAL_SPECIFIC_PROMPT = `You are SOuLO — a voice journaling assistant that helps users reflect, find patterns, and grow emotionally. Use only the journal entries below to inform your response. Do not invent or infer beyond them.
 
 Journal excerpts:
 {journalData}
@@ -64,48 +34,15 @@ Journal excerpts:
 
 User's question: "{userMessage}"
 
-Previous conversation context (if any):
-{conversationHistory}
+Guidelines:
+1. **Only use facts** from journal entries — no assumptions, no hallucinations.
+2. **Tone**: Supportive, clear, and emotionally aware. Avoid generic advice.
+3. **Data-grounded**: Back insights with bullet points referencing specific dates/events.
+4. **Insightful & Brief**: Spot emotional patterns or changes over time.
+5. **Structure**: Use bullets, bold headers, and short sections for easy reading.
+6. **When data is insufficient**, say so clearly and gently suggest journaling directions.
 
-Guidelines as a consultant:
-1. **Evidence-based insights**: Ground all observations in specific journal entries. No assumptions or generalizations.
-2. **Consultant tone**: Speak as a warm, empathetic human consultant - not as AI or a chatbot. Be conversational yet professional.
-3. **Data-grounded**: Back insights with specific examples from the journal entries, referencing dates when helpful.
-4. **Insightful analysis**: Identify emotional patterns, recurring themes, or meaningful changes over time.
-5. **Clear structure**: Use a conversational format with occasional bullet points or bold text for key insights.
-6. **Conversation continuity**: Reference our previous exchanges when relevant to maintain a flowing conversation.
-7. **When data is insufficient**: Acknowledge limitations honestly and suggest what additional journaling might reveal.
-
-Keep your response conversational, personalized, and structured as a professional mental health consultant would.`;
-
-/**
- * Detect if a message is likely a mental health query requiring journal data
- */
-function detectMentalHealthQuery(message: string): boolean {
-  const lowerMessage = message.toLowerCase();
-  
-  // Check for personal indicators combined with mental health terms
-  const hasPersonalIndicators = /\b(i|me|my|mine|myself|we|our|us)\b/i.test(lowerMessage);
-  
-  // Check if any mental health term appears in the query
-  const hasMentalHealthTerms = MENTAL_HEALTH_TERMS.some(term => 
-    lowerMessage.includes(term.toLowerCase())
-  );
-  
-  // Check for direct requests for help or advice
-  const isHelpRequest = /\b(help|advice|suggest|recommend|improve|better)\b/i.test(lowerMessage);
-  
-  // Check for questions about feelings or emotional states
-  const isEmotionalQuery = /\b(feel|feeling|felt|emotion|mood|happy|sad|angry|anxious)\b/i.test(lowerMessage);
-  
-  // If it contains personal indicators AND mental health terms OR emotional content, classify as mental_health
-  if ((hasPersonalIndicators && (hasMentalHealthTerms || isEmotionalQuery)) || 
-      (isHelpRequest && (hasMentalHealthTerms || isEmotionalQuery))) {
-    return true;
-  }
-  
-  return false;
-}
+Keep response concise (max ~150 words), personalized, and well-structured.`;
 
 // New function for query planning
 async function planQuery(query) {
@@ -435,7 +372,7 @@ serve(async (req) => {
     }
     
     // Normal chat processing flow
-    const { message, userId, timeRange, threadId, queryPlan } = reqBody;
+    const { message, userId, timeRange, threadId } = reqBody;
 
     if (!message) {
       throw new Error('Message is required');
@@ -447,15 +384,6 @@ serve(async (req) => {
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
     console.log("Time range received:", timeRange);
-    console.log("Query plan received:", queryPlan ? JSON.stringify(queryPlan, null, 2) : "No query plan provided");
-    
-    // Determine if this is a mental health query requiring personalized analysis
-    const isMentalHealthQuery = (queryPlan?.domainContext === 'mental_health') || 
-                               detectMentalHealthQuery(message);
-    
-    if (isMentalHealthQuery) {
-      console.log("Detected mental health query, forcing journal-specific processing");
-    }
     
     // Send an immediate response with processing status for long-running requests
     if (reqBody.acknowledgeRequest) {
@@ -475,8 +403,8 @@ serve(async (req) => {
     }
     
     // Fetch previous messages from this thread if a threadId is provided
-    let conversationContext = reqBody.conversationContext || [];
-    if (threadId && conversationContext.length === 0) {
+    let conversationContext = [];
+    if (threadId) {
       try {
         console.log(`Retrieving context from thread ${threadId}`);
         const { data: previousMessages, error } = await supabase
@@ -513,68 +441,47 @@ serve(async (req) => {
       }
     }
     
-    // Get local timezone offset for better time-based queries
-    const timezoneOffset = reqBody.timezoneOffset || new Date().getTimezoneOffset();
-    console.log(`Local timezone offset: ${timezoneOffset} minutes`);
-    
-    // Check if a query plan was provided
-    if (queryPlan) {
-      console.log(`Using provided query plan: ${JSON.stringify(queryPlan, null, 2)}`);
-    }
-    
     // NEW: First categorize if this is a general question or a journal-specific question
-    // unless this is a detected mental health query (always set to JOURNAL_SPECIFIC)
-    let questionType = isMentalHealthQuery ? "JOURNAL_SPECIFIC" : null;
-    
-    // Only categorize if we haven't already determined it's a mental health query
-    if (!questionType) {
-      console.log("Categorizing question type");
-      const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Authorization': `Bearer ${apiKey}`,
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          model: 'gpt-3.5-turbo',
-          messages: [
-            {
-              role: 'system',
-              content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
-              Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
-              
-              IMPORTANT GUIDELINE: If the query is related to personal mental health, well-being, emotional states, or self-improvement and could benefit from analyzing personal journal data, classify it as "JOURNAL_SPECIFIC" even if it doesn't explicitly mention journals.
-              
-              Examples:
-              - "How are you doing?" -> "GENERAL"
-              - "What is journaling?" -> "GENERAL"
-              - "Who is the president of India?" -> "GENERAL"
-              - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
-              - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
-              - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-              - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
-              - "How can I improve my mental health?" -> "JOURNAL_SPECIFIC"
-              - "Why do I feel anxious sometimes?" -> "JOURNAL_SPECIFIC"
-              - "What helps me sleep better?" -> "JOURNAL_SPECIFIC"
-              - "How can I manage stress?" -> "JOURNAL_SPECIFIC"`
-            },
-            { role: 'user', content: message }
-          ],
-          temperature: 0.1,
-          max_tokens: 10
-        }),
-      });
+    console.log("Categorizing question type");
+    const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-3.5-turbo',
+        messages: [
+          {
+            role: 'system',
+            content: `You are a classifier that determines if a user's query is a general question about mental health, greetings, or an abstract question unrelated to journaling (respond with "GENERAL") OR if it's a question seeking insights from the user's journal entries (respond with "JOURNAL_SPECIFIC"). 
+            Respond with ONLY "GENERAL" or "JOURNAL_SPECIFIC".
+            
+            Examples:
+            - "How are you doing?" -> "GENERAL"
+            - "What is journaling?" -> "GENERAL"
+            - "Who is the president of India?" -> "GENERAL"
+            - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
+            - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
+            - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
+            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
+          },
+          { role: 'user', content: message }
+        ],
+        temperature: 0.1,
+        max_tokens: 10
+      }),
+    });
 
-      if (!categorizationResponse.ok) {
-        const error = await categorizationResponse.text();
-        console.error('Failed to categorize question:', error);
-        throw new Error('Failed to categorize question');
-      }
-
-      const categorization = await categorizationResponse.json();
-      questionType = categorization.choices[0]?.message?.content.trim();
-      console.log(`Question categorized as: ${questionType}`);
+    if (!categorizationResponse.ok) {
+      const error = await categorizationResponse.text();
+      console.error('Failed to categorize question:', error);
+      throw new Error('Failed to categorize question');
     }
+
+    const categorization = await categorizationResponse.json();
+    const questionType = categorization.choices[0]?.message?.content.trim();
+    console.log(`Question categorized as: ${questionType}`);
 
     // If it's a general question, respond directly without journal entry retrieval
     if (questionType === "GENERAL") {
@@ -614,9 +521,9 @@ serve(async (req) => {
     
     // If it's a journal-specific question, continue with the enhanced RAG flow
     // 1. Plan the query into sub-queries if needed
-    console.log("Processing as journal-specific question");
-    const subQueries = queryPlan?.subqueries || [message];
-    console.log(`Using ${subQueries.length} sub-queries:`, subQueries);
+    console.log("Planning query into sub-queries");
+    const subQueries = await planQuery(message);
+    console.log(`Generated ${subQueries.length} sub-queries:`, subQueries);
     
     // If only one sub-query that matches the original query, use standard processing
     if (subQueries.length === 1 && subQueries[0] === message) {
@@ -653,7 +560,7 @@ serve(async (req) => {
       // 3. Search for relevant entries with proper temporal filtering
       console.log("Searching for relevant entries");
       
-      // Always analyze all entries unless specific time range is provided
+      // Use different search function based on whether we have a time range
       let entries = [];
       if (timeRange && (timeRange.startDate || timeRange.endDate)) {
         console.log(`Using time-filtered search with range: ${JSON.stringify(timeRange)}`);
@@ -672,70 +579,19 @@ serve(async (req) => {
         // Return a friendly message indicating no entries were found
         return new Response(
           JSON.stringify({ 
-            data: "I don't see any journal entries for the time period you're asking about. Perhaps we could look at your entries from a broader time range?",
+            data: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
             noEntriesForTimeRange: true
           }),
           { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
         );
       }
 
-      // Get ALL entries for the user to ensure we have comprehensive data
-      // This ensures we're analyzing all entries, not just the ones that match the vector search
-      let allEntries = entries;
-      if (!timeRange || (!timeRange.startDate && !timeRange.endDate)) {
-        try {
-          console.log("Fetching all journal entries for comprehensive analysis");
-          const { data: allUserEntries, error } = await supabase
-            .from('journal_entries')
-            .select('id, content, created_at, sentiment, entities')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false });
-            
-          if (error) {
-            console.error("Error fetching all entries:", error);
-          } else if (allUserEntries && allUserEntries.length > 0) {
-            console.log(`Found ${allUserEntries.length} total entries for the user`);
-            
-            // If we have more total entries than what our vector search found,
-            // use the full set for comprehensive analysis but keep the vector search results
-            // for specific reference
-            if (allUserEntries.length > entries.length) {
-              // Keep original entries for reference, but note the total count
-              console.log(`Using all ${allUserEntries.length} entries for comprehensive analysis`);
-              
-              // Add similarity scores to entries that matched the vector search
-              const entriesWithSimilarity = new Map();
-              entries.forEach(entry => {
-                entriesWithSimilarity.set(entry.id, entry.similarity);
-              });
-              
-              // Add similarity property to all entries (0 for non-matched entries)
-              allEntries = allUserEntries.map(entry => ({
-                ...entry,
-                similarity: entriesWithSimilarity.has(entry.id) ? entriesWithSimilarity.get(entry.id) : 0
-              }));
-            }
-          }
-        } catch (error) {
-          console.error("Error fetching all entries:", error);
-        }
-      }
-      
-      console.log(`Using ${allEntries.length} total entries for analysis`);
-      
-      // Track the total number of entries analyzed
-      const totalEntriesAnalyzed = allEntries.length;
-
       // Get earliest and latest entry dates
       let earliestDate = null;
       let latestDate = null;
       
-      // Sort entries by similarity for the prompt (most relevant first)
-      const relevantEntries = [...entries].sort((a, b) => b.similarity - a.similarity).slice(0, 15);
-      console.log(`Using ${relevantEntries.length} most relevant entries for the prompt`);
-      
       // Format entries for the prompt with dates
-      const entriesWithDates = relevantEntries.map(entry => {
+      const entriesWithDates = entries.map(entry => {
         const entryDate = new Date(entry.created_at);
         
         // Track earliest and latest dates
@@ -784,14 +640,17 @@ serve(async (req) => {
         return `- Entry from ${formattedDate}: ${entry.content}${entityInfo}${sentimentInfo}`;
       }).join('\n\n');
 
-      // Format conversation history for the prompt
-      let conversationHistoryText = "";
-      if (conversationContext.length > 0) {
-        conversationHistoryText = conversationContext.map(msg => 
-          `${msg.role === 'user' ? 'User' : 'Consultant'}: ${msg.content}`
-        ).join('\n\n');
-      }
-
+      // Get all the dates of entries as an array
+      const entryDates = entries.map(entry => {
+        return new Date(entry.created_at).toLocaleDateString('en-US', {
+          month: 'short',
+          day: 'numeric',
+          year: 'numeric'
+        });
+      });
+      
+      console.log("Available journal entry dates:", JSON.stringify(entryDates, null, 2));
+      
       // Format date range for the prompt
       const startDateFormatted = earliestDate ? earliestDate.toLocaleDateString('en-US', {
         month: 'long',
@@ -804,19 +663,41 @@ serve(async (req) => {
         day: 'numeric',
         year: 'numeric'
       }) : 'unknown date';
+      
+      const entryDateRange = `Your journal entries span from ${startDateFormatted} to ${endDateFormatted}.`;
+      console.log("Entry date range:", entryDateRange);
 
       // 4. Prepare prompt with updated instructions
       const promptFormatted = JOURNAL_SPECIFIC_PROMPT
         .replace('{journalData}', entriesWithDates)
         .replace('{userMessage}', message)
         .replace('{startDate}', startDateFormatted)
-        .replace('{endDate}', endDateFormatted)
-        .replace('{conversationHistory}', conversationHistoryText);
+        .replace('{endDate}', endDateFormatted);
         
       // 5. Call OpenAI
       console.log("Calling OpenAI for completion");
       
-      // Call OpenAI with system prompt only - conversation history is included in the prompt
+      // Prepare the messages array with system prompt and conversation context
+      const messages = [];
+      
+      // Add system prompt
+      messages.push({ role: 'system', content: promptFormatted });
+      
+      // Add conversation context if available
+      if (conversationContext.length > 0) {
+        // Log that we're using conversation context
+        console.log(`Including ${conversationContext.length} messages of conversation context`);
+        
+        // Add the conversation context messages
+        messages.push(...conversationContext);
+        
+        // Add the current user message
+        messages.push({ role: 'user', content: message });
+      } else {
+        // If no context, just use the system prompt
+        console.log("No conversation context available, using only system prompt");
+      }
+      
       const completionResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
@@ -825,10 +706,7 @@ serve(async (req) => {
         },
         body: JSON.stringify({
           model: 'gpt-3.5-turbo',
-          messages: [
-            { role: 'system', content: promptFormatted },
-            { role: 'user', content: message }
-          ],
+          messages: conversationContext.length > 0 ? messages : [{ role: 'system', content: promptFormatted }],
         }),
       });
 
@@ -841,6 +719,19 @@ serve(async (req) => {
       const completionData = await completionResponse.json();
       const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
       console.log("Response generated successfully");
+
+      // Validate response for hallucinated dates
+      const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
+      console.log("Response generated successfully");
+      
+      // Check for hallucinated dates in the response
+      const containsHallucinatedDates = checkForHallucinatedDates(responseContent, entries);
+      if (containsHallucinatedDates) {
+        console.warn("WARNING: Response contains potentially hallucinated dates!");
+        // In a production system, you might want to regenerate or post-process the response
+      } else {
+        console.log("No hallucinated dates detected in response");
+      }
 
       // Save the sub-queries even for standard processing (where there's only one)
       if (threadId) {
@@ -864,21 +755,11 @@ serve(async (req) => {
         }
       }
 
-      // Create reference objects for ALL entries but mark only the top ones as most relevant
-      const referenceEntries = allEntries.map(entry => ({
-        id: entry.id,
-        date: entry.created_at,
-        snippet: entry.content?.substring(0, 150) + (entry.content?.length > 150 ? "..." : ""),
-        similarity: entry.similarity || 0
-      }));
-
-      // Return the response with the total count of entries analyzed
+      // Return the response
       return new Response(
         JSON.stringify({ 
           data: responseContent,
-          processingComplete: true,
-          totalEntriesAnalyzed: totalEntriesAnalyzed, // Add the total count
-          references: referenceEntries
+          processingComplete: true 
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
       );
@@ -949,32 +830,7 @@ serve(async (req) => {
         }
       }
       
-      // Create a more consultant-like prompt for synthesizing responses
-      const consultantSynthesisPrompt = `You are an expert journaling consultant helping users reflect on their emotional and mental well-being.
-
-The user asked:
-"${message}"
-
-Previous conversation context:
-${conversationContext.map(msg => `${msg.role === 'user' ? 'User' : 'Consultant'}: ${msg.content}`).join('\n\n')}
-
-We have analyzed this using multiple sub-queries, and here are their results:
-${subQueryResponses.map((sqr, index) => {
-  return `Sub-query ${index + 1}: "${sqr.query}"\nResults: ${sqr.response}\n`;
-}).join('\n')}
-
-Your task is to:
-1. Synthesize the information from all sub-query outputs into a single, clear response
-2. Speak as a warm, empathetic human consultant - not as AI or a chatbot
-3. Fully address the user's original question, referencing patterns or insights from their journal
-4. Combine both quantitative analysis and qualitative interpretation 
-5. Be empathetic and supportive in tone, maintaining a conversational style
-6. Reference previous parts of our conversation when relevant
-7. Present meaningful takeaways or reflections tailored to the user
-
-Be conversational, supportive, and emotionally intelligent as a human mental health consultant would be.`;
-      
-      // Synthesize the responses with the consultant prompt
+      // Synthesize the responses
       const synthesizedResponse = await synthesizeResponses(message, subQueries, subQueryResponses);
       
       // Collect references from all sub-queries
@@ -991,7 +847,6 @@ Be conversational, supportive, and emotionally intelligent as a human mental hea
         JSON.stringify({ 
           data: synthesizedResponse,
           processingComplete: true,
-          totalEntriesAnalyzed: allReferences.length, // Add the total count
           references: allReferences.length > 0 ? allReferences : undefined
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
