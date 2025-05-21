@@ -17,9 +17,13 @@ export interface ChatThread {
 
 // Sub-query response type definition
 export interface SubQueryResponse {
-  query: string;
-  response: string;
+  success?: boolean;
+  message?: string;
+  query?: string;
+  response?: string;
   references?: any[];
+  subQueries?: string[];
+  subResponses?: string[];
 }
 
 // Chat message type definition
@@ -42,3 +46,16 @@ export interface ChatMessage {
   diagnostics?: any;
   is_processing?: boolean;
 }
+
+// Time analysis type definition
+export interface TimeAnalysis {
+  totalEntries: number;
+  peakHours: Array<{hour: number, label: string, count: number}>;
+  timePeriods: {
+    morning: number;
+    afternoon: number;
+    evening: number;
+    night: number;
+  };
+}
+

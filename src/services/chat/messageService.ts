@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { ChatMessage, ChatThread, SubQueryResponse, TimeAnalysis } from './types';
@@ -190,7 +189,6 @@ export async function processComplexQuery(
     // If the query couldn't be segmented, treat it as a single query
     if (!data || !data.segments || data.segments.length === 0) {
       return {
-        success: false,
         message: "Could not process complex query"
       };
     }
@@ -228,8 +226,9 @@ export async function processComplexQuery(
     if (combineError) throw combineError;
     
     return {
-      success: true,
       message: combinedData.response,
+      query: query,
+      response: combinedData.response,
       subQueries: segments,
       subResponses: responses.map(r => r.response),
     };
@@ -237,7 +236,6 @@ export async function processComplexQuery(
   } catch (error) {
     console.error("Error processing complex query:", error);
     return {
-      success: false,
       message: "Error processing your complex question. Please try asking one question at a time."
     };
   }
@@ -249,5 +247,98 @@ async function processMessageForSegment(message: string, userId: string, threadI
   return "Segment response placeholder";
 }
 
+// Basic CRUD functions for chat threads and messages
+export async function getUserChatThreads(userId: string): Promise<ChatThread[]> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .select('*')
+      .eq('user_id', userId)
+      .order('updated_at', { ascending: false });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching user chat threads:', error);
+    return [];
+  }
+}
+
+export async function getThreadMessages(threadId: string): Promise<ChatMessage[]> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .select('*')
+      .eq('thread_id', threadId)
+      .order('created_at', { ascending: true });
+      
+    if (error) throw error;
+    return data || [];
+  } catch (error) {
+    console.error('Error fetching thread messages:', error);
+    return [];
+  }
+}
+
+export async function saveMessage(message: ChatMessage): Promise<ChatMessage> {
+  try {
+    const { data, error } = await supabase
+      .from('chat_messages')
+      .insert(message)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error saving message:', error);
+    throw error;
+  }
+}
+
+export async function createThread(userId: string, title: string = 'New Conversation'): Promise<ChatThread> {
+  try {
+    const threadId = uuidv4();
+    const thread: ChatThread = {
+      id: threadId,
+      user_id: userId,
+      title,
+      created_at: new Date().toISOString(),
+      updated_at: new Date().toISOString()
+    };
+    
+    const { data, error } = await supabase
+      .from('chat_threads')
+      .insert(thread)
+      .select()
+      .single();
+      
+    if (error) throw error;
+    return data;
+  } catch (error) {
+    console.error('Error creating thread:', error);
+    throw error;
+  }
+}
+
+export async function updateThreadTitle(threadId: string, title: string): Promise<void> {
+  try {
+    const { error } = await supabase
+      .from('chat_threads')
+      .update({ title, updated_at: new Date().toISOString() })
+      .eq('id', threadId);
+      
+    if (error) throw error;
+  } catch (error) {
+    console.error('Error updating thread title:', error);
+    throw error;
+  }
+}
+
 // Re-export the existing function
 export * from './types';
+
+// Add timezone utility function
+export function getUserTimezoneOffset(): number {
+  return new Date().getTimezoneOffset();
+}

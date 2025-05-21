@@ -15,6 +15,7 @@ export interface ConversationState {
   previousState?: ConversationState | null; // Previous state for tracking changes
   previousQuery?: string | null;     // Previous query text for context
   lastUpdateTime?: string;           // Timestamp of last state update
+  messageBuffer?: string[];          // Store recent messages for context
 }
 
 export type IntentType = 
