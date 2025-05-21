@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useEffect } from 'react';
 import { Outlet, useLocation, Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useIsMobile } from '@/hooks/use-mobile';
@@ -30,10 +30,14 @@ const ViewportManager: React.FC = () => {
   // Explicit check for app root path with authenticated user - needs special handling
   const isAppRootWithUser = location.pathname === '/app' && !!user;
   
+  // Is this the home page where scrolling should be disabled?
+  const isHomePage = location.pathname === '/app/home' || location.pathname === '/app';
+  
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
     isAppRoute: isAppRoute(location.pathname),
     isWebsiteRoute: isWebsiteRoute(location.pathname),
+    isHomePage,
     user: !!user,
     isOnboardingOrAuth,
     onboardingComplete,
@@ -46,12 +50,36 @@ const ViewportManager: React.FC = () => {
   
   // Ensure proper scrolling behavior on route changes
   useEffect(() => {
-    // Force enable scrolling on website routes
-    if (isWebsiteRoute(location.pathname)) {
-      console.log('ViewportManager: Website route detected, ensuring scrolling is enabled');
+    // Force enable scrolling on website routes and non-home app routes
+    if (isWebsiteRoute(location.pathname) || (isAppRoute(location.pathname) && !isHomePage)) {
+      console.log('ViewportManager: Non-home route detected, ensuring scrolling is enabled');
       forceEnableScrolling();
     }
-  }, [location.pathname]);
+    
+    // Disable scrolling on home page
+    if (isHomePage) {
+      console.log('ViewportManager: Home page detected, disabling scrolling');
+      document.body.style.overflow = 'hidden';
+      document.body.style.position = 'fixed';
+      document.body.style.width = '100%';
+      document.body.style.height = '100%';
+      document.body.style.top = '0';
+      document.body.style.left = '0';
+    }
+    
+    // Cleanup when unmounting
+    return () => {
+      if (isHomePage) {
+        // Only restore these if we're navigating away from home
+        document.body.style.overflow = '';
+        document.body.style.position = '';
+        document.body.style.width = '';
+        document.body.style.height = '';
+        document.body.style.top = '';
+        document.body.style.left = '';
+      }
+    };
+  }, [location.pathname, isHomePage]);
   
   // If we're at /app and the user is logged in, redirect to /app/home
   if (isAppRootWithUser && onboardingComplete) {
@@ -62,7 +90,7 @@ const ViewportManager: React.FC = () => {
   // Render the appropriate layout based on route and device
   return (
     <>
-      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} overflow-x-hidden`}>
+      <div className={`app-container ${isMobile ? 'mobile-view' : 'desktop-view'} ${isHomePage ? 'overflow-hidden' : 'overflow-x-hidden'}`}>
         <Outlet />
       </div>
       

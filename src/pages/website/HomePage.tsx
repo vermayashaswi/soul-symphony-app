@@ -1,19 +1,23 @@
-
-import React from 'react';
+import React, { useEffect } from 'react';
 import Navbar from '@/components/website/Navbar';
 import Footer from '@/components/website/Footer';
 import HeroSection from '@/components/website/sections/HeroSection';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useScrollRestoration, forceEnableScrolling } from '@/hooks/use-scroll-restoration';
+import { forceEnableScrolling } from '@/hooks/use-scroll-restoration';
 
 const HomePage = () => {
-  // Restore scroll position on navigation
-  useScrollRestoration();
-  
   // Force enable scrolling for website pages
   React.useEffect(() => {
     console.log('HomePage: Forcing scroll enabling for website');
     forceEnableScrolling();
+    
+    // Explicitly ensure scrolling is enabled for website
+    document.body.style.overflow = '';
+    document.body.style.position = '';
+    document.body.style.width = '';
+    document.body.style.height = '';
+    document.body.style.top = '';
+    document.body.style.left = '';
   }, []);
 
   const openAppStore = () => {
