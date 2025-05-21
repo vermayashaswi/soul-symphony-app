@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
 import { corsHeaders } from '../_shared/cors.ts';
@@ -45,6 +46,8 @@ function detectTimeSummaryQuery(message) {
   // Check if the query contains both a summary pattern and a time pattern
   const hasSummaryPattern = summaryPatterns.some(pattern => lowerMessage.includes(pattern));
   const hasTimePattern = timePatterns.some(pattern => lowerMessage.includes(pattern));
+  
+  console.log(`Time summary detection - Has summary pattern: ${hasSummaryPattern}, Has time pattern: ${hasTimePattern}`);
   
   return hasSummaryPattern && hasTimePattern;
 }
@@ -126,10 +129,27 @@ serve(async (req) => {
       console.error("Error during domain classification:", error);
     }
     
+    // Get journal entry count for accurate information in the prompt
+    let entryCount = 0;
+    try {
+      const { count, error } = await supabase
+        .from('Journal Entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
+        
+      if (!error && count !== null) {
+        entryCount = count;
+        console.log(`User ${userId} has ${entryCount} total journal entries available`);
+      }
+    } catch (error) {
+      console.error("Error fetching journal entry count:", error);
+    }
+    
     // Include isTimeSummaryQuery in the prompt
     let promptAddition = "";
     if (isTimeSummaryQuery) {
       promptAddition += `\nThis appears to be a time-based summary query where the user wants a concise overview of a period.`;
+      promptAddition += `\nThe user has ${entryCount} journal entries available for analysis.`;
     }
 
     // Set temperature based on follow-up status

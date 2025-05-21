@@ -354,8 +354,8 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
     let systemPrompt = "";
     
     if (isTimeSummary) {
-      // Special prompt for time-based summary queries
-      systemPrompt = `You are a helpful personal assistant that summarizes journal entries over time periods. You have access to the following journal entries:
+      // Special prompt for time-based summary queries - dynamically include the entry count
+      systemPrompt = `You are a helpful personal assistant that summarizes journal entries over time periods. You have access to the following ${relevantEntries.length} journal entries:
 
 ${journalContext}
 
@@ -375,7 +375,7 @@ RESPONSE GUIDELINES:
 The user is asking for a summary of their journal entries over a time period. Provide a concise, insightful overview without excessive detail.`;
     } else {
       // Standard prompt for other journal queries
-      systemPrompt = `You are a helpful personal assistant that helps users reflect on and analyze their journal entries. You have access to the following journal entries from the user:
+      systemPrompt = `You are a helpful personal assistant that helps users reflect on and analyze their journal entries. You have access to the following ${relevantEntries.length} journal entries from the user:
 
 ${journalContext}
 
@@ -398,6 +398,8 @@ Stay factual and only make conclusions that are directly supported by the journa
       // Don't add conversation history here since we've included it in the system prompt
       { role: "user", content: message }
     ];
+    
+    console.log(`Sending request to OpenAI with ${relevantEntries.length} journal entries in context`);
     
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       headers: {

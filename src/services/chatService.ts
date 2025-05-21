@@ -39,8 +39,13 @@ export async function processChatMessage(
         duration: 0
       };
       
+      // Show processing state to user
+      console.log(`Starting time pattern analysis for user ${userId} over ${timeRange.periodName}`);
+      
       // Analyze time patterns in journal entries
       const timePatternResults = await analyzeTimePatterns(userId, timeRange);
+      
+      console.log(`Time pattern analysis complete, found: ${timePatternResults.entryCount} entries`);
       
       if (!timePatternResults.hasEntries) {
         return {
@@ -56,8 +61,8 @@ export async function processChatMessage(
       const { timeDistribution } = timePatternResults;
       const timeOfDayPreference = getTimeOfDayPreference(timeDistribution);
       
-      // Clearly indicate how many entries were analyzed
-      response += `Based on analyzing all ${timePatternResults.entryCount} of your journal entries, `;
+      // Clearly indicate how many entries were analyzed - using the ACTUAL count from the analysis
+      response += `Based on analyzing ${timePatternResults.entryCount} of your journal entries${timeRange.periodName !== "all time" ? ` from ${timeRange.periodName}` : ""}, `;
       
       if (timeOfDayPreference) {
         response += `you typically prefer journaling during the ${timeOfDayPreference.period} (${timeOfDayPreference.percentage}% of your entries). `;
