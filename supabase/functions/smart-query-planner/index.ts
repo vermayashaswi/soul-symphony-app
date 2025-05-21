@@ -145,6 +145,50 @@ serve(async (req) => {
       console.error("Error fetching journal entry count:", error);
     }
     
+    // Check for entries in the specified time range if a date range was detected
+    if (dateRange && dateRange.startDate && dateRange.endDate) {
+      try {
+        const { count: rangeCount, error: rangeError } = await supabase
+          .from('Journal Entries')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('created_at', dateRange.startDate)
+          .lte('created_at', dateRange.endDate);
+          
+        if (!rangeError && rangeCount !== null) {
+          console.log(`User ${userId} has ${rangeCount} journal entries in ${dateRange.periodName} (${dateRange.startDate} to ${dateRange.endDate})`);
+          
+          // If no entries in this time range, we can indicate that in the response
+          if (rangeCount === 0) {
+            console.log(`No entries found in the specified time range - serving early response`);
+            return new Response(
+              JSON.stringify({
+                queryPlan: {
+                  strategy: "none",
+                  filters: {
+                    date_range: dateRange,
+                    emotions: null,
+                    themes: null
+                  },
+                  isTimePatternQuery: true,
+                  needsDataAggregation: false,
+                  domainContext: domainContext || null,
+                  isTimeSummaryQuery: true,
+                  hasEntriesInRange: false
+                },
+                rawPlan: "No entries found in the specified time range."
+              }),
+              {
+                headers: { ...corsHeaders, "Content-Type": "application/json" },
+              }
+            );
+          }
+        }
+      } catch (error) {
+        console.error("Error checking for entries in date range:", error);
+      }
+    }
+    
     // Include isTimeSummaryQuery in the prompt
     let promptAddition = "";
     if (isTimeSummaryQuery) {
@@ -219,6 +263,16 @@ Return a JSON object with the following structure:
     // Include isTimeSummaryQuery in the response
     if (planObject && !planObject.plan.isTimeSummaryQuery) {
       planObject.plan.isTimeSummaryQuery = isTimeSummaryQuery;
+    }
+    
+    // Add the date range information explicitly if we have it
+    if (dateRange && planObject && planObject.plan && planObject.plan.filters) {
+      planObject.plan.filters.date_range = dateRange;
+    }
+    
+    // Add entry count information to the plan
+    if (planObject && planObject.plan) {
+      planObject.plan.totalEntryCount = entryCount;
     }
 
     console.log("Parsed Query Plan:", planObject);
