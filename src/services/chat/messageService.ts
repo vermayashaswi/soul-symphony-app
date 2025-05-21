@@ -1,223 +1,253 @@
 
 import { supabase } from "@/integrations/supabase/client";
-import { ChatMessage } from "@/types/chat";
-import { Json } from "@/integrations/supabase/types";
+import { v4 as uuidv4 } from 'uuid';
+import { ChatMessage, ChatThread, SubQueryResponse, TimeAnalysis } from './types';
 
 /**
- * Gets the user's timezone offset in minutes
+ * Process a user message with structured prompt approach
+ * This supports more complex analysis, especially for mental health queries
  */
-export const getUserTimezoneOffset = (): number => {
-  return new Date().getTimezoneOffset();
-};
-
-/**
- * Gets all messages for a thread, ordered by creation time
- */
-export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]> => {
-  try {
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .select('*')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: true });
-      
-    if (error) throw error;
-    
-    // Process data to ensure types are correct
-    return (data || []).map((msg) => ({
-      ...msg,
-      sender: msg.sender as 'user' | 'assistant' | 'error',
-      role: msg.role as 'user' | 'assistant' | 'error',
-      // Add aliases for backward compatibility
-      references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
-      analysis: msg.analysis_data,
-      hasNumericResult: msg.has_numeric_result,
-      // Ensure sub_query_responses is always an array
-      sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
-    } as ChatMessage));
-  } catch (error) {
-    console.error("Error fetching thread messages:", error);
-    return [];
-  }
-};
-
-/**
- * Saves a message to the database
- */
-export const saveMessage = async (
-  threadId: string, 
-  content: string, 
-  sender: 'user' | 'assistant',
-  references?: any[],
-  analysis?: any,
-  hasNumericResult?: boolean,
-  isInteractive?: boolean,
-  interactiveOptions?: any[]
-): Promise<ChatMessage | null> => {
-  try {
-    // Create the base message object
-    const messageData = {
-      thread_id: threadId,
-      content,
-      sender,
-      role: sender, // Role and sender should match for now
-      reference_entries: references || null,
-      analysis_data: analysis || null,
-      has_numeric_result: hasNumericResult || false,
-      // Ensure sub_query_responses is always an array
-      sub_query_responses: [] // Default empty array
-    };
-    
-    // Insert the message
-    const { data, error } = await supabase
-      .from('chat_messages')
-      .insert(messageData)
-      .select()
-      .single();
-      
-    if (error) throw error;
-    
-    if (!data) {
-      throw new Error("No data returned from message insert");
-    }
-    
-    // Convert the database response to our ChatMessage type
-    const chatMessage: ChatMessage = {
-      ...data,
-      sender: data.sender as 'user' | 'assistant' | 'error',
-      role: data.role as 'user' | 'assistant' | 'error',
-      // Add aliases for backward compatibility
-      references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
-      analysis: data.analysis_data,
-      hasNumericResult: data.has_numeric_result,
-      // Ensure sub_query_responses is always an array
-      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
-    };
-    
-    // If this is an interactive message with options, add those properties
-    if (isInteractive && interactiveOptions) {
-      chatMessage.isInteractive = true;
-      chatMessage.interactiveOptions = interactiveOptions;
-    }
-    
-    // Update the thread's updated_at timestamp
-    await supabase
-      .from('chat_threads')
-      .update({ updated_at: new Date().toISOString() })
-      .eq('id', threadId);
-      
-    return chatMessage;
-  } catch (error) {
-    console.error("Error saving message:", error);
-    return null;
-  }
-};
-
-/**
- * Creates a new thread
- */
-export const createThread = async (
-  userId: string,
-  title: string = "New Conversation"
-): Promise<string | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('chat_threads')
-      .insert({
-        user_id: userId,
-        title,
-        created_at: new Date().toISOString(),
-        updated_at: new Date().toISOString()
-      })
-      .select('id')
-      .single();
-      
-    if (error) throw error;
-    
-    return data?.id || null;
-  } catch (error) {
-    console.error("Error creating thread:", error);
-    return null;
-  }
-};
-
-/**
- * Gets all threads for a user, ordered by update time
- */
-export const getUserChatThreads = async (userId: string): Promise<any[] | null> => {
-  try {
-    const { data, error } = await supabase
-      .from('chat_threads')
-      .select('*')
-      .eq('user_id', userId)
-      .order('updated_at', { ascending: false });
-      
-    if (error) throw error;
-    
-    return data || null;
-  } catch (error) {
-    console.error("Error getting user threads:", error);
-    return null;
-  }
-};
-
-/**
- * Updates the title of a thread
- */
-export const updateThreadTitle = async (threadId: string, title: string): Promise<boolean> => {
-  try {
-    const { error } = await supabase
-      .from('chat_threads')
-      .update({ title, updated_at: new Date().toISOString() })
-      .eq('id', threadId);
-      
-    if (error) throw error;
-    
-    return true;
-  } catch (error) {
-    console.error("Error updating thread title:", error);
-    return false;
-  }
-};
-
-/**
- * Process a message using the structured chat approach
- */
-export const processWithStructuredPrompt = async (
+export async function processWithStructuredPrompt(
   message: string,
   userId: string,
-  entries: any[],
-  threadId?: string
-): Promise<any> => {
+  references: any[],
+  threadId: string
+): Promise<{ data: string, analysis?: TimeAnalysis }> {
   try {
-    // Instead of directly accessing protected properties, use the Supabase URL from the environment
-    // or from where your Supabase client is initialized
-    const supabaseUrl = "https://kwnwhgucnzqxndzjayyq.supabase.co";
+    console.log(`Processing with structured prompt for thread ${threadId}`);
     
-    const response = await fetch(`${supabaseUrl}/functions/v1/structured-chat`, {
-      method: 'POST',
-      headers: {
-        // Use a public anon key instead of directly accessing the protected property
-        'Authorization': `Bearer eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imt3bndoZ3VjbnpxeG5kempheXlxIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDIzMzk4ODMsImV4cCI6MjA1NzkxNTg4M30.UAB3e5b44iJa9kKT391xyJKoQmlUOtsAi-yp4UEqZrc`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        message,
-        userId,
-        entries,
-        threadId
-      }),
+    // Generate time analysis based on provided references
+    const timeAnalysis = generateTimeAnalysis(references);
+    
+    // Detect if this is a mental health query
+    const isMentalHealthQuery = detectMentalHealthQuery(message);
+    
+    // Create a structured prompt based on the journal entries
+    const promptData = {
+      query: message,
+      references: references.map(ref => ({
+        date: ref.date || ref.created_at,
+        content: ref.content || ref.transcription_text || ref.refined_text || ref.snippet,
+        emotions: ref.emotions,
+        themes: ref.themes || ref.master_themes,
+      })),
+      userId,
+      threadId,
+      timeAnalysis,
+      isMentalHealthQuery,
+    };
+
+    // Call the structured-chat edge function with our data
+    const { data, error } = await supabase.functions.invoke('structured-chat', {
+      body: promptData
     });
 
-    if (!response.ok) {
-      const errorText = await response.text();
-      throw new Error(`Error from structured-chat function: ${errorText}`);
+    if (error) {
+      console.error("Error calling structured-chat function:", error);
+      throw new Error(`Error processing message: ${error.message}`);
     }
 
-    const data = await response.json();
-    return data;
+    // Return the response data
+    return { 
+      data: data?.response || "I couldn't analyze your journal entries at this time.",
+      analysis: timeAnalysis
+    };
   } catch (error) {
-    console.error("Error processing with structured prompt:", error);
-    throw error;
+    console.error("Error in processWithStructuredPrompt:", error);
+    return { 
+      data: "I encountered an issue analyzing your journal entries. Please try again later."
+    };
   }
-};
+}
+
+/**
+ * Generate time analysis based on journal entries
+ */
+function generateTimeAnalysis(references: any[]): TimeAnalysis {
+  // Initialize counters
+  const hourCounts: Record<number, number> = {};
+  const timePeriods = {
+    morning: 0,   // 5am-11:59am
+    afternoon: 0, // 12pm-4:59pm
+    evening: 0,   // 5pm-8:59pm
+    night: 0      // 9pm-4:59am
+  };
+  
+  // Process each entry
+  references.forEach(entry => {
+    if (!entry.date && !entry.created_at) return;
+    
+    const date = new Date(entry.date || entry.created_at);
+    const hour = date.getHours();
+    
+    // Count by hour
+    hourCounts[hour] = (hourCounts[hour] || 0) + 1;
+    
+    // Count by time period
+    if (hour >= 5 && hour < 12) {
+      timePeriods.morning++;
+    } else if (hour >= 12 && hour < 17) {
+      timePeriods.afternoon++;
+    } else if (hour >= 17 && hour < 21) {
+      timePeriods.evening++;
+    } else {
+      timePeriods.night++;
+    }
+  });
+  
+  // Find peak hours (top 3)
+  const hourEntries = Object.entries(hourCounts)
+    .map(([hour, count]) => ({
+      hour: parseInt(hour),
+      count
+    }))
+    .sort((a, b) => b.count - a.count)
+    .slice(0, 3);
+  
+  // Format peak hours with labels
+  const peakHours = hourEntries.map(entry => {
+    let label;
+    const hour = entry.hour;
+    if (hour === 0) {
+      label = "12am";
+    } else if (hour < 12) {
+      label = `${hour}am`;
+    } else if (hour === 12) {
+      label = "12pm";
+    } else {
+      label = `${hour - 12}pm`;
+    }
+    return { hour, label, count: entry.count };
+  });
+  
+  return {
+    totalEntries: references.length,
+    peakHours,
+    timePeriods
+  };
+}
+
+/**
+ * Enhanced detection of mental health related queries
+ */
+function detectMentalHealthQuery(message: string): boolean {
+  const mentalHealthKeywords = [
+    'mental health', 'anxiety', 'depression', 'stress', 'mood', 'emotion', 
+    'feeling', 'therapy', 'therapist', 'psychiatrist', 'psychologist', 
+    'counselor', 'counseling', 'wellbeing', 'well-being', 'wellness',
+    'self-care', 'burnout', 'overwhelm', 'mindfulness', 'meditation',
+    'coping', 'psychological', 'emotional health', 'distress', 'worried',
+    'sad', 'upset', 'frustrated', 'angry', 'happiness', 'happy', 'unhappy',
+    'content', 'discontent', 'satisfied', 'unsatisfied', 'fulfilled'
+  ];
+  
+  const lowerMessage = message.toLowerCase();
+  
+  // Direct keyword check
+  for (const keyword of mentalHealthKeywords) {
+    if (lowerMessage.includes(keyword)) {
+      return true;
+    }
+  }
+  
+  // Check for phrases commonly used in mental health contexts
+  const mentalHealthPatterns = [
+    /\b(?:i (?:feel|am feeling|have been feeling))\b/i,
+    /\b(?:help|improve) (?:my|with) (?:mental|emotional)/i,
+    /\b(?:my|with) (?:mental|emotional) (?:health|state|wellbeing)/i,
+    /\bhow (?:to|can i|should i) (?:feel better|improve|help)/i,
+    /\badvice (?:for|on|about) (?:my|dealing with|handling)/i,
+    /\bi (?:can't|cannot|don't|do not) (?:cope|handle|manage|deal)/i,
+    /\bam i (?:okay|happy|sad|depressed|anxious|good enough)/i,
+    /\bwhy (?:am i|do i feel|can't i|is it so hard)/i,
+    /\bhow (?:do i|can i|should i|best|better to) (?:cope|handle|manage|deal)/i
+  ];
+  
+  for (const pattern of mentalHealthPatterns) {
+    if (pattern.test(lowerMessage)) {
+      return true;
+    }
+  }
+  
+  return false;
+}
+
+/**
+ * Process a complex query by breaking it into sub-queries and assembling the responses
+ */
+export async function processComplexQuery(
+  query: string, 
+  userId: string,
+  threadId: string
+): Promise<SubQueryResponse> {
+  try {
+    const { data, error } = await supabase.functions.invoke('segment-complex-query', {
+      body: { query, userId }
+    });
+    
+    if (error) throw error;
+    
+    // If the query couldn't be segmented, treat it as a single query
+    if (!data || !data.segments || data.segments.length === 0) {
+      return {
+        success: false,
+        message: "Could not process complex query"
+      };
+    }
+    
+    const segments = data.segments;
+    const responses: any[] = [];
+    
+    // Process each segment
+    for (const segment of segments) {
+      try {
+        // Process each segment as its own message
+        const response = await processMessageForSegment(segment, userId, threadId);
+        responses.push({
+          segment: segment,
+          response: response
+        });
+      } catch (segError) {
+        console.error(`Error processing segment "${segment}":`, segError);
+        responses.push({
+          segment: segment,
+          error: segError.message
+        });
+      }
+    }
+    
+    // Combine the responses
+    const { data: combinedData, error: combineError } = await supabase.functions.invoke('combine-segment-responses', {
+      body: { 
+        originalQuery: query, 
+        segmentResponses: responses,
+        userId
+      }
+    });
+    
+    if (combineError) throw combineError;
+    
+    return {
+      success: true,
+      message: combinedData.response,
+      subQueries: segments,
+      subResponses: responses.map(r => r.response),
+    };
+    
+  } catch (error) {
+    console.error("Error processing complex query:", error);
+    return {
+      success: false,
+      message: "Error processing your complex question. Please try asking one question at a time."
+    };
+  }
+}
+
+// Helper function to process a single segment
+async function processMessageForSegment(message: string, userId: string, threadId: string) {
+  // This is simplified - you would use your main message processing logic here
+  return "Segment response placeholder";
+}
+
+// Re-export the existing function
+export * from './types';

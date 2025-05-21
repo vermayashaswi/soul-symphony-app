@@ -4,20 +4,12 @@ import { Button } from "@/components/ui/button";
 import { ChevronDown, ChevronUp, ExternalLink } from "lucide-react";
 import { Card } from "@/components/ui/card";
 import { TranslatableText } from "@/components/translation/TranslatableText";
+import { TimeAnalysis } from "@/services/chat";
 
 interface ReferencesDisplayProps {
   references: any[];
   threadId?: string;
-  timeAnalysis?: {
-    totalEntries: number;
-    peakHours: Array<{hour: number, label: string, count: number}>;
-    timePeriods: {
-      morning: number;
-      afternoon: number;
-      evening: number; 
-      night: number;
-    };
-  };
+  timeAnalysis?: TimeAnalysis;
 }
 
 const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({ 
@@ -48,7 +40,18 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
     `from ${earliestDate.toLocaleDateString()} to ${latestDate.toLocaleDateString()}` : 
     '';
 
-  // Format text differently if there are more entries analyzed than shown
+  // Determine if this is likely a mental health related response
+  const hasMentalHealthKeywords = references.some(ref => {
+    if (!ref.emotions) return false;
+    const emotionsList = Array.isArray(ref.emotions) 
+      ? ref.emotions 
+      : (typeof ref.emotions === 'object' ? Object.keys(ref.emotions) : []);
+    
+    const mentalHealthEmotions = ['anxiety', 'stress', 'depression', 'worry', 'fear', 'sadness', 'overwhelm'];
+    return emotionsList.some(e => mentalHealthEmotions.includes(e.toLowerCase()));
+  });
+
+  // Format text differently based on query type and content
   const entryText = totalEntriesAnalyzed === totalReferences 
     ? `Based on ${totalReferences} journal ${totalReferences === 1 ? 'entry' : 'entries'} ${dateRangeText}`
     : `Based on ${totalEntriesAnalyzed} analyzed journal ${totalEntriesAnalyzed === 1 ? 'entry' : 'entries'} (showing ${totalReferences}) ${dateRangeText}`;
@@ -72,7 +75,7 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
       {expanded && (
         <div className="mt-2 space-y-2 border-l-2 border-primary/20 pl-3">
           {timeAnalysis && (
-            <Card className="p-2 text-xs bg-muted/30">
+            <Card className={`p-2 text-xs ${hasMentalHealthKeywords ? 'bg-primary/10' : 'bg-muted/30'}`}>
               <div className="font-medium">Time Pattern Analysis</div>
               <div className="text-muted-foreground">
                 <p>Peak journaling times: {timeAnalysis.peakHours.map(p => p.label).join(', ')}</p>
@@ -99,31 +102,49 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
             </Card>
           )}
           
-          {visibleReferences.map((ref, idx) => (
-            <Card key={idx} className="p-2 text-xs">
-              <div className="font-medium">
-                {ref.date ? new Date(ref.date).toLocaleDateString() : "Unknown date"}
-              </div>
-              <p className="text-muted-foreground">{ref.snippet}</p>
-              {ref.emotions && (
-                <div className="text-xs text-primary-600 mt-1">
-                  Emotions: {Array.isArray(ref.emotions) ? ref.emotions.join(', ') : 
-                    (typeof ref.emotions === 'object' ? 
-                      Object.entries(ref.emotions)
-                        .sort((a, b) => (b[1] as number) - (a[1] as number))
-                        .slice(0, 3)
-                        .map(([emotion, value]) => `${emotion} (${Math.round((value as number) * 100)}%)`)
-                        .join(', ') 
-                      : ref.emotions)}
+          {visibleReferences.map((ref, idx) => {
+            // Determine if this entry contains strong emotions
+            const hasStrongEmotions = ref.emotions && (
+              (Array.isArray(ref.emotions) && ref.emotions.some(e => 
+                ['anger', 'anxiety', 'sadness', 'fear', 'stress', 'depression'].includes(e.toLowerCase())
+              )) || 
+              (typeof ref.emotions === 'object' && Object.entries(ref.emotions)
+                .some(([emotion, value]) => 
+                  ['anger', 'anxiety', 'sadness', 'fear', 'stress', 'depression'].includes(emotion.toLowerCase()) && 
+                  (value as number) > 0.6
+                )
+              )
+            );
+            
+            return (
+              <Card 
+                key={idx} 
+                className={`p-2 text-xs ${hasStrongEmotions ? 'border-primary/40' : ''}`}
+              >
+                <div className="font-medium">
+                  {ref.date ? new Date(ref.date).toLocaleDateString() : "Unknown date"}
                 </div>
-              )}
-              {ref.themes && (
-                <div className="text-xs text-secondary-600 mt-1">
-                  Themes: {Array.isArray(ref.themes) ? ref.themes.join(', ') : ref.themes}
-                </div>
-              )}
-            </Card>
-          ))}
+                <p className="text-muted-foreground">{ref.snippet}</p>
+                {ref.emotions && (
+                  <div className={`text-xs mt-1 ${hasStrongEmotions ? 'text-primary-600 font-medium' : 'text-primary-600'}`}>
+                    Emotions: {Array.isArray(ref.emotions) ? ref.emotions.join(', ') : 
+                      (typeof ref.emotions === 'object' ? 
+                        Object.entries(ref.emotions)
+                          .sort((a, b) => (b[1] as number) - (a[1] as number))
+                          .slice(0, 3)
+                          .map(([emotion, value]) => `${emotion} (${Math.round((value as number) * 100)}%)`)
+                          .join(', ') 
+                        : ref.emotions)}
+                  </div>
+                )}
+                {ref.themes && (
+                  <div className="text-xs text-secondary-600 mt-1">
+                    Themes: {Array.isArray(ref.themes) ? ref.themes.join(', ') : ref.themes}
+                  </div>
+                )}
+              </Card>
+            );
+          })}
           {references.length > visibleReferences.length && !expanded && (
             <div className="text-xs text-muted-foreground">
               <TranslatableText text={`+ ${references.length - visibleReferences.length} more entries`} />
