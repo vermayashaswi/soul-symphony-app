@@ -1,4 +1,3 @@
-
 import React from "react";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
@@ -22,9 +21,10 @@ interface MobileChatMessageProps {
     hasNumericResult?: boolean;
   };
   showAnalysis?: boolean;
+  isLoading?: boolean; // Added the missing isLoading prop
 }
 
-const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false }) => {
+const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false, isLoading = false }) => {
   const [showReferences, setShowReferences] = useState(false);
   const { user } = useAuth();
   
