@@ -6,7 +6,11 @@ import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useTutorial } from "@/contexts/TutorialContext";
 
-const EmptyChatState: React.FC = () => {
+interface EmptyChatStateProps {
+  onStarterPrompt?: (message: string) => void;
+}
+
+const EmptyChatState: React.FC<EmptyChatStateProps> = ({ onStarterPrompt }) => {
   const { isActive, isInStep, tutorialCompleted } = useTutorial();
   const componentMounted = useRef(true);
   
@@ -107,6 +111,13 @@ const EmptyChatState: React.FC = () => {
     }
   }, [tutorialCompleted]);
   
+  // Function to handle clicking on a suggestion
+  const handleSuggestionClick = (content: string) => {
+    if (onStarterPrompt) {
+      onStarterPrompt(content);
+    }
+  };
+  
   return (
     <motion.div
       initial={{ opacity: 0 }}
@@ -151,6 +162,7 @@ const EmptyChatState: React.FC = () => {
           variant="secondary"
           size="sm"
           className={`w-full justify-start px-4 py-3 h-auto ${isInTutorialStep5 ? 'chat-question-highlight empty-chat-suggestion' : ''}`}
+          onClick={() => handleSuggestionClick("How am I feeling today based on my journal entries?")}
         >
           <TranslatableText text="How am I feeling today based on my journal entries?" />
         </Button>
@@ -158,6 +170,7 @@ const EmptyChatState: React.FC = () => {
           variant="secondary"
           size="sm"
           className={`w-full justify-start px-4 py-3 h-auto ${isInTutorialStep5 ? 'chat-question-highlight empty-chat-suggestion' : ''}`}
+          onClick={() => handleSuggestionClick("What emotions have I experienced most frequently?")}
         >
           <TranslatableText text="What emotions have I experienced most frequently?" />
         </Button>
