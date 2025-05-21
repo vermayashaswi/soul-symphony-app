@@ -1,6 +1,7 @@
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { ChatMessage, ChatThread, SubQueryResponse, TimeAnalysis } from './types';
+import { Json } from "@/integrations/supabase/types";
 
 /**
  * Process a user message with structured prompt approach
@@ -257,7 +258,10 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[]> 
       .order('updated_at', { ascending: false });
       
     if (error) throw error;
-    return data || [];
+    return data ? data.map(thread => ({
+      ...thread,
+      processing_status: thread.processing_status as 'idle' | 'processing' | 'failed'
+    })) : [];
   } catch (error) {
     console.error('Error fetching user chat threads:', error);
     return [];
@@ -273,23 +277,61 @@ export async function getThreadMessages(threadId: string): Promise<ChatMessage[]
       .order('created_at', { ascending: true });
       
     if (error) throw error;
-    return data || [];
+    return data ? data.map(msg => ({
+      ...msg,
+      sender: msg.sender as 'user' | 'assistant' | 'error',
+      role: msg.role as 'user' | 'assistant' | 'error'
+    })) : [];
   } catch (error) {
     console.error('Error fetching thread messages:', error);
     return [];
   }
 }
 
-export async function saveMessage(message: ChatMessage): Promise<ChatMessage> {
+export async function saveMessage(
+  threadId: string, 
+  content: string, 
+  sender: 'user' | 'assistant' | 'error',
+  references?: any[] | null, 
+  analysis?: any | null,
+  hasNumericResult?: boolean,
+  isInteractive?: boolean,
+  interactiveOptions?: any[]
+): Promise<ChatMessage | null> {
   try {
+    const messageData: any = {
+      thread_id: threadId,
+      content: content,
+      sender: sender,
+      role: sender,
+      created_at: new Date().toISOString(),
+      reference_entries: references || null,
+      analysis_data: analysis || null,
+      has_numeric_result: hasNumericResult || false,
+      is_processing: false
+    };
+    
     const { data, error } = await supabase
       .from('chat_messages')
-      .insert(message)
+      .insert(messageData)
       .select()
       .single();
       
     if (error) throw error;
-    return data;
+    
+    // Convert the response to our ChatMessage type
+    const chatMessage: ChatMessage = {
+      ...data,
+      sender: data.sender as 'user' | 'assistant' | 'error',
+      role: data.role as 'user' | 'assistant' | 'error',
+      references: data.reference_entries,
+      analysis: data.analysis_data,
+      hasNumericResult: data.has_numeric_result,
+      isInteractive: isInteractive || false,
+      interactiveOptions: interactiveOptions || []
+    };
+    
+    return chatMessage;
   } catch (error) {
     console.error('Error saving message:', error);
     throw error;
@@ -299,12 +341,13 @@ export async function saveMessage(message: ChatMessage): Promise<ChatMessage> {
 export async function createThread(userId: string, title: string = 'New Conversation'): Promise<ChatThread> {
   try {
     const threadId = uuidv4();
-    const thread: ChatThread = {
+    const thread = {
       id: threadId,
       user_id: userId,
       title,
       created_at: new Date().toISOString(),
-      updated_at: new Date().toISOString()
+      updated_at: new Date().toISOString(),
+      processing_status: 'idle' as const
     };
     
     const { data, error } = await supabase
@@ -314,7 +357,11 @@ export async function createThread(userId: string, title: string = 'New Conversa
       .single();
       
     if (error) throw error;
-    return data;
+    
+    return {
+      ...data,
+      processing_status: data.processing_status as 'idle' | 'processing' | 'failed'
+    };
   } catch (error) {
     console.error('Error creating thread:', error);
     throw error;
@@ -335,10 +382,10 @@ export async function updateThreadTitle(threadId: string, title: string): Promis
   }
 }
 
-// Re-export the existing function
-export * from './types';
-
 // Add timezone utility function
 export function getUserTimezoneOffset(): number {
   return new Date().getTimezoneOffset();
 }
+
+// Re-export the existing function
+export * from './types';

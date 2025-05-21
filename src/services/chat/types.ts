@@ -17,7 +17,6 @@ export interface ChatThread {
 
 // Sub-query response type definition
 export interface SubQueryResponse {
-  success?: boolean;
   message?: string;
   query?: string;
   response?: string;
@@ -58,4 +57,3 @@ export interface TimeAnalysis {
     night: number;
   };
 }
-

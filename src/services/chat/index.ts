@@ -2,14 +2,12 @@
 // Re-export all chat service functions for easier imports
 export * from './messageService';
 // Explicitly re-export types to avoid conflicts
-export type { ChatThread, SubQueryResponse, TimeAnalysis } from './types';
+export type { ChatThread, SubQueryResponse } from './types';
 // Export ChatMessage from only one place to avoid conflicts
 export type { ChatMessage as ServiceChatMessage } from './types'; 
 export * from './useChatPersistence';
 
-// Export type aliases for backwards compatibility
-export type { TimeAnalysis };
-
+// Export functions from messageService for backward compatibility
 export { 
   processWithStructuredPrompt,
   getUserChatThreads,

@@ -141,12 +141,14 @@ export function useChatPersistence(userId?: string | null, threadId?: string | n
         .eq('id', threadId);
 
       // Save the message to the database
-      const savedMessage = await saveMessage(message);
+      const savedMessage = await saveMessage(threadId, content, sender);
       
-      // Replace the temporary message with the saved version
-      setMessages(prev => 
-        prev.map(msg => msg.id === message.id ? savedMessage : msg)
-      );
+      if (savedMessage) {
+        // Replace the temporary message with the saved version
+        setMessages(prev => 
+          prev.map(msg => msg.id === message.id ? savedMessage : msg)
+        );
+      }
 
       return savedMessage;
     } catch (err) {
