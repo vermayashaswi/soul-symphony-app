@@ -1,18 +1,16 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { calculateRelativeDateRange, formatDateForUser } from './dateUtils';
+import { calculateRelativeDateRange } from './dateUtils';
 
 /**
  * Analyzes journal entries based on time patterns in a user query
  * @param userId The user ID to fetch journal entries for
  * @param timeRange Optional time range to filter entries
- * @param timezoneOffset User's timezone offset in minutes (from UTC)
  * @returns Analysis of time patterns found in journal entries
  */
 export async function analyzeTimePatterns(
   userId: string,
-  timeRange?: { startDate?: string; endDate?: string; periodName?: string; duration?: number },
-  timezoneOffset: number = new Date().getTimezoneOffset() * -1 // Default to browser's timezone
+  timeRange?: { startDate?: string; endDate?: string; periodName?: string; duration?: number }
 ) {
   if (!userId) {
     console.error("No user ID provided for time pattern analysis");
@@ -64,27 +62,17 @@ export async function analyzeTimePatterns(
     const timeDistribution = analyzeTimeOfDayDistribution(entries);
     
     // Analyze frequency patterns
-    const frequencyPatterns = analyzeJournalingFrequency(entries, timezoneOffset);
-
-    // Format dates in the user's timezone 
-    const firstEntryDate = formatDateForUser(entries[entries.length - 1].created_at, timezoneOffset);
-    const lastEntryDate = formatDateForUser(entries[0].created_at, timezoneOffset);
-    const mostActiveDayFormatted = mostActiveDay.date ? 
-      formatDateForUser(mostActiveDay.date, timezoneOffset) : 
-      "No active day found";
+    const frequencyPatterns = analyzeJournalingFrequency(entries);
 
     return {
       hasEntries: true,
       entryCount: entries.length,
       timeRange: timeRange?.periodName || "all time",
-      mostActiveDay: {
-        date: mostActiveDayFormatted,
-        entryCount: mostActiveDay.entryCount
-      },
+      mostActiveDay,
       timeDistribution,
       frequencyPatterns,
-      firstEntryDate,
-      lastEntryDate
+      firstEntryDate: entries[entries.length - 1].created_at,
+      lastEntryDate: entries[0].created_at
     };
   } catch (error) {
     console.error("Error in time pattern analysis:", error);
@@ -163,10 +151,8 @@ function analyzeTimeOfDayDistribution(entries: any[]) {
 
 /**
  * Analyze journaling frequency patterns
- * @param entries Journal entries to analyze
- * @param timezoneOffset User's timezone offset in minutes
  */
-function analyzeJournalingFrequency(entries: any[], timezoneOffset: number = 0) {
+function analyzeJournalingFrequency(entries: any[]) {
   // Sort entries by date (oldest first)
   const sortedEntries = [...entries].sort((a, b) => 
     new Date(a.created_at).getTime() - new Date(b.created_at).getTime()
@@ -181,28 +167,15 @@ function analyzeJournalingFrequency(entries: any[], timezoneOffset: number = 0) 
     };
   }
   
-  // Calculate days between entries, accounting for timezone
+  // Calculate days between entries
   const daysBetweenEntries: number[] = [];
   let longestStreak = 1;
   let currentStreak = 1;
+  let streakDates: string[] = [new Date(sortedEntries[0].created_at).toISOString().split('T')[0]];
   
-  // Group by local date (adjusted for timezone) to handle date boundaries correctly
-  const entriesByLocalDate = new Map<string, boolean>();
-  
-  sortedEntries.forEach(entry => {
-    const entryDate = new Date(entry.created_at);
-    // Adjust for timezone to get the correct local date
-    const adjustedDate = new Date(entryDate.getTime() + (timezoneOffset * 60 * 1000));
-    const localDateKey = adjustedDate.toISOString().split('T')[0];
-    entriesByLocalDate.set(localDateKey, true);
-  });
-  
-  // Convert to array of dates for streak calculation
-  const localDates = Array.from(entriesByLocalDate.keys()).sort();
-  
-  for (let i = 1; i < localDates.length; i++) {
-    const currentDate = new Date(localDates[i]);
-    const previousDate = new Date(localDates[i-1]);
+  for (let i = 1; i < sortedEntries.length; i++) {
+    const currentDate = new Date(sortedEntries[i].created_at);
+    const previousDate = new Date(sortedEntries[i-1].created_at);
     
     // Calculate days between entries
     const timeDiff = currentDate.getTime() - previousDate.getTime();
@@ -210,13 +183,18 @@ function analyzeJournalingFrequency(entries: any[], timezoneOffset: number = 0) 
     daysBetweenEntries.push(daysDiff);
     
     // Check for consecutive days to track streaks
-    if (daysDiff <= 1) {
-      currentStreak++;
-      if (currentStreak > longestStreak) {
-        longestStreak = currentStreak;
+    const currentDateStr = currentDate.toISOString().split('T')[0];
+    if (!streakDates.includes(currentDateStr)) {
+      streakDates.push(currentDateStr);
+      
+      if (daysDiff <= 1) {
+        currentStreak++;
+        if (currentStreak > longestStreak) {
+          longestStreak = currentStreak;
+        }
+      } else {
+        currentStreak = 1;
       }
-    } else {
-      currentStreak = 1;
     }
   }
   
@@ -245,20 +223,16 @@ function analyzeJournalingFrequency(entries: any[], timezoneOffset: number = 0) 
 
 /**
  * Find patterns or correlations between time and emotional states
- * @param userId The user ID to fetch journal entries for
- * @param timeRange Optional time range to filter entries
- * @param timezoneOffset User's timezone offset in minutes
  */
 export async function analyzeTimeEmotionPatterns(
   userId: string,
-  timeRange?: { startDate?: string; endDate?: string; periodName?: string; duration?: number },
-  timezoneOffset: number = new Date().getTimezoneOffset() * -1
+  timeRange?: { startDate?: string; endDate?: string; periodName?: string; duration?: number }
 ) {
   try {
     // Build the query with time filters if provided
     let query = supabase
       .from('Journal Entries')
-      .select('id, "refined text", "transcription text", created_at, master_themes, emotions')
+      .select('id, created_at, sentiment, emotions')
       .eq('user_id', userId)
       .order('created_at', { ascending: true });
 
@@ -293,13 +267,11 @@ export async function analyzeTimeEmotionPatterns(
       6: []  // Saturday
     };
 
-    // Process each entry, accounting for timezone
+    // Process each entry
     entries.forEach(entry => {
-      const entryDateUTC = new Date(entry.created_at);
-      // Adjust for timezone - this ensures we're working in the user's local time
-      const entryLocalDate = new Date(entryDateUTC.getTime() + (timezoneOffset * 60 * 1000));
-      const hour = entryLocalDate.getHours();
-      const dayOfWeek = entryLocalDate.getDay();
+      const entryDate = new Date(entry.created_at);
+      const hour = entryDate.getHours();
+      const dayOfWeek = entryDate.getDay();
       const sentiment = entry.sentiment;
       const emotions = entry.emotions;
       
@@ -343,8 +315,6 @@ export async function analyzeTimeEmotionPatterns(
     
     // Find most common emotions by day of week
     const topEmotionsByDay = {};
-    const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
-    
     for (const [day, emotionList] of Object.entries(dayOfWeekEmotions)) {
       if (emotionList.length === 0) continue;
       
@@ -359,10 +329,8 @@ export async function analyzeTimeEmotionPatterns(
         .sort(([, countA], [, countB]) => (countB as number) - (countA as number))
         .slice(0, 3)
         .map(([emotion]) => emotion);
-      
-      // Use day name instead of number for clearer output
-      const dayName = dayNames[parseInt(day)];  
-      topEmotionsByDay[dayName] = sortedEmotions;
+        
+      topEmotionsByDay[day] = sortedEmotions;
     }
 
     return {
