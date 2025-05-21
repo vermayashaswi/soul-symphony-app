@@ -54,12 +54,14 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({
           <CardContent className="p-3 prose-sm dark:prose-invert">
             <ReactMarkdown>{message.content}</ReactMarkdown>
 
-            {/* References */}
-            {message.reference_entries && message.reference_entries.length > 0 && (
-              <ReferencesDisplay 
-                references={message.reference_entries} 
-                threadId={message.thread_id}
-              />
+            {/* References - Check if array and has entries */}
+            {message.reference_entries && 
+              Array.isArray(message.reference_entries) && 
+              message.reference_entries.length > 0 && (
+                <ReferencesDisplay 
+                  references={message.reference_entries} 
+                  threadId={message.thread_id}
+                />
             )}
 
             {/* Analytics Display */}

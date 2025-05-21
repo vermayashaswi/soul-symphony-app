@@ -16,25 +16,23 @@ const MobileChatInput: React.FC<MobileChatInputProps> = ({ onSendMessage, disabl
   const textareaRef = useRef<HTMLTextAreaElement>(null);
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   
-  // Use the audio recorder hook
+  // Use the audio recorder hook with the correct return values
   const { 
-    status, 
+    isRecording, 
     recordingTime, 
+    audioBlob, 
     startRecording, 
-    stopRecording, 
-    recordingBlob
+    stopRecording 
   } = useAudioRecorder();
-
-  const isRecording = status === 'recording';
 
   // When audio is recorded, we'll need to handle it
   useEffect(() => {
-    if (recordingBlob) {
+    if (audioBlob) {
       // In a real implementation, we would process the audio blob here
       // For now, we'll just log it
-      console.log("Audio recording completed:", recordingBlob);
+      console.log("Audio recording completed:", audioBlob);
     }
-  }, [recordingBlob]);
+  }, [audioBlob]);
 
   // Auto-resize textarea as content grows
   useEffect(() => {
