@@ -264,9 +264,9 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[]> 
       ...thread,
       processing_status: thread.processing_status as 'idle' | 'processing' | 'failed',
       metadata: thread.metadata ? 
-        (typeof thread.metadata === 'string' ? 
+        ((typeof thread.metadata === 'string' ? 
           JSON.parse(thread.metadata as string) : 
-          thread.metadata) as ChatThread['metadata']
+          thread.metadata) as ChatThread['metadata'])
     })) : [];
   } catch (error) {
     console.error('Error fetching user chat threads:', error);
