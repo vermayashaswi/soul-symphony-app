@@ -31,7 +31,7 @@ export interface ChatMessage {
   thread_id: string;
   content: string;
   sender: 'user' | 'assistant' | 'error';
-  role: 'user' | 'assistant' | 'error';  // Making 'role' required to match src/types/chat.ts
+  role: 'user' | 'assistant' | 'error';
   created_at: string;
   reference_entries?: any[] | null;
   references?: any[];

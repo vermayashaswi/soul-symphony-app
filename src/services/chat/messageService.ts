@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { v4 as uuidv4 } from 'uuid';
 import { ChatMessage, ChatThread, SubQueryResponse, TimeAnalysis } from './types';
@@ -264,7 +263,10 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[]> 
     return data ? data.map(thread => ({
       ...thread,
       processing_status: thread.processing_status as 'idle' | 'processing' | 'failed',
-      metadata: thread.metadata as ChatThread['metadata']
+      metadata: thread.metadata ? 
+        (typeof thread.metadata === 'string' ? 
+          JSON.parse(thread.metadata) : 
+          thread.metadata) as ChatThread['metadata']
     })) : [];
   } catch (error) {
     console.error('Error fetching user chat threads:', error);
@@ -282,17 +284,36 @@ export async function getThreadMessages(threadId: string): Promise<ChatMessage[]
       
     if (error) throw error;
     
-    // Convert database response to ChatMessage[] type with proper type assertions
-    return data ? data.map(msg => ({
-      ...msg,
-      sender: msg.sender as 'user' | 'assistant' | 'error',
-      role: msg.role as 'user' | 'assistant' | 'error',
-      reference_entries: msg.reference_entries as any[] | null,
-      analysis_data: msg.analysis_data as any | null,
-      references: msg.reference_entries as any[] | null,
-      analysis: msg.analysis_data as any | null,
-      hasNumericResult: msg.has_numeric_result,
-    })) : [];
+    // Convert database response to ChatMessage[] type with proper type conversions
+    return data ? data.map(msg => {
+      // Safely parse JSON fields or keep as is if already parsed
+      const reference_entries = msg.reference_entries ? 
+        (typeof msg.reference_entries === 'string' ? 
+          JSON.parse(msg.reference_entries) : 
+          msg.reference_entries) as any[] | null : null;
+          
+      const analysis_data = msg.analysis_data ? 
+        (typeof msg.analysis_data === 'string' ? 
+          JSON.parse(msg.analysis_data) : 
+          msg.analysis_data) : null;
+          
+      const sub_query_responses = msg.sub_query_responses ? 
+        (typeof msg.sub_query_responses === 'string' ? 
+          JSON.parse(msg.sub_query_responses) : 
+          msg.sub_query_responses) as SubQueryResponse[] | null : null;
+
+      return {
+        ...msg,
+        sender: msg.sender as 'user' | 'assistant' | 'error',
+        role: msg.role as 'user' | 'assistant' | 'error',
+        reference_entries: reference_entries,
+        analysis_data: analysis_data,
+        references: reference_entries,
+        analysis: analysis_data,
+        hasNumericResult: msg.has_numeric_result,
+        sub_query_responses: sub_query_responses
+      } as ChatMessage;
+    }) : [];
   } catch (error) {
     console.error('Error fetching thread messages:', error);
     return [];
@@ -310,7 +331,8 @@ export async function saveMessage(
   interactiveOptions?: any[]
 ): Promise<ChatMessage | null> {
   try {
-    const messageData: any = {
+    // Prepare data for database insertion
+    const messageData = {
       thread_id: threadId,
       content: content,
       sender: sender,
@@ -330,13 +352,27 @@ export async function saveMessage(
       
     if (error) throw error;
     
+    if (!data) throw new Error('No data returned from message insert');
+    
     // Convert the response to our ChatMessage type
+    const reference_entries = data.reference_entries ? 
+      (typeof data.reference_entries === 'string' ? 
+        JSON.parse(data.reference_entries) : 
+        data.reference_entries) : null;
+        
+    const analysis_data = data.analysis_data ? 
+      (typeof data.analysis_data === 'string' ? 
+        JSON.parse(data.analysis_data) : 
+        data.analysis_data) : null;
+
     const chatMessage: ChatMessage = {
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: data.role as 'user' | 'assistant' | 'error',
-      references: data.reference_entries as any[] | null,
-      analysis: data.analysis_data,
+      reference_entries: reference_entries as any[] | null,
+      references: reference_entries as any[] | null,
+      analysis_data: analysis_data,
+      analysis: analysis_data,
       hasNumericResult: data.has_numeric_result,
       isInteractive: isInteractive || false,
       interactiveOptions: interactiveOptions || []
@@ -369,11 +405,18 @@ export async function createThread(userId: string, title: string = 'New Conversa
       
     if (error) throw error;
     
+    if (!data) throw new Error('No data returned from thread insert');
+    
     // Convert the response to our ChatThread type
+    const metadata = data.metadata ? 
+      (typeof data.metadata === 'string' ? 
+        JSON.parse(data.metadata) : 
+        data.metadata) : undefined;
+
     return {
       ...data,
       processing_status: data.processing_status as 'idle' | 'processing' | 'failed',
-      metadata: data.metadata as ChatThread['metadata']
+      metadata: metadata as ChatThread['metadata']
     };
   } catch (error) {
     console.error('Error creating thread:', error);
