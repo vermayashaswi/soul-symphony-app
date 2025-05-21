@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -28,6 +29,36 @@ const MAX_ENTRIES = 10;
 const MAX_TIME_ANALYSIS_ENTRIES = 1000; // Increased from 100 to handle more entries
 
 /**
+ * Detect if query appears to be a time-based summary query
+ */
+function isTimeSummaryQuery(message: string): boolean {
+  const lowerQuery = message.toLowerCase();
+  
+  // Check for phrases that suggest the user wants a summary of a period
+  const summaryPatterns = [
+    'how has', 'how have', 'how was', 'how were',
+    'summarize', 'summary of', 'recap',
+    'what happened', 'what was happening',
+    'how did i feel', 'how was i feeling'
+  ];
+  
+  // Check for time periods
+  const timePatterns = [
+    'day', 'week', 'month', 'year',
+    'last few days', 'past few days',
+    'last night', 'yesterday',
+    'last week', 'last month', 'past month',
+    'recent', 'lately'
+  ];
+  
+  // Check if the query contains both a summary pattern and a time pattern
+  const hasSummaryPattern = summaryPatterns.some(pattern => lowerQuery.includes(pattern));
+  const hasTimePattern = timePatterns.some(pattern => lowerQuery.includes(pattern));
+  
+  return hasSummaryPattern && hasTimePattern;
+}
+
+/**
  * Handle the request to chat with RAG (Retrieval-Augmented Generation)
  */
 serve(async (req) => {
@@ -55,6 +86,7 @@ serve(async (req) => {
     let needsDataAggregation = false;
     let domainContext = null;
     let isTimePatternQuery = false;
+    let isTimeSummary = isTimeSummaryQuery(message);
     
     // Check if this is a time pattern related query
     if (message.toLowerCase().includes('time') || 
@@ -76,6 +108,7 @@ serve(async (req) => {
     console.log(`Using search strategy: ${searchStrategy}`);
     console.log(`Domain context: ${domainContext}`);
     console.log(`Is time pattern query: ${isTimePatternQuery}`);
+    console.log(`Is time summary query: ${isTimeSummary}`);
     console.log(`Conversation history length: ${conversationHistory.length}`);
 
     // Generate an OpenAI embedding for the user's message
@@ -105,7 +138,7 @@ serve(async (req) => {
       console.log("Processing as journal-specific question");
       
       // Process the query with vector similarity search on journal entries
-      return await handleJournalQuestion(message, userId, embedding, filters, searchStrategy, needsDataAggregation, conversationHistory, isTimePatternQuery);
+      return await handleJournalQuestion(message, userId, embedding, filters, searchStrategy, needsDataAggregation, conversationHistory, isTimePatternQuery, isTimeSummary);
     } else {
       console.log("Processing as general question (no personal context)");
       
@@ -190,7 +223,7 @@ async function handleGeneralQuestion(message, userId, conversationHistory = []) 
 /**
  * Handle journal questions that require personal context
  */
-async function handleJournalQuestion(message, userId, embedding, filters = {}, searchStrategy = 'hybrid', needsDataAggregation = false, conversationHistory = [], isTimePatternQuery = false) {
+async function handleJournalQuestion(message, userId, embedding, filters = {}, searchStrategy = 'hybrid', needsDataAggregation = false, conversationHistory = [], isTimePatternQuery = false, isTimeSummary = false) {
   try {
     console.log("Handling journal question");
     
@@ -317,8 +350,32 @@ async function handleJournalQuestion(message, userId, embedding, filters = {}, s
       conversationContextText += "\n";
     }
     
-    // Step 3: Call OpenAI to process the query with journal context
-    const systemPrompt = `You are a helpful personal assistant that helps users reflect on and analyze their journal entries. You have access to the following journal entries from the user:
+    // Step 3: Determine the appropriate system prompt based on query type
+    let systemPrompt = "";
+    
+    if (isTimeSummary) {
+      // Special prompt for time-based summary queries
+      systemPrompt = `You are a helpful personal assistant that summarizes journal entries over time periods. You have access to the following journal entries:
+
+${journalContext}
+
+${conversationContextText}
+
+Based on these entries, provide a CONCISE SUMMARY of the user's experiences and emotions during this time period.
+
+RESPONSE GUIDELINES:
+1. Keep your summary UNDER 150 WORDS
+2. Focus on PATTERNS and TRENDS rather than day-by-day details
+3. Highlight emotional themes and significant events only
+4. DO NOT list every daily activity or provide a chronological account
+5. Include 2-3 key insights about the user's emotional state during this period
+6. Use bullet points sparingly and only for the most important insights
+7. Maintain a warm, empathetic tone
+
+The user is asking for a summary of their journal entries over a time period. Provide a concise, insightful overview without excessive detail.`;
+    } else {
+      // Standard prompt for other journal queries
+      systemPrompt = `You are a helpful personal assistant that helps users reflect on and analyze their journal entries. You have access to the following journal entries from the user:
 
 ${journalContext}
 
@@ -334,6 +391,7 @@ Formatting guidelines:
 5. If the information in the entries is not sufficient to answer completely, clearly state what is missing
 
 Stay factual and only make conclusions that are directly supported by the journal entries. Be empathetic, personal, and thoughtful in your responses.`;
+    }
 
     const messages = [
       { role: 'system', content: systemPrompt },
