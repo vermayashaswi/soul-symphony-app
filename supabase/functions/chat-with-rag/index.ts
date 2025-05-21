@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -282,6 +283,68 @@ function detectEmotionQuantitativeQuery(message: string) {
   };
 }
 
+// Function to detect if a query is likely about mental health
+function isMentalHealthQuery(message: string) {
+  // List of mental health related keywords
+  const mentalHealthKeywords = [
+    'anxiety', 'depression', 'stress', 'mood', 'emotion', 'feeling', 'mental health',
+    'therapy', 'therapist', 'counseling', 'trauma', 'grief', 'self-care', 'burnout',
+    'overwhelm', 'coping', 'distress', 'worry', 'panic', 'sadness', 'happiness',
+    'wellness', 'wellbeing', 'self-esteem', 'mindfulness', 'meditation',
+    'psychological', 'emotional', 'behavior', 'behaviour', 'health', 'healthy',
+    'unhealthy', 'relationship', 'support', 'self-improvement', 'growth',
+    'introvert', 'extrovert', 'personality', 'anger', 'calm', 'peace', 'balance'
+  ];
+  
+  // Personal pronouns and self-reference terms
+  const personalTerms = [
+    'i ', "i'm", 'me', 'my', 'mine', 'myself', 'am i', 'do i', 'when i',
+    'self', 'personal', 'own', 'identity', 'character', 'nature', 'tendency'
+  ];
+  
+  // Convert query to lowercase for case-insensitive matching
+  const lowerMessage = message.toLowerCase();
+  
+  // Check for mental health keywords
+  const mentalHealthMatches = mentalHealthKeywords.filter(keyword => 
+    lowerMessage.includes(keyword)
+  );
+  
+  // Check for personal terms
+  const personalMatches = personalTerms.filter(term => 
+    lowerMessage.includes(term)
+  );
+  
+  // Calculate confidence score (simple version)
+  // If we have both mental health keywords and personal references, higher confidence
+  let confidence = 0;
+  
+  if (mentalHealthMatches.length > 0) {
+    confidence += 40; // Base score for having mental health terms
+    confidence += Math.min(mentalHealthMatches.length * 10, 20); // More terms = higher confidence, max +20
+  }
+  
+  if (personalMatches.length > 0) {
+    confidence += 30; // Base score for having personal terms
+    confidence += Math.min(personalMatches.length * 5, 20); // More terms = higher confidence, max +20
+  }
+  
+  // Log the analysis
+  console.log(`Mental health query analysis:
+    - Message: "${message}"
+    - Mental health keywords found: ${mentalHealthMatches.length > 0 ? mentalHealthMatches.join(', ') : 'none'}
+    - Personal terms found: ${personalMatches.length > 0 ? personalMatches.join(', ') : 'none'}
+    - Confidence score: ${confidence}%
+  `);
+  
+  return {
+    isMentalHealth: confidence > 25, // Threshold of 25%
+    confidence: confidence,
+    keywords: mentalHealthMatches,
+    personalTerms: personalMatches
+  };
+}
+
 // Update the function that searches journal entries using vector similarity
 async function searchJournalEntriesWithVector(
   userId: string, 
@@ -297,7 +360,7 @@ async function searchJournalEntriesWithVector(
       {
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
-        match_count: 10,
+        match_count: 20, // Increased from 10 to 20 for more comprehensive analysis
         user_id_filter: userId
       }
     );
@@ -350,6 +413,14 @@ serve(async (req) => {
       });
       throw new Error("OpenAI API key is not configured");
     }
+    
+    // Analyze if this is likely a mental health query that should use journal entries
+    const mentalHealthAnalysis = isMentalHealthQuery(message);
+    diagnosticSteps.push({
+      name: "Mental Health Query Analysis", 
+      status: "success",
+      details: `Analysis complete: confidence ${mentalHealthAnalysis.confidence}%, is mental health query: ${mentalHealthAnalysis.isMentalHealth}`
+    });
     
     // Check if this is a quantitative query about emotions
     const emotionQueryAnalysis = detectEmotionQuantitativeQuery(message);
@@ -597,7 +668,7 @@ serve(async (req) => {
       name: "match_journal_entries_fixed",
       params: {
         match_threshold: 0.5,
-        match_count: 10,
+        match_count: 20, // Increased from 10 to 20
         user_id_filter: userId
       },
       result: searchError ? { error: searchError.message } : { count: similarEntries?.length || 0 },
@@ -722,11 +793,11 @@ serve(async (req) => {
         .select('id, "refined text", created_at, emotions, master_themes')
         .eq('user_id', userId)
         .order('created_at', { ascending: false })
-        .limit(3);
+        .limit(8); // Increased from 3 to 8 for more comprehensive analysis
       
       const recentExecution: FunctionExecution = {
         name: "fetch_recent_journal_entries",
-        params: { user_id: "***", limit: 3 },
+        params: { user_id: "***", limit: 8 }, // Increased from 3 to 8
         result: recentError ? { error: recentError.message } : { count: recentEntries?.length || 0 },
         executionTime: Date.now() - startRecentTime,
         success: !recentError
@@ -827,13 +898,21 @@ serve(async (req) => {
       });
     }
     
-    // Prepare system prompt with RAG context
-    const systemPrompt = `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
+    // Prepare system prompt with RAG context - include a note about mental health queries if applicable
+    let systemPrompt = `You are Roha, an AI assistant specialized in emotional wellbeing and journaling. 
 ${journalContext ? journalContext : "I don't have access to any of your journal entries yet. Feel free to use the journal feature to record your thoughts and feelings."}
 Based on the above context (if available) and the user's message, provide a thoughtful, personalized response.
 ${firstName ? `Always address the user by their first name (${firstName}) in your responses.` : ""}
+`;
 
-RESPONSE GUIDELINES:
+    // Add special instructions for mental health queries
+    if (mentalHealthAnalysis.isMentalHealth) {
+      systemPrompt += `\nThis appears to be a personal query about mental health or personality (confidence: ${mentalHealthAnalysis.confidence}%). 
+Please analyze the journal entries carefully to provide insights about their specific mental health or personality patterns.
+Pay special attention to emotions, behaviors, and patterns that might inform your response.\n`;
+    }
+
+    systemPrompt += `\nRESPONSE GUIDELINES:
 - Be extremely concise and to the point
 - Use bullet points wherever possible
 - Don't make assumptions about information not provided
@@ -979,6 +1058,7 @@ RESPONSE GUIDELINES:
               sender: 'assistant',
               reference_entries: references,
               analysis_data: {
+                mentalHealthAnalysis: mentalHealthAnalysis,
                 queryTypeDetection: emotionQueryAnalysis,
                 diagnosticSteps: diagnosticSteps
               },

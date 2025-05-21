@@ -20,6 +20,10 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
     return null;
   }
 
+  // Display total number of references but only show a subset
+  const visibleReferences = expanded ? references : references.slice(0, 3);
+  const totalReferences = references.length;
+
   // Extract date range if available
   const dates = references.map(ref => ref.date ? new Date(ref.date) : null).filter(Boolean);
   const earliestDate = dates.length > 0 ? new Date(Math.min(...dates.map(d => d ? d.getTime() : 0))) : null;
@@ -37,7 +41,7 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
         className="p-0 h-6 text-xs font-normal flex items-center gap-1 text-muted-foreground hover:text-foreground"
         onClick={() => setExpanded(!expanded)}
       >
-        <TranslatableText text={`Based on ${references.length} journal ${references.length === 1 ? 'entry' : 'entries'} ${dateRangeText}`} />
+        <TranslatableText text={`Based on ${totalReferences} journal ${totalReferences === 1 ? 'entry' : 'entries'} ${dateRangeText}`} />
         {expanded ? (
           <ChevronUp className="h-3 w-3 ml-1" />
         ) : (
@@ -47,7 +51,7 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
       
       {expanded && (
         <div className="mt-2 space-y-2 border-l-2 border-primary/20 pl-3">
-          {references.slice(0, 3).map((ref, idx) => (
+          {visibleReferences.map((ref, idx) => (
             <Card key={idx} className="p-2 text-xs">
               <div className="font-medium">
                 {ref.date ? new Date(ref.date).toLocaleDateString() : "Unknown date"}
@@ -55,7 +59,14 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
               <p className="text-muted-foreground">{ref.snippet}</p>
               {ref.emotions && (
                 <div className="text-xs text-primary-600 mt-1">
-                  Emotions: {Array.isArray(ref.emotions) ? ref.emotions.join(', ') : ref.emotions}
+                  Emotions: {Array.isArray(ref.emotions) ? ref.emotions.join(', ') : 
+                    (typeof ref.emotions === 'object' ? 
+                      Object.entries(ref.emotions)
+                        .sort((a, b) => (b[1] as number) - (a[1] as number))
+                        .slice(0, 3)
+                        .map(([emotion, value]) => `${emotion} (${Math.round((value as number) * 100)}%)`)
+                        .join(', ') 
+                      : ref.emotions)}
                 </div>
               )}
               {ref.themes && (
@@ -65,9 +76,9 @@ const ReferencesDisplay: React.FC<ReferencesDisplayProps> = ({
               )}
             </Card>
           ))}
-          {references.length > 3 && (
+          {references.length > visibleReferences.length && !expanded && (
             <div className="text-xs text-muted-foreground">
-              <TranslatableText text={`+ ${references.length - 3} more entries`} />
+              <TranslatableText text={`+ ${references.length - visibleReferences.length} more entries`} />
             </div>
           )}
         </div>

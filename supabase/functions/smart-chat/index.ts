@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 
@@ -331,6 +332,68 @@ Be concise and insightful. Keep the tone conversational, supportive, and emotion
   }
 }
 
+// Function to detect if a query is likely about mental health
+function isMentalHealthQuery(query) {
+  // List of mental health related keywords
+  const mentalHealthKeywords = [
+    'anxiety', 'depression', 'stress', 'mood', 'emotion', 'feeling', 'mental health',
+    'therapy', 'therapist', 'counseling', 'trauma', 'grief', 'self-care', 'burnout',
+    'overwhelm', 'coping', 'distress', 'worry', 'panic', 'sadness', 'happiness',
+    'wellness', 'wellbeing', 'self-esteem', 'mindfulness', 'meditation',
+    'psychological', 'emotional', 'behavior', 'behaviour', 'health', 'healthy',
+    'unhealthy', 'relationship', 'support', 'self-improvement', 'growth',
+    'introvert', 'extrovert', 'personality', 'anger', 'calm', 'peace', 'balance'
+  ];
+  
+  // Personal pronouns and self-reference terms
+  const personalTerms = [
+    'i ', "i'm", 'me', 'my', 'mine', 'myself', 'am i', 'do i', 'when i',
+    'self', 'personal', 'own', 'identity', 'character', 'nature', 'tendency'
+  ];
+  
+  // Convert query to lowercase for case-insensitive matching
+  const lowerQuery = query.toLowerCase();
+  
+  // Check for mental health keywords
+  const mentalHealthMatches = mentalHealthKeywords.filter(keyword => 
+    lowerQuery.includes(keyword)
+  );
+  
+  // Check for personal terms
+  const personalMatches = personalTerms.filter(term => 
+    lowerQuery.includes(term)
+  );
+  
+  // Calculate confidence score (simple version)
+  // If we have both mental health keywords and personal references, higher confidence
+  let confidence = 0;
+  
+  if (mentalHealthMatches.length > 0) {
+    confidence += 40; // Base score for having mental health terms
+    confidence += Math.min(mentalHealthMatches.length * 10, 20); // More terms = higher confidence, max +20
+  }
+  
+  if (personalMatches.length > 0) {
+    confidence += 30; // Base score for having personal terms
+    confidence += Math.min(personalMatches.length * 5, 20); // More terms = higher confidence, max +20
+  }
+  
+  // Log the analysis
+  console.log(`Mental health query analysis:
+    - Query: "${query}"
+    - Mental health keywords found: ${mentalHealthMatches.length > 0 ? mentalHealthMatches.join(', ') : 'none'}
+    - Personal terms found: ${personalMatches.length > 0 ? personalMatches.join(', ') : 'none'}
+    - Confidence score: ${confidence}%
+  `);
+  
+  return {
+    isMentalHealth: confidence > 25, // Threshold of 25%
+    confidence: confidence,
+    keywords: mentalHealthMatches,
+    personalTerms: personalMatches
+  };
+}
+
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -441,7 +504,11 @@ serve(async (req) => {
       }
     }
     
-    // NEW: First categorize if this is a general question or a journal-specific question
+    // First analyze if this is likely a mental health query that should use journal entries
+    const mentalHealthAnalysis = isMentalHealthQuery(message);
+    console.log("Mental health query analysis result:", mentalHealthAnalysis);
+    
+    // NEW: Categorize if this is a general question or a journal-specific question
     console.log("Categorizing question type");
     const categorizationResponse = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -464,7 +531,11 @@ serve(async (req) => {
             - "How was I feeling last week?" -> "JOURNAL_SPECIFIC"
             - "What patterns do you see in my anxiety?" -> "JOURNAL_SPECIFIC"
             - "Am I happier on weekends based on my entries?" -> "JOURNAL_SPECIFIC"
-            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"`
+            - "Did I mention being stressed in my entries?" -> "JOURNAL_SPECIFIC"
+            - "Am I an introvert?" -> "JOURNAL_SPECIFIC"
+            - "Do I like social interactions?" -> "JOURNAL_SPECIFIC"
+            - "What's my personality like?" -> "JOURNAL_SPECIFIC"
+            - "How do I handle stress?" -> "JOURNAL_SPECIFIC"`
           },
           { role: 'user', content: message }
         ],
@@ -480,8 +551,16 @@ serve(async (req) => {
     }
 
     const categorization = await categorizationResponse.json();
-    const questionType = categorization.choices[0]?.message?.content.trim();
-    console.log(`Question categorized as: ${questionType}`);
+    let questionType = categorization.choices[0]?.message?.content.trim();
+    console.log(`Question initially categorized as: ${questionType}`);
+    
+    // Override classification if it's a mental health query with confidence > 25%
+    if (questionType === "GENERAL" && mentalHealthAnalysis.isMentalHealth) {
+      console.log(`Overriding categorization from GENERAL to JOURNAL_SPECIFIC based on mental health confidence score of ${mentalHealthAnalysis.confidence}%`);
+      questionType = "JOURNAL_SPECIFIC";
+    }
+    
+    console.log(`Final question categorization: ${questionType}`);
 
     // If it's a general question, respond directly without journal entry retrieval
     if (questionType === "GENERAL") {
@@ -716,11 +795,7 @@ serve(async (req) => {
         throw new Error('Failed to generate response');
       }
 
-      const completionData = await completionResponse.json();
-      const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
-      console.log("Response generated successfully");
-
-      // Validate response for hallucinated dates
+      // Check for hallucinated dates in the response
       const responseContent = completionData.choices[0]?.message?.content || 'Sorry, I could not generate a response.';
       console.log("Response generated successfully");
       
