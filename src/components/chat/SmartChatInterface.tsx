@@ -34,7 +34,6 @@ import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
-import { SmartChatInterfaceProps } from "@/types/chat-interfaces";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -46,11 +45,11 @@ import {
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
 
-const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
-  mentalHealthInsights,
-  timezoneOffset,
-  timezone
-}) => {
+export interface SmartChatInterfaceProps {
+  mentalHealthInsights?: MentalHealthInsights;
+}
+
+const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthInsights }) => {
   const [chatHistory, setChatHistory] = useState<ChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
@@ -653,7 +652,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
             <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
           </div>
         ) : chatHistory.length === 0 ? (
-          <EmptyChatState onStarterPrompt={handleSendMessage} />
+          <EmptyChatState />
         ) : (
           <ChatArea 
             chatMessages={chatHistory}

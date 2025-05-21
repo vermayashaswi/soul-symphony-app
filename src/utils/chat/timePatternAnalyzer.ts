@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { calculateRelativeDateRange, formatDateForUser } from './dateUtils';
 
@@ -299,9 +300,19 @@ export async function analyzeTimeEmotionPatterns(
       const entryLocalDate = new Date(entryDateUTC.getTime() + (timezoneOffset * 60 * 1000));
       const hour = entryLocalDate.getHours();
       const dayOfWeek = entryLocalDate.getDay();
-      
-      // Get emotions from the entry
+      const sentiment = entry.sentiment;
       const emotions = entry.emotions;
+      
+      // Add sentiment to time of day
+      if (hour >= 5 && hour < 12) {
+        sentimentByTimeOfDay.morning.push(sentiment);
+      } else if (hour >= 12 && hour < 17) {
+        sentimentByTimeOfDay.afternoon.push(sentiment);
+      } else if (hour >= 17 && hour < 21) {
+        sentimentByTimeOfDay.evening.push(sentiment);
+      } else {
+        sentimentByTimeOfDay.night.push(sentiment);
+      }
       
       // Add emotions to day of week
       if (emotions && Array.isArray(emotions)) {
@@ -309,6 +320,27 @@ export async function analyzeTimeEmotionPatterns(
       }
     });
 
+    // Calculate average sentiment by time of day
+    const avgSentimentByTime = {};
+    for (const [timeOfDay, sentiments] of Object.entries(sentimentByTimeOfDay)) {
+      if (sentiments.length === 0) continue;
+      
+      // Calculate numeric values for average
+      const numericSentiments = sentiments
+        .filter(s => typeof s === 'string')
+        .map(s => {
+          if (s === 'POSITIVE') return 1;
+          if (s === 'NEGATIVE') return -1;
+          return 0; // NEUTRAL
+        });
+      
+      const avg = numericSentiments.length > 0
+        ? numericSentiments.reduce((sum, val) => sum + val, 0) / numericSentiments.length
+        : null;
+        
+      avgSentimentByTime[timeOfDay] = avg;
+    }
+    
     // Find most common emotions by day of week
     const topEmotionsByDay = {};
     const dayNames = ["Sunday", "Monday", "Tuesday", "Wednesday", "Thursday", "Friday", "Saturday"];
@@ -333,8 +365,8 @@ export async function analyzeTimeEmotionPatterns(
       topEmotionsByDay[dayName] = sortedEmotions;
     }
 
-    // Since we're not using sentimentByTimeOfDay anymore, we'll return only emotions data
     return {
+      avgSentimentByTimeOfDay: avgSentimentByTime,
       topEmotionsByDayOfWeek: topEmotionsByDay
     };
   } catch (error) {

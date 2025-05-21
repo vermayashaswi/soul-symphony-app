@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
@@ -331,7 +332,6 @@ const Chat = () => {
     <div className="w-full h-full flex flex-col">
       <SmartChatInterface 
         timezoneOffset={getUserTimezoneOffset()}
-        timezone={Intl.DateTimeFormat().resolvedOptions().timeZone}
       />
     </div>
   );
