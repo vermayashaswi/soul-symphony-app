@@ -1,6 +1,5 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const apiKey = Deno.env.get('OPENAI_API_KEY');
@@ -9,17 +8,11 @@ if (!apiKey) {
   Deno.exit(1);
 }
 
-const config = new Configuration({
-  apiKey: apiKey,
-});
-
-// Define corsHeaders directly in this file instead of importing
+// Define corsHeaders directly in this file
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const openai = new OpenAIApi(config);
 
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
@@ -57,6 +50,28 @@ function detectTimeSummaryQuery(message) {
   return hasSummaryPattern && hasTimePattern;
 }
 
+/**
+ * Detect if query is a personality-related question
+ */
+function detectPersonalityQuestion(message) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Check for patterns that indicate personality questions
+  const personalityPatterns = [
+    'am i ', 'am i a', 'am i an', 
+    'do i like', 'do i enjoy',
+    'what kind of person am i',
+    'what is my personality',
+    'what do i like',
+    'what are my preferences'
+  ];
+  
+  const isPersonalityQuestion = personalityPatterns.some(pattern => lowerMessage.includes(pattern));
+  console.log(`Personality question detection: ${isPersonalityQuestion}`);
+  
+  return isPersonalityQuestion;
+}
+
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, {
@@ -81,6 +96,12 @@ serve(async (req) => {
     const isTimeSummaryQuery = detectTimeSummaryQuery(message);
     if (isTimeSummaryQuery) {
       console.log("Detected time-based summary query.");
+    }
+    
+    // Add personality question detection
+    const isPersonalityQuestion = detectPersonalityQuestion(message);
+    if (isPersonalityQuestion) {
+      console.log("Detected personality-related question.");
     }
 
     // Time expression detection and parsing
@@ -194,6 +215,35 @@ serve(async (req) => {
       }
     }
     
+    // Provide direct plan for personality questions
+    if (isPersonalityQuestion) {
+      console.log("Generating plan for personality question");
+      const personalityPlan = {
+        strategy: "vector",
+        filters: {
+          date_range: null,
+          emotions: null,
+          themes: null
+        },
+        isTimePatternQuery: false,
+        needsDataAggregation: false,
+        domainContext: "personal_insights",
+        isTimeSummaryQuery: false,
+        isPersonalityQuery: true,
+        totalEntryCount: entryCount
+      };
+      
+      return new Response(
+        JSON.stringify({
+          queryPlan: personalityPlan,
+          rawPlan: JSON.stringify({ plan: { ...personalityPlan } })
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    }
+    
     // Include isTimeSummaryQuery in the prompt
     let promptAddition = "";
     if (isTimeSummaryQuery) {
@@ -245,57 +295,122 @@ Return a JSON object with the following structure:
 
     console.log("Query Planner Prompt:", prompt);
 
-    const apiResponse = await openai.createChatCompletion({
-      model: "gpt-3.5-turbo",
-      messages: [{ role: "user", content: prompt }],
-      temperature: temperature,
-    });
-
-    const rawPlan = apiResponse.data.choices[0].message?.content;
-    console.log("Raw Query Plan:", rawPlan);
-
-    let planObject = null;
+    // Use direct fetch API call instead of OpenAI SDK to avoid issues
     try {
-      planObject = JSON.parse(rawPlan);
-    } catch (error) {
-      console.error("Failed to parse query plan:", error);
-      return new Response(JSON.stringify({ error: "Failed to parse query plan" }), {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-        status: 500,
+      const openaiResponse = await fetch("https://api.openai.com/v1/chat/completions", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          "Authorization": `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+          model: "gpt-3.5-turbo",
+          messages: [{ role: "user", content: prompt }],
+          temperature: temperature,
+        })
       });
-    }
-    
-    // Include isTimeSummaryQuery in the response
-    if (planObject && !planObject.plan.isTimeSummaryQuery) {
-      planObject.plan.isTimeSummaryQuery = isTimeSummaryQuery;
-    }
-    
-    // Add the date range information explicitly if we have it
-    if (dateRange && planObject && planObject.plan && planObject.plan.filters) {
-      planObject.plan.filters.date_range = dateRange;
-    }
-    
-    // Add entry count information to the plan
-    if (planObject && planObject.plan) {
-      planObject.plan.totalEntryCount = entryCount;
-    }
-
-    console.log("Parsed Query Plan:", planObject);
-
-    return new Response(
-      JSON.stringify({
-        queryPlan: planObject?.plan || null,
-        rawPlan: rawPlan
-      }),
-      {
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      
+      if (!openaiResponse.ok) {
+        console.error("OpenAI API error:", openaiResponse.status, await openaiResponse.text());
+        throw new Error(`OpenAI API returned error ${openaiResponse.status}`);
       }
-    );
+      
+      const openaiData = await openaiResponse.json();
+      const rawPlan = openaiData.choices[0].message?.content;
+      console.log("Raw Query Plan:", rawPlan);
+
+      let planObject = null;
+      try {
+        planObject = JSON.parse(rawPlan);
+      } catch (error) {
+        console.error("Failed to parse query plan:", error);
+        // Create a fallback plan when parsing fails
+        planObject = {
+          plan: {
+            strategy: "hybrid",
+            filters: {
+              date_range: dateRange || null,
+              emotions: null,
+              themes: null
+            },
+            isTimePatternQuery: isTimeSummaryQuery,
+            needsDataAggregation: false,
+            domainContext: domainContext || "general_insights",
+            isTimeSummaryQuery: isTimeSummaryQuery
+          }
+        };
+        console.log("Using fallback plan due to parsing error:", planObject);
+      }
+      
+      // Include isTimeSummaryQuery in the response
+      if (planObject && !planObject.plan.isTimeSummaryQuery) {
+        planObject.plan.isTimeSummaryQuery = isTimeSummaryQuery;
+      }
+      
+      // Add the date range information explicitly if we have it
+      if (dateRange && planObject && planObject.plan && planObject.plan.filters) {
+        planObject.plan.filters.date_range = dateRange;
+      }
+      
+      // Add entry count information to the plan
+      if (planObject && planObject.plan) {
+        planObject.plan.totalEntryCount = entryCount;
+      }
+
+      console.log("Parsed Query Plan:", planObject);
+
+      return new Response(
+        JSON.stringify({
+          queryPlan: planObject?.plan || null,
+          rawPlan: rawPlan
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        }
+      );
+    } catch (error) {
+      console.error("Error in OpenAI API request:", error);
+      
+      // Return a fallback plan when OpenAI API call fails
+      const fallbackPlan = {
+        strategy: "hybrid",
+        filters: {
+          date_range: dateRange || null,
+          emotions: null,
+          themes: null
+        },
+        isTimePatternQuery: false,
+        needsDataAggregation: false,
+        domainContext: domainContext || "general_insights",
+        isTimeSummaryQuery: isTimeSummaryQuery,
+        totalEntryCount: entryCount,
+        isErrorFallback: true
+      };
+      
+      return new Response(
+        JSON.stringify({
+          queryPlan: fallbackPlan,
+          rawPlan: JSON.stringify({ plan: fallbackPlan }),
+          error: error.message
+        }),
+        {
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+          status: 200 // Return 200 with error info in body instead of 500
+        }
+      );
+    }
   } catch (error) {
     console.error("Error in smart-query-planner:", error);
-    return new Response(JSON.stringify({ error: error.message }), {
+    return new Response(JSON.stringify({ 
+      error: error.message,
+      queryPlan: {
+        strategy: "fallback",
+        isErrorFallback: true
+      } 
+    }), {
       headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 500,
+      status: 200 // Return 200 with error info in body instead of 500
     });
   }
 });
+
