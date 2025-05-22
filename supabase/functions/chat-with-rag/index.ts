@@ -1,3 +1,4 @@
+
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -467,7 +468,7 @@ async function searchEntriesWithVector(userId, embedding, filters = {}, isCompre
       return {
         ...entry,
         // Ensure we have a content field that uses the correct data
-        content: entry.content || COALESCE(entry["refined text"], entry["transcription text"]) || ""
+        content: entry.content || coalesceValues(entry["refined text"], entry["transcription text"]) || ""
       };
     });
     
@@ -479,7 +480,7 @@ async function searchEntriesWithVector(userId, embedding, filters = {}, isCompre
 }
 
 // Helper function to coalesce values (similar to SQL COALESCE)
-function COALESCE(...args) {
+function coalesceValues(...args) {
   for (let i = 0; i < args.length; i++) {
     if (args[i] !== null && args[i] !== undefined) {
       return args[i];
@@ -814,7 +815,7 @@ async function searchEntriesWithSQL(userId, query, filters = {}, isComprehensive
     const mappedEntries = entries.map(entry => {
       return {
         ...entry,
-        content: COALESCE(entry["refined text"], entry["transcription text"]) || ""
+        content: coalesceValues(entry["refined text"], entry["transcription text"]) || ""
       };
     });
     
@@ -825,14 +826,3 @@ async function searchEntriesWithSQL(userId, query, filters = {}, isComprehensive
   }
 }
 
-/**
- * Helper function to coalesce values (similar to SQL COALESCE)
- */
-function COALESCE(...args) {
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] !== null && args[i] !== undefined) {
-      return args[i];
-    }
-  }
-  return null;
-}
