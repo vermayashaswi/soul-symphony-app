@@ -45,8 +45,14 @@ export function processTimeRange(timeRange: any): { startDate?: string; endDate?
       result.endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
     } else if (timeRange.type === 'lastWeek') {
       const now = new Date();
-      const lastWeekMonday = startOfWeek(subDays(now, 7), { weekStartsOn: 1 });
-      const lastWeekSunday = endOfWeek(subDays(now, 7), { weekStartsOn: 1 });
+      // Get this week's Monday
+      const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
+      
+      // Last week's Monday is 7 days before this week's Monday
+      const lastWeekMonday = subDays(thisWeekMonday, 7);
+      
+      // Last week's Sunday is 1 day before this week's Monday
+      const lastWeekSunday = subDays(thisWeekMonday, 1);
       
       // Log the calculation details for debugging
       console.log("Last week calculation details:");

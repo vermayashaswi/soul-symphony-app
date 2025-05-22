@@ -1,9 +1,9 @@
-
 import React, { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
 import FloatingThemeStrips from './FloatingThemeStrips';
+import { getClientTimeInfo } from '@/services/dateService';
 
 interface SummaryResponse {
   summary: string | null;
@@ -58,12 +58,8 @@ const JournalSummaryCard: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        // Calculate client timezone info for accurate date calculations
-        const clientInfo = {
-          timestamp: new Date().toISOString(),
-          timezoneName: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-          timezoneOffset: new Date().getTimezoneOffset()
-        };
+        // Get client timezone info from centralized service
+        const clientInfo = getClientTimeInfo();
         
         console.log('JournalSummaryCard: Client timezone info', clientInfo);
         
@@ -89,7 +85,7 @@ const JournalSummaryCard: React.FC = () => {
           setError('Failed to connect to the journal summary service');
         }
         
-        // Calculate date 7 days ago for filtering
+        // Calculate date 7 days ago for filtering - use our new service
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
