@@ -85,15 +85,15 @@ function getCurrentWeekDates(timezone?: string): string {
 /**
  * Get the formatted date range for the last week
  */
-function getLastWeekDates(timezone?: string): string {
+function getLastWeekDates(timezone?: string, clientTimestamp?: string): string {
   // Default to UTC if no timezone specified
   const tz = timezone || 'UTC';
   console.log(`Getting last week dates for timezone: ${tz}`);
   
   try {
     // Create a fresh date object - critical for avoiding stale dates
-    const nowUTC = new Date();
-    console.log(`Current UTC time for last week calc: ${nowUTC.toISOString()}`);
+    const nowUTC = clientTimestamp ? new Date(clientTimestamp) : new Date();
+    console.log(`Using ${clientTimestamp ? 'client timestamp' : 'fresh date'}: ${nowUTC.toISOString()}`);
     
     // Get the current date in the user's timezone
     const now = toZonedTime(nowUTC, tz);
@@ -244,33 +244,36 @@ serve(async (req) => {
       usePersonalContext = false,
       queryPlan = null,
       conversationHistory = [],
+      clientTimeInfo = null,
+      userTimezone = null,
       cacheBreaker = Date.now() // Add cache breaker parameter to prevent caching
     } = await req.json();
 
     console.log(`Processing request for user ${userId} at ${new Date().toISOString()}: ${message}`);
     console.log(`Cache breaker: ${cacheBreaker}`);
+    
+    // Log client time information
+    if (clientTimeInfo) {
+      console.log(`Client device time: ${clientTimeInfo.timestamp}`);
+      console.log(`Client timezone: ${clientTimeInfo.timezoneName}`);
+      console.log(`Client timezone offset: ${clientTimeInfo.timezoneOffset} minutes`);
+    }
+    
+    if (userTimezone) {
+      console.log(`User profile timezone: ${userTimezone}`);
+    }
 
     // Check if this is a direct date query that needs a simple calendar response
     const isDateQuery = queryPlan?.isDirectDateQuery || isDirectDateQuery(message);
     if (isDateQuery) {
       console.log(`Processing as direct date query at ${new Date().toISOString()}`);
       
-      // Get user's timezone from their profile
-      let userTimezone;
-      try {
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('timezone')
-          .eq('id', userId)
-          .single();
-          
-        if (data && !error) {
-          userTimezone = data.timezone;
-          console.log(`Found user timezone: ${userTimezone}`);
-        }
-      } catch (error) {
-        console.error("Error fetching user timezone:", error);
-      }
+      // Use the user timezone from the profile or client timezone
+      const effectiveTimezone = userTimezone || 
+                               (clientTimeInfo ? clientTimeInfo.timezoneName : null) ||
+                               'UTC';
+      
+      console.log(`Using effective timezone for date calculations: ${effectiveTimezone}`);
       
       // Check if asking about current week or last week
       const isLastWeekQuery = message.toLowerCase().includes('last week') || 
@@ -279,15 +282,24 @@ serve(async (req) => {
       let response;
       
       if (isLastWeekQuery) {
-        // Get the last week's date range in user's timezone
-        const dateRange = getLastWeekDates(userTimezone);
+        // Get the last week's date range using client time reference if available
+        const clientTimestamp = clientTimeInfo ? clientTimeInfo.timestamp : undefined;
+        const dateRange = getLastWeekDates(effectiveTimezone, clientTimestamp);
         console.log(`Last week date range: ${dateRange}`);
         response = `The last week dates were: ${dateRange}`;
       } else {
-        // Get the current week's date range in user's timezone
-        const dateRange = getCurrentWeekDates(userTimezone);
+        // Get the current week's date range
+        const dateRange = getCurrentWeekDates(effectiveTimezone);
         console.log(`Current week date range: ${dateRange}`);
-        const today = new Date();
+        
+        // Format today's date in user's timezone
+        let today;
+        if (clientTimeInfo && clientTimeInfo.timestamp) {
+          today = toZonedTime(new Date(clientTimeInfo.timestamp), effectiveTimezone);
+        } else {
+          today = toZonedTime(new Date(), effectiveTimezone);
+        }
+        
         response = `The current week dates are: ${dateRange}\n\nToday is ${format(today, 'EEEE, MMMM d, yyyy')}.`;
       }
       

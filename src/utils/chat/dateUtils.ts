@@ -75,36 +75,44 @@ export function getLastWeekDates(timezone?: string): string {
  * @param timePeriod - The time period expression (e.g., "this month", "last week")
  * @param timezoneOffset - User's timezone offset in minutes
  * @param referenceDate - Optional reference date for relative calculations
+ * @param clientTimestamp - Optional client device timestamp for reference
+ * @param userTimezone - Optional user timezone from profile
  * @returns Date range with start and end dates
  */
 export function calculateRelativeDateRange(
   timePeriod: string, 
-  timezoneOffset: number = 0, 
-  referenceDate?: Date
+  timezoneOffset: number = 0,
+  referenceDate?: Date,
+  clientTimestamp?: string,
+  userTimezone?: string
 ): { startDate: string, endDate: string, periodName: string } {
   // Convert timezone offset to milliseconds
   const offsetMs = timezoneOffset * 60 * 1000;
   
   // Get timezone name if available
-  const timezoneName = getUserTimezoneName() || 'UTC';
+  const timezoneName = userTimezone || getUserTimezoneName() || 'UTC';
   
-  // Use provided reference date or get current date in user's timezone
-  const now = referenceDate ? 
-    toZonedTime(new Date(referenceDate), timezoneName) : 
-    toZonedTime(new Date(), timezoneName);
+  // Use provided reference time or get current date in user's timezone
+  let now;
+  if (clientTimestamp) {
+    // Use the client's device time if provided
+    now = toZonedTime(new Date(clientTimestamp), timezoneName);
+    console.log(`Using client's timestamp: ${clientTimestamp} in timezone ${timezoneName}`);
+  } else if (referenceDate) { 
+    // Use provided reference date
+    now = toZonedTime(new Date(referenceDate), timezoneName);
+  } else {
+    // Use current server time (last resort)
+    now = toZonedTime(new Date(), timezoneName);
+  }
     
   let startDate: Date;
   let endDate: Date;
   let periodName = timePeriod;
   
-  console.log(`Calculating date range for "${timePeriod}" with timezone offset ${timezoneOffset} minutes`);
-  console.log(`User's timezone: ${timezoneName}`);
-  console.log(`Current date in user's timezone: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+  console.log(`Calculating date range for "${timePeriod}" with timezone ${timezoneName}`);
+  console.log(`Using reference date: ${format(now, 'yyyy-MM-dd HH:mm:ss')} (${now.toISOString()})`);
   console.log(`Day of week: ${now.getDay()}, Date: ${now.getDate()}, Month: ${now.getMonth() + 1}, Year: ${now.getFullYear()}`);
-  
-  if (referenceDate) {
-    console.log(`Reference date provided: ${format(referenceDate, 'yyyy-MM-dd HH:mm:ss')}`);
-  }
   
   // Normalize time period for better matching
   const lowerTimePeriod = timePeriod.toLowerCase().trim();
@@ -161,7 +169,7 @@ export function calculateRelativeDateRange(
     
     // Last week is 7 days before this week
     const lastWeekMonday = subDays(thisWeekMonday, 7);
-    const lastWeekSunday = subDays(thisWeekSunday, 7);
+    const lastWeekSunday = subDays(thisWeekMonday, 1);
     
     console.log("LAST WEEK CALCULATION (NEW METHOD):");
     console.log(`Current date: ${format(now, 'yyyy-MM-dd')}`);

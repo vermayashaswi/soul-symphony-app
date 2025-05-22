@@ -59,6 +59,36 @@ export async function planQuery(message: string, threadId: string, userId: strin
       debugTimezoneInfo();
     }
     
+    // Get client's device time information for accurate date calculations
+    const clientInfo = {
+      timestamp: new Date().toISOString(), // Will be replaced with client timestamp
+      timezoneOffset: new Date().getTimezoneOffset(), // Will be replaced with client timezone offset
+      timezoneName: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' // Will be replaced with client timezone name
+    };
+    
+    console.log(`[Query Planner] Client time information:`, clientInfo);
+    
+    // Get user's timezone from their profile
+    let userTimezone;
+    try {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
+        
+      if (profileData && profileData.timezone) {
+        userTimezone = profileData.timezone;
+        console.log(`[Query Planner] User timezone from profile: ${userTimezone}`);
+      } else {
+        console.log(`[Query Planner] No timezone found in user profile, using client timezone`);
+        userTimezone = clientInfo.timezoneName;
+      }
+    } catch (error) {
+      console.error("Error fetching user timezone from profile:", error);
+      userTimezone = clientInfo.timezoneName;
+    }
+    
     // Check if this is a direct date query, including last week queries
     const isLastWeekQuery = message.toLowerCase().includes('last week') && 
                            (message.toLowerCase().includes('date') || 
@@ -72,7 +102,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
       
       if (isLastWeekQuery) {
         // Log last week dates for debugging
-        const lastWeekDates = getLastWeekDates();
+        const lastWeekDates = getLastWeekDates(userTimezone);
         console.log(`[Query Planner] Last week dates calculated: ${lastWeekDates}`);
       }
       
@@ -85,7 +115,11 @@ export async function planQuery(message: string, threadId: string, userId: strin
         filterByEmotion: null,
         enhancedQuery: message,
         originalQuery: message,
-        timestamp: new Date().toISOString()  // Add timestamp for debugging
+        timestamp: new Date().toISOString(),  // Add timestamp for debugging
+        clientDeviceTime: clientInfo.timestamp,
+        clientTimezone: clientInfo.timezoneName,
+        clientTimezoneOffset: clientInfo.timezoneOffset,
+        userTimezone: userTimezone
       };
     }
     
@@ -155,7 +189,11 @@ export async function planQuery(message: string, threadId: string, userId: strin
       filterByEmotion: queryTypes.emotion || null,
       enhancedQuery,
       originalQuery: message,
-      timestamp: new Date().toISOString()  // Add timestamp for debugging
+      timestamp: new Date().toISOString(),  // Add timestamp for debugging
+      clientDeviceTime: clientInfo.timestamp,
+      clientTimezone: clientInfo.timezoneName,
+      clientTimezoneOffset: clientInfo.timezoneOffset,
+      userTimezone: userTimezone
     };
   } catch (error) {
     console.error("[Query Planner] Error planning query:", error);

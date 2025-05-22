@@ -17,8 +17,14 @@ export async function sendMessage(
     // Create a message ID for this new message
     const messageId = uuidv4();
     
-    // Get the user's timezone offset
-    const timezoneOffset = new Date().getTimezoneOffset();
+    // Capture client's device time and timezone information
+    const clientTimeInfo = {
+      timestamp: new Date().toISOString(),
+      timezoneOffset: new Date().getTimezoneOffset(),
+      timezoneName: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
+    };
+    
+    console.log(`[sendMessage] Captured client time info:`, clientTimeInfo);
     
     // Save the user message to the database
     await supabase.from('chat_messages').insert({
@@ -35,6 +41,27 @@ export async function sendMessage(
       updated_at: new Date().toISOString(),
       processing_status: 'processing',
     }).eq('id', threadId);
+    
+    // Get user's timezone from their profile
+    let userTimezone;
+    try {
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
+        
+      if (profileData && profileData.timezone) {
+        userTimezone = profileData.timezone;
+        console.log(`[sendMessage] User timezone from profile: ${userTimezone}`);
+      } else {
+        console.log(`[sendMessage] No timezone found in user profile, using client timezone`);
+        userTimezone = clientTimeInfo.timezoneName;
+      }
+    } catch (error) {
+      console.error("Error fetching user timezone from profile:", error);
+      userTimezone = clientTimeInfo.timezoneName;
+    }
     
     // Get previous messages from this thread for context (most recent 15)
     const { data: previousMessages, error: contextError } = await supabase
@@ -89,7 +116,9 @@ export async function sendMessage(
       message,
       userId,
       conversationContext,
-      timezoneOffset,
+      timezoneOffset: clientTimeInfo.timezoneOffset,
+      timezoneName: clientTimeInfo.timezoneName,
+      clientTime: clientTimeInfo.timestamp,
       appContext: {
         appInfo: {
           name: "SOULo",
@@ -103,7 +132,8 @@ export async function sendMessage(
           needsClarity: metadataObj.needsClarity || false,
           confidenceScore: metadataObj.confidenceScore || null,
           ambiguities: metadataObj.ambiguities || [],
-          isMentalHealthQuery: isMentalHealthQuery
+          isMentalHealthQuery: isMentalHealthQuery,
+          userTimezone: userTimezone
         }
       },
       checkForMultiQuestions: true,
@@ -282,7 +312,16 @@ export async function sendMessage(
     if (queryPlan.isSegmented) {
       // Handle multi-part/segmented queries
       const subQueries = queryPlan.subqueries || [];
-      const queryResponse = await processMultiPartQuery(message, userId, threadId, dateRange, referenceDate, subQueries);
+      const queryResponse = await processMultiPartQuery(
+        message, 
+        userId, 
+        threadId, 
+        dateRange, 
+        referenceDate, 
+        subQueries, 
+        clientTimeInfo,
+        userTimezone
+      );
       finalResponse = queryResponse.response;
     } else {
       // Standard query processing
@@ -295,7 +334,9 @@ export async function sendMessage(
           referenceDate,
           conversationContext,
           queryPlan,
-          isMentalHealthQuery
+          isMentalHealthQuery,
+          clientTimeInfo: clientTimeInfo,
+          userTimezone: userTimezone
         }
       });
       
@@ -407,7 +448,9 @@ async function processMultiPartQuery(
   threadId: string,
   timeRange: any,
   referenceDate?: string,
-  subQueries: string[] = []
+  subQueries: string[] = [],
+  clientTimeInfo: any = null,
+  userTimezone: string = 'UTC'
 ): Promise<SubQueryResponse> {
   try {
     // If no sub-queries were provided, break down the question ourselves
@@ -434,7 +477,9 @@ async function processMultiPartQuery(
           threadId,
           timeRange,
           referenceDate,
-          subQueryMode: true
+          subQueryMode: true,
+          clientTimeInfo: clientTimeInfo,
+          userTimezone: userTimezone
         }
       });
       
