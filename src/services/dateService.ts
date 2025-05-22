@@ -13,7 +13,8 @@ import {
   endOfWeek, 
   startOfDay, 
   endOfDay,
-  format as formatDate
+  format as formatDate,
+  isValid
 } from "date-fns";
 import { formatInTimeZone, toZonedTime } from "date-fns-tz";
 
@@ -97,15 +98,20 @@ export function formatInTimezone(
   formatStr: string = 'yyyy-MM-dd HH:mm:ss',
   timezone: string = 'UTC'
 ): string {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
-  // Check if date is valid before formatting
-  if (isNaN(dateObj.getTime())) {
-    console.error('Invalid date provided to formatInTimezone:', date);
+  if (!date) {
+    console.error('Null or undefined date provided to formatInTimezone');
     return 'Invalid Date';
   }
-  
+
   try {
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is valid before formatting
+    if (!isValid(dateObj)) {
+      console.error('Invalid date provided to formatInTimezone:', date);
+      return 'Invalid Date';
+    }
+    
     return formatInTimeZone(dateObj, timezone, formatStr);
   } catch (error) {
     console.error('Error in formatInTimezone:', error);

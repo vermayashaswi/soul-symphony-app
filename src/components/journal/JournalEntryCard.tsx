@@ -1,5 +1,4 @@
-
-import React, { useState, useEffect, useRef, useCallback } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
 import { motion } from 'framer-motion';
@@ -271,10 +270,17 @@ export function JournalEntryCard({
 
   const createdAtFormatted = (() => {
     try {
-      // Just use the formatShortDate function which already handles both string and Date inputs
-      return formatShortDate(safeEntry.created_at);
+      // Make sure we pass a valid date string to formatShortDate
+      if (!safeEntry.created_at) {
+        console.error('[JournalEntryCard] Invalid created_at:', safeEntry.created_at);
+        return 'Recently';
+      }
+      
+      // formatShortDate already handles both string and Date inputs with validation
+      const formatted = formatShortDate(safeEntry.created_at);
+      return formatted;
     } catch (error) {
-      console.error('[JournalEntryCard] Error formatting date:', error);
+      console.error('[JournalEntryCard] Error formatting date:', error, 'Input:', safeEntry.created_at);
       return 'Recently';
     }
   })();

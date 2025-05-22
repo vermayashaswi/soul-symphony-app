@@ -1,5 +1,4 @@
-
-import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear, formatISO, parseISO } from 'date-fns';
+import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear, formatISO, parseISO, isValid } from 'date-fns';
 import { TimeRange } from '@/hooks/use-insights-data';
 
 /**
@@ -9,10 +8,10 @@ export const formatDateForTimeRange = (date: Date | string, range: TimeRange | '
   if (!date) return '';
   
   // Ensure we have a valid Date object
-  const d = date instanceof Date ? date : new Date(date);
+  const d = typeof date === 'string' ? new Date(date) : date;
   
   // Return empty string for invalid dates
-  if (isNaN(d.getTime())) return '';
+  if (!isValid(d)) return '';
   
   try {
     switch (range) {
@@ -169,7 +168,7 @@ export const formatDateToReadable = (dateStr: string, includeYear = true): strin
   
   try {
     const date = parseISO(dateStr);
-    if (isNaN(date.getTime())) return 'Invalid date';
+    if (!isValid(date)) return 'Invalid date';
     
     if (isToday(date)) {
       return `Today at ${format(date, 'h:mm a')}`;
@@ -192,8 +191,8 @@ export const validateDateRange = (startDate: string | Date, endDate: string | Da
     const start = typeof startDate === 'string' ? new Date(startDate) : startDate;
     const end = typeof endDate === 'string' ? new Date(endDate) : endDate;
     
-    // Check for invalid dates
-    if (isNaN(start.getTime()) || isNaN(end.getTime())) {
+    // Check for invalid dates using isValid
+    if (!isValid(start) || !isValid(end)) {
       return false;
     }
     
