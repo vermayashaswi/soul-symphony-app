@@ -1,7 +1,6 @@
-
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { format, addDays, startOfWeek, endOfWeek } from "https://esm.sh/date-fns@3.3.1";
+import { format, addDays, startOfWeek, endOfWeek, subDays } from "https://esm.sh/date-fns@3.3.1";
 import { toZonedTime } from "https://esm.sh/date-fns-tz@3.2.0";
 
 // Define Supabase client
@@ -72,6 +71,57 @@ function getCurrentWeekDates(timezone?: string): string {
 }
 
 /**
+ * Get the formatted date range for the last week
+ */
+function getLastWeekDates(timezone?: string): string {
+  // Default to UTC if no timezone specified
+  const tz = timezone || 'UTC';
+  console.log(`Getting last week dates for timezone: ${tz}`);
+  
+  try {
+    // Get the current date in the user's timezone
+    const now = toZonedTime(new Date(), tz);
+    console.log(`Current date in ${tz}: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+    
+    // Get this week's Monday and Sunday
+    const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
+    const thisWeekSunday = endOfWeek(now, { weekStartsOn: 1 });
+    
+    // Last week is 7 days before this week
+    const lastWeekMonday = subDays(thisWeekMonday, 7);
+    const lastWeekSunday = subDays(thisWeekSunday, 7);
+    
+    console.log("LAST WEEK CALCULATION (EDGE FUNCTION):");
+    console.log(`Current date: ${format(now, 'yyyy-MM-dd')}`);
+    console.log(`This week's Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')}`);
+    console.log(`This week's Sunday: ${format(thisWeekSunday, 'yyyy-MM-dd')}`);
+    console.log(`Last week's Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')}`);
+    console.log(`Last week's Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')}`);
+    
+    // Format the dates in a user-friendly way
+    const formattedStart = format(lastWeekMonday, 'MMMM d');
+    const formattedEnd = format(lastWeekSunday, 'MMMM d, yyyy');
+    
+    return `${formattedStart} to ${formattedEnd}`;
+  } catch (error) {
+    console.error("Error calculating last week dates:", error);
+    // Fallback calculation if there's an error with timezone handling
+    const now = new Date();
+    const todayDay = now.getDay(); // 0 is Sunday
+    
+    // Get last week's Monday (current day - 7 - days since last Monday)
+    const lastMonday = new Date(now);
+    lastMonday.setDate(now.getDate() - 7 - todayDay + (todayDay === 0 ? -6 : 1)); 
+    
+    // Get last week's Sunday (last Monday + 6 days)
+    const lastSunday = new Date(lastMonday);
+    lastSunday.setDate(lastMonday.getDate() + 6);
+    
+    return `${format(lastMonday, 'MMMM d')} to ${format(lastSunday, 'MMMM d, yyyy')}`;
+  }
+}
+
+/**
  * Detect if query appears to be a time-based summary query
  */
 function isTimeSummaryQuery(message: string): boolean {
@@ -123,7 +173,7 @@ function isJournalAnalysisQuery(message: string): boolean {
 }
 
 /**
- * Check if query is asking about current dates
+ * Check if query is asking about current or last week dates
  */
 function isDirectDateQuery(message: string): boolean {
   const lowerQuery = message.toLowerCase();
@@ -133,10 +183,12 @@ function isDirectDateQuery(message: string): boolean {
     /\bwhat\s+(is|are)\s+(the\s+)?(current|this)\s+week('s)?\s+dates\b/i,
     /\bwhat\s+date\s+is\s+it\b/i,
     /\bwhat\s+day\s+is\s+(it|today)\b/i,
-    /\bwhat\s+(is|are)\s+(the\s+)?dates?\s+for\s+(this|current)\s+week\b/i,
+    /\bwhat\s+(is|are)\s+(the\s+)?dates?\s+for\s+(this|current|last|previous)\s+week\b/i,
     /\bcurrent\s+week\s+dates?\b/i,
+    /\blast\s+week\s+dates?\b/i,
+    /\blast\s+week('s)?\s+dates?\b/i,
     /\bthis\s+week('s)?\s+dates?\b/i, 
-    /\bwhat\s+dates?\s+(is|are)\s+this\s+week\b/i,
+    /\bwhat\s+dates?\s+(is|are)\s+(this|last)\s+week\b/i,
     /\btoday's\s+date\b/i
   ];
   
@@ -194,13 +246,24 @@ serve(async (req) => {
         console.error("Error fetching user timezone:", error);
       }
       
-      // Get the current week's date range in user's timezone
-      const dateRange = getCurrentWeekDates(userTimezone);
-      console.log(`Current week date range: ${dateRange}`);
-
-      // Provide a direct answer with the date information
-      const today = new Date();
-      const response = `The current week dates are: ${dateRange}\n\nToday is ${format(today, 'EEEE, MMMM d, yyyy')}.`;
+      // Check if asking about current week or last week
+      const isLastWeekQuery = message.toLowerCase().includes('last week') || 
+                             message.toLowerCase().includes('previous week');
+      
+      let response;
+      
+      if (isLastWeekQuery) {
+        // Get the last week's date range in user's timezone
+        const dateRange = getLastWeekDates(userTimezone);
+        console.log(`Last week date range: ${dateRange}`);
+        response = `The last week dates were: ${dateRange}`;
+      } else {
+        // Get the current week's date range in user's timezone
+        const dateRange = getCurrentWeekDates(userTimezone);
+        console.log(`Current week date range: ${dateRange}`);
+        const today = new Date();
+        response = `The current week dates are: ${dateRange}\n\nToday is ${format(today, 'EEEE, MMMM d, yyyy')}.`;
+      }
       
       return new Response(
         JSON.stringify({

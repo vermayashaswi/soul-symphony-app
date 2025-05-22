@@ -52,9 +52,16 @@ export async function planQuery(message: string, threadId: string, userId: strin
   try {
     console.log("[Query Planner] Planning strategy for:", message);
     
-    // Check if this is a direct date query
-    if (isDirectDateQuery(message)) {
-      console.log("[Query Planner] Detected direct date query");
+    // Check if this is a direct date query, including last week queries
+    const isLastWeekQuery = message.toLowerCase().includes('last week') && 
+                           (message.toLowerCase().includes('date') || 
+                            message.toLowerCase().includes('what') || 
+                            message.toLowerCase().includes('when'));
+                           
+    const isCurrentWeekQuery = isDirectDateQuery(message);
+    
+    if (isCurrentWeekQuery || isLastWeekQuery) {
+      console.log("[Query Planner] Detected direct date query:", isLastWeekQuery ? "last week" : "current week");
       return {
         strategy: "direct_date",
         isDirectDateQuery: true,

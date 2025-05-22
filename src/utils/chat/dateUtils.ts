@@ -1,3 +1,4 @@
+
 import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { format, formatInTimeZone, toZonedTime } from "date-fns-tz";
 
@@ -24,6 +25,38 @@ export function getCurrentWeekDates(timezone?: string): string {
   // Format the dates in a user-friendly way
   const formattedStart = format(startOfCurrentWeek, 'MMMM d');
   const formattedEnd = format(endOfCurrentWeek, 'MMMM d, yyyy');
+
+  return `${formattedStart} to ${formattedEnd}`;
+}
+
+/**
+ * Get the formatted date range for the last week
+ * @returns Formatted string with the last week's date range
+ */
+export function getLastWeekDates(timezone?: string): string {
+  const tz = timezone || getUserTimezoneName() || 'UTC';
+  console.log(`Getting last week dates for timezone: ${tz}`);
+  
+  // Get the current date in the user's timezone
+  const now = toZonedTime(new Date(), tz);
+  console.log(`Current date in timezone (${tz}): ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+  
+  // Get last Monday (go back 7 days from current Monday)
+  const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
+  const lastWeekMonday = subDays(thisWeekMonday, 7);
+  
+  // Get last Sunday (go back 7 days from current Sunday)
+  const thisWeekSunday = endOfWeek(now, { weekStartsOn: 1 });
+  const lastWeekSunday = subDays(thisWeekSunday, 7);
+  
+  console.log(`This week Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')}`);
+  console.log(`Last week Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')}`);
+  console.log(`This week Sunday: ${format(thisWeekSunday, 'yyyy-MM-dd')}`);
+  console.log(`Last week Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')}`);
+  
+  // Format the dates in a user-friendly way
+  const formattedStart = format(lastWeekMonday, 'MMMM d');
+  const formattedEnd = format(lastWeekSunday, 'MMMM d, yyyy');
 
   return `${formattedStart} to ${formattedEnd}`;
 }
@@ -111,21 +144,25 @@ export function calculateRelativeDateRange(
     periodName = 'this week';
   } 
   else if (lowerTimePeriod.includes('last week')) {
-    // Last calendar week: Start at previous week Monday, end at previous week Sunday
-    // This is the key fix - we need to get the previous calendar week
-    const dayOfWeek = now.getDay(); // 0 = Sunday, 1 = Monday, ..., 6 = Saturday
-    const daysToLastSunday = dayOfWeek === 0 ? 7 : dayOfWeek; // How many days to go back to reach last Sunday
+    // FIXED: Properly calculate last calendar week
     
-    // Last Sunday at end of day
-    const lastSunday = subDays(now, daysToLastSunday);
-    // Last Monday at start of day (7 days before last Sunday)
-    const lastMonday = subDays(lastSunday, 6);
+    // Get this week's Monday and Sunday
+    const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
+    const thisWeekSunday = endOfWeek(now, { weekStartsOn: 1 });
     
-    console.log(`Day of week: ${dayOfWeek}, days to last Sunday: ${daysToLastSunday}`);
-    console.log(`Last Sunday: ${format(lastSunday, 'yyyy-MM-dd')}, Last Monday: ${format(lastMonday, 'yyyy-MM-dd')}`);
+    // Last week is 7 days before this week
+    const lastWeekMonday = subDays(thisWeekMonday, 7);
+    const lastWeekSunday = subDays(thisWeekSunday, 7);
     
-    startDate = startOfDay(lastMonday);
-    endDate = endOfDay(lastSunday);
+    console.log("LAST WEEK CALCULATION (NEW METHOD):");
+    console.log(`Current date: ${format(now, 'yyyy-MM-dd')}`);
+    console.log(`This week's Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')}`);
+    console.log(`This week's Sunday: ${format(thisWeekSunday, 'yyyy-MM-dd')}`);
+    console.log(`Last week's Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')}`);
+    console.log(`Last week's Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')}`);
+    
+    startDate = startOfDay(lastWeekMonday);
+    endDate = endOfDay(lastWeekSunday);
     periodName = 'last week';
   }
   else if (lowerTimePeriod.includes('past week') || lowerTimePeriod.includes('previous week')) {
@@ -361,9 +398,13 @@ export function debugTimezoneInfo(): void {
   const currentWeek = getCurrentWeekDates();
   console.log(`Current week dates: ${currentWeek}`);
   
-  // Test "last week" calculation
+  // Test "last week" calculation using both methods
+  console.log("Testing 'last week' calculation:");
+  const lastWeekDates = getLastWeekDates();
+  console.log(`Last week dates (direct function): ${lastWeekDates}`);
+  
   const lastWeekTest = calculateRelativeDateRange("last week");
-  console.log(`"last week" calculation result:`, lastWeekTest);
+  console.log(`"last week" calculation via calculateRelativeDateRange:`, lastWeekTest);
   
   // Parse the ISO dates for clearer output
   const startDate = new Date(lastWeekTest.startDate);
