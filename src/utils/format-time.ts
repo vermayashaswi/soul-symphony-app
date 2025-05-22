@@ -39,18 +39,22 @@ export function formatTime(seconds: number): string {
 
 /**
  * Format a date to a short readable format (e.g., "May 15, 2025")
- * @param date - Date to format
+ * @param date - Date to format (can be Date object or string)
  * @returns Formatted date string
  */
-export function formatShortDate(date: Date): string {
-  return format(date, 'MMM d, yyyy');
+export function formatShortDate(date: Date | string): string {
+  // Convert to Date object if a string is provided
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return format(dateObj, 'MMM d, yyyy');
 }
 
 /**
  * Format time string for display in chat messages
- * @param date - Date to format
+ * @param date - Date to format (can be Date object or string)
  * @returns Formatted time string (e.g., "3:45 PM")
  */
-export function formatMessageTime(date: Date): string {
-  return format(date, 'h:mm a');
+export function formatMessageTime(date: Date | string): string {
+  // Convert to Date object if a string is provided
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  return format(dateObj, 'h:mm a');
 }

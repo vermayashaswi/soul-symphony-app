@@ -270,7 +270,9 @@ export function JournalEntryCard({
 
   const createdAtFormatted = (() => {
     try {
-      return formatShortDate(safeEntry.created_at);
+      // Convert the string date to a Date object before passing to formatShortDate
+      const dateObj = new Date(safeEntry.created_at);
+      return formatShortDate(dateObj);
     } catch (error) {
       console.error('[JournalEntryCard] Error formatting date:', error);
       return 'Recently';
