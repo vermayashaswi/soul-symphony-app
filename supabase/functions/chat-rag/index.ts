@@ -20,7 +20,6 @@ import {
 import { generateResponse } from "./utils/responseGenerator.ts";
 import { processTimeRange } from "./utils/dateProcessor.ts";
 import { analyzeEmotions } from "./utils/emotionAnalyzer.ts";
-import { validateDateFilter } from "./utils/dateFilterValidator.ts";
 
 // Define Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -87,7 +86,7 @@ serve(async (req) => {
     } : null;
     
     // Process time range if provided
-    let initialTimeRange = timeRangeWithTimezone ? processTimeRange(timeRangeWithTimezone) : null;
+    let processedTimeRange = timeRangeWithTimezone ? processTimeRange(timeRangeWithTimezone) : null;
     
     // Check for month-specific queries before proceeding
     const monthName = detectMonthInQuery(message);
@@ -101,51 +100,24 @@ serve(async (req) => {
       const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
       
       // Override any existing time range with the detected month
-      initialTimeRange = processTimeRange({
+      processedTimeRange = processTimeRange({
         type: 'specificMonth',
         monthName: monthName,
         year: year,
         timezone: userTimezone || reqBody.timezoneName || "UTC"
       });
       
-      console.log(`Setting initial time range for ${monthName} ${year}:`, initialTimeRange);
+      console.log(`Setting time range for ${monthName} ${year}:`, processedTimeRange);
     }
     
     // Extract time frame from query if not provided explicitly
-    if (!initialTimeRange) {
+    if (!processedTimeRange) {
       const detectedTimeframe = detectTimeframeInQuery(message);
       if (detectedTimeframe) {
         console.log(`Detected timeframe in query: ${JSON.stringify(detectedTimeframe)}`);
-        initialTimeRange = processTimeRange(detectedTimeframe);
-        console.log("Processed detected timeframe:", initialTimeRange);
+        processedTimeRange = processTimeRange(detectedTimeframe);
+        console.log("Processed detected timeframe:", processedTimeRange);
       }
-    }
-
-    // ===== NEW: GPT-powered date filter validation =====
-    const currentDate = new Date().toISOString();
-    console.log("Starting GPT date filter validation");
-    
-    // Validate and potentially correct the time range using GPT
-    const validatedFilter = await validateDateFilter(apiKey, {
-      originalQuery: message,
-      detectedTimeRange: initialTimeRange,
-      userTimezone: userTimezone,
-      currentDate: currentDate
-    });
-    
-    // Use the validated filter for our search
-    let processedTimeRange = validatedFilter.correctedTimeRange || initialTimeRange;
-    
-    // Log extensive debugging info about the time range processing
-    console.log("=== TIME RANGE PROCESSING DEBUG ===");
-    console.log("Original query:", message);
-    console.log("Initial time range:", initialTimeRange);
-    console.log("GPT validation result:", validatedFilter);
-    console.log("Final processed time range:", processedTimeRange);
-    console.log("===================================");
-    
-    if (processedTimeRange) {
-      console.log("Final time range to be used in search:", processedTimeRange);
     }
     
     // Determine if this is a mental health query requiring personalized analysis
@@ -225,7 +197,7 @@ serve(async (req) => {
     console.log("Embedding generated successfully");
 
     // Search for relevant entries with proper temporal filtering
-    console.log("Searching for relevant entries with final validated time range");
+    console.log("Searching for relevant entries");
     
     // Use different search function based on whether we have a time range
     let entries = [];
@@ -239,7 +211,7 @@ serve(async (req) => {
       queryType: isMonthQuery && monthName ? "month-specific" : processedTimeRange ? "time-filtered" : "standard"
     });
     
-    if (isMonthQuery && monthName && validatedFilter.isValid) {
+    if (isMonthQuery && monthName) {
       // Extract year if present in the query, otherwise use current year
       const yearMatch = message.match(/\b(20\d{2})\b/);
       const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
@@ -247,7 +219,7 @@ serve(async (req) => {
       console.log(`Using month-specific search for ${monthName} ${year}`);
       entries = await searchEntriesByMonth(supabase, userId, queryEmbedding, monthName, year);
     } else if (processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate)) {
-      console.log(`Using time-filtered search with validated range: ${JSON.stringify(processedTimeRange)}`);
+      console.log(`Using time-filtered search with range: ${JSON.stringify(processedTimeRange)}`);
       entries = await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, processedTimeRange);
       
       // Log the returned entries dates for debugging
@@ -276,20 +248,13 @@ serve(async (req) => {
         noEntriesMessage = `Sorry, it looks like you don't have any journal entries for ${monthName} ${year}.`;
       }
       
-      // If the time range was corrected by GPT, include that information in the response
-      if (!validatedFilter.isValid) {
-        noEntriesMessage += ` (I searched for entries between ${new Date(processedTimeRange.startDate).toDateString()} and ${new Date(processedTimeRange.endDate).toDateString()})`;
-      }
-      
       // Return a friendly message indicating no entries were found
       return new Response(
         JSON.stringify({ 
           data: noEntriesMessage,
           noEntriesForTimeRange: true,
           timeRangeDebug: {
-            original: initialTimeRange,
-            validated: validatedFilter,
-            final: processedTimeRange
+            timeRange: processedTimeRange
           }
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
@@ -327,12 +292,7 @@ serve(async (req) => {
           date: entry.created_at,
           snippet: entry.content?.substring(0, 150) + (entry.content?.length > 150 ? "..." : ""),
           similarity: entry.similarity
-        })),
-        timeRangeDebug: {
-          original: initialTimeRange,
-          validated: validatedFilter,
-          final: processedTimeRange
-        }
+        }))
       }),
       { headers: { 'Content-Type': 'application/json', ...corsHeaders } }
     );
