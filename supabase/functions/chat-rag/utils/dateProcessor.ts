@@ -1,8 +1,8 @@
 
 // Import all date functions directly from date-fns with specific version
 import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'https://esm.sh/date-fns@2.30.0';
-// Import timezone functions directly with specific version
-import { utcToZonedTime } from 'https://esm.sh/date-fns-tz@2.0.0/utcToZonedTime.js';
+// Import timezone functions directly with specific version - using the full path
+import { utcToZonedTime } from 'https://esm.sh/date-fns-tz@2.0.0/esm/utcToZonedTime/index.js';
 
 /**
  * Process a time range object to ensure dates are in proper format

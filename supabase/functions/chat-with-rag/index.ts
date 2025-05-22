@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
 import { 
@@ -9,7 +10,7 @@ import {
   startOfDay,
   endOfDay
 } from "https://esm.sh/date-fns@2.30.0";
-import { toZonedTime } from "https://esm.sh/date-fns-tz@2.0.0/toZonedTime.js";
+import { toZonedTime } from "https://esm.sh/date-fns-tz@2.0.0/esm/toZonedTime/index.js";
 
 // Define Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
