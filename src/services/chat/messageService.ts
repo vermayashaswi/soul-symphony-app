@@ -2,6 +2,7 @@ import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMet
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { Json } from '@/integrations/supabase/types';
+import { isDirectDateQuery, getClientTimeInfo } from '@/services/dateService';
 
 /**
  * Send a message to the AI assistant and get a response
@@ -18,11 +19,7 @@ export async function sendMessage(
     const messageId = uuidv4();
     
     // Capture client's device time and timezone information
-    const clientTimeInfo = {
-      timestamp: new Date().toISOString(),
-      timezoneOffset: new Date().getTimezoneOffset(),
-      timezoneName: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC'
-    };
+    const clientTimeInfo = getClientTimeInfo();
     
     console.log(`[sendMessage] Captured client time info:`, clientTimeInfo);
     

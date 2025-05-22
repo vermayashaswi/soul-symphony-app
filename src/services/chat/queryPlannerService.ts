@@ -1,8 +1,14 @@
 
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
-import { isDirectDateQuery } from '@/utils/format-time';
-import { getLastWeekDates, debugTimezoneInfo } from '@/utils/chat/dateUtils';
+import { 
+  isDirectDateQuery, 
+  getClientTimeInfo, 
+  getLastWeekDateRange, 
+  getCurrentWeekDateRange, 
+  debugTimezoneInfo, 
+  ClientTimeInfo 
+} from '@/services/dateService';
 
 /**
  * Enhance query with thread context
@@ -60,11 +66,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
     }
     
     // Get client's device time information for accurate date calculations
-    const clientInfo = {
-      timestamp: new Date().toISOString(), // Will be replaced with client timestamp
-      timezoneOffset: new Date().getTimezoneOffset(), // Will be replaced with client timezone offset
-      timezoneName: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC' // Will be replaced with client timezone name
-    };
+    const clientInfo: ClientTimeInfo = getClientTimeInfo();
     
     console.log(`[Query Planner] Client time information:`, clientInfo);
     
@@ -100,26 +102,37 @@ export async function planQuery(message: string, threadId: string, userId: strin
     if (isCurrentWeekQuery || isLastWeekQuery) {
       console.log("[Query Planner] Detected direct date query:", isLastWeekQuery ? "last week" : "current week");
       
+      let dateResponse, dateRange;
+      
       if (isLastWeekQuery) {
-        // Log last week dates for debugging
-        const lastWeekDates = getLastWeekDates(userTimezone);
-        console.log(`[Query Planner] Last week dates calculated: ${lastWeekDates}`);
+        // Get last week dates using the client's time information and user timezone
+        const lastWeekResult = getLastWeekDateRange(clientInfo, userTimezone);
+        dateResponse = lastWeekResult.formattedRange;
+        dateRange = lastWeekResult.rangeObj;
+        console.log(`[Query Planner] Last week dates calculated: ${dateResponse}`);
+      } else {
+        // Get current week dates using the client's time information and user timezone
+        const currentWeekResult = getCurrentWeekDateRange(clientInfo, userTimezone);
+        dateResponse = currentWeekResult.formattedRange;
+        dateRange = currentWeekResult.rangeObj;
+        console.log(`[Query Planner] Current week dates calculated: ${dateResponse}`);
       }
       
       return {
         strategy: "direct_date",
         isDirectDateQuery: true,
-        timeRange: null,
+        timeRange: dateRange,
         useHistoricalData: false,
         usePersonalContext: false,
         filterByEmotion: null,
         enhancedQuery: message,
         originalQuery: message,
-        timestamp: new Date().toISOString(),  // Add timestamp for debugging
+        timestamp: new Date().toISOString(),
         clientDeviceTime: clientInfo.timestamp,
         clientTimezone: clientInfo.timezoneName,
         clientTimezoneOffset: clientInfo.timezoneOffset,
-        userTimezone: userTimezone
+        userTimezone: userTimezone,
+        dateResponse: dateResponse // Include the formatted date response
       };
     }
     
@@ -189,7 +202,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
       filterByEmotion: queryTypes.emotion || null,
       enhancedQuery,
       originalQuery: message,
-      timestamp: new Date().toISOString(),  // Add timestamp for debugging
+      timestamp: new Date().toISOString(),
       clientDeviceTime: clientInfo.timestamp,
       clientTimezone: clientInfo.timezoneName,
       clientTimezoneOffset: clientInfo.timezoneOffset,
@@ -202,7 +215,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
       originalQuery: message,
       enhancedQuery: message,
       errorState: true,
-      timestamp: new Date().toISOString()  // Add timestamp for debugging
+      timestamp: new Date().toISOString()
     };
   }
 }

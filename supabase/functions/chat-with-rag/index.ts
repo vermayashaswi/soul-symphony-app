@@ -1,6 +1,14 @@
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { format, addDays, startOfWeek, endOfWeek, subDays } from "https://esm.sh/date-fns@3.3.1";
+import { 
+  format, 
+  addDays, 
+  startOfWeek, 
+  endOfWeek, 
+  subDays,
+  startOfDay,
+  endOfDay
+} from "https://esm.sh/date-fns@3.3.1";
 import { toZonedTime } from "https://esm.sh/date-fns-tz@3.2.0";
 
 // Define Supabase client
@@ -22,24 +30,21 @@ const corsHeaders = {
 };
 
 // Maximum number of journal entries to retrieve for vector search
-// Keep this reasonable for vector search to ensure quality results
 const MAX_ENTRIES = 10;
-
-// Don't limit entries for time pattern or special analysis queries
-// Set to a higher value to ensure all entries are analyzed
-const MAX_TIME_ANALYSIS_ENTRIES = 1000; // Increased from 100 to handle more entries
+const MAX_TIME_ANALYSIS_ENTRIES = 1000;
 
 /**
- * Get the formatted date range for the current week
+ * Gets the formatted date range for the current week
+ * Following the consistent "Monday to Sunday" definition
  */
-function getCurrentWeekDates(timezone?: string): string {
+function getCurrentWeekDates(timezone?: string, clientTimestamp?: string): string {
   // Default to UTC if no timezone specified
   const tz = timezone || 'UTC';
   console.log(`Getting current week dates for timezone: ${tz}`);
   
   try {
     // Create a fresh date object - critical for avoiding stale dates
-    const nowUTC = new Date();
+    const nowUTC = clientTimestamp ? new Date(clientTimestamp) : new Date();
     console.log(`Current UTC time: ${nowUTC.toISOString()}`);
     
     // Get the current date in the user's timezone
@@ -83,7 +88,8 @@ function getCurrentWeekDates(timezone?: string): string {
 }
 
 /**
- * Get the formatted date range for the last week
+ * Gets the formatted date range for the last week
+ * Following the consistent "Monday to Sunday" definition for last calendar week
  */
 function getLastWeekDates(timezone?: string, clientTimestamp?: string): string {
   // Default to UTC if no timezone specified
@@ -99,24 +105,27 @@ function getLastWeekDates(timezone?: string, clientTimestamp?: string): string {
     const now = toZonedTime(nowUTC, tz);
     console.log(`Current date in ${tz} for last week calc: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
     
-    // Get this week's Monday and Sunday
+    // Get this week's Monday
     const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
-    const thisWeekSunday = endOfWeek(now, { weekStartsOn: 1 });
     
-    // Last week is 7 days before this week
+    // Last week's Monday is 7 days before this week's Monday
     const lastWeekMonday = subDays(thisWeekMonday, 7);
-    const lastWeekSunday = subDays(thisWeekMonday, 1); // Day before this week's Monday
+    // Last week's Sunday is 1 day before this week's Monday
+    const lastWeekSunday = subDays(thisWeekMonday, 1); 
     
     console.log("LAST WEEK CALCULATION (EDGE FUNCTION):");
     console.log(`Current date: ${format(now, 'yyyy-MM-dd')} (${now.toISOString()})`);
     console.log(`This week's Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')} (${thisWeekMonday.toISOString()})`);
-    console.log(`This week's Sunday: ${format(thisWeekSunday, 'yyyy-MM-dd')} (${thisWeekSunday.toISOString()})`);
     console.log(`Last week's Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')} (${lastWeekMonday.toISOString()})`);
     console.log(`Last week's Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')} (${lastWeekSunday.toISOString()})`);
     
+    // Apply start of day and end of day to ensure full day coverage
+    const lastWeekStart = startOfDay(lastWeekMonday);
+    const lastWeekEnd = endOfDay(lastWeekSunday);
+    
     // Format the dates in a user-friendly way
-    const formattedStart = format(lastWeekMonday, 'MMMM d');
-    const formattedEnd = format(lastWeekSunday, 'MMMM d, yyyy');
+    const formattedStart = format(lastWeekStart, 'MMMM d');
+    const formattedEnd = format(lastWeekEnd, 'MMMM d, yyyy');
     
     const result = `${formattedStart} to ${formattedEnd}`;
     console.log(`Final formatted last week: ${result}`);
@@ -129,14 +138,20 @@ function getLastWeekDates(timezone?: string, clientTimestamp?: string): string {
     
     const todayDay = now.getDay(); // 0 is Sunday
     
-    // Get last week's Monday (current day - 7 - days since last Monday)
-    const lastMonday = new Date(now);
-    lastMonday.setDate(now.getDate() - 7 - todayDay + (todayDay === 0 ? -6 : 1)); 
-    console.log(`Fallback last Monday: ${lastMonday.toISOString()}`);
+    // Get this week's Monday
+    const thisMonday = new Date(now);
+    thisMonday.setDate(now.getDate() - todayDay + (todayDay === 0 ? -6 : 1));
     
-    // Get last week's Sunday (last Monday + 6 days)
-    const lastSunday = new Date(lastMonday);
-    lastSunday.setDate(lastMonday.getDate() + 6);
+    // Get last week's Monday (7 days before this week's Monday)
+    const lastMonday = new Date(thisMonday);
+    lastMonday.setDate(thisMonday.getDate() - 7);
+    
+    // Get last week's Sunday (1 day before this week's Monday)
+    const lastSunday = new Date(thisMonday);
+    lastSunday.setDate(thisMonday.getDate() - 1);
+    
+    console.log(`Fallback this Monday: ${thisMonday.toISOString()}`);
+    console.log(`Fallback last Monday: ${lastMonday.toISOString()}`);
     console.log(`Fallback last Sunday: ${lastSunday.toISOString()}`);
     
     return `${format(lastMonday, 'MMMM d')} to ${format(lastSunday, 'MMMM d, yyyy')}`;
@@ -289,7 +304,8 @@ serve(async (req) => {
         response = `The last week dates were: ${dateRange}`;
       } else {
         // Get the current week's date range
-        const dateRange = getCurrentWeekDates(effectiveTimezone);
+        const dateRange = getCurrentWeekDates(effectiveTimezone, 
+                                             clientTimeInfo ? clientTimeInfo.timestamp : undefined);
         console.log(`Current week date range: ${dateRange}`);
         
         // Format today's date in user's timezone
@@ -308,7 +324,7 @@ serve(async (req) => {
           response: response,
           references: [],
           isDirectDateResponse: true,
-          timestamp: new Date().toISOString()  // Add timestamp to response for debugging
+          timestamp: new Date().toISOString()  // Add timestamp for debugging
         }),
         {
           headers: {
