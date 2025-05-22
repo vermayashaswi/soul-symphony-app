@@ -1,4 +1,3 @@
-
 /**
  * Unified Date Service
  * 
@@ -98,11 +97,20 @@ export function formatInTimezone(
   formatStr: string = 'yyyy-MM-dd HH:mm:ss',
   timezone: string = 'UTC'
 ): string {
-  return formatInTimeZone(
-    typeof date === 'string' ? new Date(date) : date,
-    timezone,
-    formatStr
-  );
+  const dateObj = typeof date === 'string' ? new Date(date) : date;
+  
+  // Check if date is valid before formatting
+  if (isNaN(dateObj.getTime())) {
+    console.error('Invalid date provided to formatInTimezone:', date);
+    return 'Invalid Date';
+  }
+  
+  try {
+    return formatInTimeZone(dateObj, timezone, formatStr);
+  } catch (error) {
+    console.error('Error in formatInTimezone:', error);
+    return 'Invalid Date';
+  }
 }
 
 /**

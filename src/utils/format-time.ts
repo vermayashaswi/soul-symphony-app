@@ -23,7 +23,8 @@ export {
   getLastWeekDateRange,
   getCurrentWeekDateRange,
   debugTimezoneInfo,
-  calculateDateRange
+  calculateDateRange,
+  formatInTimezone
 };
 
 /**
@@ -46,9 +47,16 @@ export function formatShortDate(date: Date | string): string {
   try {
     // Convert to Date object if a string is provided
     const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is valid before formatting
+    if (isNaN(dateObj.getTime())) {
+      console.error('Invalid date provided to formatShortDate:', date);
+      return 'Invalid Date';
+    }
+    
     return format(dateObj, 'MMM d, yyyy');
   } catch (error) {
-    console.error('Error formatting short date:', error);
+    console.error('Error formatting short date:', error, 'Input:', date);
     return 'Invalid Date';
   }
 }
@@ -62,9 +70,16 @@ export function formatMessageTime(date: Date | string): string {
   try {
     // Convert to Date object if a string is provided
     const dateObj = typeof date === 'string' ? new Date(date) : date;
+    
+    // Check if date is valid before formatting
+    if (isNaN(dateObj.getTime())) {
+      console.error('Invalid date provided to formatMessageTime:', date);
+      return 'Invalid Time';
+    }
+    
     return format(dateObj, 'h:mm a');
   } catch (error) {
-    console.error('Error formatting message time:', error);
+    console.error('Error formatting message time:', error, 'Input:', date);
     return 'Invalid Time';
   }
 }

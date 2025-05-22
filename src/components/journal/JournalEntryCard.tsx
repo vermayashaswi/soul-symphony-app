@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Card } from '@/components/ui/card';
 import { formatShortDate } from '@/utils/format-time';
@@ -270,8 +271,7 @@ export function JournalEntryCard({
 
   const createdAtFormatted = (() => {
     try {
-      // Convert the string date to a Date object before passing to formatShortDate
-      // This should work with our updated formatShortDate function that accepts string or Date
+      // Just use the formatShortDate function which already handles both string and Date inputs
       return formatShortDate(safeEntry.created_at);
     } catch (error) {
       console.error('[JournalEntryCard] Error formatting date:', error);
