@@ -23,6 +23,7 @@ export {
  * @returns Formatted string with the current week's date range
  */
 export function getCurrentWeekDates(timezone?: string): string {
+  console.log(`[dateUtils] Getting current week dates for timezone: ${timezone || 'default'}`);
   const { formattedRange } = getCurrentWeekDateRange(
     { timezoneName: timezone },
     timezone
@@ -35,6 +36,7 @@ export function getCurrentWeekDates(timezone?: string): string {
  * @returns Formatted string with the last week's date range
  */
 export function getLastWeekDates(timezone?: string): string {
+  console.log(`[dateUtils] Getting last week dates for timezone: ${timezone || 'default'}`);
   const { formattedRange } = getLastWeekDateRange(
     { timezoneName: timezone },
     timezone
@@ -58,6 +60,9 @@ export function calculateRelativeDateRange(
   clientTimestamp?: string,
   userTimezone?: string
 ): { startDate: string, endDate: string, periodName: string } {
+  console.log(`[dateUtils] Calculating relative date range for "${timePeriod}"`);
+  console.log(`[dateUtils] Using timezone offset: ${timezoneOffset}, timezone: ${userTimezone || 'not provided'}`);
+  
   return calculateDateRange(
     timePeriod,
     {
@@ -97,6 +102,7 @@ export function detectRelativeTimeExpression(query: string): string | null {
     const match = lowerQuery.match(pattern);
     if (match) {
       // Return the matched time expression
+      console.log(`[dateUtils] Detected time expression: ${match[0]}`);
       return match[0];
     }
   }
@@ -104,9 +110,13 @@ export function detectRelativeTimeExpression(query: string): string | null {
   // Special case for simple query like "last month?" or "what about last year?"
   if (/^(what\s+about\s+)?(the\s+)?(last|this|previous|past|recent)\s+(day|week|month|year|(\d+)\s+days?|(\d+)\s+weeks?|(\d+)\s+months?|(\d+)\s+years?)(\?|\.|$)/i.test(lowerQuery)) {
     const match = lowerQuery.match(/(last|this|previous|past|recent)\s+(day|week|month|year|(\d+)\s+days?|(\d+)\s+weeks?|(\d+)\s+months?|(\d+)\s+years?)/i);
-    if (match) return match[0];
+    if (match) {
+      console.log(`[dateUtils] Detected special case time expression: ${match[0]}`);
+      return match[0];
+    }
   }
   
+  console.log(`[dateUtils] No time expression detected in query: ${lowerQuery}`);
   return null;
 }
 
@@ -126,9 +136,10 @@ export function extractReferenceDate(previousDateRange: any): Date | undefined {
     if (isNaN(referenceDate.getTime())) {
       return undefined;
     }
+    console.log(`[dateUtils] Extracted reference date: ${referenceDate.toISOString()}`);
     return referenceDate;
   } catch (error) {
-    console.error("Error extracting reference date:", error);
+    console.error("[dateUtils] Error extracting reference date:", error);
     return undefined;
   }
 }
@@ -153,15 +164,18 @@ export function isRelativeTimeQuery(query: string): boolean {
   
   for (const pattern of relativeTimePatterns) {
     if (pattern.test(lowerQuery)) {
+      console.log(`[dateUtils] Detected relative time query: ${lowerQuery}`);
       return true;
     }
   }
   
   // Also check for standalone time periods that could be follow-ups
   if (/^(today|yesterday|this week|last week|this month|last month|this year|last year)(\?|\.|$)/i.test(lowerQuery)) {
+    console.log(`[dateUtils] Detected standalone time period query: ${lowerQuery}`);
     return true;
   }
   
+  console.log(`[dateUtils] Not a relative time query: ${lowerQuery}`);
   return false;
 }
 

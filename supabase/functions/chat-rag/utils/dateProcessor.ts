@@ -43,6 +43,7 @@ export function processTimeRange(timeRange: any): { startDate?: string; endDate?
       const now = new Date();
       result.startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString(); // Week starts on Monday
       result.endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
+      console.log(`Generated 'this week' date range: ${result.startDate} to ${result.endDate}`);
     } else if (timeRange.type === 'lastWeek') {
       const now = new Date();
       // Get this week's Monday
@@ -57,21 +58,29 @@ export function processTimeRange(timeRange: any): { startDate?: string; endDate?
       // Log the calculation details for debugging
       console.log("Last week calculation details:");
       console.log(`Current date: ${now.toISOString()}`);
+      console.log(`This week's Monday: ${thisWeekMonday.toISOString()}`);
       console.log(`Last week Monday: ${lastWeekMonday.toISOString()}`);
       console.log(`Last week Sunday: ${lastWeekSunday.toISOString()}`);
       
       result.startDate = startOfDay(lastWeekMonday).toISOString();
       result.endDate = endOfDay(lastWeekSunday).toISOString();
+      console.log(`Generated 'last week' date range: ${result.startDate} to ${result.endDate}`);
     } else if (timeRange.type === 'month') {
       const now = new Date();
       result.startDate = startOfMonth(now).toISOString();
       result.endDate = endOfMonth(now).toISOString();
+      console.log(`Generated 'this month' date range: ${result.startDate} to ${result.endDate}`);
     } else if (timeRange.type === 'lastMonth') {
       const now = new Date();
       const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
       result.startDate = startOfMonth(lastMonth).toISOString();
       result.endDate = endOfMonth(lastMonth).toISOString();
+      console.log(`Generated 'last month' date range: ${result.startDate} to ${result.endDate}`);
     }
+    
+    // Log timezone information for debugging
+    const userTimezone = timeRange.timezone || 'UTC';
+    console.log(`Time range processing using timezone: ${userTimezone}`);
     
     // Validate the resulting dates
     if (result.startDate && result.endDate) {
@@ -118,7 +127,13 @@ export function convertToTimezone(date: Date | string, timezone: string = 'UTC')
     if (typeof date === 'string') {
       date = parseISO(date);
     }
-    return toZonedTime(date, timezone); // Using toZonedTime from date-fns-tz v3
+    const result = toZonedTime(date, timezone); // Using toZonedTime from date-fns-tz v3
+    console.log(`Converted date to timezone ${timezone}:`, {
+      inputDate: date instanceof Date ? date.toISOString() : date,
+      outputDate: result.toISOString(),
+      outputLocal: result.toString()
+    });
+    return result;
   } catch (error) {
     console.error("Error converting date to timezone:", error);
     return new Date(date);

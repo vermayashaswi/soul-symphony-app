@@ -53,11 +53,37 @@ serve(async (req) => {
     }
 
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
-    console.log("Time range received:", timeRange);
+    console.log("Time range received:", timeRange ? JSON.stringify(timeRange) : "No time range provided");
     console.log("Query plan received:", queryPlan ? JSON.stringify(queryPlan, null, 2) : "No query plan provided");
+    console.log("Timezone information:", reqBody.timezoneOffset, reqBody.timezoneName);
+    
+    // Get user timezone preference from profile
+    let userTimezone = "UTC";
+    try {
+      const { data: profileData, error: profileError } = await supabase
+        .from('profiles')
+        .select('timezone')
+        .eq('id', userId)
+        .single();
+        
+      if (profileData && profileData.timezone) {
+        userTimezone = profileData.timezone;
+        console.log(`User timezone from profile: ${userTimezone}`);
+      } else {
+        console.log("No timezone found in user profile, using default UTC");
+      }
+    } catch (profileError) {
+      console.error("Error fetching user profile timezone:", profileError);
+    }
+    
+    // Enhance timeRange with user timezone
+    const timeRangeWithTimezone = timeRange ? { 
+      ...timeRange, 
+      timezone: userTimezone || reqBody.timezoneName || "UTC" 
+    } : null;
     
     // Process time range if provided
-    const processedTimeRange = timeRange ? processTimeRange(timeRange) : null;
+    const processedTimeRange = timeRangeWithTimezone ? processTimeRange(timeRangeWithTimezone) : null;
     if (processedTimeRange) {
       console.log("Processed time range:", processedTimeRange);
     }
@@ -126,6 +152,7 @@ serve(async (req) => {
     // Get local timezone offset for better time-based queries
     const timezoneOffset = reqBody.timezoneOffset || new Date().getTimezoneOffset();
     console.log(`Local timezone offset: ${timezoneOffset} minutes`);
+    console.log(`Using timezone: ${userTimezone || reqBody.timezoneName || "UTC"}`);
 
     // Handle different types of queries
     const isDateQuery = isDirectDateQuery(message);

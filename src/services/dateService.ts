@@ -86,7 +86,21 @@ export function getZonedDate(
   timezone: string = 'UTC'
 ): Date {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return toZonedTime(dateObj, timezone); // Using toZonedTime from date-fns-tz v3
+  
+  // Log the conversion for debugging
+  console.log(`[DateService] Converting date to timezone ${timezone}:`, {
+    inputDate: dateObj.toISOString(),
+    inputTimezone: timezone
+  });
+  
+  const zonedDate = toZonedTime(dateObj, timezone); // Using toZonedTime from date-fns-tz v3
+  
+  console.log(`[DateService] Date converted to timezone:`, {
+    outputDate: zonedDate.toISOString(),
+    localString: zonedDate.toString()
+  });
+  
+  return zonedDate;
 }
 
 /**
@@ -102,7 +116,7 @@ export function formatInTimezone(
   timezone: string = 'UTC'
 ): string {
   if (!date) {
-    console.error('Null or undefined date provided to formatInTimezone');
+    console.error('[DateService] Null or undefined date provided to formatInTimezone');
     return 'Invalid Date';
   }
 
@@ -111,13 +125,25 @@ export function formatInTimezone(
     
     // Check if date is valid before formatting
     if (!isValid(dateObj)) {
-      console.error('Invalid date provided to formatInTimezone:', date);
+      console.error('[DateService] Invalid date provided to formatInTimezone:', date);
       return 'Invalid Date';
     }
     
-    return formatInTimeZone(dateObj, timezone, formatStr);
+    // Log the formatting operation
+    console.log(`[DateService] Formatting date in timezone ${timezone}:`, {
+      inputDate: dateObj.toISOString(),
+      formatString: formatStr
+    });
+    
+    const result = formatInTimeZone(dateObj, timezone, formatStr);
+    
+    console.log(`[DateService] Formatted date result:`, {
+      formattedDate: result
+    });
+    
+    return result;
   } catch (error) {
-    console.error('Error in formatInTimezone:', error);
+    console.error('[DateService] Error in formatInTimezone:', error);
     return 'Invalid Date';
   }
 }
@@ -199,10 +225,10 @@ export function getLastWeekDateRange(
   const thisWeekMonday = startOfWeek(zonedNow, { weekStartsOn: 1 });
   
   // Last week's Monday is 7 days before this week's Monday
-  const lastWeekMonday = subDays(thisWeekMonday, 7);
+  const lastWeekMonday = startOfDay(subDays(thisWeekMonday, 7));
   
   // Last week's Sunday is 1 day before this week's Monday
-  const lastWeekSunday = subDays(thisWeekMonday, 1);
+  const lastWeekSunday = endOfDay(subDays(thisWeekMonday, 1));
   
   // Log detailed calculation information
   console.log("[DateService] LAST WEEK CALCULATION:");
@@ -211,23 +237,26 @@ export function getLastWeekDateRange(
   console.log(`[DateService] Last week's Monday: ${formatDate(lastWeekMonday, 'yyyy-MM-dd')} (${lastWeekMonday.toISOString()})`);
   console.log(`[DateService] Last week's Sunday: ${formatDate(lastWeekSunday, 'yyyy-MM-dd')} (${lastWeekSunday.toISOString()})`);
   
-  // Ensure we have the start and end of day
-  const lastWeekStart = startOfDay(lastWeekMonday);
-  const lastWeekEnd = endOfDay(lastWeekSunday);
-  
   // Format the dates in a user-friendly way
-  const formattedStart = formatDate(lastWeekStart, 'MMMM d');
-  const formattedEnd = formatDate(lastWeekEnd, 'MMMM d, yyyy');
+  const formattedStart = formatDate(lastWeekMonday, 'MMMM d');
+  const formattedEnd = formatDate(lastWeekSunday, 'MMMM d, yyyy');
   const formattedRange = `${formattedStart} to ${formattedEnd}`;
   
-  // Create date range object with ISO strings
+  // Create date range object with ISO strings for exact calculations
   const rangeObj: DateRange = {
-    startDate: lastWeekStart.toISOString(),
-    endDate: lastWeekEnd.toISOString(),
+    startDate: lastWeekMonday.toISOString(),
+    endDate: lastWeekSunday.toISOString(),
     periodName: 'last week'
   };
   
   console.log(`[DateService] Formatted last week: ${formattedRange}`);
+  console.log(`[DateService] Last week date range:`, {
+    startDateISO: lastWeekMonday.toISOString(),
+    endDateISO: lastWeekSunday.toISOString(),
+    startDateLocal: lastWeekMonday.toString(),
+    endDateLocal: lastWeekSunday.toString(),
+    timezone: timezone
+  });
   
   return { formattedRange, rangeObj };
 }
@@ -286,6 +315,17 @@ export function calculateDateRange(
     startDate = startOfDay(subDays(zonedDate, 1));
     endDate = endOfDay(subDays(zonedDate, 1));
     periodName = 'yesterday';
+  }
+  else if (lowerTimePeriod === 'this month') {
+    startDate = startOfMonth(zonedDate);
+    endDate = endOfMonth(zonedDate);
+    periodName = 'this month';
+  }
+  else if (lowerTimePeriod === 'last month') {
+    const prevMonth = subDays(startOfMonth(zonedDate), 1);
+    startDate = startOfMonth(prevMonth);
+    endDate = endOfMonth(prevMonth);
+    periodName = 'last month';
   }
   else if (lowerTimePeriod.match(/last (\d+) days?/)) {
     const matches = lowerTimePeriod.match(/last (\d+) days?/);

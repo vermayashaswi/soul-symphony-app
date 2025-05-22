@@ -21,6 +21,7 @@ AS $$
 BEGIN
   -- Log date parameters for debugging
   RAISE NOTICE 'Date filter parameters - Start: %, End: %', start_date, end_date;
+  RAISE NOTICE 'Filtering entries for user: %', user_id_filter;
   
   -- First check if date parameters are valid
   IF start_date IS NOT NULL AND end_date IS NOT NULL AND start_date > end_date THEN
@@ -63,5 +64,8 @@ BEGIN
   ORDER BY
     dfe.embedding <=> query_embedding
   LIMIT match_count;
+  
+  -- Log completion of query for debugging
+  RAISE NOTICE 'Completed vector search with date filtering';
 END;
 $$;

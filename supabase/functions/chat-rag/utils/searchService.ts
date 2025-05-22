@@ -42,6 +42,12 @@ export async function searchEntriesWithTimeRange(
     console.log(`Searching entries with time range for userId: ${userId}`);
     console.log(`Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'}`);
     
+    // Convert dates to UTC for database filtering
+    const startDate = timeRange.startDate ? new Date(timeRange.startDate).toISOString() : null;
+    const endDate = timeRange.endDate ? new Date(timeRange.endDate).toISOString() : null;
+    
+    console.log(`Converted time range for database query: from ${startDate || 'none'} to ${endDate || 'none'}`);
+    
     const { data, error } = await supabase.rpc(
       'match_journal_entries_with_date',
       {
@@ -49,8 +55,8 @@ export async function searchEntriesWithTimeRange(
         match_threshold: 0.5,
         match_count: 10,
         user_id_filter: userId,
-        start_date: timeRange.startDate || null,
-        end_date: timeRange.endDate || null
+        start_date: startDate,
+        end_date: endDate
       }
     );
     
@@ -60,6 +66,13 @@ export async function searchEntriesWithTimeRange(
     }
     
     console.log(`Found ${data?.length || 0} entries with time-filtered vector similarity`);
+    
+    // Log entry dates for debugging
+    if (data && data.length > 0) {
+      const entryDates = data.map((entry: any) => new Date(entry.created_at).toISOString());
+      console.log("Entry dates found:", entryDates);
+    }
+    
     return data || [];
   } catch (error) {
     console.error('Error searching entries with time range:', error);
