@@ -318,6 +318,38 @@ async function searchJournalEntriesWithVector(
   }
 }
 
+// Detect if query appears to be a direct date query
+function isDirectDateQuery(message: string): boolean {
+  const lowerQuery = message.toLowerCase();
+  
+  // Check for direct date-related queries
+  return (
+    lowerQuery.includes('what is the current week') ||
+    lowerQuery.includes('what are the dates for this week') ||
+    lowerQuery.includes('current week dates') ||
+    lowerQuery.includes('this week dates') ||
+    lowerQuery.includes('last week dates') ||
+    lowerQuery.includes('previous week dates') ||
+    lowerQuery.includes('what are the dates for last week')
+  );
+}
+
+// Detect if query appears to be a journal analysis query
+function isJournalAnalysisQuery(message: string): boolean {
+  const lowerQuery = message.toLowerCase();
+  
+  // Check for journal analysis related queries
+  return (
+    lowerQuery.includes('analyze my journal') ||
+    lowerQuery.includes('journal analysis') ||
+    lowerQuery.includes('journal entries') ||
+    lowerQuery.includes('my entries') ||
+    lowerQuery.includes('what have i written about') ||
+    lowerQuery.includes('what did i write about')
+  );
+}
+
+// Handle the request to chat with RAG (Retrieval-Augmented Generation)
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
