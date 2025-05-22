@@ -43,9 +43,14 @@ export function formatTime(seconds: number): string {
  * @returns Formatted date string
  */
 export function formatShortDate(date: Date | string): string {
-  // Convert to Date object if a string is provided
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return format(dateObj, 'MMM d, yyyy');
+  try {
+    // Convert to Date object if a string is provided
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return format(dateObj, 'MMM d, yyyy');
+  } catch (error) {
+    console.error('Error formatting short date:', error);
+    return 'Invalid Date';
+  }
 }
 
 /**
@@ -54,7 +59,12 @@ export function formatShortDate(date: Date | string): string {
  * @returns Formatted time string (e.g., "3:45 PM")
  */
 export function formatMessageTime(date: Date | string): string {
-  // Convert to Date object if a string is provided
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return format(dateObj, 'h:mm a');
+  try {
+    // Convert to Date object if a string is provided
+    const dateObj = typeof date === 'string' ? new Date(date) : date;
+    return format(dateObj, 'h:mm a');
+  } catch (error) {
+    console.error('Error formatting message time:', error);
+    return 'Invalid Time';
+  }
 }

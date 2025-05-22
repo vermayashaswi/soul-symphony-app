@@ -271,8 +271,8 @@ export function JournalEntryCard({
   const createdAtFormatted = (() => {
     try {
       // Convert the string date to a Date object before passing to formatShortDate
-      const dateObj = new Date(safeEntry.created_at);
-      return formatShortDate(dateObj);
+      // This should work with our updated formatShortDate function that accepts string or Date
+      return formatShortDate(safeEntry.created_at);
     } catch (error) {
       console.error('[JournalEntryCard] Error formatting date:', error);
       return 'Recently';
