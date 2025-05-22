@@ -1,4 +1,3 @@
-
 import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { format, formatInTimeZone, toZonedTime } from "date-fns-tz";
 
@@ -11,22 +10,27 @@ export function getCurrentWeekDates(timezone?: string): string {
   console.log(`Getting current week dates for timezone: ${tz}`);
   
   // Get the current date in the user's timezone
-  const now = toZonedTime(new Date(), tz);
-  console.log(`Current date in timezone (${tz}): ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+  const now = new Date();
+  const zonedNow = toZonedTime(now, tz);
+  
+  console.log(`Current date (UTC): ${now.toISOString()}`);
+  console.log(`Current date in timezone (${tz}): ${format(zonedNow, 'yyyy-MM-dd HH:mm:ss')}`);
   
   // Get the start of the week (Monday)
-  const startOfCurrentWeek = startOfWeek(now, { weekStartsOn: 1 });
+  const startOfCurrentWeek = startOfWeek(zonedNow, { weekStartsOn: 1 });
   // Get the end of the week (Sunday)
-  const endOfCurrentWeek = endOfWeek(now, { weekStartsOn: 1 });
+  const endOfCurrentWeek = endOfWeek(zonedNow, { weekStartsOn: 1 });
   
-  console.log(`Start of current week: ${format(startOfCurrentWeek, 'yyyy-MM-dd')}`);
-  console.log(`End of current week: ${format(endOfCurrentWeek, 'yyyy-MM-dd')}`);
+  console.log(`Start of current week: ${format(startOfCurrentWeek, 'yyyy-MM-dd')} (${startOfCurrentWeek.toISOString()})`);
+  console.log(`End of current week: ${format(endOfCurrentWeek, 'yyyy-MM-dd')} (${endOfCurrentWeek.toISOString()})`);
   
   // Format the dates in a user-friendly way
   const formattedStart = format(startOfCurrentWeek, 'MMMM d');
   const formattedEnd = format(endOfCurrentWeek, 'MMMM d, yyyy');
 
-  return `${formattedStart} to ${formattedEnd}`;
+  const result = `${formattedStart} to ${formattedEnd}`;
+  console.log(`Formatted current week: ${result}`);
+  return result;
 }
 
 /**
@@ -37,28 +41,33 @@ export function getLastWeekDates(timezone?: string): string {
   const tz = timezone || getUserTimezoneName() || 'UTC';
   console.log(`Getting last week dates for timezone: ${tz}`);
   
+  // IMPORTANT: Always create a fresh date object
+  const now = new Date();
+  console.log(`Using fresh date object for calculation: ${now.toISOString()}`);
+  
   // Get the current date in the user's timezone
-  const now = toZonedTime(new Date(), tz);
-  console.log(`Current date in timezone (${tz}): ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+  const zonedNow = toZonedTime(now, tz);
+  console.log(`Current date in timezone (${tz}): ${format(zonedNow, 'yyyy-MM-dd HH:mm:ss')} (${zonedNow.toISOString()})`);
   
-  // Get last Monday (go back 7 days from current Monday)
-  const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
+  // Get this week's Monday (start of current week)
+  const thisWeekMonday = startOfWeek(zonedNow, { weekStartsOn: 1 });
+  console.log(`This week's Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')} (${thisWeekMonday.toISOString()})`);
+  
+  // Last week's Monday is 7 days before this week's Monday
   const lastWeekMonday = subDays(thisWeekMonday, 7);
+  console.log(`Last week's Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')} (${lastWeekMonday.toISOString()})`);
   
-  // Get last Sunday (go back 7 days from current Sunday)
-  const thisWeekSunday = endOfWeek(now, { weekStartsOn: 1 });
-  const lastWeekSunday = subDays(thisWeekSunday, 7);
-  
-  console.log(`This week Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')}`);
-  console.log(`Last week Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')}`);
-  console.log(`This week Sunday: ${format(thisWeekSunday, 'yyyy-MM-dd')}`);
-  console.log(`Last week Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')}`);
+  // Last week's Sunday is 1 day before this week's Monday
+  const lastWeekSunday = subDays(thisWeekMonday, 1);
+  console.log(`Last week's Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')} (${lastWeekSunday.toISOString()})`);
   
   // Format the dates in a user-friendly way
   const formattedStart = format(lastWeekMonday, 'MMMM d');
   const formattedEnd = format(lastWeekSunday, 'MMMM d, yyyy');
 
-  return `${formattedStart} to ${formattedEnd}`;
+  const result = `${formattedStart} to ${formattedEnd}`;
+  console.log(`Formatted last week: ${result}`);
+  return result;
 }
 
 /**
@@ -368,7 +377,9 @@ export function getUserTimezoneOffset(): number {
  */
 export function getUserTimezoneName(): string | undefined {
   try {
-    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+    const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    console.log(`Detected user timezone: ${timezoneName}`);
+    return timezoneName;
   } catch (e) {
     console.error("Unable to get user timezone name:", e);
     return undefined;

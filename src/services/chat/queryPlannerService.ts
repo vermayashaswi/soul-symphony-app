@@ -2,6 +2,7 @@
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
 import { isDirectDateQuery } from '@/utils/format-time';
+import { getLastWeekDates, debugTimezoneInfo } from '@/utils/chat/dateUtils';
 
 /**
  * Enhance query with thread context
@@ -51,6 +52,12 @@ async function enhanceWithThreadContext(message: string, threadId: string, query
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
     console.log("[Query Planner] Planning strategy for:", message);
+    console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
+    
+    // For debugging timezone issues
+    if (message.toLowerCase().includes('debug timezone')) {
+      debugTimezoneInfo();
+    }
     
     // Check if this is a direct date query, including last week queries
     const isLastWeekQuery = message.toLowerCase().includes('last week') && 
@@ -62,6 +69,13 @@ export async function planQuery(message: string, threadId: string, userId: strin
     
     if (isCurrentWeekQuery || isLastWeekQuery) {
       console.log("[Query Planner] Detected direct date query:", isLastWeekQuery ? "last week" : "current week");
+      
+      if (isLastWeekQuery) {
+        // Log last week dates for debugging
+        const lastWeekDates = getLastWeekDates();
+        console.log(`[Query Planner] Last week dates calculated: ${lastWeekDates}`);
+      }
+      
       return {
         strategy: "direct_date",
         isDirectDateQuery: true,
@@ -70,7 +84,8 @@ export async function planQuery(message: string, threadId: string, userId: strin
         usePersonalContext: false,
         filterByEmotion: null,
         enhancedQuery: message,
-        originalQuery: message
+        originalQuery: message,
+        timestamp: new Date().toISOString()  // Add timestamp for debugging
       };
     }
     
@@ -139,7 +154,8 @@ export async function planQuery(message: string, threadId: string, userId: strin
       usePersonalContext: usePersonalContext || false,
       filterByEmotion: queryTypes.emotion || null,
       enhancedQuery,
-      originalQuery: message
+      originalQuery: message,
+      timestamp: new Date().toISOString()  // Add timestamp for debugging
     };
   } catch (error) {
     console.error("[Query Planner] Error planning query:", error);
@@ -147,7 +163,8 @@ export async function planQuery(message: string, threadId: string, userId: strin
       strategy: 'default',
       originalQuery: message,
       enhancedQuery: message,
-      errorState: true
+      errorState: true,
+      timestamp: new Date().toISOString()  // Add timestamp for debugging
     };
   }
 }

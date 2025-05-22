@@ -38,8 +38,12 @@ function getCurrentWeekDates(timezone?: string): string {
   console.log(`Getting current week dates for timezone: ${tz}`);
   
   try {
+    // Create a fresh date object - critical for avoiding stale dates
+    const nowUTC = new Date();
+    console.log(`Current UTC time: ${nowUTC.toISOString()}`);
+    
     // Get the current date in the user's timezone
-    const now = toZonedTime(new Date(), tz);
+    const now = toZonedTime(nowUTC, tz);
     console.log(`Current date in ${tz}: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
     
     // Get the start of the week (Monday)
@@ -47,24 +51,32 @@ function getCurrentWeekDates(timezone?: string): string {
     // Get the end of the week (Sunday)
     const endOfCurrentWeek = endOfWeek(now, { weekStartsOn: 1 });
     
-    console.log(`Start of current week: ${format(startOfCurrentWeek, 'yyyy-MM-dd')}`);
-    console.log(`End of current week: ${format(endOfCurrentWeek, 'yyyy-MM-dd')}`);
+    console.log(`Start of current week: ${format(startOfCurrentWeek, 'yyyy-MM-dd')} (${startOfCurrentWeek.toISOString()})`);
+    console.log(`End of current week: ${format(endOfCurrentWeek, 'yyyy-MM-dd')} (${endOfCurrentWeek.toISOString()})`);
     
     // Format the dates in a user-friendly way
     const formattedStart = format(startOfCurrentWeek, 'MMMM d');
     const formattedEnd = format(endOfCurrentWeek, 'MMMM d, yyyy');
     
-    return `${formattedStart} to ${formattedEnd}`;
+    const result = `${formattedStart} to ${formattedEnd}`;
+    console.log(`Final formatted current week: ${result}`);
+    return result;
   } catch (error) {
     console.error("Error calculating current week dates:", error);
     // Fallback calculation if there's an error with timezone handling
     const now = new Date();
+    console.log("Using fallback calculation with date: " + now.toISOString());
+    
     const dayOfWeek = now.getDay(); // 0 is Sunday
     const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust to get Monday
     
-    const monday = new Date(now.setDate(diff));
-    const sunday = new Date(now);
+    const monday = new Date(now);
+    monday.setDate(diff);
+    console.log(`Fallback Monday: ${monday.toISOString()}`);
+    
+    const sunday = new Date(monday);
     sunday.setDate(monday.getDate() + 6);
+    console.log(`Fallback Sunday: ${sunday.toISOString()}`);
     
     return `${format(monday, 'MMMM d')} to ${format(sunday, 'MMMM d, yyyy')}`;
   }
@@ -79,9 +91,13 @@ function getLastWeekDates(timezone?: string): string {
   console.log(`Getting last week dates for timezone: ${tz}`);
   
   try {
+    // Create a fresh date object - critical for avoiding stale dates
+    const nowUTC = new Date();
+    console.log(`Current UTC time for last week calc: ${nowUTC.toISOString()}`);
+    
     // Get the current date in the user's timezone
-    const now = toZonedTime(new Date(), tz);
-    console.log(`Current date in ${tz}: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+    const now = toZonedTime(nowUTC, tz);
+    console.log(`Current date in ${tz} for last week calc: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
     
     // Get this week's Monday and Sunday
     const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
@@ -89,33 +105,39 @@ function getLastWeekDates(timezone?: string): string {
     
     // Last week is 7 days before this week
     const lastWeekMonday = subDays(thisWeekMonday, 7);
-    const lastWeekSunday = subDays(thisWeekSunday, 7);
+    const lastWeekSunday = subDays(thisWeekMonday, 1); // Day before this week's Monday
     
     console.log("LAST WEEK CALCULATION (EDGE FUNCTION):");
-    console.log(`Current date: ${format(now, 'yyyy-MM-dd')}`);
-    console.log(`This week's Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')}`);
-    console.log(`This week's Sunday: ${format(thisWeekSunday, 'yyyy-MM-dd')}`);
-    console.log(`Last week's Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')}`);
-    console.log(`Last week's Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')}`);
+    console.log(`Current date: ${format(now, 'yyyy-MM-dd')} (${now.toISOString()})`);
+    console.log(`This week's Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')} (${thisWeekMonday.toISOString()})`);
+    console.log(`This week's Sunday: ${format(thisWeekSunday, 'yyyy-MM-dd')} (${thisWeekSunday.toISOString()})`);
+    console.log(`Last week's Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')} (${lastWeekMonday.toISOString()})`);
+    console.log(`Last week's Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')} (${lastWeekSunday.toISOString()})`);
     
     // Format the dates in a user-friendly way
     const formattedStart = format(lastWeekMonday, 'MMMM d');
     const formattedEnd = format(lastWeekSunday, 'MMMM d, yyyy');
     
-    return `${formattedStart} to ${formattedEnd}`;
+    const result = `${formattedStart} to ${formattedEnd}`;
+    console.log(`Final formatted last week: ${result}`);
+    return result;
   } catch (error) {
     console.error("Error calculating last week dates:", error);
     // Fallback calculation if there's an error with timezone handling
     const now = new Date();
+    console.log("Using fallback calculation for last week with date: " + now.toISOString());
+    
     const todayDay = now.getDay(); // 0 is Sunday
     
     // Get last week's Monday (current day - 7 - days since last Monday)
     const lastMonday = new Date(now);
     lastMonday.setDate(now.getDate() - 7 - todayDay + (todayDay === 0 ? -6 : 1)); 
+    console.log(`Fallback last Monday: ${lastMonday.toISOString()}`);
     
     // Get last week's Sunday (last Monday + 6 days)
     const lastSunday = new Date(lastMonday);
     lastSunday.setDate(lastMonday.getDate() + 6);
+    console.log(`Fallback last Sunday: ${lastSunday.toISOString()}`);
     
     return `${format(lastMonday, 'MMMM d')} to ${format(lastSunday, 'MMMM d, yyyy')}`;
   }
@@ -195,10 +217,12 @@ function isDirectDateQuery(message: string): boolean {
   // Check if any of the patterns match
   for (const pattern of dateQueryPatterns) {
     if (pattern.test(lowerQuery)) {
+      console.log(`Direct date query detected with pattern: ${pattern}`);
       return true;
     }
   }
   
+  console.log("Not a direct date query");
   return false;
 }
 
@@ -219,15 +243,17 @@ serve(async (req) => {
       threadId,
       usePersonalContext = false,
       queryPlan = null,
-      conversationHistory = []
+      conversationHistory = [],
+      cacheBreaker = Date.now() // Add cache breaker parameter to prevent caching
     } = await req.json();
 
-    console.log(`Processing request for user ${userId}: ${message}`);
+    console.log(`Processing request for user ${userId} at ${new Date().toISOString()}: ${message}`);
+    console.log(`Cache breaker: ${cacheBreaker}`);
 
     // Check if this is a direct date query that needs a simple calendar response
     const isDateQuery = queryPlan?.isDirectDateQuery || isDirectDateQuery(message);
     if (isDateQuery) {
-      console.log("Processing as direct date query");
+      console.log(`Processing as direct date query at ${new Date().toISOString()}`);
       
       // Get user's timezone from their profile
       let userTimezone;
@@ -269,7 +295,8 @@ serve(async (req) => {
         JSON.stringify({
           response: response,
           references: [],
-          isDirectDateResponse: true
+          isDirectDateResponse: true,
+          timestamp: new Date().toISOString()  // Add timestamp to response for debugging
         }),
         {
           headers: {
