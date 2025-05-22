@@ -1,3 +1,4 @@
+
 import { format, isToday, isYesterday, startOfDay, startOfWeek, startOfMonth, startOfYear, formatISO, parseISO, isValid } from 'date-fns';
 import { TimeRange } from '@/hooks/use-insights-data';
 
@@ -193,13 +194,40 @@ export const validateDateRange = (startDate: string | Date, endDate: string | Da
     
     // Check for invalid dates using isValid
     if (!isValid(start) || !isValid(end)) {
+      console.error('Invalid dates in range:', { startDate, endDate });
       return false;
     }
     
     // Check that start is before end
-    return start <= end;
+    if (start > end) {
+      console.error('Start date is after end date:', { startDate, endDate });
+      return false;
+    }
+    
+    return true;
   } catch (error) {
     console.error('Error validating date range:', error);
     return false;
+  }
+};
+
+/**
+ * Debug function to log date range information
+ * Useful for troubleshooting date filtering issues
+ */
+export const debugDateRange = (startDate: Date | string | null, endDate: Date | string | null, context: string = ''): void => {
+  try {
+    const start = startDate ? (typeof startDate === 'string' ? new Date(startDate) : startDate) : null;
+    const end = endDate ? (typeof endDate === 'string' ? new Date(endDate) : endDate) : null;
+    
+    console.log(`[DateDebug][${context}] Date Range:`, {
+      startRaw: startDate,
+      endRaw: endDate,
+      startParsed: start ? start.toISOString() : 'null',
+      endParsed: end ? end.toISOString() : 'null',
+      isValid: start && end ? validateDateRange(start, end) : 'N/A'
+    });
+  } catch (error) {
+    console.error(`[DateDebug][${context}] Error:`, error);
   }
 };

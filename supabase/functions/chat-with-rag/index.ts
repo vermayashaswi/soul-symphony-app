@@ -62,8 +62,8 @@ function getCurrentWeekDates(timezone?: string, clientTimestamp?: string): strin
     // Format the dates in a user-friendly way
     const formattedStart = format(startOfCurrentWeek, 'MMMM d');
     const formattedEnd = format(endOfCurrentWeek, 'MMMM d, yyyy');
-    
     const result = `${formattedStart} to ${formattedEnd}`;
+
     console.log(`Final formatted current week: ${result}`);
     return result;
   } catch (error) {
@@ -186,59 +186,6 @@ function isTimeSummaryQuery(message: string): boolean {
   const hasTimePattern = timePatterns.some(pattern => lowerQuery.includes(pattern));
   
   return hasSummaryPattern && hasTimePattern;
-}
-
-/**
- * Detect if the query is about journal patterns, habits, or personality insights
- * These queries should analyze all entries regardless of time mentions
- */
-function isJournalAnalysisQuery(message: string): boolean {
-  const lowerQuery = message.toLowerCase();
-  
-  // Patterns suggesting the query is about overall journal insights or patterns
-  const analysisPatterns = [
-    'pattern', 'habit', 'routine', 'tendency', 'prefer', 
-    'typically', 'usually', 'often', 'frequently',
-    'what do i', 'how do i', 'am i', 'do i',
-    'personality', 'trait', 'characteristic',
-    'my top', 'most common', 'most frequent', 'overall',
-    'in general', 'generally', 'typically', 'trends',
-    'insights', 'analysis', 'reflect'
-  ];
-  
-  return analysisPatterns.some(pattern => lowerQuery.includes(pattern));
-}
-
-/**
- * Check if query is asking about current or last week dates
- */
-function isDirectDateQuery(message: string): boolean {
-  const lowerQuery = message.toLowerCase();
-  
-  // Patterns for direct date inquiries
-  const dateQueryPatterns = [
-    /\bwhat\s+(is|are)\s+(the\s+)?(current|this)\s+week('s)?\s+dates\b/i,
-    /\bwhat\s+date\s+is\s+it\b/i,
-    /\bwhat\s+day\s+is\s+(it|today)\b/i,
-    /\bwhat\s+(is|are)\s+(the\s+)?dates?\s+for\s+(this|current|last|previous)\s+week\b/i,
-    /\bcurrent\s+week\s+dates?\b/i,
-    /\blast\s+week\s+dates?\b/i,
-    /\blast\s+week('s)?\s+dates?\b/i,
-    /\bthis\s+week('s)?\s+dates?\b/i, 
-    /\bwhat\s+dates?\s+(is|are)\s+(this|last)\s+week\b/i,
-    /\btoday's\s+date\b/i
-  ];
-  
-  // Check if any of the patterns match
-  for (const pattern of dateQueryPatterns) {
-    if (pattern.test(lowerQuery)) {
-      console.log(`Direct date query detected with pattern: ${pattern}`);
-      return true;
-    }
-  }
-  
-  console.log("Not a direct date query");
-  return false;
 }
 
 /**
@@ -433,6 +380,77 @@ serve(async (req) => {
     );
   }
 });
+
+/**
+ * Search journal entries using vector similarity with filters
+ */
+async function searchEntriesWithVector(userId, embedding, filters = {}, isComprehensiveAnalysisQuery = false) {
+  try {
+    let matchFn = 'match_journal_entries_fixed';
+    
+    // Determine the appropriate match count based on the query type
+    const matchCount = isComprehensiveAnalysisQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES;
+    console.log(`Vector search using match count: ${matchCount} (comprehensive: ${isComprehensiveAnalysisQuery})`);
+    
+    const params = {
+      query_embedding: embedding,
+      match_threshold: 0.5,
+      match_count: matchCount,
+      user_id_filter: userId
+    };
+    
+    // Use date-aware function if date range filters are provided
+    if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
+      matchFn = 'match_journal_entries_with_date';
+      
+      // Ensure dates are in ISO string format for Postgres
+      params.start_date = filters.dateRange.startDate ? new Date(filters.dateRange.startDate).toISOString() : null;
+      params.end_date = filters.dateRange.endDate ? new Date(filters.dateRange.endDate).toISOString() : null;
+      
+      // Log date parameters for debugging
+      console.log(`Date range filter applied in vector search:`, {
+        start_date: params.start_date,
+        end_date: params.end_date,
+        start_date_obj: filters.dateRange.startDate ? new Date(filters.dateRange.startDate).toString() : 'null',
+        end_date_obj: filters.dateRange.endDate ? new Date(filters.dateRange.endDate).toString() : 'null',
+      });
+    }
+    
+    // Call the appropriate database function for vector search
+    const { data: entries, error } = await supabase.rpc(matchFn, params);
+    
+    if (error) {
+      console.error(`Error in vector search using ${matchFn}:`, error);
+      throw error;
+    }
+    
+    console.log(`Found ${entries?.length || 0} entries with vector search`);
+    
+    // Map the results to include a proper content field
+    const mappedEntries = entries.map(entry => {
+      return {
+        ...entry,
+        // Ensure we have a content field that uses the correct data
+        content: entry.content || COALESCE(entry["refined text"], entry["transcription text"]) || ""
+      };
+    });
+    
+    return mappedEntries;
+  } catch (error) {
+    console.error("Error searching entries with vector:", error);
+    throw error;
+  }
+}
+
+// Helper function to coalesce values (similar to SQL COALESCE)
+function COALESCE(...args) {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== null && args[i] !== undefined) {
+      return args[i];
+    }
+  }
+  return null;
+}
 
 /**
  * Handle general questions that don't require personal context
@@ -716,18 +734,6 @@ Stay factual and only make conclusions that are directly supported by the journa
 }
 
 /**
- * Helper function to coalesce values (similar to SQL COALESCE)
- */
-function COALESCE(...args) {
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] !== null && args[i] !== undefined) {
-      return args[i];
-    }
-  }
-  return null;
-}
-
-/**
  * Search journal entries using SQL-based text search with filters
  */
 async function searchEntriesWithSQL(userId, query, filters = {}, isComprehensiveAnalysisQuery = false) {
@@ -784,50 +790,13 @@ async function searchEntriesWithSQL(userId, query, filters = {}, isComprehensive
 }
 
 /**
- * Search journal entries using vector similarity with filters
+ * Helper function to coalesce values (similar to SQL COALESCE)
  */
-async function searchEntriesWithVector(userId, embedding, filters = {}, isComprehensiveAnalysisQuery = false) {
-  try {
-    let matchFn = 'match_journal_entries_fixed';
-    
-    // Determine the appropriate match count based on the query type
-    const matchCount = isComprehensiveAnalysisQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES;
-    console.log(`Vector search using match count: ${matchCount} (comprehensive: ${isComprehensiveAnalysisQuery})`);
-    
-    const params = {
-      query_embedding: embedding,
-      match_threshold: 0.5,
-      match_count: matchCount,
-      user_id_filter: userId
-    };
-    
-    // Use date-aware function if date range filters are provided
-    if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
-      matchFn = 'match_journal_entries_with_date';
-      params.start_date = filters.dateRange.startDate || null;
-      params.end_date = filters.dateRange.endDate || null;
+function COALESCE(...args) {
+  for (let i = 0; i < args.length; i++) {
+    if (args[i] !== null && args[i] !== undefined) {
+      return args[i];
     }
-    
-    // Call the appropriate database function for vector search
-    const { data: entries, error } = await supabase.rpc(matchFn, params);
-    
-    if (error) {
-      console.error(`Error in vector search using ${matchFn}:`, error);
-      throw error;
-    }
-    
-    // Map the results to include a proper content field
-    const mappedEntries = entries.map(entry => {
-      return {
-        ...entry,
-        // Ensure we have a content field that uses the correct data
-        content: COALESCE(entry["refined text"], entry["transcription text"], entry.content) || ""
-      };
-    });
-    
-    return mappedEntries;
-  } catch (error) {
-    console.error("Error searching entries with vector:", error);
-    throw error;
   }
+  return null;
 }
