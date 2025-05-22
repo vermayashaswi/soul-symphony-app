@@ -1,4 +1,3 @@
-
 import "https://deno.land/x/xhr@0.1.0/mod.ts";
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
@@ -10,8 +9,8 @@ import {
   subDays,
   startOfDay,
   endOfDay
-} from "https://esm.sh/date-fns@2.30.0";
-import { toZonedTime } from "https://esm.sh/date-fns-tz@2.0.0/esm/toZonedTime/index.js";
+} from "https://esm.sh/date-fns@4.1.0";
+import { toZonedTime } from "https://esm.sh/date-fns-tz@3.2.0/esm/toZonedTime/index.js";
 
 // Define Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
@@ -50,7 +49,7 @@ function getCurrentWeekDates(timezone?: string, clientTimestamp?: string): strin
     console.log(`Current UTC time: ${nowUTC.toISOString()}`);
     
     // Get the current date in the user's timezone
-    const now = toZonedTime(nowUTC, tz);
+    const now = toZonedTime(nowUTC, tz); // Updated to toZonedTime
     console.log(`Current date in ${tz}: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
     
     // Get the start of the week (Monday)
