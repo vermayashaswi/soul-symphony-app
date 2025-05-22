@@ -2,8 +2,8 @@
 // Import all date functions directly from date-fns with specific version
 import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'https://esm.sh/date-fns@4.1.0';
 
-// Import timezone function using the new name in v3
-import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0/esm/toZonedTime/index.js';
+// Import timezone function using the correct import path for v3.2.0
+import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
 
 /**
  * Process a time range object to ensure dates are in proper format
@@ -104,7 +104,7 @@ export function convertToTimezone(date: Date | string, timezone: string = 'UTC')
     if (typeof date === 'string') {
       date = parseISO(date);
     }
-    return toZonedTime(date, timezone); // Updated to use toZonedTime instead of utcToZonedTime
+    return toZonedTime(date, timezone); // Using toZonedTime from date-fns-tz v3
   } catch (error) {
     console.error("Error converting date to timezone:", error);
     return new Date(date);
