@@ -1,4 +1,3 @@
-
 // Mental health and wellbeing term dictionary for domain recognition
 const MENTAL_HEALTH_TERMS = [
   // Emotional states
@@ -62,11 +61,21 @@ export function detectMentalHealthQuery(message: string): boolean {
 export function detectMonthInQuery(message: string): string | null {
   const lowerMessage = message.toLowerCase();
   
-  // Special handling for the word "may" since it's both a month and a modal verb
-  // Look for patterns that clearly indicate "may" is being used as a month
-  if (/(^|\s)(may\s+month|month\s+of\s+may|\bin\s+may\b|during\s+may|\bfor\s+may\b|may\s+\d{4}|may\s+\d{1,2}|\bfirst\s+week\s+in\s+may\b)/.test(lowerMessage)) {
-    console.log("Detected 'may' as a month in query:", message);
-    return 'may';
+  // Enhanced special handling for the word "may" since it's both a month and a modal verb
+  // Check for patterns that indicate "may" is being used as a month
+  const mayMonthPatterns = [
+    /(^|\s)(in\s+may\b|during\s+may\b|\bfor\s+may\b|may\s+\d{4}|may\s+\d{1,2}|may\s+month|month\s+of\s+may|\bfirst\s+week\s+in\s+may\b)/i,
+    /(^|\s)(early\s+may\b|late\s+may\b|mid\s+may\b|may\s+entries|\babout\s+may\b)/i,
+    /(^|\s)(show\s+me\s+may\b|what\s+(about|happened\s+in)\s+may)/i,
+    /(^|\s)(last\s+may\b|this\s+may\b|may\s+journal)/i
+  ];
+  
+  // Check for "may" month patterns
+  for (const pattern of mayMonthPatterns) {
+    if (pattern.test(lowerMessage)) {
+      console.log(`Detected 'May' as a month in query with pattern ${pattern}: "${message}"`);
+      return 'may';
+    }
   }
   
   // Iterate through all month names to find matches
@@ -74,10 +83,18 @@ export function detectMonthInQuery(message: string): string | null {
     // Skip "may" as it's handled specially above
     if (month === 'may') continue;
     
-    if (lowerMessage.includes(month)) {
+    // Check if the month name appears surrounded by word boundaries to avoid partial matches
+    const regex = new RegExp(`\\b${month}\\b`, 'i');
+    if (regex.test(lowerMessage)) {
       console.log(`Detected month in query: ${month} in "${message}"`);
       return month;
     }
+  }
+  
+  // Special case: if query is JUST about may (like "may?" or "May.")
+  if (/^may\??\.?$/i.test(lowerMessage.trim())) {
+    console.log(`Detected 'may' as single-word month query: "${message}"`);
+    return 'may';
   }
   
   return null;
@@ -123,25 +140,43 @@ export function isMonthSpecificQuery(message: string): boolean {
   
   const lowerQuery = message.toLowerCase();
   
-  // Check for patterns that suggest querying about a specific month
-  return (
-    lowerQuery.includes(`${monthName} month`) ||
-    lowerQuery.includes(`month of ${monthName}`) ||
-    lowerQuery.includes(`in ${monthName}`) ||
-    lowerQuery.includes(`during ${monthName}`) ||
-    lowerQuery.includes(`${monthName}`) ||
-    lowerQuery.includes(`for ${monthName}`) ||
-    // Add specific patterns for "first week in month" type queries
-    lowerQuery.includes(`week in ${monthName}`) ||
-    lowerQuery.includes(`week of ${monthName}`)
-  );
+  // Enhanced patterns for month-specific queries
+  const monthPatterns = [
+    new RegExp(`\\b${monthName}\\s+month\\b`, 'i'),
+    new RegExp(`month\\s+of\\s+${monthName}\\b`, 'i'),
+    new RegExp(`\\bin\\s+${monthName}\\b`, 'i'),
+    new RegExp(`\\bduring\\s+${monthName}\\b`, 'i'),
+    new RegExp(`\\bfor\\s+${monthName}\\b`, 'i'),
+    new RegExp(`\\bweek\\s+in\\s+${monthName}\\b`, 'i'),
+    new RegExp(`\\bweek\\s+of\\s+${monthName}\\b`, 'i'),
+    new RegExp(`\\b${monthName}\\s+\\d{1,2}`, 'i'),     // "May 15" format
+    new RegExp(`\\b${monthName}\\s+\\d{4}\\b`, 'i'),   // "May 2023" format
+    // Single month name queries
+    new RegExp(`^${monthName}\\??$`, 'i')               // Just the month name with optional question mark
+  ];
+  
+  // Check each pattern
+  for (const pattern of monthPatterns) {
+    if (pattern.test(lowerQuery)) {
+      console.log(`Detected month-specific query with pattern ${pattern}: "${message}"`);
+      return true;
+    }
+  }
+  
+  // If the month is mentioned prominently and query is short, consider it month-specific
+  if (lowerQuery.length < 30 && lowerQuery.includes(monthName.toLowerCase())) {
+    console.log(`Short query with month mention detected as month-specific: "${message}"`);
+    return true;
+  }
+  
+  return false;
 }
 
 // Detect time frame in the query
 export function detectTimeframeInQuery(message: string): any {
   const lowerQuery = message.toLowerCase();
   
-  // Check for specific month mentions first
+  // Enhanced detection for month-specific queries
   const monthName = detectMonthInQuery(message);
   if (monthName) {
     console.log(`Detected month in query: ${monthName}`);
@@ -154,6 +189,7 @@ export function detectTimeframeInQuery(message: string): any {
     const yearMatch = lowerQuery.match(/\b(20\d{2})\b/);
     if (yearMatch) {
       year = parseInt(yearMatch[1]);
+      console.log(`Detected year in query: ${year}`);
     }
     
     // Determine month index (0-based)
@@ -182,88 +218,57 @@ export function detectTimeframeInQuery(message: string): any {
     }
     
     if (monthIndex >= 0) {
-      // Create start and end dates for the specified month
-      const startDate = new Date(year, monthIndex, 1);
-      const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
-      
-      // Check if the query asks for a specific week
-      const isFirstWeek = lowerQuery.includes('first week') || lowerQuery.includes('week 1');
-      const isSecondWeek = lowerQuery.includes('second week') || lowerQuery.includes('week 2');
-      const isThirdWeek = lowerQuery.includes('third week') || lowerQuery.includes('week 3');
-      const isFourthWeek = lowerQuery.includes('fourth week') || lowerQuery.includes('week 4');
-      const isLastWeek = lowerQuery.includes('last week') && lowerQuery.includes(monthName);
-      
-      let periodDescription = `${monthName} ${year}`;
-      let resultStartDate = startDate;
-      let resultEndDate = endDate;
-      
-      // Calculate date range for specific week if requested
-      if (isFirstWeek) {
-        resultEndDate = new Date(year, monthIndex, 7); // First 7 days
-        periodDescription = `first week of ${monthName} ${year}`;
-      } else if (isSecondWeek) {
-        resultStartDate = new Date(year, monthIndex, 8);
-        resultEndDate = new Date(year, monthIndex, 14);
-        periodDescription = `second week of ${monthName} ${year}`;
-      } else if (isThirdWeek) {
-        resultStartDate = new Date(year, monthIndex, 15);
-        resultEndDate = new Date(year, monthIndex, 21);
-        periodDescription = `third week of ${monthName} ${year}`;
-      } else if (isFourthWeek) {
-        resultStartDate = new Date(year, monthIndex, 22);
-        resultEndDate = new Date(year, monthIndex, 28);
-        periodDescription = `fourth week of ${monthName} ${year}`;
-      } else if (isLastWeek) {
-        // Last 7 days of month
-        resultStartDate = new Date(year, monthIndex + 1, 0);
-        resultStartDate.setDate(resultStartDate.getDate() - 6);
-        periodDescription = `last week of ${monthName} ${year}`;
-      }
-      
       // Generate the timeframe object with the calculated dates
       const timeframe = {
-        startDate: resultStartDate.toISOString(),
-        endDate: resultEndDate.toISOString(),
-        description: periodDescription,
-        periodName: monthName,
-        duration: Math.floor((resultEndDate.getTime() - resultStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1,
         type: 'specificMonth',
         monthName: monthName,
-        year: year
+        year: year,
+        timezone: 'UTC', // Assuming UTC; this should be overridden with user timezone
+        description: `${monthName} ${year}`
       };
       
-      console.log("Generated month date range:", JSON.stringify(timeframe, null, 2));
-      console.log(`Month date range: ${timeframe.startDate} to ${timeframe.endDate}`);
-      
+      console.log("Generated month-specific timeframe:", JSON.stringify(timeframe, null, 2));
       return timeframe;
     }
   }
   
-  // Simple timeframe detection - this could be enhanced with NLP
+  // Enhanced timeframe detection for more common patterns
   if (lowerQuery.includes('last week') || lowerQuery.includes('previous week')) {
-    const today = new Date();
-    const lastWeekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 7);
-    const lastWeekEnd = new Date(today.getFullYear(), today.getMonth(), today.getDate() - 1);
-    
+    console.log(`Detected "last week" timeframe in query: "${message}"`);
     return {
-      startDate: lastWeekStart.toISOString(),
-      endDate: lastWeekEnd.toISOString(),
+      type: 'lastWeek',
       description: 'last week',
-      type: 'lastWeek'
+      timezone: 'UTC' // Will be overridden with user timezone
+    };
+  }
+  
+  if (lowerQuery.includes('this week') || lowerQuery.includes('current week')) {
+    console.log(`Detected "this week" timeframe in query: "${message}"`);
+    return {
+      type: 'week',
+      description: 'this week',
+      timezone: 'UTC'
     };
   }
   
   if (lowerQuery.includes('this month') || lowerQuery.includes('current month')) {
-    const today = new Date();
-    const monthStart = new Date(today.getFullYear(), today.getMonth(), 1);
-    
+    console.log(`Detected "this month" timeframe in query: "${message}"`);
     return {
-      startDate: monthStart.toISOString(),
-      endDate: today.toISOString(),
+      type: 'month',
       description: 'this month',
-      type: 'month'
+      timezone: 'UTC'
     };
   }
   
+  if (lowerQuery.includes('last month') || lowerQuery.includes('previous month')) {
+    console.log(`Detected "last month" timeframe in query: "${message}"`);
+    return {
+      type: 'lastMonth',
+      description: 'last month',
+      timezone: 'UTC'
+    };
+  }
+  
+  console.log(`No timeframe detected in query: "${message}"`);
   return null;
 }

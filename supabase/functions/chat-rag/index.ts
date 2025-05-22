@@ -58,31 +58,42 @@ serve(async (req) => {
     console.log(`Processing message for user ${userId}: ${message.substring(0, 50)}...`);
     console.log("Time range received:", timeRange ? JSON.stringify(timeRange) : "No time range provided");
     console.log("Query plan received:", queryPlan ? JSON.stringify(queryPlan, null, 2) : "No query plan provided");
-    console.log("Timezone information:", reqBody.timezoneOffset, reqBody.timezoneName);
+    console.log("Timezone information:", {
+      timezoneOffset: reqBody.timezoneOffset, 
+      timezoneName: reqBody.timezoneName
+    });
     
-    // Get user timezone preference from profile
-    let userTimezone = "UTC";
+    // Get user timezone preference from profile - this is crucial for correct date calculations
+    let userTimezone = reqBody.timezoneName || "UTC";
     try {
+      console.log(`Fetching user profile timezone for user: ${userId}`);
       const { data: profileData, error: profileError } = await supabase
         .from('profiles')
         .select('timezone')
         .eq('id', userId)
-        .single();
+        .maybeSingle();
         
       if (profileData && profileData.timezone) {
         userTimezone = profileData.timezone;
         console.log(`User timezone from profile: ${userTimezone}`);
       } else {
-        console.log("No timezone found in user profile, using default UTC");
+        console.log(`No timezone found in user profile, using client timezone: ${userTimezone}`);
+      }
+      
+      if (profileError) {
+        console.error("Error fetching user profile timezone:", profileError);
       }
     } catch (profileError) {
-      console.error("Error fetching user profile timezone:", profileError);
+      console.error("Exception fetching user profile timezone:", profileError);
     }
+    
+    // Always use the user's timezone for all date operations
+    console.log(`Using timezone for all operations: ${userTimezone}`);
     
     // Enhance timeRange with user timezone
     const timeRangeWithTimezone = timeRange ? { 
       ...timeRange, 
-      timezone: userTimezone || reqBody.timezoneName || "UTC" 
+      timezone: userTimezone 
     } : null;
     
     // Process time range if provided
@@ -104,7 +115,7 @@ serve(async (req) => {
         type: 'specificMonth',
         monthName: monthName,
         year: year,
-        timezone: userTimezone || reqBody.timezoneName || "UTC"
+        timezone: userTimezone
       });
       
       console.log(`Setting time range for ${monthName} ${year}:`, processedTimeRange);
@@ -114,6 +125,9 @@ serve(async (req) => {
     if (!processedTimeRange) {
       const detectedTimeframe = detectTimeframeInQuery(message);
       if (detectedTimeframe) {
+        // Add timezone to detected timeframe
+        detectedTimeframe.timezone = userTimezone;
+        
         console.log(`Detected timeframe in query: ${JSON.stringify(detectedTimeframe)}`);
         processedTimeRange = processTimeRange(detectedTimeframe);
         console.log("Processed detected timeframe:", processedTimeRange);
@@ -208,7 +222,8 @@ serve(async (req) => {
       timeRange: processedTimeRange, 
       isMonthQuery,
       monthName,
-      queryType: isMonthQuery && monthName ? "month-specific" : processedTimeRange ? "time-filtered" : "standard"
+      queryType: isMonthQuery && monthName ? "month-specific" : processedTimeRange ? "time-filtered" : "standard",
+      userTimezone
     });
     
     if (isMonthQuery && monthName) {
@@ -225,7 +240,11 @@ serve(async (req) => {
       // Log the returned entries dates for debugging
       if (entries && entries.length > 0) {
         console.log("Entry dates found in time-filtered search:", 
-          entries.map(entry => ({id: entry.id, date: new Date(entry.created_at).toISOString()}))
+          entries.map(entry => ({
+            id: entry.id, 
+            date: new Date(entry.created_at).toISOString(),
+            localDate: new Date(entry.created_at).toString()
+          }))
         );
       }
     } else {
@@ -254,7 +273,8 @@ serve(async (req) => {
           data: noEntriesMessage,
           noEntriesForTimeRange: true,
           timeRangeDebug: {
-            timeRange: processedTimeRange
+            timeRange: processedTimeRange,
+            userTimezone: userTimezone
           }
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }

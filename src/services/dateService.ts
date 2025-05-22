@@ -93,14 +93,22 @@ export function getZonedDate(
     inputTimezone: timezone
   });
   
-  const zonedDate = toZonedTime(dateObj, timezone); // Using toZonedTime from date-fns-tz v3
-  
-  console.log(`[DateService] Date converted to timezone:`, {
-    outputDate: zonedDate.toISOString(),
-    localString: zonedDate.toString()
-  });
-  
-  return zonedDate;
+  try {
+    // Use toZonedTime correctly (date-fns-tz v3 api)
+    const zonedDate = toZonedTime(dateObj, timezone);
+    
+    console.log(`[DateService] Date converted to timezone:`, {
+      outputDate: zonedDate.toISOString(),
+      localString: zonedDate.toString(),
+      timezoneUsed: timezone
+    });
+    
+    return zonedDate;
+  } catch (error) {
+    console.error(`[DateService] Error converting date to timezone ${timezone}:`, error);
+    // Fallback to original date
+    return dateObj;
+  }
 }
 
 /**
@@ -230,12 +238,16 @@ export function getLastWeekDateRange(
   // Last week's Sunday is 1 day before this week's Monday
   const lastWeekSunday = endOfDay(subDays(thisWeekMonday, 1));
   
-  // Log detailed calculation information
-  console.log("[DateService] LAST WEEK CALCULATION:");
-  console.log(`[DateService] Current date: ${formatDate(zonedNow, 'yyyy-MM-dd')} (${zonedNow.toISOString()})`);
-  console.log(`[DateService] This week's Monday: ${formatDate(thisWeekMonday, 'yyyy-MM-dd')} (${thisWeekMonday.toISOString()})`);
-  console.log(`[DateService] Last week's Monday: ${formatDate(lastWeekMonday, 'yyyy-MM-dd')} (${lastWeekMonday.toISOString()})`);
-  console.log(`[DateService] Last week's Sunday: ${formatDate(lastWeekSunday, 'yyyy-MM-dd')} (${lastWeekSunday.toISOString()})`);
+  // COMPREHENSIVE LOG for debugging the last week calculation
+  console.log("========== LAST WEEK CALCULATION DEBUG ==========");
+  console.log(`Input reference time (raw): ${referenceTime}`);
+  console.log(`Input reference time (ISO): ${referenceTime.toISOString()}`);
+  console.log(`Timezone being used: ${timezone}`);
+  console.log(`Current date in timezone: ${zonedNow.toString()} (${zonedNow.toISOString()})`);
+  console.log(`This week's Monday: ${thisWeekMonday.toString()} (${thisWeekMonday.toISOString()})`);
+  console.log(`Last week's Monday: ${lastWeekMonday.toString()} (${lastWeekMonday.toISOString()})`);
+  console.log(`Last week's Sunday: ${lastWeekSunday.toString()} (${lastWeekSunday.toISOString()})`);
+  console.log("===============================================");
   
   // Format the dates in a user-friendly way
   const formattedStart = formatDate(lastWeekMonday, 'MMMM d');
@@ -432,4 +444,26 @@ export function debugTimezoneInfo(): void {
   // Test "last week" calculation
   const lastWeek = getLastWeekDateRange();
   console.log(`[DateService] Last week dates: ${lastWeek.formattedRange}`);
+  
+  // Test timezone conversions
+  if (timezoneName) {
+    const nowInUserTz = getZonedDate(now, timezoneName);
+    console.log(`[DateService] Current date in user timezone (${timezoneName}):`, nowInUserTz.toString());
+    
+    // Test some specific dates with known timezone effects
+    const winterDate = new Date('2023-01-15T12:00:00Z');
+    const summerDate = new Date('2023-07-15T12:00:00Z');
+    
+    console.log(`[DateService] January date in user timezone:`, 
+      getZonedDate(winterDate, timezoneName).toString());
+    console.log(`[DateService] July date in user timezone:`, 
+      getZonedDate(summerDate, timezoneName).toString());
+  }
 }
+
+// Re-export the functions that need to be available
+export {
+  getUserTimezoneName,
+  getUserTimezoneOffset,
+  isDirectDateQuery
+};

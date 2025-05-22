@@ -54,11 +54,22 @@ export async function searchEntriesWithTimeRange(
     console.log(`Searching entries with time range for userId: ${userId}`);
     console.log(`Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'}`);
     
-    // Convert dates to UTC for database filtering
-    const startDate = timeRange.startDate ? new Date(timeRange.startDate).toISOString() : null;
-    const endDate = timeRange.endDate ? new Date(timeRange.endDate).toISOString() : null;
+    // Enhanced debugging for date formats
+    if (timeRange.startDate) {
+      const startDate = new Date(timeRange.startDate);
+      console.log(`Start date parsed: ${startDate.toISOString()} (${startDate.toString()})`);
+    }
     
-    console.log(`Converted time range for database query: from ${startDate || 'none'} to ${endDate || 'none'}`);
+    if (timeRange.endDate) {
+      const endDate = new Date(timeRange.endDate);
+      console.log(`End date parsed: ${endDate.toISOString()} (${endDate.toString()})`);
+    }
+    
+    // Ensure dates are in ISO format for the database
+    const startDate = timeRange.startDate || null;
+    const endDate = timeRange.endDate || null;
+    
+    console.log(`Sending time range to database: from ${startDate || 'none'} to ${endDate || 'none'}`);
     
     // Detailed logging of the actual parameters being sent to the database
     console.log("Database function parameters:", {
@@ -70,6 +81,7 @@ export async function searchEntriesWithTimeRange(
       end_date: endDate
     });
     
+    // Execute the database function with date parameters
     const { data, error } = await supabase.rpc(
       'match_journal_entries_with_date',
       {
@@ -84,6 +96,7 @@ export async function searchEntriesWithTimeRange(
     
     if (error) {
       console.error(`Error in time-filtered vector search: ${error.message}`);
+      console.error(`Full error object:`, JSON.stringify(error));
       throw error;
     }
     
@@ -93,10 +106,12 @@ export async function searchEntriesWithTimeRange(
     if (data && data.length > 0) {
       const entryDates = data.map((entry: any) => ({
         id: entry.id,
-        date: new Date(entry.created_at).toISOString(),
+        date: entry.created_at,
+        isoDate: new Date(entry.created_at).toISOString(),
+        localDate: new Date(entry.created_at).toString(),
         score: entry.similarity
       }));
-      console.log("Time-filtered search - Entry dates found:", entryDates);
+      console.log("Time-filtered search - Entries found:", entryDates);
     } else {
       console.log("No entries found within time range");
     }
@@ -140,10 +155,20 @@ export async function searchEntriesByMonth(
     };
     
     let monthIndex = -1;
-    for (const [key, index] of Object.entries(monthMap)) {
-      if (monthName.toLowerCase() === key.toLowerCase()) {
-        monthIndex = index;
-        break;
+    
+    // First look for exact matches
+    const normalizedMonthName = monthName.toLowerCase().trim();
+    if (monthMap.hasOwnProperty(normalizedMonthName)) {
+      monthIndex = monthMap[normalizedMonthName];
+      console.log(`Found exact match for month name "${monthName}" -> index ${monthIndex}`);
+    } else {
+      // Try partial matches
+      for (const [key, index] of Object.entries(monthMap)) {
+        if (key.includes(normalizedMonthName) || normalizedMonthName.includes(key)) {
+          console.log(`Found partial match for month "${monthName}" with "${key}"`);
+          monthIndex = index;
+          break;
+        }
       }
     }
     
@@ -153,21 +178,30 @@ export async function searchEntriesByMonth(
     }
     
     // Create start and end dates for the month
-    const startDate = new Date(targetYear, monthIndex, 1).toISOString();
-    const endDate = new Date(targetYear, monthIndex + 1, 0, 23, 59, 59, 999).toISOString();
+    const startDate = new Date(targetYear, monthIndex, 1);
+    const endDate = new Date(targetYear, monthIndex + 1, 0, 23, 59, 59, 999);
     
-    console.log(`Month date range: from ${startDate} to ${endDate}`);
+    console.log(`Month date range: from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    console.log(`Month JS dates: from ${startDate.toString()} to ${endDate.toString()}`);
     
     // Additional debugging for month detection
     console.log("Month detection details:", {
       providedMonthName: monthName,
-      normalizedName: monthName.toLowerCase(),
+      normalizedName: normalizedMonthName,
       detectedMonthIndex: monthIndex,
-      resultingDateRange: {startDate, endDate}
+      resultingDateRange: {
+        startDate: startDate.toISOString(), 
+        endDate: endDate.toISOString()
+      },
+      month: monthIndex + 1,
+      year: targetYear
     });
     
     // Use the existing time range function with these dates
-    return await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, { startDate, endDate });
+    return await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, { 
+      startDate: startDate.toISOString(), 
+      endDate: endDate.toISOString() 
+    });
   } catch (error) {
     console.error('Error searching entries by month:', error);
     throw error;
