@@ -12,6 +12,8 @@ import {
   subDays, 
   startOfWeek, 
   endOfWeek, 
+  startOfMonth, 
+  endOfMonth, 
   startOfDay, 
   endOfDay,
   format as formatDate,
@@ -84,7 +86,7 @@ export function getZonedDate(
   timezone: string = 'UTC'
 ): Date {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
-  return toZonedTime(dateObj, timezone);
+  return toZonedTime(dateObj, timezone); // Using toZonedTime from date-fns-tz v3
 }
 
 /**
