@@ -719,7 +719,7 @@ Formatting guidelines:
 
 Stay factual and only make conclusions that are directly supported by the journal entries. Be empathetic, personal, and thoughtful in your responses.`;
     }
-
+    
     const messages = [
       { role: 'system', content: systemPrompt },
       // Don't add conversation history here since we've included it in the system prompt
