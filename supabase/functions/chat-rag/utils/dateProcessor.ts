@@ -79,6 +79,9 @@ export function processTimeRange(timeRange: any): { startDate?: string; endDate?
     } else if (timeRange.type === 'specificMonth' && timeRange.monthName) {
       // Handle specific month by name (case insensitive)
       processSpecificMonthByName(timeRange.monthName, result, timeRange.year);
+      
+      // Add additional logging for month name processing
+      console.log(`Processed specific month name "${timeRange.monthName}" to date range: ${result.startDate} to ${result.endDate}`);
     }
     
     // Log timezone information for debugging
@@ -121,7 +124,7 @@ function processSpecificMonthByName(monthName: string, result: { startDate?: str
     'february': 1, 'feb': 1,
     'march': 2, 'mar': 2,
     'april': 3, 'apr': 3,
-    'may': 4, 'may': 4,
+    'may': 4,
     'june': 5, 'jun': 5,
     'july': 6, 'jul': 6,
     'august': 7, 'aug': 7,
@@ -131,8 +134,27 @@ function processSpecificMonthByName(monthName: string, result: { startDate?: str
     'december': 11, 'dec': 11
   };
   
-  const normalizedMonthName = monthName.toLowerCase();
-  const monthIndex = monthMap[normalizedMonthName];
+  // Special handling for "may" which can be ambiguous
+  const normalizedMonthName = monthName.toLowerCase().trim();
+  let monthIndex: number | undefined = undefined;
+  
+  // First look for exact matches
+  if (monthMap.hasOwnProperty(normalizedMonthName)) {
+    monthIndex = monthMap[normalizedMonthName];
+    console.log(`Found exact match for month name "${monthName}" -> index ${monthIndex}`);
+  }
+  
+  // If we still don't have a valid month index, look for partial matches
+  if (monthIndex === undefined) {
+    // This should never happen with our current implementation, but adding as a fallback
+    for (const [key, index] of Object.entries(monthMap)) {
+      if (key.includes(normalizedMonthName) || normalizedMonthName.includes(key)) {
+        console.log(`Found partial match for month "${monthName}" with "${key}"`);
+        monthIndex = index;
+        break;
+      }
+    }
+  }
   
   if (monthIndex !== undefined) {
     // Create start and end dates for the specified month
@@ -144,7 +166,7 @@ function processSpecificMonthByName(monthName: string, result: { startDate?: str
     
     console.log(`Generated date range for ${monthName} ${targetYear}: ${result.startDate} to ${result.endDate}`);
   } else {
-    console.warn(`Unknown month name: ${monthName}`);
+    console.warn(`Unknown month name: "${monthName}"`);
   }
 }
 

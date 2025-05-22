@@ -63,12 +63,17 @@ export function detectMonthInQuery(message: string): string | null {
   const lowerMessage = message.toLowerCase();
   
   // Special handling for the word "may" since it's both a month and a modal verb
-  if (/(^|\s)(may\s+month|month\s+of\s+may|\bin\s+may\b|during\s+may)/.test(lowerMessage)) {
+  // Look for patterns that clearly indicate "may" is being used as a month
+  if (/(^|\s)(may\s+month|month\s+of\s+may|\bin\s+may\b|during\s+may|\bfor\s+may\b|may\s+\d{4}|may\s+\d{1,2}|\bfirst\s+week\s+in\s+may\b)/.test(lowerMessage)) {
     console.log("Detected 'may' as a month in query:", message);
     return 'may';
   }
   
+  // Iterate through all month names to find matches
   for (const month of MONTH_NAMES) {
+    // Skip "may" as it's handled specially above
+    if (month === 'may') continue;
+    
     if (lowerMessage.includes(month)) {
       console.log(`Detected month in query: ${month} in "${message}"`);
       return month;
@@ -124,7 +129,11 @@ export function isMonthSpecificQuery(message: string): boolean {
     lowerQuery.includes(`month of ${monthName}`) ||
     lowerQuery.includes(`in ${monthName}`) ||
     lowerQuery.includes(`during ${monthName}`) ||
-    lowerQuery.includes(`${monthName}`)
+    lowerQuery.includes(`${monthName}`) ||
+    lowerQuery.includes(`for ${monthName}`) ||
+    // Add specific patterns for "first week in month" type queries
+    lowerQuery.includes(`week in ${monthName}`) ||
+    lowerQuery.includes(`week of ${monthName}`)
   );
 }
 
@@ -177,15 +186,56 @@ export function detectTimeframeInQuery(message: string): any {
       const startDate = new Date(year, monthIndex, 1);
       const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
       
-      return {
-        startDate: startDate.toISOString(),
-        endDate: endDate.toISOString(),
-        description: `${monthName} ${year}`,
+      // Check if the query asks for a specific week
+      const isFirstWeek = lowerQuery.includes('first week') || lowerQuery.includes('week 1');
+      const isSecondWeek = lowerQuery.includes('second week') || lowerQuery.includes('week 2');
+      const isThirdWeek = lowerQuery.includes('third week') || lowerQuery.includes('week 3');
+      const isFourthWeek = lowerQuery.includes('fourth week') || lowerQuery.includes('week 4');
+      const isLastWeek = lowerQuery.includes('last week') && lowerQuery.includes(monthName);
+      
+      let periodDescription = `${monthName} ${year}`;
+      let resultStartDate = startDate;
+      let resultEndDate = endDate;
+      
+      // Calculate date range for specific week if requested
+      if (isFirstWeek) {
+        resultEndDate = new Date(year, monthIndex, 7); // First 7 days
+        periodDescription = `first week of ${monthName} ${year}`;
+      } else if (isSecondWeek) {
+        resultStartDate = new Date(year, monthIndex, 8);
+        resultEndDate = new Date(year, monthIndex, 14);
+        periodDescription = `second week of ${monthName} ${year}`;
+      } else if (isThirdWeek) {
+        resultStartDate = new Date(year, monthIndex, 15);
+        resultEndDate = new Date(year, monthIndex, 21);
+        periodDescription = `third week of ${monthName} ${year}`;
+      } else if (isFourthWeek) {
+        resultStartDate = new Date(year, monthIndex, 22);
+        resultEndDate = new Date(year, monthIndex, 28);
+        periodDescription = `fourth week of ${monthName} ${year}`;
+      } else if (isLastWeek) {
+        // Last 7 days of month
+        resultStartDate = new Date(year, monthIndex + 1, 0);
+        resultStartDate.setDate(resultStartDate.getDate() - 6);
+        periodDescription = `last week of ${monthName} ${year}`;
+      }
+      
+      // Generate the timeframe object with the calculated dates
+      const timeframe = {
+        startDate: resultStartDate.toISOString(),
+        endDate: resultEndDate.toISOString(),
+        description: periodDescription,
         periodName: monthName,
+        duration: Math.floor((resultEndDate.getTime() - resultStartDate.getTime()) / (1000 * 60 * 60 * 24)) + 1,
         type: 'specificMonth',
         monthName: monthName,
         year: year
       };
+      
+      console.log("Generated month date range:", JSON.stringify(timeframe, null, 2));
+      console.log(`Month date range: ${timeframe.startDate} to ${timeframe.endDate}`);
+      
+      return timeframe;
     }
   }
   

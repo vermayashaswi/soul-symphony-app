@@ -24,6 +24,18 @@ export async function searchEntriesWithVector(
     }
     
     console.log(`Found ${data?.length || 0} entries with vector similarity`);
+    
+    // Add more detailed logging of results
+    if (data && data.length > 0) {
+      console.log("Vector search results - entry dates:", 
+        data.map((entry: any) => ({
+          id: entry.id,
+          date: new Date(entry.created_at).toISOString(),
+          score: entry.similarity
+        }))
+      );
+    }
+    
     return data || [];
   } catch (error) {
     console.error('Error searching entries with vector:', error);
@@ -48,6 +60,16 @@ export async function searchEntriesWithTimeRange(
     
     console.log(`Converted time range for database query: from ${startDate || 'none'} to ${endDate || 'none'}`);
     
+    // Detailed logging of the actual parameters being sent to the database
+    console.log("Database function parameters:", {
+      query_embedding: `[array with ${queryEmbedding.length} elements]`,
+      match_threshold: 0.5,
+      match_count: 10,
+      user_id_filter: userId,
+      start_date: startDate,
+      end_date: endDate
+    });
+    
     const { data, error } = await supabase.rpc(
       'match_journal_entries_with_date',
       {
@@ -69,8 +91,14 @@ export async function searchEntriesWithTimeRange(
     
     // Log entry dates for debugging
     if (data && data.length > 0) {
-      const entryDates = data.map((entry: any) => new Date(entry.created_at).toISOString());
-      console.log("Entry dates found:", entryDates);
+      const entryDates = data.map((entry: any) => ({
+        id: entry.id,
+        date: new Date(entry.created_at).toISOString(),
+        score: entry.similarity
+      }));
+      console.log("Time-filtered search - Entry dates found:", entryDates);
+    } else {
+      console.log("No entries found within time range");
     }
     
     return data || [];
@@ -129,6 +157,14 @@ export async function searchEntriesByMonth(
     const endDate = new Date(targetYear, monthIndex + 1, 0, 23, 59, 59, 999).toISOString();
     
     console.log(`Month date range: from ${startDate} to ${endDate}`);
+    
+    // Additional debugging for month detection
+    console.log("Month detection details:", {
+      providedMonthName: monthName,
+      normalizedName: monthName.toLowerCase(),
+      detectedMonthIndex: monthIndex,
+      resultingDateRange: {startDate, endDate}
+    });
     
     // Use the existing time range function with these dates
     return await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, { startDate, endDate });
