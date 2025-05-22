@@ -9,7 +9,7 @@ import {
   startOfDay,
   endOfDay
 } from "https://esm.sh/date-fns@2.30.0";
-import { toZonedTime } from "https://esm.sh/date-fns-tz@2.0.0";
+import { toZonedTime } from "https://esm.sh/date-fns-tz@2.0.0/toZonedTime.js";
 
 // Define Supabase client
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
