@@ -1,6 +1,32 @@
-
 import { addDays, endOfDay, endOfMonth, endOfWeek, endOfYear, startOfDay, startOfMonth, startOfWeek, startOfYear, subDays, subMonths, subWeeks, subYears } from "date-fns";
 import { format, formatInTimeZone, toZonedTime } from "date-fns-tz";
+
+/**
+ * Get the formatted date range for the current week
+ * @returns Formatted string with the current week's date range
+ */
+export function getCurrentWeekDates(timezone?: string): string {
+  const tz = timezone || getUserTimezoneName() || 'UTC';
+  console.log(`Getting current week dates for timezone: ${tz}`);
+  
+  // Get the current date in the user's timezone
+  const now = toZonedTime(new Date(), tz);
+  console.log(`Current date in timezone (${tz}): ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
+  
+  // Get the start of the week (Monday)
+  const startOfCurrentWeek = startOfWeek(now, { weekStartsOn: 1 });
+  // Get the end of the week (Sunday)
+  const endOfCurrentWeek = endOfWeek(now, { weekStartsOn: 1 });
+  
+  console.log(`Start of current week: ${format(startOfCurrentWeek, 'yyyy-MM-dd')}`);
+  console.log(`End of current week: ${format(endOfCurrentWeek, 'yyyy-MM-dd')}`);
+  
+  // Format the dates in a user-friendly way
+  const formattedStart = format(startOfCurrentWeek, 'MMMM d');
+  const formattedEnd = format(endOfCurrentWeek, 'MMMM d, yyyy');
+
+  return `${formattedStart} to ${formattedEnd}`;
+}
 
 /**
  * Calculates relative date ranges based on time expressions
@@ -329,6 +355,11 @@ export function debugTimezoneInfo(): void {
   
   // Additional debugging for specific dates
   console.log("\nDate Calculation Tests:");
+  
+  // Test "current week" calculation
+  console.log("Testing 'current week' calculation:");
+  const currentWeek = getCurrentWeekDates();
+  console.log(`Current week dates: ${currentWeek}`);
   
   // Test "last week" calculation
   const lastWeekTest = calculateRelativeDateRange("last week");
