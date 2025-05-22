@@ -81,12 +81,12 @@ export function processTimeRange(timeRange: any): { startDate?: string; endDate?
 /**
  * Format a date for display
  */
-export function formatDate(date: Date | string, format: string = 'MMM d, yyyy'): string {
+export function formatDate(date: Date | string, formatStr: string = 'MMM d, yyyy'): string {
   try {
     if (typeof date === 'string') {
       date = parseISO(date);
     }
-    return format(date, format);
+    return format(date, formatStr);
   } catch (error) {
     console.error("Error formatting date:", error);
     return String(date);
