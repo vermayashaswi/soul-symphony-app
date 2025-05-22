@@ -28,6 +28,8 @@ const JournalSummaryCard: React.FC = () => {
   const [themeData, setThemeData] = useState<ThemeData[]>([]);
   const [isReady, setIsReady] = useState(false);
   const [retryCount, setRetryCount] = useState(0);
+  const MAX_RETRIES = 3;
+  const RETRY_DELAY = 2000; // 2 seconds
 
   const getThemeColorHex = (): string => {
     switch (colorTheme) {
@@ -56,11 +58,24 @@ const JournalSummaryCard: React.FC = () => {
         setLoading(true);
         setError(null);
         
+        // Calculate client timezone info for accurate date calculations
+        const clientInfo = {
+          timestamp: new Date().toISOString(),
+          timezoneName: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
+          timezoneOffset: new Date().getTimezoneOffset()
+        };
+        
+        console.log('JournalSummaryCard: Client timezone info', clientInfo);
+        
         // Fetch journal summary with error handling
         let summaryData;
         try {
           const { data, error: summaryError } = await supabase.functions.invoke('journal-summary', {
-            body: { userId: user.id, days: 7 }
+            body: { 
+              userId: user.id, 
+              days: 7,
+              clientTimeInfo: clientInfo 
+            }
           });
           
           if (summaryError) {
@@ -79,7 +94,7 @@ const JournalSummaryCard: React.FC = () => {
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
         try {
-          // Fetch journal entries for theme data
+          // Fetch journal entries for theme data with proper date formatting
           const { data: journalEntries, error: entriesError } = await supabase
             .from('Journal Entries')
             .select('master_themes, sentiment')
@@ -89,7 +104,8 @@ const JournalSummaryCard: React.FC = () => {
           
           console.log('JournalSummaryCard: Fetched journal entries', {
             entriesCount: journalEntries?.length || 0,
-            error: entriesError?.message
+            error: entriesError?.message,
+            dateFilter: sevenDaysAgo.toISOString()
           });
           
           if (entriesError) {
@@ -146,11 +162,12 @@ const JournalSummaryCard: React.FC = () => {
         // Use fallback data for theme display
         setThemeData(getFallbackThemeData());
         
-        // If we've tried less than 3 times, try again after a delay
-        if (retryCount < 3) {
+        // If we've tried less than MAX_RETRIES times, try again after a delay
+        if (retryCount < MAX_RETRIES) {
+          console.log(`JournalSummaryCard: Retry attempt ${retryCount + 1} of ${MAX_RETRIES} in ${RETRY_DELAY}ms`);
           setRetryCount(count => count + 1);
-          setTimeout(() => fetchSummary(), 2000); // Retry after 2 seconds
-          return; // Exit this attempt
+          setTimeout(() => fetchSummary(), RETRY_DELAY); 
+          return;
         }
       } finally {
         setLoading(false);

@@ -1,6 +1,6 @@
 
 // Import all date functions directly from date-fns with specific version
-import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth } from 'https://esm.sh/date-fns@4.1.0';
+import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'https://esm.sh/date-fns@4.1.0';
 
 // Import timezone function using the correct import path for v3.2.0
 import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
@@ -45,9 +45,17 @@ export function processTimeRange(timeRange: any): { startDate?: string; endDate?
       result.endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
     } else if (timeRange.type === 'lastWeek') {
       const now = new Date();
-      const lastWeek = subDays(now, 7);
-      result.startDate = startOfWeek(lastWeek, { weekStartsOn: 1 }).toISOString();
-      result.endDate = endOfWeek(lastWeek, { weekStartsOn: 1 }).toISOString();
+      const lastWeekMonday = startOfWeek(subDays(now, 7), { weekStartsOn: 1 });
+      const lastWeekSunday = endOfWeek(subDays(now, 7), { weekStartsOn: 1 });
+      
+      // Log the calculation details for debugging
+      console.log("Last week calculation details:");
+      console.log(`Current date: ${now.toISOString()}`);
+      console.log(`Last week Monday: ${lastWeekMonday.toISOString()}`);
+      console.log(`Last week Sunday: ${lastWeekSunday.toISOString()}`);
+      
+      result.startDate = startOfDay(lastWeekMonday).toISOString();
+      result.endDate = endOfDay(lastWeekSunday).toISOString();
     } else if (timeRange.type === 'month') {
       const now = new Date();
       result.startDate = startOfMonth(now).toISOString();
