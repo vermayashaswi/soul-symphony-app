@@ -76,6 +76,9 @@ export function processTimeRange(timeRange: any): { startDate?: string; endDate?
       result.startDate = startOfMonth(lastMonth).toISOString();
       result.endDate = endOfMonth(lastMonth).toISOString();
       console.log(`Generated 'last month' date range: ${result.startDate} to ${result.endDate}`);
+    } else if (timeRange.type === 'specificMonth' && timeRange.monthName) {
+      // Handle specific month by name (case insensitive)
+      processSpecificMonthByName(timeRange.monthName, result, timeRange.year);
     }
     
     // Log timezone information for debugging
@@ -101,6 +104,47 @@ export function processTimeRange(timeRange: any): { startDate?: string; endDate?
   } catch (error) {
     console.error("Error processing time range:", error);
     return {};
+  }
+}
+
+/**
+ * Process a specific month by name
+ */
+function processSpecificMonthByName(monthName: string, result: { startDate?: string; endDate?: string }, year?: number) {
+  const now = new Date();
+  const currentYear = now.getFullYear();
+  const targetYear = year || currentYear;
+  
+  // Map of month names to their indices (0-based)
+  const monthMap: Record<string, number> = {
+    'january': 0, 'jan': 0,
+    'february': 1, 'feb': 1,
+    'march': 2, 'mar': 2,
+    'april': 3, 'apr': 3,
+    'may': 4, 'may': 4,
+    'june': 5, 'jun': 5,
+    'july': 6, 'jul': 6,
+    'august': 7, 'aug': 7,
+    'september': 8, 'sep': 8, 'sept': 8,
+    'october': 9, 'oct': 9,
+    'november': 10, 'nov': 10,
+    'december': 11, 'dec': 11
+  };
+  
+  const normalizedMonthName = monthName.toLowerCase();
+  const monthIndex = monthMap[normalizedMonthName];
+  
+  if (monthIndex !== undefined) {
+    // Create start and end dates for the specified month
+    const startDate = new Date(targetYear, monthIndex, 1);
+    const endDate = new Date(targetYear, monthIndex + 1, 0); // Last day of month
+    
+    result.startDate = startOfDay(startDate).toISOString();
+    result.endDate = endOfDay(endDate).toISOString();
+    
+    console.log(`Generated date range for ${monthName} ${targetYear}: ${result.startDate} to ${result.endDate}`);
+  } else {
+    console.warn(`Unknown month name: ${monthName}`);
   }
 }
 

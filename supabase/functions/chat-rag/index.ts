@@ -7,12 +7,15 @@ import {
   detectMentalHealthQuery,
   isDirectDateQuery,
   isJournalAnalysisQuery,
-  detectTimeframeInQuery
+  detectTimeframeInQuery,
+  detectMonthInQuery,
+  isMonthSpecificQuery
 } from "./utils/queryClassifier.ts";
 import { generateEmbedding } from "./utils/embeddingService.ts";
 import { 
   searchEntriesWithVector, 
-  searchEntriesWithTimeRange 
+  searchEntriesWithTimeRange,
+  searchEntriesByMonth 
 } from "./utils/searchService.ts";
 import { generateResponse } from "./utils/responseGenerator.ts";
 import { processTimeRange } from "./utils/dateProcessor.ts";
@@ -83,7 +86,30 @@ serve(async (req) => {
     } : null;
     
     // Process time range if provided
-    const processedTimeRange = timeRangeWithTimezone ? processTimeRange(timeRangeWithTimezone) : null;
+    let processedTimeRange = timeRangeWithTimezone ? processTimeRange(timeRangeWithTimezone) : null;
+    
+    // Check for month-specific queries before proceeding
+    const monthName = detectMonthInQuery(message);
+    const isMonthQuery = isMonthSpecificQuery(message);
+    
+    if (isMonthQuery && monthName) {
+      console.log(`Detected specific month query for: ${monthName}`);
+      
+      // Extract year if present in the query, otherwise use current year
+      const yearMatch = message.match(/\b(20\d{2})\b/);
+      const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
+      
+      // Override any existing time range with the detected month
+      processedTimeRange = processTimeRange({
+        type: 'specificMonth',
+        monthName: monthName,
+        year: year,
+        timezone: userTimezone || reqBody.timezoneName || "UTC"
+      });
+      
+      console.log(`Setting time range for ${monthName} ${year}:`, processedTimeRange);
+    }
+    
     if (processedTimeRange) {
       console.log("Processed time range:", processedTimeRange);
     }
@@ -169,7 +195,8 @@ serve(async (req) => {
       const detectedTimeframe = detectTimeframeInQuery(message);
       if (detectedTimeframe) {
         console.log(`Detected timeframe in query: ${JSON.stringify(detectedTimeframe)}`);
-        // Use the detected timeframe
+        processedTimeRange = processTimeRange(detectedTimeframe);
+        console.log("Processed detected timeframe:", processedTimeRange);
       }
     }
     
@@ -183,7 +210,14 @@ serve(async (req) => {
     
     // Use different search function based on whether we have a time range
     let entries = [];
-    if (processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate)) {
+    if (isMonthQuery && monthName) {
+      // Extract year if present in the query, otherwise use current year
+      const yearMatch = message.match(/\b(20\d{2})\b/);
+      const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
+      
+      console.log(`Using month-specific search for ${monthName} ${year}`);
+      entries = await searchEntriesByMonth(supabase, userId, queryEmbedding, monthName, year);
+    } else if (processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate)) {
       console.log(`Using time-filtered search with range: ${JSON.stringify(processedTimeRange)}`);
       entries = await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, processedTimeRange);
     } else {
@@ -194,13 +228,22 @@ serve(async (req) => {
     console.log(`Found ${entries.length} relevant entries`);
 
     // Check if we found any entries for the requested time period
-    if (processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate) && entries.length === 0) {
+    if ((processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate) || (isMonthQuery && monthName)) && entries.length === 0) {
       console.log("No entries found for the specified time range");
+      
+      let noEntriesMessage = "Sorry, it looks like you don't have any journal entries for the time period you're asking about.";
+      
+      // Make the message more specific if we know it's a month query
+      if (isMonthQuery && monthName) {
+        const yearMatch = message.match(/\b(20\d{2})\b/);
+        const year = yearMatch ? parseInt(yearMatch[1]) : new Date().getFullYear();
+        noEntriesMessage = `Sorry, it looks like you don't have any journal entries for ${monthName} ${year}.`;
+      }
       
       // Return a friendly message indicating no entries were found
       return new Response(
         JSON.stringify({ 
-          data: "Sorry, it looks like you don't have any journal entries for the time period you're asking about.",
+          data: noEntriesMessage,
           noEntriesForTimeRange: true
         }),
         { headers: { 'Content-Type': 'application/json', ...corsHeaders } }

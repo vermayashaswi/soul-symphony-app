@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -17,6 +16,13 @@ const corsHeaders = {
 const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
+
+// Month names for consistent recognition
+const MONTH_NAMES = [
+  'january', 'february', 'march', 'april', 'may', 'june', 
+  'july', 'august', 'september', 'october', 'november', 'december',
+  'jan', 'feb', 'mar', 'apr', 'jun', 'jul', 'aug', 'sep', 'sept', 'oct', 'nov', 'dec'
+];
 
 /**
  * Detect if query appears to be a time-based summary query
@@ -41,13 +47,105 @@ function detectTimeSummaryQuery(message) {
     'recent', 'lately'
   ];
   
+  // Also check for specific month names in the query
+  const hasMonthName = MONTH_NAMES.some(month => lowerMessage.includes(month));
+  
+  // Special handling for "may" as it's both a month and a modal verb
+  const hasMayAsMonth = /(^|\s)(may\s+month|month\s+of\s+may|\bin\s+may\b|during\s+may)/.test(lowerMessage);
+  
   // Check if the query contains both a summary pattern and a time pattern
   const hasSummaryPattern = summaryPatterns.some(pattern => lowerMessage.includes(pattern));
-  const hasTimePattern = timePatterns.some(pattern => lowerMessage.includes(pattern));
+  const hasTimePattern = timePatterns.some(pattern => lowerMessage.includes(pattern)) || hasMonthName || hasMayAsMonth;
   
   console.log(`Time summary detection - Has summary pattern: ${hasSummaryPattern}, Has time pattern: ${hasTimePattern}`);
+  if (hasMayAsMonth) {
+    console.log("Detected 'may' as a month reference");
+  }
   
   return hasSummaryPattern && hasTimePattern;
+}
+
+/**
+ * Detect month mentions in a query text
+ */
+function detectMonthInQuery(message) {
+  const lowerMessage = message.toLowerCase();
+  
+  // Special handling for the word "may" since it's both a month and a modal verb
+  if (/(^|\s)(may\s+month|month\s+of\s+may|\bin\s+may\b|during\s+may)/.test(lowerMessage)) {
+    console.log("Detected 'may' as a month in query:", message);
+    return 'may';
+  }
+  
+  for (const month of MONTH_NAMES) {
+    if (lowerMessage.includes(month)) {
+      console.log(`Detected month in query: ${month} in "${message}"`);
+      return month;
+    }
+  }
+  
+  return null;
+}
+
+/**
+ * Process a month-specific query to generate appropriate time range
+ */
+function processMonthSpecificQuery(message) {
+  const monthName = detectMonthInQuery(message);
+  if (!monthName) return null;
+  
+  console.log(`Processing month-specific query for: ${monthName}`);
+  
+  // Map month name to month index (0-based)
+  const monthMap = {
+    'january': 0, 'jan': 0,
+    'february': 1, 'feb': 1,
+    'march': 2, 'mar': 2,
+    'april': 3, 'apr': 3,
+    'may': 4,
+    'june': 5, 'jun': 5,
+    'july': 6, 'jul': 6,
+    'august': 7, 'aug': 7,
+    'september': 8, 'sep': 8, 'sept': 8,
+    'october': 9, 'oct': 9,
+    'november': 10, 'nov': 10,
+    'december': 11, 'dec': 11
+  };
+  
+  // Find correct month index
+  let monthIndex = -1;
+  for (const [key, index] of Object.entries(monthMap)) {
+    if (monthName.toLowerCase() === key.toLowerCase()) {
+      monthIndex = index;
+      break;
+    }
+  }
+  
+  if (monthIndex === -1) return null;
+  
+  // Extract year if specified, otherwise use current year
+  const currentYear = new Date().getFullYear();
+  let year = currentYear;
+  const yearMatch = message.match(/\b(20\d{2})\b/);
+  if (yearMatch) {
+    year = parseInt(yearMatch[1]);
+  }
+  
+  // Create start and end dates for the month
+  const startDate = new Date(year, monthIndex, 1);
+  const endDate = new Date(year, monthIndex + 1, 0); // Last day of month
+  
+  console.log(`Month date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
+  
+  return {
+    start_date: startDate.toISOString(),
+    end_date: endDate.toISOString(),
+    periodName: `${monthName} ${year}`,
+    duration: endDate.getDate(), // Number of days in the month
+    type: 'specificMonth',
+    monthName: monthName,
+    year: year
+  };
 }
 
 /**
@@ -156,6 +254,61 @@ serve(async (req) => {
       Preserve topic context: ${preserveTopicContext}
       Intent type: ${intentType || 'not provided'}
     `);
+    
+    // Check for month-specific queries first
+    const monthName = detectMonthInQuery(message);
+    if (monthName) {
+      console.log(`Detected month-specific query for: ${monthName}`);
+      const monthDateRange = processMonthSpecificQuery(message);
+      
+      if (monthDateRange) {
+        console.log(`Generated month date range for ${monthName}:`, monthDateRange);
+        
+        // Check if we have entries for this month
+        let hasEntriesInMonth = false;
+        try {
+          const { count, error } = await supabase
+            .from('Journal Entries')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', monthDateRange.start_date)
+            .lte('created_at', monthDateRange.end_date);
+            
+          hasEntriesInMonth = count > 0;
+          console.log(`User has ${count || 0} entries in ${monthName}`);
+        } catch (error) {
+          console.error("Error checking for entries in month:", error);
+        }
+        
+        // Return a direct plan for month-specific query
+        const isTimeSummary = detectTimeSummaryQuery(message);
+        const monthQueryPlan = {
+          strategy: "hybrid",
+          filters: {
+            date_range: monthDateRange,
+            emotions: null,
+            themes: null
+          },
+          isTimePatternQuery: false,
+          needsDataAggregation: false,
+          domainContext: "general_insights",
+          isTimeSummaryQuery: isTimeSummary,
+          hasEntriesInRange: hasEntriesInMonth,
+          isMonthQuery: true,
+          monthName: monthName
+        };
+        
+        return new Response(
+          JSON.stringify({
+            queryPlan: monthQueryPlan,
+            rawPlan: JSON.stringify({ plan: { ...monthQueryPlan } })
+          }),
+          {
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          }
+        );
+      }
+    }
     
     // Check if this is a direct date query that can be answered without journal analysis
     const isDateQuery = detectDirectDateQuery(message);

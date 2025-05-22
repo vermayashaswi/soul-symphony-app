@@ -79,3 +79,61 @@ export async function searchEntriesWithTimeRange(
     throw error;
   }
 }
+
+/**
+ * Search entries by specific month name
+ */
+export async function searchEntriesByMonth(
+  supabase: any,
+  userId: string,
+  queryEmbedding: number[],
+  monthName: string,
+  year?: number
+) {
+  try {
+    // Get current year if not provided
+    const targetYear = year || new Date().getFullYear();
+    console.log(`Searching entries for month: ${monthName} ${targetYear} for userId: ${userId}`);
+    
+    // Map month name to month index (0-based)
+    const monthMap: Record<string, number> = {
+      'january': 0, 'jan': 0,
+      'february': 1, 'feb': 1,
+      'march': 2, 'mar': 2,
+      'april': 3, 'apr': 3,
+      'may': 4,
+      'june': 5, 'jun': 5,
+      'july': 6, 'jul': 6,
+      'august': 7, 'aug': 7,
+      'september': 8, 'sep': 8, 'sept': 8,
+      'october': 9, 'oct': 9,
+      'november': 10, 'nov': 10,
+      'december': 11, 'dec': 11
+    };
+    
+    let monthIndex = -1;
+    for (const [key, index] of Object.entries(monthMap)) {
+      if (monthName.toLowerCase() === key.toLowerCase()) {
+        monthIndex = index;
+        break;
+      }
+    }
+    
+    if (monthIndex === -1) {
+      console.error(`Invalid month name: ${monthName}`);
+      return [];
+    }
+    
+    // Create start and end dates for the month
+    const startDate = new Date(targetYear, monthIndex, 1).toISOString();
+    const endDate = new Date(targetYear, monthIndex + 1, 0, 23, 59, 59, 999).toISOString();
+    
+    console.log(`Month date range: from ${startDate} to ${endDate}`);
+    
+    // Use the existing time range function with these dates
+    return await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, { startDate, endDate });
+  } catch (error) {
+    console.error('Error searching entries by month:', error);
+    throw error;
+  }
+}
