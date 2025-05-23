@@ -14,7 +14,7 @@ interface MessageClassification {
 
 export function useChatMessageClassification() {
   const [classification, setClassification] = useState<MessageClassification>({
-    category: QueryCategory.GENERAL,
+    category: QueryCategory.GENERAL_NO_RELATION,
     confidence: 0,
     reasoning: '',
     shouldUseJournal: false,
@@ -23,12 +23,12 @@ export function useChatMessageClassification() {
   });
 
   /**
-   * Classify a message using local utilities and edge function
+   * Classify a message using enhanced 3-tier categorization system
    */
   const classifyMessage = useCallback(async (message: string) => {
     if (!message?.trim()) {
       return {
-        category: QueryCategory.GENERAL,
+        category: QueryCategory.GENERAL_NO_RELATION,
         confidence: 0,
         reasoning: 'Empty message',
         shouldUseJournal: false
@@ -42,7 +42,7 @@ export function useChatMessageClassification() {
     }));
 
     try {
-      // First, do client-side classification using our utility
+      // First, do client-side classification using our enhanced utility
       const localClassification = enhancedQueryClassification(message);
       
       // Then try to get server-side classification for better accuracy
@@ -94,7 +94,7 @@ export function useChatMessageClassification() {
       const errorMessage = error.message || 'Unknown error classifying message';
       
       setClassification({
-        category: QueryCategory.GENERAL,
+        category: QueryCategory.GENERAL_NO_RELATION,
         confidence: 0,
         reasoning: 'Error in classification',
         shouldUseJournal: false,
@@ -103,7 +103,7 @@ export function useChatMessageClassification() {
       });
       
       return {
-        category: QueryCategory.GENERAL,
+        category: QueryCategory.GENERAL_NO_RELATION,
         confidence: 0,
         reasoning: 'Error in classification',
         shouldUseJournal: false

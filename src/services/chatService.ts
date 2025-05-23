@@ -1,6 +1,6 @@
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
-import { enhancedQueryClassification } from '../utils/chat/messageClassifier';
+import { enhancedQueryClassification, QueryCategory } from '../utils/chat/messageClassifier';
 import { analyzeTimePatterns } from '@/utils/chat/timePatternAnalyzer';
 import { showToast } from '@/utils/journal/toast-helper';
 import { fetchWithRetry } from '@/utils/api-client';
@@ -18,7 +18,7 @@ type ProcessedResponse = {
 };
 
 /**
- * Process a chat message with proper personal/general classification
+ * Process a chat message with enhanced 3-tier categorization
  */
 export async function processChatMessage(
   message: string, 
@@ -190,38 +190,39 @@ export async function processChatMessage(
     }
   }
   
-  // Continue with the rest of the processing for other query types
+  // Enhanced classification with 3-tier system
   try {
     console.log("Processing chat message:", message.substring(0, 30) + "...");
     console.log("Parameters:", parameters);
     
-    // Determine if this should be processed as a personal query or general question
-    let usePersonalContext = parameters.usePersonalContext || false;
+    // Use enhanced classification to determine message category
+    const classification = enhancedQueryClassification(message);
+    console.log("Enhanced message classification:", {
+      category: classification.category,
+      confidence: classification.confidence,
+      reasoning: classification.reasoning,
+      forceJournalSpecific: classification.forceJournalSpecific
+    });
     
-    // If the query types show this is a personal insight or mental health query,
-    // automatically use personal context
-    if (queryTypes.isPersonalInsightQuery || queryTypes.isMentalHealthQuery) {
-      usePersonalContext = true;
-      console.log("Forcing personal context due to query type:", 
-        queryTypes.isPersonalInsightQuery ? "personal insight" : "mental health");
-    }
-    
-    // Use our advanced classifier to determine if this should use personal context
-    if (!usePersonalContext) {
-      try {
-        const classification = enhancedQueryClassification(message);
-        usePersonalContext = classification.category === 'JOURNAL_SPECIFIC' || classification.forceJournalSpecific;
+    // Handle different categories appropriately
+    switch (classification.category) {
+      case QueryCategory.GENERAL_NO_RELATION:
+        return {
+          content: "I'm SOULo, your mental health assistant focused on helping with emotional wellbeing and personal insights. I'm not designed to answer general factual questions. Is there anything about your mental health or personal growth I can help you with instead?",
+          role: "assistant"
+        };
         
-        console.log("Message classification:", {
-          category: classification.category,
-          confidence: classification.confidence,
-          reasoning: classification.reasoning,
-          forceJournalSpecific: classification.forceJournalSpecific,
-          usePersonalContext
-        });
-      } catch (error) {
-        console.error("Error classifying message:", error);
-      }
+      case QueryCategory.CONVERSATIONAL:
+        // Handle conversational queries - let them go through to chat-with-rag for natural responses
+        break;
+        
+      case QueryCategory.GENERAL_MENTAL_HEALTH:
+        // Let these go through to chat-with-rag but without personal context
+        break;
+        
+      case QueryCategory.JOURNAL_SPECIFIC:
+        // Process with full journal context
+        break;
     }
 
     let conversationHistory = [];
@@ -252,11 +253,11 @@ export async function processChatMessage(
     const queryPlanParams = {
       message,
       userId,
-      previousMessages: conversationHistory,  // Pass previous messages for context
+      previousMessages: conversationHistory,
       isFollowUp,
       useHistoricalData: parameters.useHistoricalData || false,
-      // Add current date as reference date for better time understanding
-      referenceDate: new Date().toISOString()
+      referenceDate: new Date().toISOString(),
+      messageCategory: classification.category
     };
 
     // Check network status before calling Edge Function
@@ -283,14 +284,15 @@ export async function processChatMessage(
       const queryPlan = planData?.queryPlan || planData?.plan || null;
       console.log("Generated query plan:", queryPlan);
 
-      // Process the message based on the plan
+      // Process the message based on the plan and category
       const chatParams = {
         message,
         userId,
         threadId,
-        usePersonalContext,
+        usePersonalContext: classification.category === QueryCategory.JOURNAL_SPECIFIC,
         queryPlan,
-        conversationHistory // Pass the conversation history to chat-with-rag
+        conversationHistory,
+        messageCategory: classification.category
       };
 
       try {
@@ -304,12 +306,6 @@ export async function processChatMessage(
         }
 
         console.log("Raw chat-with-rag response:", chatResponse);
-        console.log("Response structure:", {
-          hasData: !!chatResponse,
-          dataType: typeof chatResponse,
-          dataKeys: chatResponse ? Object.keys(chatResponse) : [],
-          dataValue: chatResponse
-        });
 
         // Extract the response and analysis metadata
         let finalResponse;
@@ -326,14 +322,6 @@ export async function processChatMessage(
           console.error("Unexpected response format from chat-with-rag:", chatResponse);
           finalResponse = null;
         }
-
-        console.log("Final extracted response:", {
-          hasResponse: !!finalResponse,
-          responseType: typeof finalResponse,
-          responseLength: finalResponse ? finalResponse.length : 0,
-          hasAnalysisMetadata: !!analysisMetadata,
-          firstChars: finalResponse ? finalResponse.substring(0, 100) : null
-        });
 
         if (!finalResponse || typeof finalResponse !== 'string') {
           console.error("No valid response extracted from chat-with-rag");
