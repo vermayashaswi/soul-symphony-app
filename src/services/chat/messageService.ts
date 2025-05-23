@@ -1,4 +1,3 @@
-
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -6,7 +5,7 @@ import { Json } from '@/integrations/supabase/types';
 import { isDirectDateQuery, getClientTimeInfo } from '@/services/dateService';
 
 /**
- * Send a message to the AI assistant and get a response
+ * Send a message to the AI assistant and get a response with enhanced error handling
  */
 export async function sendMessage(
   message: string,
@@ -15,6 +14,8 @@ export async function sendMessage(
   timeRange?: { startDate?: string; endDate?: string; periodName?: string },
   referenceDate?: string
 ): Promise<MessageResponse> {
+  const startTime = Date.now();
+  
   try {
     // Create a message ID for this new message
     const messageId = uuidv4();
@@ -22,7 +23,7 @@ export async function sendMessage(
     // Capture client's device time and timezone information
     const clientTimeInfo = getClientTimeInfo();
     
-    console.log(`[sendMessage] Processing query with intelligent pipeline: "${message}"`);
+    console.log(`[sendMessage] Processing query: "${message}"`);
     console.log(`[sendMessage] Client time info:`, clientTimeInfo);
     
     // Save the user message to the database
@@ -62,13 +63,13 @@ export async function sendMessage(
       userTimezone = clientTimeInfo.timezoneName;
     }
     
-    // Get previous messages from this thread for context (most recent 10)
+    // Get previous messages from this thread for context (limit to 5 for performance)
     const { data: previousMessages, error: contextError } = await supabase
       .from('chat_messages')
       .select('content, sender, created_at')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: false })
-      .limit(10);
+      .limit(5);
     
     if (contextError) {
       console.error('Error fetching conversation context:', contextError);
@@ -112,13 +113,14 @@ export async function sendMessage(
       thread_id: threadId,
       sender: 'assistant',
       role: 'assistant',
-      content: "Analyzing your question intelligently...",
+      content: "Analyzing your question...",
       is_processing: true,
       created_at: new Date().toISOString()
     });
     
-    // Step 1: Get intelligent query plan using enhanced smart-query-planner
-    console.log(`[sendMessage] Calling enhanced smart-query-planner`);
+    // Step 1: Get intelligent query plan with timeout
+    console.log(`[sendMessage] Calling smart-query-planner`);
+    
     const queryPlannerParams = {
       message,
       userId,
@@ -132,11 +134,46 @@ export async function sendMessage(
       timeRange
     };
     
-    const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
-      body: queryPlannerParams
-    });
+    // Add timeout to query planner call
+    const queryPlanController = new AbortController();
+    const queryPlanTimeoutId = setTimeout(() => queryPlanController.abort(), 10000); // 10 second timeout
     
-    console.log(`[sendMessage] Query planner response:`, queryPlanResponse);
+    let queryPlanResponse;
+    try {
+      queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
+        body: queryPlannerParams
+      });
+      clearTimeout(queryPlanTimeoutId);
+    } catch (error) {
+      clearTimeout(queryPlanTimeoutId);
+      console.error('Query planner timeout or error:', error);
+      
+      // Use fallback plan
+      queryPlanResponse = {
+        data: {
+          queryPlan: {
+            strategy: "hybrid",
+            queryType: "journal_specific",
+            requiresJournalData: true,
+            searchParameters: {
+              vectorThreshold: 0.3,
+              useEmotionSQL: false,
+              useThemeSQL: false,
+              dateRange: null,
+              fallbackStrategy: "recent_entries",
+              sqlQueries: [],
+              executeSQLQueries: false
+            },
+            filters: { date_range: null, emotions: null, themes: null },
+            domainContext: "general_insights",
+            confidence: 0.5,
+            reasoning: "Fallback due to planner timeout"
+          }
+        }
+      };
+    }
+    
+    console.log(`[sendMessage] Query planner response received`);
     
     // Check if we have a direct response that doesn't need further processing
     if (queryPlanResponse.data && queryPlanResponse.data.directResponse) {
@@ -170,19 +207,17 @@ export async function sendMessage(
     
     // Extract the enhanced query plan
     const queryPlan = queryPlanResponse.data?.queryPlan || {};
-    console.log(`[sendMessage] Enhanced query plan:`, JSON.stringify(queryPlan, null, 2));
+    console.log(`[sendMessage] Enhanced query plan received`);
     
     // Update processing message based on query plan
-    let processingContent = "Processing your request with intelligent analysis...";
+    let processingContent = "Processing your request...";
     
     if (queryPlan.isPersonalityQuery) {
-      processingContent = "Analyzing personality patterns in your journal entries...";
+      processingContent = "Analyzing personality patterns...";
     } else if (queryPlan.isEmotionQuery) {
-      processingContent = "Analyzing emotional patterns and insights...";
+      processingContent = "Analyzing emotional patterns...";
     } else if (queryPlan.needsComprehensiveAnalysis) {
-      processingContent = "Performing comprehensive analysis of your journal data...";
-    } else if (queryPlan.strategy === 'hybrid') {
-      processingContent = "Using multiple search strategies to find relevant insights...";
+      processingContent = "Performing comprehensive analysis...";
     }
     
     await supabase.from('chat_messages')
@@ -204,60 +239,85 @@ export async function sendMessage(
       };
     }
     
-    console.log(`[sendMessage] Final date range:`, dateRange);
+    console.log(`[sendMessage] Using date range:`, dateRange);
     
-    // Step 2: Execute intelligent search and response generation using enhanced chat-with-rag
-    console.log(`[sendMessage] Calling enhanced chat-with-rag with query plan`);
+    // Step 2: Execute intelligent search and response generation with timeout
+    console.log(`[sendMessage] Calling chat-with-rag`);
     
-    const queryResponse = await supabase.functions.invoke('chat-with-rag', {
-      body: {
-        message,
-        userId,
-        threadId,
-        timeRange: dateRange,
-        referenceDate,
-        conversationContext,
-        queryPlan, // Pass the intelligent query plan
-        isMentalHealthQuery,
-        clientTimeInfo: clientTimeInfo,
-        userTimezone: userTimezone
-      }
-    });
+    const ragController = new AbortController();
+    const ragTimeoutId = setTimeout(() => ragController.abort(), 20000); // 20 second timeout
     
-    console.log(`[sendMessage] Enhanced chat-with-rag response:`, queryResponse);
+    let queryResponse;
+    try {
+      queryResponse = await supabase.functions.invoke('chat-with-rag', {
+        body: {
+          message,
+          userId,
+          threadId,
+          timeRange: dateRange,
+          referenceDate,
+          conversationContext,
+          queryPlan,
+          isMentalHealthQuery,
+          clientTimeInfo: clientTimeInfo,
+          userTimezone: userTimezone
+        }
+      });
+      clearTimeout(ragTimeoutId);
+    } catch (error) {
+      clearTimeout(ragTimeoutId);
+      console.error('Chat-with-rag timeout or error:', error);
+      
+      // Provide fallback response
+      await supabase.from('chat_messages')
+        .update({
+          content: "I'm experiencing high demand right now. Please try your question again in a moment.",
+          is_processing: false,
+        })
+        .eq('id', processingMessageId);
+      
+      await supabase.from('chat_threads')
+        .update({ processing_status: 'idle' })
+        .eq('id', threadId);
+      
+      return {
+        response: "I'm experiencing high demand right now. Please try your question again in a moment.",
+        status: 'error',
+        messageId: processingMessageId,
+      };
+    }
+    
+    console.log(`[sendMessage] Chat-with-rag response received`);
     
     if (queryResponse.error) {
-      console.error('Error from enhanced chat-with-rag:', queryResponse.error);
-      throw new Error(`Enhanced chat service error: ${queryResponse.error.message || queryResponse.error}`);
+      console.error('Error from chat-with-rag:', queryResponse.error);
+      throw new Error(`Chat service error: ${queryResponse.error.message || queryResponse.error}`);
     }
     
     if (!queryResponse.data) {
-      console.error('No data received from enhanced chat-with-rag:', queryResponse);
-      throw new Error('Failed to get response from enhanced chat-with-rag engine');
+      console.error('No data received from chat-with-rag:', queryResponse);
+      throw new Error('Failed to get response from chat engine');
     }
     
-    // The enhanced backend returns { data: "response string" }
+    // The backend returns { data: "response string" }
     const finalResponse = queryResponse.data;
     
-    console.log(`[sendMessage] Final response type: ${typeof finalResponse}`);
-    console.log(`[sendMessage] Final response preview: ${finalResponse?.substring(0, 100)}...`);
+    console.log(`[sendMessage] Final response received, length: ${finalResponse?.length || 0}`);
     
     // Validate that we got a proper string response
     if (!finalResponse || typeof finalResponse !== 'string') {
-      console.error('Invalid response format from enhanced chat-with-rag:', {
+      console.error('Invalid response format from chat-with-rag:', {
         responseType: typeof finalResponse,
-        responseValue: finalResponse,
-        fullQueryResponse: queryResponse,
-        dataProperty: queryResponse.data
+        responseValue: finalResponse
       });
       
       // Provide fallback response based on query type
       let fallbackResponse = 'I apologize, but I encountered an error processing your request. Please try again.';
       
       if (queryPlan.isPersonalityQuery) {
-        fallbackResponse = 'I had trouble analyzing personality traits from your journal entries. Could you try writing more detailed entries about your thoughts, reactions, and experiences? This will help me provide better personality insights.';
+        fallbackResponse = 'I had trouble analyzing personality traits. Could you try adding more detailed entries about your thoughts and experiences?';
       } else if (queryPlan.isEmotionQuery) {
-        fallbackResponse = 'I had difficulty analyzing emotional patterns. Try adding more journal entries that describe your feelings and emotional experiences for better insights.';
+        fallbackResponse = 'I had difficulty analyzing emotional patterns. Try adding more entries describing your feelings.';
       }
       
       await supabase.from('chat_messages')
@@ -305,20 +365,24 @@ export async function sendMessage(
       .update({ processing_status: 'idle' })
       .eq('id', threadId);
     
+    const totalTime = Date.now() - startTime;
+    console.log(`[sendMessage] Complete pipeline finished in ${totalTime}ms`);
+    
     return {
       response: finalResponse,
       status: 'success',
       messageId: processingMessageId,
     };
   } catch (error) {
-    console.error('Error in enhanced sendMessage:', error);
+    const totalTime = Date.now() - startTime;
+    console.error(`Error in sendMessage after ${totalTime}ms:`, error);
     
     await supabase.from('chat_threads')
       .update({ processing_status: 'error' })
       .eq('id', threadId);
     
     return {
-      response: 'Sorry, I encountered an error while processing your message with the enhanced pipeline.',
+      response: 'Sorry, I encountered an error while processing your message. Please try again.',
       status: 'error',
       error: error.message,
     };

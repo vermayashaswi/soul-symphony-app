@@ -18,7 +18,43 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
- * Intelligent query analysis using GPT
+ * Enhanced JSON extraction that handles markdown wrapping and malformed responses
+ */
+function extractAndParseJSON(content: string): any {
+  try {
+    // First try direct parsing
+    return JSON.parse(content);
+  } catch (error) {
+    console.log("Direct JSON parse failed, trying extraction methods");
+    
+    // Try to extract JSON from markdown code blocks
+    const jsonBlockMatch = content.match(/```json\s*([\s\S]*?)\s*```/);
+    if (jsonBlockMatch) {
+      try {
+        return JSON.parse(jsonBlockMatch[1]);
+      } catch (e) {
+        console.log("JSON block extraction failed");
+      }
+    }
+    
+    // Try to find JSON within the text (look for { ... })
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        return JSON.parse(jsonMatch[0]);
+      } catch (e) {
+        console.log("JSON pattern extraction failed");
+      }
+    }
+    
+    // If all else fails, return null
+    console.error("All JSON extraction methods failed for content:", content.substring(0, 200));
+    return null;
+  }
+}
+
+/**
+ * Intelligent query analysis using GPT with enhanced error handling
  */
 async function analyzeQueryWithGPT(message: string, conversationContext: any[], userEntryCount: number) {
   try {
@@ -31,13 +67,8 @@ async function analyzeQueryWithGPT(message: string, conversationContext: any[], 
 User query: "${message}"
 User has ${userEntryCount} journal entries available.${contextString}
 
-Database schema available:
-- Journal Entries table: contains transcription text, refined text, emotions (jsonb), master_themes (array), sentiment, entities, created_at
-- Emotions are stored as JSON objects with emotion names as keys and confidence scores (0-1) as values
-- Vector embeddings are available for semantic search
-- SQL queries can access emotions, themes, sentiment, and date ranges
+IMPORTANT: Respond with ONLY a valid JSON object, no markdown formatting, no explanations.
 
-Analyze this query and return a JSON response with this exact structure:
 {
   "queryType": "journal_specific" | "general_question" | "direct_response",
   "strategy": "vector_only" | "sql_only" | "hybrid" | "comprehensive" | "direct",
@@ -46,27 +77,17 @@ Analyze this query and return a JSON response with this exact structure:
   "isEmotionQuery": boolean,
   "isTemporalQuery": boolean,
   "isPatternAnalysis": boolean,
-  "confidence": number (0-1),
+  "confidence": number,
   "searchParameters": {
-    "vectorThreshold": number (0.1-0.8),
+    "vectorThreshold": number,
     "useEmotionSQL": boolean,
     "useThemeSQL": boolean,
     "dateRange": object | null,
     "fallbackStrategy": "recent_entries" | "emotion_based" | "comprehensive" | null
   },
   "expectedResponse": "analysis" | "direct_answer" | "clarification_needed" | "insufficient_data",
-  "reasoning": "brief explanation of the analysis"
-}
-
-Guidelines:
-- "journal_specific" queries need journal data analysis
-- "general_question" queries about journaling/mental health concepts don't need personal data
-- "direct_response" queries ask for dates, facts, or app features
-- Personality queries (traits, characteristics) need comprehensive analysis with low vector threshold (0.1-0.2)
-- Emotion queries benefit from SQL emotion table searches + vector search
-- Pattern analysis needs comprehensive data analysis
-- Set lower thresholds (0.1-0.3) for complex analysis queries
-- Set higher thresholds (0.5-0.7) for specific content searches`;
+  "reasoning": "brief explanation"
+}`;
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -77,7 +98,8 @@ Guidelines:
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.3,
+        temperature: 0.1, // Lower temperature for more consistent JSON
+        max_tokens: 800,
       })
     });
 
@@ -87,70 +109,82 @@ Guidelines:
     }
 
     const data = await response.json();
-    const analysisResult = JSON.parse(data.choices[0].message?.content || '{}');
+    const content = data.choices[0].message?.content || '{}';
+    
+    console.log("Raw GPT response:", content);
+    
+    const analysisResult = extractAndParseJSON(content);
+    
+    if (!analysisResult) {
+      console.error("Failed to parse GPT response, using fallback");
+      return createFallbackAnalysis(message);
+    }
     
     console.log("GPT Query Analysis Result:", JSON.stringify(analysisResult, null, 2));
     return analysisResult;
 
   } catch (error) {
     console.error("Error in GPT query analysis:", error);
-    // Return fallback analysis
-    return {
-      queryType: "journal_specific",
-      strategy: "hybrid",
-      requiresJournalData: true,
-      isPersonalityQuery: message.toLowerCase().includes('trait') || message.toLowerCase().includes('personality'),
-      isEmotionQuery: message.toLowerCase().includes('emotion') || message.toLowerCase().includes('feel'),
-      isTemporalQuery: false,
-      isPatternAnalysis: message.toLowerCase().includes('pattern') || message.toLowerCase().includes('often'),
-      confidence: 0.5,
-      searchParameters: {
-        vectorThreshold: 0.3,
-        useEmotionSQL: true,
-        useThemeSQL: false,
-        dateRange: null,
-        fallbackStrategy: "recent_entries"
-      },
-      expectedResponse: "analysis",
-      reasoning: "Fallback analysis due to GPT error"
-    };
+    return createFallbackAnalysis(message);
   }
 }
 
 /**
- * Generate SQL queries for emotion/theme analysis
+ * Create fallback analysis when GPT fails
+ */
+function createFallbackAnalysis(message: string) {
+  const lowerMessage = message.toLowerCase();
+  
+  return {
+    queryType: "journal_specific",
+    strategy: "hybrid",
+    requiresJournalData: true,
+    isPersonalityQuery: lowerMessage.includes('trait') || lowerMessage.includes('personality') || lowerMessage.includes('character'),
+    isEmotionQuery: lowerMessage.includes('emotion') || lowerMessage.includes('feel') || lowerMessage.includes('mood'),
+    isTemporalQuery: lowerMessage.includes('last week') || lowerMessage.includes('yesterday') || lowerMessage.includes('today'),
+    isPatternAnalysis: lowerMessage.includes('pattern') || lowerMessage.includes('often') || lowerMessage.includes('usually'),
+    confidence: 0.6,
+    searchParameters: {
+      vectorThreshold: 0.3,
+      useEmotionSQL: true,
+      useThemeSQL: false,
+      dateRange: null,
+      fallbackStrategy: "recent_entries"
+    },
+    expectedResponse: "analysis",
+    reasoning: "Fallback analysis due to GPT error"
+  };
+}
+
+/**
+ * Generate SQL queries for emotion/theme analysis with timeout
  */
 async function generateSQLQueries(message: string, userId: string, analysisResult: any) {
   if (!analysisResult.searchParameters.useEmotionSQL && !analysisResult.searchParameters.useThemeSQL) {
-    return null;
+    return { shouldExecute: false, emotionQueries: [] };
   }
 
   try {
-    const prompt = `Based on this query analysis, generate SQL queries to extract relevant journal data.
-
-User Query: "${message}"
-Analysis: ${JSON.stringify(analysisResult, null, 2)}
-User ID: ${userId}
+    const prompt = `Generate SQL function calls for this query: "${message}"
 
 Available functions:
-- get_top_emotions(user_id, start_date, end_date, limit_count)
-- get_top_emotions_with_entries(user_id, start_date, end_date, limit_count)  
+- get_top_emotions_with_entries(user_id, start_date, end_date, limit_count)
 - match_journal_entries_by_emotion(emotion_name, user_id, min_score, start_date, end_date, limit_count)
 
-Generate appropriate SQL function calls and return as JSON:
+Respond with ONLY valid JSON:
 {
   "emotionQueries": [
     {
       "function": "function_name",
       "parameters": {...},
-      "purpose": "what this query will find"
+      "purpose": "description"
     }
   ],
   "shouldExecute": boolean
-}
+}`;
 
-For personality/trait analysis, use get_top_emotions_with_entries to get comprehensive emotion data.
-For specific emotion queries, use match_journal_entries_by_emotion.`;
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // 5 second timeout
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -161,23 +195,33 @@ For specific emotion queries, use match_journal_entries_by_emotion.`;
       body: JSON.stringify({
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
-        temperature: 0.2,
-      })
+        temperature: 0.1,
+        max_tokens: 400,
+      }),
+      signal: controller.signal
     });
+
+    clearTimeout(timeoutId);
 
     if (!response.ok) {
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    const sqlPlan = JSON.parse(data.choices[0].message?.content || '{"shouldExecute": false}');
+    const content = data.choices[0].message?.content || '{"shouldExecute": false}';
+    
+    const sqlPlan = extractAndParseJSON(content);
+    
+    if (!sqlPlan) {
+      return { shouldExecute: false, emotionQueries: [] };
+    }
     
     console.log("Generated SQL Plan:", JSON.stringify(sqlPlan, null, 2));
     return sqlPlan;
 
   } catch (error) {
     console.error("Error generating SQL queries:", error);
-    return null;
+    return { shouldExecute: false, emotionQueries: [] };
   }
 }
 
@@ -191,7 +235,7 @@ serve(async (req) => {
 
     console.log(`[Smart Query Planner] Analyzing query: "${message}"`);
 
-    // Get user's journal entry count
+    // Get user's journal entry count with timeout
     let entryCount = 0;
     try {
       const { count, error } = await supabase
