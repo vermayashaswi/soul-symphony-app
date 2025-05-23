@@ -1,170 +1,134 @@
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
-/**
- * Search for journal entries using embedding vector similarity
- */
-export async function searchEntriesWithVector(
-  supabase: any,
-  userId: string,
-  queryEmbedding: number[],
-  limit: number = 10,
-  matchThreshold: number = 0.5
-) {
+export async function searchEntriesWithVector(supabase: any, query: string, userId: string, limit: number = 10) {
+  console.log(`Searching entries with vector similarity for user ${userId}`);
+  
   try {
-    console.log(`Searching entries with vector similarity for user ${userId}`);
-    
-    const { data: entries, error } = await supabase.rpc('match_journal_entries', {
+    // Generate embedding for the query
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: query,
+      }),
+    });
+
+    if (!embeddingResponse.ok) {
+      console.error('Failed to generate embedding');
+      return [];
+    }
+
+    const embeddingData = await embeddingResponse.json();
+    const queryEmbedding = embeddingData.data[0].embedding;
+
+    // Search for similar entries using the vector similarity function
+    const { data, error } = await supabase.rpc('match_journal_entries', {
       query_embedding: queryEmbedding,
-      match_threshold: matchThreshold,
+      match_threshold: 0.5,
       match_count: limit,
       user_id_filter: userId
     });
-    
+
     if (error) {
       console.error('Error in vector search:', error);
       return [];
     }
-    
-    console.log(`Found ${entries?.length || 0} entries with vector similarity`);
-    return entries || [];
+
+    console.log(`Found ${data ? data.length : 0} entries with vector similarity`);
+    return data || [];
+
   } catch (error) {
     console.error('Error in searchEntriesWithVector:', error);
     return [];
   }
 }
 
-/**
- * Search for journal entries using embedding vector similarity within a time range
- */
 export async function searchEntriesWithTimeRange(
-  supabase: any,
-  userId: string,
-  queryEmbedding: number[],
-  dateRange: { startDate?: string; endDate?: string },
-  limit: number = 10,
-  matchThreshold: number = 0.5
+  supabase: any, 
+  query: string, 
+  userId: string, 
+  startDate: string, 
+  endDate: string,
+  limit: number = 10
 ) {
+  console.log(`Searching entries with time range for userId: ${userId}`);
+  console.log(`Time range: from ${startDate} to ${endDate}`);
+  
   try {
-    console.log(`Searching entries with time range for userId: ${userId}`);
-    console.log(`Time range: from ${dateRange.startDate || 'none'} to ${dateRange.endDate || 'none'}`);
+    // Parse dates to ensure they're valid
+    const start = new Date(startDate);
+    const end = new Date(endDate);
     
-    // Parse dates to ensure proper format
-    let startDate = null;
-    let endDate = null;
+    console.log(`Start date parsed: ${start.toISOString()} (${start})`);
+    console.log(`End date parsed: ${end.toISOString()} (${end})`);
     
-    if (dateRange.startDate) {
-      startDate = new Date(dateRange.startDate);
-      console.log(`Start date parsed: ${startDate.toISOString()} (${startDate.toString()})`);
-    }
-    
-    if (dateRange.endDate) {
-      endDate = new Date(dateRange.endDate);
-      console.log(`End date parsed: ${endDate.toISOString()} (${endDate.toString()})`);
-    }
-    
-    console.log(`Sending time range to database: from ${startDate?.toISOString() || 'none'} to ${endDate?.toISOString() || 'none'}`);
-    
-    // Detailed database function parameters for debugging
-    console.log("Database function parameters:", {
-      query_embedding: "[array with 1536 elements]",
-      match_threshold: matchThreshold,
-      match_count: limit,
-      user_id_filter: userId,
-      start_date: startDate?.toISOString() || null,
-      end_date: endDate?.toISOString() || null
+    console.log(`Sending time range to database: from ${start.toISOString()} to ${end.toISOString()}`);
+
+    // Generate embedding for better matching
+    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'text-embedding-ada-002',
+        input: query,
+      }),
     });
-    
-    const { data: entries, error } = await supabase.rpc('match_journal_entries_with_date', {
+
+    let queryEmbedding = null;
+    if (embeddingResponse.ok) {
+      const embeddingData = await embeddingResponse.json();
+      queryEmbedding = embeddingData.data[0].embedding;
+    }
+
+    // Call the time-filtered vector search function
+    const { data, error } = await supabase.rpc('match_journal_entries_time_filtered', {
       query_embedding: queryEmbedding,
-      match_threshold: matchThreshold,
+      match_threshold: 0.5,
       match_count: limit,
       user_id_filter: userId,
-      start_date: startDate?.toISOString() || null,
-      end_date: endDate?.toISOString() || null
+      start_date: start.toISOString(),
+      end_date: end.toISOString()
     });
-    
+
+    console.log(`Database function parameters:`, {
+      query_embedding: queryEmbedding ? '[array with 1536 elements]' : 'null',
+      match_threshold: 0.5,
+      match_count: limit,
+      user_id_filter: userId,
+      start_date: start.toISOString(),
+      end_date: end.toISOString()
+    });
+
     if (error) {
-      console.error('Error in time-range search:', error);
-      console.log('No entries found within time range');
+      console.error('Error in time-filtered vector search:', error);
       return [];
     }
-    
-    console.log(`Found ${entries?.length || 0} entries with time-filtered vector similarity`);
-    return entries || [];
+
+    console.log(`Found ${data ? data.length : 0} entries with time-filtered vector similarity`);
+    return data || [];
+
   } catch (error) {
     console.error('Error in searchEntriesWithTimeRange:', error);
     return [];
   }
 }
 
-/**
- * Search for journal entries by month
- */
-export async function searchEntriesByMonth(
-  supabase: any,
-  userId: string,
-  monthName: string,
-  year?: number,
-  limit: number = 10
-) {
+export async function searchEntriesByMonth(supabase: any, query: string, userId: string, month: number, year: number) {
+  console.log(`Searching entries by month: ${month}/${year} for user ${userId}`);
+  
   try {
-    console.log(`Searching entries for month: ${monthName} ${year || 'current year'}`);
+    const startDate = new Date(year, month - 1, 1);
+    const endDate = new Date(year, month, 0, 23, 59, 59);
     
-    // Convert month name to month number (1-12)
-    const currentYear = new Date().getFullYear();
-    const targetYear = year || currentYear;
-    
-    const monthMap: { [key: string]: number } = {
-      'january': 0, 'jan': 0,
-      'february': 1, 'feb': 1,
-      'march': 2, 'mar': 2,
-      'april': 3, 'apr': 3,
-      'may': 4,
-      'june': 5, 'jun': 5,
-      'july': 6, 'jul': 6,
-      'august': 7, 'aug': 7,
-      'september': 8, 'sep': 8, 'sept': 8,
-      'october': 9, 'oct': 9,
-      'november': 10, 'nov': 10,
-      'december': 11, 'dec': 11
-    };
-    
-    const month = monthMap[monthName.toLowerCase()];
-    if (month === undefined) {
-      console.error(`Invalid month name: ${monthName}`);
-      return [];
-    }
-    
-    // Create start and end dates for the month
-    const startDate = new Date(targetYear, month, 1);
-    const endDate = new Date(targetYear, month + 1, 0, 23, 59, 59, 999); // Last day of month
-    
-    console.log(`Month date range: ${startDate.toISOString()} to ${endDate.toISOString()}`);
-    
-    // Query entries within the date range
-    const { data: entries, error } = await supabase
-      .from('Journal Entries')
-      .select('id, created_at, "transcription text", "refined text", master_themes, emotions')
-      .eq('user_id', userId)
-      .gte('created_at', startDate.toISOString())
-      .lte('created_at', endDate.toISOString())
-      .order('created_at', { ascending: true })
-      .limit(limit);
-      
-    if (error) {
-      console.error('Error in month search:', error);
-      return [];
-    }
-    
-    // Process entries to add content field
-    const processedEntries = entries.map((entry: any) => ({
-      ...entry,
-      content: entry["refined text"] || entry["transcription text"] || ""
-    }));
-    
-    console.log(`Found ${processedEntries.length} entries for ${monthName} ${targetYear}`);
-    return processedEntries || [];
+    return await searchEntriesWithTimeRange(supabase, query, userId, startDate.toISOString(), endDate.toISOString());
   } catch (error) {
     console.error('Error in searchEntriesByMonth:', error);
     return [];
