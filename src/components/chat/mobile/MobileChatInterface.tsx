@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -243,6 +244,8 @@ export default function MobileChatInterface() {
       <div className="sticky bottom-0 mobile-chat-input-container">
         <MobileChatInput
           onSendMessage={handleSendMessage}
+          isLoading={loading || isSending}
+          userId={user?.id}
         />
       </div>
     </div>
