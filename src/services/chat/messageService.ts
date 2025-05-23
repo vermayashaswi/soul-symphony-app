@@ -157,7 +157,7 @@ export async function sendMessage(
     });
     
     // Check if we have a direct response that doesn't need further processing
-    if (queryPlanResponse.data.directResponse) {
+    if (queryPlanResponse.data && queryPlanResponse.data.directResponse) {
       await supabase.from('chat_messages')
         .update({
           content: queryPlanResponse.data.directResponse,
@@ -183,8 +183,8 @@ export async function sendMessage(
     }
     
     // Extract the query plan from the response
-    const queryPlan = queryPlanResponse.data.plan || {};
-    const queryType = queryPlanResponse.data.queryType || 'journal_specific';
+    const queryPlan = queryPlanResponse.data?.plan || {};
+    const queryType = queryPlanResponse.data?.queryType || 'journal_specific';
     
     console.log('[sendMessage] Enhanced debugging - Query plan received:', JSON.stringify(queryPlan, null, 2));
     console.log(`[sendMessage] Enhanced debugging - Query type: ${queryType}`);
@@ -338,10 +338,21 @@ export async function sendMessage(
       console.log(`[sendMessage] Enhanced debugging - chat-with-rag response:`, queryResponse);
       
       if (!queryResponse.data) {
+        console.error('No data received from chat-with-rag:', queryResponse);
         throw new Error('Failed to get response from chat-with-rag engine');
       }
       
-      finalResponse = queryResponse.data.data;
+      // FIX: The correct property is queryResponse.data, not queryResponse.data.data
+      finalResponse = queryResponse.data;
+      
+      // Additional validation to ensure we have a string response
+      if (typeof finalResponse !== 'string') {
+        console.error('Unexpected response format from chat-with-rag:', finalResponse);
+        finalResponse = finalResponse?.response || finalResponse?.data || 'I apologize, but I encountered an error processing your request.';
+      }
+      
+      console.log(`[sendMessage] Enhanced debugging - Final response type: ${typeof finalResponse}`);
+      console.log(`[sendMessage] Enhanced debugging - Final response preview: ${finalResponse?.substring(0, 100)}...`);
       
       if (isMentalHealthQuery && (!finalResponse || finalResponse.trim() === '' || finalResponse.includes("I don't have enough information"))) {
         finalResponse = "Based on the journal entries I have access to, I don't have enough information to provide specific mental health recommendations. " +
