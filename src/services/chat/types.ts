@@ -1,3 +1,4 @@
+
 // Chat thread type definition
 export interface ChatThread {
   id: string;
@@ -19,12 +20,19 @@ export interface ChatThread {
   };
 }
 
-// MessageResponse type for sendMessage function
+// MessageResponse type for sendMessage function - enhanced with all needed properties
 export interface MessageResponse {
   response: string;
+  content: string;
   status: string;
   messageId?: string;
   error?: string;
+  role: 'user' | 'assistant' | 'error';
+  references?: any[];
+  analysis?: any;
+  hasNumericResult?: boolean;
+  isInteractive?: boolean;
+  interactiveOptions?: any[];
 }
 
 // Sub-query response type definition
@@ -54,6 +62,14 @@ export interface ChatMessage {
   diagnostics?: any;
   is_processing?: boolean;
   time_pattern_analysis?: any; // Add this field for time pattern analysis results
+}
+
+// Client time info type
+export interface ClientTimeInfo {
+  timestamp: string;
+  timezoneOffset: number;
+  timezoneName: string;
+  rawOffset: number;
 }
 
 // Type guard to check if an object has thread metadata
