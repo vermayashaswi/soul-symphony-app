@@ -1,8 +1,12 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { processTimeRange } from './utils/dateProcessor.ts';
 import { searchEntriesWithVector, searchEntriesWithTimeRange, searchEntriesByMonth } from './utils/searchService.ts';
 import { detectMentalHealthQuery, detectMonthInQuery, isDirectDateQuery, isJournalAnalysisQuery, isMonthSpecificQuery, detectTimeframeInQuery } from './utils/queryClassifier.ts';
+
+// Import date functions directly from date-fns
+import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'https://esm.sh/date-fns@4.1.0';
+import { toZonedTime } from 'https://esm.sh/date-fns-tz@3.2.0';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -11,9 +15,158 @@ const corsHeaders = {
 
 const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
+/**
+ * Process a time range object to ensure dates are in proper format
+ */
+function processTimeRange(timeRange: any): { startDate?: string; endDate?: string } {
+  if (!timeRange) return {};
+  
+  console.log("[chat-with-rag] Processing time range:", timeRange);
+  
+  const result: { startDate?: string; endDate?: string } = {};
+  
+  try {
+    // Use timezone from the timeRange object if available
+    const timezone = timeRange.timezone || 'UTC';
+    console.log(`[chat-with-rag] Using timezone for date processing: ${timezone}`);
+    
+    // Handle startDate if provided
+    if (timeRange.startDate) {
+      const startDate = new Date(timeRange.startDate);
+      if (!isNaN(startDate.getTime())) {
+        result.startDate = startDate.toISOString();
+      } else {
+        console.warn(`[chat-with-rag] Invalid startDate: ${timeRange.startDate}`);
+      }
+    }
+    
+    // Handle endDate if provided
+    if (timeRange.endDate) {
+      const endDate = new Date(timeRange.endDate);
+      if (!isNaN(endDate.getTime())) {
+        result.endDate = endDate.toISOString();
+      } else {
+        console.warn(`[chat-with-rag] Invalid endDate: ${timeRange.endDate}`);
+      }
+    }
+    
+    // Calculate current date in user's timezone
+    const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
+    console.log(`[chat-with-rag] Current date in timezone ${timezone}: ${now.toISOString()}`);
+    
+    // Handle special time range cases
+    if (timeRange.type === 'week') {
+      result.startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
+      result.endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
+      console.log(`[chat-with-rag] Generated 'this week' date range: ${result.startDate} to ${result.endDate}`);
+    } else if (timeRange.type === 'lastWeek') {
+      console.log("[chat-with-rag] CALCULATING LAST WEEK");
+      const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
+      const lastWeekMonday = subDays(thisWeekMonday, 7);
+      const lastWeekSunday = subDays(thisWeekMonday, 1);
+      
+      console.log("[chat-with-rag] LAST WEEK CALCULATION DETAILED DEBUG:");
+      console.log(`[chat-with-rag] Current date in timezone ${timezone}: ${now.toISOString()}`);
+      console.log(`[chat-with-rag] This week's Monday: ${thisWeekMonday.toISOString()}`);
+      console.log(`[chat-with-rag] Last week's Monday: ${lastWeekMonday.toISOString()}`);
+      console.log(`[chat-with-rag] Last week's Sunday: ${lastWeekSunday.toISOString()}`);
+      
+      result.startDate = startOfDay(lastWeekMonday).toISOString();
+      result.endDate = endOfDay(lastWeekSunday).toISOString();
+      console.log(`[chat-with-rag] Generated 'last week' date range: ${result.startDate} to ${result.endDate}`);
+    } else if (timeRange.type === 'month') {
+      result.startDate = startOfMonth(now).toISOString();
+      result.endDate = endOfMonth(now).toISOString();
+      console.log(`[chat-with-rag] Generated 'this month' date range: ${result.startDate} to ${result.endDate}`);
+    } else if (timeRange.type === 'lastMonth') {
+      const lastMonth = new Date(now.getFullYear(), now.getMonth() - 1, 1);
+      result.startDate = startOfMonth(lastMonth).toISOString();
+      result.endDate = endOfMonth(lastMonth).toISOString();
+      console.log(`[chat-with-rag] Generated 'last month' date range: ${result.startDate} to ${result.endDate}`);
+    } else if (timeRange.type === 'specificMonth' && timeRange.monthName) {
+      console.log(`[chat-with-rag] Processing specific month: ${timeRange.monthName}`);
+      processSpecificMonthByName(timeRange.monthName, result, timeRange.year, timezone);
+      console.log(`[chat-with-rag] Processed specific month name "${timeRange.monthName}" to date range: ${result.startDate} to ${result.endDate}`);
+    }
+    
+    // Validate the resulting dates
+    if (result.startDate && result.endDate) {
+      const startDate = new Date(result.startDate);
+      const endDate = new Date(result.endDate);
+      
+      if (startDate > endDate) {
+        console.warn(`[chat-with-rag] Invalid date range: startDate (${result.startDate}) is after endDate (${result.endDate})`);
+        const temp = result.startDate;
+        result.startDate = result.endDate;
+        result.endDate = temp;
+      }
+    }
+    
+    console.log("[chat-with-rag] Processed time range:", result);
+    return result;
+  } catch (error) {
+    console.error("[chat-with-rag] Error processing time range:", error);
+    return {};
+  }
+}
+
+/**
+ * Process a specific month by name
+ */
+function processSpecificMonthByName(monthName: string, result: { startDate?: string; endDate?: string }, year?: number, timezone?: string) {
+  const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
+  const currentYear = now.getFullYear();
+  const targetYear = year || currentYear;
+  
+  console.log(`[chat-with-rag] Processing month ${monthName} for year ${targetYear} with timezone ${timezone}`);
+  
+  const monthMap: Record<string, number> = {
+    'january': 0, 'jan': 0,
+    'february': 1, 'feb': 1,
+    'march': 2, 'mar': 2,
+    'april': 3, 'apr': 3,
+    'may': 4,
+    'june': 5, 'jun': 5,
+    'july': 6, 'jul': 6,
+    'august': 7, 'aug': 7,
+    'september': 8, 'sep': 8, 'sept': 8,
+    'october': 9, 'oct': 9,
+    'november': 10, 'nov': 10,
+    'december': 11, 'dec': 11
+  };
+  
+  const normalizedMonthName = monthName.toLowerCase().trim();
+  let monthIndex: number | undefined = undefined;
+  
+  if (monthMap.hasOwnProperty(normalizedMonthName)) {
+    monthIndex = monthMap[normalizedMonthName];
+    console.log(`[chat-with-rag] Found exact match for month name "${monthName}" -> index ${monthIndex}`);
+  }
+  
+  if (monthIndex !== undefined) {
+    let startDate: Date;
+    let endDate: Date;
+    
+    if (timezone) {
+      const timezonedDate = toZonedTime(new Date(targetYear, monthIndex, 1), timezone);
+      startDate = startOfMonth(timezonedDate);
+      endDate = endOfMonth(timezonedDate);
+    } else {
+      startDate = startOfMonth(new Date(targetYear, monthIndex, 1));
+      endDate = endOfMonth(new Date(targetYear, monthIndex, 1));
+    }
+    
+    result.startDate = startOfDay(startDate).toISOString();
+    result.endDate = endOfDay(endDate).toISOString();
+    
+    console.log(`[chat-with-rag] Generated date range for ${monthName} ${targetYear}: ${result.startDate} to ${result.endDate}`);
+  } else {
+    console.warn(`[chat-with-rag] Unknown month name: "${monthName}"`);
+  }
+}
+
 // Enhanced date calculation functions with proper timezone handling
 function getLastWeekDates(clientTimeInfo?: any, userTimezone?: string): { startDate: string; endDate: string; formattedRange: string } {
-  // Determine the most appropriate timezone to use
   const timezone = clientTimeInfo?.timezoneName || userTimezone || 'UTC';
   
   console.log(`[chat-with-rag] Getting last week dates for timezone: ${timezone}`);
@@ -23,8 +176,8 @@ function getLastWeekDates(clientTimeInfo?: any, userTimezone?: string): { startD
   const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
   console.log(`[chat-with-rag] Using reference time: ${referenceTime.toISOString()}`);
   
-  // For last week calculation, we need to get the current date in user's timezone
-  const now = new Date(referenceTime);
+  // Convert to user's timezone if provided
+  const now = timezone !== 'UTC' ? toZonedTime(referenceTime, timezone) : referenceTime;
   
   // Get this week's Monday (start of current week) - week starts on Monday (1)
   const currentDay = now.getDay();
@@ -62,14 +215,13 @@ function getLastWeekDates(clientTimeInfo?: any, userTimezone?: string): { startD
 }
 
 function getCurrentWeekDates(clientTimeInfo?: any, userTimezone?: string): { startDate: string; endDate: string; formattedRange: string } {
-  // Determine the most appropriate timezone to use
   const timezone = clientTimeInfo?.timezoneName || userTimezone || 'UTC';
   
   console.log(`[chat-with-rag] Getting current week dates for timezone: ${timezone}`);
   
   // Get reference time (prefer client's time over server time)
   const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
-  const now = new Date(referenceTime);
+  const now = timezone !== 'UTC' ? toZonedTime(referenceTime, timezone) : referenceTime;
   
   // Get this week's Monday (start of current week)
   const currentDay = now.getDay();
@@ -108,10 +260,10 @@ serve(async (req) => {
   try {
     const { message, userId, threadId, timeRange, referenceDate, conversationContext, queryPlan, isMentalHealthQuery, clientTimeInfo, userTimezone } = await req.json();
 
-    console.log(`Processing request for user ${userId} at ${new Date().toISOString()}: ${message}`);
-    console.log(`Cache breaker: ${Date.now()}`);
-    console.log(`Client time info received:`, clientTimeInfo);
-    console.log(`User timezone: ${userTimezone}`);
+    console.log(`[chat-with-rag] Processing request for user ${userId} at ${new Date().toISOString()}: ${message}`);
+    console.log(`[chat-with-rag] Cache breaker: ${Date.now()}`);
+    console.log(`[chat-with-rag] Client time info received:`, clientTimeInfo);
+    console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
@@ -125,7 +277,7 @@ serve(async (req) => {
     if (!processedTimeRange || (!processedTimeRange.startDate && !processedTimeRange.endDate)) {
       const detectedTimeframe = detectTimeframeInQuery(message);
       if (detectedTimeframe) {
-        console.log(`Detected timeframe from message:`, detectedTimeframe);
+        console.log(`[chat-with-rag] Detected timeframe from message:`, detectedTimeframe);
         
         // Add timezone and client info to detected timeframe
         if (detectedTimeframe.timezone === 'UTC' && (clientTimeInfo?.timezoneName || userTimezone)) {
@@ -134,7 +286,7 @@ serve(async (req) => {
         
         // Process the detected timeframe into actual dates
         processedTimeRange = processTimeRange(detectedTimeframe);
-        console.log(`Processed timeframe into date range:`, processedTimeRange);
+        console.log(`[chat-with-rag] Processed timeframe into date range:`, processedTimeRange);
       }
     }
 
@@ -183,17 +335,15 @@ serve(async (req) => {
     const domainContext = queryPlan?.domainContext || 'general_insights';
     const searchStrategy = queryPlan?.searchStrategy || 'hybrid';
     
-    console.log(`Domain context: ${domainContext}`);
-    console.log(`Using search strategy: ${searchStrategy}`);
+    console.log(`[chat-with-rag] Domain context: ${domainContext}`);
+    console.log(`[chat-with-rag] Using search strategy: ${searchStrategy}`);
 
-    // Determine if this is a comprehensive analysis query
     const isComprehensiveQuery = isComprehensiveAnalysisQuery(message);
-    console.log(`Is comprehensive analysis query: ${isComprehensiveQuery}`);
+    console.log(`[chat-with-rag] Is comprehensive analysis query: ${isComprehensiveQuery}`);
     
-    // Handle journal question
-    console.log('Handling journal question');
-    console.log(`Processing as journal-specific question`);
-    console.log(`Conversation history length: ${conversationContext?.length || 0}`);
+    console.log('[chat-with-rag] Handling journal question');
+    console.log(`[chat-with-rag] Processing as journal-specific question`);
+    console.log(`[chat-with-rag] Conversation history length: ${conversationContext?.length || 0}`);
 
     const isTimePatternQuery = /\b(pattern|trend|change|over time|frequency|often|usually|typically)\b/i.test(message);
     const isTimeSummaryQuery = /\b(summary|summarize|overview|review)\b/i.test(message) && 
@@ -201,19 +351,19 @@ serve(async (req) => {
     const isPersonalityQuery = /\b(personality|character|trait|type|am i|who am i)\b/i.test(message);
     const isJournalAnalysis = isJournalAnalysisQuery(message);
 
-    console.log(`Is time pattern query: ${isTimePatternQuery}`);
-    console.log(`Is time summary query: ${isTimeSummaryQuery}`);
-    console.log(`Is personality query: ${isPersonalityQuery}`);
-    console.log(`Is journal analysis query: ${isJournalAnalysis}`);
+    console.log(`[chat-with-rag] Is time pattern query: ${isTimePatternQuery}`);
+    console.log(`[chat-with-rag] Is time summary query: ${isTimeSummaryQuery}`);
+    console.log(`[chat-with-rag] Is personality query: ${isPersonalityQuery}`);
+    console.log(`[chat-with-rag] Is journal analysis query: ${isJournalAnalysis}`);
 
     // Search for relevant journal entries using enhanced search
-    console.log('Searching for relevant journal entries using strategy:', searchStrategy);
+    console.log('[chat-with-rag] Searching for relevant journal entries using strategy:', searchStrategy);
 
     let relevantEntries = [];
     
     // Enhanced search logic with proper date range handling
     if (processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate)) {
-      console.log(`Time range search: from ${processedTimeRange.startDate || 'none'} to ${processedTimeRange.endDate || 'none'}`);
+      console.log(`[chat-with-rag] Time range search: from ${processedTimeRange.startDate || 'none'} to ${processedTimeRange.endDate || 'none'}`);
       
       // Get query embedding for semantic search
       const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -266,7 +416,7 @@ serve(async (req) => {
       relevantEntries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
     }
 
-    console.log(`Found ${relevantEntries?.length || 0} relevant entries`);
+    console.log(`[chat-with-rag] Found ${relevantEntries?.length || 0} relevant entries`);
 
     if (!relevantEntries || relevantEntries.length === 0) {
       return new Response(JSON.stringify({
@@ -280,7 +430,7 @@ serve(async (req) => {
     const maxEntries = isComprehensiveQuery ? 1000 : 10;
     const entriesToUse = relevantEntries.slice(0, maxEntries);
     
-    console.log(`Using ${entriesToUse.length} entries for analysis (comprehensive: ${isComprehensiveQuery})`);
+    console.log(`[chat-with-rag] Using ${entriesToUse.length} entries for analysis (comprehensive: ${isComprehensiveQuery})`);
 
     // Enhanced system prompt with better context
     const systemPrompt = `You are a supportive mental health assistant analyzing journal entries from the SOULo voice journaling app. 
@@ -327,21 +477,21 @@ Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
 
     if (!openAiResponse.ok) {
       const errorText = await openAiResponse.text();
-      console.error('OpenAI API error:', errorText);
+      console.error('[chat-with-rag] OpenAI API error:', errorText);
       throw new Error(`OpenAI API error: ${openAiResponse.status}`);
     }
 
     const openAiData = await openAiResponse.json();
     const assistantResponse = openAiData.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response.';
 
-    console.log(`Generated response: ${assistantResponse.substring(0, 100)}...`);
+    console.log(`[chat-with-rag] Generated response: ${assistantResponse.substring(0, 100)}...`);
 
     return new Response(JSON.stringify({ data: assistantResponse }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 
   } catch (error) {
-    console.error('Error in chat-with-rag:', error);
+    console.error('[chat-with-rag] Error in chat-with-rag:', error);
     return new Response(JSON.stringify({ 
       error: 'Internal server error', 
       details: error.message 
