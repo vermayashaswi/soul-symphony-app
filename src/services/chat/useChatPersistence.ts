@@ -11,6 +11,7 @@ import {
 import { ChatThread, ChatMessage } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { useToast } from "@/hooks/use-toast";
+import { Json } from "@/integrations/supabase/types";
 
 export interface ChatMessagePersistence {
   id: string;
@@ -159,18 +160,19 @@ export const useChatPersistence = (userId: string | undefined) => {
         // Ensure metadata is properly typed
         let typedMetadata: ChatThread['metadata'] | undefined = undefined;
         
-        if (newThread.metadata && typeof newThread.metadata === 'object' && !Array.isArray(newThread.metadata)) {
+        if (newThread.metadata && typeof newThread.metadata === 'object' && newThread.metadata !== null && !Array.isArray(newThread.metadata)) {
+          const metadataObj = newThread.metadata as { [key: string]: Json };
           typedMetadata = {
-            timeContext: typeof newThread.metadata.timeContext === 'string' ? newThread.metadata.timeContext : null,
-            topicContext: typeof newThread.metadata.topicContext === 'string' ? newThread.metadata.topicContext : null,
-            intentType: typeof newThread.metadata.intentType === 'string' ? newThread.metadata.intentType : undefined,
-            confidenceScore: typeof newThread.metadata.confidenceScore === 'number' ? newThread.metadata.confidenceScore : undefined,
-            needsClarity: Boolean(newThread.metadata.needsClarity),
-            ambiguities: Array.isArray(newThread.metadata.ambiguities) ? 
-              newThread.metadata.ambiguities.filter(item => typeof item === 'string') as string[] : 
+            timeContext: typeof metadataObj.timeContext === 'string' ? metadataObj.timeContext : null,
+            topicContext: typeof metadataObj.topicContext === 'string' ? metadataObj.topicContext : null,
+            intentType: typeof metadataObj.intentType === 'string' ? metadataObj.intentType : undefined,
+            confidenceScore: typeof metadataObj.confidenceScore === 'number' ? metadataObj.confidenceScore : undefined,
+            needsClarity: typeof metadataObj.needsClarity === 'boolean' ? metadataObj.needsClarity : false,
+            ambiguities: Array.isArray(metadataObj.ambiguities) ? 
+              metadataObj.ambiguities.filter(item => typeof item === 'string') as string[] : 
               [],
-            domainContext: typeof newThread.metadata.domainContext === 'string' ? newThread.metadata.domainContext : null,
-            lastUpdated: typeof newThread.metadata.lastUpdated === 'string' ? newThread.metadata.lastUpdated : undefined
+            domainContext: typeof metadataObj.domainContext === 'string' ? metadataObj.domainContext : null,
+            lastUpdated: typeof metadataObj.lastUpdated === 'string' ? metadataObj.lastUpdated : undefined
           };
         }
         

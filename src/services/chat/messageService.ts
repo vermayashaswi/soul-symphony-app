@@ -160,32 +160,30 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[] |
       // Handle metadata with proper type safety
       let typedMetadata: ChatThread['metadata'] | undefined = undefined;
       
-      if (thread.metadata) {
-        // Convert to proper typed metadata
+      if (thread.metadata && typeof thread.metadata === 'object' && thread.metadata !== null && !Array.isArray(thread.metadata)) {
+        const metadataObj = thread.metadata as { [key: string]: Json };
         typedMetadata = {
-          timeContext: typeof thread.metadata.timeContext === 'string' ? thread.metadata.timeContext : null,
-          topicContext: typeof thread.metadata.topicContext === 'string' ? thread.metadata.topicContext : null,
-          intentType: typeof thread.metadata.intentType === 'string' ? thread.metadata.intentType : undefined,
-          confidenceScore: typeof thread.metadata.confidenceScore === 'number' ? thread.metadata.confidenceScore : undefined,
-          needsClarity: typeof thread.metadata.needsClarity === 'boolean' ? thread.metadata.needsClarity : false,
-          ambiguities: Array.isArray(thread.metadata.ambiguities) ? 
-            thread.metadata.ambiguities.filter(item => typeof item === 'string') as string[] : 
+          timeContext: typeof metadataObj.timeContext === 'string' ? metadataObj.timeContext : null,
+          topicContext: typeof metadataObj.topicContext === 'string' ? metadataObj.topicContext : null,
+          intentType: typeof metadataObj.intentType === 'string' ? metadataObj.intentType : undefined,
+          confidenceScore: typeof metadataObj.confidenceScore === 'number' ? metadataObj.confidenceScore : undefined,
+          needsClarity: typeof metadataObj.needsClarity === 'boolean' ? metadataObj.needsClarity : false,
+          ambiguities: Array.isArray(metadataObj.ambiguities) ? 
+            metadataObj.ambiguities.filter(item => typeof item === 'string') as string[] : 
             [],
-          domainContext: typeof thread.metadata.domainContext === 'string' ? thread.metadata.domainContext : null,
-          lastUpdated: typeof thread.metadata.lastUpdated === 'string' ? thread.metadata.lastUpdated : undefined
+          domainContext: typeof metadataObj.domainContext === 'string' ? metadataObj.domainContext : null,
+          lastUpdated: typeof metadataObj.lastUpdated === 'string' ? metadataObj.lastUpdated : undefined
         };
         
         // Add any other properties from the original metadata
-        if (typeof thread.metadata === 'object' && thread.metadata !== null) {
-          Object.entries(thread.metadata).forEach(([key, value]) => {
-            if (!['timeContext', 'topicContext', 'intentType', 'confidenceScore', 
-                 'needsClarity', 'ambiguities', 'domainContext', 'lastUpdated'].includes(key)) {
-              if (typedMetadata) {
-                (typedMetadata as any)[key] = value;
-              }
+        Object.entries(metadataObj).forEach(([key, value]) => {
+          if (!['timeContext', 'topicContext', 'intentType', 'confidenceScore', 
+               'needsClarity', 'ambiguities', 'domainContext', 'lastUpdated'].includes(key)) {
+            if (typedMetadata) {
+              (typedMetadata as any)[key] = value;
             }
-          });
-        }
+          }
+        });
       }
       
       // Ensure processing_status is one of the allowed values
