@@ -7,7 +7,8 @@ import {
   getThreadMessages,
   saveMessage,
   updateThreadTitle
-} from "@/services/chat/messageService";
+} from "./messageService";
+import { ChatThread } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { useToast } from "@/hooks/use-toast";
 import { ChatMessage } from "@/types/chat";

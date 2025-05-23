@@ -30,6 +30,19 @@ export default function MobileChatMessage({ message }: MobileChatMessageProps) {
     }
   };
 
+  // Helper function to safely check if reference_entries is an array
+  const getReferenceEntries = () => {
+    if (Array.isArray(message.reference_entries)) {
+      return message.reference_entries;
+    }
+    if (Array.isArray(message.references)) {
+      return message.references;
+    }
+    return [];
+  };
+
+  const referenceEntries = getReferenceEntries();
+
   return (
     <div className={`flex mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
       <div className={`max-w-[85%] ${isUser ? 'order-2' : 'order-1'}`}>
@@ -46,13 +59,13 @@ export default function MobileChatMessage({ message }: MobileChatMessageProps) {
             </div>
             
             {/* Show references if available */}
-            {message.reference_entries && message.reference_entries.length > 0 && (
+            {referenceEntries.length > 0 && (
               <div className="mt-3 pt-2 border-t border-border/50">
                 <div className="text-xs text-muted-foreground mb-1">
                   <TranslatableText text="Referenced entries:" />
                 </div>
                 <div className="space-y-1">
-                  {message.reference_entries.slice(0, 2).map((entry: any, index: number) => (
+                  {referenceEntries.slice(0, 2).map((entry: any, index: number) => (
                     <div key={index} className="text-xs bg-background/50 rounded p-2">
                       <div className="text-muted-foreground">
                         {entry.created_at && formatTime(entry.created_at)}
