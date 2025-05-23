@@ -7,7 +7,7 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Optimized multi-strategy search execution with timeout handling
+// Enhanced multi-strategy search execution with adaptive thresholds
 async function executeMultiStrategySearch(
   message: string,
   userId: string,
@@ -18,18 +18,32 @@ async function executeMultiStrategySearch(
   console.log(`[chat-with-rag] Executing ${queryPlan.strategy} search strategy`);
   
   let allResults = [];
-  const threshold = queryPlan.searchParameters?.vectorThreshold || 0.3;
-  const searchTimeout = 8000; // 8 second timeout for searches
+  
+  // Adaptive threshold based on query type and domain context
+  let threshold = 0.3; // Default threshold
+  
+  if (queryPlan.isPersonalityQuery || queryPlan.domainContext === 'personal_insights') {
+    threshold = 0.1; // Much lower for personality queries
+  } else if (queryPlan.isEmotionQuery || queryPlan.domainContext === 'emotional_analysis') {
+    threshold = 0.2; // Lower for emotion queries
+  } else if (queryPlan.searchParameters?.vectorThreshold) {
+    // Don't use the high threshold from planner, cap it
+    threshold = Math.min(queryPlan.searchParameters.vectorThreshold, 0.4);
+  }
+  
+  console.log(`[chat-with-rag] Using adaptive threshold: ${threshold} for query type: ${queryPlan.domainContext}`);
+  
+  const searchTimeout = 6000; // Reduced from 8000ms
   
   try {
-    // Strategy 1: Execute SQL queries if planned (with timeout)
+    // Strategy 1: Execute SQL queries if planned (with reduced timeout)
     if (queryPlan.searchParameters?.executeSQLQueries && queryPlan.searchParameters?.sqlQueries?.length > 0) {
       console.log(`[chat-with-rag] Executing ${queryPlan.searchParameters.sqlQueries.length} SQL queries`);
       
       const sqlPromises = queryPlan.searchParameters.sqlQueries.map(async (sqlQuery) => {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000); // 3 second timeout per SQL query
+          const timeoutId = setTimeout(() => controller.abort(), 2000); // Reduced to 2 seconds
           
           let sqlResults = [];
           
@@ -38,7 +52,7 @@ async function executeMultiStrategySearch(
               user_id_param: userId,
               start_date: sqlQuery.parameters?.start_date || null,
               end_date: sqlQuery.parameters?.end_date || null,
-              limit_count: sqlQuery.parameters?.limit_count || 5
+              limit_count: sqlQuery.parameters?.limit_count || 10
             });
             
             clearTimeout(timeoutId);
@@ -60,10 +74,10 @@ async function executeMultiStrategySearch(
             const { data, error } = await supabase.rpc('match_journal_entries_by_emotion', {
               emotion_name: sqlQuery.parameters.emotion_name,
               user_id_filter: userId,
-              min_score: sqlQuery.parameters.min_score || 0.3,
+              min_score: sqlQuery.parameters.min_score || 0.1, // Lowered from 0.3
               start_date: sqlQuery.parameters?.start_date || null,
               end_date: sqlQuery.parameters?.end_date || null,
-              limit_count: sqlQuery.parameters?.limit_count || 5
+              limit_count: sqlQuery.parameters?.limit_count || 10
             });
             
             clearTimeout(timeoutId);
@@ -89,21 +103,23 @@ async function executeMultiStrategySearch(
         }
       });
       
-      // Wait for all SQL queries with timeout
+      // Execute SQL queries in parallel with timeout
       const sqlResultsArrays = await Promise.allSettled(sqlPromises);
       sqlResultsArrays.forEach(result => {
         if (result.status === 'fulfilled') {
           allResults = allResults.concat(result.value);
         }
       });
+      
+      console.log(`[chat-with-rag] SQL queries completed, ${allResults.length} results so far`);
     }
     
-    // Strategy 2: Vector search with timeout
+    // Strategy 2: Vector search with adaptive threshold
     console.log(`[chat-with-rag] Executing vector search with threshold ${threshold}`);
     
     try {
       const vectorController = new AbortController();
-      const vectorTimeoutId = setTimeout(() => vectorController.abort(), 5000); // 5 second timeout
+      const vectorTimeoutId = setTimeout(() => vectorController.abort(), 4000); // Reduced timeout
       
       let vectorResults = [];
       
@@ -113,7 +129,7 @@ async function executeMultiStrategySearch(
           {
             query_embedding: queryEmbedding,
             match_threshold: threshold,
-            match_count: 12,
+            match_count: 15,
             user_id_filter: userId,
             start_date: queryPlan.filters.date_range.startDate,
             end_date: queryPlan.filters.date_range.endDate
@@ -132,7 +148,7 @@ async function executeMultiStrategySearch(
           {
             query_embedding: queryEmbedding,
             match_threshold: threshold,
-            match_count: 12,
+            match_count: 15,
             user_id_filter: userId
           }
         );
@@ -153,18 +169,19 @@ async function executeMultiStrategySearch(
       console.error(`[chat-with-rag] Vector search error:`, error);
     }
     
-    // Strategy 3: Fast fallback if insufficient results
-    if (allResults.length < 3 && queryPlan.fallbackStrategy) {
-      console.log(`[chat-with-rag] Executing fast fallback strategy: ${queryPlan.fallbackStrategy}`);
+    // Strategy 3: Enhanced fallback if insufficient results
+    if (allResults.length < 3) {
+      console.log(`[chat-with-rag] Insufficient results (${allResults.length}), executing enhanced fallback`);
       
       try {
-        if (queryPlan.fallbackStrategy === 'recent_entries') {
+        // Fallback 1: Recent entries
+        if (queryPlan.fallbackStrategy === 'recent_entries' || allResults.length === 0) {
           const { data, error } = await supabase
             .from('Journal Entries')
             .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
             .eq('user_id', userId)
             .order('created_at', { ascending: false })
-            .limit(8);
+            .limit(10);
             
           if (!error && data) {
             const recentResults = data.map(entry => ({
@@ -181,6 +198,42 @@ async function executeMultiStrategySearch(
             allResults = allResults.concat(recentResults);
           }
         }
+        
+        // Fallback 2: Keyword-based content search for personality queries
+        if (allResults.length < 5 && (queryPlan.isPersonalityQuery || queryPlan.isEmotionQuery)) {
+          const keywords = extractKeywords(message);
+          if (keywords.length > 0) {
+            console.log(`[chat-with-rag] Executing keyword fallback with: ${keywords.join(', ')}`);
+            
+            const keywordQuery = keywords.map(keyword => 
+              `("refined text" ILIKE '%${keyword}%' OR "transcription text" ILIKE '%${keyword}%')`
+            ).join(' OR ');
+            
+            const { data, error } = await supabase
+              .from('Journal Entries')
+              .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
+              .eq('user_id', userId)
+              .or(keywordQuery)
+              .order('created_at', { ascending: false })
+              .limit(8);
+              
+            if (!error && data) {
+              const keywordResults = data.map(entry => ({
+                id: entry.id,
+                content: entry['refined text'] || entry['transcription text'] || '',
+                created_at: entry.created_at,
+                similarity: 0.4,
+                source: 'fallback_keyword',
+                emotions: entry.emotions,
+                themes: entry.master_themes
+              }));
+              
+              console.log(`[chat-with-rag] Keyword fallback returned ${keywordResults.length} results`);
+              allResults = allResults.concat(keywordResults);
+            }
+          }
+        }
+        
       } catch (error) {
         console.error(`[chat-with-rag] Fallback strategy error:`, error);
       }
@@ -192,7 +245,7 @@ async function executeMultiStrategySearch(
     ).sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
     
     console.log(`[chat-with-rag] Multi-strategy search completed: ${uniqueResults.length} unique results`);
-    return uniqueResults.slice(0, 15); // Limit to top 15 results
+    return uniqueResults.slice(0, 15);
     
   } catch (error) {
     console.error('[chat-with-rag] Error in multi-strategy search:', error);
@@ -200,7 +253,25 @@ async function executeMultiStrategySearch(
   }
 }
 
-// Enhanced response generation with optimized prompting
+// Extract keywords for fallback search
+function extractKeywords(message: string): string[] {
+  const personalityKeywords = ['personality', 'trait', 'character', 'behavior', 'habit', 'pattern', 'tend', 'usually', 'often', 'always', 'never'];
+  const emotionKeywords = ['feel', 'emotion', 'mood', 'happy', 'sad', 'angry', 'anxious', 'excited', 'calm', 'stressed', 'joy', 'fear'];
+  
+  const words = message.toLowerCase().split(/\s+/);
+  const keywords = [];
+  
+  words.forEach(word => {
+    if (personalityKeywords.some(keyword => word.includes(keyword)) || 
+        emotionKeywords.some(keyword => word.includes(keyword))) {
+      keywords.push(word);
+    }
+  });
+  
+  return [...new Set(keywords)].slice(0, 3); // Unique keywords, max 3
+}
+
+// Enhanced response generation with optimized prompting and timeout
 async function generateContextAwareResponse(
   message: string,
   entries: any[],
@@ -269,7 +340,7 @@ Provide a comprehensive analysis based on the available journal data.`;
     ];
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 15000); // 15 second timeout
+    const timeoutId = setTimeout(() => controller.abort(), 10000); // Reduced from 15s to 10s
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -378,9 +449,9 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] User has ${entryCount} journal entries available`);
 
-    // Get query embedding with timeout
+    // Get query embedding with reduced timeout
     const embeddingController = new AbortController();
-    const embeddingTimeoutId = setTimeout(() => embeddingController.abort(), 5000);
+    const embeddingTimeoutId = setTimeout(() => embeddingController.abort(), 4000); // Reduced from 5s
 
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',

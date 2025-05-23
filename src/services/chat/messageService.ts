@@ -3,9 +3,10 @@ import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
 import { Json } from '@/integrations/supabase/types';
 import { isDirectDateQuery, getClientTimeInfo } from '@/services/dateService';
+import { performanceMonitor, withPerformanceMonitoring, monitorChatOperation } from '@/utils/performance-monitor';
 
 /**
- * Send a message to the AI assistant and get a response with enhanced error handling
+ * Send a message to the AI assistant and get a response with enhanced error handling and performance monitoring
  */
 export async function sendMessage(
   message: string,
@@ -14,7 +15,12 @@ export async function sendMessage(
   timeRange?: { startDate?: string; endDate?: string; periodName?: string },
   referenceDate?: string
 ): Promise<MessageResponse> {
-  const startTime = Date.now();
+  const operationId = `send-message-${Date.now()}`;
+  performanceMonitor.startOperation(operationId, 'complete-chat-pipeline', {
+    messageLength: message.length,
+    userId: userId.substring(0, 8) + '...',
+    hasTimeRange: !!timeRange
+  });
   
   try {
     // Create a message ID for this new message
@@ -27,13 +33,15 @@ export async function sendMessage(
     console.log(`[sendMessage] Client time info:`, clientTimeInfo);
     
     // Save the user message to the database
-    await supabase.from('chat_messages').insert({
-      id: messageId,
-      thread_id: threadId,
-      content: message,
-      sender: 'user',
-      role: 'user',
-      created_at: new Date().toISOString(),
+    await withPerformanceMonitoring('save-user-message', async () => {
+      await supabase.from('chat_messages').insert({
+        id: messageId,
+        thread_id: threadId,
+        content: message,
+        sender: 'user',
+        role: 'user',
+        created_at: new Date().toISOString(),
+      });
     });
     
     // Update the thread's updated_at timestamp
@@ -64,12 +72,17 @@ export async function sendMessage(
     }
     
     // Get previous messages from this thread for context (limit to 5 for performance)
-    const { data: previousMessages, error: contextError } = await supabase
-      .from('chat_messages')
-      .select('content, sender, created_at')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: false })
-      .limit(5);
+    const { data: previousMessages, error: contextError } = await withPerformanceMonitoring(
+      'fetch-conversation-context',
+      async () => {
+        return await supabase
+          .from('chat_messages')
+          .select('content, sender, created_at')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(5);
+      }
+    );
     
     if (contextError) {
       console.error('Error fetching conversation context:', contextError);
@@ -118,7 +131,7 @@ export async function sendMessage(
       created_at: new Date().toISOString()
     });
     
-    // Step 1: Get intelligent query plan with timeout
+    // Step 1: Get intelligent query plan with enhanced monitoring
     console.log(`[sendMessage] Calling smart-query-planner`);
     
     const queryPlannerParams = {
@@ -134,18 +147,29 @@ export async function sendMessage(
       timeRange
     };
     
-    // Add timeout to query planner call
-    const queryPlanController = new AbortController();
-    const queryPlanTimeoutId = setTimeout(() => queryPlanController.abort(), 10000); // 10 second timeout
-    
+    // Enhanced query planner call with monitoring
     let queryPlanResponse;
     try {
-      queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
-        body: queryPlannerParams
-      });
-      clearTimeout(queryPlanTimeoutId);
+      queryPlanResponse = await monitorChatOperation(
+        async () => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 8000); // Reduced from 10s
+          
+          try {
+            const response = await supabase.functions.invoke('smart-query-planner', {
+              body: queryPlannerParams
+            });
+            clearTimeout(timeoutId);
+            return response;
+          } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+          }
+        },
+        'query-planning',
+        { message, userId, strategy: 'enhanced' }
+      );
     } catch (error) {
-      clearTimeout(queryPlanTimeoutId);
       console.error('Query planner timeout or error:', error);
       
       // Use fallback plan
@@ -156,7 +180,7 @@ export async function sendMessage(
             queryType: "journal_specific",
             requiresJournalData: true,
             searchParameters: {
-              vectorThreshold: 0.3,
+              vectorThreshold: 0.1, // Use low threshold for fallback
               useEmotionSQL: false,
               useThemeSQL: false,
               dateRange: null,
@@ -197,6 +221,8 @@ export async function sendMessage(
       await supabase.from('chat_threads')
         .update({ processing_status: 'idle' })
         .eq('id', threadId);
+      
+      performanceMonitor.endOperation(operationId, 'success');
       
       return {
         response: queryPlanResponse.data.directResponse,
@@ -241,31 +267,42 @@ export async function sendMessage(
     
     console.log(`[sendMessage] Using date range:`, dateRange);
     
-    // Step 2: Execute intelligent search and response generation with timeout
+    // Step 2: Execute intelligent search and response generation with enhanced monitoring
     console.log(`[sendMessage] Calling chat-with-rag`);
-    
-    const ragController = new AbortController();
-    const ragTimeoutId = setTimeout(() => ragController.abort(), 20000); // 20 second timeout
     
     let queryResponse;
     try {
-      queryResponse = await supabase.functions.invoke('chat-with-rag', {
-        body: {
-          message,
-          userId,
-          threadId,
-          timeRange: dateRange,
-          referenceDate,
-          conversationContext,
-          queryPlan,
-          isMentalHealthQuery,
-          clientTimeInfo: clientTimeInfo,
-          userTimezone: userTimezone
-        }
-      });
-      clearTimeout(ragTimeoutId);
+      queryResponse = await monitorChatOperation(
+        async () => {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced from 20s
+          
+          try {
+            const response = await supabase.functions.invoke('chat-with-rag', {
+              body: {
+                message,
+                userId,
+                threadId,
+                timeRange: dateRange,
+                referenceDate,
+                conversationContext,
+                queryPlan,
+                isMentalHealthQuery,
+                clientTimeInfo: clientTimeInfo,
+                userTimezone: userTimezone
+              }
+            });
+            clearTimeout(timeoutId);
+            return response;
+          } catch (error) {
+            clearTimeout(timeoutId);
+            throw error;
+          }
+        },
+        'response-generation',
+        { message, userId, strategy: queryPlan.strategy }
+      );
     } catch (error) {
-      clearTimeout(ragTimeoutId);
       console.error('Chat-with-rag timeout or error:', error);
       
       // Provide fallback response
@@ -279,6 +316,8 @@ export async function sendMessage(
       await supabase.from('chat_threads')
         .update({ processing_status: 'idle' })
         .eq('id', threadId);
+      
+      performanceMonitor.endOperation(operationId, 'error', 'Chat-with-rag timeout');
       
       return {
         response: "I'm experiencing high demand right now. Please try your question again in a moment.",
@@ -331,6 +370,8 @@ export async function sendMessage(
         .update({ processing_status: 'idle' })
         .eq('id', threadId);
       
+      performanceMonitor.endOperation(operationId, 'error', 'Invalid response format');
+      
       return {
         response: fallbackResponse,
         status: 'error',
@@ -365,8 +406,8 @@ export async function sendMessage(
       .update({ processing_status: 'idle' })
       .eq('id', threadId);
     
-    const totalTime = Date.now() - startTime;
-    console.log(`[sendMessage] Complete pipeline finished in ${totalTime}ms`);
+    performanceMonitor.endOperation(operationId, 'success');
+    performanceMonitor.logSummary();
     
     return {
       response: finalResponse,
@@ -374,12 +415,14 @@ export async function sendMessage(
       messageId: processingMessageId,
     };
   } catch (error) {
-    const totalTime = Date.now() - startTime;
-    console.error(`Error in sendMessage after ${totalTime}ms:`, error);
+    console.error(`Error in sendMessage:`, error);
     
     await supabase.from('chat_threads')
       .update({ processing_status: 'error' })
       .eq('id', threadId);
+    
+    performanceMonitor.endOperation(operationId, 'error', error.message);
+    performanceMonitor.logSummary();
     
     return {
       response: 'Sorry, I encountered an error while processing your message. Please try again.',
