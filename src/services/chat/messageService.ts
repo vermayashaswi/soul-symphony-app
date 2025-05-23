@@ -1,3 +1,4 @@
+
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -348,8 +349,8 @@ export async function sendMessage(
           throw new Error('Failed to get response from chat-with-rag engine');
         }
         
-        // Handle both response formats for backward compatibility
-        finalResponse = queryResponse.data.data || queryResponse.data.response;
+        // FIXED: Handle the correct response format
+        finalResponse = queryResponse.data.response || queryResponse.data.data;
         
         // Ensure we have a response
         if (!finalResponse || typeof finalResponse !== 'string') {

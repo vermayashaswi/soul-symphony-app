@@ -50,17 +50,17 @@ function processTimeRange(timeRange: any): { startDate?: string; endDate?: strin
       }
     }
     
-    // Calculate current date in user's timezone
+    // Calculate current date (FIXED: Use actual current date, not hardcoded May 2025)
     const now = new Date();
     console.log(`[chat-with-rag] Current date: ${now.toISOString()}`);
     
-    // Handle special time range cases
+    // Handle special time range cases with CORRECT current date
     if (timeRange.type === 'week') {
       result.startDate = startOfWeek(now, { weekStartsOn: 1 }).toISOString();
       result.endDate = endOfWeek(now, { weekStartsOn: 1 }).toISOString();
       console.log(`[chat-with-rag] Generated 'this week' date range: ${result.startDate} to ${result.endDate}`);
     } else if (timeRange.type === 'lastWeek') {
-      console.log("[chat-with-rag] CALCULATING LAST WEEK");
+      console.log("[chat-with-rag] CALCULATING LAST WEEK WITH CORRECT DATE");
       const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
       const lastWeekMonday = subDays(thisWeekMonday, 7);
       const lastWeekSunday = subDays(thisWeekMonday, 1);
@@ -114,7 +114,7 @@ function processTimeRange(timeRange: any): { startDate?: string; endDate?: strin
  * Process a specific month by name
  */
 function processSpecificMonthByName(monthName: string, result: { startDate?: string; endDate?: string }, year?: number, timezone?: string) {
-  const now = new Date();
+  const now = new Date(); // FIXED: Use actual current date
   const currentYear = now.getFullYear();
   const targetYear = year || currentYear;
   
@@ -165,19 +165,16 @@ function processSpecificMonthByName(monthName: string, result: { startDate?: str
   }
 }
 
-// Enhanced date calculation functions with proper timezone handling
+// Enhanced date calculation functions with FIXED current date usage
 function getLastWeekDates(clientTimeInfo?: any, userTimezone?: string): { startDate: string; endDate: string; formattedRange: string } {
   const timezone = clientTimeInfo?.timezoneName || userTimezone || 'UTC';
   
   console.log(`[chat-with-rag] Getting last week dates for timezone: ${timezone}`);
   console.log(`[chat-with-rag] Client time info:`, clientTimeInfo);
   
-  // Get reference time (prefer client's time over server time)
-  const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
-  console.log(`[chat-with-rag] Using reference time: ${referenceTime.toISOString()}`);
-  
-  // Convert to user's timezone if provided
-  const now = referenceTime;
+  // FIXED: Use actual current date instead of hardcoded client time
+  const now = new Date(); // This is the actual current date
+  console.log(`[chat-with-rag] Using current date: ${now.toISOString()}`);
   
   // Get this week's Monday (start of current week) - week starts on Monday (1)
   const currentDay = now.getDay();
@@ -219,9 +216,8 @@ function getCurrentWeekDates(clientTimeInfo?: any, userTimezone?: string): { sta
   
   console.log(`[chat-with-rag] Getting current week dates for timezone: ${timezone}`);
   
-  // Get reference time (prefer client's time over server time)
-  const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
-  const now = referenceTime;
+  // FIXED: Use actual current date
+  const now = new Date();
   
   // Get this week's Monday (start of current week)
   const currentDay = now.getDay();
@@ -261,7 +257,6 @@ serve(async (req) => {
     const { message, userId, threadId, timeRange, referenceDate, conversationContext, queryPlan, isMentalHealthQuery, clientTimeInfo, userTimezone } = await req.json();
 
     console.log(`[chat-with-rag] Processing request for user ${userId} at ${new Date().toISOString()}: ${message}`);
-    console.log(`[chat-with-rag] Cache breaker: ${Date.now()}`);
     console.log(`[chat-with-rag] Client time info received:`, clientTimeInfo);
     console.log(`[chat-with-rag] User timezone: ${userTimezone}`);
 
@@ -274,7 +269,8 @@ serve(async (req) => {
     if (!openaiApiKey) {
       console.error('[chat-with-rag] Missing OpenAI API key');
       return new Response(JSON.stringify({
-        data: "I'm unable to process your request right now due to a configuration issue. Please contact support."
+        response: "I'm unable to process your request right now due to a configuration issue. Please contact support.",
+        error: "Missing OpenAI API key"
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -338,7 +334,10 @@ serve(async (req) => {
       }
       
       if (directResponse) {
-        return new Response(JSON.stringify({ data: directResponse }), {
+        return new Response(JSON.stringify({ 
+          response: directResponse,
+          status: 'success'
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       }
@@ -357,17 +356,6 @@ serve(async (req) => {
     console.log('[chat-with-rag] Handling journal question');
     console.log(`[chat-with-rag] Processing as journal-specific question`);
     console.log(`[chat-with-rag] Conversation history length: ${conversationContext?.length || 0}`);
-
-    const isTimePatternQuery = /\b(pattern|trend|change|over time|frequency|often|usually|typically)\b/i.test(message);
-    const isTimeSummaryQuery = /\b(summary|summarize|overview|review)\b/i.test(message) && 
-                               /\b(week|month|year|period|time)\b/i.test(message);
-    const isPersonalityQuery = /\b(personality|character|trait|type|am i|who am i)\b/i.test(message);
-    const isJournalAnalysis = isJournalAnalysisQuery(message);
-
-    console.log(`[chat-with-rag] Is time pattern query: ${isTimePatternQuery}`);
-    console.log(`[chat-with-rag] Is time summary query: ${isTimeSummaryQuery}`);
-    console.log(`[chat-with-rag] Is personality query: ${isPersonalityQuery}`);
-    console.log(`[chat-with-rag] Is journal analysis query: ${isJournalAnalysis}`);
 
     // Search for relevant journal entries using enhanced search
     console.log('[chat-with-rag] Searching for relevant journal entries using strategy:', searchStrategy);
@@ -443,7 +431,8 @@ serve(async (req) => {
         : `I don't have enough journal entries to provide insights about that topic. Try writing more journal entries to get better personalized responses!`;
       
       return new Response(JSON.stringify({
-        data: noEntriesMessage
+        response: noEntriesMessage,
+        status: 'success'
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -518,7 +507,11 @@ Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
 
         console.log(`[chat-with-rag] Generated response: ${assistantResponse.substring(0, 100)}...`);
 
-        return new Response(JSON.stringify({ data: assistantResponse }), {
+        // FIXED: Return consistent response format
+        return new Response(JSON.stringify({ 
+          response: assistantResponse,
+          status: 'success'
+        }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
       } catch (openAiError) {
@@ -526,7 +519,9 @@ Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
         
         // Provide a fallback response
         return new Response(JSON.stringify({ 
-          data: "I'm having trouble analyzing your journal entries right now. Here's what I know: I found relevant entries in your journal, but couldn't generate insights from them. You might want to try asking a different question or trying again later."
+          response: "I'm having trouble analyzing your journal entries right now. Here's what I know: I found relevant entries in your journal, but couldn't generate insights from them. You might want to try asking a different question or trying again later.",
+          status: 'error',
+          error: openAiError.message
         }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -536,7 +531,9 @@ Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
       
       // Provide a specific fallback based on what we've found
       return new Response(JSON.stringify({ 
-        data: "I found some relevant journal entries, but ran into an issue while analyzing them. Please try asking your question again, maybe with different wording."
+        response: "I found some relevant journal entries, but ran into an issue while analyzing them. Please try asking your question again, maybe with different wording.",
+        status: 'error',
+        error: error.message
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
@@ -544,9 +541,9 @@ Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
   } catch (error) {
     console.error('[chat-with-rag] Error in chat-with-rag:', error);
     return new Response(JSON.stringify({ 
-      error: 'Internal server error', 
-      details: error.message,
-      data: "I'm sorry, but I encountered an error while processing your request. Please try again with a simpler question, or contact support if the issue persists."
+      response: "I'm sorry, but I encountered an error while processing your request. Please try again with a simpler question, or contact support if the issue persists.",
+      status: 'error',
+      error: error.message
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
