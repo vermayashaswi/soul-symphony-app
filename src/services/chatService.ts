@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
 import { enhancedQueryClassification, QueryCategory } from '../utils/chat/messageClassifier';
@@ -20,12 +21,20 @@ type ProcessedResponse = {
 /**
  * Generate simple conversational responses for basic interactions
  */
-function generateConversationalResponse(message: string, isFollowUp: boolean): string {
+function generateConversationalResponse(message: string, isFollowUp: boolean, conversationHistory: any[] = []): string {
   const lowerMessage = message.toLowerCase().trim();
+  
+  // Check if there's recent context from conversation history
+  const hasRecentContext = conversationHistory.length > 0;
+  const lastAssistantMessage = conversationHistory.slice().reverse().find(msg => msg.role === 'assistant');
   
   // Greetings
   if (/^(hi|hello|hey|hiya|good morning|good afternoon|good evening)$/i.test(lowerMessage)) {
-    if (isFollowUp) {
+    if (isFollowUp || hasRecentContext) {
+      // If there's context, acknowledge the ongoing conversation
+      if (lastAssistantMessage && lastAssistantMessage.content.includes('journal')) {
+        return "Hi again! Ready to continue exploring your journal insights?";
+      }
       return "Hi again! How can I help you with your mental health and journaling insights?";
     }
     return "Hello! I'm SOULo, your mental health assistant. How can I help you explore your journal entries today?";
@@ -33,19 +42,38 @@ function generateConversationalResponse(message: string, isFollowUp: boolean): s
   
   // Thanks/appreciation
   if (/^(thanks?|thank you|ty|appreciate|awesome|great|perfect)$/i.test(lowerMessage)) {
+    // If there's context about what they're thanking for, be more specific
+    if (hasRecentContext) {
+      return "You're welcome! Is there anything else you'd like to explore from your journal entries?";
+    }
     return "You're welcome! Is there anything else about your mental health or journal insights I can help with?";
   }
   
   // Yes/No responses
   if (/^(yes|yeah|yep|yup|ok|okay)$/i.test(lowerMessage)) {
+    // Context-aware yes responses
+    if (hasRecentContext && lastAssistantMessage) {
+      if (lastAssistantMessage.content.includes('journal')) {
+        return "Great! What specific aspect of your journaling would you like to dive into?";
+      }
+      if (lastAssistantMessage.content.includes('analyze') || lastAssistantMessage.content.includes('pattern')) {
+        return "Perfect! What would you like me to analyze from your entries?";
+      }
+    }
     return "Great! What would you like to explore about your mental health or journal entries?";
   }
   
   if (/^(no|nope|nah)$/i.test(lowerMessage)) {
+    if (hasRecentContext) {
+      return "No worries! Let me know if you change your mind or want to explore something different from your journal.";
+    }
     return "No problem! Feel free to ask me anything about your mental health or journaling patterns whenever you're ready.";
   }
   
-  // Default conversational response
+  // Default conversational response with context awareness
+  if (hasRecentContext) {
+    return "I'm here to help you continue exploring your mental health insights and journal entries. What would you like to look at next?";
+  }
   return "I'm here to help you with mental health insights and analyzing your journal entries. What would you like to explore?";
 }
 
@@ -60,6 +88,31 @@ export async function processChatMessage(
   isFollowUp: boolean = false,
   parameters: Record<string, any> = {}
 ) {
+  // Get conversation history FIRST for all query types
+  let conversationHistory = [];
+  if (threadId) {
+    try {
+      const { data: chatMessages, error } = await supabase
+        .from('chat_messages')
+        .select('content, sender, role')
+        .eq('thread_id', threadId)
+        .order('created_at', { ascending: false })
+        .limit(10);
+
+      if (!error && chatMessages && chatMessages.length > 0) {
+        conversationHistory = chatMessages
+          .reverse()
+          .map(msg => ({
+            role: msg.sender === 'user' ? 'user' : 'assistant',
+            content: msg.content
+          }));
+        console.log(`Found ${conversationHistory.length} previous messages for context`);
+      }
+    } catch (error) {
+      console.error("Error fetching conversation history:", error);
+    }
+  }
+
   // Check if this is a time pattern query
   if (queryTypes.isTimePatternQuery || message.toLowerCase().includes('what time') || 
       message.toLowerCase().includes('when do i usually')) {
@@ -182,32 +235,6 @@ export async function processChatMessage(
         response += `Your most active journaling day was ${formattedDate} with ${timePatternResults.mostActiveDay.entryCount} entries.`;
       }
       
-      // Get conversation history for better context in future follow-ups
-      let conversationHistory = [];
-      if (threadId) {
-        try {
-          const { data: chatMessages, error } = await supabase
-            .from('chat_messages')
-            .select('content, sender, role')
-            .eq('thread_id', threadId)
-            .order('created_at', { ascending: false })
-            .limit(10);
-
-          if (!error && chatMessages && chatMessages.length > 0) {
-            // Format messages for OpenAI context
-            conversationHistory = chatMessages
-              .reverse()
-              .map(msg => ({
-                role: msg.sender === 'user' ? 'user' : 'assistant',
-                content: msg.content
-              }));
-            console.log(`Found ${conversationHistory.length} previous messages for context in time analysis`);
-          }
-        } catch (error) {
-          console.error("Error fetching conversation history for time analysis:", error);
-        }
-      }
-      
       return {
         content: response,
         role: "assistant",
@@ -246,8 +273,8 @@ export async function processChatMessage(
         };
         
       case QueryCategory.CONVERSATIONAL:
-        // Handle conversational queries with simple responses
-        const conversationalResponse = generateConversationalResponse(message, isFollowUp);
+        // Handle conversational queries with simple responses and conversation history
+        const conversationalResponse = generateConversationalResponse(message, isFollowUp, conversationHistory);
         return {
           content: conversationalResponse,
           role: "assistant"
@@ -262,31 +289,7 @@ export async function processChatMessage(
         break;
     }
 
-    let conversationHistory = [];
-    if (threadId) {
-      try {
-        const { data: chatMessages, error } = await supabase
-          .from('chat_messages')
-          .select('content, sender, role')
-          .eq('thread_id', threadId)
-          .order('created_at', { ascending: false })
-          .limit(10);
-
-        if (!error && chatMessages && chatMessages.length > 0) {
-          conversationHistory = chatMessages
-            .reverse()
-            .map(msg => ({
-              role: msg.sender === 'user' ? 'user' : 'assistant',
-              content: msg.content
-            }));
-          console.log(`Found ${conversationHistory.length} previous messages for context`);
-        }
-      } catch (error) {
-        console.error("Error fetching conversation history:", error);
-      }
-    }
-
-    // Set up the parameters for the query planner
+    // Set up the parameters for the query planner with conversation history
     const queryPlanParams = {
       message,
       userId,
@@ -321,14 +324,14 @@ export async function processChatMessage(
       const queryPlan = planData?.queryPlan || planData?.plan || null;
       console.log("Generated query plan:", queryPlan);
 
-      // Process the message based on the plan and category
+      // Process the message based on the plan and category WITH conversation history
       const chatParams = {
         message,
         userId,
         threadId,
         usePersonalContext: classification.category === QueryCategory.JOURNAL_SPECIFIC,
         queryPlan,
-        conversationHistory,
+        conversationHistory, // Always include conversation history
         messageCategory: classification.category
       };
 
