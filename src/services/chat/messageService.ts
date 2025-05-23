@@ -1,4 +1,3 @@
-
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -301,7 +300,7 @@ export async function sendMessage(
       };
     }
     
-    // Use chat-with-rag function for all queries
+    // CRUCIAL: Use only chat-with-rag function (the more robust one)
     console.log(`[sendMessage] Enhanced debugging - Calling chat-with-rag function`);
     
     let finalResponse;
@@ -339,26 +338,16 @@ export async function sendMessage(
       console.log(`[sendMessage] Enhanced debugging - chat-with-rag response:`, queryResponse);
       
       if (!queryResponse.data) {
-        console.error('[sendMessage] No data in chat-with-rag response');
         throw new Error('Failed to get response from chat-with-rag engine');
       }
       
-      // CRITICAL FIX: The response format is { data: assistantResponse }, not { data: { data: assistantResponse } }
-      finalResponse = queryResponse.data.data || queryResponse.data;
-      
-      console.log(`[sendMessage] Enhanced debugging - Extracted final response: ${finalResponse?.substring(0, 200)}...`);
+      finalResponse = queryResponse.data.data;
       
       if (isMentalHealthQuery && (!finalResponse || finalResponse.trim() === '' || finalResponse.includes("I don't have enough information"))) {
         finalResponse = "Based on the journal entries I have access to, I don't have enough information to provide specific mental health recommendations. " +
           "To give you better personalized advice, could you add more journal entries about your feelings, challenges, and daily experiences? " +
           "In the meantime, some general mental health practices include regular exercise, adequate sleep, mindfulness meditation, and connecting with others.";
       }
-    }
-    
-    // Validate that we have a response
-    if (!finalResponse || typeof finalResponse !== 'string' || finalResponse.trim() === '') {
-      console.error('[sendMessage] Empty or invalid final response:', finalResponse);
-      finalResponse = "I'm having trouble processing your request right now. Could you try rephrasing your question?";
     }
     
     console.log(`[sendMessage] Enhanced debugging - Final response: ${finalResponse?.substring(0, 200)}...`);
@@ -402,7 +391,7 @@ export async function sendMessage(
       .eq('id', threadId);
     
     return {
-      response: 'Sorry, I encountered an error while processing your message. Please try again.',
+      response: 'Sorry, I encountered an error while processing your message.',
       status: 'error',
       error: error.message,
     };

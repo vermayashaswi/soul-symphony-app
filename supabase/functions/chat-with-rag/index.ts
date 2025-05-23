@@ -442,8 +442,6 @@ serve(async (req) => {
         ? `I don't have any journal entries for the time period you asked about. Try asking about a different time period, or try journaling more regularly to get personalized insights.`
         : `I don't have enough journal entries to provide insights about that topic. Try writing more journal entries to get better personalized responses!`;
       
-      console.log(`[chat-with-rag] No entries found, returning helpful message: ${noEntriesMessage}`);
-      
       return new Response(JSON.stringify({
         data: noEntriesMessage
       }), {
@@ -520,7 +518,6 @@ Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
 
         console.log(`[chat-with-rag] Generated response: ${assistantResponse.substring(0, 100)}...`);
 
-        // CRITICAL: Return the response in the correct format that messageService expects
         return new Response(JSON.stringify({ data: assistantResponse }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
