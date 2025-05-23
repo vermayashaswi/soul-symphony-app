@@ -1,4 +1,3 @@
-
 // Standard vector search without time filtering
 export async function searchEntriesWithVector(
   supabase: any,
@@ -206,4 +205,69 @@ export async function searchEntriesByMonth(
     console.error('[chat-with-rag] Error searching entries by month:', error);
     throw error;
   }
+}
+
+/**
+ * Enhanced search orchestrator that determines the best search strategy
+ */
+export async function searchWithStrategy(
+  supabase: any,
+  userId: string,
+  queryEmbedding: number[],
+  strategy: 'vector' | 'hybrid' | 'comprehensive',
+  timeRange?: { startDate?: string; endDate?: string },
+  maxEntries: number = 10
+) {
+  console.log(`[searchService] Using search strategy: ${strategy}`);
+  
+  try {
+    let entries = [];
+    
+    switch (strategy) {
+      case 'comprehensive':
+        // Use larger limits for comprehensive searches
+        if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+          entries = await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, timeRange);
+        } else {
+          entries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+        }
+        break;
+        
+      case 'hybrid':
+        // Combine vector and time-based search
+        if (timeRange && (timeRange.startDate || timeRange.endDate)) {
+          entries = await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, timeRange);
+        } else {
+          entries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+        }
+        break;
+        
+      case 'vector':
+      default:
+        // Standard vector search
+        entries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+        break;
+    }
+    
+    // Apply max entries limit
+    const limitedEntries = entries ? entries.slice(0, maxEntries) : [];
+    console.log(`[searchService] Retrieved ${limitedEntries.length} entries using ${strategy} strategy`);
+    
+    return limitedEntries;
+    
+  } catch (error) {
+    console.error(`[searchService] Error in ${strategy} search:`, error);
+    throw error;
+  }
+}
+
+/**
+ * Validate search parameters
+ */
+export function validateSearchParams(userId: string, queryEmbedding: number[]): boolean {
+  if (!userId || !queryEmbedding || !Array.isArray(queryEmbedding) || queryEmbedding.length === 0) {
+    console.error('[searchService] Invalid search parameters');
+    return false;
+  }
+  return true;
 }
