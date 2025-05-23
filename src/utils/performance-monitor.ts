@@ -1,4 +1,3 @@
-
 interface PerformanceMetric {
   operation: string;
   startTime: number;
@@ -127,29 +126,56 @@ class PerformanceMonitor {
       ${avgDuration > 5000 ? '⚠️  Overall performance needs optimization' : avgDuration < 3000 ? '✅ Good overall performance' : '📊 Acceptable performance'}`);
   }
   
-  // New method to track RAG pipeline performance
-  trackRAGPipeline(queryType: string, threshold: number, resultCount: number, totalDuration: number): void {
+  // New method to track RAG pipeline performance with sub-questions
+  trackRAGPipeline(queryType: string, subQuestionCount: number, totalResults: number, totalDuration: number): void {
     const pipelineId = `rag-pipeline-${Date.now()}`;
     
-    console.log(`[Performance] RAG Pipeline Complete:
+    console.log(`[Performance] Intelligent RAG Pipeline Complete:
       - Query Type: ${queryType}
-      - Vector Threshold: ${threshold}
-      - Results Found: ${resultCount}
+      - Sub-Questions: ${subQuestionCount}
+      - Total Results: ${totalResults}
       - Total Duration: ${totalDuration}ms
-      - Performance: ${totalDuration < 5000 ? '✅ Fast' : totalDuration < 8000 ? '⚠️ Moderate' : '❌ Slow'}`);
+      - Avg per Sub-Question: ${subQuestionCount > 0 ? Math.round(totalDuration / subQuestionCount) : 0}ms
+      - Performance: ${totalDuration < 6000 ? '✅ Fast' : totalDuration < 10000 ? '⚠️ Moderate' : '❌ Slow'}`);
     
     // Store pipeline metrics
     this.metrics.set(pipelineId, {
-      operation: `rag-pipeline-${queryType}`,
+      operation: `intelligent-rag-pipeline-${queryType}`,
       startTime: Date.now() - totalDuration,
       endTime: Date.now(),
       duration: totalDuration,
-      status: resultCount > 0 ? 'success' : 'error',
+      status: totalResults > 0 ? 'success' : 'error',
       metadata: {
         queryType,
-        threshold,
+        subQuestionCount,
+        totalResults,
+        avgPerSubQuestion: subQuestionCount > 0 ? Math.round(totalDuration / subQuestionCount) : 0,
+        performance: totalDuration < 6000 ? 'fast' : totalDuration < 10000 ? 'moderate' : 'slow'
+      }
+    });
+  }
+  
+  // New method to track sub-question execution
+  trackSubQuestionExecution(subQuestionIndex: number, question: string, resultCount: number, duration: number): void {
+    const subQuestionId = `sub-question-${Date.now()}-${subQuestionIndex}`;
+    
+    console.log(`[Performance] Sub-Question ${subQuestionIndex + 1} Complete:
+      - Question: "${question.substring(0, 50)}..."
+      - Results: ${resultCount}
+      - Duration: ${duration}ms
+      - Effectiveness: ${resultCount > 0 ? '✅ Effective' : '❌ No Results'}`);
+    
+    this.metrics.set(subQuestionId, {
+      operation: `sub-question-execution`,
+      startTime: Date.now() - duration,
+      endTime: Date.now(),
+      duration: duration,
+      status: resultCount > 0 ? 'success' : 'error',
+      metadata: {
+        subQuestionIndex,
+        question: question.substring(0, 100),
         resultCount,
-        performance: totalDuration < 5000 ? 'fast' : totalDuration < 8000 ? 'moderate' : 'slow'
+        effectiveness: resultCount > 0 ? 'effective' : 'ineffective'
       }
     });
   }
@@ -220,4 +246,42 @@ export function trackSearchEffectiveness(
     - Speed: ${speed}
     ${resultCount === 0 && threshold > 0.2 ? '💡 Consider lowering threshold' : ''}
     ${duration > 4000 ? '💡 Consider optimizing search parameters' : ''}`);
+}
+
+// Enhanced monitoring for intelligent sub-query operations
+export function monitorSubQueryExecution<T>(
+  operation: () => Promise<T>,
+  subQuestionIndex: number,
+  question: string
+): Promise<T> {
+  return withPerformanceMonitoring(
+    `sub-question-${subQuestionIndex}`,
+    operation,
+    {
+      subQuestionIndex,
+      questionPreview: question.substring(0, 50),
+      operationType: 'intelligent-sub-query'
+    }
+  );
+}
+
+// Enhanced utility for tracking intelligent search effectiveness
+export function trackIntelligentSearchEffectiveness(
+  subQuestionCount: number,
+  totalResults: number,
+  duration: number,
+  queryType: string
+): void {
+  const avgResultsPerSubQuestion = subQuestionCount > 0 ? totalResults / subQuestionCount : 0;
+  const avgTimePerSubQuestion = subQuestionCount > 0 ? duration / subQuestionCount : duration;
+  
+  console.log(`[Performance] Intelligent Search Summary:
+    - Sub-Questions: ${subQuestionCount}
+    - Total Results: ${totalResults}
+    - Avg Results/Sub-Question: ${avgResultsPerSubQuestion.toFixed(1)}
+    - Avg Time/Sub-Question: ${avgTimePerSubQuestion.toFixed(0)}ms
+    - Overall Effectiveness: ${totalResults > 0 ? 'effective' : 'ineffective'}
+    - Query Type: ${queryType}
+    ${totalResults === 0 ? '💡 Consider adjusting sub-question strategies' : ''}
+    ${duration > 8000 ? '💡 Consider optimizing parallel execution' : ''}`);
 }

@@ -1,4 +1,3 @@
-
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -49,15 +48,11 @@ async function enhanceWithThreadContext(message: string, threadId: string, query
 }
 
 /**
- * Enhanced query planning service to determine the best approach for handling user queries
- * @param message User query message
- * @param threadId Chat thread ID
- * @param userId User ID
- * @returns Query plan with strategy and parameters
+ * Enhanced query planning service with intelligent sub-query generation
  */
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
-    console.log("[Query Planner] Planning strategy for:", message);
+    console.log("[Query Planner] Planning intelligent sub-query strategy for:", message);
     console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
     
     // For debugging timezone issues
@@ -91,7 +86,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
       userTimezone = clientInfo.timezoneName;
     }
     
-    // Check if this is a direct date query, including last week queries
+    // Check if this is a direct date query
     const isLastWeekQuery = message.toLowerCase().includes('last week') && 
                            (message.toLowerCase().includes('date') || 
                             message.toLowerCase().includes('what') || 
@@ -105,13 +100,11 @@ export async function planQuery(message: string, threadId: string, userId: strin
       let dateResponse, dateRange;
       
       if (isLastWeekQuery) {
-        // Get last week dates using the client's time information and user timezone
         const lastWeekResult = getLastWeekDateRange(clientInfo, userTimezone);
         dateResponse = lastWeekResult.formattedRange;
         dateRange = lastWeekResult.rangeObj;
         console.log(`[Query Planner] Last week dates calculated: ${dateResponse}`);
       } else {
-        // Get current week dates using the client's time information and user timezone
         const currentWeekResult = getCurrentWeekDateRange(clientInfo, userTimezone);
         dateResponse = currentWeekResult.formattedRange;
         dateRange = currentWeekResult.rangeObj;
@@ -132,14 +125,14 @@ export async function planQuery(message: string, threadId: string, userId: strin
         clientTimezone: clientInfo.timezoneName,
         clientTimezoneOffset: clientInfo.timezoneOffset,
         userTimezone: userTimezone,
-        dateResponse: dateResponse // Include the formatted date response
+        dateResponse: dateResponse
       };
     }
     
-    // Analyze the query types
+    // Analyze the query types for intelligent sub-query planning
     const queryTypes = analyzeQueryTypes(message);
     
-    // Add properties needed by the code
+    // Add properties needed for intelligent planning
     queryTypes.needsDataAggregation = queryTypes.isQuantitative || 
                                      queryTypes.isStatisticalQuery || 
                                      message.toLowerCase().includes('how many times');
@@ -148,7 +141,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
                                message.split(' ').length < 3 || 
                                /^(tell me|show)( more| about)?/i.test(message);
     
-    console.log("[Query Planner] Query type analysis:", queryTypes);
+    console.log("[Query Planner] Query type analysis for sub-query planning:", queryTypes);
     
     // Check if this is a time pattern analysis query
     const isTimePatternQuery = queryTypes.isTemporalQuery && 
@@ -161,44 +154,35 @@ export async function planQuery(message: string, threadId: string, userId: strin
     // Enhance query analysis based on thread context
     const enhancedQuery = await enhanceWithThreadContext(message, threadId, queryTypes);
     
-    // Define query plan strategy
-    let strategy = 'default';
+    // Define intelligent sub-query strategy
+    let strategy = 'intelligent_sub_query'; // Default to intelligent sub-query planning
     
     if (queryTypes.needsMoreContext) {
       strategy = 'request_clarification';
     } 
     else if (isTimePatternQuery) {
-      strategy = 'time_pattern_analysis';
-      console.log("[Query Planner] Using time pattern analysis strategy");
+      strategy = 'intelligent_sub_query'; // Use sub-query planning for time patterns
+      console.log("[Query Planner] Using intelligent sub-query strategy for time pattern analysis");
     }
     else if (queryTypes.needsDataAggregation) {
-      strategy = 'data_aggregation';
-      console.log("[Query Planner] Using data aggregation strategy");
+      strategy = 'intelligent_sub_query'; // Use sub-query planning for data aggregation
+      console.log("[Query Planner] Using intelligent sub-query strategy for data aggregation");
     }
     else if (queryTypes.isEmotionFocused) {
-      strategy = 'emotion_analysis';
+      strategy = 'intelligent_sub_query'; // Use sub-query planning for emotion analysis
+      console.log("[Query Planner] Using intelligent sub-query strategy for emotion analysis");
     }
     else if (queryTypes.isWhyQuestion) {
-      strategy = 'causal_analysis';
+      strategy = 'intelligent_sub_query'; // Use sub-query planning for causal analysis
+      console.log("[Query Planner] Using intelligent sub-query strategy for causal analysis");
     }
     
-    // Determine if historical data should be used
-    let useHistoricalData = false;
-    if (message.toLowerCase().includes('historical data') || message.toLowerCase().includes('past entries')) {
-      useHistoricalData = true;
-    }
-    
-    // Determine if personal context should be used
-    let usePersonalContext = false;
-    if (message.toLowerCase().includes('personal context') || message.toLowerCase().includes('my feelings')) {
-      usePersonalContext = true;
-    }
-    
+    // Return plan that will trigger intelligent sub-query generation
     return {
       strategy,
       timeRange: queryTypes.timeRange,
-      useHistoricalData: useHistoricalData,
-      usePersonalContext: usePersonalContext || false,
+      useHistoricalData: false, // Sub-query planner will determine this
+      usePersonalContext: true, // Always use personal context for sub-query planning
       filterByEmotion: queryTypes.emotion || null,
       enhancedQuery,
       originalQuery: message,
@@ -206,16 +190,20 @@ export async function planQuery(message: string, threadId: string, userId: strin
       clientDeviceTime: clientInfo.timestamp,
       clientTimezone: clientInfo.timezoneName,
       clientTimezoneOffset: clientInfo.timezoneOffset,
-      userTimezone: userTimezone
+      userTimezone: userTimezone,
+      requiresIntelligentPlanning: true, // Flag to trigger sub-query generation
+      queryComplexity: queryTypes.needsDataAggregation ? 'high' : 
+                      queryTypes.isEmotionFocused ? 'medium' : 'standard'
     };
   } catch (error) {
-    console.error("[Query Planner] Error planning query:", error);
+    console.error("[Query Planner] Error planning intelligent sub-query:", error);
     return {
-      strategy: 'default',
+      strategy: 'intelligent_sub_query', // Default to intelligent planning even on error
       originalQuery: message,
       enhancedQuery: message,
       errorState: true,
-      timestamp: new Date().toISOString()
+      timestamp: new Date().toISOString(),
+      requiresIntelligentPlanning: true
     };
   }
 }

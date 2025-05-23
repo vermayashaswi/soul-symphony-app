@@ -17,23 +17,36 @@ const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
+// Database schema context for GPT
+const DATABASE_SCHEMA_CONTEXT = `
+Available PostgreSQL Functions:
+1. get_top_emotions_with_entries(user_id, start_date, end_date, limit_count) - Returns top emotions with sample entries
+2. match_journal_entries_by_emotion(emotion_name, user_id, min_score, start_date, end_date, limit_count) - Find entries by specific emotion
+3. match_journal_entries_fixed(query_embedding, match_threshold, match_count, user_id) - Vector similarity search
+4. match_journal_entries_with_date(query_embedding, match_threshold, match_count, user_id, start_date, end_date) - Vector search with date filter
+
+Table Structure:
+- Journal Entries: id, user_id, created_at, "refined text", "transcription text", emotions (jsonb), master_themes (array), sentiment
+- Emotions: Stored as jsonb with emotion names as keys and scores (0-1) as values
+- Master Themes: Array of theme strings extracted from entries
+
+Common Emotions: happy, sad, anxious, excited, calm, stressed, angry, peaceful, grateful, frustrated, hopeful, lonely
+Common Themes: work, relationships, family, health, goals, travel, creativity, learning, challenges, growth
+`;
+
 /**
  * Enhanced JSON extraction with multiple fallback methods
  */
 function extractAndParseJSON(content: string): any {
   try {
-    // First try direct parsing
     return JSON.parse(content);
   } catch (error) {
     console.log("Direct JSON parse failed, trying extraction methods");
     
     let cleanedContent = content.trim();
+    cleanedContent = cleanedContent.replace(/^[^{]*/, '');
+    cleanedContent = cleanedContent.replace(/[^}]*$/, '}');
     
-    // Remove common markdown or explanation text more aggressively
-    cleanedContent = cleanedContent.replace(/^[^{]*/, ''); // Remove everything before first {
-    cleanedContent = cleanedContent.replace(/[^}]*$/, '}'); // Keep everything until last }
-    
-    // Try to extract JSON from markdown code blocks
     const jsonBlockMatch = cleanedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (jsonBlockMatch) {
       try {
@@ -43,24 +56,19 @@ function extractAndParseJSON(content: string): any {
       }
     }
     
-    // Try to find JSON within the text (look for { ... })
     const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         let jsonText = jsonMatch[0];
-        
-        // Clean up common JSON formatting issues
-        jsonText = jsonText.replace(/,\s*\}/g, '}'); // Remove trailing commas
-        jsonText = jsonText.replace(/,\s*\]/g, ']'); // Remove trailing commas in arrays
-        jsonText = jsonText.replace(/([{,]\s*)(\w+):/g, '$1"$2":'); // Add quotes to unquoted keys
-        
+        jsonText = jsonText.replace(/,\s*\}/g, '}');
+        jsonText = jsonText.replace(/,\s*\]/g, ']');
+        jsonText = jsonText.replace(/([{,]\s*)(\w+):/g, '$1"$2":');
         return JSON.parse(jsonText);
       } catch (e) {
         console.log("JSON pattern extraction failed");
       }
     }
     
-    // Create a basic valid response as final fallback
     console.error("All JSON extraction methods failed, using emergency fallback");
     return createEmergencyFallback(content);
   }
@@ -74,65 +82,83 @@ function createEmergencyFallback(originalContent: string): any {
   
   return {
     queryType: "journal_specific",
-    strategy: "hybrid",
-    requiresJournalData: true,
-    isPersonalityQuery: /personality|trait|character|behavior/.test(lowerContent),
-    isEmotionQuery: /emotion|feel|mood|happy|sad|anxious/.test(lowerContent),
-    isTemporalQuery: /last week|yesterday|today|recently/.test(lowerContent),
-    isPatternAnalysis: /pattern|often|usually|tend/.test(lowerContent),
+    strategy: "intelligent_sub_query",
+    subQuestions: [
+      {
+        question: "Find relevant journal entries",
+        searchPlan: {
+          vectorSearch: {
+            threshold: 0.1,
+            enabled: true
+          },
+          sqlQueries: [],
+          fallbackStrategy: "recent_entries"
+        }
+      }
+    ],
     confidence: 0.3,
-    searchParameters: {
-      vectorThreshold: 0.1, // Always use very low threshold for emergency fallback
-      useEmotionSQL: true,
-      useThemeSQL: false,
-      dateRange: null,
-      fallbackStrategy: "recent_entries"
-    },
-    expectedResponse: "analysis",
     reasoning: "Emergency fallback due to JSON parsing failure"
   };
 }
 
 /**
- * Intelligent query analysis with reduced timeouts and better error handling
+ * Intelligent query analysis with sub-question generation
  */
-async function analyzeQueryWithGPT(message: string, conversationContext: any[], userEntryCount: number) {
+async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number) {
   try {
     const contextString = conversationContext.length > 0 
       ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
       : '';
 
-    const prompt = `Analyze this user query for a voice journaling app called SOULo and return ONLY valid JSON:
+    const prompt = `You are an intelligent query planner for a voice journaling app called SOULo. Your task is to break down user queries into executable sub-questions with detailed search plans.
+
+${DATABASE_SCHEMA_CONTEXT}
 
 User query: "${message}"
 User has ${userEntryCount} journal entries.${contextString}
 
-Return JSON with these exact fields:
+Break this query into 2-4 strategic sub-questions that will help answer the original query. For each sub-question, create a detailed search plan.
+
+Return ONLY valid JSON with this structure:
 {
   "queryType": "journal_specific" | "general_question" | "direct_response",
-  "strategy": "vector_only" | "sql_only" | "hybrid" | "comprehensive",
-  "requiresJournalData": boolean,
-  "isPersonalityQuery": boolean,
-  "isEmotionQuery": boolean,
-  "isTemporalQuery": boolean,
-  "isPatternAnalysis": boolean,
+  "strategy": "intelligent_sub_query",
+  "subQuestions": [
+    {
+      "question": "Specific sub-question to answer",
+      "purpose": "Why this sub-question helps answer the main query",
+      "searchPlan": {
+        "vectorSearch": {
+          "enabled": boolean,
+          "threshold": number (0.05-0.3),
+          "query": "optimized search query for this sub-question",
+          "dateFilter": null | {"startDate": "ISO", "endDate": "ISO"}
+        },
+        "sqlQueries": [
+          {
+            "function": "function_name",
+            "parameters": {...},
+            "purpose": "what this query achieves"
+          }
+        ],
+        "fallbackStrategy": "recent_entries" | "emotion_based" | "theme_based"
+      }
+    }
+  ],
   "confidence": number,
-  "searchParameters": {
-    "vectorThreshold": number,
-    "useEmotionSQL": boolean,
-    "useThemeSQL": boolean,
-    "dateRange": object | null,
-    "fallbackStrategy": "recent_entries" | "emotion_based" | "comprehensive"
-  },
-  "expectedResponse": "analysis" | "direct_answer" | "clarification_needed",
-  "reasoning": "brief explanation"
+  "reasoning": "brief explanation of the approach",
+  "expectedResponse": "analysis" | "direct_answer" | "clarification_needed"
 }
 
-CRITICAL: Use vectorThreshold between 0.05-0.3 ONLY. Lower values find more results.`;
+Guidelines:
+- Use vector thresholds between 0.05-0.2 for personality/emotion queries
+- Use 0.1-0.3 for general queries
+- Include SQL queries when specific emotions or patterns are mentioned
+- Each sub-question should target a specific aspect of the main query
+- Combine different search approaches for comprehensive results`;
 
-    // Reduced timeout significantly
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced from 8s to 5s
+    const timeoutId = setTimeout(() => controller.abort(), 6000);
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -144,7 +170,7 @@ CRITICAL: Use vectorThreshold between 0.05-0.3 ONLY. Lower values find more resu
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 400, // Further reduced
+        max_tokens: 800,
       }),
       signal: controller.signal
     });
@@ -168,8 +194,8 @@ CRITICAL: Use vectorThreshold between 0.05-0.3 ONLY. Lower values find more resu
       return createFallbackAnalysis(message);
     }
     
-    // Force lower thresholds and validate
-    const validatedResult = validateAndFixAnalysis(analysisResult, message);
+    // Validate and enhance the sub-questions
+    const validatedResult = validateAndEnhanceSubQuestions(analysisResult, message);
     
     console.log("Final Analysis Result:", JSON.stringify(validatedResult, null, 2));
     return validatedResult;
@@ -181,9 +207,9 @@ CRITICAL: Use vectorThreshold between 0.05-0.3 ONLY. Lower values find more resu
 }
 
 /**
- * Validate and fix analysis result with aggressive threshold capping
+ * Validate and enhance sub-questions with better defaults
  */
-function validateAndFixAnalysis(analysis: any, message: string) {
+function validateAndEnhanceSubQuestions(analysis: any, message: string) {
   const lowerMessage = message.toLowerCase();
   
   // Detect query characteristics
@@ -191,44 +217,136 @@ function validateAndFixAnalysis(analysis: any, message: string) {
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
   const isTemporalQuery = /last week|yesterday|today|this month|recently/.test(lowerMessage);
   
-  // Force very low thresholds based on query type
-  let vectorThreshold = 0.2; // Default
-  if (isPersonalityQuery) {
-    vectorThreshold = 0.05; // Extremely low for personality
-  } else if (isEmotionQuery) {
-    vectorThreshold = 0.1; // Very low for emotions
-  } else if (isTemporalQuery) {
-    vectorThreshold = 0.15; // Low for temporal queries
+  // Ensure we have valid sub-questions
+  if (!analysis.subQuestions || !Array.isArray(analysis.subQuestions) || analysis.subQuestions.length === 0) {
+    analysis.subQuestions = createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery);
   }
   
-  // Cap any threshold above 0.3 to prevent no results
-  if (analysis.searchParameters?.vectorThreshold > 0.3) {
-    console.warn(`Capping high threshold ${analysis.searchParameters.vectorThreshold} to ${vectorThreshold}`);
-  }
+  // Validate and enhance each sub-question
+  analysis.subQuestions = analysis.subQuestions.map((subQ, index) => {
+    if (!subQ.searchPlan) {
+      subQ.searchPlan = {};
+    }
+    
+    // Ensure vector search configuration
+    if (!subQ.searchPlan.vectorSearch) {
+      subQ.searchPlan.vectorSearch = {
+        enabled: true,
+        threshold: isPersonalityQuery ? 0.05 : isEmotionQuery ? 0.1 : 0.15,
+        query: subQ.question || message
+      };
+    }
+    
+    // Cap thresholds
+    if (subQ.searchPlan.vectorSearch.threshold > 0.3) {
+      subQ.searchPlan.vectorSearch.threshold = 0.2;
+    }
+    
+    // Ensure SQL queries array
+    if (!subQ.searchPlan.sqlQueries) {
+      subQ.searchPlan.sqlQueries = [];
+    }
+    
+    // Add relevant SQL queries based on query type
+    if (isEmotionQuery && subQ.searchPlan.sqlQueries.length === 0) {
+      subQ.searchPlan.sqlQueries.push({
+        function: "get_top_emotions_with_entries",
+        parameters: {
+          user_id_param: "USER_ID_PLACEHOLDER",
+          limit_count: 5
+        },
+        purpose: "Get top emotions with sample entries"
+      });
+    }
+    
+    // Ensure fallback strategy
+    if (!subQ.searchPlan.fallbackStrategy) {
+      subQ.searchPlan.fallbackStrategy = "recent_entries";
+    }
+    
+    return subQ;
+  });
   
   const validated = {
     queryType: analysis.queryType || "journal_specific",
-    strategy: analysis.strategy || "hybrid",
-    requiresJournalData: analysis.requiresJournalData !== false,
-    isPersonalityQuery: isPersonalityQuery || analysis.isPersonalityQuery || false,
-    isEmotionQuery: isEmotionQuery || analysis.isEmotionQuery || false,
-    isTemporalQuery: isTemporalQuery || analysis.isTemporalQuery || false,
-    isPatternAnalysis: analysis.isPatternAnalysis || /pattern|often|usually|tend/.test(lowerMessage),
+    strategy: "intelligent_sub_query",
+    subQuestions: analysis.subQuestions,
     confidence: typeof analysis.confidence === 'number' ? analysis.confidence : 0.7,
-    searchParameters: {
-      vectorThreshold: vectorThreshold, // Use our calculated threshold
-      useEmotionSQL: isEmotionQuery || isPersonalityQuery || analysis.searchParameters?.useEmotionSQL || false,
-      useThemeSQL: analysis.searchParameters?.useThemeSQL || false,
-      dateRange: analysis.searchParameters?.dateRange || null,
-      fallbackStrategy: analysis.searchParameters?.fallbackStrategy || "recent_entries"
-    },
+    reasoning: analysis.reasoning || "Sub-query planning with optimized search strategies",
     expectedResponse: analysis.expectedResponse || "analysis",
-    reasoning: analysis.reasoning || `Analysis with optimized threshold ${vectorThreshold}`
+    isPersonalityQuery,
+    isEmotionQuery,
+    isTemporalQuery
   };
   
-  console.log(`Applied threshold ${vectorThreshold} for query type - Personality: ${isPersonalityQuery}, Emotion: ${isEmotionQuery}, Temporal: ${isTemporalQuery}`);
+  console.log(`Generated ${validated.subQuestions.length} sub-questions for query type - Personality: ${isPersonalityQuery}, Emotion: ${isEmotionQuery}, Temporal: ${isTemporalQuery}`);
   
   return validated;
+}
+
+/**
+ * Create default sub-questions when GPT fails to generate them
+ */
+function createDefaultSubQuestions(message: string, isPersonality: boolean, isEmotion: boolean, isTemporal: boolean) {
+  const subQuestions = [];
+  
+  if (isPersonality) {
+    subQuestions.push({
+      question: "Find entries that reveal personality patterns and behaviors",
+      purpose: "Identify behavioral patterns and personality traits",
+      searchPlan: {
+        vectorSearch: {
+          enabled: true,
+          threshold: 0.05,
+          query: message
+        },
+        sqlQueries: [],
+        fallbackStrategy: "recent_entries"
+      }
+    });
+  }
+  
+  if (isEmotion) {
+    subQuestions.push({
+      question: "Analyze emotional patterns and triggers",
+      purpose: "Understand emotional states and their contexts",
+      searchPlan: {
+        vectorSearch: {
+          enabled: true,
+          threshold: 0.1,
+          query: message
+        },
+        sqlQueries: [
+          {
+            function: "get_top_emotions_with_entries",
+            parameters: {
+              user_id_param: "USER_ID_PLACEHOLDER",
+              limit_count: 5
+            },
+            purpose: "Get top emotions with examples"
+          }
+        ],
+        fallbackStrategy: "emotion_based"
+      }
+    });
+  }
+  
+  // Always add a general search sub-question
+  subQuestions.push({
+    question: "Find relevant journal entries related to the query",
+    purpose: "Gather contextual information from journal entries",
+    searchPlan: {
+      vectorSearch: {
+        enabled: true,
+        threshold: 0.15,
+        query: message
+      },
+      sqlQueries: [],
+      fallbackStrategy: "recent_entries"
+    }
+  });
+  
+  return subQuestions;
 }
 
 /**
@@ -241,93 +359,17 @@ function createFallbackAnalysis(message: string) {
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
   const isTemporalQuery = /last week|yesterday|today|this month|recently/.test(lowerMessage);
   
-  // Use very aggressive low thresholds for fallback
-  let threshold = 0.1;
-  if (isPersonalityQuery) threshold = 0.05;
-  if (isEmotionQuery) threshold = 0.08;
-  
   return {
     queryType: "journal_specific",
-    strategy: "hybrid",
-    requiresJournalData: true,
+    strategy: "intelligent_sub_query",
+    subQuestions: createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery),
+    confidence: 0.5,
+    reasoning: "Fallback analysis with default sub-questions",
+    expectedResponse: "analysis",
     isPersonalityQuery,
     isEmotionQuery,
-    isTemporalQuery,
-    isPatternAnalysis: /pattern|often|usually|tend/.test(lowerMessage),
-    confidence: 0.5,
-    searchParameters: {
-      vectorThreshold: threshold,
-      useEmotionSQL: isEmotionQuery || isPersonalityQuery,
-      useThemeSQL: false,
-      dateRange: null,
-      fallbackStrategy: "recent_entries"
-    },
-    expectedResponse: "analysis",
-    reasoning: `Fallback analysis with threshold ${threshold}`
+    isTemporalQuery
   };
-}
-
-/**
- * Generate SQL queries with reduced timeout
- */
-async function generateSQLQueries(message: string, userId: string, analysisResult: any) {
-  if (!analysisResult.searchParameters.useEmotionSQL && !analysisResult.searchParameters.useThemeSQL) {
-    return { shouldExecute: false, emotionQueries: [] };
-  }
-
-  try {
-    const prompt = `Generate SQL function calls for: "${message}"
-
-Available functions:
-- get_top_emotions_with_entries(user_id, start_date, end_date, limit_count)
-- match_journal_entries_by_emotion(emotion_name, user_id, min_score, start_date, end_date, limit_count)
-
-Return JSON:
-{
-  "emotionQueries": [{"function": "function_name", "parameters": {...}, "purpose": "description"}],
-  "shouldExecute": boolean
-}`;
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced to 3s
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${apiKey}`
-      },
-      body: JSON.stringify({
-        model: "gpt-4o-mini",
-        messages: [{ role: "user", content: prompt }],
-        temperature: 0.1,
-        max_tokens: 200,
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message?.content || '{"shouldExecute": false}';
-    
-    const sqlPlan = extractAndParseJSON(content);
-    
-    if (!sqlPlan) {
-      return { shouldExecute: false, emotionQueries: [] };
-    }
-    
-    console.log("Generated SQL Plan:", JSON.stringify(sqlPlan, null, 2));
-    return sqlPlan;
-
-  } catch (error) {
-    console.error("Error generating SQL queries:", error);
-    return { shouldExecute: false, emotionQueries: [] };
-  }
 }
 
 serve(async (req) => {
@@ -338,13 +380,13 @@ serve(async (req) => {
   try {
     const { message, userId, conversationContext = [], isFollowUp = false } = await req.json();
 
-    console.log(`[Smart Query Planner] Analyzing query: "${message}"`);
+    console.log(`[Smart Query Planner] Analyzing query with sub-questions: "${message}"`);
 
-    // Get user's journal entry count with shorter timeout
+    // Get user's journal entry count
     let entryCount = 0;
     try {
       const countController = new AbortController();
-      const countTimeoutId = setTimeout(() => countController.abort(), 1500); // Reduced to 1.5s
+      const countTimeoutId = setTimeout(() => countController.abort(), 1500);
       
       const { count, error } = await supabase
         .from('Journal Entries')
@@ -359,13 +401,12 @@ serve(async (req) => {
       }
     } catch (error) {
       console.error("Error fetching entry count:", error);
-      // Continue without count
     }
 
-    // Use GPT to analyze the query intelligently
-    const analysisResult = await analyzeQueryWithGPT(message, conversationContext, entryCount);
+    // Use GPT to analyze the query and generate sub-questions
+    const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, entryCount);
 
-    // Handle direct responses with better messaging
+    // Handle direct responses
     if (analysisResult.queryType === "general_question") {
       return new Response(JSON.stringify({
         directResponse: "I'm SOULo, your voice journaling assistant. I can help you analyze your journal entries to understand emotions, patterns, and personal insights. What would you like to explore about your journaling journey?",
@@ -384,43 +425,23 @@ serve(async (req) => {
       });
     }
 
-    // Generate SQL queries if needed with reduced timeout
-    let sqlPlan = null;
-    if (analysisResult.searchParameters.useEmotionSQL || analysisResult.searchParameters.useThemeSQL) {
-      sqlPlan = await generateSQLQueries(message, userId, analysisResult);
-    }
-
-    // Enhanced query plan with optimized settings
+    // Enhanced query plan with sub-questions
     const enhancedPlan = {
       strategy: analysisResult.strategy,
       queryType: analysisResult.queryType,
-      requiresJournalData: analysisResult.requiresJournalData,
-      searchParameters: {
-        ...analysisResult.searchParameters,
-        sqlQueries: sqlPlan?.emotionQueries || [],
-        executeSQLQueries: sqlPlan?.shouldExecute || false
-      },
-      filters: {
-        date_range: analysisResult.searchParameters.dateRange,
-        emotions: null,
-        themes: null
-      },
-      isTimePatternQuery: analysisResult.isTemporalQuery,
-      needsDataAggregation: analysisResult.isPatternAnalysis,
-      domainContext: analysisResult.isPersonalityQuery ? "personal_insights" : 
-                   analysisResult.isEmotionQuery ? "emotional_analysis" : "general_insights",
-      isTimeSummaryQuery: analysisResult.isTemporalQuery,
-      needsComprehensiveAnalysis: analysisResult.isPersonalityQuery || analysisResult.isPatternAnalysis,
+      subQuestions: analysisResult.subQuestions,
       totalEntryCount: entryCount,
       confidence: analysisResult.confidence,
       reasoning: analysisResult.reasoning,
       expectedResponse: analysisResult.expectedResponse,
-      fallbackStrategy: analysisResult.searchParameters.fallbackStrategy,
       isPersonalityQuery: analysisResult.isPersonalityQuery,
-      isEmotionQuery: analysisResult.isEmotionQuery
+      isEmotionQuery: analysisResult.isEmotionQuery,
+      isTemporalQuery: analysisResult.isTemporalQuery,
+      domainContext: analysisResult.isPersonalityQuery ? "personal_insights" : 
+                   analysisResult.isEmotionQuery ? "emotional_analysis" : "general_insights"
     };
 
-    console.log("Enhanced Query Plan:", JSON.stringify(enhancedPlan, null, 2));
+    console.log("Enhanced Query Plan with Sub-Questions:", JSON.stringify(enhancedPlan, null, 2));
 
     return new Response(JSON.stringify({
       queryPlan: enhancedPlan,
@@ -432,31 +453,26 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in smart-query-planner:", error);
     
-    // Better fallback plan with very low threshold
     const fallbackPlan = {
-      strategy: "hybrid",
+      strategy: "intelligent_sub_query",
       queryType: "journal_specific",
-      requiresJournalData: true,
-      searchParameters: {
-        vectorThreshold: 0.05, // Extremely low for fallback
-        useEmotionSQL: true,
-        useThemeSQL: false,
-        dateRange: null,
-        fallbackStrategy: "recent_entries",
-        sqlQueries: [],
-        executeSQLQueries: false
-      },
-      filters: { date_range: null, emotions: null, themes: null },
-      isTimePatternQuery: false,
-      needsDataAggregation: false,
-      domainContext: "general_insights",
-      isTimeSummaryQuery: false,
-      needsComprehensiveAnalysis: false,
+      subQuestions: [
+        {
+          question: "Find relevant journal entries",
+          searchPlan: {
+            vectorSearch: {
+              enabled: true,
+              threshold: 0.05
+            },
+            sqlQueries: [],
+            fallbackStrategy: "recent_entries"
+          }
+        }
+      ],
       totalEntryCount: 0,
       confidence: 0.3,
-      reasoning: "Emergency fallback plan with ultra-low threshold",
+      reasoning: "Emergency fallback plan",
       expectedResponse: "analysis",
-      fallbackStrategy: "recent_entries",
       isErrorFallback: true
     };
     

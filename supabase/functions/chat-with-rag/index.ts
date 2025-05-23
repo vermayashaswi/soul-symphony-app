@@ -7,121 +7,109 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Enhanced multi-strategy search execution with much lower thresholds
-async function executeMultiStrategySearch(
-  message: string,
+/**
+ * Execute a single sub-question's search plan
+ */
+async function executeSubQuestionPlan(
+  subQuestion: any,
   userId: string,
   supabase: any,
-  queryPlan: any,
   queryEmbedding: number[]
-): Promise<any[]> {
-  console.log(`[chat-with-rag] Executing ${queryPlan.strategy} search strategy`);
+): Promise<any> {
+  console.log(`[chat-with-rag] Executing sub-question: "${subQuestion.question}"`);
   
-  let allResults = [];
-  
-  // Force very low thresholds based on query type
-  let threshold = queryPlan.searchParameters?.vectorThreshold || 0.2;
-  
-  // Apply aggressive threshold reduction
-  if (queryPlan.isPersonalityQuery) {
-    threshold = 0.05; // Extremely low for personality
-    console.log("[chat-with-rag] Using ultra-low threshold 0.05 for personality query");
-  } else if (queryPlan.isEmotionQuery) {
-    threshold = 0.1; // Very low for emotions
-    console.log("[chat-with-rag] Using low threshold 0.1 for emotion query");
-  } else if (threshold > 0.3) {
-    threshold = 0.2; // Cap any high thresholds
-    console.log(`[chat-with-rag] Capped threshold to 0.2 from ${queryPlan.searchParameters?.vectorThreshold}`);
-  }
-  
-  console.log(`[chat-with-rag] Final threshold: ${threshold} for domain: ${queryPlan.domainContext}`);
+  let results = [];
+  const searchPlan = subQuestion.searchPlan;
   
   try {
-    // Strategy 1: Execute SQL queries if planned (parallel execution)
-    const sqlPromise = (async () => {
-      if (queryPlan.searchParameters?.executeSQLQueries && queryPlan.searchParameters?.sqlQueries?.length > 0) {
-        console.log(`[chat-with-rag] Executing ${queryPlan.searchParameters.sqlQueries.length} SQL queries in parallel`);
-        
-        const sqlPromises = queryPlan.searchParameters.sqlQueries.map(async (sqlQuery) => {
-          try {
-            const controller = new AbortController();
-            const timeoutId = setTimeout(() => controller.abort(), 2000);
+    // Execute SQL queries if specified
+    if (searchPlan.sqlQueries && searchPlan.sqlQueries.length > 0) {
+      console.log(`[chat-with-rag] Executing ${searchPlan.sqlQueries.length} SQL queries for sub-question`);
+      
+      const sqlPromises = searchPlan.sqlQueries.map(async (sqlQuery) => {
+        try {
+          const controller = new AbortController();
+          const timeoutId = setTimeout(() => controller.abort(), 2000);
+          
+          // Replace USER_ID_PLACEHOLDER with actual userId
+          const parameters = { ...sqlQuery.parameters };
+          Object.keys(parameters).forEach(key => {
+            if (parameters[key] === 'USER_ID_PLACEHOLDER') {
+              parameters[key] = userId;
+            }
+          });
+          
+          let sqlResults = [];
+          
+          if (sqlQuery.function === 'get_top_emotions_with_entries') {
+            const { data, error } = await supabase.rpc('get_top_emotions_with_entries', {
+              user_id_param: userId,
+              start_date: parameters.start_date || null,
+              end_date: parameters.end_date || null,
+              limit_count: parameters.limit_count || 10
+            });
             
-            let sqlResults = [];
+            clearTimeout(timeoutId);
             
-            if (sqlQuery.function === 'get_top_emotions_with_entries') {
-              const { data, error } = await supabase.rpc('get_top_emotions_with_entries', {
-                user_id_param: userId,
-                start_date: sqlQuery.parameters?.start_date || null,
-                end_date: sqlQuery.parameters?.end_date || null,
-                limit_count: sqlQuery.parameters?.limit_count || 15
-              });
-              
-              clearTimeout(timeoutId);
-              
-              if (!error && data) {
-                sqlResults = data.flatMap(emotion => 
-                  emotion.sample_entries.map(entry => ({
-                    id: entry.id,
-                    content: entry.content,
-                    created_at: entry.created_at,
-                    similarity: 0.9,
-                    source: 'sql_emotion',
-                    emotion: emotion.emotion,
-                    emotion_score: emotion.score
-                  }))
-                );
-              }
-            } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
-              const { data, error } = await supabase.rpc('match_journal_entries_by_emotion', {
-                emotion_name: sqlQuery.parameters.emotion_name,
-                user_id_filter: userId,
-                min_score: 0.05, // Very low minimum score
-                start_date: sqlQuery.parameters?.start_date || null,
-                end_date: sqlQuery.parameters?.end_date || null,
-                limit_count: sqlQuery.parameters?.limit_count || 15
-              });
-              
-              clearTimeout(timeoutId);
-              
-              if (!error && data) {
-                sqlResults = data.map(entry => ({
+            if (!error && data) {
+              sqlResults = data.flatMap(emotion => 
+                emotion.sample_entries.map(entry => ({
                   id: entry.id,
                   content: entry.content,
                   created_at: entry.created_at,
-                  similarity: 0.8,
-                  source: 'sql_emotion_specific',
-                  emotion_score: entry.emotion_score
-                }));
-              }
+                  similarity: 0.9,
+                  source: 'sql_emotion',
+                  emotion: emotion.emotion,
+                  emotion_score: emotion.score,
+                  subQuestion: subQuestion.question
+                }))
+              );
             }
+          } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
+            const { data, error } = await supabase.rpc('match_journal_entries_by_emotion', {
+              emotion_name: parameters.emotion_name,
+              user_id_filter: userId,
+              min_score: 0.05,
+              start_date: parameters.start_date || null,
+              end_date: parameters.end_date || null,
+              limit_count: parameters.limit_count || 10
+            });
             
-            console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${sqlResults.length} results`);
-            return sqlResults;
+            clearTimeout(timeoutId);
             
-          } catch (error) {
-            console.error(`[chat-with-rag] Error executing SQL query ${sqlQuery.function}:`, error);
-            return [];
+            if (!error && data) {
+              sqlResults = data.map(entry => ({
+                id: entry.id,
+                content: entry.content,
+                created_at: entry.created_at,
+                similarity: 0.8,
+                source: 'sql_emotion_specific',
+                emotion_score: entry.emotion_score,
+                subQuestion: subQuestion.question
+              }));
+            }
           }
-        });
-        
-        const sqlResultsArrays = await Promise.allSettled(sqlPromises);
-        const sqlResults = [];
-        sqlResultsArrays.forEach(result => {
-          if (result.status === 'fulfilled') {
-            sqlResults.push(...result.value);
-          }
-        });
-        
-        console.log(`[chat-with-rag] SQL queries completed, ${sqlResults.length} results`);
-        return sqlResults;
-      }
-      return [];
-    })();
+          
+          console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${sqlResults.length} results`);
+          return sqlResults;
+          
+        } catch (error) {
+          console.error(`[chat-with-rag] Error executing SQL query ${sqlQuery.function}:`, error);
+          return [];
+        }
+      });
+      
+      const sqlResultsArrays = await Promise.allSettled(sqlPromises);
+      sqlResultsArrays.forEach(result => {
+        if (result.status === 'fulfilled') {
+          results.push(...result.value);
+        }
+      });
+    }
     
-    // Strategy 2: Vector search (parallel execution)
-    const vectorPromise = (async () => {
-      console.log(`[chat-with-rag] Executing vector search with threshold ${threshold}`);
+    // Execute vector search if enabled
+    if (searchPlan.vectorSearch && searchPlan.vectorSearch.enabled) {
+      console.log(`[chat-with-rag] Executing vector search with threshold ${searchPlan.vectorSearch.threshold}`);
       
       try {
         const vectorController = new AbortController();
@@ -129,32 +117,58 @@ async function executeMultiStrategySearch(
         
         let vectorResults = [];
         
-        if (queryPlan.filters?.date_range?.startDate || queryPlan.filters?.date_range?.endDate) {
+        // Use the optimized query from the search plan or fallback to sub-question
+        const searchQuery = searchPlan.vectorSearch.query || subQuestion.question;
+        
+        // Generate embedding for the specific sub-question query
+        let subQuestionEmbedding = queryEmbedding; // Default to main query embedding
+        if (searchQuery !== subQuestion.question) {
+          // Generate specific embedding for optimized query
+          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              input: searchQuery,
+              model: 'text-embedding-3-small',
+            }),
+          });
+          
+          if (embeddingResponse.ok) {
+            const embeddingData = await embeddingResponse.json();
+            subQuestionEmbedding = embeddingData.data[0].embedding;
+          }
+        }
+        
+        if (searchPlan.vectorSearch.dateFilter) {
           const { data, error } = await supabase.rpc(
             'match_journal_entries_with_date',
             {
-              query_embedding: queryEmbedding,
-              match_threshold: threshold,
-              match_count: 20,
+              query_embedding: subQuestionEmbedding,
+              match_threshold: searchPlan.vectorSearch.threshold,
+              match_count: 15,
               user_id_filter: userId,
-              start_date: queryPlan.filters.date_range.startDate,
-              end_date: queryPlan.filters.date_range.endDate
+              start_date: searchPlan.vectorSearch.dateFilter.startDate,
+              end_date: searchPlan.vectorSearch.dateFilter.endDate
             }
           );
           
           if (!error && data) {
             vectorResults = data.map(entry => ({
               ...entry,
-              source: 'vector_time_filtered'
+              source: 'vector_time_filtered',
+              subQuestion: subQuestion.question
             }));
           }
         } else {
           const { data, error } = await supabase.rpc(
             'match_journal_entries_fixed',
             {
-              query_embedding: queryEmbedding,
-              match_threshold: threshold,
-              match_count: 20,
+              query_embedding: subQuestionEmbedding,
+              match_threshold: searchPlan.vectorSearch.threshold,
+              match_count: 15,
               user_id_filter: userId
             }
           );
@@ -162,216 +176,182 @@ async function executeMultiStrategySearch(
           if (!error && data) {
             vectorResults = data.map(entry => ({
               ...entry,
-              source: 'vector_semantic'
+              source: 'vector_semantic',
+              subQuestion: subQuestion.question
             }));
           }
         }
         
         clearTimeout(vectorTimeoutId);
         console.log(`[chat-with-rag] Vector search returned ${vectorResults.length} results`);
-        return vectorResults;
+        results = results.concat(vectorResults);
         
       } catch (error) {
-        console.error(`[chat-with-rag] Vector search error:`, error);
-        return [];
+        console.error(`[chat-with-rag] Vector search error for sub-question:`, error);
       }
-    })();
+    }
     
-    // Execute SQL and vector searches in parallel
-    const [sqlResults, vectorResults] = await Promise.all([sqlPromise, vectorPromise]);
-    allResults = [...sqlResults, ...vectorResults];
-    
-    // Strategy 3: Progressive fallback if insufficient results
-    if (allResults.length < 5) {
-      console.log(`[chat-with-rag] Insufficient results (${allResults.length}), executing progressive fallback`);
+    // Apply fallback strategy if insufficient results
+    if (results.length < 3 && searchPlan.fallbackStrategy) {
+      console.log(`[chat-with-rag] Applying fallback strategy: ${searchPlan.fallbackStrategy}`);
       
-      // Fallback 1: Try with even lower threshold
-      if (allResults.length < 3 && threshold > 0.05) {
-        console.log("[chat-with-rag] Trying ultra-low threshold 0.05");
-        try {
-          const { data, error } = await supabase.rpc(
-            'match_journal_entries_fixed',
-            {
-              query_embedding: queryEmbedding,
-              match_threshold: 0.05,
-              match_count: 15,
-              user_id_filter: userId
-            }
-          );
-          
-          if (!error && data) {
-            const ultraLowResults = data.map(entry => ({
-              ...entry,
-              source: 'vector_ultra_low'
-            }));
-            allResults = allResults.concat(ultraLowResults);
-            console.log(`[chat-with-rag] Ultra-low threshold search returned ${ultraLowResults.length} results`);
-          }
-        } catch (error) {
-          console.error("[chat-with-rag] Ultra-low threshold search failed:", error);
-        }
-      }
-      
-      // Fallback 2: Recent entries
-      if (allResults.length < 5) {
-        try {
+      try {
+        let fallbackResults = [];
+        
+        if (searchPlan.fallbackStrategy === 'recent_entries') {
           const { data, error } = await supabase
             .from('Journal Entries')
             .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
             .eq('user_id', userId)
             .order('created_at', { ascending: false })
-            .limit(15);
+            .limit(10);
             
           if (!error && data) {
-            const recentResults = data.map(entry => ({
+            fallbackResults = data.map(entry => ({
               id: entry.id,
               content: entry['refined text'] || entry['transcription text'] || '',
               created_at: entry.created_at,
               similarity: 0.5,
               source: 'fallback_recent',
-              emotions: entry.emotions,
-              themes: entry.master_themes
+              subQuestion: subQuestion.question
             }));
-            
-            console.log(`[chat-with-rag] Recent entries fallback returned ${recentResults.length} results`);
-            allResults = allResults.concat(recentResults);
           }
-        } catch (error) {
-          console.error("[chat-with-rag] Recent entries fallback failed:", error);
-        }
-      }
-      
-      // Fallback 3: Keyword-based search for personality/emotion queries
-      if (allResults.length < 8 && (queryPlan.isPersonalityQuery || queryPlan.isEmotionQuery)) {
-        const keywords = extractKeywords(message);
-        if (keywords.length > 0) {
-          console.log(`[chat-with-rag] Executing keyword fallback with: ${keywords.join(', ')}`);
+        } else if (searchPlan.fallbackStrategy === 'emotion_based') {
+          const { data, error } = await supabase.rpc('get_top_emotions_with_entries', {
+            user_id_param: userId,
+            limit_count: 3
+          });
           
-          try {
-            const keywordQuery = keywords.map(keyword => 
-              `("refined text" ILIKE '%${keyword}%' OR "transcription text" ILIKE '%${keyword}%')`
-            ).join(' OR ');
-            
-            const { data, error } = await supabase
-              .from('Journal Entries')
-              .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
-              .eq('user_id', userId)
-              .or(keywordQuery)
-              .order('created_at', { ascending: false })
-              .limit(10);
-              
-            if (!error && data) {
-              const keywordResults = data.map(entry => ({
+          if (!error && data) {
+            fallbackResults = data.flatMap(emotion => 
+              emotion.sample_entries.map(entry => ({
                 id: entry.id,
-                content: entry['refined text'] || entry['transcription text'] || '',
+                content: entry.content,
                 created_at: entry.created_at,
-                similarity: 0.4,
-                source: 'fallback_keyword',
-                emotions: entry.emotions,
-                themes: entry.master_themes
-              }));
-              
-              console.log(`[chat-with-rag] Keyword fallback returned ${keywordResults.length} results`);
-              allResults = allResults.concat(keywordResults);
-            }
-          } catch (error) {
-            console.error("[chat-with-rag] Keyword fallback failed:", error);
+                similarity: 0.6,
+                source: 'fallback_emotion',
+                emotion: emotion.emotion,
+                subQuestion: subQuestion.question
+              }))
+            );
           }
         }
+        
+        results = results.concat(fallbackResults);
+        console.log(`[chat-with-rag] Fallback strategy added ${fallbackResults.length} results`);
+        
+      } catch (error) {
+        console.error(`[chat-with-rag] Fallback strategy failed:`, error);
       }
     }
+    
+    return {
+      subQuestion: subQuestion.question,
+      purpose: subQuestion.purpose,
+      results: results,
+      resultCount: results.length
+    };
+    
+  } catch (error) {
+    console.error(`[chat-with-rag] Error executing sub-question plan:`, error);
+    return {
+      subQuestion: subQuestion.question,
+      purpose: subQuestion.purpose,
+      results: [],
+      resultCount: 0,
+      error: error.message
+    };
+  }
+}
+
+/**
+ * Execute all sub-questions in parallel and aggregate results
+ */
+async function executeIntelligentSubQueries(
+  message: string,
+  userId: string,
+  supabase: any,
+  queryPlan: any,
+  queryEmbedding: number[]
+): Promise<any> {
+  console.log(`[chat-with-rag] Executing ${queryPlan.subQuestions.length} sub-questions in parallel`);
+  
+  try {
+    // Execute all sub-questions in parallel
+    const subQuestionPromises = queryPlan.subQuestions.map(subQuestion => 
+      executeSubQuestionPlan(subQuestion, userId, supabase, queryEmbedding)
+    );
+    
+    const subQuestionResults = await Promise.allSettled(subQuestionPromises);
+    
+    // Aggregate all results
+    let allResults = [];
+    const subQuestionSummary = [];
+    
+    subQuestionResults.forEach((result, index) => {
+      if (result.status === 'fulfilled') {
+        const subResult = result.value;
+        allResults = allResults.concat(subResult.results);
+        subQuestionSummary.push({
+          question: subResult.subQuestion,
+          purpose: subResult.purpose,
+          resultCount: subResult.resultCount,
+          status: 'success'
+        });
+      } else {
+        console.error(`Sub-question ${index} failed:`, result.reason);
+        subQuestionSummary.push({
+          question: queryPlan.subQuestions[index].question,
+          resultCount: 0,
+          status: 'failed',
+          error: result.reason
+        });
+      }
+    });
     
     // Remove duplicates and sort by relevance
     const uniqueResults = allResults.filter((entry, index, self) => 
       index === self.findIndex(e => e.id === entry.id)
     ).sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
     
-    console.log(`[chat-with-rag] Multi-strategy search completed: ${uniqueResults.length} unique results`);
-    return uniqueResults.slice(0, 20);
+    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${subQuestionSummary.length} sub-questions`);
+    
+    return {
+      results: uniqueResults.slice(0, 20),
+      subQuestionSummary,
+      totalResults: uniqueResults.length
+    };
     
   } catch (error) {
-    console.error('[chat-with-rag] Error in multi-strategy search:', error);
-    
-    // Emergency fallback - get ANY recent entries
-    try {
-      console.log("[chat-with-rag] Executing emergency fallback");
-      const { data, error } = await supabase
-        .from('Journal Entries')
-        .select('id, created_at, "refined text", "transcription text", emotions')
-        .eq('user_id', userId)
-        .order('created_at', { ascending: false })
-        .limit(10);
-        
-      if (!error && data) {
-        return data.map(entry => ({
-          id: entry.id,
-          content: entry['refined text'] || entry['transcription text'] || '',
-          created_at: entry.created_at,
-          similarity: 0.3,
-          source: 'emergency_fallback'
-        }));
-      }
-    } catch (emergencyError) {
-      console.error("[chat-with-rag] Emergency fallback failed:", emergencyError);
-    }
-    
-    return [];
+    console.error('[chat-with-rag] Error in sub-question execution:', error);
+    throw error;
   }
 }
 
-// Extract keywords for fallback search
-function extractKeywords(message: string): string[] {
-  const personalityKeywords = ['personality', 'trait', 'character', 'behavior', 'habit', 'pattern', 'tend', 'usually', 'often', 'always', 'never', 'am i', 'do i'];
-  const emotionKeywords = ['feel', 'emotion', 'mood', 'happy', 'sad', 'angry', 'anxious', 'excited', 'calm', 'stressed', 'joy', 'fear', 'emotional'];
-  
-  const words = message.toLowerCase().split(/\s+/);
-  const keywords = [];
-  
-  words.forEach(word => {
-    if (personalityKeywords.some(keyword => word.includes(keyword)) || 
-        emotionKeywords.some(keyword => word.includes(keyword))) {
-      keywords.push(word);
-    }
-  });
-  
-  return [...new Set(keywords)].slice(0, 4);
-}
-
-// Enhanced response generation with better error handling
-async function generateContextAwareResponse(
+/**
+ * Enhanced response generation with sub-question context
+ */
+async function generateResponseWithSubQuestionContext(
   message: string,
-  entries: any[],
+  aggregatedResults: any,
   queryPlan: any,
   conversationContext: any[],
   openAiApiKey: string
 ): Promise<string> {
   try {
-    // Optimize prompt based on query plan
+    // Create system prompt based on query plan
     let systemPrompt = '';
     
     if (queryPlan.isPersonalityQuery) {
-      systemPrompt = `You are SOULo, analyzing personality traits. For "${message}", focus on:
-- Behavioral patterns and decision-making
-- Personal values and strengths
-- Growth opportunities (positive framing)
-- Specific examples from the entries
-Be supportive and evidence-based. Limit: 200 words.`;
-
+      systemPrompt = `You are SOULo, analyzing personality traits from journal entries. The analysis was conducted through ${queryPlan.subQuestions.length} targeted sub-questions to provide comprehensive insights.`;
     } else if (queryPlan.isEmotionQuery) {
-      systemPrompt = `You are SOULo, analyzing emotions. For "${message}", focus on:
-- Emotional trends and triggers
-- Processing patterns
-- Insights for wellbeing
-- Specific examples
-Be encouraging and actionable. Limit: 200 words.`;
-
+      systemPrompt = `You are SOULo, analyzing emotional patterns from journal entries. The analysis used ${queryPlan.subQuestions.length} specific approaches to understand emotional trends.`;
     } else {
-      systemPrompt = `You are SOULo, a supportive journaling assistant. Answer "${message}" based on the journal entries.
-Provide insights with specific examples. Be encouraging. Limit: 200 words.`;
+      systemPrompt = `You are SOULo, a supportive journaling assistant. The analysis was conducted through ${queryPlan.subQuestions.length} strategic sub-questions to provide thorough insights.`;
     }
 
-    // Format entries efficiently
-    const formattedEntries = entries.slice(0, 12).map((entry, index) => {
+    // Format results with sub-question context
+    const formattedResults = aggregatedResults.results.slice(0, 15).map((entry, index) => {
       const date = new Date(entry.created_at).toLocaleDateString('en-US', {
         month: 'short', day: 'numeric'
       });
@@ -379,27 +359,35 @@ Provide insights with specific examples. Be encouraging. Limit: 200 words.`;
       let metadata = `[${index + 1} - ${date}`;
       if (entry.emotion) metadata += ` - ${entry.emotion}`;
       if (entry.source) metadata += ` - ${entry.source}`;
+      if (entry.subQuestion) metadata += ` - Found via: "${entry.subQuestion}"`;
       metadata += `]`;
       
-      return `${metadata}\n${entry.content.substring(0, 250)}...\n`;
+      return `${metadata}\n${entry.content.substring(0, 300)}...\n`;
     }).join('\n');
 
-    const userPrompt = `Journal Entries (${entries.length} found):
-${formattedEntries}
+    // Include sub-question summary
+    const subQuestionSummary = aggregatedResults.subQuestionSummary.map(sq => 
+      `- "${sq.question}": ${sq.resultCount} results (${sq.status})`
+    ).join('\n');
 
-Question: "${message}"
+    const userPrompt = `Analysis conducted through sub-questions:
+${subQuestionSummary}
 
-Analyze based on available data and provide insights.`;
+Journal Entries Found (${aggregatedResults.results.length} total):
+${formattedResults}
 
-    // Minimal conversation context
+Original Question: "${message}"
+
+Based on the comprehensive analysis above, provide insights that directly answer the user's question. Reference specific examples from the entries and explain how the different aspects explored through the sub-questions contribute to your analysis.`;
+
     const messages = [
       { role: 'system', content: systemPrompt },
-      ...conversationContext.slice(-1), // Only last message for context
+      ...conversationContext.slice(-1),
       { role: 'user', content: userPrompt }
     ];
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // Reduced from 10s
+    const timeoutId = setTimeout(() => controller.abort(), 10000);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -410,7 +398,7 @@ Analyze based on available data and provide insights.`;
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: messages,
-        max_tokens: 500,
+        max_tokens: 600,
         temperature: 0.7,
       }),
       signal: controller.signal
@@ -419,23 +407,20 @@ Analyze based on available data and provide insights.`;
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[chat-with-rag] OpenAI API error:', errorText);
       throw new Error(`OpenAI API error: ${response.status}`);
     }
 
     const data = await response.json();
-    return data.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response based on your journal entries.';
+    return data.choices[0]?.message?.content || 'I apologize, but I was unable to generate a comprehensive response based on your journal entries.';
 
   } catch (error) {
     console.error('[chat-with-rag] Error generating response:', error);
     
-    // Return a helpful error message instead of throwing
     if (error.name === 'AbortError') {
-      return "I apologize, but the response took too long to generate. Please try rephrasing your question or try again.";
+      return "I apologize, but the response took too long to generate. The analysis found relevant information, but please try rephrasing your question for a faster response.";
     }
     
-    return "I encountered an error while analyzing your journal entries. Please try rephrasing your question or contact support if the issue persists.";
+    return "I encountered an error while analyzing your journal entries. The system successfully found relevant entries, but please try rephrasing your question or contact support if the issue persists.";
   }
 }
 
@@ -460,7 +445,7 @@ serve(async (req) => {
       userTimezone 
     } = await req.json();
 
-    console.log(`[chat-with-rag] Processing query: "${message}"`);
+    console.log(`[chat-with-rag] Processing intelligent sub-query for: "${message}"`);
 
     // Validate required parameters
     if (!message || !userId) {
@@ -473,7 +458,6 @@ serve(async (req) => {
       });
     }
 
-    // Validate OpenAI API key
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
       console.error('[chat-with-rag] CRITICAL: OpenAI API key not configured');
@@ -484,23 +468,17 @@ serve(async (req) => {
       });
     }
 
-    // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Quick entry count check with timeout
+    // Quick entry count check
     let entryCount = 0;
     try {
-      const countController = new AbortController();
-      const countTimeoutId = setTimeout(() => countController.abort(), 1000);
-      
       const { count, error: countError } = await supabase
         .from('Journal Entries')
         .select('id', { count: "exact", head: true })
         .eq('user_id', userId);
-
-      clearTimeout(countTimeoutId);
 
       if (countError) {
         console.error('[chat-with-rag] Error checking entries:', countError);
@@ -515,17 +493,13 @@ serve(async (req) => {
       }
     } catch (error) {
       console.error('[chat-with-rag] Entry count check failed:', error);
-      // Continue without count check
     }
 
     console.log(`[chat-with-rag] User has ${entryCount} journal entries available`);
 
-    // Get query embedding with reduced timeout
+    // Get query embedding
     let queryEmbedding;
     try {
-      const embeddingController = new AbortController();
-      const embeddingTimeoutId = setTimeout(() => embeddingController.abort(), 3000);
-
       const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: {
@@ -536,10 +510,7 @@ serve(async (req) => {
           input: message,
           model: 'text-embedding-3-small',
         }),
-        signal: embeddingController.signal
       });
-
-      clearTimeout(embeddingTimeoutId);
 
       if (!embeddingResponse.ok) {
         throw new Error('Failed to get query embedding');
@@ -556,18 +527,46 @@ serve(async (req) => {
       });
     }
 
-    // Execute optimized multi-strategy search
-    const relevantEntries = await executeMultiStrategySearch(
-      message,
-      userId,
-      supabase,
-      queryPlan,
-      queryEmbedding
-    );
+    // Execute intelligent sub-question planning
+    let aggregatedResults;
+    if (queryPlan.strategy === 'intelligent_sub_query' && queryPlan.subQuestions && queryPlan.subQuestions.length > 0) {
+      aggregatedResults = await executeIntelligentSubQueries(
+        message,
+        userId,
+        supabase,
+        queryPlan,
+        queryEmbedding
+      );
+    } else {
+      // Fallback to single query if no sub-questions available
+      console.log('[chat-with-rag] No sub-questions available, using fallback single query');
+      
+      const { data, error } = await supabase.rpc(
+        'match_journal_entries_fixed',
+        {
+          query_embedding: queryEmbedding,
+          match_threshold: 0.1,
+          match_count: 15,
+          user_id_filter: userId
+        }
+      );
+      
+      const fallbackResults = data ? data.map(entry => ({
+        ...entry,
+        source: 'fallback_single',
+        subQuestion: 'Direct search'
+      })) : [];
+      
+      aggregatedResults = {
+        results: fallbackResults,
+        subQuestionSummary: [{ question: 'Direct search', resultCount: fallbackResults.length, status: 'success' }],
+        totalResults: fallbackResults.length
+      };
+    }
 
-    console.log(`[chat-with-rag] Retrieved ${relevantEntries.length} relevant entries`);
+    console.log(`[chat-with-rag] Retrieved ${aggregatedResults.totalResults} total relevant entries from sub-questions`);
 
-    if (relevantEntries.length === 0) {
+    if (aggregatedResults.totalResults === 0) {
       let noDataResponse = `I couldn't find relevant journal entries for "${message}".`;
       
       if (queryPlan.isPersonalityQuery) {
@@ -583,17 +582,17 @@ serve(async (req) => {
       });
     }
 
-    // Generate optimized response
-    const response = await generateContextAwareResponse(
+    // Generate comprehensive response with sub-question context
+    const response = await generateResponseWithSubQuestionContext(
       message,
-      relevantEntries,
+      aggregatedResults,
       queryPlan,
       conversationContext,
       openAiApiKey
     );
 
     const totalTime = Date.now() - startTime;
-    console.log(`[chat-with-rag] Generated response in ${totalTime}ms, length: ${response.length}`);
+    console.log(`[chat-with-rag] Generated comprehensive response in ${totalTime}ms, length: ${response.length}`);
 
     return new Response(JSON.stringify({ data: response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
