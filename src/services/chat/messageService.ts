@@ -336,23 +336,35 @@ export async function sendMessage(
       });
       
       console.log(`[sendMessage] Enhanced debugging - chat-with-rag response:`, queryResponse);
+      console.log(`[sendMessage] Enhanced debugging - queryResponse.data:`, queryResponse.data);
+      console.log(`[sendMessage] Enhanced debugging - queryResponse.error:`, queryResponse.error);
+      
+      if (queryResponse.error) {
+        console.error('Error from chat-with-rag:', queryResponse.error);
+        throw new Error(`Chat service error: ${queryResponse.error.message || queryResponse.error}`);
+      }
       
       if (!queryResponse.data) {
         console.error('No data received from chat-with-rag:', queryResponse);
         throw new Error('Failed to get response from chat-with-rag engine');
       }
       
-      // FIX: The correct property is queryResponse.data, not queryResponse.data.data
+      // CRITICAL FIX: The backend returns { data: actualResponseString }
+      // So queryResponse.data contains the actual response string
       finalResponse = queryResponse.data;
-      
-      // Additional validation to ensure we have a string response
-      if (typeof finalResponse !== 'string') {
-        console.error('Unexpected response format from chat-with-rag:', finalResponse);
-        finalResponse = finalResponse?.response || finalResponse?.data || 'I apologize, but I encountered an error processing your request.';
-      }
       
       console.log(`[sendMessage] Enhanced debugging - Final response type: ${typeof finalResponse}`);
       console.log(`[sendMessage] Enhanced debugging - Final response preview: ${finalResponse?.substring(0, 100)}...`);
+      
+      // Validate that we got a proper string response
+      if (!finalResponse || typeof finalResponse !== 'string') {
+        console.error('Invalid response format from chat-with-rag:', {
+          responseType: typeof finalResponse,
+          responseValue: finalResponse,
+          fullQueryResponse: queryResponse
+        });
+        finalResponse = 'I apologize, but I encountered an error processing your request. Please try again.';
+      }
       
       if (isMentalHealthQuery && (!finalResponse || finalResponse.trim() === '' || finalResponse.includes("I don't have enough information"))) {
         finalResponse = "Based on the journal entries I have access to, I don't have enough information to provide specific mental health recommendations. " +
