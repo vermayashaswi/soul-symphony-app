@@ -51,8 +51,8 @@ function processTimeRange(timeRange: any): { startDate?: string; endDate?: strin
     }
     
     // Calculate current date in user's timezone
-    const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
-    console.log(`[chat-with-rag] Current date in timezone ${timezone}: ${now.toISOString()}`);
+    const now = new Date();
+    console.log(`[chat-with-rag] Current date: ${now.toISOString()}`);
     
     // Handle special time range cases
     if (timeRange.type === 'week') {
@@ -66,7 +66,7 @@ function processTimeRange(timeRange: any): { startDate?: string; endDate?: strin
       const lastWeekSunday = subDays(thisWeekMonday, 1);
       
       console.log("[chat-with-rag] LAST WEEK CALCULATION DETAILED DEBUG:");
-      console.log(`[chat-with-rag] Current date in timezone ${timezone}: ${now.toISOString()}`);
+      console.log(`[chat-with-rag] Current date: ${now.toISOString()}`);
       console.log(`[chat-with-rag] This week's Monday: ${thisWeekMonday.toISOString()}`);
       console.log(`[chat-with-rag] Last week's Monday: ${lastWeekMonday.toISOString()}`);
       console.log(`[chat-with-rag] Last week's Sunday: ${lastWeekSunday.toISOString()}`);
@@ -114,7 +114,7 @@ function processTimeRange(timeRange: any): { startDate?: string; endDate?: strin
  * Process a specific month by name
  */
 function processSpecificMonthByName(monthName: string, result: { startDate?: string; endDate?: string }, year?: number, timezone?: string) {
-  const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
+  const now = new Date();
   const currentYear = now.getFullYear();
   const targetYear = year || currentYear;
   
@@ -177,7 +177,7 @@ function getLastWeekDates(clientTimeInfo?: any, userTimezone?: string): { startD
   console.log(`[chat-with-rag] Using reference time: ${referenceTime.toISOString()}`);
   
   // Convert to user's timezone if provided
-  const now = timezone !== 'UTC' ? toZonedTime(referenceTime, timezone) : referenceTime;
+  const now = referenceTime;
   
   // Get this week's Monday (start of current week) - week starts on Monday (1)
   const currentDay = now.getDay();
@@ -221,7 +221,7 @@ function getCurrentWeekDates(clientTimeInfo?: any, userTimezone?: string): { sta
   
   // Get reference time (prefer client's time over server time)
   const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
-  const now = timezone !== 'UTC' ? toZonedTime(referenceTime, timezone) : referenceTime;
+  const now = referenceTime;
   
   // Get this week's Monday (start of current week)
   const currentDay = now.getDay();

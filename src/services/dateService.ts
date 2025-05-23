@@ -1,462 +1,326 @@
 
-/**
- * Unified Date Service
- * 
- * This service provides a single source of truth for all date-related operations
- * in the application. It handles timezone conversions, date calculations, and
- * formatting consistently across both client and server environments.
- */
-
-import { 
-  addDays, 
-  subDays, 
-  startOfWeek, 
-  endOfWeek, 
-  startOfMonth, 
-  endOfMonth, 
-  startOfDay, 
-  endOfDay,
-  format as formatDate,
-  isValid
-} from "date-fns";
-import { formatInTimeZone, toZonedTime } from "date-fns-tz";
+import { format, getDay, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, addDays, subMonths, isAfter, isBefore, subDays } from 'date-fns';
+import { formatInTimeZone as fnsFormatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 /**
- * Client time information structure
+ * Get client's timezone information
  */
-export interface ClientTimeInfo {
-  timestamp: string;      // ISO timestamp from client device
-  timezoneName: string;   // IANA timezone name (e.g., "America/New_York")
-  timezoneOffset: number; // Timezone offset in minutes
-}
-
-/**
- * Date range response structure
- */
-export interface DateRange {
-  startDate: string;   // ISO start date
-  endDate: string;     // ISO end date
-  periodName: string;  // Human-readable period name
-}
-
-/**
- * Gets the current client time information
- * @returns ClientTimeInfo object with current client time details
- */
-export function getClientTimeInfo(): ClientTimeInfo {
-  return {
-    timestamp: new Date().toISOString(),
-    timezoneName: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC',
-    timezoneOffset: new Date().getTimezoneOffset()
-  };
-}
-
-/**
- * Logs detailed information about a date calculation
- * @param operation - The operation being performed
- * @param input - Input date or parameters
- * @param output - Result of the operation
- * @param additionalInfo - Any additional context
- */
-export function logDateOperation(
-  operation: string,
-  input: any,
-  output: any,
-  additionalInfo: Record<string, any> = {}
-): void {
-  console.log(
-    `[DateService] ${operation}:`,
-    {
-      input,
-      output,
-      currentServerTime: new Date().toISOString(),
-      ...additionalInfo
-    }
-  );
-}
-
-/**
- * Gets a specific timezone-aware date
- * @param date - Date to convert (defaults to now)
- * @param timezone - Target timezone (defaults to UTC)
- * @returns Date object in the specified timezone
- */
-export function getZonedDate(
-  date: Date | string = new Date(),
-  timezone: string = 'UTC'
-): Date {
-  const dateObj = typeof date === 'string' ? new Date(date) : date;
-  
-  // Log the conversion for debugging
-  console.log(`[DateService] Converting date to timezone ${timezone}:`, {
-    inputDate: dateObj.toISOString(),
-    inputTimezone: timezone
-  });
-  
+export function getClientTimeInfo() {
   try {
-    // Use toZonedTime correctly (date-fns-tz v3 api)
-    const zonedDate = toZonedTime(dateObj, timezone);
+    const now = new Date();
+    const timezoneOffset = now.getTimezoneOffset();
+    const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
     
-    console.log(`[DateService] Date converted to timezone:`, {
-      outputDate: zonedDate.toISOString(),
-      localString: zonedDate.toString(),
-      timezoneUsed: timezone
-    });
-    
-    return zonedDate;
+    return {
+      timestamp: now.toISOString(),
+      timezoneOffset,
+      timezoneName,
+      rawOffset: -timezoneOffset * 60 * 1000 // Convert minutes to milliseconds
+    };
   } catch (error) {
-    console.error(`[DateService] Error converting date to timezone ${timezone}:`, error);
-    // Fallback to original date
-    return dateObj;
+    console.error("Error getting client timezone info:", error);
+    return {
+      timestamp: new Date().toISOString(),
+      timezoneOffset: 0,
+      timezoneName: "UTC",
+      rawOffset: 0
+    };
   }
 }
+
+/**
+ * Get user's timezone offset in minutes
+ */
+export const getUserTimezoneOffset = (): number => {
+  try {
+    return new Date().getTimezoneOffset();
+  } catch (error) {
+    console.error("Error getting timezone offset:", error);
+    return 0; // Default to UTC
+  }
+};
+
+/**
+ * Get user's timezone name
+ */
+export const getUserTimezoneName = (): string => {
+  try {
+    return Intl.DateTimeFormat().resolvedOptions().timeZone;
+  } catch (error) {
+    console.error("Error getting timezone name:", error);
+    return "UTC"; // Default to UTC
+  }
+};
 
 /**
  * Format a date in a specific timezone
- * @param date - Date to format
- * @param formatStr - Format string
- * @param timezone - Target timezone
- * @returns Formatted date string
  */
-export function formatInTimezone(
-  date: Date | string,
-  formatStr: string = 'yyyy-MM-dd HH:mm:ss',
-  timezone: string = 'UTC'
-): string {
-  if (!date) {
-    console.error('[DateService] Null or undefined date provided to formatInTimezone');
-    return 'Invalid Date';
-  }
-
+export function formatInTimezone(date: Date | string, format: string, timezone: string = 'UTC'): string {
   try {
     const dateObj = typeof date === 'string' ? new Date(date) : date;
-    
-    // Check if date is valid before formatting
-    if (!isValid(dateObj)) {
-      console.error('[DateService] Invalid date provided to formatInTimezone:', date);
-      return 'Invalid Date';
-    }
-    
-    // Log the formatting operation
-    console.log(`[DateService] Formatting date in timezone ${timezone}:`, {
-      inputDate: dateObj.toISOString(),
-      formatString: formatStr
-    });
-    
-    const result = formatInTimeZone(dateObj, timezone, formatStr);
-    
-    console.log(`[DateService] Formatted date result:`, {
-      formattedDate: result
-    });
-    
-    return result;
+    return fnsFormatInTimeZone(dateObj, timezone, format);
   } catch (error) {
-    console.error('[DateService] Error in formatInTimezone:', error);
-    return 'Invalid Date';
+    console.error("Error formatting date in timezone:", error);
+    return format;
   }
 }
 
 /**
- * Gets the dates for the current week in a specific timezone
- * @param clientTimeInfo - Client time information
- * @param userTimezone - User's preferred timezone from their profile (fallback)
- * @returns Formatted string with the current week's date range
+ * Debug helper for timezone issues
  */
-export function getCurrentWeekDateRange(
-  clientTimeInfo?: Partial<ClientTimeInfo>,
-  userTimezone?: string
-): { formattedRange: string; rangeObj: DateRange } {
-  // Determine the most appropriate timezone to use
-  const timezone = (clientTimeInfo?.timezoneName || userTimezone || getUserTimezoneName() || 'UTC');
+export function debugTimezoneInfo() {
+  const now = new Date();
+  const tzOffset = now.getTimezoneOffset();
+  const tzName = Intl.DateTimeFormat().resolvedOptions().timeZone;
   
-  // Get reference time (prefer client's time over server time)
-  const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
+  console.log("Date/Time Debugging Information:");
+  console.log(`Current time: ${now.toISOString()}`);
+  console.log(`Local time string: ${now.toString()}`);
+  console.log(`Timezone offset: ${tzOffset} minutes`);
+  console.log(`Timezone name: ${tzName}`);
   
-  console.log(`[DateService] Getting current week dates for timezone: ${timezone}`);
-  console.log(`[DateService] Using reference time: ${referenceTime.toISOString()}`);
+  const formatted = format(now, 'yyyy-MM-dd HH:mm:ss');
+  console.log(`Formatted local time: ${formatted}`);
   
-  // Get the current date in the user's timezone
-  const zonedNow = getZonedDate(referenceTime, timezone);
+  // Calculate week days
+  const today = new Date();
+  const currentDay = today.getDay(); // 0 = Sunday, 1 = Monday, ...
+  const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
+  const mondayDate = new Date(today);
+  mondayDate.setDate(today.getDate() - daysFromMonday);
   
-  // Get the start of the week (Monday) and end of the week (Sunday)
-  const startOfCurrentWeek = startOfWeek(zonedNow, { weekStartsOn: 1 });
-  const endOfCurrentWeek = endOfWeek(zonedNow, { weekStartsOn: 1 });
+  console.log(`Today is day ${currentDay} of week (0=Sunday, 1=Monday)`);
+  console.log(`Days from Monday: ${daysFromMonday}`);
+  console.log(`This week's Monday: ${mondayDate.toDateString()}`);
   
-  // Log detailed information
-  console.log(`[DateService] Current date in timezone (${timezone}): ${formatDate(zonedNow, 'yyyy-MM-dd HH:mm:ss')}`);
-  console.log(`[DateService] Start of current week: ${formatDate(startOfCurrentWeek, 'yyyy-MM-dd')} (${startOfCurrentWeek.toISOString()})`);
-  console.log(`[DateService] End of current week: ${formatDate(endOfCurrentWeek, 'yyyy-MM-dd')} (${endOfCurrentWeek.toISOString()})`);
+  // Last week calculation
+  const lastWeekMonday = new Date(mondayDate);
+  lastWeekMonday.setDate(mondayDate.getDate() - 7);
+  const lastWeekSunday = new Date(mondayDate);
+  lastWeekSunday.setDate(mondayDate.getDate() - 1);
   
-  // Format the dates in a user-friendly way
-  const formattedStart = formatDate(startOfCurrentWeek, 'MMMM d');
-  const formattedEnd = formatDate(endOfCurrentWeek, 'MMMM d, yyyy');
-  const formattedRange = `${formattedStart} to ${formattedEnd}`;
-
-  // Create date range object with ISO strings for exact calculations
-  const rangeObj: DateRange = {
-    startDate: startOfCurrentWeek.toISOString(),
-    endDate: endOfCurrentWeek.toISOString(),
-    periodName: 'this week'
+  console.log(`Last week's Monday: ${lastWeekMonday.toDateString()}`);
+  console.log(`Last week's Sunday: ${lastWeekSunday.toDateString()}`);
+  
+  return {
+    now,
+    tzOffset,
+    tzName,
+    formatted,
+    thisWeekMonday: mondayDate,
+    lastWeekMonday,
+    lastWeekSunday
   };
-  
-  console.log(`[DateService] Formatted current week: ${formattedRange}`);
-  
-  return { formattedRange, rangeObj };
 }
 
 /**
- * Gets the dates for the last week in a specific timezone
- * 
- * "Last week" is defined as the previous calendar week (Monday-Sunday)
- * 
- * @param clientTimeInfo - Client time information
- * @param userTimezone - User's preferred timezone from their profile (fallback)
- * @returns Formatted string with the last week's date range and range object
+ * Get the date range for last week with proper formatting
  */
 export function getLastWeekDateRange(
-  clientTimeInfo?: Partial<ClientTimeInfo>,
+  clientTimeInfo?: { timezoneName?: string; timestamp?: string },
   userTimezone?: string
-): { formattedRange: string; rangeObj: DateRange } {
-  // Determine the most appropriate timezone to use
-  const timezone = (clientTimeInfo?.timezoneName || userTimezone || getUserTimezoneName() || 'UTC');
+): { 
+  startDate: string; 
+  endDate: string; 
+  formattedRange: string;
+} {
+  console.log(`Getting last week date range with timezone: ${userTimezone || clientTimeInfo?.timezoneName || 'UTC'}`);
   
-  // Get reference time (prefer client's time over server time)
-  const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
+  // Get current reference time (use client time if provided)
+  const referenceDate = clientTimeInfo?.timestamp 
+    ? parseISO(clientTimeInfo.timestamp)
+    : new Date();
+    
+  console.log(`Reference date for last week calculation: ${referenceDate.toISOString()}`);
+    
+  // Get the current day of the week (0 = Sunday, 1 = Monday, ...)
+  const currentDay = getDay(referenceDate);
   
-  console.log(`[DateService] Getting last week dates for timezone: ${timezone}`);
-  console.log(`[DateService] Using reference time: ${referenceTime.toISOString()}`);
+  // Calculate days from Monday (if today is Sunday, it's 6 days from last Monday)
+  const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
   
-  // Get the current date in the user's timezone
-  const zonedNow = getZonedDate(referenceTime, timezone);
+  // Get this week's Monday
+  const thisWeekMonday = startOfDay(
+    subDays(referenceDate, daysFromMonday)
+  );
   
-  // Get this week's Monday (start of current week)
-  const thisWeekMonday = startOfWeek(zonedNow, { weekStartsOn: 1 });
+  // Calculate last week's Monday and Sunday
+  const lastWeekMonday = subDays(thisWeekMonday, 7);
+  const lastWeekSunday = subDays(thisWeekMonday, 1);
   
-  // Last week's Monday is 7 days before this week's Monday
-  const lastWeekMonday = startOfDay(subDays(thisWeekMonday, 7));
+  // Format the date range for display
+  const startFormatted = format(lastWeekMonday, 'MMMM d');
+  const endFormatted = format(lastWeekSunday, 'MMMM d, yyyy');
+  const formattedRange = `${startFormatted} to ${endFormatted}`;
   
-  // Last week's Sunday is 1 day before this week's Monday
-  const lastWeekSunday = endOfDay(subDays(thisWeekMonday, 1));
+  console.log(`Calculated last week range: ${formattedRange}`);
+  console.log(`Last week start: ${lastWeekMonday.toISOString()}`);
+  console.log(`Last week end: ${lastWeekSunday.toISOString()}`);
   
-  // COMPREHENSIVE LOG for debugging the last week calculation
-  console.log("========== LAST WEEK CALCULATION DEBUG ==========");
-  console.log(`Input reference time (raw): ${referenceTime}`);
-  console.log(`Input reference time (ISO): ${referenceTime.toISOString()}`);
-  console.log(`Timezone being used: ${timezone}`);
-  console.log(`Current date in timezone: ${zonedNow.toString()} (${zonedNow.toISOString()})`);
-  console.log(`This week's Monday: ${thisWeekMonday.toString()} (${thisWeekMonday.toISOString()})`);
-  console.log(`Last week's Monday: ${lastWeekMonday.toString()} (${lastWeekMonday.toISOString()})`);
-  console.log(`Last week's Sunday: ${lastWeekSunday.toString()} (${lastWeekSunday.toISOString()})`);
-  console.log("===============================================");
-  
-  // Format the dates in a user-friendly way
-  const formattedStart = formatDate(lastWeekMonday, 'MMMM d');
-  const formattedEnd = formatDate(lastWeekSunday, 'MMMM d, yyyy');
-  const formattedRange = `${formattedStart} to ${formattedEnd}`;
-  
-  // Create date range object with ISO strings for exact calculations
-  const rangeObj: DateRange = {
+  return {
     startDate: lastWeekMonday.toISOString(),
-    endDate: lastWeekSunday.toISOString(),
-    periodName: 'last week'
+    endDate: endOfDay(lastWeekSunday).toISOString(),
+    formattedRange
   };
-  
-  console.log(`[DateService] Formatted last week: ${formattedRange}`);
-  console.log(`[DateService] Last week date range:`, {
-    startDateISO: lastWeekMonday.toISOString(),
-    endDateISO: lastWeekSunday.toISOString(),
-    startDateLocal: lastWeekMonday.toString(),
-    endDateLocal: lastWeekSunday.toString(),
-    timezone: timezone
-  });
-  
-  return { formattedRange, rangeObj };
 }
 
 /**
- * Calculates a date range based on a time period expression
- * @param timePeriod - Time period expression (e.g., "last week", "this month")
- * @param clientTimeInfo - Client time information 
- * @param userTimezone - User's timezone from their profile
- * @returns Date range with start and end dates
+ * Get the date range for current week with proper formatting
+ */
+export function getCurrentWeekDateRange(
+  clientTimeInfo?: { timezoneName?: string; timestamp?: string },
+  userTimezone?: string
+): {
+  startDate: string;
+  endDate: string;
+  formattedRange: string;
+} {
+  // Get current reference time (use client time if provided)
+  const referenceDate = clientTimeInfo?.timestamp 
+    ? parseISO(clientTimeInfo.timestamp)
+    : new Date();
+  
+  // Get the current day of the week (0 = Sunday, 1 = Monday, ...)
+  const currentDay = getDay(referenceDate);
+  
+  // Calculate days from Monday
+  const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
+  
+  // Get this week's Monday
+  const thisWeekMonday = startOfDay(
+    subDays(referenceDate, daysFromMonday)
+  );
+  
+  // Get this week's Sunday
+  const thisWeekSunday = addDays(thisWeekMonday, 6);
+  
+  // Format the date range for display
+  const startFormatted = format(thisWeekMonday, 'MMMM d');
+  const endFormatted = format(thisWeekSunday, 'MMMM d, yyyy');
+  const formattedRange = `${startFormatted} to ${endFormatted}`;
+  
+  return {
+    startDate: thisWeekMonday.toISOString(),
+    endDate: endOfDay(thisWeekSunday).toISOString(),
+    formattedRange
+  };
+}
+
+/**
+ * Calculate date range based on time period expression
  */
 export function calculateDateRange(
   timePeriod: string,
-  clientTimeInfo?: Partial<ClientTimeInfo>,
+  clientTimeInfo?: { timezoneName?: string; timestamp?: string; timezoneOffset?: number },
   userTimezone?: string
-): DateRange {
-  // Determine timezone to use (in order of priority)
-  const timezone = clientTimeInfo?.timezoneName || userTimezone || getUserTimezoneName() || 'UTC';
-  
-  // Get reference time (prefer client time over server time)
-  const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
-  
-  console.log(`[DateService] Calculating date range for "${timePeriod}" with timezone ${timezone}`);
-  console.log(`[DateService] Using reference time: ${referenceTime.toISOString()}`);
-  
-  // Get the date in the user's timezone
-  const zonedDate = getZonedDate(referenceTime, timezone);
-  console.log(`[DateService] Reference date in timezone: ${formatDate(zonedDate, 'yyyy-MM-dd HH:mm:ss')}`);
-  
-  let startDate: Date;
-  let endDate: Date;
-  let periodName = timePeriod;
-  
-  // Normalize time period for better matching
-  const lowerTimePeriod = timePeriod.toLowerCase().trim();
-  
-  // Special case handling for "last week" to ensure consistent behavior
-  if (lowerTimePeriod === 'last week') {
-    const lastWeek = getLastWeekDateRange({ timestamp: referenceTime.toISOString(), timezoneName: timezone }, userTimezone);
-    return lastWeek.rangeObj;
-  }
-  
-  // Special case handling for "this week" to ensure consistent behavior
-  if (lowerTimePeriod === 'this week') {
-    const currentWeek = getCurrentWeekDateRange({ timestamp: referenceTime.toISOString(), timezoneName: timezone }, userTimezone);
-    return currentWeek.rangeObj;
-  }
-  
-  // Handle other common time periods
-  if (lowerTimePeriod === 'today') {
-    startDate = startOfDay(zonedDate);
-    endDate = endOfDay(zonedDate);
-    periodName = 'today';
-  } 
-  else if (lowerTimePeriod === 'yesterday') {
-    startDate = startOfDay(subDays(zonedDate, 1));
-    endDate = endOfDay(subDays(zonedDate, 1));
-    periodName = 'yesterday';
-  }
-  else if (lowerTimePeriod === 'this month') {
-    startDate = startOfMonth(zonedDate);
-    endDate = endOfMonth(zonedDate);
-    periodName = 'this month';
-  }
-  else if (lowerTimePeriod === 'last month') {
-    const prevMonth = subDays(startOfMonth(zonedDate), 1);
-    startDate = startOfMonth(prevMonth);
-    endDate = endOfMonth(prevMonth);
-    periodName = 'last month';
-  }
-  else if (lowerTimePeriod.match(/last (\d+) days?/)) {
-    const matches = lowerTimePeriod.match(/last (\d+) days?/);
-    const days = parseInt(matches![1], 10) || 7;
-    startDate = startOfDay(subDays(zonedDate, days));
-    endDate = endOfDay(zonedDate);
-    periodName = `last ${days} days`;
-  }
-  else {
-    // Default to last 7 days if no specific period matched
-    startDate = startOfDay(subDays(zonedDate, 7));
-    endDate = endOfDay(zonedDate);
-    periodName = 'last 7 days';
-  }
-  
-  // Log the calculated dates
-  console.log(`[DateService] Period: ${periodName}`);
-  console.log(`[DateService] Start date: ${formatDate(startDate, 'yyyy-MM-dd HH:mm:ss')} (${startDate.toISOString()})`);
-  console.log(`[DateService] End date: ${formatDate(endDate, 'yyyy-MM-dd HH:mm:ss')} (${endDate.toISOString()})`);
-  
-  return {
-    startDate: startDate.toISOString(),
-    endDate: endDate.toISOString(),
-    periodName
-  };
-}
-
-/**
- * Gets the user's current timezone offset in minutes
- */
-export function getUserTimezoneOffset(): number {
-  return new Date().getTimezoneOffset();
-}
-
-/**
- * Gets the user's timezone name
- */
-export function getUserTimezoneName(): string | undefined {
+): {
+  startDate: string;
+  endDate: string;
+  periodName: string;
+} {
   try {
-    const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    console.log(`[DateService] Detected user timezone: ${timezoneName}`);
-    return timezoneName;
-  } catch (e) {
-    console.error("[DateService] Unable to get user timezone name:", e);
-    return undefined;
+    console.log(`Calculating date range for time period: "${timePeriod}"`);
+    
+    // Use provided timestamp or current time
+    const referenceTime = clientTimeInfo?.timestamp 
+      ? new Date(clientTimeInfo.timestamp) 
+      : new Date();
+      
+    // Clean up time period text for matching
+    const cleanTimePeriod = timePeriod.toLowerCase().trim();
+    
+    // Simple cases first
+    if (cleanTimePeriod.includes('today')) {
+      const today = startOfDay(referenceTime);
+      return {
+        startDate: today.toISOString(),
+        endDate: endOfDay(today).toISOString(),
+        periodName: 'today'
+      };
+    }
+    
+    if (cleanTimePeriod.includes('yesterday')) {
+      const yesterday = startOfDay(subDays(referenceTime, 1));
+      return {
+        startDate: yesterday.toISOString(),
+        endDate: endOfDay(yesterday).toISOString(),
+        periodName: 'yesterday'
+      };
+    }
+    
+    // This week
+    if (cleanTimePeriod.includes('this week')) {
+      const weekData = getCurrentWeekDateRange(clientTimeInfo, userTimezone);
+      return {
+        startDate: weekData.startDate,
+        endDate: weekData.endDate,
+        periodName: 'this week'
+      };
+    }
+    
+    // Last week
+    if (cleanTimePeriod.includes('last week')) {
+      const weekData = getLastWeekDateRange(clientTimeInfo, userTimezone);
+      return {
+        startDate: weekData.startDate,
+        endDate: weekData.endDate,
+        periodName: 'last week'
+      };
+    }
+    
+    // This month
+    if (cleanTimePeriod.includes('this month')) {
+      const thisMonth = startOfMonth(referenceTime);
+      return {
+        startDate: thisMonth.toISOString(),
+        endDate: endOfMonth(referenceTime).toISOString(),
+        periodName: 'this month'
+      };
+    }
+    
+    // Last month
+    if (cleanTimePeriod.includes('last month')) {
+      const lastMonth = startOfMonth(subMonths(referenceTime, 1));
+      return {
+        startDate: lastMonth.toISOString(),
+        endDate: endOfMonth(subMonths(referenceTime, 1)).toISOString(),
+        periodName: 'last month'
+      };
+    }
+    
+    // Default to all time
+    return {
+      startDate: '',
+      endDate: '',
+      periodName: 'all time'
+    };
+  } catch (error) {
+    console.error("Error calculating date range:", error);
+    
+    // Default to all time on error
+    return {
+      startDate: '',
+      endDate: '',
+      periodName: 'all time'
+    };
   }
 }
 
 /**
- * Check if a query is asking about dates like "what day is today" or "what's the current week"
- * @param message - User's query
- * @returns boolean indicating if this is a direct date query
+ * Check if a date query can be answered directly without searching journal entries
  */
-export function isDirectDateQuery(message: string): boolean {
-  const lowerQuery = message.toLowerCase();
+export function isDirectDateQuery(query: string): boolean {
+  if (!query) return false;
   
-  // Patterns for direct date inquiries
-  const dateQueryPatterns = [
-    /\bwhat\s+(is|are)\s+(the\s+)?(current|this)\s+week('s)?\s+dates\b/i,
-    /\bwhat\s+date\s+is\s+it\b/i,
-    /\bwhat\s+day\s+is\s+(it|today)\b/i,
-    /\bwhat\s+(is|are)\s+(the\s+)?dates?\s+for\s+(this|current|last|previous)\s+week\b/i,
-    /\bcurrent\s+week\s+dates?\b/i,
-    /\blast\s+week\s+dates?\b/i,
-    /\blast\s+week('s)?\s+dates?\b/i,
-    /\bthis\s+week('s)?\s+dates?\b/i, 
-    /\bwhat\s+dates?\s+(is|are)\s+(this|last)\s+week\b/i,
-    /\btoday's\s+date\b/i
+  const lowerQuery = query.toLowerCase().trim();
+  
+  // Direct date queries that can be answered without journal searching
+  const patterns = [
+    /^what\s+(dates?|days?|time)\s+(are|is|was|were)\s+(the|this|last)\s+(current|week|month|year)/i,
+    /^when\s+(is|was)\s+(the|this|last)\s+(week|month|year)/i,
+    /^(what is|what are) the dates? (for|of) (the |this |last )?(current |ongoing )?(week|month|year)/i,
+    /^(tell me|show me) (the dates? for|when is) (the |this |last )?(current |ongoing )?(week|month|year)/i
   ];
   
-  // Check if any of the patterns match
-  for (const pattern of dateQueryPatterns) {
-    if (pattern.test(lowerQuery)) {
-      console.log(`[DateService] Direct date query detected with pattern: ${pattern}`);
-      return true;
-    }
-  }
-  
-  console.log("[DateService] Not a direct date query");
-  return false;
-}
-
-/**
- * Debug helper that logs detailed timezone information
- */
-export function debugTimezoneInfo(): void {
-  const offset = getUserTimezoneOffset();
-  const timezoneName = getUserTimezoneName();
-  const now = new Date();
-  
-  console.log("[DateService] Timezone Debug Information:");
-  console.log(`[DateService] Current date (local): ${now.toString()}`);
-  console.log(`[DateService] Current date (ISO): ${now.toISOString()}`);
-  console.log(`[DateService] Timezone offset: ${offset} minutes`);
-  console.log(`[DateService] Timezone name: ${timezoneName || "unknown"}`);
-  
-  // Test date calculations
-  console.log("\n[DateService] Date Calculation Tests:");
-  
-  // Test "current week" calculation
-  const currentWeek = getCurrentWeekDateRange();
-  console.log(`[DateService] Current week dates: ${currentWeek.formattedRange}`);
-  
-  // Test "last week" calculation
-  const lastWeek = getLastWeekDateRange();
-  console.log(`[DateService] Last week dates: ${lastWeek.formattedRange}`);
-  
-  // Test timezone conversions
-  if (timezoneName) {
-    const nowInUserTz = getZonedDate(now, timezoneName);
-    console.log(`[DateService] Current date in user timezone (${timezoneName}):`, nowInUserTz.toString());
-    
-    // Test some specific dates with known timezone effects
-    const winterDate = new Date('2023-01-15T12:00:00Z');
-    const summerDate = new Date('2023-07-15T12:00:00Z');
-    
-    console.log(`[DateService] January date in user timezone:`, 
-      getZonedDate(winterDate, timezoneName).toString());
-    console.log(`[DateService] July date in user timezone:`, 
-      getZonedDate(summerDate, timezoneName).toString());
-  }
+  return patterns.some(pattern => pattern.test(lowerQuery));
 }

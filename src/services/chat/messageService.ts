@@ -157,7 +157,7 @@ export async function sendMessage(
     });
     
     // Check if we have a direct response that doesn't need further processing
-    if (queryPlanResponse.data.directResponse) {
+    if (queryPlanResponse.data?.directResponse) {
       await supabase.from('chat_messages')
         .update({
           content: queryPlanResponse.data.directResponse,
@@ -183,8 +183,8 @@ export async function sendMessage(
     }
     
     // Extract the query plan from the response
-    const queryPlan = queryPlanResponse.data.plan || {};
-    const queryType = queryPlanResponse.data.queryType || 'journal_specific';
+    const queryPlan = queryPlanResponse.data?.plan || queryPlanResponse.data?.queryPlan || {};
+    const queryType = queryPlanResponse.data?.queryType || 'journal_specific';
     
     console.log('[sendMessage] Enhanced debugging - Query plan received:', JSON.stringify(queryPlan, null, 2));
     console.log(`[sendMessage] Enhanced debugging - Query type: ${queryType}`);
@@ -250,7 +250,7 @@ export async function sendMessage(
     
     // Get the appropriate date range from the query plan or use defaults
     let dateRange = timeRange;
-    if (!dateRange && queryPlan.filters?.date_range) {
+    if (!dateRange && queryPlan?.filters?.date_range) {
       dateRange = queryPlan.filters.date_range;
     }
     
@@ -320,28 +320,40 @@ export async function sendMessage(
       finalResponse = queryResponse.response;
     } else {
       // Standard query processing - ONLY use chat-with-rag
-      const queryResponse = await supabase.functions.invoke('chat-with-rag', {
-        body: {
-          message,
-          userId,
-          threadId,
-          timeRange: dateRange,
-          referenceDate,
-          conversationContext,
-          queryPlan,
-          isMentalHealthQuery,
-          clientTimeInfo: clientTimeInfo,
-          userTimezone: userTimezone
+      try {
+        const queryResponse = await supabase.functions.invoke('chat-with-rag', {
+          body: {
+            message,
+            userId,
+            threadId,
+            timeRange: dateRange,
+            referenceDate,
+            conversationContext,
+            queryPlan,
+            isMentalHealthQuery,
+            clientTimeInfo: clientTimeInfo,
+            userTimezone: userTimezone
+          }
+        });
+        
+        console.log(`[sendMessage] Enhanced debugging - chat-with-rag response:`, queryResponse);
+        
+        if (!queryResponse.data) {
+          throw new Error('Failed to get response from chat-with-rag engine');
         }
-      });
-      
-      console.log(`[sendMessage] Enhanced debugging - chat-with-rag response:`, queryResponse);
-      
-      if (!queryResponse.data) {
-        throw new Error('Failed to get response from chat-with-rag engine');
+        
+        // Handle both response formats for backward compatibility
+        finalResponse = queryResponse.data.data || queryResponse.data.response;
+        
+        // Ensure we have a response
+        if (!finalResponse || typeof finalResponse !== 'string') {
+          console.error('[sendMessage] Invalid response format from chat-with-rag:', queryResponse.data);
+          throw new Error('Invalid response format received from chat engine');
+        }
+      } catch (error) {
+        console.error('[sendMessage] Error in chat-with-rag function:', error);
+        throw error;
       }
-      
-      finalResponse = queryResponse.data.data;
       
       if (isMentalHealthQuery && (!finalResponse || finalResponse.trim() === '' || finalResponse.includes("I don't have enough information"))) {
         finalResponse = "Based on the journal entries I have access to, I don't have enough information to provide specific mental health recommendations. " +

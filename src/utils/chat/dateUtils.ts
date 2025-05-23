@@ -179,7 +179,7 @@ export function isRelativeTimeQuery(query: string): boolean {
     }
   }
   
-  if (/^(today|yesterday|this week|last week|this month|last month|this year|last year)(\?|\.|$)/i.test(lowerQuery)) {
+  if (/^(today|yesterday|this week|last week|this month|last month|this year|last year)(\?|\.)?$/i.test(lowerQuery)) {
     console.log(`[dateUtils] Enhanced debugging - Detected standalone time period query: ${lowerQuery}`);
     return true;
   }

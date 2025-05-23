@@ -33,7 +33,7 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { processChatMessage } from "@/services/chatService";
+import { sendMessage } from '@/services/chat/messageService';
 import {
   AlertDialog,
   AlertDialogAction,
@@ -300,7 +300,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         debugLog.addEvent("Query Enhancement", "Forcing personal context for mental health or personality question", "info");
       }
       
-      const response = await processChatMessage(
+      const response = await sendMessage(
         message, 
         user.id, 
         queryTypes, 

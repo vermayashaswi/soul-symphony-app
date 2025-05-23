@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
@@ -5,12 +6,8 @@ import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
 import { supabase } from '@/integrations/supabase/client';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { ConversationStateManager } from '@/utils/chat/conversationStateManager';
-import { extractConversationInsights } from '@/utils/chat/messageProcessor';
-import { ChatMessage } from '@/types/chat';
 import { debugTimezoneInfo, getCurrentWeekDates } from '@/utils/chat/dateUtils';
 import { format } from 'date-fns';
-import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -43,10 +40,6 @@ const Chat = () => {
     try {
       const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
       console.log(`Browser timezone: ${timeZone}`);
-      
-      // Format date in detected timezone
-      const zonedDate = toZonedTime(now, timeZone);
-      console.log(`Date in ${timeZone}: ${format(zonedDate, 'yyyy-MM-dd HH:mm:ss')}`);
     } catch (e) {
       console.error("Error getting timezone:", e);
     }
@@ -206,44 +199,23 @@ const Chat = () => {
             let timeContext = null;
             
             if (messages && messages.length > 0) {
-              // Convert to proper ChatMessage type before passing to extractConversationInsights
-              const typedMessages: ChatMessage[] = messages.map(msg => ({
-                id: msg.id,
-                thread_id: msg.thread_id,
-                content: msg.content,
-                sender: msg.sender as 'user' | 'assistant' | 'error',
-                role: msg.sender as 'user' | 'assistant' | 'error',
-                created_at: msg.created_at
-              }));
-              
-              // Try to extract insights from messages
-              const insights = extractConversationInsights(typedMessages);
-              
-              if (insights.topics.length > 0) {
-                topicContext = insights.topics[0];
-              }
-              
-              if (insights.timeReferences.length > 0) {
-                timeContext = insights.timeReferences[0];
-              }
+              // Add empty metadata structure
+              await supabase
+                .from('chat_threads')
+                .update({
+                  metadata: {
+                    timeContext,
+                    topicContext,
+                    intentType: 'new_query',
+                    confidenceScore: 1.0,
+                    needsClarity: false,
+                    ambiguities: [],
+                    lastQueryType: 'journal_specific',
+                    lastUpdated: new Date().toISOString()
+                  }
+                })
+                .eq('id', thread.id);
             }
-            
-            // Initialize with default metadata
-            await supabase
-              .from('chat_threads')
-              .update({
-                metadata: {
-                  timeContext,
-                  topicContext,
-                  intentType: 'new_query',
-                  confidenceScore: 1.0,
-                  needsClarity: false,
-                  ambiguities: [],
-                  lastQueryType: 'journal_specific',
-                  lastUpdated: new Date().toISOString()
-                }
-              })
-              .eq('id', thread.id);
           }
         }
         
