@@ -6,8 +6,8 @@ import {
   getClientTimeInfo, 
   getLastWeekDateRange, 
   getCurrentWeekDateRange, 
-  debugTimezoneInfo,
-  ClientTimeInfo
+  debugTimezoneInfo, 
+  ClientTimeInfo 
 } from '@/services/dateService';
 
 /**
@@ -108,13 +108,13 @@ export async function planQuery(message: string, threadId: string, userId: strin
         // Get last week dates using the client's time information and user timezone
         const lastWeekResult = getLastWeekDateRange(clientInfo, userTimezone);
         dateResponse = lastWeekResult.formattedRange;
-        dateRange = { startDate: lastWeekResult.startDate, endDate: lastWeekResult.endDate };
+        dateRange = lastWeekResult.rangeObj;
         console.log(`[Query Planner] Last week dates calculated: ${dateResponse}`);
       } else {
         // Get current week dates using the client's time information and user timezone
         const currentWeekResult = getCurrentWeekDateRange(clientInfo, userTimezone);
         dateResponse = currentWeekResult.formattedRange;
-        dateRange = { startDate: currentWeekResult.startDate, endDate: currentWeekResult.endDate };
+        dateRange = currentWeekResult.rangeObj;
         console.log(`[Query Planner] Current week dates calculated: ${dateResponse}`);
       }
       

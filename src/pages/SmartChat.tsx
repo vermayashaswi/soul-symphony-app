@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import { SmartChatInterface } from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -388,7 +389,13 @@ export default function SmartChat() {
         className="smart-chat-container flex-1 flex flex-col"
       >
         <div className="flex-1 flex flex-col">
-          <MobileChatInterface />
+          <MobileChatInterface 
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={createNewThread}
+            userId={user?.id}
+            mentalHealthInsights={mentalHealthInsights}
+          />
         </div>
       </motion.div>
     </div>

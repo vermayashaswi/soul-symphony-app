@@ -33,7 +33,7 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { useDebugLog } from "@/utils/debug/DebugContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
-import { sendMessage } from '@/services/chat/messageService';
+import { processChatMessage } from "@/services/chatService";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -300,13 +300,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         debugLog.addEvent("Query Enhancement", "Forcing personal context for mental health or personality question", "info");
       }
       
-      // Fix: Use correct sendMessage signature with 5 arguments max
-      const response = await sendMessage(
+      const response = await processChatMessage(
         message, 
         user.id, 
+        queryTypes, 
         threadId,
-        undefined, // timeRange
-        undefined  // referenceDate
+        false,
+        parameters
       );
       
       // Update or delete the processing message

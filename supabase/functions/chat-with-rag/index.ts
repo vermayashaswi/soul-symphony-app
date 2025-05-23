@@ -51,8 +51,8 @@ function processTimeRange(timeRange: any): { startDate?: string; endDate?: strin
     }
     
     // Calculate current date in user's timezone
-    const now = new Date();
-    console.log(`[chat-with-rag] Current date: ${now.toISOString()}`);
+    const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
+    console.log(`[chat-with-rag] Current date in timezone ${timezone}: ${now.toISOString()}`);
     
     // Handle special time range cases
     if (timeRange.type === 'week') {
@@ -66,7 +66,7 @@ function processTimeRange(timeRange: any): { startDate?: string; endDate?: strin
       const lastWeekSunday = subDays(thisWeekMonday, 1);
       
       console.log("[chat-with-rag] LAST WEEK CALCULATION DETAILED DEBUG:");
-      console.log(`[chat-with-rag] Current date: ${now.toISOString()}`);
+      console.log(`[chat-with-rag] Current date in timezone ${timezone}: ${now.toISOString()}`);
       console.log(`[chat-with-rag] This week's Monday: ${thisWeekMonday.toISOString()}`);
       console.log(`[chat-with-rag] Last week's Monday: ${lastWeekMonday.toISOString()}`);
       console.log(`[chat-with-rag] Last week's Sunday: ${lastWeekSunday.toISOString()}`);
@@ -114,7 +114,7 @@ function processTimeRange(timeRange: any): { startDate?: string; endDate?: strin
  * Process a specific month by name
  */
 function processSpecificMonthByName(monthName: string, result: { startDate?: string; endDate?: string }, year?: number, timezone?: string) {
-  const now = new Date();
+  const now = timezone ? toZonedTime(new Date(), timezone) : new Date();
   const currentYear = now.getFullYear();
   const targetYear = year || currentYear;
   
@@ -177,7 +177,7 @@ function getLastWeekDates(clientTimeInfo?: any, userTimezone?: string): { startD
   console.log(`[chat-with-rag] Using reference time: ${referenceTime.toISOString()}`);
   
   // Convert to user's timezone if provided
-  const now = referenceTime;
+  const now = timezone !== 'UTC' ? toZonedTime(referenceTime, timezone) : referenceTime;
   
   // Get this week's Monday (start of current week) - week starts on Monday (1)
   const currentDay = now.getDay();
@@ -221,7 +221,7 @@ function getCurrentWeekDates(clientTimeInfo?: any, userTimezone?: string): { sta
   
   // Get reference time (prefer client's time over server time)
   const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
-  const now = referenceTime;
+  const now = timezone !== 'UTC' ? toZonedTime(referenceTime, timezone) : referenceTime;
   
   // Get this week's Monday (start of current week)
   const currentDay = now.getDay();
@@ -268,19 +268,6 @@ serve(async (req) => {
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    
-    // Check if OpenAI API key exists
-    const openaiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openaiApiKey) {
-      console.error('[chat-with-rag] Missing OpenAI API key');
-      return new Response(JSON.stringify({
-        data: "I'm unable to process your request right now due to a configuration issue. Please contact support."
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Create supabase client
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Enhanced timeframe detection and processing
@@ -374,90 +361,79 @@ serve(async (req) => {
 
     let relevantEntries = [];
     
-    try {
-      // Enhanced search logic with proper date range handling
-      if (processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate)) {
-        console.log(`[chat-with-rag] Time range search: from ${processedTimeRange.startDate || 'none'} to ${processedTimeRange.endDate || 'none'}`);
-        
-        // Get query embedding for semantic search
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            input: message,
-            model: 'text-embedding-3-small',
-          }),
-        });
-        
-        if (!embeddingResponse.ok) {
-          throw new Error(`Failed to get embedding from OpenAI: ${embeddingResponse.status} ${await embeddingResponse.text()}`);
-        }
-        
-        const embeddingData = await embeddingResponse.json();
-        const queryEmbedding = embeddingData.data[0].embedding;
-        
-        // Use time-filtered search
-        relevantEntries = await searchEntriesWithTimeRange(
-          supabase,
-          userId,
-          queryEmbedding,
-          processedTimeRange
-        );
-      } else {
-        // No time range, use general search
-        const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            input: message,
-            model: 'text-embedding-3-small',
-          }),
-        });
-        
-        if (!embeddingResponse.ok) {
-          throw new Error(`Failed to get embedding from OpenAI: ${embeddingResponse.status} ${await embeddingResponse.text()}`);
-        }
-        
-        const embeddingData = await embeddingResponse.json();
-        const queryEmbedding = embeddingData.data[0].embedding;
-        
-        relevantEntries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+    // Enhanced search logic with proper date range handling
+    if (processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate)) {
+      console.log(`[chat-with-rag] Time range search: from ${processedTimeRange.startDate || 'none'} to ${processedTimeRange.endDate || 'none'}`);
+      
+      // Get query embedding for semantic search
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: message,
+          model: 'text-embedding-3-small',
+        }),
+      });
+      
+      if (!embeddingResponse.ok) {
+        throw new Error('Failed to get embedding from OpenAI');
       }
-
-      console.log(`[chat-with-rag] Found ${relevantEntries?.length || 0} relevant entries`);
-    } catch (error) {
-      console.error('[chat-with-rag] Error during search:', error);
-      // Continue with empty entries array - we'll handle this case below
+      
+      const embeddingData = await embeddingResponse.json();
+      const queryEmbedding = embeddingData.data[0].embedding;
+      
+      // Use time-filtered search
+      relevantEntries = await searchEntriesWithTimeRange(
+        supabase,
+        userId,
+        queryEmbedding,
+        processedTimeRange
+      );
+    } else {
+      // No time range, use general search
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: message,
+          model: 'text-embedding-3-small',
+        }),
+      });
+      
+      if (!embeddingResponse.ok) {
+        throw new Error('Failed to get embedding from OpenAI');
+      }
+      
+      const embeddingData = await embeddingResponse.json();
+      const queryEmbedding = embeddingData.data[0].embedding;
+      
+      relevantEntries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
     }
 
+    console.log(`[chat-with-rag] Found ${relevantEntries?.length || 0} relevant entries`);
+
     if (!relevantEntries || relevantEntries.length === 0) {
-      // Provide a helpful response when no entries are found
-      const noEntriesMessage = processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate) 
-        ? `I don't have any journal entries for the time period you asked about. Try asking about a different time period, or try journaling more regularly to get personalized insights.`
-        : `I don't have enough journal entries to provide insights about that topic. Try writing more journal entries to get better personalized responses!`;
-      
       return new Response(JSON.stringify({
-        data: noEntriesMessage
+        data: "I don't have enough journal entries to provide insights about that topic. Try writing more journal entries to get better personalized responses!"
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
       });
     }
 
-    try {
-      // Limit entries for processing
-      const maxEntries = isComprehensiveQuery ? 1000 : 10;
-      const entriesToUse = relevantEntries.slice(0, maxEntries);
-      
-      console.log(`[chat-with-rag] Using ${entriesToUse.length} entries for analysis (comprehensive: ${isComprehensiveQuery})`);
+    // Limit entries for processing
+    const maxEntries = isComprehensiveQuery ? 1000 : 10;
+    const entriesToUse = relevantEntries.slice(0, maxEntries);
+    
+    console.log(`[chat-with-rag] Using ${entriesToUse.length} entries for analysis (comprehensive: ${isComprehensiveQuery})`);
 
-      // Enhanced system prompt with better context
-      const systemPrompt = `You are a supportive mental health assistant analyzing journal entries from the SOULo voice journaling app. 
+    // Enhanced system prompt with better context
+    const systemPrompt = `You are a supportive mental health assistant analyzing journal entries from the SOULo voice journaling app. 
 
 Current date and time: ${new Date().toISOString()}
 User timezone: ${userTimezone || clientTimeInfo?.timezoneName || 'UTC'}
@@ -474,79 +450,51 @@ Your role is to:
 
 Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
 
-      // Carefully handle the OpenAI API call with proper error handling
-      try {
-        const openAiResponse = await fetch(OPENAI_API_URL, {
-          method: 'POST',
-          headers: {
-            'Authorization': `Bearer ${openaiApiKey}`,
-            'Content-Type': 'application/json',
-          },
-          body: JSON.stringify({
-            model: 'gpt-4o-mini', // Using a more modern model that's reliable
-            messages: [
-              { role: 'system', content: systemPrompt },
-              ...(conversationContext || []).slice(-10), // Include recent conversation context
-              { 
-                role: 'user', 
-                content: `Based on these journal entries: ${JSON.stringify(entriesToUse.map(entry => ({
-                  date: entry.created_at,
-                  content: entry.content,
-                  emotions: entry.emotions
-                })))}\n\nUser question: ${message}` 
-              }
-            ],
-            max_tokens: 1000,
-            temperature: 0.7,
-          }),
-        });
+    const openAiResponse = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...conversationContext.slice(-10), // Include recent conversation context
+          { 
+            role: 'user', 
+            content: `Based on these journal entries: ${JSON.stringify(entriesToUse.map(entry => ({
+              date: entry.created_at,
+              content: entry.content,
+              emotions: entry.emotions
+            })))}\n\nUser question: ${message}` 
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.7,
+      }),
+    });
 
-        if (!openAiResponse.ok) {
-          const errorText = await openAiResponse.text();
-          console.error('[chat-with-rag] OpenAI API error:', errorText);
-          throw new Error(`OpenAI API error: ${openAiResponse.status} - ${errorText}`);
-        }
-
-        const openAiData = await openAiResponse.json();
-        console.log('[chat-with-rag] OpenAI response received:', JSON.stringify(openAiData).substring(0, 200) + '...');
-        
-        const assistantResponse = openAiData.choices[0]?.message?.content;
-        
-        if (!assistantResponse) {
-          throw new Error('Empty response from OpenAI');
-        }
-
-        console.log(`[chat-with-rag] Generated response: ${assistantResponse.substring(0, 100)}...`);
-
-        return new Response(JSON.stringify({ data: assistantResponse }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } catch (openAiError) {
-        console.error('[chat-with-rag] Error in OpenAI processing:', openAiError);
-        
-        // Provide a fallback response
-        return new Response(JSON.stringify({ 
-          data: "I'm having trouble analyzing your journal entries right now. Here's what I know: I found relevant entries in your journal, but couldn't generate insights from them. You might want to try asking a different question or trying again later."
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      }
-    } catch (error) {
-      console.error('[chat-with-rag] Error processing entries:', error);
-      
-      // Provide a specific fallback based on what we've found
-      return new Response(JSON.stringify({ 
-        data: "I found some relevant journal entries, but ran into an issue while analyzing them. Please try asking your question again, maybe with different wording."
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
+    if (!openAiResponse.ok) {
+      const errorText = await openAiResponse.text();
+      console.error('[chat-with-rag] OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${openAiResponse.status}`);
     }
+
+    const openAiData = await openAiResponse.json();
+    const assistantResponse = openAiData.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response.';
+
+    console.log(`[chat-with-rag] Generated response: ${assistantResponse.substring(0, 100)}...`);
+
+    return new Response(JSON.stringify({ data: assistantResponse }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
   } catch (error) {
     console.error('[chat-with-rag] Error in chat-with-rag:', error);
     return new Response(JSON.stringify({ 
       error: 'Internal server error', 
-      details: error.message,
-      data: "I'm sorry, but I encountered an error while processing your request. Please try again with a simpler question, or contact support if the issue persists."
+      details: error.message 
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
