@@ -179,6 +179,59 @@ class PerformanceMonitor {
       }
     });
   }
+  
+  // Enhanced monitoring for emergency fixes
+  trackEmergencyFix(
+    fixType: 'progressive_threshold' | 'keyword_fallback' | 'retry_logic',
+    queryType: string,
+    resultCount: number,
+    duration: number,
+    thresholdUsed?: number
+  ): void {
+    const fixId = `emergency-fix-${Date.now()}`;
+    
+    console.log(`[Performance] Emergency Fix Applied:
+      - Fix Type: ${fixType}
+      - Query Type: ${queryType}
+      - Results Found: ${resultCount}
+      - Duration: ${duration}ms
+      ${thresholdUsed ? `- Final Threshold: ${thresholdUsed}` : ''}
+      - Effectiveness: ${resultCount > 0 ? '✅ Successful' : '❌ Failed'}`);
+    
+    this.metrics.set(fixId, {
+      operation: `emergency-fix-${fixType}`,
+      startTime: Date.now() - duration,
+      endTime: Date.now(),
+      duration: duration,
+      status: resultCount > 0 ? 'success' : 'error',
+      metadata: {
+        fixType,
+        queryType,
+        resultCount,
+        thresholdUsed,
+        effectiveness: resultCount > 0 ? 'successful' : 'failed'
+      }
+    });
+  }
+  
+  // Track progressive threshold attempts
+  trackProgressiveThreshold(
+    thresholds: number[],
+    successfulThreshold: number | null,
+    queryType: string,
+    totalDuration: number
+  ): void {
+    console.log(`[Performance] Progressive Threshold Analysis:
+      - Thresholds Tried: ${thresholds.join(', ')}
+      - Successful Threshold: ${successfulThreshold || 'None'}
+      - Query Type: ${queryType}
+      - Total Duration: ${totalDuration}ms
+      - Success Rate: ${successfulThreshold ? 'Success' : 'Failed'}`);
+    
+    if (successfulThreshold && successfulThreshold <= 0.05) {
+      console.log(`[Performance] 💡 Ultra-low threshold (${successfulThreshold}) was needed - query may need semantic optimization`);
+    }
+  }
 }
 
 export const performanceMonitor = new PerformanceMonitor();

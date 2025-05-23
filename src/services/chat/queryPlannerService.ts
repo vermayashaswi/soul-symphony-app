@@ -52,7 +52,7 @@ async function enhanceWithThreadContext(message: string, threadId: string, query
  */
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
-    console.log("[Query Planner] Planning intelligent sub-query strategy for:", message);
+    console.log("[Query Planner] Planning intelligent sub-query strategy with emergency fixes for:", message);
     console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
     
     // For debugging timezone issues
@@ -132,7 +132,10 @@ export async function planQuery(message: string, threadId: string, userId: strin
     // Analyze the query types for intelligent sub-query planning
     const queryTypes = analyzeQueryTypes(message);
     
-    // Add properties needed for intelligent planning
+    // Enhanced detection for personality queries requiring emergency fixes
+    const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate|worst|best/.test(message.toLowerCase());
+    
+    // Add properties needed for intelligent planning with emergency fixes
     queryTypes.needsDataAggregation = queryTypes.isQuantitative || 
                                      queryTypes.isStatisticalQuery || 
                                      message.toLowerCase().includes('how many times');
@@ -141,7 +144,13 @@ export async function planQuery(message: string, threadId: string, userId: strin
                                message.split(' ').length < 3 || 
                                /^(tell me|show)( more| about)?/i.test(message);
     
-    console.log("[Query Planner] Query type analysis for sub-query planning:", queryTypes);
+    queryTypes.needsEmergencyFixes = isPersonalityQuery || queryTypes.isEmotionFocused;
+    
+    console.log("[Query Planner] Enhanced query type analysis:", {
+      ...queryTypes,
+      isPersonalityQuery,
+      needsEmergencyFixes: queryTypes.needsEmergencyFixes
+    });
     
     // Check if this is a time pattern analysis query
     const isTimePatternQuery = queryTypes.isTemporalQuery && 
@@ -154,35 +163,35 @@ export async function planQuery(message: string, threadId: string, userId: strin
     // Enhance query analysis based on thread context
     const enhancedQuery = await enhanceWithThreadContext(message, threadId, queryTypes);
     
-    // Define intelligent sub-query strategy
-    let strategy = 'intelligent_sub_query'; // Default to intelligent sub-query planning
+    // Define intelligent sub-query strategy with emergency fix priority
+    let strategy = 'intelligent_sub_query';
     
     if (queryTypes.needsMoreContext) {
       strategy = 'request_clarification';
     } 
     else if (isTimePatternQuery) {
-      strategy = 'intelligent_sub_query'; // Use sub-query planning for time patterns
+      strategy = 'intelligent_sub_query';
       console.log("[Query Planner] Using intelligent sub-query strategy for time pattern analysis");
     }
     else if (queryTypes.needsDataAggregation) {
-      strategy = 'intelligent_sub_query'; // Use sub-query planning for data aggregation
+      strategy = 'intelligent_sub_query';
       console.log("[Query Planner] Using intelligent sub-query strategy for data aggregation");
     }
-    else if (queryTypes.isEmotionFocused) {
-      strategy = 'intelligent_sub_query'; // Use sub-query planning for emotion analysis
-      console.log("[Query Planner] Using intelligent sub-query strategy for emotion analysis");
+    else if (queryTypes.isEmotionFocused || isPersonalityQuery) {
+      strategy = 'intelligent_sub_query';
+      console.log("[Query Planner] Using intelligent sub-query strategy with emergency fixes for personality/emotion analysis");
     }
     else if (queryTypes.isWhyQuestion) {
-      strategy = 'intelligent_sub_query'; // Use sub-query planning for causal analysis
+      strategy = 'intelligent_sub_query';
       console.log("[Query Planner] Using intelligent sub-query strategy for causal analysis");
     }
     
-    // Return plan that will trigger intelligent sub-query generation
+    // Return enhanced plan with emergency fix indicators
     return {
       strategy,
       timeRange: queryTypes.timeRange,
-      useHistoricalData: false, // Sub-query planner will determine this
-      usePersonalContext: true, // Always use personal context for sub-query planning
+      useHistoricalData: false,
+      usePersonalContext: true,
       filterByEmotion: queryTypes.emotion || null,
       enhancedQuery,
       originalQuery: message,
@@ -191,19 +200,24 @@ export async function planQuery(message: string, threadId: string, userId: strin
       clientTimezone: clientInfo.timezoneName,
       clientTimezoneOffset: clientInfo.timezoneOffset,
       userTimezone: userTimezone,
-      requiresIntelligentPlanning: true, // Flag to trigger sub-query generation
+      requiresIntelligentPlanning: true,
       queryComplexity: queryTypes.needsDataAggregation ? 'high' : 
-                      queryTypes.isEmotionFocused ? 'medium' : 'standard'
+                      queryTypes.isEmotionFocused || isPersonalityQuery ? 'medium' : 'standard',
+      needsEmergencyFixes: queryTypes.needsEmergencyFixes,
+      isPersonalityQuery: isPersonalityQuery,
+      emergencyFixPriority: isPersonalityQuery ? 'high' : queryTypes.isEmotionFocused ? 'medium' : 'low'
     };
   } catch (error) {
     console.error("[Query Planner] Error planning intelligent sub-query:", error);
     return {
-      strategy: 'intelligent_sub_query', // Default to intelligent planning even on error
+      strategy: 'intelligent_sub_query',
       originalQuery: message,
       enhancedQuery: message,
       errorState: true,
       timestamp: new Date().toISOString(),
-      requiresIntelligentPlanning: true
+      requiresIntelligentPlanning: true,
+      needsEmergencyFixes: true,
+      emergencyFixPriority: 'high'
     };
   }
 }

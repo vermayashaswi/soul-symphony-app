@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -8,7 +7,124 @@ const corsHeaders = {
 };
 
 /**
- * Execute a single sub-question's search plan
+ * Progressive threshold reduction for vector search
+ */
+async function searchWithProgressiveThresholds(
+  supabase: any,
+  userId: string,
+  queryEmbedding: number[],
+  initialThreshold: number,
+  searchPlan: any
+): Promise<any[]> {
+  const thresholds = [initialThreshold, 0.05, 0.03, 0.01];
+  
+  for (const threshold of thresholds) {
+    console.log(`[chat-with-rag] Trying vector search with threshold ${threshold}`);
+    
+    try {
+      let results = [];
+      
+      if (searchPlan.dateFilter) {
+        const { data, error } = await supabase.rpc(
+          'match_journal_entries_with_date',
+          {
+            query_embedding: queryEmbedding,
+            match_threshold: threshold,
+            match_count: 15,
+            user_id_filter: userId,
+            start_date: searchPlan.dateFilter.startDate,
+            end_date: searchPlan.dateFilter.endDate
+          }
+        );
+        
+        if (!error && data) {
+          results = data;
+        }
+      } else {
+        const { data, error } = await supabase.rpc(
+          'match_journal_entries_fixed',
+          {
+            query_embedding: queryEmbedding,
+            match_threshold: threshold,
+            match_count: 15,
+            user_id_filter: userId
+          }
+        );
+        
+        if (!error && data) {
+          results = data;
+        }
+      }
+      
+      if (results.length > 0) {
+        console.log(`[chat-with-rag] Found ${results.length} results with threshold ${threshold}`);
+        return results;
+      }
+    } catch (error) {
+      console.error(`[chat-with-rag] Error with threshold ${threshold}:`, error);
+    }
+  }
+  
+  console.log(`[chat-with-rag] No results found with progressive thresholds`);
+  return [];
+}
+
+/**
+ * Keyword-based content search fallback
+ */
+async function searchByKeywords(
+  supabase: any,
+  userId: string,
+  query: string
+): Promise<any[]> {
+  console.log(`[chat-with-rag] Attempting keyword search for: "${query}"`);
+  
+  // Extract meaningful keywords from the query
+  const keywords = query.toLowerCase()
+    .replace(/[^\w\s]/g, ' ')
+    .split(/\s+/)
+    .filter(word => word.length > 3 && !['what', 'when', 'where', 'how', 'why', 'the', 'and', 'for', 'are', 'with'].includes(word))
+    .slice(0, 5);
+  
+  if (keywords.length === 0) {
+    return [];
+  }
+  
+  try {
+    const keywordPattern = keywords.map(k => `%${k}%`).join('|');
+    
+    const { data, error } = await supabase
+      .from('Journal Entries')
+      .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
+      .eq('user_id', userId)
+      .or(keywords.map(keyword => 
+        `"refined text".ilike.%${keyword}%,"transcription text".ilike.%${keyword}%`
+      ).join(','))
+      .order('created_at', { ascending: false })
+      .limit(10);
+      
+    if (!error && data) {
+      const results = data.map(entry => ({
+        id: entry.id,
+        content: entry['refined text'] || entry['transcription text'] || '',
+        created_at: entry.created_at,
+        similarity: 0.7, // Assign moderate similarity for keyword matches
+        source: 'keyword_search',
+        matched_keywords: keywords
+      }));
+      
+      console.log(`[chat-with-rag] Keyword search found ${results.length} results`);
+      return results;
+    }
+  } catch (error) {
+    console.error(`[chat-with-rag] Error in keyword search:`, error);
+  }
+  
+  return [];
+}
+
+/**
+ * Execute a single sub-question's search plan with enhanced fallbacks
  */
 async function executeSubQuestionPlan(
   subQuestion: any,
@@ -29,7 +145,7 @@ async function executeSubQuestionPlan(
       const sqlPromises = searchPlan.sqlQueries.map(async (sqlQuery) => {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 2000);
+          const timeoutId = setTimeout(() => controller.abort(), 3000);
           
           // Replace USER_ID_PLACEHOLDER with actual userId
           const parameters = { ...sqlQuery.parameters };
@@ -107,98 +223,76 @@ async function executeSubQuestionPlan(
       });
     }
     
-    // Execute vector search if enabled
+    // Execute vector search with progressive threshold reduction
     if (searchPlan.vectorSearch && searchPlan.vectorSearch.enabled) {
-      console.log(`[chat-with-rag] Executing vector search with threshold ${searchPlan.vectorSearch.threshold}`);
+      console.log(`[chat-with-rag] Executing progressive vector search starting with threshold ${searchPlan.vectorSearch.threshold}`);
       
       try {
-        const vectorController = new AbortController();
-        const vectorTimeoutId = setTimeout(() => vectorController.abort(), 3000);
-        
-        let vectorResults = [];
-        
         // Use the optimized query from the search plan or fallback to sub-question
         const searchQuery = searchPlan.vectorSearch.query || subQuestion.question;
         
         // Generate embedding for the specific sub-question query
         let subQuestionEmbedding = queryEmbedding; // Default to main query embedding
         if (searchQuery !== subQuestion.question) {
-          // Generate specific embedding for optimized query
-          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-            method: 'POST',
-            headers: {
-              'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-              'Content-Type': 'application/json',
-            },
-            body: JSON.stringify({
-              input: searchQuery,
-              model: 'text-embedding-3-small',
-            }),
-          });
-          
-          if (embeddingResponse.ok) {
-            const embeddingData = await embeddingResponse.json();
-            subQuestionEmbedding = embeddingData.data[0].embedding;
+          try {
+            const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+              method: 'POST',
+              headers: {
+                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+                'Content-Type': 'application/json',
+              },
+              body: JSON.stringify({
+                input: searchQuery,
+                model: 'text-embedding-3-small',
+              }),
+            });
+            
+            if (embeddingResponse.ok) {
+              const embeddingData = await embeddingResponse.json();
+              subQuestionEmbedding = embeddingData.data[0].embedding;
+            }
+          } catch (embeddingError) {
+            console.error('[chat-with-rag] Failed to generate sub-question embedding:', embeddingError);
           }
         }
         
-        if (searchPlan.vectorSearch.dateFilter) {
-          const { data, error } = await supabase.rpc(
-            'match_journal_entries_with_date',
-            {
-              query_embedding: subQuestionEmbedding,
-              match_threshold: searchPlan.vectorSearch.threshold,
-              match_count: 15,
-              user_id_filter: userId,
-              start_date: searchPlan.vectorSearch.dateFilter.startDate,
-              end_date: searchPlan.vectorSearch.dateFilter.endDate
-            }
-          );
-          
-          if (!error && data) {
-            vectorResults = data.map(entry => ({
-              ...entry,
-              source: 'vector_time_filtered',
-              subQuestion: subQuestion.question
-            }));
-          }
-        } else {
-          const { data, error } = await supabase.rpc(
-            'match_journal_entries_fixed',
-            {
-              query_embedding: subQuestionEmbedding,
-              match_threshold: searchPlan.vectorSearch.threshold,
-              match_count: 15,
-              user_id_filter: userId
-            }
-          );
-          
-          if (!error && data) {
-            vectorResults = data.map(entry => ({
-              ...entry,
-              source: 'vector_semantic',
-              subQuestion: subQuestion.question
-            }));
-          }
-        }
+        const vectorResults = await searchWithProgressiveThresholds(
+          supabase,
+          userId,
+          subQuestionEmbedding,
+          searchPlan.vectorSearch.threshold,
+          searchPlan.vectorSearch
+        );
         
-        clearTimeout(vectorTimeoutId);
-        console.log(`[chat-with-rag] Vector search returned ${vectorResults.length} results`);
-        results = results.concat(vectorResults);
+        const enhancedVectorResults = vectorResults.map(entry => ({
+          ...entry,
+          source: searchPlan.vectorSearch.dateFilter ? 'vector_time_filtered' : 'vector_semantic',
+          subQuestion: subQuestion.question
+        }));
+        
+        results = results.concat(enhancedVectorResults);
+        console.log(`[chat-with-rag] Progressive vector search returned ${enhancedVectorResults.length} results`);
         
       } catch (error) {
         console.error(`[chat-with-rag] Vector search error for sub-question:`, error);
       }
     }
     
-    // Apply fallback strategy if insufficient results
+    // Apply enhanced fallback strategies if insufficient results
     if (results.length < 3 && searchPlan.fallbackStrategy) {
-      console.log(`[chat-with-rag] Applying fallback strategy: ${searchPlan.fallbackStrategy}`);
+      console.log(`[chat-with-rag] Applying enhanced fallback strategy: ${searchPlan.fallbackStrategy}`);
       
       try {
         let fallbackResults = [];
         
-        if (searchPlan.fallbackStrategy === 'recent_entries') {
+        if (searchPlan.fallbackStrategy === 'keyword_search') {
+          fallbackResults = await searchByKeywords(supabase, userId, subQuestion.question);
+          fallbackResults = fallbackResults.map(entry => ({
+            ...entry,
+            source: 'fallback_keyword',
+            subQuestion: subQuestion.question
+          }));
+        } else if (searchPlan.fallbackStrategy === 'recent_entries') {
           const { data, error } = await supabase
             .from('Journal Entries')
             .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
@@ -238,10 +332,10 @@ async function executeSubQuestionPlan(
         }
         
         results = results.concat(fallbackResults);
-        console.log(`[chat-with-rag] Fallback strategy added ${fallbackResults.length} results`);
+        console.log(`[chat-with-rag] Enhanced fallback strategy added ${fallbackResults.length} results`);
         
       } catch (error) {
-        console.error(`[chat-with-rag] Fallback strategy failed:`, error);
+        console.error(`[chat-with-rag] Enhanced fallback strategy failed:`, error);
       }
     }
     

@@ -85,10 +85,10 @@ function createEmergencyFallback(originalContent: string): any {
     strategy: "intelligent_sub_query",
     subQuestions: [
       {
-        question: "Find relevant journal entries",
+        question: "Find relevant journal entries with ultra-sensitive search",
         searchPlan: {
           vectorSearch: {
-            threshold: 0.1,
+            threshold: 0.01,
             enabled: true
           },
           sqlQueries: [],
@@ -102,7 +102,42 @@ function createEmergencyFallback(originalContent: string): any {
 }
 
 /**
- * Intelligent query analysis with sub-question generation
+ * Retry wrapper for OpenAI API calls with exponential backoff
+ */
+async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetries: number = 2): Promise<any> {
+  let lastError;
+  
+  for (let attempt = 0; attempt <= maxRetries; attempt++) {
+    try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased to 10s
+      
+      const response = await promptFunction();
+      clearTimeout(timeoutId);
+      
+      if (!response.ok) {
+        throw new Error(`OpenAI API returned error ${response.status}`);
+      }
+      
+      const data = await response.json();
+      return data.choices[0].message?.content || '{}';
+      
+    } catch (error) {
+      lastError = error;
+      console.log(`OpenAI attempt ${attempt + 1} failed:`, error.message);
+      
+      if (attempt < maxRetries) {
+        const delayMs = Math.pow(2, attempt) * 1000; // Exponential backoff
+        await new Promise(resolve => setTimeout(resolve, delayMs));
+      }
+    }
+  }
+  
+  throw lastError;
+}
+
+/**
+ * Intelligent query analysis with sub-question generation and retry logic
  */
 async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number) {
   try {
@@ -119,6 +154,8 @@ User has ${userEntryCount} journal entries.${contextString}
 
 Break this query into 2-4 strategic sub-questions that will help answer the original query. For each sub-question, create a detailed search plan.
 
+CRITICAL: For personality and trait analysis queries, use ULTRA-LOW vector thresholds (0.01-0.05) to ensure results are found.
+
 Return ONLY valid JSON with this structure:
 {
   "queryType": "journal_specific" | "general_question" | "direct_response",
@@ -130,7 +167,7 @@ Return ONLY valid JSON with this structure:
       "searchPlan": {
         "vectorSearch": {
           "enabled": boolean,
-          "threshold": number (0.05-0.3),
+          "threshold": number (0.01-0.05 for personality, 0.05-0.15 for others),
           "query": "optimized search query for this sub-question",
           "dateFilter": null | {"startDate": "ISO", "endDate": "ISO"}
         },
@@ -141,7 +178,7 @@ Return ONLY valid JSON with this structure:
             "purpose": "what this query achieves"
           }
         ],
-        "fallbackStrategy": "recent_entries" | "emotion_based" | "theme_based"
+        "fallbackStrategy": "recent_entries" | "emotion_based" | "theme_based" | "keyword_search"
       }
     }
   ],
@@ -151,16 +188,13 @@ Return ONLY valid JSON with this structure:
 }
 
 Guidelines:
-- Use vector thresholds between 0.05-0.2 for personality/emotion queries
-- Use 0.1-0.3 for general queries
+- Use vector thresholds between 0.01-0.05 for personality/trait/behavior queries
+- Use 0.05-0.15 for general queries
 - Include SQL queries when specific emotions or patterns are mentioned
 - Each sub-question should target a specific aspect of the main query
-- Combine different search approaches for comprehensive results`;
+- Add keyword_search as fallback for personality queries`;
 
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 6000);
-
-    const response = await fetch("https://api.openai.com/v1/chat/completions", {
+    const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
@@ -171,20 +205,10 @@ Guidelines:
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
         max_tokens: 800,
-      }),
-      signal: controller.signal
+      })
     });
 
-    clearTimeout(timeoutId);
-
-    if (!response.ok) {
-      console.error("OpenAI API error:", response.status);
-      throw new Error(`OpenAI API returned error ${response.status}`);
-    }
-
-    const data = await response.json();
-    const content = data.choices[0].message?.content || '{}';
-    
+    const content = await retryOpenAICall(promptFunction, 2);
     console.log("Raw GPT response:", content);
     
     const analysisResult = extractAndParseJSON(content);
@@ -207,13 +231,13 @@ Guidelines:
 }
 
 /**
- * Validate and enhance sub-questions with better defaults
+ * Validate and enhance sub-questions with ultra-low thresholds for personality queries
  */
 function validateAndEnhanceSubQuestions(analysis: any, message: string) {
   const lowerMessage = message.toLowerCase();
   
   // Detect query characteristics
-  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality/.test(lowerMessage);
+  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate/.test(lowerMessage);
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
   const isTemporalQuery = /last week|yesterday|today|this month|recently/.test(lowerMessage);
   
@@ -222,24 +246,29 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
     analysis.subQuestions = createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery);
   }
   
-  // Validate and enhance each sub-question
+  // Validate and enhance each sub-question with ultra-low thresholds
   analysis.subQuestions = analysis.subQuestions.map((subQ, index) => {
     if (!subQ.searchPlan) {
       subQ.searchPlan = {};
     }
     
-    // Ensure vector search configuration
+    // Ensure vector search configuration with ultra-low thresholds
     if (!subQ.searchPlan.vectorSearch) {
       subQ.searchPlan.vectorSearch = {
         enabled: true,
-        threshold: isPersonalityQuery ? 0.05 : isEmotionQuery ? 0.1 : 0.15,
+        threshold: isPersonalityQuery ? 0.01 : isEmotionQuery ? 0.05 : 0.1,
         query: subQ.question || message
       };
     }
     
-    // Cap thresholds
-    if (subQ.searchPlan.vectorSearch.threshold > 0.3) {
-      subQ.searchPlan.vectorSearch.threshold = 0.2;
+    // Force ultra-low thresholds for personality queries
+    if (isPersonalityQuery && subQ.searchPlan.vectorSearch.threshold > 0.05) {
+      subQ.searchPlan.vectorSearch.threshold = 0.01;
+    }
+    
+    // Cap all thresholds at reasonable maximums
+    if (subQ.searchPlan.vectorSearch.threshold > 0.15) {
+      subQ.searchPlan.vectorSearch.threshold = 0.1;
     }
     
     // Ensure SQL queries array
@@ -259,9 +288,9 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
       });
     }
     
-    // Ensure fallback strategy
+    // Enhanced fallback strategy for personality queries
     if (!subQ.searchPlan.fallbackStrategy) {
-      subQ.searchPlan.fallbackStrategy = "recent_entries";
+      subQ.searchPlan.fallbackStrategy = isPersonalityQuery ? "keyword_search" : "recent_entries";
     }
     
     return subQ;
@@ -272,7 +301,7 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
     strategy: "intelligent_sub_query",
     subQuestions: analysis.subQuestions,
     confidence: typeof analysis.confidence === 'number' ? analysis.confidence : 0.7,
-    reasoning: analysis.reasoning || "Sub-query planning with optimized search strategies",
+    reasoning: analysis.reasoning || "Sub-query planning with ultra-low thresholds for personality queries",
     expectedResponse: analysis.expectedResponse || "analysis",
     isPersonalityQuery,
     isEmotionQuery,
@@ -285,7 +314,7 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
 }
 
 /**
- * Create default sub-questions when GPT fails to generate them
+ * Create default sub-questions with ultra-low thresholds
  */
 function createDefaultSubQuestions(message: string, isPersonality: boolean, isEmotion: boolean, isTemporal: boolean) {
   const subQuestions = [];
@@ -297,11 +326,11 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
       searchPlan: {
         vectorSearch: {
           enabled: true,
-          threshold: 0.05,
+          threshold: 0.01, // Ultra-low for personality
           query: message
         },
         sqlQueries: [],
-        fallbackStrategy: "recent_entries"
+        fallbackStrategy: "keyword_search"
       }
     });
   }
@@ -313,7 +342,7 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
       searchPlan: {
         vectorSearch: {
           enabled: true,
-          threshold: 0.1,
+          threshold: 0.05,
           query: message
         },
         sqlQueries: [
@@ -331,18 +360,18 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
     });
   }
   
-  // Always add a general search sub-question
+  // Always add a general search sub-question with progressive threshold
   subQuestions.push({
     question: "Find relevant journal entries related to the query",
     purpose: "Gather contextual information from journal entries",
     searchPlan: {
       vectorSearch: {
         enabled: true,
-        threshold: 0.15,
+        threshold: isPersonality ? 0.03 : 0.1, // Lower for personality
         query: message
       },
       sqlQueries: [],
-      fallbackStrategy: "recent_entries"
+      fallbackStrategy: isPersonality ? "keyword_search" : "recent_entries"
     }
   });
   
@@ -355,7 +384,7 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
 function createFallbackAnalysis(message: string) {
   const lowerMessage = message.toLowerCase();
   
-  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i/.test(lowerMessage);
+  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|negative|positive|improve|rate/.test(lowerMessage);
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
   const isTemporalQuery = /last week|yesterday|today|this month|recently/.test(lowerMessage);
   
@@ -364,7 +393,7 @@ function createFallbackAnalysis(message: string) {
     strategy: "intelligent_sub_query",
     subQuestions: createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery),
     confidence: 0.5,
-    reasoning: "Fallback analysis with default sub-questions",
+    reasoning: "Fallback analysis with ultra-low thresholds for personality queries",
     expectedResponse: "analysis",
     isPersonalityQuery,
     isEmotionQuery,
@@ -380,13 +409,13 @@ serve(async (req) => {
   try {
     const { message, userId, conversationContext = [], isFollowUp = false } = await req.json();
 
-    console.log(`[Smart Query Planner] Analyzing query with sub-questions: "${message}"`);
+    console.log(`[Smart Query Planner] Analyzing query with enhanced sub-questions: "${message}"`);
 
-    // Get user's journal entry count
+    // Get user's journal entry count with timeout
     let entryCount = 0;
     try {
       const countController = new AbortController();
-      const countTimeoutId = setTimeout(() => countController.abort(), 1500);
+      const countTimeoutId = setTimeout(() => countController.abort(), 2000);
       
       const { count, error } = await supabase
         .from('Journal Entries')
@@ -403,7 +432,7 @@ serve(async (req) => {
       console.error("Error fetching entry count:", error);
     }
 
-    // Use GPT to analyze the query and generate sub-questions
+    // Use GPT to analyze the query and generate sub-questions with retry logic
     const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, entryCount);
 
     // Handle direct responses
@@ -425,7 +454,7 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced query plan with sub-questions
+    // Enhanced query plan with ultra-low thresholds
     const enhancedPlan = {
       strategy: analysisResult.strategy,
       queryType: analysisResult.queryType,
@@ -441,7 +470,7 @@ serve(async (req) => {
                    analysisResult.isEmotionQuery ? "emotional_analysis" : "general_insights"
     };
 
-    console.log("Enhanced Query Plan with Sub-Questions:", JSON.stringify(enhancedPlan, null, 2));
+    console.log("Enhanced Query Plan with Ultra-Low Thresholds:", JSON.stringify(enhancedPlan, null, 2));
 
     return new Response(JSON.stringify({
       queryPlan: enhancedPlan,
@@ -458,20 +487,20 @@ serve(async (req) => {
       queryType: "journal_specific",
       subQuestions: [
         {
-          question: "Find relevant journal entries",
+          question: "Find relevant journal entries with ultra-sensitive search",
           searchPlan: {
             vectorSearch: {
               enabled: true,
-              threshold: 0.05
+              threshold: 0.01 // Ultra-low emergency threshold
             },
             sqlQueries: [],
-            fallbackStrategy: "recent_entries"
+            fallbackStrategy: "keyword_search"
           }
         }
       ],
       totalEntryCount: 0,
       confidence: 0.3,
-      reasoning: "Emergency fallback plan",
+      reasoning: "Emergency fallback plan with ultra-low thresholds",
       expectedResponse: "analysis",
       isErrorFallback: true
     };
