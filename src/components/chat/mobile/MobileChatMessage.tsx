@@ -30,14 +30,17 @@ export default function MobileChatMessage({ message }: MobileChatMessageProps) {
     }
   };
 
-  // Helper function to safely check if reference_entries is an array
+  // Helper function to safely check for references
   const getReferenceEntries = () => {
+    // Check message.reference_entries first (it could be undefined, an array, or something else)
     if (Array.isArray(message.reference_entries)) {
       return message.reference_entries;
     }
+    // Check message.references as a fallback (it could be undefined, an array, or something else)
     if (Array.isArray(message.references)) {
       return message.references;
     }
+    // Return an empty array if neither property exists or they're not arrays
     return [];
   };
 

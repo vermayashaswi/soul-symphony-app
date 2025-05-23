@@ -48,7 +48,7 @@ export interface ChatMessage {
   thread_id: string;
   content: string;
   sender: 'user' | 'assistant' | 'error';
-  role: 'user' | 'assistant' | 'error';  // Make this required to match types/chat.ts
+  role: 'user' | 'assistant' | 'error';
   created_at: string;
   reference_entries?: any[];
   references?: any[];
@@ -61,7 +61,10 @@ export interface ChatMessage {
   interactiveOptions?: any[];
   diagnostics?: any;
   is_processing?: boolean;
-  time_pattern_analysis?: any; // Add this field for time pattern analysis results
+  time_pattern_analysis?: any;
+  sub_query1?: string;
+  sub_query2?: string;
+  sub_query3?: string;
 }
 
 // Client time info type
@@ -100,7 +103,11 @@ export function jsonToSubQueryResponse(json: any): SubQueryResponse[] {
   if (!json) return [];
   if (!Array.isArray(json)) {
     try {
-      json = JSON.parse(json);
+      // If it's a string, try to parse it
+      if (typeof json === 'string') {
+        json = JSON.parse(json);
+      }
+      // If it's still not an array after parsing, return empty
       if (!Array.isArray(json)) return [];
     } catch {
       return [];

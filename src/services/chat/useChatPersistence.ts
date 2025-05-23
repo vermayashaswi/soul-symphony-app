@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -16,7 +17,7 @@ export interface ChatMessagePersistence {
   thread_id: string;
   content: string;
   sender: 'user' | 'assistant' | 'error';
-  role?: string;
+  role?: 'user' | 'assistant' | 'error';
   created_at: string;
   reference_entries?: any[];
   analysis_data?: any;
@@ -155,22 +156,29 @@ export const useChatPersistence = (userId: string | undefined) => {
           
         if (error || !newThread) throw new Error("Failed to retrieve new thread");
         
-        // Cast to ChatThread type with proper type safety
-        let typedMetadata: ChatThread['metadata'] = undefined;
+        // Ensure metadata is properly typed
+        let typedMetadata: ChatThread['metadata'] | undefined = undefined;
         
         if (newThread.metadata && typeof newThread.metadata === 'object' && !Array.isArray(newThread.metadata)) {
           typedMetadata = {
-            timeContext: newThread.metadata.timeContext || null,
-            topicContext: newThread.metadata.topicContext || null,
-            intentType: newThread.metadata.intentType || undefined,
-            confidenceScore: newThread.metadata.confidenceScore || undefined,
-            needsClarity: newThread.metadata.needsClarity || false,
-            ambiguities: Array.isArray(newThread.metadata.ambiguities) ? newThread.metadata.ambiguities : [],
-            domainContext: newThread.metadata.domainContext || null,
-            lastUpdated: newThread.metadata.lastUpdated || undefined,
-            ...(newThread.metadata as object) // Include other properties
+            timeContext: typeof newThread.metadata.timeContext === 'string' ? newThread.metadata.timeContext : null,
+            topicContext: typeof newThread.metadata.topicContext === 'string' ? newThread.metadata.topicContext : null,
+            intentType: typeof newThread.metadata.intentType === 'string' ? newThread.metadata.intentType : undefined,
+            confidenceScore: typeof newThread.metadata.confidenceScore === 'number' ? newThread.metadata.confidenceScore : undefined,
+            needsClarity: Boolean(newThread.metadata.needsClarity),
+            ambiguities: Array.isArray(newThread.metadata.ambiguities) ? 
+              newThread.metadata.ambiguities.filter(item => typeof item === 'string') as string[] : 
+              [],
+            domainContext: typeof newThread.metadata.domainContext === 'string' ? newThread.metadata.domainContext : null,
+            lastUpdated: typeof newThread.metadata.lastUpdated === 'string' ? newThread.metadata.lastUpdated : undefined
           };
         }
+        
+        // Ensure processing_status is one of the allowed values
+        const status = newThread.processing_status as string;
+        const allowedStatuses = ['idle', 'processing', 'failed'];
+        const safeStatus = allowedStatuses.includes(status) ? 
+          status as 'idle' | 'processing' | 'failed' : 'idle';
         
         const typedThread: ChatThread = {
           id: newThread.id,
@@ -178,7 +186,7 @@ export const useChatPersistence = (userId: string | undefined) => {
           user_id: newThread.user_id,
           created_at: newThread.created_at,
           updated_at: newThread.updated_at,
-          processing_status: (newThread.processing_status as 'idle' | 'processing' | 'failed') || 'idle',
+          processing_status: safeStatus,
           metadata: typedMetadata
         };
         
@@ -198,7 +206,7 @@ export const useChatPersistence = (userId: string | undefined) => {
     }
   };
 
-  const sendMessage = async (
+  const sendMessageToThread = async (
     content: string, 
     parameters: Record<string, any> = {}
   ) => {
@@ -284,7 +292,7 @@ export const useChatPersistence = (userId: string | undefined) => {
     loading,
     selectThread,
     createNewThread,
-    sendMessage,
+    sendMessage: sendMessageToThread,
     updateTitle
   };
 };
