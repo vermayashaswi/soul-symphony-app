@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -18,7 +17,7 @@ import EmptyChatState from '../EmptyChatState';
 export default function MobileChatInterface() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { threadId } = useParams();
+  const { threadId } = useParams<{ threadId?: string }>();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   
@@ -31,7 +30,7 @@ export default function MobileChatInterface() {
 
   useEffect(() => {
     if (!user) {
-      navigate('/auth');
+      navigate('/app/auth');
       return;
     }
 
@@ -49,7 +48,7 @@ export default function MobileChatInterface() {
           // If no specific thread is specified but user has threads, use the most recent one
           if (!currentThreadId && userThreads.length > 0) {
             currentThreadId = userThreads[0].id;
-            navigate(`/chat/${currentThreadId}`, { replace: true });
+            navigate(`/app/smart-chat/${currentThreadId}`, { replace: true });
           }
         }
         
@@ -58,7 +57,7 @@ export default function MobileChatInterface() {
           const newThreadId = await createThread(user.id);
           if (newThreadId) {
             currentThreadId = newThreadId;
-            navigate(`/chat/${newThreadId}`, { replace: true });
+            navigate(`/app/smart-chat/${newThreadId}`, { replace: true });
             
             // Refresh threads list
             const updatedThreads = await getUserChatThreads(user.id);
@@ -162,7 +161,7 @@ export default function MobileChatInterface() {
       
       const newThreadId = await createThread(user.id);
       if (newThreadId) {
-        navigate(`/chat/${newThreadId}`);
+        navigate(`/app/smart-chat/${newThreadId}`);
         setSidebarOpen(false);
         
         // Refresh threads list
@@ -210,7 +209,7 @@ export default function MobileChatInterface() {
             <ChatThreadList
               activeThreadId={activeThreadId}
               onSelectThread={(threadId) => {
-                navigate(`/chat/${threadId}`);
+                navigate(`/app/smart-chat/${threadId}`);
                 setSidebarOpen(false);
               }}
               onCreateThread={handleCreateNewThread}

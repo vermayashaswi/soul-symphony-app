@@ -77,7 +77,9 @@ const AppRoutes = () => {
             </React.Suspense>
           } />
           <Route path="chat" element={<Chat />} />
+          <Route path="chat/:threadId" element={<Chat />} />
           <Route path="smart-chat" element={<SmartChat />} />
+          <Route path="smart-chat/:threadId" element={<SmartChat />} />
           <Route path="settings" element={<Settings />} />
         </Route>
         
@@ -88,7 +90,9 @@ const AppRoutes = () => {
         <Route path="/journal" element={<Navigate to="/app/journal" replace />} />
         <Route path="/insights" element={<Navigate to="/app/insights" replace />} />
         <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
+        <Route path="/chat/:threadId" element={<Navigate to="/app/chat/$1" replace />} />
         <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
+        <Route path="/smart-chat/:threadId" element={<Navigate to="/app/smart-chat/$1" replace />} />
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
         
         {/* Catch-all route */}
