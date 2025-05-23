@@ -70,12 +70,13 @@ async function searchWithProgressiveThresholds(
 }
 
 /**
- * Keyword-based content search fallback
+ * Enhanced keyword-based content search with date filtering support
  */
 async function searchByKeywords(
   supabase: any,
   userId: string,
-  query: string
+  query: string,
+  dateFilter?: { startDate?: string; endDate?: string }
 ): Promise<any[]> {
   console.log(`[chat-with-rag] Attempting keyword search for: "${query}"`);
   
@@ -91,15 +92,26 @@ async function searchByKeywords(
   }
   
   try {
-    const keywordPattern = keywords.map(k => `%${k}%`).join('|');
-    
-    const { data, error } = await supabase
+    let query_builder = supabase
       .from('Journal Entries')
       .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
       .eq('user_id', userId)
       .or(keywords.map(keyword => 
         `"refined text".ilike.%${keyword}%,"transcription text".ilike.%${keyword}%`
-      ).join(','))
+      ).join(','));
+    
+    // Apply date filters if provided
+    if (dateFilter?.startDate) {
+      query_builder = query_builder.gte('created_at', dateFilter.startDate);
+      console.log(`[chat-with-rag] Applying keyword search start date filter: ${dateFilter.startDate}`);
+    }
+    
+    if (dateFilter?.endDate) {
+      query_builder = query_builder.lte('created_at', dateFilter.endDate);
+      console.log(`[chat-with-rag] Applying keyword search end date filter: ${dateFilter.endDate}`);
+    }
+    
+    const { data, error } = await query_builder
       .order('created_at', { ascending: false })
       .limit(10);
       
@@ -113,7 +125,7 @@ async function searchByKeywords(
         matched_keywords: keywords
       }));
       
-      console.log(`[chat-with-rag] Keyword search found ${results.length} results`);
+      console.log(`[chat-with-rag] Keyword search found ${results.length} results with date filtering`);
       return results;
     }
   } catch (error) {
@@ -278,25 +290,59 @@ async function executeSubQuestionPlan(
       }
     }
     
-    // Apply enhanced fallback strategies if insufficient results
+    // Apply enhanced fallback strategies with strict date filtering
     if (results.length < 3 && searchPlan.fallbackStrategy) {
       console.log(`[chat-with-rag] Applying enhanced fallback strategy: ${searchPlan.fallbackStrategy}`);
+      
+      // Extract date filter from vector search plan
+      const dateFilter = searchPlan.vectorSearch?.dateFilter || null;
+      
+      // If we have a date filter but no results, don't apply fallback - return empty
+      if (dateFilter) {
+        console.log(`[chat-with-rag] Date filter detected: ${JSON.stringify(dateFilter)} - checking if fallback should respect it`);
+        
+        // For date-filtered queries, if we have no results, we should NOT fall back to broader searches
+        if (results.length === 0) {
+          console.log(`[chat-with-rag] No results found within date range ${dateFilter.startDate} to ${dateFilter.endDate} - NOT applying fallback to maintain date constraint integrity`);
+          return {
+            subQuestion: subQuestion.question,
+            purpose: subQuestion.purpose,
+            results: [],
+            resultCount: 0,
+            dateFilterApplied: true,
+            dateRange: dateFilter
+          };
+        }
+      }
       
       try {
         let fallbackResults = [];
         
         if (searchPlan.fallbackStrategy === 'keyword_search') {
-          fallbackResults = await searchByKeywords(supabase, userId, subQuestion.question);
+          fallbackResults = await searchByKeywords(supabase, userId, subQuestion.question, dateFilter);
           fallbackResults = fallbackResults.map(entry => ({
             ...entry,
             source: 'fallback_keyword',
             subQuestion: subQuestion.question
           }));
         } else if (searchPlan.fallbackStrategy === 'recent_entries') {
-          const { data, error } = await supabase
+          let query_builder = supabase
             .from('Journal Entries')
             .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
-            .eq('user_id', userId)
+            .eq('user_id', userId);
+          
+          // Apply date filters to recent entries fallback if they exist
+          if (dateFilter?.startDate) {
+            query_builder = query_builder.gte('created_at', dateFilter.startDate);
+            console.log(`[chat-with-rag] Applying recent entries fallback start date filter: ${dateFilter.startDate}`);
+          }
+          
+          if (dateFilter?.endDate) {
+            query_builder = query_builder.lte('created_at', dateFilter.endDate);
+            console.log(`[chat-with-rag] Applying recent entries fallback end date filter: ${dateFilter.endDate}`);
+          }
+          
+          const { data, error } = await query_builder
             .order('created_at', { ascending: false })
             .limit(10);
             
@@ -311,10 +357,23 @@ async function executeSubQuestionPlan(
             }));
           }
         } else if (searchPlan.fallbackStrategy === 'emotion_based') {
-          const { data, error } = await supabase.rpc('get_top_emotions_with_entries', {
+          // Apply date filters to emotion-based fallback
+          const emotionParams = {
             user_id_param: userId,
             limit_count: 3
-          });
+          };
+          
+          if (dateFilter?.startDate) {
+            emotionParams.start_date = dateFilter.startDate;
+            console.log(`[chat-with-rag] Applying emotion fallback start date filter: ${dateFilter.startDate}`);
+          }
+          
+          if (dateFilter?.endDate) {
+            emotionParams.end_date = dateFilter.endDate;
+            console.log(`[chat-with-rag] Applying emotion fallback end date filter: ${dateFilter.endDate}`);
+          }
+          
+          const { data, error } = await supabase.rpc('get_top_emotions_with_entries', emotionParams);
           
           if (!error && data) {
             fallbackResults = data.flatMap(emotion => 
@@ -332,7 +391,7 @@ async function executeSubQuestionPlan(
         }
         
         results = results.concat(fallbackResults);
-        console.log(`[chat-with-rag] Enhanced fallback strategy added ${fallbackResults.length} results`);
+        console.log(`[chat-with-rag] Enhanced fallback strategy added ${fallbackResults.length} results (with date filtering: ${dateFilter ? 'yes' : 'no'})`);
         
       } catch (error) {
         console.error(`[chat-with-rag] Enhanced fallback strategy failed:`, error);
@@ -343,7 +402,8 @@ async function executeSubQuestionPlan(
       subQuestion: subQuestion.question,
       purpose: subQuestion.purpose,
       results: results,
-      resultCount: results.length
+      resultCount: results.length,
+      dateFilterApplied: !!searchPlan.vectorSearch?.dateFilter
     };
     
   } catch (error) {
@@ -381,6 +441,7 @@ async function executeIntelligentSubQueries(
     // Aggregate all results
     let allResults = [];
     const subQuestionSummary = [];
+    let hasDateFilters = false;
     
     subQuestionResults.forEach((result, index) => {
       if (result.status === 'fulfilled') {
@@ -390,8 +451,13 @@ async function executeIntelligentSubQueries(
           question: subResult.subQuestion,
           purpose: subResult.purpose,
           resultCount: subResult.resultCount,
-          status: 'success'
+          status: 'success',
+          dateFilterApplied: subResult.dateFilterApplied
         });
+        
+        if (subResult.dateFilterApplied) {
+          hasDateFilters = true;
+        }
       } else {
         console.error(`Sub-question ${index} failed:`, result.reason);
         subQuestionSummary.push({
@@ -408,12 +474,13 @@ async function executeIntelligentSubQueries(
       index === self.findIndex(e => e.id === entry.id)
     ).sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
     
-    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${subQuestionSummary.length} sub-questions`);
+    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${subQuestionSummary.length} sub-questions (date filters applied: ${hasDateFilters})`);
     
     return {
       results: uniqueResults.slice(0, 20),
       subQuestionSummary,
-      totalResults: uniqueResults.length
+      totalResults: uniqueResults.length,
+      hasDateFilters
     };
     
   } catch (error) {
@@ -465,6 +532,36 @@ Response formatting requirements:
       systemPrompt += `\n\nFocus: Analyze emotional patterns using ${queryPlan.subQuestions.length} targeted approaches.`;
     }
 
+    // Check if we have date filters but no results - provide specific message
+    if (aggregatedResults.hasDateFilters && aggregatedResults.results.length === 0) {
+      // Extract date information from the query for a more specific response
+      let timeReference = "that time period";
+      if (message.toLowerCase().includes("last week")) {
+        timeReference = "last week";
+      } else if (message.toLowerCase().includes("yesterday")) {
+        timeReference = "yesterday";
+      } else if (message.toLowerCase().includes("last month")) {
+        timeReference = "last month";
+      } else if (message.toLowerCase().includes("this week")) {
+        timeReference = "this week";
+      } else if (message.toLowerCase().includes("this month")) {
+        timeReference = "this month";
+      }
+      
+      const noEntriesResponse = `I don't see any journal entries from ${timeReference} to analyze. To help me understand your patterns and provide insights, try journaling regularly during the time periods you're curious about. Once you have some entries, I'll be able to give you personalized analysis!`;
+      
+      return {
+        content: noEntriesResponse,
+        analysisMetadata: {
+          entriesAnalyzed: 0,
+          totalEntries: 0,
+          dateFilterApplied: true,
+          timeReference: timeReference,
+          reason: "No entries found in specified date range"
+        }
+      };
+    }
+
     // Optimize journal entry formatting
     const formattedResults = aggregatedResults.results.slice(0, 12).map((entry, index) => {
       const date = new Date(entry.created_at).toLocaleDateString('en-US', {
@@ -489,7 +586,8 @@ Response formatting requirements:
           new Date(Math.max(...aggregatedResults.results.map(r => new Date(r.created_at).getTime()))) : null
       },
       subQuestionsUsed: aggregatedResults.subQuestionSummary.length,
-      analysisApproaches: aggregatedResults.subQuestionSummary.map(sq => sq.question)
+      analysisApproaches: aggregatedResults.subQuestionSummary.map(sq => sq.question),
+      dateFilterApplied: aggregatedResults.hasDateFilters
     };
 
     const userPrompt = `Based on your ${aggregatedResults.results.length} journal entries, here's what I found:
@@ -718,7 +816,8 @@ serve(async (req) => {
       aggregatedResults = {
         results: fallbackResults,
         subQuestionSummary: [{ question: 'Direct search', resultCount: fallbackResults.length, status: 'success' }],
-        totalResults: fallbackResults.length
+        totalResults: fallbackResults.length,
+        hasDateFilters: false
       };
     }
 
