@@ -460,10 +460,3 @@ export function debugTimezoneInfo(): void {
       getZonedDate(summerDate, timezoneName).toString());
   }
 }
-
-// Re-export the functions that need to be available
-export {
-  getUserTimezoneName,
-  getUserTimezoneOffset,
-  isDirectDateQuery
-};
