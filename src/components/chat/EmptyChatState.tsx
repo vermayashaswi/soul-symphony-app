@@ -2,6 +2,7 @@
 import React from 'react';
 import ChatSuggestionButton from './ChatSuggestionButton';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { ChartBar, Lightbulb, Search, Flower } from 'lucide-react';
 
 interface EmptyChatStateProps {
   onSuggestionClick?: (suggestion: string) => void;
@@ -9,10 +10,22 @@ interface EmptyChatStateProps {
 
 const EmptyChatState: React.FC<EmptyChatStateProps> = ({ onSuggestionClick }) => {
   const suggestions = [
-    "How have I been feeling lately?",
-    "What patterns do you see in my journal?",
-    "Can you help me reflect on my recent entries?",
-    "What insights can you share about my mood?"
+    {
+      text: "What were my top emotions last week?",
+      icon: ChartBar
+    },
+    {
+      text: "What time of the day do I usually like journaling?",
+      icon: Search
+    },
+    {
+      text: "Am I an introvert? Do I like people in general?",
+      icon: Lightbulb
+    },
+    {
+      text: "What should I particularly do to help my mental health?",
+      icon: Flower
+    }
   ];
 
   return (
@@ -27,14 +40,20 @@ const EmptyChatState: React.FC<EmptyChatStateProps> = ({ onSuggestionClick }) =>
       </div>
       
       <div className="grid gap-3 w-full max-w-sm empty-chat-suggestion">
-        {suggestions.map((suggestion, index) => (
-          <ChatSuggestionButton
-            key={index}
-            onClick={() => onSuggestionClick?.(suggestion)}
-          >
-            {suggestion}
-          </ChatSuggestionButton>
-        ))}
+        {suggestions.map((suggestion, index) => {
+          const IconComponent = suggestion.icon;
+          return (
+            <ChatSuggestionButton
+              key={index}
+              onClick={() => onSuggestionClick?.(suggestion.text)}
+            >
+              <div className="flex items-center gap-2">
+                <IconComponent className="h-4 w-4 text-muted-foreground" />
+                <span>{suggestion.text}</span>
+              </div>
+            </ChatSuggestionButton>
+          );
+        })}
       </div>
     </div>
   );
