@@ -10,15 +10,14 @@ import { useNavigate, useParams } from 'react-router-dom';
 import { Button } from '@/components/ui/button';
 import { Plus, List, Loader2 } from 'lucide-react';
 import { Sheet, SheetContent, SheetHeader, SheetTitle } from '@/components/ui/sheet';
-import { useTranslation } from '@/contexts/TranslationContext';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 import { supabase } from '@/integrations/supabase/client';
-import ChatThreadList from '../ChatThreadList';
+import { ChatThreadList } from '../ChatThreadList';
 import EmptyChatState from '../EmptyChatState';
 
 export default function MobileChatInterface() {
   const { user } = useAuth();
   const { toast } = useToast();
-  const { translate } = useTranslation();
   const { threadId } = useParams();
   const navigate = useNavigate();
   const messagesEndRef = useRef<HTMLDivElement>(null);
@@ -86,8 +85,8 @@ export default function MobileChatInterface() {
       } catch (error) {
         console.error("Error initializing chat:", error);
         toast({
-          title: translate ? translate("Error loading messages", "en") : "Error loading messages",
-          description: translate ? translate("Could not load conversation history.", "en") : "Could not load conversation history.",
+          title: "Error loading messages",
+          description: "Could not load conversation history.",
           variant: "destructive",
         });
       } finally {
@@ -124,7 +123,7 @@ export default function MobileChatInterface() {
         supabase.removeChannel(messageSubscription);
       };
     }
-  }, [user, navigate, threadId, toast, translate]);
+  }, [user, navigate, threadId, toast]);
   
   // Scroll to bottom when messages change
   useEffect(() => {
@@ -194,7 +193,7 @@ export default function MobileChatInterface() {
           <List className="h-5 w-5" />
         </Button>
         <h1 className="text-md font-medium">
-          {translate ? translate("Chat", "en") : "Chat"}
+          <TranslatableText text="Chat" />
         </h1>
         <Button variant="ghost" size="icon" onClick={handleCreateNewThread}>
           <Plus className="h-5 w-5" />
@@ -205,17 +204,16 @@ export default function MobileChatInterface() {
       <Sheet open={sidebarOpen} onOpenChange={setSidebarOpen}>
         <SheetContent side="left" className="w-[85%] sm:w-[385px]">
           <SheetHeader className="sheet-header">
-            <SheetTitle>{translate ? translate("Conversations", "en") : "Conversations"}</SheetTitle>
+            <SheetTitle><TranslatableText text="Conversations" /></SheetTitle>
           </SheetHeader>
           <div className="mt-5">
             <ChatThreadList
-              threads={threads}
               activeThreadId={activeThreadId}
               onSelectThread={(threadId) => {
                 navigate(`/chat/${threadId}`);
                 setSidebarOpen(false);
               }}
-              onCreateNewThread={handleCreateNewThread}
+              onCreateThread={handleCreateNewThread}
             />
           </div>
         </SheetContent>
@@ -235,7 +233,6 @@ export default function MobileChatInterface() {
               <MobileChatMessage
                 key={msg.id}
                 message={msg}
-                showTimestamp={true}
               />
             ))}
             <div ref={messagesEndRef} />
@@ -247,8 +244,8 @@ export default function MobileChatInterface() {
       <div className="sticky bottom-0 mobile-chat-input-container">
         <MobileChatInput
           onSendMessage={handleSendMessage}
-          threadId={activeThreadId || undefined}
-          disabled={loading || !activeThreadId || isSending}
+          isLoading={loading || isSending}
+          userId={user?.id}
         />
       </div>
     </div>
