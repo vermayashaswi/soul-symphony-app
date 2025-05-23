@@ -1,3 +1,4 @@
+
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { supabase } from '@/integrations/supabase/client';
 import { 
@@ -65,14 +66,20 @@ export async function planQuery(message: string, threadId: string, userId: strin
     
     console.log(`[Query Planner] Client time information:`, clientInfo);
     
-    // Get user's timezone from their profile
+    // Get user's timezone from their profile with 25s timeout
     let userTimezone;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 seconds
+      
       const { data: profileData } = await supabase
         .from('profiles')
         .select('timezone')
         .eq('id', userId)
+        .abortSignal(controller.signal)
         .single();
+        
+      clearTimeout(timeoutId);
         
       if (profileData && profileData.timezone) {
         userTimezone = profileData.timezone;

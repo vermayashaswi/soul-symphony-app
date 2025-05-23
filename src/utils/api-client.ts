@@ -17,7 +17,7 @@ export async function fetchWithRetry(
   const { 
     retries = 3, 
     retryDelay = 1000, 
-    timeout = 10000,
+    timeout = 25000, // 25 seconds
     ...fetchOptions 
   } = options;
   

@@ -110,7 +110,7 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000); // Increased to 10s
+      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 seconds
       
       const response = await promptFunction();
       clearTimeout(timeoutId);
@@ -411,16 +411,17 @@ serve(async (req) => {
 
     console.log(`[Smart Query Planner] Analyzing query with enhanced sub-questions: "${message}"`);
 
-    // Get user's journal entry count with timeout
+    // Get user's journal entry count with 25s timeout
     let entryCount = 0;
     try {
       const countController = new AbortController();
-      const countTimeoutId = setTimeout(() => countController.abort(), 2000);
+      const countTimeoutId = setTimeout(() => countController.abort(), 25000); // 25 seconds
       
       const { count, error } = await supabase
         .from('Journal Entries')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .abortSignal(countController.signal);
         
       clearTimeout(countTimeoutId);
         
