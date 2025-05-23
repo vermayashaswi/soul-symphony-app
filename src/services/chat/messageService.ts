@@ -1,3 +1,4 @@
+
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -336,8 +337,7 @@ export async function sendMessage(
       });
       
       console.log(`[sendMessage] Enhanced debugging - chat-with-rag response:`, queryResponse);
-      console.log(`[sendMessage] Enhanced debugging - queryResponse.data:`, queryResponse.data);
-      console.log(`[sendMessage] Enhanced debugging - queryResponse.error:`, queryResponse.error);
+      console.log(`[sendMessage] Enhanced debugging - Raw queryResponse:`, JSON.stringify(queryResponse, null, 2));
       
       if (queryResponse.error) {
         console.error('Error from chat-with-rag:', queryResponse.error);
@@ -349,9 +349,10 @@ export async function sendMessage(
         throw new Error('Failed to get response from chat-with-rag engine');
       }
       
-      // CRITICAL FIX: The backend returns { data: actualResponseString }
-      // So queryResponse.data contains the actual response string
-      finalResponse = queryResponse.data;
+      // CRITICAL FIX: Access the nested data properly
+      // The backend returns { data: responseString } and Supabase wraps it again
+      // So we need queryResponse.data.data for the actual response string
+      finalResponse = queryResponse.data.data || queryResponse.data;
       
       console.log(`[sendMessage] Enhanced debugging - Final response type: ${typeof finalResponse}`);
       console.log(`[sendMessage] Enhanced debugging - Final response preview: ${finalResponse?.substring(0, 100)}...`);
@@ -361,7 +362,9 @@ export async function sendMessage(
         console.error('Invalid response format from chat-with-rag:', {
           responseType: typeof finalResponse,
           responseValue: finalResponse,
-          fullQueryResponse: queryResponse
+          fullQueryResponse: queryResponse,
+          dataProperty: queryResponse.data,
+          nestedData: queryResponse.data?.data
         });
         finalResponse = 'I apologize, but I encountered an error processing your request. Please try again.';
       }
