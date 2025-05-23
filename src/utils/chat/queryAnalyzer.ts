@@ -17,6 +17,7 @@ export type QueryTypes = {
   isPersonalInsightQuery: boolean;  // New field for personal insight queries
   isMentalHealthQuery: boolean;     // New field for mental health queries
   isStatisticalQuery: boolean;      // Added missing property
+  needsEmergencyFixes: boolean;     // Added missing property for emergency fixes
   emotion?: string;
   theme?: string;
   timeRange: {
@@ -196,6 +197,7 @@ export function analyzeQueryTypes(message: string): QueryTypes {
     isPersonalInsightQuery: false,
     isMentalHealthQuery: false,
     isStatisticalQuery: false, // Initialize the new property
+    needsEmergencyFixes: false, // Initialize the emergency fixes property
     timeRange: {
       startDate: null,
       endDate: null,
@@ -270,6 +272,9 @@ export function analyzeQueryTypes(message: string): QueryTypes {
     result.isPersonalInsightQuery = true;
     result.needsMoreContext = true;
   }
+
+  // Set emergency fixes flag for personality and emotion queries
+  result.needsEmergencyFixes = result.isPersonalInsightQuery || result.isEmotionFocused;
 
   // Enhanced theme detection
   // First check for explicit theme words
