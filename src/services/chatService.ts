@@ -306,9 +306,46 @@ export async function processChatMessage(
           throw new Error(`Failed to process chat: ${chatError.message}`);
         }
 
+        console.log("Raw chat-with-rag response:", chatResponse);
+        console.log("Response structure:", {
+          hasData: !!chatResponse,
+          dataType: typeof chatResponse,
+          dataKeys: chatResponse ? Object.keys(chatResponse) : [],
+          dataValue: chatResponse
+        });
+
+        // EMERGENCY FIX: chat-with-rag returns { data: "response string" }
+        // We need to extract the actual response from the data field
+        let finalResponse;
+        if (chatResponse && typeof chatResponse === 'string') {
+          // Sometimes the response is directly a string
+          finalResponse = chatResponse;
+        } else if (chatResponse && chatResponse.data) {
+          // Most of the time it's wrapped in a data field
+          finalResponse = chatResponse.data;
+        } else if (chatResponse && chatResponse.response) {
+          // Fallback for legacy response format
+          finalResponse = chatResponse.response;
+        } else {
+          console.error("Unexpected response format from chat-with-rag:", chatResponse);
+          finalResponse = null;
+        }
+
+        console.log("Final extracted response:", {
+          hasResponse: !!finalResponse,
+          responseType: typeof finalResponse,
+          responseLength: finalResponse ? finalResponse.length : 0,
+          firstChars: finalResponse ? finalResponse.substring(0, 100) : null
+        });
+
+        if (!finalResponse || typeof finalResponse !== 'string') {
+          console.error("No valid response extracted from chat-with-rag");
+          throw new Error("Failed to extract valid response from chat engine");
+        }
+
         // Prepare the response
         return {
-          content: chatResponse?.response || "I couldn't generate a response at this time.",
+          content: finalResponse,
           role: 'assistant',
           references: chatResponse?.references || [],
           analysis: chatResponse?.analysis || null,
