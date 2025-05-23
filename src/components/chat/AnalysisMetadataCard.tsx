@@ -2,7 +2,6 @@
 import React, { useState } from 'react';
 import { Card, CardContent } from '@/components/ui/card';
 import { ChevronDown, ChevronUp, BarChart3, Calendar, Brain } from 'lucide-react';
-import { useTheme } from '@/hooks/use-theme';
 
 interface AnalysisMetadataProps {
   metadata: {
@@ -19,7 +18,6 @@ interface AnalysisMetadataProps {
 
 export const AnalysisMetadataCard: React.FC<AnalysisMetadataProps> = ({ metadata }) => {
   const [isExpanded, setIsExpanded] = useState(false);
-  const { theme } = useTheme();
 
   if (!metadata) return null;
 
@@ -47,7 +45,7 @@ export const AnalysisMetadataCard: React.FC<AnalysisMetadataProps> = ({ metadata
           onClick={() => setIsExpanded(!isExpanded)}
         >
           <div className="flex items-center gap-2">
-            <BarChart3 className={`h-4 w-4 text-${theme.primary}`} />
+            <BarChart3 className="h-4 w-4 text-theme" />
             <span className="text-sm font-medium">
               Analyzed {metadata.entriesAnalyzed} journal entries
             </span>
@@ -76,7 +74,7 @@ export const AnalysisMetadataCard: React.FC<AnalysisMetadataProps> = ({ metadata
                 <div className="text-xs font-medium mb-1">Analysis methods used:</div>
                 <div className="space-y-1">
                   {metadata.analysisApproaches.map((approach, index) => (
-                    <div key={index} className="text-xs pl-2 border-l-2 border-opacity-30" style={{ borderColor: `var(--${theme.primary})` }}>
+                    <div key={index} className="text-xs pl-2 border-l-2 border-theme border-opacity-30">
                       {approach}
                     </div>
                   ))}

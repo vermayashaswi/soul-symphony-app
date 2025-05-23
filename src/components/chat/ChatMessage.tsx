@@ -5,7 +5,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Bot, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { AnalysisMetadataCard } from './AnalysisMetadataCard';
-import { useTheme } from '@/hooks/use-theme';
 
 interface ChatMessageProps {
   message: {
@@ -18,27 +17,26 @@ interface ChatMessageProps {
 }
 
 export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
-  const { theme } = useTheme();
   const isUser = message.sender === 'user';
 
   const customRenderers = {
     h1: ({ children }: any) => (
-      <h1 className={`text-lg font-bold mb-2 text-${theme.primary}`}>
+      <h1 className="text-lg font-bold mb-2 text-theme">
         {children}
       </h1>
     ),
     h2: ({ children }: any) => (
-      <h2 className={`text-base font-bold mb-2 text-${theme.primary}`}>
+      <h2 className="text-base font-bold mb-2 text-theme">
         {children}
       </h2>
     ),
     h3: ({ children }: any) => (
-      <h3 className={`text-sm font-bold mb-2 text-${theme.primary}`}>
+      <h3 className="text-sm font-bold mb-2 text-theme">
         {children}
       </h3>
     ),
     strong: ({ children }: any) => (
-      <strong className={`font-bold text-${theme.primary}`}>
+      <strong className="font-bold text-theme">
         {children}
       </strong>
     ),
@@ -49,7 +47,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     ),
     li: ({ children }: any) => (
       <li className="flex items-start gap-2">
-        <span className={`text-${theme.primary} mt-1 text-sm`}>•</span>
+        <span className="text-theme mt-1 text-sm">•</span>
         <span className="flex-1">{children}</span>
       </li>
     ),
@@ -59,7 +57,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
         <Avatar className="h-8 w-8 mt-1">
-          <AvatarFallback className={`bg-${theme.primary} text-white`}>
+          <AvatarFallback className="bg-theme text-white">
             <Bot className="h-4 w-4" />
           </AvatarFallback>
         </Avatar>
@@ -73,7 +71,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
         <Card className={`${
           isUser 
-            ? `bg-${theme.primary} text-white` 
+            ? 'bg-theme text-white' 
             : 'bg-card'
         }`}>
           <CardContent className="p-3">
