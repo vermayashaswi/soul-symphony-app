@@ -22,6 +22,7 @@ export async function sendMessage(
     const clientTimeInfo = getClientTimeInfo();
     
     console.log(`[sendMessage] Captured client time info:`, clientTimeInfo);
+    console.log(`[sendMessage] Enhanced debugging: Processing "${message}" for user ${userId}`);
     
     // Save the user message to the database
     await supabase.from('chat_messages').insert({
@@ -66,7 +67,7 @@ export async function sendMessage(
       .select('content, sender, created_at')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: false })
-      .limit(15); // Limit to last 15 messages
+      .limit(15);
     
     if (contextError) {
       console.error('Error fetching conversation context:', contextError);
@@ -75,7 +76,6 @@ export async function sendMessage(
     // Build conversation context for OpenAI
     const conversationContext = [];
     if (previousMessages && previousMessages.length > 0) {
-      // Convert to OpenAI message format (reverse to get chronological order)
       for (const msg of [...previousMessages].reverse()) {
         conversationContext.push({
           role: msg.sender === 'user' ? 'user' : 'assistant',
@@ -93,7 +93,6 @@ export async function sendMessage(
     
     const metadata = threadData?.metadata || {};
     
-    // Safely access metadata properties with type checking
     let metadataObj: Record<string, any> = {};
     if (isThreadMetadata(metadata)) {
       metadataObj = metadata;
@@ -159,7 +158,6 @@ export async function sendMessage(
     
     // Check if we have a direct response that doesn't need further processing
     if (queryPlanResponse.data.directResponse) {
-      // Replace the processing message with the direct response
       await supabase.from('chat_messages')
         .update({
           content: queryPlanResponse.data.directResponse,
@@ -167,7 +165,6 @@ export async function sendMessage(
         })
         .eq('id', processingMessageId);
       
-      // Update the thread metadata
       await updateThreadMetadata(threadId, {
         intentType: 'direct_response',
         timeContext: metadataObj.timeContext,
@@ -189,7 +186,8 @@ export async function sendMessage(
     const queryPlan = queryPlanResponse.data.plan || {};
     const queryType = queryPlanResponse.data.queryType || 'journal_specific';
     
-    console.log('Query plan received:', JSON.stringify(queryPlan, null, 2));
+    console.log('[sendMessage] Enhanced debugging - Query plan received:', JSON.stringify(queryPlan, null, 2));
+    console.log(`[sendMessage] Enhanced debugging - Query type: ${queryType}`);
     
     // Update the processing message with status based on the query plan
     let processingContent = "Processing your request...";
@@ -265,6 +263,8 @@ export async function sendMessage(
       };
     }
     
+    console.log(`[sendMessage] Enhanced debugging - Final date range:`, dateRange);
+    
     // First, verify that this user has journal entries in the database
     const { count: entryCount, error: countError } = await supabase
       .from('Journal Entries')
@@ -282,7 +282,6 @@ export async function sendMessage(
         "I need to analyze your journal entries. Would you like to create a journal entry first? " +
         "That will help me give you more tailored recommendations based on your experiences and emotions.";
       
-      // Update the processing message with the response
       await supabase.from('chat_messages')
         .update({
           content: noEntriesResponse,
@@ -290,7 +289,6 @@ export async function sendMessage(
         })
         .eq('id', processingMessageId);
       
-      // Update thread status
       await supabase.from('chat_threads')
         .update({ processing_status: 'idle' })
         .eq('id', threadId);
@@ -302,12 +300,12 @@ export async function sendMessage(
       };
     }
     
-    // Step 2: Send to chat-with-rag endpoint for processing (Enhanced)
-    // First check if we should treat this as a multi-part query
+    // CRUCIAL: Use only chat-with-rag function (the more robust one)
+    console.log(`[sendMessage] Enhanced debugging - Calling chat-with-rag function`);
+    
     let finalResponse;
     
     if (queryPlan.isSegmented) {
-      // Handle multi-part/segmented queries
       const subQueries = queryPlan.subqueries || [];
       const queryResponse = await processMultiPartQuery(
         message, 
@@ -321,7 +319,7 @@ export async function sendMessage(
       );
       finalResponse = queryResponse.response;
     } else {
-      // Standard query processing
+      // Standard query processing - ONLY use chat-with-rag
       const queryResponse = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message,
@@ -337,20 +335,22 @@ export async function sendMessage(
         }
       });
       
-      // Check if we got a response
+      console.log(`[sendMessage] Enhanced debugging - chat-with-rag response:`, queryResponse);
+      
       if (!queryResponse.data) {
-        throw new Error('Failed to get response from RAG engine');
+        throw new Error('Failed to get response from chat-with-rag engine');
       }
       
       finalResponse = queryResponse.data.data;
       
-      // If we got a response but it's empty or insufficient for mental health query
       if (isMentalHealthQuery && (!finalResponse || finalResponse.trim() === '' || finalResponse.includes("I don't have enough information"))) {
         finalResponse = "Based on the journal entries I have access to, I don't have enough information to provide specific mental health recommendations. " +
           "To give you better personalized advice, could you add more journal entries about your feelings, challenges, and daily experiences? " +
           "In the meantime, some general mental health practices include regular exercise, adequate sleep, mindfulness meditation, and connecting with others.";
       }
     }
+    
+    console.log(`[sendMessage] Enhanced debugging - Final response: ${finalResponse?.substring(0, 200)}...`);
     
     // Replace the processing message with the final response
     await supabase.from('chat_messages')
@@ -374,7 +374,6 @@ export async function sendMessage(
     
     await updateThreadMetadata(threadId, updatedMetadata);
     
-    // Update thread status
     await supabase.from('chat_threads')
       .update({ processing_status: 'idle' })
       .eq('id', threadId);
@@ -387,7 +386,6 @@ export async function sendMessage(
   } catch (error) {
     console.error('Error in sendMessage:', error);
     
-    // Update thread status
     await supabase.from('chat_threads')
       .update({ processing_status: 'error' })
       .eq('id', threadId);
@@ -406,7 +404,6 @@ export async function sendMessage(
 function detectMentalHealthQuery(message: string): boolean {
   const lowerMessage = message.toLowerCase().trim();
   
-  // Mental health keywords and patterns
   const mentalHealthPatterns = [
     /mental\s+health/i,
     /\b(anxiety|anxious|depress(ed|ion)|stress(ed)?|mood|emotion|therapy)\b/i,
@@ -416,7 +413,6 @@ function detectMentalHealthQuery(message: string): boolean {
     /what\s+(should|can|must)\s+i\s+do/i
   ];
   
-  // Check if any pattern matches
   return mentalHealthPatterns.some(pattern => pattern.test(lowerMessage));
 }
 
@@ -426,13 +422,11 @@ function detectMentalHealthQuery(message: string): boolean {
 function detectTimeFollowUp(message: string): boolean {
   const lowerMessage = message.toLowerCase().trim();
   
-  // Time reference patterns
   const timePatterns = [
     /^(what|how) about (yesterday|today|this week|last week|this month|last month)/i,
     /^(yesterday|today|this week|last week|this month|last month)(\?|\.)?$/i
   ];
   
-  // Check if any pattern matches
   return timePatterns.some(pattern => pattern.test(lowerMessage));
 }
 
@@ -450,23 +444,19 @@ async function processMultiPartQuery(
   userTimezone: string = 'UTC'
 ): Promise<SubQueryResponse> {
   try {
-    // If no sub-queries were provided, break down the question ourselves
     if (subQueries.length === 0) {
-      // We'll perform a basic split based on common patterns
       const questionParts = message.split(/(?:and|also|\?)\s+/i).filter(q => q.trim().length > 0);
       
-      // If we found multiple parts, use them as sub-queries
       if (questionParts.length > 1) {
         subQueries = questionParts.map(q => q.trim() + (q.endsWith('?') ? '' : '?'));
       } else {
-        // Fall back to the original message
         subQueries = [message];
       }
     }
     
-    // Process each sub-query
     const subQueryResponses: SubQueryResponse[] = [];
     for (const subQuery of subQueries) {
+      // Use chat-with-rag for all sub-queries too
       const queryResponse = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message: subQuery,
@@ -488,7 +478,6 @@ async function processMultiPartQuery(
       }
     }
     
-    // If we only have one response, return it directly
     if (subQueryResponses.length === 1) {
       return {
         query: message,
@@ -496,7 +485,6 @@ async function processMultiPartQuery(
       };
     }
     
-    // If we have multiple responses, combine them
     const combinedResponse = await supabase.functions.invoke('combine-segment-responses', {
       body: {
         originalQuery: message,
@@ -511,7 +499,6 @@ async function processMultiPartQuery(
       };
     }
     
-    // Fallback: concatenate the responses with headings
     let response = '';
     subQueryResponses.forEach((sq, index) => {
       if (index > 0) response += '\n\n';
@@ -536,7 +523,6 @@ async function processMultiPartQuery(
  */
 async function updateThreadMetadata(threadId: string, updates: Record<string, any>) {
   try {
-    // First get existing metadata
     const { data, error } = await supabase
       .from('chat_threads')
       .select('metadata')
@@ -548,24 +534,20 @@ async function updateThreadMetadata(threadId: string, updates: Record<string, an
       return;
     }
     
-    // Merge existing metadata with updates
     const currentMetadata = data?.metadata || {};
     let metadataObj: Record<string, any> = {};
     
-    // Ensure currentMetadata is an object before merging
     if (isThreadMetadata(currentMetadata)) {
       metadataObj = { ...currentMetadata };
     } else {
       console.warn('Thread metadata is not in expected format:', currentMetadata);
     }
     
-    // Merge with updates
     const updatedMetadata = {
       ...metadataObj,
       ...updates
     };
     
-    // Save the updated metadata
     await supabase
       .from('chat_threads')
       .update({ metadata: updatedMetadata })
@@ -595,9 +577,7 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
       
     if (error) throw error;
     
-    // Process data to ensure types are correct
     return (data || []).map((msg: any) => {
-      // Create a properly typed ChatMessage object
       const chatMessage: ChatMessage = {
         id: msg.id,
         thread_id: msg.thread_id,
@@ -605,13 +585,10 @@ export const getThreadMessages = async (threadId: string): Promise<ChatMessage[]
         sender: msg.sender as 'user' | 'assistant' | 'error',
         role: msg.role as 'user' | 'assistant' | 'error',
         created_at: msg.created_at,
-        // Add aliases for backward compatibility - ensure these are arrays even if the database returns them as strings
         references: Array.isArray(msg.reference_entries) ? msg.reference_entries : [], 
         reference_entries: Array.isArray(msg.reference_entries) ? msg.reference_entries : [],
-        // Handle analysis data properly (it could be any JSON structure)
         analysis: msg.analysis_data,
         analysis_data: msg.analysis_data,
-        // Convert sub_query_responses to proper type
         sub_query_responses: jsonToSubQueryResponse(msg.sub_query_responses),
         is_processing: msg.is_processing,
         hasNumericResult: msg.has_numeric_result,
@@ -640,18 +617,16 @@ export const saveMessage = async (
   interactiveOptions?: any[]
 ): Promise<ChatMessage | null> => {
   try {
-    // Create the base message object with properly formatted fields for database
     const messageData = {
       thread_id: threadId,
       content,
       sender,
-      role: sender, // Role and sender should match for now
+      role: sender,
       reference_entries: references ? references : null,
       analysis_data: analysis ? analysis : null,
       has_numeric_result: !!hasNumericResult
     };
     
-    // Insert the message
     const { data, error } = await supabase
       .from('chat_messages')
       .insert(messageData)
@@ -664,7 +639,6 @@ export const saveMessage = async (
       throw new Error("No data returned from message insert");
     }
     
-    // Convert the database response to our ChatMessage type with proper type safety
     const chatMessage: ChatMessage = {
       id: data.id,
       thread_id: data.thread_id,
@@ -672,24 +646,20 @@ export const saveMessage = async (
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: data.role as 'user' | 'assistant' | 'error',
       created_at: data.created_at,
-      // Add safe aliases for backward compatibility - ensure these are arrays
       references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
       reference_entries: Array.isArray(data.reference_entries) ? data.reference_entries : [],
       analysis: data.analysis_data,
       analysis_data: data.analysis_data,
       hasNumericResult: data.has_numeric_result,
       has_numeric_result: data.has_numeric_result,
-      // Ensure sub_query_responses is properly typed
       sub_query_responses: jsonToSubQueryResponse(data.sub_query_responses)
     };
     
-    // If this is an interactive message with options, add those properties
     if (isInteractive && interactiveOptions) {
       chatMessage.isInteractive = true;
       chatMessage.interactiveOptions = interactiveOptions;
     }
     
-    // Update the thread's updated_at timestamp
     await supabase
       .from('chat_threads')
       .update({ updated_at: new Date().toISOString() })

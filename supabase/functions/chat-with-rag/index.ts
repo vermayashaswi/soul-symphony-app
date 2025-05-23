@@ -1,233 +1,104 @@
+import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
+import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { processTimeRange } from './utils/dateProcessor.ts';
+import { searchEntriesWithVector, searchEntriesWithTimeRange, searchEntriesByMonth } from './utils/searchService.ts';
+import { detectMentalHealthQuery, detectMonthInQuery, isDirectDateQuery, isJournalAnalysisQuery, isMonthSpecificQuery, detectTimeframeInQuery } from './utils/queryClassifier.ts';
 
-import "https://deno.land/x/xhr@0.1.0/mod.ts";
-import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.38.4";
-import { 
-  format, 
-  addDays, 
-  startOfWeek, 
-  endOfWeek, 
-  subDays,
-  startOfDay,
-  endOfDay
-} from "https://esm.sh/date-fns@4.1.0";
-import { toZonedTime } from "https://esm.sh/date-fns-tz@3.2.0";
-
-// Define Supabase client
-const supabaseUrl = Deno.env.get('SUPABASE_URL') || '';
-const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
-const supabase = createClient(supabaseUrl, supabaseServiceKey);
-
-// Get OpenAI API key from environment variable
-const apiKey = Deno.env.get('OPENAI_API_KEY');
-if (!apiKey) {
-  console.error('OPENAI_API_KEY is not set');
-  Deno.exit(1);
-}
-
-// Define CORS headers
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-// Maximum number of journal entries to retrieve for vector search
-const MAX_ENTRIES = 10;
-const MAX_TIME_ANALYSIS_ENTRIES = 1000;
+const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
-/**
- * Gets the formatted date range for the current week
- * Following the consistent "Monday to Sunday" definition
- */
-function getCurrentWeekDates(timezone?: string, clientTimestamp?: string): string {
-  // Default to UTC if no timezone specified
-  const tz = timezone || 'UTC';
-  console.log(`Getting current week dates for timezone: ${tz}`);
+// Enhanced date calculation functions with proper timezone handling
+function getLastWeekDates(clientTimeInfo?: any, userTimezone?: string): { startDate: string; endDate: string; formattedRange: string } {
+  // Determine the most appropriate timezone to use
+  const timezone = clientTimeInfo?.timezoneName || userTimezone || 'UTC';
   
-  try {
-    // Create a fresh date object - critical for avoiding stale dates
-    const nowUTC = clientTimestamp ? new Date(clientTimestamp) : new Date();
-    console.log(`Current UTC time: ${nowUTC.toISOString()}`);
-    
-    // Get the current date in the user's timezone
-    const now = toZonedTime(nowUTC, tz); // Updated to toZonedTime
-    console.log(`Current date in ${tz}: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
-    
-    // Get the start of the week (Monday)
-    const startOfCurrentWeek = startOfWeek(now, { weekStartsOn: 1 });
-    // Get the end of the week (Sunday)
-    const endOfCurrentWeek = endOfWeek(now, { weekStartsOn: 1 });
-    
-    console.log(`Start of current week: ${format(startOfCurrentWeek, 'yyyy-MM-dd')} (${startOfCurrentWeek.toISOString()})`);
-    console.log(`End of current week: ${format(endOfCurrentWeek, 'yyyy-MM-dd')} (${endOfCurrentWeek.toISOString()})`);
-    
-    // Format the dates in a user-friendly way
-    const formattedStart = format(startOfCurrentWeek, 'MMMM d');
-    const formattedEnd = format(endOfCurrentWeek, 'MMMM d, yyyy');
-    const result = `${formattedStart} to ${formattedEnd}`;
-
-    console.log(`Final formatted current week: ${result}`);
-    return result;
-  } catch (error) {
-    console.error("Error calculating current week dates:", error);
-    // Fallback calculation if there's an error with timezone handling
-    const now = new Date();
-    console.log("Using fallback calculation with date: " + now.toISOString());
-    
-    const dayOfWeek = now.getDay(); // 0 is Sunday
-    const diff = now.getDate() - dayOfWeek + (dayOfWeek === 0 ? -6 : 1); // Adjust to get Monday
-    
-    const monday = new Date(now);
-    monday.setDate(diff);
-    console.log(`Fallback Monday: ${monday.toISOString()}`);
-    
-    const sunday = new Date(monday);
-    sunday.setDate(monday.getDate() + 6);
-    console.log(`Fallback Sunday: ${sunday.toISOString()}`);
-    
-    return `${format(monday, 'MMMM d')} to ${format(sunday, 'MMMM d, yyyy')}`;
-  }
+  console.log(`[chat-with-rag] Getting last week dates for timezone: ${timezone}`);
+  console.log(`[chat-with-rag] Client time info:`, clientTimeInfo);
+  
+  // Get reference time (prefer client's time over server time)
+  const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
+  console.log(`[chat-with-rag] Using reference time: ${referenceTime.toISOString()}`);
+  
+  // For last week calculation, we need to get the current date in user's timezone
+  const now = new Date(referenceTime);
+  
+  // Get this week's Monday (start of current week) - week starts on Monday (1)
+  const currentDay = now.getDay();
+  const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1; // Sunday = 0, so it's 6 days from Monday
+  const thisWeekMonday = new Date(now);
+  thisWeekMonday.setDate(now.getDate() - daysFromMonday);
+  thisWeekMonday.setHours(0, 0, 0, 0);
+  
+  // Last week's Monday is 7 days before this week's Monday
+  const lastWeekMonday = new Date(thisWeekMonday);
+  lastWeekMonday.setDate(thisWeekMonday.getDate() - 7);
+  
+  // Last week's Sunday is 1 day before this week's Monday
+  const lastWeekSunday = new Date(thisWeekMonday);
+  lastWeekSunday.setDate(thisWeekMonday.getDate() - 1);
+  lastWeekSunday.setHours(23, 59, 59, 999);
+  
+  console.log(`[chat-with-rag] LAST WEEK CALCULATION DEBUG:`);
+  console.log(`[chat-with-rag] Current time: ${now.toISOString()}`);
+  console.log(`[chat-with-rag] This week's Monday: ${thisWeekMonday.toISOString()}`);
+  console.log(`[chat-with-rag] Last week's Monday: ${lastWeekMonday.toISOString()}`);
+  console.log(`[chat-with-rag] Last week's Sunday: ${lastWeekSunday.toISOString()}`);
+  
+  // Format for display
+  const formatOptions: Intl.DateTimeFormatOptions = { month: 'long', day: 'numeric', year: 'numeric' };
+  const startFormatted = lastWeekMonday.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  const endFormatted = lastWeekSunday.toLocaleDateString('en-US', formatOptions);
+  const formattedRange = `${startFormatted} to ${endFormatted}`;
+  
+  return {
+    startDate: lastWeekMonday.toISOString(),
+    endDate: lastWeekSunday.toISOString(),
+    formattedRange
+  };
 }
 
-/**
- * Gets the formatted date range for the last week
- * Following the consistent "Monday to Sunday" definition for last calendar week
- */
-function getLastWeekDates(timezone?: string, clientTimestamp?: string): string {
-  // Default to UTC if no timezone specified
-  const tz = timezone || 'UTC';
-  console.log(`Getting last week dates for timezone: ${tz}`);
+function getCurrentWeekDates(clientTimeInfo?: any, userTimezone?: string): { startDate: string; endDate: string; formattedRange: string } {
+  // Determine the most appropriate timezone to use
+  const timezone = clientTimeInfo?.timezoneName || userTimezone || 'UTC';
   
-  try {
-    // Create a fresh date object - critical for avoiding stale dates
-    const nowUTC = clientTimestamp ? new Date(clientTimestamp) : new Date();
-    console.log(`Using ${clientTimestamp ? 'client timestamp' : 'fresh date'}: ${nowUTC.toISOString()}`);
-    
-    // Get the current date in the user's timezone
-    const now = toZonedTime(nowUTC, tz);
-    console.log(`Current date in ${tz} for last week calc: ${format(now, 'yyyy-MM-dd HH:mm:ss')}`);
-    
-    // Get this week's Monday
-    const thisWeekMonday = startOfWeek(now, { weekStartsOn: 1 });
-    
-    // Last week's Monday is 7 days before this week's Monday
-    const lastWeekMonday = subDays(thisWeekMonday, 7);
-    // Last week's Sunday is 1 day before this week's Monday
-    const lastWeekSunday = subDays(thisWeekMonday, 1); 
-    
-    console.log("LAST WEEK CALCULATION (EDGE FUNCTION):");
-    console.log(`Current date: ${format(now, 'yyyy-MM-dd')} (${now.toISOString()})`);
-    console.log(`This week's Monday: ${format(thisWeekMonday, 'yyyy-MM-dd')} (${thisWeekMonday.toISOString()})`);
-    console.log(`Last week's Monday: ${format(lastWeekMonday, 'yyyy-MM-dd')} (${lastWeekMonday.toISOString()})`);
-    console.log(`Last week's Sunday: ${format(lastWeekSunday, 'yyyy-MM-dd')} (${lastWeekSunday.toISOString()})`);
-    
-    // Apply start of day and end of day to ensure full day coverage
-    const lastWeekStart = startOfDay(lastWeekMonday);
-    const lastWeekEnd = endOfDay(lastWeekSunday);
-    
-    // Format the dates in a user-friendly way
-    const formattedStart = format(lastWeekStart, 'MMMM d');
-    const formattedEnd = format(lastWeekEnd, 'MMMM d, yyyy');
-    
-    const result = `${formattedStart} to ${formattedEnd}`;
-    console.log(`Final formatted last week: ${result}`);
-    return result;
-  } catch (error) {
-    console.error("Error calculating last week dates:", error);
-    // Fallback calculation if there's an error with timezone handling
-    const now = new Date();
-    console.log("Using fallback calculation for last week with date: " + now.toISOString());
-    
-    const todayDay = now.getDay(); // 0 is Sunday
-    
-    // Get this week's Monday
-    const thisMonday = new Date(now);
-    thisMonday.setDate(now.getDate() - todayDay + (todayDay === 0 ? -6 : 1));
-    
-    // Get last week's Monday (7 days before this week's Monday)
-    const lastMonday = new Date(thisMonday);
-    lastMonday.setDate(thisMonday.getDate() - 7);
-    
-    // Get last week's Sunday (1 day before this week's Monday)
-    const lastSunday = new Date(thisMonday);
-    lastSunday.setDate(thisMonday.getDate() - 1);
-    
-    console.log(`Fallback this Monday: ${thisMonday.toISOString()}`);
-    console.log(`Fallback last Monday: ${lastMonday.toISOString()}`);
-    console.log(`Fallback last Sunday: ${lastSunday.toISOString()}`);
-    
-    return `${format(lastMonday, 'MMMM d')} to ${format(lastSunday, 'MMMM d, yyyy')}`;
-  }
+  console.log(`[chat-with-rag] Getting current week dates for timezone: ${timezone}`);
+  
+  // Get reference time (prefer client's time over server time)
+  const referenceTime = clientTimeInfo?.timestamp ? new Date(clientTimeInfo.timestamp) : new Date();
+  const now = new Date(referenceTime);
+  
+  // Get this week's Monday (start of current week)
+  const currentDay = now.getDay();
+  const daysFromMonday = currentDay === 0 ? 6 : currentDay - 1;
+  const thisWeekMonday = new Date(now);
+  thisWeekMonday.setDate(now.getDate() - daysFromMonday);
+  thisWeekMonday.setHours(0, 0, 0, 0);
+  
+  // This week's Sunday
+  const thisWeekSunday = new Date(thisWeekMonday);
+  thisWeekSunday.setDate(thisWeekMonday.getDate() + 6);
+  thisWeekSunday.setHours(23, 59, 59, 999);
+  
+  console.log(`[chat-with-rag] THIS WEEK CALCULATION:`);
+  console.log(`[chat-with-rag] This week's Monday: ${thisWeekMonday.toISOString()}`);
+  console.log(`[chat-with-rag] This week's Sunday: ${thisWeekSunday.toISOString()}`);
+  
+  // Format for display
+  const startFormatted = thisWeekMonday.toLocaleDateString('en-US', { month: 'long', day: 'numeric' });
+  const endFormatted = thisWeekSunday.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' });
+  const formattedRange = `${startFormatted} to ${endFormatted}`;
+  
+  return {
+    startDate: thisWeekMonday.toISOString(),
+    endDate: thisWeekSunday.toISOString(),
+    formattedRange
+  };
 }
 
-/**
- * Detect if query appears to be a time-based summary query
- */
-function isTimeSummaryQuery(message: string): boolean {
-  const lowerQuery = message.toLowerCase();
-  
-  // Check for phrases that suggest the user wants a summary of a period
-  const summaryPatterns = [
-    'how has', 'how have', 'how was', 'how were',
-    'summarize', 'summary of', 'recap',
-    'what happened', 'what was happening',
-    'how did i feel', 'how was i feeling'
-  ];
-  
-  // Check for time periods
-  const timePatterns = [
-    'day', 'week', 'month', 'year',
-    'last few days', 'past few days',
-    'last night', 'yesterday',
-    'last week', 'last month', 'past month',
-    'recent', 'lately'
-  ];
-  
-  // Check if the query contains both a summary pattern and a time pattern
-  const hasSummaryPattern = summaryPatterns.some(pattern => lowerQuery.includes(pattern));
-  const hasTimePattern = timePatterns.some(pattern => lowerQuery.includes(pattern));
-  
-  return hasSummaryPattern && hasTimePattern;
-}
-
-/**
- * Detect if query appears to be a direct date query
- */
-function isDirectDateQuery(message: string): boolean {
-  const lowerQuery = message.toLowerCase();
-  
-  // Check for direct date-related queries
-  return (
-    lowerQuery.includes('what is the current week') ||
-    lowerQuery.includes('what are the dates for this week') ||
-    lowerQuery.includes('current week dates') ||
-    lowerQuery.includes('this week dates') ||
-    lowerQuery.includes('last week dates') ||
-    lowerQuery.includes('previous week dates') ||
-    lowerQuery.includes('what are the dates for last week')
-  );
-}
-
-/**
- * Detect if query appears to be a journal analysis query
- */
-function isJournalAnalysisQuery(message: string): boolean {
-  const lowerQuery = message.toLowerCase();
-  
-  // Check for journal analysis related queries
-  return (
-    lowerQuery.includes('analyze my journal') ||
-    lowerQuery.includes('journal analysis') ||
-    lowerQuery.includes('journal entries') ||
-    lowerQuery.includes('my entries') ||
-    lowerQuery.includes('what have i written about') ||
-    lowerQuery.includes('what did i write about')
-  );
-}
-
-/**
- * Handle the request to chat with RAG (Retrieval-Augmented Generation)
- */
 serve(async (req) => {
   // Handle CORS preflight requests
   if (req.method === 'OPTIONS') {
@@ -235,594 +106,263 @@ serve(async (req) => {
   }
 
   try {
-    // Parse the request body
-    const {
-      message,
-      userId,
-      threadId,
-      usePersonalContext = false,
-      queryPlan = null,
-      conversationHistory = [],
-      clientTimeInfo = null,
-      userTimezone = null,
-      cacheBreaker = Date.now() // Add cache breaker parameter to prevent caching
-    } = await req.json();
+    const { message, userId, threadId, timeRange, referenceDate, conversationContext, queryPlan, isMentalHealthQuery, clientTimeInfo, userTimezone } = await req.json();
 
     console.log(`Processing request for user ${userId} at ${new Date().toISOString()}: ${message}`);
-    console.log(`Cache breaker: ${cacheBreaker}`);
-    
-    // Log client time information
-    if (clientTimeInfo) {
-      console.log(`Client device time: ${clientTimeInfo.timestamp}`);
-      console.log(`Client timezone: ${clientTimeInfo.timezoneName}`);
-      console.log(`Client timezone offset: ${clientTimeInfo.timezoneOffset} minutes`);
-    }
-    
-    if (userTimezone) {
-      console.log(`User profile timezone: ${userTimezone}`);
-    }
+    console.log(`Cache breaker: ${Date.now()}`);
+    console.log(`Client time info received:`, clientTimeInfo);
+    console.log(`User timezone: ${userTimezone}`);
 
-    // Check if this is a direct date query that needs a simple calendar response
-    const isDateQuery = queryPlan?.isDirectDateQuery || isDirectDateQuery(message);
-    if (isDateQuery) {
-      console.log(`Processing as direct date query at ${new Date().toISOString()}`);
-      
-      // Use the user timezone from the profile or client timezone
-      const effectiveTimezone = userTimezone || 
-                               (clientTimeInfo ? clientTimeInfo.timezoneName : null) ||
-                               'UTC';
-      
-      console.log(`Using effective timezone for date calculations: ${effectiveTimezone}`);
-      
-      // Check if asking about current week or last week
-      const isLastWeekQuery = message.toLowerCase().includes('last week') || 
-                             message.toLowerCase().includes('previous week');
-      
-      let response;
-      
-      if (isLastWeekQuery) {
-        // Get the last week's date range using client time reference if available
-        const clientTimestamp = clientTimeInfo ? clientTimeInfo.timestamp : undefined;
-        const dateRange = getLastWeekDates(effectiveTimezone, clientTimestamp);
-        console.log(`Last week date range: ${dateRange}`);
-        response = `The last week dates were: ${dateRange}`;
-      } else {
-        // Get the current week's date range
-        const dateRange = getCurrentWeekDates(effectiveTimezone, 
-                                             clientTimeInfo ? clientTimeInfo.timestamp : undefined);
-        console.log(`Current week date range: ${dateRange}`);
+    // Create Supabase client
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseKey);
+
+    // Enhanced timeframe detection and processing
+    let processedTimeRange = timeRange;
+    
+    // If no time range provided, try to detect it from the message
+    if (!processedTimeRange || (!processedTimeRange.startDate && !processedTimeRange.endDate)) {
+      const detectedTimeframe = detectTimeframeInQuery(message);
+      if (detectedTimeframe) {
+        console.log(`Detected timeframe from message:`, detectedTimeframe);
         
-        // Format today's date in user's timezone
-        let today;
-        if (clientTimeInfo && clientTimeInfo.timestamp) {
-          today = toZonedTime(new Date(clientTimeInfo.timestamp), effectiveTimezone);
-        } else {
-          today = toZonedTime(new Date(), effectiveTimezone);
+        // Add timezone and client info to detected timeframe
+        if (detectedTimeframe.timezone === 'UTC' && (clientTimeInfo?.timezoneName || userTimezone)) {
+          detectedTimeframe.timezone = clientTimeInfo?.timezoneName || userTimezone;
         }
         
-        response = `The current week dates are: ${dateRange}\n\nToday is ${format(today, 'EEEE, MMMM d, yyyy')}.`;
+        // Process the detected timeframe into actual dates
+        processedTimeRange = processTimeRange(detectedTimeframe);
+        console.log(`Processed timeframe into date range:`, processedTimeRange);
+      }
+    }
+
+    // Special handling for "last week" queries with enhanced date calculation
+    if (message.toLowerCase().includes('last week')) {
+      console.log(`[chat-with-rag] Detected "last week" query - using enhanced calculation`);
+      const lastWeekDates = getLastWeekDates(clientTimeInfo, userTimezone);
+      processedTimeRange = {
+        startDate: lastWeekDates.startDate,
+        endDate: lastWeekDates.endDate
+      };
+      console.log(`[chat-with-rag] Enhanced last week date range:`, processedTimeRange);
+    }
+    
+    // Special handling for "this week" queries
+    if (message.toLowerCase().includes('this week')) {
+      console.log(`[chat-with-rag] Detected "this week" query - using enhanced calculation`);
+      const thisWeekDates = getCurrentWeekDates(clientTimeInfo, userTimezone);
+      processedTimeRange = {
+        startDate: thisWeekDates.startDate,
+        endDate: thisWeekDates.endDate
+      };
+      console.log(`[chat-with-rag] Enhanced this week date range:`, processedTimeRange);
+    }
+
+    // Handle direct date queries
+    if (isDirectDateQuery(message)) {
+      let directResponse = '';
+      
+      if (message.toLowerCase().includes('current week') || message.toLowerCase().includes('this week')) {
+        const currentWeek = getCurrentWeekDates(clientTimeInfo, userTimezone);
+        directResponse = `This week's dates are ${currentWeek.formattedRange}.`;
+      } else if (message.toLowerCase().includes('last week')) {
+        const lastWeek = getLastWeekDates(clientTimeInfo, userTimezone);
+        directResponse = `Last week's dates were ${lastWeek.formattedRange}.`;
       }
       
-      return new Response(
-        JSON.stringify({
-          response: response,
-          references: [],
-          isDirectDateResponse: true,
-          timestamp: new Date().toISOString()  // Add timestamp for debugging
-        }),
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
+      if (directResponse) {
+        return new Response(JSON.stringify({ data: directResponse }), {
+          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        });
+      }
     }
 
-    // Determine the appropriate query strategy based on usePersonalContext and queryPlan
-    let searchStrategy = 'default';
-    let filters = {};
-    let needsDataAggregation = false;
-    let domainContext = null;
-    let isTimePatternQuery = false;
-    let isTimeSummary = isTimeSummaryQuery(message);
-    let isPersonalityQuery = false;
-    let isJournalAnalysis = isJournalAnalysisQuery(message);
+    // Determine search strategy and domain context
+    const domainContext = queryPlan?.domainContext || 'general_insights';
+    const searchStrategy = queryPlan?.searchStrategy || 'hybrid';
     
-    // Check if this is a time pattern related query
-    if (message.toLowerCase().includes('time') || 
-        message.toLowerCase().includes('when') || 
-        message.toLowerCase().includes('pattern') ||
-        message.toLowerCase().includes('schedule') ||
-        message.toLowerCase().includes('frequent')) {
-      isTimePatternQuery = true;
-    }
-
-    if (queryPlan) {
-      searchStrategy = queryPlan.strategy || queryPlan.searchStrategy || 'hybrid';
-      filters = queryPlan.filters || {};
-      needsDataAggregation = queryPlan.needsDataAggregation || false;
-      domainContext = queryPlan.domainContext || null;
-      isTimePatternQuery = queryPlan.isTimePatternQuery || isTimePatternQuery;
-      isPersonalityQuery = queryPlan.isPersonalityQuery || false;
-    }
-
-    console.log(`Using search strategy: ${searchStrategy}`);
     console.log(`Domain context: ${domainContext}`);
+    console.log(`Using search strategy: ${searchStrategy}`);
+
+    // Determine if this is a comprehensive analysis query
+    const isComprehensiveQuery = isComprehensiveAnalysisQuery(message);
+    console.log(`Is comprehensive analysis query: ${isComprehensiveQuery}`);
+    
+    // Handle journal question
+    console.log('Handling journal question');
+    console.log(`Processing as journal-specific question`);
+    console.log(`Conversation history length: ${conversationContext?.length || 0}`);
+
+    const isTimePatternQuery = /\b(pattern|trend|change|over time|frequency|often|usually|typically)\b/i.test(message);
+    const isTimeSummaryQuery = /\b(summary|summarize|overview|review)\b/i.test(message) && 
+                               /\b(week|month|year|period|time)\b/i.test(message);
+    const isPersonalityQuery = /\b(personality|character|trait|type|am i|who am i)\b/i.test(message);
+    const isJournalAnalysis = isJournalAnalysisQuery(message);
+
     console.log(`Is time pattern query: ${isTimePatternQuery}`);
-    console.log(`Is time summary query: ${isTimeSummary}`);
+    console.log(`Is time summary query: ${isTimeSummaryQuery}`);
     console.log(`Is personality query: ${isPersonalityQuery}`);
     console.log(`Is journal analysis query: ${isJournalAnalysis}`);
-    console.log(`Conversation history length: ${conversationHistory.length}`);
 
-    // Generate an OpenAI embedding for the user's message
-    const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      method: 'POST',
-      body: JSON.stringify({
-        model: "text-embedding-ada-002",
-        input: message
-      })
-    });
+    // Search for relevant journal entries using enhanced search
+    console.log('Searching for relevant journal entries using strategy:', searchStrategy);
 
-    if (!embeddingResponse.ok) {
-      const error = await embeddingResponse.text();
-      console.error("Error generating embedding:", error);
-      throw new Error("Failed to generate embedding for query");
-    }
-
-    const { data: embeddingData } = await embeddingResponse.json();
-    const embedding = embeddingData[0].embedding;
-
-    // Different handling based on whether personal context is needed or not
-    if (usePersonalContext || searchStrategy !== 'default') {
-      console.log("Processing as journal-specific question");
+    let relevantEntries = [];
+    
+    // Enhanced search logic with proper date range handling
+    if (processedTimeRange && (processedTimeRange.startDate || processedTimeRange.endDate)) {
+      console.log(`Time range search: from ${processedTimeRange.startDate || 'none'} to ${processedTimeRange.endDate || 'none'}`);
       
-      // Process the query with vector similarity search on journal entries
-      return await handleJournalQuestion(
-        message, 
-        userId, 
-        embedding, 
-        filters, 
-        searchStrategy, 
-        needsDataAggregation, 
-        conversationHistory, 
-        isTimePatternQuery || isJournalAnalysis || isPersonalityQuery, 
-        isTimeSummary
+      // Get query embedding for semantic search
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
+        headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+          'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+          input: message,
+          model: 'text-embedding-3-small',
+        }),
+      });
+      
+      if (!embeddingResponse.ok) {
+        throw new Error('Failed to get embedding from OpenAI');
+      }
+      
+      const embeddingData = await embeddingResponse.json();
+      const queryEmbedding = embeddingData.data[0].embedding;
+      
+      // Use time-filtered search
+      relevantEntries = await searchEntriesWithTimeRange(
+        supabase,
+        userId,
+        queryEmbedding,
+        processedTimeRange
       );
     } else {
-      console.log("Processing as general question (no personal context)");
-      
-      // Process the query as a general question without personal context
-      return await handleGeneralQuestion(message, userId, conversationHistory);
-    }
-  } catch (error) {
-    console.error("Error in chat-with-rag function:", error);
-    
-    return new Response(
-      JSON.stringify({
-        response: `I encountered an error: ${error.message}. Please try again.`,
-        error: error.message
-      }),
-      {
+      // No time range, use general search
+      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+        method: 'POST',
         headers: {
+          'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
           'Content-Type': 'application/json',
-          ...corsHeaders
         },
-        status: 500
+        body: JSON.stringify({
+          input: message,
+          model: 'text-embedding-3-small',
+        }),
+      });
+      
+      if (!embeddingResponse.ok) {
+        throw new Error('Failed to get embedding from OpenAI');
       }
-    );
+      
+      const embeddingData = await embeddingResponse.json();
+      const queryEmbedding = embeddingData.data[0].embedding;
+      
+      relevantEntries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+    }
+
+    console.log(`Found ${relevantEntries?.length || 0} relevant entries`);
+
+    if (!relevantEntries || relevantEntries.length === 0) {
+      return new Response(JSON.stringify({
+        data: "I don't have enough journal entries to provide insights about that topic. Try writing more journal entries to get better personalized responses!"
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+
+    // Limit entries for processing
+    const maxEntries = isComprehensiveQuery ? 1000 : 10;
+    const entriesToUse = relevantEntries.slice(0, maxEntries);
+    
+    console.log(`Using ${entriesToUse.length} entries for analysis (comprehensive: ${isComprehensiveQuery})`);
+
+    // Enhanced system prompt with better context
+    const systemPrompt = `You are a supportive mental health assistant analyzing journal entries from the SOULo voice journaling app. 
+
+Current date and time: ${new Date().toISOString()}
+User timezone: ${userTimezone || clientTimeInfo?.timezoneName || 'UTC'}
+Query timeframe: ${processedTimeRange ? `${processedTimeRange.startDate || 'start'} to ${processedTimeRange.endDate || 'end'}` : 'all time'}
+
+IMPORTANT: When providing insights about timeframes like "last week" or "this week", make sure to reference the correct dates based on the current date ${new Date().toISOString()}.
+
+Your role is to:
+1. Analyze journal entries with empathy and understanding
+2. Provide personalized insights based on patterns and emotions
+3. Offer constructive mental health guidance
+4. Reference specific dates and timeframes accurately
+5. Be supportive while maintaining appropriate boundaries
+
+Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
+
+    const openAiResponse = await fetch(OPENAI_API_URL, {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4',
+        messages: [
+          { role: 'system', content: systemPrompt },
+          ...conversationContext.slice(-10), // Include recent conversation context
+          { 
+            role: 'user', 
+            content: `Based on these journal entries: ${JSON.stringify(entriesToUse.map(entry => ({
+              date: entry.created_at,
+              content: entry.content,
+              emotions: entry.emotions
+            })))}\n\nUser question: ${message}` 
+          }
+        ],
+        max_tokens: 1000,
+        temperature: 0.7,
+      }),
+    });
+
+    if (!openAiResponse.ok) {
+      const errorText = await openAiResponse.text();
+      console.error('OpenAI API error:', errorText);
+      throw new Error(`OpenAI API error: ${openAiResponse.status}`);
+    }
+
+    const openAiData = await openAiResponse.json();
+    const assistantResponse = openAiData.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response.';
+
+    console.log(`Generated response: ${assistantResponse.substring(0, 100)}...`);
+
+    return new Response(JSON.stringify({ data: assistantResponse }), {
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
+
+  } catch (error) {
+    console.error('Error in chat-with-rag:', error);
+    return new Response(JSON.stringify({ 
+      error: 'Internal server error', 
+      details: error.message 
+    }), {
+      status: 500,
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+    });
   }
 });
 
-/**
- * Search journal entries using vector similarity with filters
- */
-async function searchEntriesWithVector(userId, embedding, filters = {}, isComprehensiveAnalysisQuery = false) {
-  try {
-    let matchFn = 'match_journal_entries_fixed';
-    
-    // Determine the appropriate match count based on the query type
-    const matchCount = isComprehensiveAnalysisQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES;
-    console.log(`Vector search using match count: ${matchCount} (comprehensive: ${isComprehensiveAnalysisQuery})`);
-    
-    const params = {
-      query_embedding: embedding,
-      match_threshold: 0.5,
-      match_count: matchCount,
-      user_id_filter: userId
-    };
-    
-    // Use date-aware function if date range filters are provided
-    if (filters.dateRange && (filters.dateRange.startDate || filters.dateRange.endDate)) {
-      matchFn = 'match_journal_entries_with_date';
-      
-      // Ensure dates are in ISO string format for Postgres
-      params.start_date = filters.dateRange.startDate ? new Date(filters.dateRange.startDate).toISOString() : null;
-      params.end_date = filters.dateRange.endDate ? new Date(filters.dateRange.endDate).toISOString() : null;
-      
-      // Log date parameters for debugging
-      console.log(`Date range filter applied in vector search:`, {
-        start_date: params.start_date,
-        end_date: params.end_date,
-        start_date_obj: filters.dateRange.startDate ? new Date(filters.dateRange.startDate).toString() : 'null',
-        end_date_obj: filters.dateRange.endDate ? new Date(filters.dateRange.endDate).toString() : 'null',
-      });
-    }
-    
-    // Call the appropriate database function for vector search
-    const { data: entries, error } = await supabase.rpc(matchFn, params);
-    
-    if (error) {
-      console.error(`Error in vector search using ${matchFn}:`, error);
-      throw error;
-    }
-    
-    console.log(`Found ${entries?.length || 0} entries with vector search`);
-    
-    // Map the results to include a proper content field
-    const mappedEntries = entries.map(entry => {
-      return {
-        ...entry,
-        // Ensure we have a content field that uses the correct data
-        content: entry.content || coalesceValues(entry["refined text"], entry["transcription text"]) || ""
-      };
-    });
-    
-    return mappedEntries;
-  } catch (error) {
-    console.error("Error searching entries with vector:", error);
-    throw error;
-  }
+// Helper function to detect comprehensive analysis queries
+function isComprehensiveAnalysisQuery(message: string): boolean {
+  const lowerMessage = message.toLowerCase();
+  
+  const comprehensivePatterns = [
+    /\b(all|every|entire|complete|full|total|overall|comprehensive)\b/,
+    /\b(pattern|trend|analysis|insight|summary|overview)\b/,
+    /\b(emotion|feeling|mood)s?\b.*\b(over|during|in|for)\b/,
+    /\btop\s+\d+\b/,
+    /\bmost\s+(common|frequent|often)\b/
+  ];
+  
+  return comprehensivePatterns.some(pattern => pattern.test(lowerMessage));
 }
-
-// Helper function to coalesce values (similar to SQL COALESCE)
-function coalesceValues(...args) {
-  for (let i = 0; i < args.length; i++) {
-    if (args[i] !== null && args[i] !== undefined) {
-      return args[i];
-    }
-  }
-  return null;
-}
-
-/**
- * Handle general questions that don't require personal context
- */
-async function handleGeneralQuestion(message, userId, conversationHistory = []) {
-  try {
-    console.log("Handling general question");
-    
-    // Call OpenAI to process the general question
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      method: 'POST',
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: [
-          {
-            role: "system",
-            content: "You are a helpful conversational assistant. Respond naturally to the user's queries without referencing any specific personal data unless provided."
-          },
-          ...conversationHistory,
-          { role: "user", content: message }
-        ],
-        temperature: 0.7,
-        max_tokens: 800
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error("Error from OpenAI:", error);
-      throw new Error("Failed to generate response");
-    }
-
-    const data = await response.json();
-    const answer = data.choices[0].message.content;
-
-    return new Response(
-      JSON.stringify({
-        response: answer,
-        references: []
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      }
-    );
-  } catch (error) {
-    console.error("Error in handleGeneralQuestion:", error);
-    throw error;
-  }
-}
-
-/**
- * Handle journal questions that require personal context
- */
-async function handleJournalQuestion(message, userId, embedding, filters = {}, searchStrategy = 'hybrid', needsDataAggregation = false, conversationHistory = [], isComprehensiveAnalysisQuery = false, isTimeSummary = false) {
-  try {
-    console.log("Handling journal question");
-    console.log(`Is comprehensive analysis query: ${isComprehensiveAnalysisQuery}`);
-    
-    // Step 1: Search for relevant journal entries using the appropriate strategy
-    let relevantEntries = [];
-    let textSearchEntries = [];
-    let vectorSearchEntries = [];
-    
-    console.log(`Searching for relevant journal entries using strategy: ${searchStrategy}`);
-    
-    // Apply the search strategy
-    if (searchStrategy === 'text' || searchStrategy === 'hybrid') {
-      try {
-        console.log("Performing text search");
-        textSearchEntries = await searchEntriesWithSQL(userId, message, filters, isComprehensiveAnalysisQuery);
-        console.log(`Found ${textSearchEntries.length} entries with text search`);
-      } catch (error) {
-        console.error("Error in text search:", error);
-      }
-    }
-    
-    if (searchStrategy === 'vector' || searchStrategy === 'hybrid') {
-      try {
-        console.log("Performing vector search");
-        vectorSearchEntries = await searchEntriesWithVector(userId, embedding, filters, isComprehensiveAnalysisQuery);
-        console.log(`Found ${vectorSearchEntries.length} entries with vector search`);
-      } catch (error) {
-        console.error("Error in vector search:", error);
-      }
-    }
-    
-    // Merge results depending on search strategy
-    if (searchStrategy === 'hybrid') {
-      const entryIds = new Set();
-      relevantEntries = [];
-      
-      // First add vector search results (typically higher quality)
-      for (const entry of vectorSearchEntries) {
-        if (!entryIds.has(entry.id)) {
-          entryIds.add(entry.id);
-          relevantEntries.push(entry);
-        }
-      }
-      
-      // Then add text search results that weren't already added
-      for (const entry of textSearchEntries) {
-        if (!entryIds.has(entry.id)) {
-          entryIds.add(entry.id);
-          relevantEntries.push(entry);
-        }
-      }
-      
-    } else if (searchStrategy === 'vector') {
-      relevantEntries = vectorSearchEntries;
-    } else {
-      relevantEntries = textSearchEntries;
-    }
-    
-    // Determine whether to limit entries based on query type
-    // For comprehensive analysis queries, we want all entries
-    const shouldLimitEntries = !isComprehensiveAnalysisQuery;
-    
-    if (relevantEntries.length > MAX_ENTRIES && shouldLimitEntries) {
-      console.log(`Limiting entries from ${relevantEntries.length} to ${MAX_ENTRIES} for regular query processing`);
-      relevantEntries = relevantEntries.slice(0, MAX_ENTRIES);
-    } else {
-      console.log(`Using all ${relevantEntries.length} relevant entries for analysis`);
-    }
-    
-    console.log(`Total relevant entries found: ${relevantEntries.length}`);
-    
-    if (relevantEntries.length === 0) {
-      console.log("No relevant journal entries found");
-      return new Response(
-        JSON.stringify({
-          response: "I don't see any journal entries that match what you're asking about. Could you try asking something else or provide more context?",
-          references: []
-        }),
-        {
-          headers: {
-            'Content-Type': 'application/json',
-            ...corsHeaders
-          }
-        }
-      );
-    }
-    
-    // Step 2: Format entries for the prompt
-    let journalContext = "";
-    const references = [];
-    
-    for (const entry of relevantEntries) {
-      // Ensure we use the correct content field from journal entries
-      const entryContent = entry.content || 
-                          (entry["refined text"] || entry["transcription text"]) || 
-                          "";
-                          
-      const formattedDate = new Date(entry.created_at).toLocaleDateString('en-US', {
-        weekday: 'long',
-        month: 'long',
-        day: 'numeric',
-        year: 'numeric',
-        hour: 'numeric',
-        minute: 'numeric'
-      });
-      
-      // Add entry to context
-      journalContext += `Journal entry from ${formattedDate}:\n${entryContent}\n\n`;
-      
-      // Add entry to references (for citation in UI)
-      references.push({
-        id: entry.id,
-        date: entry.created_at,
-        snippet: entryContent.substring(0, 150) + (entryContent.length > 150 ? "..." : "")
-      });
-    }
-    
-    // Format conversation history for the prompt
-    let conversationContextText = "";
-    if (conversationHistory && conversationHistory.length > 0) {
-      conversationContextText = "\n\nRecent conversation history:\n";
-      conversationHistory.forEach((msg, i) => {
-        const role = msg.role === 'user' ? 'User' : 'Assistant';
-        conversationContextText += `${role}: ${msg.content}\n`;
-      });
-      conversationContextText += "\n";
-    }
-    
-    // Step 3: Determine the appropriate system prompt based on query type
-    let systemPrompt = "";
-    
-    if (isTimeSummary) {
-      // Special prompt for time-based summary queries - dynamically include the entry count
-      systemPrompt = `You are a helpful personal assistant that summarizes journal entries over time periods. You have access to the following ${relevantEntries.length} journal entries:
-
-${journalContext}
-
-${conversationContextText}
-
-Based on these entries, provide a CONCISE SUMMARY of the user's experiences and emotions during this time period.
-
-RESPONSE GUIDELINES:
-1. Keep your summary UNDER 150 WORDS
-2. Focus on PATTERNS and TRENDS rather than day-by-day details
-3. Highlight emotional themes and significant events only
-4. DO NOT list every daily activity or provide a chronological account
-5. Include 2-3 key insights about the user's emotional state during this period
-6. Use bullet points sparingly and only for the most important insights
-7. Maintain a warm, empathetic tone
-
-The user is asking for a summary of their journal entries over a time period. Provide a concise, insightful overview without excessive detail.`;
-    } else {
-      // Standard prompt for other journal queries
-      systemPrompt = `You are a helpful personal assistant that helps users reflect on and analyze their journal entries. You have access to the following ${relevantEntries.length} journal entries from the user:
-
-${journalContext}
-
-${conversationContextText}
-
-Based on these entries and conversation history, help the user by answering their question. 
-
-Formatting guidelines:
-1. Structure your response with clear sections using markdown formatting when appropriate
-2. For analytical responses, include bullet points to highlight key insights
-3. When referencing dates or timeframes, be specific 
-4. For personal advice or reflections, use a warm, empathetic tone
-5. If the information in the entries is not sufficient to answer completely, clearly state what is missing
-
-Stay factual and only make conclusions that are directly supported by the journal entries. Be empathetic, personal, and thoughtful in your responses.`;
-    }
-    
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      // Don't add conversation history here since we've included it in the system prompt
-      { role: "user", content: message }
-    ];
-    
-    console.log(`Sending request to OpenAI with ${relevantEntries.length} journal entries in context`);
-    
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      headers: {
-        'Authorization': `Bearer ${apiKey}`,
-        'Content-Type': 'application/json'
-      },
-      method: 'POST',
-      body: JSON.stringify({
-        model: "gpt-3.5-turbo",
-        messages: messages,
-        temperature: 0.7,
-        max_tokens: 800
-      })
-    });
-
-    if (!response.ok) {
-      const error = await response.text();
-      console.error("Error from OpenAI:", error);
-      throw new Error("Failed to generate response");
-    }
-
-    const data = await response.json();
-    const answer = data.choices[0].message.content;
-
-    return new Response(
-      JSON.stringify({
-        response: answer,
-        references: references
-      }),
-      {
-        headers: {
-          'Content-Type': 'application/json',
-          ...corsHeaders
-        }
-      }
-    );
-  } catch (error) {
-    console.error("Error handling journal question:", error);
-    throw error;
-  }
-}
-
-/**
- * Search journal entries using SQL-based text search with filters
- */
-async function searchEntriesWithSQL(userId, query, filters = {}, isComprehensiveAnalysisQuery = false) {
-  try {
-    // Start building the query
-    let queryBuilder = supabase
-      .from('Journal Entries')
-      .select('id, "refined text", "transcription text", created_at, master_themes, emotions')
-      .eq('user_id', userId);
-    
-    // Apply date range filters if provided
-    if (filters.dateRange) {
-      if (filters.dateRange.startDate) {
-        queryBuilder = queryBuilder.gte('created_at', filters.dateRange.startDate);
-      }
-      if (filters.dateRange.endDate) {
-        queryBuilder = queryBuilder.lte('created_at', filters.dateRange.endDate);
-      }
-    }
-    
-    // Apply full-text search on content and themes
-    // Note: We search in both refined text and transcription text columns since there's no content column
-    const searchTerms = query.split(' ').filter(term => term.length > 3).join(' | ');
-    if (searchTerms) {
-      queryBuilder = queryBuilder.or(`"refined text".ilike.%${searchTerms}%, "transcription text".ilike.%${searchTerms}%`);
-    }
-    
-    // Execute the query - don't limit if it's a comprehensive analysis query
-    const entryLimit = isComprehensiveAnalysisQuery ? MAX_TIME_ANALYSIS_ENTRIES : MAX_ENTRIES;
-    console.log(`SQL search using entry limit: ${entryLimit} (comprehensive: ${isComprehensiveAnalysisQuery})`);
-    
-    const { data: entries, error } = await queryBuilder
-      .order('created_at', { ascending: false })
-      .limit(entryLimit);
-    
-    if (error) {
-      console.error("Error in SQL search:", error);
-      throw error;
-    }
-    
-    // Map the results to include a proper content field
-    const mappedEntries = entries.map(entry => {
-      return {
-        ...entry,
-        content: coalesceValues(entry["refined text"], entry["transcription text"]) || ""
-      };
-    });
-    
-    return mappedEntries;
-  } catch (error) {
-    console.error("Error in text search:", error);
-    throw error;
-  }
-}
-
