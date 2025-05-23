@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -136,7 +137,97 @@ async function searchByKeywords(
 }
 
 /**
- * Execute a single sub-question's search plan with enhanced fallbacks
+ * Check if entries exist in the specified date range before processing
+ */
+async function checkEntriesInDateRange(
+  supabase: any,
+  userId: string,
+  dateFilter?: { startDate?: string; endDate?: string }
+): Promise<{ hasEntries: boolean; count: number }> {
+  if (!dateFilter) {
+    return { hasEntries: true, count: 0 };
+  }
+
+  try {
+    let query = supabase
+      .from('Journal Entries')
+      .select('id', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    if (dateFilter.startDate) {
+      query = query.gte('created_at', dateFilter.startDate);
+    }
+
+    if (dateFilter.endDate) {
+      query = query.lte('created_at', dateFilter.endDate);
+    }
+
+    const { count, error } = await query;
+
+    if (error) {
+      console.error('[chat-with-rag] Error checking entries in date range:', error);
+      return { hasEntries: false, count: 0 };
+    }
+
+    const entryCount = count || 0;
+    console.log(`[chat-with-rag] Found ${entryCount} entries in date range ${dateFilter.startDate} to ${dateFilter.endDate}`);
+    
+    return { hasEntries: entryCount > 0, count: entryCount };
+  } catch (error) {
+    console.error('[chat-with-rag] Error checking entries in date range:', error);
+    return { hasEntries: false, count: 0 };
+  }
+}
+
+/**
+ * Generate appropriate "no entries found" message based on the time reference
+ */
+function generateNoEntriesMessage(message: string, dateFilter?: { startDate?: string; endDate?: string }): string {
+  let timeReference = "that time period";
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes("last week")) {
+    timeReference = "last week";
+  } else if (lowerMessage.includes("yesterday")) {
+    timeReference = "yesterday";
+  } else if (lowerMessage.includes("last month")) {
+    timeReference = "last month";
+  } else if (lowerMessage.includes("this week")) {
+    timeReference = "this week";
+  } else if (lowerMessage.includes("this month")) {
+    timeReference = "this month";
+  } else if (lowerMessage.includes("today")) {
+    timeReference = "today";
+  }
+  
+  let response = `I don't see any journal entries from ${timeReference}`;
+  
+  if (lowerMessage.includes("emotion")) {
+    response += " to analyze your emotions";
+  } else if (lowerMessage.includes("mood")) {
+    response += " to analyze your mood patterns";
+  } else if (lowerMessage.includes("feel")) {
+    response += " to understand how you were feeling";
+  } else {
+    response += " to analyze";
+  }
+  
+  // Add encouraging follow-up based on time reference
+  if (timeReference === "yesterday" || timeReference === "today") {
+    response += ". Try journaling today and I'll be able to provide insights about your thoughts and emotions!";
+  } else if (timeReference === "this week" || timeReference === "last week") {
+    response += ". Try journaling regularly this week and I'll be able to analyze your emotional patterns and provide insights!";
+  } else if (timeReference === "this month" || timeReference === "last month") {
+    response += ". Start journaling this month and I'll be able to provide deeper insights about your emotional journey!";
+  } else {
+    response += ". Once you start journaling during the time periods you're curious about, I'll be able to give you personalized analysis!";
+  }
+  
+  return response;
+}
+
+/**
+ * Execute a single sub-question's search plan with enhanced date filtering
  */
 async function executeSubQuestionPlan(
   subQuestion: any,
@@ -148,6 +239,30 @@ async function executeSubQuestionPlan(
   
   let results = [];
   const searchPlan = subQuestion.searchPlan;
+  
+  // Check if we have date filters and if entries exist in that range FIRST
+  const dateFilter = searchPlan.vectorSearch?.dateFilter || null;
+  
+  if (dateFilter) {
+    console.log(`[chat-with-rag] Date filter detected, checking for entries in range: ${dateFilter.startDate} to ${dateFilter.endDate}`);
+    
+    const { hasEntries, count } = await checkEntriesInDateRange(supabase, userId, dateFilter);
+    
+    if (!hasEntries) {
+      console.log(`[chat-with-rag] NO ENTRIES found in date range - returning empty result WITHOUT fallback`);
+      return {
+        subQuestion: subQuestion.question,
+        purpose: subQuestion.purpose,
+        results: [],
+        resultCount: 0,
+        dateFilterApplied: true,
+        dateRange: dateFilter,
+        noEntriesInRange: true
+      };
+    }
+    
+    console.log(`[chat-with-rag] Found ${count} entries in date range, proceeding with search`);
+  }
   
   try {
     // Execute SQL queries if specified
@@ -172,8 +287,8 @@ async function executeSubQuestionPlan(
           if (sqlQuery.function === 'get_top_emotions_with_entries') {
             const { data, error } = await supabase.rpc('get_top_emotions_with_entries', {
               user_id_param: userId,
-              start_date: parameters.start_date || null,
-              end_date: parameters.end_date || null,
+              start_date: parameters.start_date || dateFilter?.startDate || null,
+              end_date: parameters.end_date || dateFilter?.endDate || null,
               limit_count: parameters.limit_count || 10
             });
             
@@ -198,8 +313,8 @@ async function executeSubQuestionPlan(
               emotion_name: parameters.emotion_name,
               user_id_filter: userId,
               min_score: 0.05,
-              start_date: parameters.start_date || null,
-              end_date: parameters.end_date || null,
+              start_date: parameters.start_date || dateFilter?.startDate || null,
+              end_date: parameters.end_date || dateFilter?.endDate || null,
               limit_count: parameters.limit_count || 10
             });
             
@@ -290,59 +405,25 @@ async function executeSubQuestionPlan(
       }
     }
     
-    // Apply enhanced fallback strategies with strict date filtering
-    if (results.length < 3 && searchPlan.fallbackStrategy) {
-      console.log(`[chat-with-rag] Applying enhanced fallback strategy: ${searchPlan.fallbackStrategy}`);
-      
-      // Extract date filter from vector search plan
-      const dateFilter = searchPlan.vectorSearch?.dateFilter || null;
-      
-      // If we have a date filter but no results, don't apply fallback - return empty
-      if (dateFilter) {
-        console.log(`[chat-with-rag] Date filter detected: ${JSON.stringify(dateFilter)} - checking if fallback should respect it`);
-        
-        // For date-filtered queries, if we have no results, we should NOT fall back to broader searches
-        if (results.length === 0) {
-          console.log(`[chat-with-rag] No results found within date range ${dateFilter.startDate} to ${dateFilter.endDate} - NOT applying fallback to maintain date constraint integrity`);
-          return {
-            subQuestion: subQuestion.question,
-            purpose: subQuestion.purpose,
-            results: [],
-            resultCount: 0,
-            dateFilterApplied: true,
-            dateRange: dateFilter
-          };
-        }
-      }
+    // CRITICALLY IMPORTANT: DO NOT apply fallback strategies when date filters are present and we have no results
+    if (results.length < 3 && searchPlan.fallbackStrategy && !dateFilter) {
+      console.log(`[chat-with-rag] Applying fallback strategy: ${searchPlan.fallbackStrategy} (NO date filter present)`);
       
       try {
         let fallbackResults = [];
         
         if (searchPlan.fallbackStrategy === 'keyword_search') {
-          fallbackResults = await searchByKeywords(supabase, userId, subQuestion.question, dateFilter);
+          fallbackResults = await searchByKeywords(supabase, userId, subQuestion.question, null);
           fallbackResults = fallbackResults.map(entry => ({
             ...entry,
             source: 'fallback_keyword',
             subQuestion: subQuestion.question
           }));
         } else if (searchPlan.fallbackStrategy === 'recent_entries') {
-          let query_builder = supabase
+          const { data, error } = await supabase
             .from('Journal Entries')
             .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
-            .eq('user_id', userId);
-          
-          // Apply date filters to recent entries fallback if they exist
-          if (dateFilter?.startDate) {
-            query_builder = query_builder.gte('created_at', dateFilter.startDate);
-            console.log(`[chat-with-rag] Applying recent entries fallback start date filter: ${dateFilter.startDate}`);
-          }
-          
-          if (dateFilter?.endDate) {
-            query_builder = query_builder.lte('created_at', dateFilter.endDate);
-            console.log(`[chat-with-rag] Applying recent entries fallback end date filter: ${dateFilter.endDate}`);
-          }
-          
-          const { data, error } = await query_builder
+            .eq('user_id', userId)
             .order('created_at', { ascending: false })
             .limit(10);
             
@@ -357,23 +438,10 @@ async function executeSubQuestionPlan(
             }));
           }
         } else if (searchPlan.fallbackStrategy === 'emotion_based') {
-          // Apply date filters to emotion-based fallback
-          const emotionParams = {
+          const { data, error } = await supabase.rpc('get_top_emotions_with_entries', {
             user_id_param: userId,
             limit_count: 3
-          };
-          
-          if (dateFilter?.startDate) {
-            emotionParams.start_date = dateFilter.startDate;
-            console.log(`[chat-with-rag] Applying emotion fallback start date filter: ${dateFilter.startDate}`);
-          }
-          
-          if (dateFilter?.endDate) {
-            emotionParams.end_date = dateFilter.endDate;
-            console.log(`[chat-with-rag] Applying emotion fallback end date filter: ${dateFilter.endDate}`);
-          }
-          
-          const { data, error } = await supabase.rpc('get_top_emotions_with_entries', emotionParams);
+          });
           
           if (!error && data) {
             fallbackResults = data.flatMap(emotion => 
@@ -391,11 +459,13 @@ async function executeSubQuestionPlan(
         }
         
         results = results.concat(fallbackResults);
-        console.log(`[chat-with-rag] Enhanced fallback strategy added ${fallbackResults.length} results (with date filtering: ${dateFilter ? 'yes' : 'no'})`);
+        console.log(`[chat-with-rag] Fallback strategy added ${fallbackResults.length} results (date filter: none)`);
         
       } catch (error) {
-        console.error(`[chat-with-rag] Enhanced fallback strategy failed:`, error);
+        console.error(`[chat-with-rag] Fallback strategy failed:`, error);
       }
+    } else if (dateFilter && results.length === 0) {
+      console.log(`[chat-with-rag] SKIPPING fallback strategies due to date filter and zero results - maintaining date constraint integrity`);
     }
     
     return {
@@ -403,7 +473,9 @@ async function executeSubQuestionPlan(
       purpose: subQuestion.purpose,
       results: results,
       resultCount: results.length,
-      dateFilterApplied: !!searchPlan.vectorSearch?.dateFilter
+      dateFilterApplied: !!dateFilter,
+      dateRange: dateFilter,
+      noEntriesInRange: dateFilter && results.length === 0
     };
     
   } catch (error) {
@@ -442,6 +514,7 @@ async function executeIntelligentSubQueries(
     let allResults = [];
     const subQuestionSummary = [];
     let hasDateFilters = false;
+    let noEntriesInAnyRange = false;
     
     subQuestionResults.forEach((result, index) => {
       if (result.status === 'fulfilled') {
@@ -452,11 +525,16 @@ async function executeIntelligentSubQueries(
           purpose: subResult.purpose,
           resultCount: subResult.resultCount,
           status: 'success',
-          dateFilterApplied: subResult.dateFilterApplied
+          dateFilterApplied: subResult.dateFilterApplied,
+          noEntriesInRange: subResult.noEntriesInRange
         });
         
         if (subResult.dateFilterApplied) {
           hasDateFilters = true;
+        }
+        
+        if (subResult.noEntriesInRange) {
+          noEntriesInAnyRange = true;
         }
       } else {
         console.error(`Sub-question ${index} failed:`, result.reason);
@@ -474,13 +552,14 @@ async function executeIntelligentSubQueries(
       index === self.findIndex(e => e.id === entry.id)
     ).sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
     
-    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${subQuestionSummary.length} sub-questions (date filters applied: ${hasDateFilters})`);
+    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${subQuestionSummary.length} sub-questions (date filters applied: ${hasDateFilters}, no entries in range: ${noEntriesInAnyRange})`);
     
     return {
       results: uniqueResults.slice(0, 20),
       subQuestionSummary,
       totalResults: uniqueResults.length,
-      hasDateFilters
+      hasDateFilters,
+      noEntriesInAnyRange
     };
     
   } catch (error) {
@@ -532,23 +611,11 @@ Response formatting requirements:
       systemPrompt += `\n\nFocus: Analyze emotional patterns using ${queryPlan.subQuestions.length} targeted approaches.`;
     }
 
-    // Check if we have date filters but no results - provide specific message
-    if (aggregatedResults.hasDateFilters && aggregatedResults.results.length === 0) {
-      // Extract date information from the query for a more specific response
-      let timeReference = "that time period";
-      if (message.toLowerCase().includes("last week")) {
-        timeReference = "last week";
-      } else if (message.toLowerCase().includes("yesterday")) {
-        timeReference = "yesterday";
-      } else if (message.toLowerCase().includes("last month")) {
-        timeReference = "last month";
-      } else if (message.toLowerCase().includes("this week")) {
-        timeReference = "this week";
-      } else if (message.toLowerCase().includes("this month")) {
-        timeReference = "this month";
-      }
+    // Check if we have date filters but no results due to missing entries in that time range
+    if (aggregatedResults.hasDateFilters && aggregatedResults.noEntriesInAnyRange) {
+      console.log('[chat-with-rag] No entries found in specified date range - generating appropriate message');
       
-      const noEntriesResponse = `I don't see any journal entries from ${timeReference} to analyze. To help me understand your patterns and provide insights, try journaling regularly during the time periods you're curious about. Once you have some entries, I'll be able to give you personalized analysis!`;
+      const noEntriesResponse = generateNoEntriesMessage(message);
       
       return {
         content: noEntriesResponse,
@@ -556,7 +623,7 @@ Response formatting requirements:
           entriesAnalyzed: 0,
           totalEntries: 0,
           dateFilterApplied: true,
-          timeReference: timeReference,
+          noEntriesInRange: true,
           reason: "No entries found in specified date range"
         }
       };
@@ -587,7 +654,8 @@ Response formatting requirements:
       },
       subQuestionsUsed: aggregatedResults.subQuestionSummary.length,
       analysisApproaches: aggregatedResults.subQuestionSummary.map(sq => sq.question),
-      dateFilterApplied: aggregatedResults.hasDateFilters
+      dateFilterApplied: aggregatedResults.hasDateFilters,
+      noEntriesInRange: aggregatedResults.noEntriesInAnyRange
     };
 
     const userPrompt = `Based on your ${aggregatedResults.results.length} journal entries, here's what I found:
@@ -817,11 +885,32 @@ serve(async (req) => {
         results: fallbackResults,
         subQuestionSummary: [{ question: 'Direct search', resultCount: fallbackResults.length, status: 'success' }],
         totalResults: fallbackResults.length,
-        hasDateFilters: false
+        hasDateFilters: false,
+        noEntriesInAnyRange: false
       };
     }
 
     console.log(`[chat-with-rag] Retrieved ${aggregatedResults.totalResults} total relevant entries from sub-questions`);
+
+    // Check if we have date filters but no entries in that range
+    if (aggregatedResults.hasDateFilters && aggregatedResults.noEntriesInAnyRange) {
+      console.log('[chat-with-rag] Date filters present but no entries in range - generating no entries message');
+      
+      const noEntriesResponse = generateNoEntriesMessage(message);
+      
+      return new Response(JSON.stringify({ 
+        data: noEntriesResponse,
+        analysisMetadata: {
+          entriesAnalyzed: 0,
+          totalEntries: 0,
+          dateFilterApplied: true,
+          noEntriesInRange: true,
+          reason: "No entries found in specified date range"
+        }
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
 
     if (aggregatedResults.totalResults === 0) {
       let noDataResponse = `I couldn't find relevant journal entries for your question about "${message}".`;
