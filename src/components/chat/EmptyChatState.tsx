@@ -8,18 +8,18 @@ const EmptyChatState: React.FC = () => {
     <div className="flex flex-col items-center justify-center h-full p-6 text-center empty-chat-state">
       <div className="space-y-2 mb-8">
         <h3 className="text-xl font-semibold">
-          <TranslatableText text="Ask about your journal entries" />
+          <TranslatableText text="How can I help you?" />
         </h3>
         <p className="text-muted-foreground text-sm">
-          <TranslatableText text="Get insights from your journal by asking questions" />
+          <TranslatableText text="Ask me anything about your mental well-being and journal entries" />
         </p>
       </div>
       
       <div className="grid gap-3 w-full max-w-sm empty-chat-suggestion">
-        <ChatSuggestionButton>How did I feel last week?</ChatSuggestionButton>
-        <ChatSuggestionButton>What topics have I been writing about recently?</ChatSuggestionButton>
-        <ChatSuggestionButton>When do I usually feel most inspired?</ChatSuggestionButton>
-        <ChatSuggestionButton>What are my most common emotions?</ChatSuggestionButton>
+        <ChatSuggestionButton>How have I been feeling lately?</ChatSuggestionButton>
+        <ChatSuggestionButton>What patterns do you see in my journal?</ChatSuggestionButton>
+        <ChatSuggestionButton>Can you help me reflect on my recent entries?</ChatSuggestionButton>
+        <ChatSuggestionButton>What insights can you share about my mood?</ChatSuggestionButton>
       </div>
     </div>
   );
