@@ -21,8 +21,8 @@ export async function sendMessage(
     // Capture client's device time and timezone information
     const clientTimeInfo = getClientTimeInfo();
     
-    console.log(`[sendMessage] Captured client time info:`, clientTimeInfo);
-    console.log(`[sendMessage] Enhanced debugging: Processing "${message}" for user ${userId}`);
+    console.log(`[sendMessage] Processing query with intelligent pipeline: "${message}"`);
+    console.log(`[sendMessage] Client time info:`, clientTimeInfo);
     
     // Save the user message to the database
     await supabase.from('chat_messages').insert({
@@ -61,19 +61,19 @@ export async function sendMessage(
       userTimezone = clientTimeInfo.timezoneName;
     }
     
-    // Get previous messages from this thread for context (most recent 15)
+    // Get previous messages from this thread for context (most recent 10)
     const { data: previousMessages, error: contextError } = await supabase
       .from('chat_messages')
       .select('content, sender, created_at')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: false })
-      .limit(15);
+      .limit(10);
     
     if (contextError) {
       console.error('Error fetching conversation context:', contextError);
     }
     
-    // Build conversation context for OpenAI
+    // Build conversation context for the query planner
     const conversationContext = [];
     if (previousMessages && previousMessages.length > 0) {
       for (const msg of [...previousMessages].reverse()) {
@@ -92,12 +92,9 @@ export async function sendMessage(
       .single();
     
     const metadata = threadData?.metadata || {};
-    
     let metadataObj: Record<string, any> = {};
     if (isThreadMetadata(metadata)) {
       metadataObj = metadata;
-    } else {
-      console.warn('Thread metadata is not in expected format:', metadata);
     }
     
     // Check if this appears to be a follow-up query with a time reference
@@ -107,38 +104,6 @@ export async function sendMessage(
     // Check if the message appears to be mental health related
     const isMentalHealthQuery = detectMentalHealthQuery(message);
     
-    // Prepare function call parameter data with enhanced context
-    const queryPlannerParams = {
-      message,
-      userId,
-      conversationContext,
-      timezoneOffset: clientTimeInfo.timezoneOffset,
-      timezoneName: clientTimeInfo.timezoneName,
-      clientTime: clientTimeInfo.timestamp,
-      appContext: {
-        appInfo: {
-          name: "SOULo",
-          type: "Voice Journaling App",
-          features: ["Journal Analysis", "Emotion Tracking", "Mental Wellbeing", "Pattern Recognition"]
-        },
-        userContext: {
-          previousTimeContext: metadataObj.timeContext || null,
-          previousTopicContext: metadataObj.topicContext || null,
-          intentType: metadataObj.intentType || 'new_query',
-          needsClarity: metadataObj.needsClarity || false,
-          confidenceScore: metadataObj.confidenceScore || null,
-          ambiguities: metadataObj.ambiguities || [],
-          isMentalHealthQuery: isMentalHealthQuery,
-          userTimezone: userTimezone
-        }
-      },
-      checkForMultiQuestions: true,
-      isFollowUp: conversationContext.length > 0,
-      referenceDate,
-      preserveTopicContext,
-      timeRange
-    };
-    
     // Create a placeholder/processing message in the database
     const processingMessageId = uuidv4();
     await supabase.from('chat_messages').insert({
@@ -146,15 +111,31 @@ export async function sendMessage(
       thread_id: threadId,
       sender: 'assistant',
       role: 'assistant',
-      content: "Analyzing your question...",
+      content: "Analyzing your question intelligently...",
       is_processing: true,
       created_at: new Date().toISOString()
     });
     
-    // Step 1: Get query plan to determine search strategy
+    // Step 1: Get intelligent query plan using enhanced smart-query-planner
+    console.log(`[sendMessage] Calling enhanced smart-query-planner`);
+    const queryPlannerParams = {
+      message,
+      userId,
+      conversationContext,
+      isFollowUp: conversationContext.length > 0,
+      timezoneOffset: clientTimeInfo.timezoneOffset,
+      timezoneName: clientTimeInfo.timezoneName,
+      clientTime: clientTimeInfo.timestamp,
+      referenceDate,
+      preserveTopicContext,
+      timeRange
+    };
+    
     const queryPlanResponse = await supabase.functions.invoke('smart-query-planner', {
       body: queryPlannerParams
     });
+    
+    console.log(`[sendMessage] Query planner response:`, queryPlanResponse);
     
     // Check if we have a direct response that doesn't need further processing
     if (queryPlanResponse.data && queryPlanResponse.data.directResponse) {
@@ -175,6 +156,10 @@ export async function sendMessage(
         lastUpdated: new Date().toISOString()
       });
       
+      await supabase.from('chat_threads')
+        .update({ processing_status: 'idle' })
+        .eq('id', threadId);
+      
       return {
         response: queryPlanResponse.data.directResponse,
         status: 'success',
@@ -182,68 +167,23 @@ export async function sendMessage(
       };
     }
     
-    // Extract the query plan from the response
-    const queryPlan = queryPlanResponse.data?.plan || {};
-    const queryType = queryPlanResponse.data?.queryType || 'journal_specific';
+    // Extract the enhanced query plan
+    const queryPlan = queryPlanResponse.data?.queryPlan || {};
+    console.log(`[sendMessage] Enhanced query plan:`, JSON.stringify(queryPlan, null, 2));
     
-    console.log('[sendMessage] Enhanced debugging - Query plan received:', JSON.stringify(queryPlan, null, 2));
-    console.log(`[sendMessage] Enhanced debugging - Query type: ${queryType}`);
+    // Update processing message based on query plan
+    let processingContent = "Processing your request with intelligent analysis...";
     
-    // Update the processing message with status based on the query plan
-    let processingContent = "Processing your request...";
-    
-    if (queryPlan.needsMoreContext) {
-      // The query needs clarification, so use the clarificationReason as response
-      const clarificationResponse = queryPlan.clarificationReason || 
-        "Could you provide more details about what you're looking for?";
-      
-      // Replace the processing message with the clarification request
-      await supabase.from('chat_messages')
-        .update({
-          content: clarificationResponse,
-          is_processing: false
-        })
-        .eq('id', processingMessageId);
-      
-      // Update thread metadata to track that we need clarity
-      await updateThreadMetadata(threadId, {
-        intentType: 'needs_clarification',
-        timeContext: queryPlan.previousTimeContext || metadataObj.timeContext,
-        topicContext: queryPlan.topicContext || metadataObj.topicContext,
-        confidenceScore: queryPlan.confidenceScore || 0.3,
-        needsClarity: true,
-        ambiguities: queryPlan.ambiguities || [],
-        lastQueryType: queryType,
-        domainContext: queryPlan.domainContext || null,
-        lastUpdated: new Date().toISOString()
-      });
-      
-      // Update thread status
-      await supabase.from('chat_threads')
-        .update({ processing_status: 'idle' })
-        .eq('id', threadId);
-      
-      return {
-        response: clarificationResponse,
-        status: 'needs_clarification',
-        messageId: processingMessageId,
-      };
+    if (queryPlan.isPersonalityQuery) {
+      processingContent = "Analyzing personality patterns in your journal entries...";
+    } else if (queryPlan.isEmotionQuery) {
+      processingContent = "Analyzing emotional patterns and insights...";
+    } else if (queryPlan.needsComprehensiveAnalysis) {
+      processingContent = "Performing comprehensive analysis of your journal data...";
+    } else if (queryPlan.strategy === 'hybrid') {
+      processingContent = "Using multiple search strategies to find relevant insights...";
     }
     
-    // Set appropriate processing message based on query type
-    if (queryType === 'journal_specific') {
-      processingContent = "Searching your journal entries for insights...";
-    } else if (queryType === 'emotional_analysis') {
-      processingContent = "Analyzing emotional patterns in your journal...";
-    } else if (queryType === 'pattern_detection') {
-      processingContent = "Looking for patterns in your journal entries...";
-    } else if (queryType === 'personality_reflection') {
-      processingContent = "Reflecting on personality insights from your journal...";
-    } else if (queryType === 'mental_health_analysis') {
-      processingContent = "Analyzing your journal entries for mental health insights...";
-    }
-    
-    // Update the processing message with the appropriate content
     await supabase.from('chat_messages')
       .update({ content: processingContent })
       .eq('id', processingMessageId);
@@ -263,29 +203,66 @@ export async function sendMessage(
       };
     }
     
-    console.log(`[sendMessage] Enhanced debugging - Final date range:`, dateRange);
+    console.log(`[sendMessage] Final date range:`, dateRange);
     
-    // First, verify that this user has journal entries in the database
-    const { count: entryCount, error: countError } = await supabase
-      .from('Journal Entries')
-      .select('id', { count: "exact", head: true })
-      .eq('user_id', userId);
+    // Step 2: Execute intelligent search and response generation using enhanced chat-with-rag
+    console.log(`[sendMessage] Calling enhanced chat-with-rag with query plan`);
     
-    if (countError) {
-      console.error('Error checking for user journal entries:', countError);
+    const queryResponse = await supabase.functions.invoke('chat-with-rag', {
+      body: {
+        message,
+        userId,
+        threadId,
+        timeRange: dateRange,
+        referenceDate,
+        conversationContext,
+        queryPlan, // Pass the intelligent query plan
+        isMentalHealthQuery,
+        clientTimeInfo: clientTimeInfo,
+        userTimezone: userTimezone
+      }
+    });
+    
+    console.log(`[sendMessage] Enhanced chat-with-rag response:`, queryResponse);
+    
+    if (queryResponse.error) {
+      console.error('Error from enhanced chat-with-rag:', queryResponse.error);
+      throw new Error(`Enhanced chat service error: ${queryResponse.error.message || queryResponse.error}`);
     }
     
-    // If no entries found and this is a mental health query, provide a helpful response
-    if ((entryCount === 0 || !entryCount) && isMentalHealthQuery) {
-      const noEntriesResponse = 
-        "I don't see any journal entries in your account yet. To provide personalized mental health advice, " +
-        "I need to analyze your journal entries. Would you like to create a journal entry first? " +
-        "That will help me give you more tailored recommendations based on your experiences and emotions.";
+    if (!queryResponse.data) {
+      console.error('No data received from enhanced chat-with-rag:', queryResponse);
+      throw new Error('Failed to get response from enhanced chat-with-rag engine');
+    }
+    
+    // The enhanced backend returns { data: "response string" }
+    const finalResponse = queryResponse.data;
+    
+    console.log(`[sendMessage] Final response type: ${typeof finalResponse}`);
+    console.log(`[sendMessage] Final response preview: ${finalResponse?.substring(0, 100)}...`);
+    
+    // Validate that we got a proper string response
+    if (!finalResponse || typeof finalResponse !== 'string') {
+      console.error('Invalid response format from enhanced chat-with-rag:', {
+        responseType: typeof finalResponse,
+        responseValue: finalResponse,
+        fullQueryResponse: queryResponse,
+        dataProperty: queryResponse.data
+      });
+      
+      // Provide fallback response based on query type
+      let fallbackResponse = 'I apologize, but I encountered an error processing your request. Please try again.';
+      
+      if (queryPlan.isPersonalityQuery) {
+        fallbackResponse = 'I had trouble analyzing personality traits from your journal entries. Could you try writing more detailed entries about your thoughts, reactions, and experiences? This will help me provide better personality insights.';
+      } else if (queryPlan.isEmotionQuery) {
+        fallbackResponse = 'I had difficulty analyzing emotional patterns. Try adding more journal entries that describe your feelings and emotional experiences for better insights.';
+      }
       
       await supabase.from('chat_messages')
         .update({
-          content: noEntriesResponse,
-          is_processing: false
+          content: fallbackResponse,
+          is_processing: false,
         })
         .eq('id', processingMessageId);
       
@@ -294,86 +271,11 @@ export async function sendMessage(
         .eq('id', threadId);
       
       return {
-        response: noEntriesResponse,
-        status: 'success',
+        response: fallbackResponse,
+        status: 'error',
         messageId: processingMessageId,
       };
     }
-    
-    // CRUCIAL: Use only chat-with-rag function (the more robust one)
-    console.log(`[sendMessage] Enhanced debugging - Calling chat-with-rag function`);
-    
-    let finalResponse;
-    
-    if (queryPlan.isSegmented) {
-      const subQueries = queryPlan.subqueries || [];
-      const queryResponse = await processMultiPartQuery(
-        message, 
-        userId, 
-        threadId, 
-        dateRange, 
-        referenceDate, 
-        subQueries, 
-        clientTimeInfo,
-        userTimezone
-      );
-      finalResponse = queryResponse.response;
-    } else {
-      // Standard query processing - ONLY use chat-with-rag
-      const queryResponse = await supabase.functions.invoke('chat-with-rag', {
-        body: {
-          message,
-          userId,
-          threadId,
-          timeRange: dateRange,
-          referenceDate,
-          conversationContext,
-          queryPlan,
-          isMentalHealthQuery,
-          clientTimeInfo: clientTimeInfo,
-          userTimezone: userTimezone
-        }
-      });
-      
-      console.log(`[sendMessage] Enhanced debugging - chat-with-rag response:`, queryResponse);
-      console.log(`[sendMessage] Enhanced debugging - Raw queryResponse:`, JSON.stringify(queryResponse, null, 2));
-      
-      if (queryResponse.error) {
-        console.error('Error from chat-with-rag:', queryResponse.error);
-        throw new Error(`Chat service error: ${queryResponse.error.message || queryResponse.error}`);
-      }
-      
-      if (!queryResponse.data) {
-        console.error('No data received from chat-with-rag:', queryResponse);
-        throw new Error('Failed to get response from chat-with-rag engine');
-      }
-      
-      // CRITICAL FIX: The backend returns { data: "response string" }
-      // So queryResponse.data contains the actual response string
-      finalResponse = queryResponse.data;
-      
-      console.log(`[sendMessage] Enhanced debugging - Final response type: ${typeof finalResponse}`);
-      console.log(`[sendMessage] Enhanced debugging - Final response preview: ${finalResponse?.substring(0, 100)}...`);
-      
-      // Validate that we got a proper string response
-      if (!finalResponse || typeof finalResponse !== 'string') {
-        console.error('Invalid response format from chat-with-rag:', {
-          responseType: typeof finalResponse,
-          responseValue: finalResponse,
-          fullQueryResponse: queryResponse,
-          dataProperty: queryResponse.data
-        });
-        finalResponse = 'I apologize, but I encountered an error processing your request. Please try again.';
-      }
-      
-      if (isMentalHealthQuery && (!finalResponse || finalResponse.trim() === '' || finalResponse.includes("I don't have enough information"))) {
-        finalResponse = "Based on the journal entries I have access to, I don't have enough information to provide specific mental health recommendations. " +
-          "To give you better personalized advice, could you add more journal entries about your feelings, challenges, and daily experiences? " +
-          "In the meantime, some general mental health practices include regular exercise, adequate sleep, mindfulness meditation, and connecting with others.";
-      }
-    }
-    
-    console.log(`[sendMessage] Enhanced debugging - Final response: ${finalResponse?.substring(0, 200)}...`);
     
     // Replace the processing message with the final response
     await supabase.from('chat_messages')
@@ -383,15 +285,16 @@ export async function sendMessage(
       })
       .eq('id', processingMessageId);
     
-    // Update thread metadata
+    // Update thread metadata with enhanced information
     const updatedMetadata = {
       intentType: 'answered',
       timeContext: dateRange?.periodName || metadataObj.timeContext,
-      topicContext: queryPlan.topicContext || metadataObj.topicContext,
-      confidenceScore: queryPlan.confidenceScore || 0.8,
+      topicContext: queryPlan.domainContext || metadataObj.topicContext,
+      confidenceScore: queryPlan.confidence || 0.8,
       needsClarity: false,
-      lastQueryType: queryType,
+      lastQueryType: queryPlan.queryType || 'journal_specific',
       domainContext: queryPlan.domainContext || null,
+      searchStrategy: queryPlan.strategy || 'hybrid',
       lastUpdated: new Date().toISOString()
     };
     
@@ -407,14 +310,14 @@ export async function sendMessage(
       messageId: processingMessageId,
     };
   } catch (error) {
-    console.error('Error in sendMessage:', error);
+    console.error('Error in enhanced sendMessage:', error);
     
     await supabase.from('chat_threads')
       .update({ processing_status: 'error' })
       .eq('id', threadId);
     
     return {
-      response: 'Sorry, I encountered an error while processing your message.',
+      response: 'Sorry, I encountered an error while processing your message with the enhanced pipeline.',
       status: 'error',
       error: error.message,
     };
@@ -672,7 +575,7 @@ export const saveMessage = async (
       references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
       reference_entries: Array.isArray(data.reference_entries) ? data.reference_entries : [],
       analysis: data.analysis_data,
-      analysis_data: data.analysis_data,
+      analysis: data.analysis_data,
       hasNumericResult: data.has_numeric_result,
       has_numeric_result: data.has_numeric_result,
       sub_query_responses: jsonToSubQueryResponse(data.sub_query_responses)
