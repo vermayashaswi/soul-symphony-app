@@ -8,18 +8,9 @@ import {
   saveMessage,
   updateThreadTitle
 } from "./messageService";
-import { ChatThread } from "./types";
+import { ChatThread, ChatMessage } from "./types";
 import { v4 as uuidv4 } from "uuid";
 import { useToast } from "@/hooks/use-toast";
-import { ChatMessage } from "@/types/chat";
-
-export interface ChatThread {
-  id: string;
-  user_id: string;
-  title: string;
-  created_at: string;
-  updated_at: string;
-}
 
 export interface ChatMessagePersistence {
   id: string;
@@ -165,7 +156,18 @@ export const useChatPersistence = (userId: string | undefined) => {
           
         if (error || !newThread) throw new Error("Failed to retrieve new thread");
         
-        setThreads(prev => [newThread, ...prev]);
+        // Cast to ChatThread type
+        const typedThread: ChatThread = {
+          id: newThread.id,
+          title: newThread.title,
+          user_id: newThread.user_id,
+          created_at: newThread.created_at,
+          updated_at: newThread.updated_at,
+          processing_status: (newThread.processing_status as 'idle' | 'processing' | 'failed') || 'idle',
+          metadata: newThread.metadata || undefined
+        };
+        
+        setThreads(prev => [typedThread, ...prev]);
         setActiveThread(newThreadId);
         return newThreadId;
       }

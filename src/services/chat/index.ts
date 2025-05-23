@@ -18,5 +18,5 @@ export type {
   ChatThread, 
   ChatMessage,
   SubQueryResponse,
-  SendMessageResponse 
+  MessageResponse as SendMessageResponse // Export MessageResponse as SendMessageResponse for backward compatibility
 } from './types';

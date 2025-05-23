@@ -153,7 +153,17 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[] |
       .order('updated_at', { ascending: false });
     
     if (error) throw error;
-    return data || [];
+    
+    // Cast the database response to our ChatThread type
+    return (data || []).map(thread => ({
+      id: thread.id,
+      title: thread.title,
+      user_id: thread.user_id,
+      created_at: thread.created_at,
+      updated_at: thread.updated_at,
+      processing_status: (thread.processing_status as 'idle' | 'processing' | 'failed') || 'idle',
+      metadata: thread.metadata || undefined
+    }));
   } catch (error) {
     console.error("Error fetching user threads:", error);
     return null;
@@ -169,7 +179,28 @@ export async function getThreadMessages(threadId: string): Promise<ChatMessage[]
       .order('created_at', { ascending: true });
     
     if (error) throw error;
-    return data || [];
+    
+    // Cast the database response to our ChatMessage type
+    return (data || []).map(message => ({
+      id: message.id,
+      thread_id: message.thread_id,
+      content: message.content,
+      sender: (message.sender as 'user' | 'assistant' | 'error') || 'user',
+      role: (message.role as 'user' | 'assistant' | 'error') || message.sender as 'user' | 'assistant' | 'error' || 'user',
+      created_at: message.created_at,
+      reference_entries: message.reference_entries || undefined,
+      analysis_data: message.analysis_data || undefined,
+      has_numeric_result: message.has_numeric_result || false,
+      sub_query1: message.sub_query1 || undefined,
+      sub_query2: message.sub_query2 || undefined,
+      sub_query3: message.sub_query3 || undefined,
+      sub_query_responses: message.sub_query_responses || undefined,
+      isInteractive: false,
+      interactiveOptions: undefined,
+      references: Array.isArray(message.reference_entries) ? message.reference_entries : [],
+      analysis: message.analysis_data,
+      hasNumericResult: message.has_numeric_result || false
+    }));
   } catch (error) {
     console.error("Error fetching thread messages:", error);
     return [];
@@ -208,7 +239,28 @@ export async function saveMessage(
       .single();
     
     if (error) throw error;
-    return data;
+    
+    // Cast the database response to our ChatMessage type
+    return {
+      id: data.id,
+      thread_id: data.thread_id,
+      content: data.content,
+      sender: data.sender as 'user' | 'assistant' | 'error',
+      role: (data.role as 'user' | 'assistant' | 'error') || data.sender as 'user' | 'assistant' | 'error',
+      created_at: data.created_at,
+      reference_entries: data.reference_entries,
+      analysis_data: data.analysis_data,
+      has_numeric_result: data.has_numeric_result,
+      sub_query1: data.sub_query1,
+      sub_query2: data.sub_query2,
+      sub_query3: data.sub_query3,
+      sub_query_responses: data.sub_query_responses,
+      isInteractive: isInteractive || false,
+      interactiveOptions: interactiveOptions,
+      references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
+      analysis: data.analysis_data,
+      hasNumericResult: data.has_numeric_result || false
+    };
   } catch (error) {
     console.error("Error saving message:", error);
     return null;
