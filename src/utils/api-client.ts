@@ -15,9 +15,9 @@ export async function fetchWithRetry(
   options: FetchOptions = {}
 ): Promise<Response> {
   const { 
-    retries = 3, 
+    retries = 2, // Reduced from 3 to 2 for faster failure detection
     retryDelay = 1000, 
-    timeout = 25000, // 25 seconds
+    timeout = 15000, // Reduced from 25s to 15s for most requests
     ...fetchOptions 
   } = options;
   
@@ -43,11 +43,11 @@ export async function fetchWithRetry(
       // Wait for the specified delay
       await new Promise(resolve => setTimeout(resolve, retryDelay));
       
-      // Retry with one less retry
+      // Retry with one less retry and shorter delay
       return fetchWithRetry(url, {
         ...options,
         retries: retries - 1,
-        retryDelay: retryDelay * 1.5, // Exponential backoff
+        retryDelay: retryDelay * 1.2, // Smaller exponential backoff
       });
     }
     
@@ -68,7 +68,7 @@ export async function fetchWithRetry(
       return fetchWithRetry(url, {
         ...options,
         retries: retries - 1,
-        retryDelay: retryDelay * 1.5, // Exponential backoff
+        retryDelay: retryDelay * 1.2, // Smaller exponential backoff
       });
     }
     

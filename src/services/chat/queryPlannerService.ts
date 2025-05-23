@@ -11,20 +11,26 @@ import {
 } from '@/services/dateService';
 
 /**
- * Enhance query with thread context
+ * Enhance query with thread context (optimized for speed)
  * @param message User query message
  * @param threadId Chat thread ID
  * @returns Enhanced query string
  */
 async function enhanceWithThreadContext(message: string, threadId: string, queryTypes: any): Promise<string> {
   try {
-    // Fetch the last few messages from the chat thread
+    // Fetch only the last 3 messages for faster processing
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // Shorter timeout for context
+    
     const { data: messages, error } = await supabase
       .from('chat_messages')
       .select('content, sender')
       .eq('thread_id', threadId)
       .order('created_at', { ascending: false })
-      .limit(5);
+      .limit(3) // Reduced from 5 to 3
+      .abortSignal(controller.signal);
+
+    clearTimeout(timeoutId);
 
     if (error) {
       console.error("Error fetching thread messages:", error);
@@ -35,13 +41,17 @@ async function enhanceWithThreadContext(message: string, threadId: string, query
     const context = messages
       .filter(msg => msg.sender === 'user')
       .map(msg => msg.content)
+      .slice(0, 2) // Only use last 2 user messages
       .join('\n');
 
-    // Combine the user's query with the context
-    const enhancedQuery = `${message}\nContext:\n${context}`;
+    // Only enhance if we have meaningful context
+    if (context.length > 10) {
+      const enhancedQuery = `${message}\nContext:\n${context}`;
+      console.log("[Query Planner] Enhanced query with thread context");
+      return enhancedQuery;
+    }
     
-    console.log("[Query Planner] Enhanced query with thread context:", enhancedQuery);
-    return enhancedQuery;
+    return message;
   } catch (error) {
     console.error("Error enhancing query with thread context:", error);
     return message;
@@ -49,11 +59,11 @@ async function enhanceWithThreadContext(message: string, threadId: string, query
 }
 
 /**
- * Enhanced query planning service with intelligent sub-query generation
+ * Enhanced query planning service with optimized performance
  */
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
-    console.log("[Query Planner] Planning intelligent sub-query strategy with emergency fixes for:", message);
+    console.log("[Query Planner] Planning intelligent sub-query strategy with optimized performance for:", message);
     console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
     
     // For debugging timezone issues
@@ -66,11 +76,11 @@ export async function planQuery(message: string, threadId: string, userId: strin
     
     console.log(`[Query Planner] Client time information:`, clientInfo);
     
-    // Get user's timezone from their profile with 25s timeout
+    // Get user's timezone from their profile with optimized timeout
     let userTimezone;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced from 25s to 5s
       
       const { data: profileData } = await supabase
         .from('profiles')
@@ -167,10 +177,13 @@ export async function planQuery(message: string, threadId: string, userId: strin
                               message.toLowerCase().includes('how often') || 
                               message.toLowerCase().includes('frequency'));
     
-    // Enhance query analysis based on thread context
-    const enhancedQuery = await enhanceWithThreadContext(message, threadId, queryTypes);
+    // Optimize thread context enhancement - only for complex queries
+    let enhancedQuery = message;
+    if (queryTypes.needsMoreContext || isPersonalityQuery) {
+      enhancedQuery = await enhanceWithThreadContext(message, threadId, queryTypes);
+    }
     
-    // Define intelligent sub-query strategy with emergency fix priority
+    // Define intelligent sub-query strategy with optimized priority
     let strategy = 'intelligent_sub_query';
     
     if (queryTypes.needsMoreContext) {
@@ -193,7 +206,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
       console.log("[Query Planner] Using intelligent sub-query strategy for causal analysis");
     }
     
-    // Return enhanced plan with emergency fix indicators
+    // Return enhanced plan with optimized performance indicators
     return {
       strategy,
       timeRange: queryTypes.timeRange,
@@ -212,7 +225,8 @@ export async function planQuery(message: string, threadId: string, userId: strin
                       queryTypes.isEmotionFocused || isPersonalityQuery ? 'medium' : 'standard',
       needsEmergencyFixes: queryTypes.needsEmergencyFixes,
       isPersonalityQuery: isPersonalityQuery,
-      emergencyFixPriority: isPersonalityQuery ? 'high' : queryTypes.isEmotionFocused ? 'medium' : 'low'
+      emergencyFixPriority: isPersonalityQuery ? 'high' : queryTypes.isEmotionFocused ? 'medium' : 'low',
+      optimizedForSpeed: true // New flag indicating performance optimizations applied
     };
   } catch (error) {
     console.error("[Query Planner] Error planning intelligent sub-query:", error);
@@ -224,7 +238,9 @@ export async function planQuery(message: string, threadId: string, userId: strin
       timestamp: new Date().toISOString(),
       requiresIntelligentPlanning: true,
       needsEmergencyFixes: true,
-      emergencyFixPriority: 'high'
+      emergencyFixPriority: 'high',
+      optimizedForSpeed: true,
+      fallbackMode: true // Indicates we're in error recovery mode
     };
   }
 }

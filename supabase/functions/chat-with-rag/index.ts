@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -108,7 +109,7 @@ async function searchByKeywords(
         id: entry.id,
         content: entry['refined text'] || entry['transcription text'] || '',
         created_at: entry.created_at,
-        similarity: 0.7, // Assign moderate similarity for keyword matches
+        similarity: 0.7,
         source: 'keyword_search',
         matched_keywords: keywords
       }));
@@ -145,7 +146,7 @@ async function executeSubQuestionPlan(
       const sqlPromises = searchPlan.sqlQueries.map(async (sqlQuery) => {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 3000);
+          const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 seconds
           
           // Replace USER_ID_PLACEHOLDER with actual userId
           const parameters = { ...sqlQuery.parameters };
@@ -423,7 +424,7 @@ async function executeIntelligentSubQueries(
 }
 
 /**
- * Enhanced response generation with sub-question context
+ * Enhanced response generation with optimized performance and better error handling
  */
 async function generateResponseWithSubQuestionContext(
   message: string,
@@ -432,20 +433,22 @@ async function generateResponseWithSubQuestionContext(
   conversationContext: any[],
   openAiApiKey: string
 ): Promise<string> {
+  const responseStartTime = Date.now();
+  
   try {
     // Create system prompt based on query plan
     let systemPrompt = '';
     
     if (queryPlan.isPersonalityQuery) {
-      systemPrompt = `You are SOULo, analyzing personality traits from journal entries. The analysis was conducted through ${queryPlan.subQuestions.length} targeted sub-questions to provide comprehensive insights.`;
+      systemPrompt = `You are SOULo, analyzing personality traits from journal entries. Provide a concise but insightful analysis based on ${queryPlan.subQuestions.length} targeted approaches.`;
     } else if (queryPlan.isEmotionQuery) {
-      systemPrompt = `You are SOULo, analyzing emotional patterns from journal entries. The analysis used ${queryPlan.subQuestions.length} specific approaches to understand emotional trends.`;
+      systemPrompt = `You are SOULo, analyzing emotional patterns from journal entries. Provide clear emotional insights using ${queryPlan.subQuestions.length} specific approaches.`;
     } else {
-      systemPrompt = `You are SOULo, a supportive journaling assistant. The analysis was conducted through ${queryPlan.subQuestions.length} strategic sub-questions to provide thorough insights.`;
+      systemPrompt = `You are SOULo, a supportive journaling assistant. Provide helpful insights using ${queryPlan.subQuestions.length} strategic approaches.`;
     }
 
-    // Format results with sub-question context
-    const formattedResults = aggregatedResults.results.slice(0, 15).map((entry, index) => {
+    // Optimize journal entry formatting - limit content length for faster processing
+    const formattedResults = aggregatedResults.results.slice(0, 12).map((entry, index) => {
       const date = new Date(entry.created_at).toLocaleDateString('en-US', {
         month: 'short', day: 'numeric'
       });
@@ -453,26 +456,26 @@ async function generateResponseWithSubQuestionContext(
       let metadata = `[${index + 1} - ${date}`;
       if (entry.emotion) metadata += ` - ${entry.emotion}`;
       if (entry.source) metadata += ` - ${entry.source}`;
-      if (entry.subQuestion) metadata += ` - Found via: "${entry.subQuestion}"`;
       metadata += `]`;
       
-      return `${metadata}\n${entry.content.substring(0, 300)}...\n`;
+      // Limit content to 200 chars for faster processing
+      return `${metadata}\n${entry.content.substring(0, 200)}...\n`;
     }).join('\n');
 
-    // Include sub-question summary
+    // Simplified sub-question summary
     const subQuestionSummary = aggregatedResults.subQuestionSummary.map(sq => 
-      `- "${sq.question}": ${sq.resultCount} results (${sq.status})`
+      `- "${sq.question}": ${sq.resultCount} results`
     ).join('\n');
 
-    const userPrompt = `Analysis conducted through sub-questions:
+    const userPrompt = `Analysis from ${aggregatedResults.subQuestionSummary.length} sub-questions:
 ${subQuestionSummary}
 
-Journal Entries Found (${aggregatedResults.results.length} total):
+Journal Entries (${aggregatedResults.results.length} total):
 ${formattedResults}
 
-Original Question: "${message}"
+Question: "${message}"
 
-Based on the comprehensive analysis above, provide insights that directly answer the user's question. Reference specific examples from the entries and explain how the different aspects explored through the sub-questions contribute to your analysis.`;
+Provide a concise, actionable response that directly answers the user's question. Be specific and reference examples from the entries.`;
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -480,8 +483,14 @@ Based on the comprehensive analysis above, provide insights that directly answer
       { role: 'user', content: userPrompt }
     ];
 
+    console.log(`[chat-with-rag] Starting OpenAI request after ${Date.now() - responseStartTime}ms of preparation`);
+
+    // CRITICAL: Increased timeout to 25 seconds and reduced max_tokens for faster response
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 10000);
+    const timeoutId = setTimeout(() => {
+      console.error('[chat-with-rag] OpenAI request timed out after 25 seconds');
+      controller.abort();
+    }, 25000);
 
     const response = await fetch('https://api.openai.com/v1/chat/completions', {
       method: 'POST',
@@ -492,29 +501,48 @@ Based on the comprehensive analysis above, provide insights that directly answer
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: messages,
-        max_tokens: 600,
+        max_tokens: 400, // Reduced from 600 for faster generation
         temperature: 0.7,
       }),
       signal: controller.signal
     });
 
     clearTimeout(timeoutId);
+    
+    const totalPreparationTime = Date.now() - responseStartTime;
+    console.log(`[chat-with-rag] OpenAI request completed after ${totalPreparationTime}ms total time`);
 
     if (!response.ok) {
-      throw new Error(`OpenAI API error: ${response.status}`);
+      const errorText = await response.text();
+      console.error(`[chat-with-rag] OpenAI API error: ${response.status} - ${errorText}`);
+      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
     }
 
     const data = await response.json();
-    return data.choices[0]?.message?.content || 'I apologize, but I was unable to generate a comprehensive response based on your journal entries.';
-
-  } catch (error) {
-    console.error('[chat-with-rag] Error generating response:', error);
+    const generatedResponse = data.choices[0]?.message?.content;
     
-    if (error.name === 'AbortError') {
-      return "I apologize, but the response took too long to generate. The analysis found relevant information, but please try rephrasing your question for a faster response.";
+    if (!generatedResponse) {
+      console.error('[chat-with-rag] No content in OpenAI response');
+      throw new Error('No content in OpenAI response');
     }
     
-    return "I encountered an error while analyzing your journal entries. The system successfully found relevant entries, but please try rephrasing your question or contact support if the issue persists.";
+    console.log(`[chat-with-rag] Generated response successfully, length: ${generatedResponse.length}`);
+    return generatedResponse;
+
+  } catch (error) {
+    const totalTime = Date.now() - responseStartTime;
+    console.error(`[chat-with-rag] Error generating response after ${totalTime}ms:`, error);
+    
+    if (error.name === 'AbortError') {
+      console.error('[chat-with-rag] Response generation timed out - this is the critical issue!');
+      return "I found relevant information in your journal entries, but the response took too long to generate. Please try asking a more specific question, or try again in a moment.";
+    }
+    
+    if (error.message.includes('OpenAI API error')) {
+      return "I found relevant journal entries but encountered an issue with the AI service. Please try rephrasing your question or try again shortly.";
+    }
+    
+    return "I successfully found relevant information in your journal entries, but encountered an error while generating the response. Please try again or contact support if this continues.";
   }
 }
 
@@ -566,13 +594,19 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Quick entry count check
+    // Quick entry count check with 25s timeout
     let entryCount = 0;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      
       const { count, error: countError } = await supabase
         .from('Journal Entries')
         .select('id', { count: "exact", head: true })
-        .eq('user_id', userId);
+        .eq('user_id', userId)
+        .abortSignal(controller.signal);
+
+      clearTimeout(timeoutId);
 
       if (countError) {
         console.error('[chat-with-rag] Error checking entries:', countError);
@@ -591,9 +625,12 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] User has ${entryCount} journal entries available`);
 
-    // Get query embedding
+    // Get query embedding with 25s timeout
     let queryEmbedding;
     try {
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
+      
       const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
         method: 'POST',
         headers: {
@@ -604,7 +641,10 @@ serve(async (req) => {
           input: message,
           model: 'text-embedding-3-small',
         }),
+        signal: controller.signal
       });
+
+      clearTimeout(timeoutId);
 
       if (!embeddingResponse.ok) {
         throw new Error('Failed to get query embedding');
@@ -676,7 +716,7 @@ serve(async (req) => {
       });
     }
 
-    // Generate comprehensive response with sub-question context
+    // Generate comprehensive response with optimized timeout handling
     const response = await generateResponseWithSubQuestionContext(
       message,
       aggregatedResults,
@@ -686,7 +726,7 @@ serve(async (req) => {
     );
 
     const totalTime = Date.now() - startTime;
-    console.log(`[chat-with-rag] Generated comprehensive response in ${totalTime}ms, length: ${response.length}`);
+    console.log(`[chat-with-rag] SUCCESSFULLY generated comprehensive response in ${totalTime}ms, length: ${response.length}`);
 
     return new Response(JSON.stringify({ data: response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -694,11 +734,19 @@ serve(async (req) => {
 
   } catch (error) {
     const totalTime = Date.now() - startTime;
-    console.error(`[chat-with-rag] Error after ${totalTime}ms:`, error);
+    console.error(`[chat-with-rag] CRITICAL ERROR after ${totalTime}ms:`, error);
+    
+    let errorMessage = `I encountered an error while analyzing your journal entries.`;
+    
+    if (error.message.includes('timeout') || error.name === 'AbortError') {
+      errorMessage = `The analysis took too long to complete. Please try asking a more specific question or try again in a moment.`;
+    } else if (error.message.includes('OpenAI')) {
+      errorMessage = `I found relevant entries but the AI service had an issue. Please try again shortly.`;
+    }
     
     return new Response(JSON.stringify({ 
       error: 'Internal server error',
-      data: `I encountered an error while analyzing your journal entries. Please try rephrasing your question or try again in a moment.`
+      data: errorMessage
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
