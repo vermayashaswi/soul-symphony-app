@@ -18,6 +18,38 @@ type ProcessedResponse = {
 };
 
 /**
+ * Generate simple conversational responses for basic interactions
+ */
+function generateConversationalResponse(message: string, isFollowUp: boolean): string {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // Greetings
+  if (/^(hi|hello|hey|hiya|good morning|good afternoon|good evening)$/i.test(lowerMessage)) {
+    if (isFollowUp) {
+      return "Hi again! How can I help you with your mental health and journaling insights?";
+    }
+    return "Hello! I'm SOULo, your mental health assistant. How can I help you explore your journal entries today?";
+  }
+  
+  // Thanks/appreciation
+  if (/^(thanks?|thank you|ty|appreciate|awesome|great|perfect)$/i.test(lowerMessage)) {
+    return "You're welcome! Is there anything else about your mental health or journal insights I can help with?";
+  }
+  
+  // Yes/No responses
+  if (/^(yes|yeah|yep|yup|ok|okay)$/i.test(lowerMessage)) {
+    return "Great! What would you like to explore about your mental health or journal entries?";
+  }
+  
+  if (/^(no|nope|nah)$/i.test(lowerMessage)) {
+    return "No problem! Feel free to ask me anything about your mental health or journaling patterns whenever you're ready.";
+  }
+  
+  // Default conversational response
+  return "I'm here to help you with mental health insights and analyzing your journal entries. What would you like to explore?";
+}
+
+/**
  * Process a chat message with enhanced 3-tier categorization
  */
 export async function processChatMessage(
@@ -31,6 +63,7 @@ export async function processChatMessage(
   // Check if this is a time pattern query
   if (queryTypes.isTimePatternQuery || message.toLowerCase().includes('what time') || 
       message.toLowerCase().includes('when do i usually')) {
+    // ... keep existing code (time pattern analysis logic)
     try {
       console.log("Executing time pattern analysis strategy");
       
@@ -213,8 +246,12 @@ export async function processChatMessage(
         };
         
       case QueryCategory.CONVERSATIONAL:
-        // Handle conversational queries - let them go through to chat-with-rag for natural responses
-        break;
+        // Handle conversational queries with simple responses
+        const conversationalResponse = generateConversationalResponse(message, isFollowUp);
+        return {
+          content: conversationalResponse,
+          role: "assistant"
+        };
         
       case QueryCategory.GENERAL_MENTAL_HEALTH:
         // Let these go through to chat-with-rag but without personal context
