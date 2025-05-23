@@ -34,6 +34,8 @@ export async function searchEntriesWithVector(
           score: entry.similarity
         }))
       );
+    } else {
+      console.log("[chat-with-rag] No entries found with vector similarity");
     }
     
     return data || [];
