@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
@@ -208,13 +207,12 @@ export default function MobileChatInterface() {
           </SheetHeader>
           <div className="mt-5">
             <ChatThreadList
-              threads={threads}
               activeThreadId={activeThreadId}
               onSelectThread={(threadId) => {
                 navigate(`/chat/${threadId}`);
                 setSidebarOpen(false);
               }}
-              onCreateNewThread={handleCreateNewThread}
+              onCreateThread={handleCreateNewThread}
             />
           </div>
         </SheetContent>
@@ -245,7 +243,6 @@ export default function MobileChatInterface() {
       <div className="sticky bottom-0 mobile-chat-input-container">
         <MobileChatInput
           onSendMessage={handleSendMessage}
-          disabled={loading || !activeThreadId || isSending}
         />
       </div>
     </div>

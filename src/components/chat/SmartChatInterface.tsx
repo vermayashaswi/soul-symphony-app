@@ -300,13 +300,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         debugLog.addEvent("Query Enhancement", "Forcing personal context for mental health or personality question", "info");
       }
       
+      // Fix: Use correct sendMessage signature with 5 arguments max
       const response = await sendMessage(
         message, 
         user.id, 
-        queryTypes, 
         threadId,
-        false,
-        parameters
+        undefined, // timeRange
+        undefined  // referenceDate
       );
       
       // Update or delete the processing message

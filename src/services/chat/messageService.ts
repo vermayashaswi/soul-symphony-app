@@ -177,8 +177,10 @@ export async function sendMessage(
       
       return {
         response: queryPlanResponse.data.directResponse,
+        content: queryPlanResponse.data.directResponse,
         status: 'success',
         messageId: processingMessageId,
+        role: 'assistant'
       };
     }
     
@@ -225,8 +227,10 @@ export async function sendMessage(
       
       return {
         response: clarificationResponse,
+        content: clarificationResponse,
         status: 'needs_clarification',
         messageId: processingMessageId,
+        role: 'assistant'
       };
     }
     
@@ -295,8 +299,10 @@ export async function sendMessage(
       
       return {
         response: noEntriesResponse,
+        content: noEntriesResponse,
         status: 'success',
         messageId: processingMessageId,
+        role: 'assistant'
       };
     }
     
@@ -392,8 +398,10 @@ export async function sendMessage(
     
     return {
       response: finalResponse,
+      content: finalResponse,
       status: 'success',
       messageId: processingMessageId,
+      role: 'assistant'
     };
   } catch (error) {
     console.error('Error in sendMessage:', error);
@@ -404,8 +412,10 @@ export async function sendMessage(
     
     return {
       response: 'Sorry, I encountered an error while processing your message.',
+      content: 'Sorry, I encountered an error while processing your message.',
       status: 'error',
       error: error.message,
+      role: 'assistant'
     };
   }
 }
