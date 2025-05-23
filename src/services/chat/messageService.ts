@@ -1,3 +1,4 @@
+
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -575,7 +576,7 @@ export const saveMessage = async (
       references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
       reference_entries: Array.isArray(data.reference_entries) ? data.reference_entries : [],
       analysis: data.analysis_data,
-      analysis: data.analysis_data,
+      analysis_data: data.analysis_data,
       hasNumericResult: data.has_numeric_result,
       has_numeric_result: data.has_numeric_result,
       sub_query_responses: jsonToSubQueryResponse(data.sub_query_responses)
