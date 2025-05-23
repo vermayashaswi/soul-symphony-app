@@ -1,4 +1,3 @@
-
 import { useState, useEffect } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { 
@@ -156,7 +155,23 @@ export const useChatPersistence = (userId: string | undefined) => {
           
         if (error || !newThread) throw new Error("Failed to retrieve new thread");
         
-        // Cast to ChatThread type
+        // Cast to ChatThread type with proper type safety
+        let typedMetadata: ChatThread['metadata'] = undefined;
+        
+        if (newThread.metadata && typeof newThread.metadata === 'object' && !Array.isArray(newThread.metadata)) {
+          typedMetadata = {
+            timeContext: newThread.metadata.timeContext || null,
+            topicContext: newThread.metadata.topicContext || null,
+            intentType: newThread.metadata.intentType || undefined,
+            confidenceScore: newThread.metadata.confidenceScore || undefined,
+            needsClarity: newThread.metadata.needsClarity || false,
+            ambiguities: Array.isArray(newThread.metadata.ambiguities) ? newThread.metadata.ambiguities : [],
+            domainContext: newThread.metadata.domainContext || null,
+            lastUpdated: newThread.metadata.lastUpdated || undefined,
+            ...(newThread.metadata as object) // Include other properties
+          };
+        }
+        
         const typedThread: ChatThread = {
           id: newThread.id,
           title: newThread.title,
@@ -164,7 +179,7 @@ export const useChatPersistence = (userId: string | undefined) => {
           created_at: newThread.created_at,
           updated_at: newThread.updated_at,
           processing_status: (newThread.processing_status as 'idle' | 'processing' | 'failed') || 'idle',
-          metadata: newThread.metadata || undefined
+          metadata: typedMetadata
         };
         
         setThreads(prev => [typedThread, ...prev]);

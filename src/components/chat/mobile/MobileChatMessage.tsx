@@ -42,6 +42,9 @@ export default function MobileChatMessage({ message }: MobileChatMessageProps) {
   };
 
   const referenceEntries = getReferenceEntries();
+  
+  // Safe check for array length
+  const hasReferences = referenceEntries && referenceEntries.length > 0;
 
   return (
     <div className={`flex mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
@@ -59,7 +62,7 @@ export default function MobileChatMessage({ message }: MobileChatMessageProps) {
             </div>
             
             {/* Show references if available */}
-            {referenceEntries.length > 0 && (
+            {hasReferences && (
               <div className="mt-3 pt-2 border-t border-border/50">
                 <div className="text-xs text-muted-foreground mb-1">
                   <TranslatableText text="Referenced entries:" />
@@ -71,7 +74,7 @@ export default function MobileChatMessage({ message }: MobileChatMessageProps) {
                         {entry.created_at && formatTime(entry.created_at)}
                       </div>
                       <div className="line-clamp-2">
-                        {entry.content?.substring(0, 100)}...
+                        {typeof entry.content === 'string' ? `${entry.content.substring(0, 100)}...` : 'No content available'}
                       </div>
                     </div>
                   ))}

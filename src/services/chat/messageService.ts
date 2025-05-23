@@ -2,8 +2,9 @@
 import { supabase } from '@/integrations/supabase/client';
 import { processChatMessage } from '../chatService';
 import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
-import { ChatMessage, ChatThread } from './types';
+import { ChatMessage, ChatThread, SubQueryResponse, isSubQueryResponse, jsonToSubQueryResponse } from './types';
 import { v4 as uuidv4 } from 'uuid';
+import { Json } from '@/integrations/supabase/types';
 
 export interface SendMessageResponse {
   status: 'success' | 'error';
@@ -154,16 +155,35 @@ export async function getUserChatThreads(userId: string): Promise<ChatThread[] |
     
     if (error) throw error;
     
-    // Cast the database response to our ChatThread type
-    return (data || []).map(thread => ({
-      id: thread.id,
-      title: thread.title,
-      user_id: thread.user_id,
-      created_at: thread.created_at,
-      updated_at: thread.updated_at,
-      processing_status: (thread.processing_status as 'idle' | 'processing' | 'failed') || 'idle',
-      metadata: thread.metadata || undefined
-    }));
+    // Cast the database response to our ChatThread type with proper type safety
+    return (data || []).map(thread => {
+      // Ensure metadata is an object or undefined
+      let typedMetadata: ChatThread['metadata'] = undefined;
+      
+      if (thread.metadata && typeof thread.metadata === 'object' && !Array.isArray(thread.metadata)) {
+        typedMetadata = {
+          timeContext: thread.metadata.timeContext || null,
+          topicContext: thread.metadata.topicContext || null,
+          intentType: thread.metadata.intentType || undefined,
+          confidenceScore: thread.metadata.confidenceScore || undefined,
+          needsClarity: thread.metadata.needsClarity || false,
+          ambiguities: Array.isArray(thread.metadata.ambiguities) ? thread.metadata.ambiguities : [],
+          domainContext: thread.metadata.domainContext || null,
+          lastUpdated: thread.metadata.lastUpdated || undefined,
+          ...(thread.metadata as object) // Include any other properties
+        };
+      }
+      
+      return {
+        id: thread.id,
+        title: thread.title,
+        user_id: thread.user_id,
+        created_at: thread.created_at,
+        updated_at: thread.updated_at,
+        processing_status: (thread.processing_status as 'idle' | 'processing' | 'failed') || 'idle',
+        metadata: typedMetadata
+      };
+    });
   } catch (error) {
     console.error("Error fetching user threads:", error);
     return null;
@@ -180,27 +200,46 @@ export async function getThreadMessages(threadId: string): Promise<ChatMessage[]
     
     if (error) throw error;
     
-    // Cast the database response to our ChatMessage type
-    return (data || []).map(message => ({
-      id: message.id,
-      thread_id: message.thread_id,
-      content: message.content,
-      sender: (message.sender as 'user' | 'assistant' | 'error') || 'user',
-      role: (message.role as 'user' | 'assistant' | 'error') || message.sender as 'user' | 'assistant' | 'error' || 'user',
-      created_at: message.created_at,
-      reference_entries: message.reference_entries || undefined,
-      analysis_data: message.analysis_data || undefined,
-      has_numeric_result: message.has_numeric_result || false,
-      sub_query1: message.sub_query1 || undefined,
-      sub_query2: message.sub_query2 || undefined,
-      sub_query3: message.sub_query3 || undefined,
-      sub_query_responses: message.sub_query_responses || undefined,
-      isInteractive: false,
-      interactiveOptions: undefined,
-      references: Array.isArray(message.reference_entries) ? message.reference_entries : [],
-      analysis: message.analysis_data,
-      hasNumericResult: message.has_numeric_result || false
-    }));
+    // Cast the database response to our ChatMessage type with proper type safety
+    return (data || []).map(message => {
+      // Properly handle reference_entries
+      let references: any[] = [];
+      if (message.reference_entries) {
+        if (Array.isArray(message.reference_entries)) {
+          references = message.reference_entries;
+        } else if (typeof message.reference_entries === 'object') {
+          // Convert object to array if possible
+          references = Object.values(message.reference_entries);
+        }
+      }
+      
+      // Properly handle sub_query_responses
+      let subQueryResponses: SubQueryResponse[] = [];
+      if (message.sub_query_responses) {
+        subQueryResponses = jsonToSubQueryResponse(message.sub_query_responses);
+      }
+      
+      return {
+        id: message.id,
+        thread_id: message.thread_id,
+        content: message.content,
+        sender: (message.sender as 'user' | 'assistant' | 'error') || 'user',
+        role: (message.role as 'user' | 'assistant' | 'error') || message.sender as 'user' | 'assistant' | 'error' || 'user',
+        created_at: message.created_at,
+        reference_entries: references,
+        analysis_data: message.analysis_data || undefined,
+        has_numeric_result: message.has_numeric_result || false,
+        sub_query1: message.sub_query1 || undefined,
+        sub_query2: message.sub_query2 || undefined,
+        sub_query3: message.sub_query3 || undefined,
+        sub_query_responses: subQueryResponses,
+        isInteractive: false,
+        interactiveOptions: undefined,
+        references: references,
+        analysis: message.analysis_data,
+        hasNumericResult: message.has_numeric_result || false
+      };
+    });
   } catch (error) {
     console.error("Error fetching thread messages:", error);
     return [];
@@ -240,7 +279,23 @@ export async function saveMessage(
     
     if (error) throw error;
     
-    // Cast the database response to our ChatMessage type
+    // Cast the database response to our ChatMessage type with proper type safety
+    // Extract references correctly
+    let typedReferences: any[] = [];
+    if (data.reference_entries) {
+      if (Array.isArray(data.reference_entries)) {
+        typedReferences = data.reference_entries;
+      } else if (typeof data.reference_entries === 'object') {
+        typedReferences = Object.values(data.reference_entries);
+      }
+    }
+    
+    // Process sub_query_responses correctly
+    let typedSubQueryResponses: SubQueryResponse[] = [];
+    if (data.sub_query_responses) {
+      typedSubQueryResponses = jsonToSubQueryResponse(data.sub_query_responses);
+    }
+    
     return {
       id: data.id,
       thread_id: data.thread_id,
@@ -248,16 +303,16 @@ export async function saveMessage(
       sender: data.sender as 'user' | 'assistant' | 'error',
       role: (data.role as 'user' | 'assistant' | 'error') || data.sender as 'user' | 'assistant' | 'error',
       created_at: data.created_at,
-      reference_entries: data.reference_entries,
+      reference_entries: typedReferences,
       analysis_data: data.analysis_data,
       has_numeric_result: data.has_numeric_result,
       sub_query1: data.sub_query1,
       sub_query2: data.sub_query2,
       sub_query3: data.sub_query3,
-      sub_query_responses: data.sub_query_responses,
+      sub_query_responses: typedSubQueryResponses,
       isInteractive: isInteractive || false,
       interactiveOptions: interactiveOptions,
-      references: Array.isArray(data.reference_entries) ? data.reference_entries : [],
+      references: typedReferences,
       analysis: data.analysis_data,
       hasNumericResult: data.has_numeric_result || false
     };
