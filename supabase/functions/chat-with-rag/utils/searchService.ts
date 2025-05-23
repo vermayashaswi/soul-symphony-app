@@ -1,3 +1,4 @@
+
 // Standard vector search without time filtering
 export async function searchEntriesWithVector(
   supabase: any,
