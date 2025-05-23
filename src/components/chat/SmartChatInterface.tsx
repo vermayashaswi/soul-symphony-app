@@ -498,6 +498,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     }
   };
 
+  const handleSuggestionClick = (suggestion: string) => {
+    handleSendMessage(suggestion);
+  };
+
   const handleInteractiveOptionClick = (option: any) => {
     if (!option || !option.action) return;
     
@@ -652,7 +656,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
           </div>
         ) : chatHistory.length === 0 ? (
-          <EmptyChatState />
+          <EmptyChatState onSuggestionClick={handleSuggestionClick} />
         ) : (
           <ChatArea 
             chatMessages={chatHistory}

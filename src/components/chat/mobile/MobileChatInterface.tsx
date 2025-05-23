@@ -2,6 +2,7 @@ import React, { useEffect, useState, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { createThread, getThreadMessages, getUserChatThreads } from '@/services/chat';
+import { sendMessage } from '@/services/chat/messageService';
 import MobileChatMessage from './MobileChatMessage';
 import MobileChatInput from './MobileChatInput';
 import { ChatMessage } from '@/types/chat';
@@ -134,14 +135,23 @@ export default function MobileChatInterface() {
   };
   
   const handleSendMessage = async (message: string) => {
+    if (!message.trim() || !activeThreadId || !user?.id || isSending) return;
+    
     try {
-      if (!activeThreadId || !user?.id || !message.trim()) return;
-      
       setIsSending(true);
       
-      // The actual message sending is handled by the ChatInput component
-      // This is just a UI state handler
-      setIsSending(false);
+      // Use the proper sendMessage service from messageService
+      const response = await sendMessage(message, user.id, activeThreadId);
+      
+      if (response.status === 'error') {
+        toast({
+          title: "Error",
+          description: response.error || "Failed to send message. Please try again.",
+          variant: "destructive",
+        });
+      }
+      
+      // Messages will be updated via the real-time subscription
       scrollToBottom();
     } catch (error) {
       console.error("Error sending message:", error);
@@ -150,8 +160,13 @@ export default function MobileChatInterface() {
         description: "Failed to send message. Please try again.",
         variant: "destructive",
       });
+    } finally {
       setIsSending(false);
     }
+  };
+
+  const handleSuggestionClick = (suggestion: string) => {
+    handleSendMessage(suggestion);
   };
   
   // Creates a new chat thread and navigates to it
@@ -225,7 +240,7 @@ export default function MobileChatInterface() {
             <Loader2 className="h-8 w-8 animate-spin text-primary" />
           </div>
         ) : messages.length === 0 ? (
-          <EmptyChatState />
+          <EmptyChatState onSuggestionClick={handleSuggestionClick} />
         ) : (
           <>
             {messages.map((msg) => (

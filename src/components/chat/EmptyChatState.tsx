@@ -3,7 +3,18 @@ import React from 'react';
 import ChatSuggestionButton from './ChatSuggestionButton';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 
-const EmptyChatState: React.FC = () => {
+interface EmptyChatStateProps {
+  onSuggestionClick?: (suggestion: string) => void;
+}
+
+const EmptyChatState: React.FC<EmptyChatStateProps> = ({ onSuggestionClick }) => {
+  const suggestions = [
+    "How have I been feeling lately?",
+    "What patterns do you see in my journal?",
+    "Can you help me reflect on my recent entries?",
+    "What insights can you share about my mood?"
+  ];
+
   return (
     <div className="flex flex-col items-center justify-center h-full p-6 text-center empty-chat-state">
       <div className="space-y-2 mb-8">
@@ -16,10 +27,14 @@ const EmptyChatState: React.FC = () => {
       </div>
       
       <div className="grid gap-3 w-full max-w-sm empty-chat-suggestion">
-        <ChatSuggestionButton>How have I been feeling lately?</ChatSuggestionButton>
-        <ChatSuggestionButton>What patterns do you see in my journal?</ChatSuggestionButton>
-        <ChatSuggestionButton>Can you help me reflect on my recent entries?</ChatSuggestionButton>
-        <ChatSuggestionButton>What insights can you share about my mood?</ChatSuggestionButton>
+        {suggestions.map((suggestion, index) => (
+          <ChatSuggestionButton
+            key={index}
+            onClick={() => onSuggestionClick?.(suggestion)}
+          >
+            {suggestion}
+          </ChatSuggestionButton>
+        ))}
       </div>
     </div>
   );
