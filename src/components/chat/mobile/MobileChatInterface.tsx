@@ -1,3 +1,4 @@
+
 import React, { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -9,7 +10,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { ChatThreadList } from "../ChatThreadList";
 import MobileChatMessage from "./MobileChatMessage";
 import MobileChatInput from "./MobileChatInput";
-import { EmptyChatState } from "../EmptyChatState";
+import EmptyChatState from "../EmptyChatState";
 import { getThreadMessages, sendMessage } from "@/services/chat/messageService";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 
