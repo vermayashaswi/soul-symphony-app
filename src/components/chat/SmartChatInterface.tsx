@@ -300,13 +300,13 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         debugLog.addEvent("Query Enhancement", "Forcing personal context for mental health or personality question", "info");
       }
       
-      // Fix: Use correct sendMessage signature with 5 arguments max
       const response = await sendMessage(
         message, 
         user.id, 
+        queryTypes, 
         threadId,
-        undefined, // timeRange
-        undefined  // referenceDate
+        false,
+        parameters
       );
       
       // Update or delete the processing message
@@ -498,10 +498,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     }
   };
 
-  const handleSuggestionClick = (suggestion: string) => {
-    handleSendMessage(suggestion);
-  };
-
   const handleInteractiveOptionClick = (option: any) => {
     if (!option || !option.action) return;
     
@@ -656,7 +652,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
           </div>
         ) : chatHistory.length === 0 ? (
-          <EmptyChatState onSuggestionClick={handleSuggestionClick} />
+          <EmptyChatState />
         ) : (
           <ChatArea 
             chatMessages={chatHistory}

@@ -1,3 +1,4 @@
+
 import { useEffect, useState, useRef } from "react";
 import { SmartChatInterface } from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -7,7 +8,7 @@ import { useJournalEntries } from "@/hooks/use-journal-entries";
 import { useMentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { Trash2, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import { useNavigate, useParams } from "react-router-dom";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "@/contexts/AuthContext";
 import MobilePreviewFrame from "@/components/MobilePreviewFrame";
 import { ChatThreadList } from "@/components/chat/ChatThreadList";
@@ -35,8 +36,7 @@ export default function SmartChat() {
   const { user } = useAuth();
   const { entries, loading } = useJournalEntries(user?.id, 0, true);
   const navigate = useNavigate();
-  const { threadId } = useParams<{ threadId?: string }>();
-  const [currentThreadId, setCurrentThreadId] = useState<string | null>(threadId || null);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const chatContainerRef = useRef<HTMLDivElement>(null);
@@ -53,14 +53,6 @@ export default function SmartChat() {
   // Add mental health insights
   const { insights: mentalHealthInsights } = useMentalHealthInsights(user?.id);
 
-  // Update currentThreadId when URL threadId changes
-  useEffect(() => {
-    if (threadId && threadId !== currentThreadId) {
-      setCurrentThreadId(threadId);
-      localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
-    }
-  }, [threadId]);
-
   useEffect(() => {
     document.title = "Roha | SOULo";
     
@@ -75,39 +67,6 @@ export default function SmartChat() {
       threadCheckInProgressRef.current = true;
       
       try {
-        // If we have a threadId from URL, use it
-        if (threadId) {
-          try {
-            const { data, error } = await supabase
-              .from('chat_threads')
-              .select('id')
-              .eq('id', threadId)
-              .eq('user_id', user.id)
-              .single();
-              
-            if (data && !error) {
-              console.log("Using thread ID from URL:", threadId);
-              setCurrentThreadId(threadId);
-              previousThreadIdRef.current = threadId;
-              localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
-              window.dispatchEvent(
-                new CustomEvent('threadSelected', { 
-                  detail: { threadId: threadId } 
-                })
-              );
-              hasInitializedRef.current = true;
-              return;
-            } else {
-              console.log("Thread ID from URL not found or not valid:", threadId, error);
-              // Navigate to base smart-chat if invalid thread ID
-              navigate('/app/smart-chat', { replace: true });
-            }
-          } catch (error) {
-            console.error("Error checking thread existence:", error);
-          }
-        }
-        
-        // Check for stored thread ID if no URL threadId
         const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
         
         if (lastActiveThreadId) {
@@ -123,7 +82,6 @@ export default function SmartChat() {
               console.log("Found stored thread ID:", lastActiveThreadId);
               setCurrentThreadId(lastActiveThreadId);
               previousThreadIdRef.current = lastActiveThreadId;
-              navigate(`/app/smart-chat/${lastActiveThreadId}`, { replace: true });
               window.dispatchEvent(
                 new CustomEvent('threadSelected', { 
                   detail: { threadId: lastActiveThreadId } 
@@ -156,7 +114,6 @@ export default function SmartChat() {
             setCurrentThreadId(threads[0].id);
             previousThreadIdRef.current = threads[0].id;
             localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
-            navigate(`/app/smart-chat/${threads[0].id}`, { replace: true });
             window.dispatchEvent(
               new CustomEvent('threadSelected', { 
                 detail: { threadId: threads[0].id } 
@@ -207,7 +164,7 @@ export default function SmartChat() {
       window.removeEventListener('closeChatSidebar', handleCloseSidebar);
       window.removeEventListener('messageCreated' as any, handleMessageCreated);
     };
-  }, [isMobile, mobileDemo, user, threadId, navigate]);
+  }, [isMobile, mobileDemo, user]);
   
   useEffect(() => {
     const generateTitleForPreviousThread = async () => {
@@ -265,7 +222,6 @@ export default function SmartChat() {
       setCurrentThreadId(newThreadId);
       previousThreadIdRef.current = newThreadId;
       localStorage.setItem(THREAD_ID_STORAGE_KEY, newThreadId);
-      navigate(`/app/smart-chat/${newThreadId}`, { replace: true });
       
       window.dispatchEvent(
         new CustomEvent('threadSelected', { 
@@ -289,7 +245,6 @@ export default function SmartChat() {
     console.log("Thread selected:", threadId);
     setCurrentThreadId(threadId);
     localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
-    navigate(`/app/smart-chat/${threadId}`);
     window.dispatchEvent(
       new CustomEvent('threadSelected', { 
         detail: { threadId: threadId } 
@@ -341,7 +296,6 @@ export default function SmartChat() {
         setCurrentThreadId(threads[0].id);
         previousThreadIdRef.current = threads[0].id;
         localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
-        navigate(`/app/smart-chat/${threads[0].id}`, { replace: true });
         window.dispatchEvent(
           new CustomEvent('threadSelected', { 
             detail: { threadId: threads[0].id } 
@@ -435,7 +389,13 @@ export default function SmartChat() {
         className="smart-chat-container flex-1 flex flex-col"
       >
         <div className="flex-1 flex flex-col">
-          <MobileChatInterface />
+          <MobileChatInterface 
+            currentThreadId={currentThreadId}
+            onSelectThread={handleSelectThread}
+            onCreateNewThread={createNewThread}
+            userId={user?.id}
+            mentalHealthInsights={mentalHealthInsights}
+          />
         </div>
       </motion.div>
     </div>

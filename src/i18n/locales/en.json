@@ -36,13 +36,7 @@
     "noJournalEntries": "No journal entries found",
     "createJournalEntries": "Create journal entries to get personalized insights.",
     "goToJournal": "Go to Journal",
-    "analysis": "Analysis:",
-    "suggestions": {
-      "topEmotions": "What were my top emotions last week?",
-      "journalingTime": "What time of the day do I usually like journaling?",
-      "personalityTraits": "Am I an introvert? Do I like people in general?",
-      "mentalHealthAdvice": "What should I particularly do to help my mental health?"
-    }
+    "analysis": "Analysis:"
   },
   "journal": {
     "entry": "entry",

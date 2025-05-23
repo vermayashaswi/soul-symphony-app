@@ -1,4 +1,3 @@
-
 // Chat thread type definition
 export interface ChatThread {
   id: string;
@@ -20,19 +19,12 @@ export interface ChatThread {
   };
 }
 
-// MessageResponse type for sendMessage function - enhanced with all needed properties
+// MessageResponse type for sendMessage function
 export interface MessageResponse {
   response: string;
-  content: string;
   status: string;
   messageId?: string;
   error?: string;
-  role: 'user' | 'assistant' | 'error';
-  references?: any[];
-  analysis?: any;
-  hasNumericResult?: boolean;
-  isInteractive?: boolean;
-  interactiveOptions?: any[];
 }
 
 // Sub-query response type definition
@@ -48,7 +40,7 @@ export interface ChatMessage {
   thread_id: string;
   content: string;
   sender: 'user' | 'assistant' | 'error';
-  role: 'user' | 'assistant' | 'error';
+  role: 'user' | 'assistant' | 'error';  // Make this required to match types/chat.ts
   created_at: string;
   reference_entries?: any[];
   references?: any[];
@@ -61,18 +53,7 @@ export interface ChatMessage {
   interactiveOptions?: any[];
   diagnostics?: any;
   is_processing?: boolean;
-  time_pattern_analysis?: any;
-  sub_query1?: string;
-  sub_query2?: string;
-  sub_query3?: string;
-}
-
-// Client time info type
-export interface ClientTimeInfo {
-  timestamp: string;
-  timezoneOffset: number;
-  timezoneName: string;
-  rawOffset: number;
+  time_pattern_analysis?: any; // Add this field for time pattern analysis results
 }
 
 // Type guard to check if an object has thread metadata
@@ -103,11 +84,7 @@ export function jsonToSubQueryResponse(json: any): SubQueryResponse[] {
   if (!json) return [];
   if (!Array.isArray(json)) {
     try {
-      // If it's a string, try to parse it
-      if (typeof json === 'string') {
-        json = JSON.parse(json);
-      }
-      // If it's still not an array after parsing, return empty
+      json = JSON.parse(json);
       if (!Array.isArray(json)) return [];
     } catch {
       return [];

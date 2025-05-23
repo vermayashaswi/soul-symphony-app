@@ -1,101 +1,173 @@
 
-import React from 'react';
-import { format } from 'date-fns';
-import { ChatMessage } from '@/types/chat';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import { Card } from '@/components/ui/card';
+import React from "react";
+import { Separator } from "@/components/ui/separator";
+import { ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { cn } from "@/lib/utils";
+import { useState } from "react";
+import { Button } from "@/components/ui/button";
+import { motion, AnimatePresence } from "framer-motion";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { useAuth } from "@/contexts/AuthContext";
+import { formatShortDate } from "@/utils/format-time";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
 
 interface MobileChatMessageProps {
-  message: ChatMessage;
+  message: {
+    role: 'user' | 'assistant' | 'error';
+    content: string;
+    analysis?: any;
+    references?: any[];
+    diagnostics?: any;
+    hasNumericResult?: boolean;
+  };
+  showAnalysis?: boolean;
 }
 
-export default function MobileChatMessage({ message }: MobileChatMessageProps) {
-  const isUser = message.sender === 'user' || message.role === 'user';
-  const isError = message.sender === 'error' || message.role === 'error';
+const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false }) => {
+  const [showReferences, setShowReferences] = useState(false);
+  const { user } = useAuth();
   
-  console.log("[MobileChatMessage] Rendering message:", {
-    id: message.id,
-    sender: message.sender,
-    role: message.role,
-    isUser,
-    isError,
-    contentLength: message.content?.length || 0
-  });
-
-  const formatTime = (dateString: string) => {
-    try {
-      return format(new Date(dateString), 'HH:mm');
-    } catch {
-      return '';
-    }
-  };
-
-  // Helper function to safely check for references
-  const getReferenceEntries = () => {
-    // Check message.reference_entries first (it could be undefined, an array, or something else)
-    if (Array.isArray(message.reference_entries)) {
-      return message.reference_entries;
-    }
-    // Check message.references as a fallback (it could be undefined, an array, or something else)
-    if (Array.isArray(message.references)) {
-      return message.references;
-    }
-    // Return an empty array if neither property exists or they're not arrays
-    return [];
-  };
-
-  const referenceEntries = getReferenceEntries();
+  const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
   
-  // Safe check for array length
-  const hasReferences = referenceEntries && referenceEntries.length > 0;
-
+  const formattedContent = React.useMemo(() => {
+    return message.content;
+  }, [message]);
+  
+  // For UI purposes, treat 'error' role as 'assistant'
+  const displayRole = message.role === 'error' ? 'assistant' : message.role;
+  
   return (
-    <div className={`flex mb-4 ${isUser ? 'justify-end' : 'justify-start'}`}>
-      <div className={`max-w-[85%] ${isUser ? 'order-2' : 'order-1'}`}>
-        <Card className={`p-3 ${
-          isUser 
-            ? 'bg-primary text-primary-foreground ml-4' 
-            : isError
-              ? 'bg-destructive/10 border-destructive/20 mr-4'
-              : 'bg-muted mr-4'
-        }`}>
-          <div className="space-y-2">
-            <div className="text-sm leading-relaxed whitespace-pre-wrap">
-              {message.content}
+    <motion.div 
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className={`relative flex items-start gap-2 ${displayRole === 'user' ? 'justify-end' : 'justify-start'} mb-3`}
+    >
+      {displayRole === 'assistant' && (
+        <Avatar className="w-8 h-8 border border-primary/20">
+          <AvatarImage 
+            src="/lovable-uploads/3f275134-f471-4af9-a7cd-700ccd855fe3.png" 
+            alt="Ruh"
+            className="bg-primary/10 object-cover"
+            loading="eager"
+          />
+          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+            <TranslatableText text="R" forceTranslate={true} />
+          </AvatarFallback>
+        </Avatar>
+      )}
+      
+      <div
+        className={cn(
+          "min-w-0 max-w-[85%] rounded-2xl p-3.5 text-sm shadow-sm",
+          displayRole === 'user' 
+            ? 'bg-primary text-primary-foreground rounded-tr-none' 
+            : 'bg-muted/60 border border-border/50 rounded-tl-none'
+        )}
+      >
+        {displayRole === 'assistant' ? (
+          <TranslatableMarkdown className="prose dark:prose-invert prose-sm max-w-none break-words" forceTranslate={true}>
+            {formattedContent}
+          </TranslatableMarkdown>
+        ) : (
+          <TranslatableText text={message.content} forceTranslate={true} className="break-words" />
+        )}
+        
+        {showAnalysis && displayRole === 'assistant' && message.analysis && (
+          <div className="mt-3 text-xs opacity-70">
+            <Separator className="my-2" />
+            <div className="font-semibold">
+              <TranslatableText text="Analysis:" forceTranslate={true} />
             </div>
-            
-            {/* Show references if available */}
-            {hasReferences && (
-              <div className="mt-3 pt-2 border-t border-border/50">
-                <div className="text-xs text-muted-foreground mb-1">
-                  <TranslatableText text="Referenced entries:" />
+            <p>
+              <TranslatableText text={message.analysis.analysis} forceTranslate={true} />
+            </p>
+            {message.analysis.requiresSql && (
+              <>
+                <div className="font-semibold mt-1">
+                  <TranslatableText text="SQL Query:" forceTranslate={true} />
                 </div>
-                <div className="space-y-1">
-                  {referenceEntries.slice(0, 2).map((entry: any, index: number) => (
-                    <div key={index} className="text-xs bg-background/50 rounded p-2">
-                      <div className="text-muted-foreground">
-                        {entry.created_at && formatTime(entry.created_at)}
+                <pre className="text-[10px] bg-black/10 p-1 rounded overflow-x-auto">
+                  {message.analysis.sqlQuery}
+                </pre>
+              </>
+            )}
+          </div>
+        )}
+        
+        {hasReferences && (
+          <div className="mt-2">
+            <Button
+              variant="ghost"
+              size="sm"
+              className="p-0 h-6 text-xs font-medium flex items-center gap-1 text-muted-foreground dark:text-white/70 dark:hover:text-white"
+              onClick={() => setShowReferences(!showReferences)}
+            >
+              <FileText className="h-3 w-3 mr-1" />
+              <TranslatableText 
+                text={`${message.references!.length} journal entries`}
+                forceTranslate={true}
+              />
+              {showReferences ? (
+                <ChevronUp className="h-3 w-3 ml-1" />
+              ) : (
+                <ChevronDown className="h-3 w-3 ml-1" />
+              )}
+            </Button>
+            
+            <AnimatePresence>
+              {showReferences && (
+                <motion.div
+                  initial={{ opacity: 0, height: 0 }}
+                  animate={{ opacity: 1, height: 'auto' }}
+                  exit={{ opacity: 0, height: 0 }}
+                  className="mt-1 text-xs max-h-32 overflow-y-auto border-l-2 border-primary/30 pl-2 pr-1"
+                >
+                  {message.references!.slice(0, 2).map((ref, idx) => (
+                    <div key={idx} className="mb-1 py-1">
+                      <div className="font-medium dark:text-white/90">
+                        {ref.date && !isNaN(new Date(ref.date).getTime()) 
+                          ? formatShortDate(new Date(ref.date))
+                          : <TranslatableText text="Unknown date" forceTranslate={true} />}
                       </div>
-                      <div className="line-clamp-2">
-                        {typeof entry.content === 'string' ? `${entry.content.substring(0, 100)}...` : 'No content available'}
+                      <div className="text-muted-foreground dark:text-white/70">
+                        <TranslatableText text={ref.snippet} forceTranslate={true} />
                       </div>
                     </div>
                   ))}
-                </div>
-              </div>
-            )}
-            
-            <div className="flex justify-between items-center text-xs text-muted-foreground">
-              <span>
-                {isUser ? <TranslatableText text="You" /> : <TranslatableText text="Rūḥ" />}
-              </span>
-              {message.created_at && (
-                <span>{formatTime(message.created_at)}</span>
+                  {message.references!.length > 2 && (
+                    <div className="text-xs text-muted-foreground dark:text-white/60">
+                      <TranslatableText 
+                        text={`+${message.references!.length - 2} more entries`}
+                        forceTranslate={true}
+                      />
+                    </div>
+                  )}
+                </motion.div>
               )}
-            </div>
+            </AnimatePresence>
           </div>
-        </Card>
+        )}
       </div>
-    </div>
+      
+      {displayRole === 'user' && (
+        <Avatar className="w-8 h-8 border border-primary/20">
+          <AvatarImage 
+            src={user?.user_metadata?.avatar_url} 
+            alt="User"
+            className="bg-primary/20"
+            loading="eager"
+          />
+          <AvatarFallback className="bg-primary/20 text-primary text-xs">
+            {user?.user_metadata?.full_name ? 
+              user.user_metadata.full_name.charAt(0) : 
+              user?.email?.charAt(0) || 'U'}
+          </AvatarFallback>
+        </Avatar>
+      )}
+    </motion.div>
   );
-}
+};
+
+export default MobileChatMessage;

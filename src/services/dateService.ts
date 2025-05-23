@@ -2,18 +2,10 @@
 import { format, getDay, parseISO, startOfDay, endOfDay, startOfWeek, endOfWeek, subWeeks, startOfMonth, endOfMonth, addDays, subMonths, isAfter, isBefore, subDays } from 'date-fns';
 import { formatInTimeZone as fnsFormatInTimeZone, toZonedTime } from 'date-fns-tz';
 
-// Client time info type
-export interface ClientTimeInfo {
-  timestamp: string;
-  timezoneOffset: number;
-  timezoneName: string;
-  rawOffset: number;
-}
-
 /**
  * Get client's timezone information
  */
-export function getClientTimeInfo(): ClientTimeInfo {
+export function getClientTimeInfo() {
   try {
     const now = new Date();
     const timezoneOffset = now.getTimezoneOffset();
