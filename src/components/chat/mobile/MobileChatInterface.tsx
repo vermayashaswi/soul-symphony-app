@@ -1,4 +1,5 @@
 
+
 import React, { useState, useRef, useEffect } from "react";
 import { Card } from "@/components/ui/card";
 import { ScrollArea } from "@/components/ui/scroll-area";
@@ -132,7 +133,7 @@ export default function MobileChatInterface({
 
       <div className="flex-1 flex flex-col">
         {messages.length === 0 ? (
-          <EmptyChatState onCreateNewThread={onCreateNewThread} />
+          <EmptyChatState onAction={onCreateNewThread} />
         ) : (
           <ScrollArea ref={scrollAreaRef} className="flex-1">
             <div className="flex flex-col p-4 space-y-4">
@@ -164,3 +165,4 @@ export default function MobileChatInterface({
     </div>
   );
 }
+
