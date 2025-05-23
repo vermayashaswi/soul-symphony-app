@@ -18,7 +18,7 @@ const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY') || '';
 const supabase = createClient(supabaseUrl, supabaseServiceKey);
 
 /**
- * Enhanced JSON extraction that handles markdown wrapping and malformed responses
+ * Enhanced JSON extraction with multiple fallback methods
  */
 function extractAndParseJSON(content: string): any {
   try {
@@ -27,13 +27,11 @@ function extractAndParseJSON(content: string): any {
   } catch (error) {
     console.log("Direct JSON parse failed, trying extraction methods");
     
-    // Remove any leading/trailing whitespace and common prefixes
     let cleanedContent = content.trim();
     
-    // Remove common markdown or explanation text
-    cleanedContent = cleanedContent.replace(/^Here's the analysis.*?:/i, '');
-    cleanedContent = cleanedContent.replace(/^The query analysis.*?:/i, '');
-    cleanedContent = cleanedContent.replace(/^Based on.*?:/i, '');
+    // Remove common markdown or explanation text more aggressively
+    cleanedContent = cleanedContent.replace(/^[^{]*/, ''); // Remove everything before first {
+    cleanedContent = cleanedContent.replace(/[^}]*$/, '}'); // Keep everything until last }
     
     // Try to extract JSON from markdown code blocks
     const jsonBlockMatch = cleanedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
@@ -41,7 +39,7 @@ function extractAndParseJSON(content: string): any {
       try {
         return JSON.parse(jsonBlockMatch[1].trim());
       } catch (e) {
-        console.log("JSON block extraction failed, trying without code block markers");
+        console.log("JSON block extraction failed");
       }
     }
     
@@ -54,67 +52,65 @@ function extractAndParseJSON(content: string): any {
         // Clean up common JSON formatting issues
         jsonText = jsonText.replace(/,\s*\}/g, '}'); // Remove trailing commas
         jsonText = jsonText.replace(/,\s*\]/g, ']'); // Remove trailing commas in arrays
+        jsonText = jsonText.replace(/([{,]\s*)(\w+):/g, '$1"$2":'); // Add quotes to unquoted keys
         
         return JSON.parse(jsonText);
       } catch (e) {
-        console.log("JSON pattern extraction failed, trying line-by-line approach");
+        console.log("JSON pattern extraction failed");
       }
     }
     
-    // Try to extract JSON properties line by line (fallback for malformed JSON)
-    try {
-      const lines = cleanedContent.split('\n');
-      const result: any = {};
-      
-      for (const line of lines) {
-        const propMatch = line.match(/"([^"]+)":\s*(.+)/);
-        if (propMatch) {
-          const key = propMatch[1];
-          let value = propMatch[2].trim().replace(/,$/, ''); // Remove trailing comma
-          
-          try {
-            // Try to parse the value as JSON
-            result[key] = JSON.parse(value);
-          } catch {
-            // If it fails, treat as string (remove quotes if present)
-            result[key] = value.replace(/^"(.*)"$/, '$1');
-          }
-        }
-      }
-      
-      // Only return if we extracted meaningful properties
-      if (Object.keys(result).length > 3) {
-        return result;
-      }
-    } catch (e) {
-      console.log("Line-by-line extraction failed");
-    }
-    
-    // If all else fails, return null
-    console.error("All JSON extraction methods failed for content:", content.substring(0, 200));
-    return null;
+    // Create a basic valid response as final fallback
+    console.error("All JSON extraction methods failed, using emergency fallback");
+    return createEmergencyFallback(content);
   }
 }
 
 /**
- * Intelligent query analysis using GPT with enhanced error handling
+ * Create emergency fallback when all JSON parsing fails
+ */
+function createEmergencyFallback(originalContent: string): any {
+  const lowerContent = originalContent.toLowerCase();
+  
+  return {
+    queryType: "journal_specific",
+    strategy: "hybrid",
+    requiresJournalData: true,
+    isPersonalityQuery: /personality|trait|character|behavior/.test(lowerContent),
+    isEmotionQuery: /emotion|feel|mood|happy|sad|anxious/.test(lowerContent),
+    isTemporalQuery: /last week|yesterday|today|recently/.test(lowerContent),
+    isPatternAnalysis: /pattern|often|usually|tend/.test(lowerContent),
+    confidence: 0.3,
+    searchParameters: {
+      vectorThreshold: 0.1, // Always use very low threshold for emergency fallback
+      useEmotionSQL: true,
+      useThemeSQL: false,
+      dateRange: null,
+      fallbackStrategy: "recent_entries"
+    },
+    expectedResponse: "analysis",
+    reasoning: "Emergency fallback due to JSON parsing failure"
+  };
+}
+
+/**
+ * Intelligent query analysis with reduced timeouts and better error handling
  */
 async function analyzeQueryWithGPT(message: string, conversationContext: any[], userEntryCount: number) {
   try {
     const contextString = conversationContext.length > 0 
-      ? `\nConversation context: ${conversationContext.slice(-3).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
+      ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
       : '';
 
-    const prompt = `You are an intelligent query analyzer for a voice journaling app called SOULo. Analyze this user query and determine the optimal search and response strategy.
+    const prompt = `Analyze this user query for a voice journaling app called SOULo and return ONLY valid JSON:
 
 User query: "${message}"
-User has ${userEntryCount} journal entries available.${contextString}
+User has ${userEntryCount} journal entries.${contextString}
 
-IMPORTANT: Respond with ONLY a valid JSON object, no markdown formatting, no explanations, no prefixes.
-
+Return JSON with these exact fields:
 {
   "queryType": "journal_specific" | "general_question" | "direct_response",
-  "strategy": "vector_only" | "sql_only" | "hybrid" | "comprehensive" | "direct",
+  "strategy": "vector_only" | "sql_only" | "hybrid" | "comprehensive",
   "requiresJournalData": boolean,
   "isPersonalityQuery": boolean,
   "isEmotionQuery": boolean,
@@ -126,15 +122,17 @@ IMPORTANT: Respond with ONLY a valid JSON object, no markdown formatting, no exp
     "useEmotionSQL": boolean,
     "useThemeSQL": boolean,
     "dateRange": object | null,
-    "fallbackStrategy": "recent_entries" | "emotion_based" | "comprehensive" | null
+    "fallbackStrategy": "recent_entries" | "emotion_based" | "comprehensive"
   },
-  "expectedResponse": "analysis" | "direct_answer" | "clarification_needed" | "insufficient_data",
+  "expectedResponse": "analysis" | "direct_answer" | "clarification_needed",
   "reasoning": "brief explanation"
-}`;
+}
 
-    // Reduced timeout for faster response
+CRITICAL: Use vectorThreshold between 0.05-0.3 ONLY. Lower values find more results.`;
+
+    // Reduced timeout significantly
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 8000); // Reduced from 10s
+    const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced from 8s to 5s
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -146,7 +144,7 @@ IMPORTANT: Respond with ONLY a valid JSON object, no markdown formatting, no exp
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 600, // Reduced from 800
+        max_tokens: 400, // Further reduced
       }),
       signal: controller.signal
     });
@@ -154,7 +152,7 @@ IMPORTANT: Respond with ONLY a valid JSON object, no markdown formatting, no exp
     clearTimeout(timeoutId);
 
     if (!response.ok) {
-      console.error("OpenAI API error:", response.status, await response.text());
+      console.error("OpenAI API error:", response.status);
       throw new Error(`OpenAI API returned error ${response.status}`);
     }
 
@@ -170,10 +168,10 @@ IMPORTANT: Respond with ONLY a valid JSON object, no markdown formatting, no exp
       return createFallbackAnalysis(message);
     }
     
-    // Validate and fix the analysis result
+    // Force lower thresholds and validate
     const validatedResult = validateAndFixAnalysis(analysisResult, message);
     
-    console.log("GPT Query Analysis Result:", JSON.stringify(validatedResult, null, 2));
+    console.log("Final Analysis Result:", JSON.stringify(validatedResult, null, 2));
     return validatedResult;
 
   } catch (error) {
@@ -183,38 +181,52 @@ IMPORTANT: Respond with ONLY a valid JSON object, no markdown formatting, no exp
 }
 
 /**
- * Validate and fix analysis result
+ * Validate and fix analysis result with aggressive threshold capping
  */
 function validateAndFixAnalysis(analysis: any, message: string) {
-  // Ensure all required fields exist with defaults
+  const lowerMessage = message.toLowerCase();
+  
+  // Detect query characteristics
+  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality/.test(lowerMessage);
+  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
+  const isTemporalQuery = /last week|yesterday|today|this month|recently/.test(lowerMessage);
+  
+  // Force very low thresholds based on query type
+  let vectorThreshold = 0.2; // Default
+  if (isPersonalityQuery) {
+    vectorThreshold = 0.05; // Extremely low for personality
+  } else if (isEmotionQuery) {
+    vectorThreshold = 0.1; // Very low for emotions
+  } else if (isTemporalQuery) {
+    vectorThreshold = 0.15; // Low for temporal queries
+  }
+  
+  // Cap any threshold above 0.3 to prevent no results
+  if (analysis.searchParameters?.vectorThreshold > 0.3) {
+    console.warn(`Capping high threshold ${analysis.searchParameters.vectorThreshold} to ${vectorThreshold}`);
+  }
+  
   const validated = {
     queryType: analysis.queryType || "journal_specific",
     strategy: analysis.strategy || "hybrid",
-    requiresJournalData: analysis.requiresJournalData !== false, // Default to true
-    isPersonalityQuery: analysis.isPersonalityQuery || false,
-    isEmotionQuery: analysis.isEmotionQuery || false,
-    isTemporalQuery: analysis.isTemporalQuery || false,
-    isPatternAnalysis: analysis.isPatternAnalysis || false,
+    requiresJournalData: analysis.requiresJournalData !== false,
+    isPersonalityQuery: isPersonalityQuery || analysis.isPersonalityQuery || false,
+    isEmotionQuery: isEmotionQuery || analysis.isEmotionQuery || false,
+    isTemporalQuery: isTemporalQuery || analysis.isTemporalQuery || false,
+    isPatternAnalysis: analysis.isPatternAnalysis || /pattern|often|usually|tend/.test(lowerMessage),
     confidence: typeof analysis.confidence === 'number' ? analysis.confidence : 0.7,
     searchParameters: {
-      vectorThreshold: 0.1, // Always use low threshold for better results
-      useEmotionSQL: analysis.searchParameters?.useEmotionSQL || false,
+      vectorThreshold: vectorThreshold, // Use our calculated threshold
+      useEmotionSQL: isEmotionQuery || isPersonalityQuery || analysis.searchParameters?.useEmotionSQL || false,
       useThemeSQL: analysis.searchParameters?.useThemeSQL || false,
       dateRange: analysis.searchParameters?.dateRange || null,
       fallbackStrategy: analysis.searchParameters?.fallbackStrategy || "recent_entries"
     },
     expectedResponse: analysis.expectedResponse || "analysis",
-    reasoning: analysis.reasoning || "Analysis based on query content"
+    reasoning: analysis.reasoning || `Analysis with optimized threshold ${vectorThreshold}`
   };
   
-  // Adjust vector threshold based on query type
-  if (validated.isPersonalityQuery) {
-    validated.searchParameters.vectorThreshold = 0.05; // Very low for personality
-    validated.searchParameters.useEmotionSQL = true;
-  } else if (validated.isEmotionQuery) {
-    validated.searchParameters.vectorThreshold = 0.1; // Low for emotions
-    validated.searchParameters.useEmotionSQL = true;
-  }
+  console.log(`Applied threshold ${vectorThreshold} for query type - Personality: ${isPersonalityQuery}, Emotion: ${isEmotionQuery}, Temporal: ${isTemporalQuery}`);
   
   return validated;
 }
@@ -225,10 +237,14 @@ function validateAndFixAnalysis(analysis: any, message: string) {
 function createFallbackAnalysis(message: string) {
   const lowerMessage = message.toLowerCase();
   
-  // Detect query characteristics
-  const isPersonalityQuery = /trait|personality|character|behavior|habit/.test(lowerMessage);
+  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i/.test(lowerMessage);
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
   const isTemporalQuery = /last week|yesterday|today|this month|recently/.test(lowerMessage);
+  
+  // Use very aggressive low thresholds for fallback
+  let threshold = 0.1;
+  if (isPersonalityQuery) threshold = 0.05;
+  if (isEmotionQuery) threshold = 0.08;
   
   return {
     queryType: "journal_specific",
@@ -238,21 +254,21 @@ function createFallbackAnalysis(message: string) {
     isEmotionQuery,
     isTemporalQuery,
     isPatternAnalysis: /pattern|often|usually|tend/.test(lowerMessage),
-    confidence: 0.6,
+    confidence: 0.5,
     searchParameters: {
-      vectorThreshold: isPersonalityQuery ? 0.05 : (isEmotionQuery ? 0.1 : 0.2),
+      vectorThreshold: threshold,
       useEmotionSQL: isEmotionQuery || isPersonalityQuery,
       useThemeSQL: false,
       dateRange: null,
       fallbackStrategy: "recent_entries"
     },
     expectedResponse: "analysis",
-    reasoning: "Fallback analysis due to GPT parsing error"
+    reasoning: `Fallback analysis with threshold ${threshold}`
   };
 }
 
 /**
- * Generate SQL queries for emotion/theme analysis with timeout
+ * Generate SQL queries with reduced timeout
  */
 async function generateSQLQueries(message: string, userId: string, analysisResult: any) {
   if (!analysisResult.searchParameters.useEmotionSQL && !analysisResult.searchParameters.useThemeSQL) {
@@ -260,26 +276,20 @@ async function generateSQLQueries(message: string, userId: string, analysisResul
   }
 
   try {
-    const prompt = `Generate SQL function calls for this query: "${message}"
+    const prompt = `Generate SQL function calls for: "${message}"
 
 Available functions:
 - get_top_emotions_with_entries(user_id, start_date, end_date, limit_count)
 - match_journal_entries_by_emotion(emotion_name, user_id, min_score, start_date, end_date, limit_count)
 
-Respond with ONLY valid JSON:
+Return JSON:
 {
-  "emotionQueries": [
-    {
-      "function": "function_name",
-      "parameters": {...},
-      "purpose": "description"
-    }
-  ],
+  "emotionQueries": [{"function": "function_name", "parameters": {...}, "purpose": "description"}],
   "shouldExecute": boolean
 }`;
 
     const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 4000); // Reduced from 5s
+    const timeoutId = setTimeout(() => controller.abort(), 3000); // Reduced to 3s
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -291,7 +301,7 @@ Respond with ONLY valid JSON:
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 300, // Reduced from 400
+        max_tokens: 200,
       }),
       signal: controller.signal
     });
@@ -330,11 +340,11 @@ serve(async (req) => {
 
     console.log(`[Smart Query Planner] Analyzing query: "${message}"`);
 
-    // Get user's journal entry count with timeout
+    // Get user's journal entry count with shorter timeout
     let entryCount = 0;
     try {
       const countController = new AbortController();
-      const countTimeoutId = setTimeout(() => countController.abort(), 2000); // 2s timeout
+      const countTimeoutId = setTimeout(() => countController.abort(), 1500); // Reduced to 1.5s
       
       const { count, error } = await supabase
         .from('Journal Entries')
@@ -349,15 +359,16 @@ serve(async (req) => {
       }
     } catch (error) {
       console.error("Error fetching entry count:", error);
+      // Continue without count
     }
 
     // Use GPT to analyze the query intelligently
     const analysisResult = await analyzeQueryWithGPT(message, conversationContext, entryCount);
 
-    // If it's a general question or direct response, return immediately
+    // Handle direct responses with better messaging
     if (analysisResult.queryType === "general_question") {
       return new Response(JSON.stringify({
-        directResponse: "I'm SOULo, your voice journaling assistant. I can help you analyze your journal entries to understand emotions, patterns, and personal insights. For general mental health questions, I can provide guidance, but for personalized insights, I'd need to analyze your journal entries. What would you like to explore about your journaling journey?",
+        directResponse: "I'm SOULo, your voice journaling assistant. I can help you analyze your journal entries to understand emotions, patterns, and personal insights. What would you like to explore about your journaling journey?",
         plan: analysisResult
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -366,20 +377,20 @@ serve(async (req) => {
 
     if (analysisResult.queryType === "direct_response") {
       return new Response(JSON.stringify({
-        directResponse: "I can help you with that! However, I'd need more specific information to provide an accurate answer. Could you please provide more details about what you're looking for?",
+        directResponse: "I can help you with that! Could you please provide more details about what you're looking for in your journal entries?",
         plan: analysisResult
       }), {
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // Generate SQL queries if needed
+    // Generate SQL queries if needed with reduced timeout
     let sqlPlan = null;
     if (analysisResult.searchParameters.useEmotionSQL || analysisResult.searchParameters.useThemeSQL) {
       sqlPlan = await generateSQLQueries(message, userId, analysisResult);
     }
 
-    // Enhanced query plan with GPT intelligence
+    // Enhanced query plan with optimized settings
     const enhancedPlan = {
       strategy: analysisResult.strategy,
       queryType: analysisResult.queryType,
@@ -421,14 +432,14 @@ serve(async (req) => {
   } catch (error) {
     console.error("Error in smart-query-planner:", error);
     
-    // Fallback plan
+    // Better fallback plan with very low threshold
     const fallbackPlan = {
       strategy: "hybrid",
       queryType: "journal_specific",
       requiresJournalData: true,
       searchParameters: {
-        vectorThreshold: 0.1, // Use low threshold for fallback
-        useEmotionSQL: false,
+        vectorThreshold: 0.05, // Extremely low for fallback
+        useEmotionSQL: true,
         useThemeSQL: false,
         dateRange: null,
         fallbackStrategy: "recent_entries",
@@ -443,7 +454,7 @@ serve(async (req) => {
       needsComprehensiveAnalysis: false,
       totalEntryCount: 0,
       confidence: 0.3,
-      reasoning: "Fallback plan due to error",
+      reasoning: "Emergency fallback plan with ultra-low threshold",
       expectedResponse: "analysis",
       fallbackStrategy: "recent_entries",
       isErrorFallback: true

@@ -42,20 +42,39 @@ class PerformanceMonitor {
     const statusIcon = status === 'success' ? '✅' : '❌';
     console.log(`[Performance] ${statusIcon} ${metric.operation}: ${duration}ms (${operationId})`);
     
-    // Log performance categories
-    if (duration > 15000) {
-      console.error(`[Performance] CRITICAL SLOW: ${metric.operation} took ${duration}ms`);
-    } else if (duration > 8000) {
-      console.warn(`[Performance] SLOW OPERATION: ${metric.operation} took ${duration}ms`);
+    // Enhanced performance categorization
+    if (duration > 10000) {
+      console.error(`[Performance] CRITICAL SLOW: ${metric.operation} took ${duration}ms - NEEDS IMMEDIATE ATTENTION`);
+    } else if (duration > 6000) {
+      console.warn(`[Performance] SLOW OPERATION: ${metric.operation} took ${duration}ms - Consider optimization`);
+    } else if (duration > 3000) {
+      console.log(`[Performance] MODERATE: ${metric.operation} took ${duration}ms - Within acceptable range`);
     } else if (duration < 2000) {
-      console.log(`[Performance] FAST: ${metric.operation} completed in ${duration}ms`);
+      console.log(`[Performance] FAST: ${metric.operation} completed in ${duration}ms - Excellent performance`);
     }
     
-    // Track specific operation types
-    if (metric.operation.includes('search')) {
-      console.log(`[Performance] Search Performance: ${duration}ms for ${metric.operation}`);
-    } else if (metric.operation.includes('GPT') || metric.operation.includes('OpenAI')) {
-      console.log(`[Performance] AI Performance: ${duration}ms for ${metric.operation}`);
+    // Track specific operation types with enhanced categories
+    if (metric.operation.includes('search') || metric.operation.includes('vector') || metric.operation.includes('sql')) {
+      const searchType = metric.operation.includes('vector') ? 'Vector' : 
+                        metric.operation.includes('sql') ? 'SQL' : 'General';
+      console.log(`[Performance] ${searchType} Search: ${duration}ms for ${metric.operation}`);
+      
+      if (duration > 4000) {
+        console.warn(`[Performance] ${searchType} search is slow - consider threshold optimization`);
+      }
+    } else if (metric.operation.includes('GPT') || metric.operation.includes('OpenAI') || metric.operation.includes('embedding')) {
+      const aiType = metric.operation.includes('embedding') ? 'Embedding' : 'GPT';
+      console.log(`[Performance] ${aiType} Performance: ${duration}ms for ${metric.operation}`);
+      
+      if (duration > 8000) {
+        console.warn(`[Performance] ${aiType} call is slow - consider timeout reduction`);
+      }
+    } else if (metric.operation.includes('query-planning')) {
+      console.log(`[Performance] Query Planning: ${duration}ms for ${metric.operation}`);
+      
+      if (duration > 5000) {
+        console.warn(`[Performance] Query planning is slow - consider prompt optimization`);
+      }
     }
   }
   
@@ -77,7 +96,7 @@ class PerformanceMonitor {
     return totalTime / operations.length;
   }
   
-  getSlowOperations(threshold: number = 5000): PerformanceMetric[] {
+  getSlowOperations(threshold: number = 4000): PerformanceMetric[] {
     return Array.from(this.metrics.values())
       .filter(m => m.duration && m.duration > threshold)
       .sort((a, b) => (b.duration || 0) - (a.duration || 0));
@@ -96,19 +115,49 @@ class PerformanceMonitor {
     
     const avgDuration = completed.reduce((sum, m) => sum + (m.duration || 0), 0) / completed.length;
     const slowOps = this.getSlowOperations();
+    const fastOps = completed.filter(m => m.duration && m.duration < 2000);
     
     console.log(`[Performance] Summary:
       - Total operations: ${metrics.length}
       - Completed: ${completed.length} (${successful.length} success, ${failed.length} failed)
       - Average duration: ${Math.round(avgDuration)}ms
-      - Slow operations (>5s): ${slowOps.length}
-      ${slowOps.length > 0 ? `- Slowest: ${slowOps[0].operation} (${slowOps[0].duration}ms)` : ''}`);
+      - Fast operations (<2s): ${fastOps.length}
+      - Slow operations (>4s): ${slowOps.length}
+      ${slowOps.length > 0 ? `- Slowest: ${slowOps[0].operation} (${slowOps[0].duration}ms)` : ''}
+      ${avgDuration > 5000 ? '⚠️  Overall performance needs optimization' : avgDuration < 3000 ? '✅ Good overall performance' : '📊 Acceptable performance'}`);
+  }
+  
+  // New method to track RAG pipeline performance
+  trackRAGPipeline(queryType: string, threshold: number, resultCount: number, totalDuration: number): void {
+    const pipelineId = `rag-pipeline-${Date.now()}`;
+    
+    console.log(`[Performance] RAG Pipeline Complete:
+      - Query Type: ${queryType}
+      - Vector Threshold: ${threshold}
+      - Results Found: ${resultCount}
+      - Total Duration: ${totalDuration}ms
+      - Performance: ${totalDuration < 5000 ? '✅ Fast' : totalDuration < 8000 ? '⚠️ Moderate' : '❌ Slow'}`);
+    
+    // Store pipeline metrics
+    this.metrics.set(pipelineId, {
+      operation: `rag-pipeline-${queryType}`,
+      startTime: Date.now() - totalDuration,
+      endTime: Date.now(),
+      duration: totalDuration,
+      status: resultCount > 0 ? 'success' : 'error',
+      metadata: {
+        queryType,
+        threshold,
+        resultCount,
+        performance: totalDuration < 5000 ? 'fast' : totalDuration < 8000 ? 'moderate' : 'slow'
+      }
+    });
   }
 }
 
 export const performanceMonitor = new PerformanceMonitor();
 
-// Helper function to wrap async operations with performance monitoring
+// Enhanced monitoring for async operations with better error handling
 export async function withPerformanceMonitoring<T>(
   operationName: string,
   operation: () => Promise<T>,
@@ -126,16 +175,17 @@ export async function withPerformanceMonitoring<T>(
     });
     return result;
   } catch (error) {
-    performanceMonitor.endOperation(operationId, 'error', error.message);
+    const errorMessage = error instanceof Error ? error.message : String(error);
+    performanceMonitor.endOperation(operationId, 'error', errorMessage);
     throw error;
   }
 }
 
-// Enhanced monitoring for chat operations
+// Enhanced monitoring for chat operations with RAG pipeline tracking
 export function monitorChatOperation<T>(
   operation: () => Promise<T>,
-  operationType: 'query-planning' | 'vector-search' | 'sql-search' | 'response-generation' | 'embedding',
-  queryInfo?: { message: string; userId: string; strategy?: string }
+  operationType: 'query-planning' | 'vector-search' | 'sql-search' | 'response-generation' | 'embedding' | 'rag-pipeline',
+  queryInfo?: { message: string; userId: string; strategy?: string; threshold?: number }
 ): Promise<T> {
   return withPerformanceMonitoring(
     `chat-${operationType}`,
@@ -143,7 +193,31 @@ export function monitorChatOperation<T>(
     {
       queryLength: queryInfo?.message?.length,
       userId: queryInfo?.userId?.substring(0, 8) + '...',
-      strategy: queryInfo?.strategy
+      strategy: queryInfo?.strategy,
+      threshold: queryInfo?.threshold
     }
   );
+}
+
+// New utility for tracking search effectiveness
+export function trackSearchEffectiveness(
+  searchType: 'vector' | 'sql' | 'fallback',
+  threshold: number,
+  resultCount: number,
+  queryType: string,
+  duration: number
+): void {
+  const effectiveness = resultCount > 0 ? 'effective' : 'ineffective';
+  const speed = duration < 2000 ? 'fast' : duration < 4000 ? 'moderate' : 'slow';
+  
+  console.log(`[Performance] Search Effectiveness:
+    - Type: ${searchType}
+    - Query Type: ${queryType}
+    - Threshold: ${threshold}
+    - Results: ${resultCount}
+    - Duration: ${duration}ms
+    - Effectiveness: ${effectiveness}
+    - Speed: ${speed}
+    ${resultCount === 0 && threshold > 0.2 ? '💡 Consider lowering threshold' : ''}
+    ${duration > 4000 ? '💡 Consider optimizing search parameters' : ''}`);
 }
