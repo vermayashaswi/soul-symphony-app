@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -424,7 +423,7 @@ async function executeIntelligentSubQueries(
 }
 
 /**
- * Enhanced response generation with optimized performance and better error handling
+ * Enhanced response generation with improved SOULo persona and formatting
  */
 async function generateResponseWithSubQuestionContext(
   message: string,
@@ -432,22 +431,41 @@ async function generateResponseWithSubQuestionContext(
   queryPlan: any,
   conversationContext: any[],
   openAiApiKey: string
-): Promise<string> {
+): Promise<{ content: string; analysisMetadata: any }> {
   const responseStartTime = Date.now();
   
   try {
-    // Create system prompt based on query plan
-    let systemPrompt = '';
-    
+    // Enhanced system prompt with SOULo's personality and formatting instructions
+    let systemPrompt = `You are SOULo, a warm and supportive mental health assistant for the SOULo voice journaling app. You analyze users' voice journal entries to provide personalized insights and emotional support.
+
+Your personality:
+- Speak in first person, directly to the user using "you" and "your"
+- Be warm, empathetic, and understanding like a trusted friend
+- Reference yourself as "I" when appropriate (e.g., "I can see from your entries...")
+- Never use clinical terms like "the individual" - always speak directly to the user
+- Be encouraging and focus on growth and self-awareness
+
+Response formatting requirements:
+- ALWAYS use **bold headers** for main sections
+- Use bullet points (•) for key insights and observations
+- Structure your response with clear sections
+- Keep responses concise but meaningful
+- Example format:
+  **Your Emotional Patterns**
+  • Main insight here
+  • Another key observation
+  
+  **What I Notice**
+  • Specific pattern from your entries
+  • Growth opportunity or strength`;
+
     if (queryPlan.isPersonalityQuery) {
-      systemPrompt = `You are SOULo, analyzing personality traits from journal entries. Provide a concise but insightful analysis based on ${queryPlan.subQuestions.length} targeted approaches.`;
+      systemPrompt += `\n\nFocus: Provide personality insights based on ${queryPlan.subQuestions.length} approaches to analyzing the user's journal entries.`;
     } else if (queryPlan.isEmotionQuery) {
-      systemPrompt = `You are SOULo, analyzing emotional patterns from journal entries. Provide clear emotional insights using ${queryPlan.subQuestions.length} specific approaches.`;
-    } else {
-      systemPrompt = `You are SOULo, a supportive journaling assistant. Provide helpful insights using ${queryPlan.subQuestions.length} strategic approaches.`;
+      systemPrompt += `\n\nFocus: Analyze emotional patterns using ${queryPlan.subQuestions.length} targeted approaches.`;
     }
 
-    // Optimize journal entry formatting - limit content length for faster processing
+    // Optimize journal entry formatting
     const formattedResults = aggregatedResults.results.slice(0, 12).map((entry, index) => {
       const date = new Date(entry.created_at).toLocaleDateString('en-US', {
         month: 'short', day: 'numeric'
@@ -455,27 +473,32 @@ async function generateResponseWithSubQuestionContext(
       
       let metadata = `[${index + 1} - ${date}`;
       if (entry.emotion) metadata += ` - ${entry.emotion}`;
-      if (entry.source) metadata += ` - ${entry.source}`;
       metadata += `]`;
       
-      // Limit content to 200 chars for faster processing
       return `${metadata}\n${entry.content.substring(0, 200)}...\n`;
     }).join('\n');
 
-    // Simplified sub-question summary
-    const subQuestionSummary = aggregatedResults.subQuestionSummary.map(sq => 
-      `- "${sq.question}": ${sq.resultCount} results`
-    ).join('\n');
+    // Create analysis metadata for the UI
+    const analysisMetadata = {
+      entriesAnalyzed: aggregatedResults.results.length,
+      totalEntries: aggregatedResults.totalResults,
+      dateRange: {
+        earliest: aggregatedResults.results.length > 0 ? 
+          new Date(Math.min(...aggregatedResults.results.map(r => new Date(r.created_at).getTime()))) : null,
+        latest: aggregatedResults.results.length > 0 ? 
+          new Date(Math.max(...aggregatedResults.results.map(r => new Date(r.created_at).getTime()))) : null
+      },
+      subQuestionsUsed: aggregatedResults.subQuestionSummary.length,
+      analysisApproaches: aggregatedResults.subQuestionSummary.map(sq => sq.question)
+    };
 
-    const userPrompt = `Analysis from ${aggregatedResults.subQuestionSummary.length} sub-questions:
-${subQuestionSummary}
+    const userPrompt = `Based on your ${aggregatedResults.results.length} journal entries, here's what I found:
 
-Journal Entries (${aggregatedResults.results.length} total):
 ${formattedResults}
 
-Question: "${message}"
+Your question: "${message}"
 
-Provide a concise, actionable response that directly answers the user's question. Be specific and reference examples from the entries.`;
+Please provide a warm, personal response with **bold headers** and bullet points. Speak directly to the user as their supportive mental health assistant.`;
 
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -485,7 +508,6 @@ Provide a concise, actionable response that directly answers the user's question
 
     console.log(`[chat-with-rag] Starting OpenAI request after ${Date.now() - responseStartTime}ms of preparation`);
 
-    // CRITICAL: Increased timeout to 25 seconds and reduced max_tokens for faster response
     const controller = new AbortController();
     const timeoutId = setTimeout(() => {
       console.error('[chat-with-rag] OpenAI request timed out after 25 seconds');
@@ -501,7 +523,7 @@ Provide a concise, actionable response that directly answers the user's question
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: messages,
-        max_tokens: 400, // Reduced from 600 for faster generation
+        max_tokens: 500,
         temperature: 0.7,
       }),
       signal: controller.signal
@@ -527,22 +549,24 @@ Provide a concise, actionable response that directly answers the user's question
     }
     
     console.log(`[chat-with-rag] Generated response successfully, length: ${generatedResponse.length}`);
-    return generatedResponse;
+    return { content: generatedResponse, analysisMetadata };
 
   } catch (error) {
     const totalTime = Date.now() - responseStartTime;
     console.error(`[chat-with-rag] Error generating response after ${totalTime}ms:`, error);
     
     if (error.name === 'AbortError') {
-      console.error('[chat-with-rag] Response generation timed out - this is the critical issue!');
-      return "I found relevant information in your journal entries, but the response took too long to generate. Please try asking a more specific question, or try again in a moment.";
+      console.error('[chat-with-rag] Response generation timed out');
+      return { 
+        content: "I found relevant information in your journal entries, but the response took too long to generate. Please try asking a more specific question.", 
+        analysisMetadata: null 
+      };
     }
     
-    if (error.message.includes('OpenAI API error')) {
-      return "I found relevant journal entries but encountered an issue with the AI service. Please try rephrasing your question or try again shortly.";
-    }
-    
-    return "I successfully found relevant information in your journal entries, but encountered an error while generating the response. Please try again or contact support if this continues.";
+    return { 
+      content: "I found relevant information in your journal entries but encountered an error while generating the response. Please try again.", 
+      analysisMetadata: null 
+    };
   }
 }
 
@@ -701,14 +725,14 @@ serve(async (req) => {
     console.log(`[chat-with-rag] Retrieved ${aggregatedResults.totalResults} total relevant entries from sub-questions`);
 
     if (aggregatedResults.totalResults === 0) {
-      let noDataResponse = `I couldn't find relevant journal entries for "${message}".`;
+      let noDataResponse = `I couldn't find relevant journal entries for your question about "${message}".`;
       
       if (queryPlan.isPersonalityQuery) {
-        noDataResponse += ` To analyze personality traits, try journaling about your thoughts, decisions, and daily experiences.`;
+        noDataResponse += ` To help me analyze your personality patterns, try journaling about your thoughts, decisions, and daily experiences.`;
       } else if (queryPlan.isEmotionQuery) {
-        noDataResponse += ` To analyze emotional patterns, try journaling about your feelings and what triggers them.`;
+        noDataResponse += ` To help me understand your emotional patterns, try journaling about your feelings and what triggers them.`;
       } else {
-        noDataResponse += ` Try adding more journal entries about your thoughts and experiences, then ask again.`;
+        noDataResponse += ` Try adding more journal entries about your thoughts and experiences, then ask me again.`;
       }
       
       return new Response(JSON.stringify({ data: noDataResponse }), {
@@ -716,8 +740,8 @@ serve(async (req) => {
       });
     }
 
-    // Generate comprehensive response with optimized timeout handling
-    const response = await generateResponseWithSubQuestionContext(
+    // Generate comprehensive response with analysis metadata
+    const { content: response, analysisMetadata } = await generateResponseWithSubQuestionContext(
       message,
       aggregatedResults,
       queryPlan,
@@ -728,7 +752,10 @@ serve(async (req) => {
     const totalTime = Date.now() - startTime;
     console.log(`[chat-with-rag] SUCCESSFULLY generated comprehensive response in ${totalTime}ms, length: ${response.length}`);
 
-    return new Response(JSON.stringify({ data: response }), {
+    return new Response(JSON.stringify({ 
+      data: response,
+      analysisMetadata: analysisMetadata
+    }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
 

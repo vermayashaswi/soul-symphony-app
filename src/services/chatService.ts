@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
 import { enhancedQueryClassification } from '../utils/chat/messageClassifier';
@@ -12,6 +11,7 @@ type ProcessedResponse = {
   role: 'assistant' | 'error';
   references?: any[];
   analysis?: any;
+  analysisMetadata?: any;
   isInteractive?: boolean;
   interactiveOptions?: any[];
   hasNumericResult?: boolean;
@@ -224,7 +224,6 @@ export async function processChatMessage(
       }
     }
 
-    // Get conversation history for better context
     let conversationHistory = [];
     if (threadId) {
       try {
@@ -236,7 +235,6 @@ export async function processChatMessage(
           .limit(10);
 
         if (!error && chatMessages && chatMessages.length > 0) {
-          // Format messages for OpenAI context
           conversationHistory = chatMessages
             .reverse()
             .map(msg => ({
@@ -247,7 +245,6 @@ export async function processChatMessage(
         }
       } catch (error) {
         console.error("Error fetching conversation history:", error);
-        // Continue with empty history if there's an error
       }
     }
 
@@ -314,17 +311,16 @@ export async function processChatMessage(
           dataValue: chatResponse
         });
 
-        // EMERGENCY FIX: chat-with-rag returns { data: "response string" }
-        // We need to extract the actual response from the data field
+        // Extract the response and analysis metadata
         let finalResponse;
+        let analysisMetadata = null;
+        
         if (chatResponse && typeof chatResponse === 'string') {
-          // Sometimes the response is directly a string
           finalResponse = chatResponse;
         } else if (chatResponse && chatResponse.data) {
-          // Most of the time it's wrapped in a data field
           finalResponse = chatResponse.data;
+          analysisMetadata = chatResponse.analysisMetadata;
         } else if (chatResponse && chatResponse.response) {
-          // Fallback for legacy response format
           finalResponse = chatResponse.response;
         } else {
           console.error("Unexpected response format from chat-with-rag:", chatResponse);
@@ -335,6 +331,7 @@ export async function processChatMessage(
           hasResponse: !!finalResponse,
           responseType: typeof finalResponse,
           responseLength: finalResponse ? finalResponse.length : 0,
+          hasAnalysisMetadata: !!analysisMetadata,
           firstChars: finalResponse ? finalResponse.substring(0, 100) : null
         });
 
@@ -349,6 +346,7 @@ export async function processChatMessage(
           role: 'assistant',
           references: chatResponse?.references || [],
           analysis: chatResponse?.analysis || null,
+          analysisMetadata: analysisMetadata,
           isInteractive: chatResponse?.isInteractive || false,
           interactiveOptions: chatResponse?.options || [],
           hasNumericResult: chatResponse?.hasNumericResult || false
