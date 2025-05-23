@@ -3,6 +3,8 @@ import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { searchEntriesWithVector, searchEntriesWithTimeRange, searchEntriesByMonth } from './utils/searchService.ts';
 import { detectMentalHealthQuery, detectMonthInQuery, isDirectDateQuery, isJournalAnalysisQuery, isMonthSpecificQuery, detectTimeframeInQuery, classifyQueryComplexity, generateSubQueries } from './utils/queryClassifier.ts';
+import { generateSystemPrompt, generateUserPrompt, generateResponse } from './utils/responseGenerator.ts';
+import { planQuery, shouldUseComprehensiveSearch, getMaxEntries } from './utils/queryPlanner.ts';
 
 // Import date functions directly from date-fns
 import { format, parseISO, subDays, startOfWeek, endOfWeek, startOfMonth, endOfMonth, startOfDay, endOfDay } from 'https://esm.sh/date-fns@4.1.0';
@@ -12,8 +14,6 @@ const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
-
-const OPENAI_API_URL = 'https://api.openai.com/v1/chat/completions';
 
 // Enhanced date calculation functions with proper timezone handling
 function getLastWeekDates(clientTimeInfo?: any, userTimezone?: string): { startDate: string; endDate: string; formattedRange: string } {
@@ -233,6 +233,31 @@ async function processQuery(
   console.log(`[chat-with-rag] Processing query: "${message}"`);
   
   try {
+    // Validate OpenAI API key
+    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAiApiKey) {
+      console.error('[chat-with-rag] CRITICAL: OpenAI API key not configured');
+      return "I'm sorry, but the AI service is not properly configured. Please contact support.";
+    }
+    
+    // Check if user has any journal entries
+    console.log(`[chat-with-rag] Checking for journal entries for user: ${userId}`);
+    const { count: entryCount, error: countError } = await supabase
+      .from('Journal Entries')
+      .select('id', { count: "exact", head: true })
+      .eq('user_id', userId);
+    
+    if (countError) {
+      console.error('[chat-with-rag] Error checking for user journal entries:', countError);
+      return "I encountered an error while accessing your journal entries. Please try again.";
+    }
+    
+    console.log(`[chat-with-rag] User has ${entryCount || 0} journal entries`);
+    
+    if (!entryCount || entryCount === 0) {
+      return "I don't have any journal entries to analyze yet. Please add some journal entries first, and then I'll be able to provide insights about your emotions, patterns, and experiences!";
+    }
+    
     // Classify query complexity
     const complexity = classifyQueryComplexity(message);
     console.log(`[chat-with-rag] Query complexity: ${complexity}`);
@@ -250,6 +275,10 @@ async function processQuery(
       console.log(`[chat-with-rag] Processed timeframe:`, processedTimeRange);
     }
     
+    // Create query plan
+    const queryPlan = planQuery(message, processedTimeRange);
+    console.log(`[chat-with-rag] Query plan:`, queryPlan);
+    
     // Handle multi-part queries
     if (complexity === 'multi_part') {
       const subQueries = generateSubQueries(message);
@@ -257,7 +286,7 @@ async function processQuery(
       
       const subResponses = [];
       for (const subQuery of subQueries) {
-        const subResponse = await processSingleQuery(subQuery, userId, supabase, processedTimeRange, clientTimeInfo, userTimezone);
+        const subResponse = await processSingleQuery(subQuery, userId, supabase, processedTimeRange, clientTimeInfo, userTimezone, openAiApiKey);
         subResponses.push({
           query: subQuery,
           response: subResponse
@@ -269,7 +298,7 @@ async function processQuery(
     }
     
     // Process single query
-    return await processSingleQuery(message, userId, supabase, processedTimeRange, clientTimeInfo, userTimezone, conversationContext);
+    return await processSingleQuery(message, userId, supabase, processedTimeRange, clientTimeInfo, userTimezone, openAiApiKey, conversationContext);
     
   } catch (error) {
     console.error('[chat-with-rag] Error processing query:', error);
@@ -285,16 +314,22 @@ async function processSingleQuery(
   timeRange?: any,
   clientTimeInfo?: any,
   userTimezone?: string,
+  openAiApiKey?: string,
   conversationContext: any[] = []
 ): Promise<string> {
   console.log(`[chat-with-rag] Processing single query: "${message}"`);
   
   try {
+    if (!openAiApiKey) {
+      openAiApiKey = Deno.env.get('OPENAI_API_KEY');
+    }
+    
     // Get query embedding for semantic search
+    console.log(`[chat-with-rag] Getting embedding for query`);
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
+        'Authorization': `Bearer ${openAiApiKey}`,
         'Content-Type': 'application/json',
       },
       body: JSON.stringify({
@@ -304,17 +339,20 @@ async function processSingleQuery(
     });
     
     if (!embeddingResponse.ok) {
+      const errorText = await embeddingResponse.text();
+      console.error('[chat-with-rag] Failed to get embedding:', errorText);
       throw new Error('Failed to get embedding from OpenAI');
     }
     
     const embeddingData = await embeddingResponse.json();
     const queryEmbedding = embeddingData.data[0].embedding;
+    console.log(`[chat-with-rag] Successfully got embedding with ${queryEmbedding.length} dimensions`);
     
     // Search for relevant entries
     let relevantEntries = [];
     
     if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-      console.log(`[chat-with-rag] Using time-filtered search`);
+      console.log(`[chat-with-rag] Using time-filtered search with range:`, timeRange);
       relevantEntries = await searchEntriesWithTimeRange(
         supabase,
         userId,
@@ -329,65 +367,39 @@ async function processSingleQuery(
     console.log(`[chat-with-rag] Found ${relevantEntries?.length || 0} relevant entries`);
     
     if (!relevantEntries || relevantEntries.length === 0) {
-      return "I don't have enough journal entries to provide insights about that topic. Try writing more journal entries to get better personalized responses!";
+      if (timeRange) {
+        return `I don't have any journal entries for the specified time period (${timeRange.startDate ? new Date(timeRange.startDate).toLocaleDateString() : 'start'} to ${timeRange.endDate ? new Date(timeRange.endDate).toLocaleDateString() : 'end'}). Try asking about a different time period or add more journal entries!`;
+      } else {
+        return "I don't have enough journal entries to provide insights about that topic. Try writing more journal entries to get better personalized responses!";
+      }
     }
     
     // Determine if this is a comprehensive query
     const isComprehensive = isComprehensiveAnalysisQuery(message);
-    const maxEntries = isComprehensive ? 1000 : 10;
+    const maxEntries = isComprehensive ? 50 : 10;
     const entriesToUse = relevantEntries.slice(0, maxEntries);
     
-    // Generate response using OpenAI
-    const systemPrompt = `You are a supportive mental health assistant analyzing journal entries from the SOULo voice journaling app. 
-
-Current date and time: ${new Date().toISOString()}
-User timezone: ${userTimezone || clientTimeInfo?.timezoneName || 'UTC'}
-Query timeframe: ${timeRange ? `${timeRange.startDate || 'start'} to ${timeRange.endDate || 'end'}` : 'all time'}
-
-Your role is to:
-1. Analyze journal entries with empathy and understanding
-2. Provide personalized insights based on patterns and emotions
-3. Offer constructive mental health guidance
-4. Reference specific dates and timeframes accurately
-5. Be supportive while maintaining appropriate boundaries
-
-Always be encouraging, non-judgmental, and focused on the user's wellbeing.`;
-
-    const openAiResponse = await fetch(OPENAI_API_URL, {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4',
-        messages: [
-          { role: 'system', content: systemPrompt },
-          ...conversationContext.slice(-10),
-          { 
-            role: 'user', 
-            content: `Based on these journal entries: ${JSON.stringify(entriesToUse.map(entry => ({
-              date: entry.created_at,
-              content: entry.content,
-              emotions: entry.emotions
-            })))}\n\nUser question: ${message}` 
-          }
-        ],
-        max_tokens: 1000,
-        temperature: 0.7,
-      }),
-    });
-
-    if (!openAiResponse.ok) {
-      const errorText = await openAiResponse.text();
-      console.error('[chat-with-rag] OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${openAiResponse.status}`);
-    }
-
-    const openAiData = await openAiResponse.json();
-    const response = openAiData.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response.';
+    console.log(`[chat-with-rag] Using ${entriesToUse.length} entries for analysis (comprehensive: ${isComprehensive})`);
     
-    console.log(`[chat-with-rag] Generated response: ${response.substring(0, 100)}...`);
+    // Generate system and user prompts
+    const systemPrompt = generateSystemPrompt(
+      userTimezone || clientTimeInfo?.timezoneName || 'UTC',
+      timeRange,
+      isComprehensive ? 'aggregated' : 'analysis'
+    );
+    
+    const userPrompt = generateUserPrompt(message, entriesToUse);
+    
+    // Generate response using OpenAI
+    console.log(`[chat-with-rag] Generating response with OpenAI`);
+    const response = await generateResponse(
+      systemPrompt,
+      userPrompt,
+      conversationContext,
+      openAiApiKey
+    );
+    
+    console.log(`[chat-with-rag] Successfully generated response: ${response.substring(0, 100)}...`);
     return response;
     
   } catch (error) {
@@ -426,12 +438,32 @@ serve(async (req) => {
 
     // Validate required parameters
     if (!message || !userId) {
-      throw new Error('Missing required parameters: message and userId');
+      const errorMsg = 'Missing required parameters: message and userId';
+      console.error('[chat-with-rag]', errorMsg);
+      return new Response(JSON.stringify({ 
+        error: errorMsg,
+        data: "I'm missing some required information to process your request. Please try again."
+      }), {
+        status: 400,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
     }
 
     // Create Supabase client
     const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+    
+    if (!supabaseUrl || !supabaseKey) {
+      console.error('[chat-with-rag] Missing Supabase configuration');
+      return new Response(JSON.stringify({ 
+        error: 'Service configuration error',
+        data: "The service is not properly configured. Please contact support."
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      });
+    }
+    
     const supabase = createClient(supabaseUrl, supabaseKey);
 
     // Handle direct date queries
@@ -447,6 +479,7 @@ serve(async (req) => {
       }
       
       if (directResponse) {
+        console.log(`[chat-with-rag] Returning direct date response: ${directResponse}`);
         return new Response(JSON.stringify({ data: directResponse }), {
           headers: { ...corsHeaders, 'Content-Type': 'application/json' },
         });
@@ -463,6 +496,8 @@ serve(async (req) => {
       conversationContext || []
     );
 
+    console.log(`[chat-with-rag] Final response ready, length: ${response.length}`);
+
     return new Response(JSON.stringify({ data: response }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
@@ -471,7 +506,8 @@ serve(async (req) => {
     console.error('[chat-with-rag] Error in chat-with-rag:', error);
     return new Response(JSON.stringify({ 
       error: 'Internal server error', 
-      details: error.message 
+      details: error.message,
+      data: "I encountered an unexpected error. Please try again or contact support if the problem persists."
     }), {
       status: 500,
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },

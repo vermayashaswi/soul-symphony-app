@@ -82,7 +82,7 @@ export function shouldUseComprehensiveSearch(plan: QueryPlan): boolean {
 
 export function getMaxEntries(plan: QueryPlan): number {
   if (plan.searchStrategy === 'comprehensive') {
-    return 1000;
+    return 100;
   } else if (plan.complexity === 'complex') {
     return 50;
   } else {
