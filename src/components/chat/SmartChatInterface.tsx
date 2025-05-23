@@ -24,22 +24,6 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
   const scrollAreaRef = useRef<HTMLDivElement>(null);
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  useEffect(() => {
-    const handleThreadSelected = (event: CustomEvent) => {
-      setCurrentThreadId(event.detail.threadId);
-    };
-
-    window.addEventListener('threadSelected' as any, handleThreadSelected);
-
-    return () => {
-      window.removeEventListener('threadSelected' as any, handleThreadSelected);
-    };
-  }, []);
-
-  useEffect(() => {
-    loadMessages();
-  }, [currentThreadId]);
-
   const scrollToBottom = useCallback(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   }, []);
@@ -107,13 +91,29 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
     }
   };
 
+  useEffect(() => {
+    const handleThreadSelected = (event: CustomEvent) => {
+      setCurrentThreadId(event.detail.threadId);
+    };
+
+    window.addEventListener('threadSelected' as any, handleThreadSelected);
+
+    return () => {
+      window.removeEventListener('threadSelected' as any, handleThreadSelected);
+    };
+  }, []);
+
+  useEffect(() => {
+    loadMessages();
+  }, [currentThreadId]);
+
   return (
     <Card className="h-full flex flex-col">
       <Card className="flex-grow overflow-hidden">
         <ScrollArea ref={scrollAreaRef} className="h-full">
           <div className="flex flex-col p-4 space-y-2">
             <AnimatePresence>
-              {messages.map((message, index) => (
+              {messages.map((message) => (
                 <motion.div
                   key={message.id}
                   initial={{ opacity: 0, y: 20 }}
@@ -124,7 +124,7 @@ export function SmartChatInterface({ mentalHealthInsights }: SmartChatInterfaceP
                   <ChatMessage
                     key={message.id}
                     message={message}
-                    isLast={index === messages.length - 1}
+                    showAnalysis={false}
                   />
                 </motion.div>
               ))}

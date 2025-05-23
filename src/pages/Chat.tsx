@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import SmartChatInterface from '@/components/chat/SmartChatInterface';
+import { SmartChatInterface } from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
 import { useNavigate } from 'react-router-dom';
 import { useToast } from '@/hooks/use-toast';
