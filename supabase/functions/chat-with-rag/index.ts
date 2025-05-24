@@ -76,7 +76,8 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] PROCESSING: "${message}"`);
     console.log(`[chat-with-rag] Flags - UseAllEntries: ${useAllEntries}, PersonalPronouns: ${hasPersonalPronouns}, TimeRef: ${hasExplicitTimeReference}`);
-    console.log(`[chat-with-rag] Validated userId:`, validatedUserId);
+    console.log(`[chat-with-rag] Validated userId: ${validatedUserId} (type: ${typeof validatedUserId})`);
+    console.log(`[chat-with-rag] Request userId: ${userId} (type: ${typeof userId})`);
 
     // Verify that the userId from request matches the validated JWT user
     const userIdString = typeof userId === 'string' ? userId : String(userId);
@@ -100,7 +101,7 @@ serve(async (req) => {
     
     let userEntryCount = 0;
     try {
-      // Use service client with explicit user_id filter
+      // Use service client with explicit user_id filter - UUID comparison
       const { count, error: countError } = await supabaseService
         .from('Journal Entries')
         .select('*', { count: 'exact', head: true })
@@ -124,7 +125,7 @@ serve(async (req) => {
       try {
         const { data: entries, error } = await supabaseService
           .from('Journal Entries')
-          .select('id, created_at, user_id')
+          .select('id, created_at, user_id, emotions')
           .eq('user_id', validatedUserId)
           .limit(5);
 
@@ -132,7 +133,13 @@ serve(async (req) => {
           console.error(`[chat-with-rag] Error in double-check query:`, error);
         } else if (entries && entries.length > 0) {
           console.log(`[chat-with-rag] Double-check found ${entries.length} entries! Sample:`, 
-            entries.map(e => ({ id: e.id, user_id: e.user_id, created_at: e.created_at })));
+            entries.map(e => ({ 
+              id: e.id, 
+              user_id: e.user_id, 
+              user_id_type: typeof e.user_id,
+              created_at: e.created_at,
+              has_emotions: !!e.emotions 
+            })));
           userEntryCount = entries.length;
         } else {
           console.log(`[chat-with-rag] Double-check also returned 0 entries for user: ${validatedUserId}`);
@@ -231,29 +238,47 @@ serve(async (req) => {
             if (sqlQuery.function === 'get_top_emotions_with_entries') {
               console.log(`[chat-with-rag] Calling get_top_emotions_with_entries with params:`, {
                 user_id_param: validatedUserId,
+                user_id_param_type: typeof validatedUserId,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
                 limit_count: sqlParams.limit_count || 5
               });
 
-              // Use service client for SQL functions
+              // Use service client for SQL functions - pass UUID directly
               const { data, error } = await supabaseService.rpc(sqlQuery.function, {
-                user_id_param: validatedUserId,
+                user_id_param: validatedUserId, // UUID passed directly
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
                 limit_count: sqlParams.limit_count || 5
               });
               
               if (error) {
-                console.error(`[chat-with-rag] SQL function error:`, error);
+                console.error(`[chat-with-rag] SQL function error for ${sqlQuery.function}:`, {
+                  error: error,
+                  message: error.message,
+                  details: error.details,
+                  hint: error.hint,
+                  code: error.code
+                });
                 throw error;
               }
               queryResult = data || [];
+              console.log(`[chat-with-rag] SQL function ${sqlQuery.function} returned ${queryResult.length} results`);
               
             } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
-              const { data, error } = await supabaseService.rpc(sqlQuery.function, {
+              console.log(`[chat-with-rag] Calling match_journal_entries_by_emotion with params:`, {
                 emotion_name: sqlParams.emotion_name,
                 user_id_filter: validatedUserId,
+                user_id_filter_type: typeof validatedUserId,
+                min_score: sqlParams.min_score || 0.3,
+                start_date: sqlParams.start_date,
+                end_date: sqlParams.end_date,
+                limit_count: sqlParams.limit_count || 5
+              });
+
+              const { data, error } = await supabaseService.rpc(sqlQuery.function, {
+                emotion_name: sqlParams.emotion_name,
+                user_id_filter: validatedUserId, // UUID passed directly
                 min_score: sqlParams.min_score || 0.3,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
@@ -261,13 +286,18 @@ serve(async (req) => {
               });
               
               if (error) {
-                console.error(`[chat-with-rag] SQL function error:`, error);
+                console.error(`[chat-with-rag] SQL function error for ${sqlQuery.function}:`, {
+                  error: error,
+                  message: error.message,
+                  details: error.details,
+                  hint: error.hint,
+                  code: error.code
+                });
                 throw error;
               }
               queryResult = data || [];
+              console.log(`[chat-with-rag] SQL function ${sqlQuery.function} returned ${queryResult.length} results`);
             }
-            
-            console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${queryResult?.length || 0} results`);
             
             if (queryResult && queryResult.length > 0) {
               allResults.push(...queryResult.map(result => ({
@@ -275,10 +305,17 @@ serve(async (req) => {
                 source: 'sql_query',
                 query_function: sqlQuery.function
               })));
+              console.log(`[chat-with-rag] Added ${queryResult.length} results from SQL query ${sqlQuery.function}`);
             }
             
           } catch (error) {
-            console.error(`[chat-with-rag] Error executing SQL query ${sqlQuery.function}:`, error);
+            console.error(`[chat-with-rag] Error executing SQL query ${sqlQuery.function}:`, {
+              error: error,
+              message: error.message,
+              details: error.details,
+              hint: error.hint,
+              code: error.code
+            });
           }
         }
       }
@@ -317,7 +354,7 @@ serve(async (req) => {
               query_embedding: embedding,
               match_threshold: vectorSearch.threshold || 0.1,
               match_count: 10,
-              user_id_filter: validatedUserId,
+              user_id_filter: validatedUserId, // UUID passed directly
               start_date: effectiveDateFilter.startDate,
               end_date: effectiveDateFilter.endDate
             });
@@ -334,7 +371,7 @@ serve(async (req) => {
               query_embedding: embedding,
               match_threshold: vectorSearch.threshold || 0.1,
               match_count: useAllEntries ? 50 : 10,
-              user_id_filter: validatedUserId
+              user_id_filter: validatedUserId // UUID passed directly
             });
             
             if (error) {
