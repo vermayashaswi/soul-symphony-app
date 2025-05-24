@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * GPT-powered message classifier with enhanced contextual understanding
+ * GPT-powered message classifier with enhanced typo handling and intent understanding
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -30,15 +30,15 @@ serve(async (req) => {
     // Get OpenAI API key
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
     if (!openAiApiKey) {
-      console.error('[Query Classifier] OpenAI API key not found, falling back to rule-based classification');
-      const fallbackResult = ruleBased_classifyMessage(message);
+      console.error('[Query Classifier] OpenAI API key not found, falling back to enhanced rule-based classification');
+      const fallbackResult = enhancedRuleBased_classifyMessage(message);
       return new Response(
         JSON.stringify(fallbackResult),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
 
-    // Use GPT for classification
+    // Use GPT for classification with enhanced typo handling
     const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
 
     console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence})`);
@@ -50,10 +50,10 @@ serve(async (req) => {
   } catch (error) {
     console.error('[Query Classifier] Error:', error);
     
-    // Fallback to rule-based classification on error
+    // Fallback to enhanced rule-based classification on error
     try {
       const { message } = await req.json();
-      const fallbackResult = ruleBased_classifyMessage(message);
+      const fallbackResult = enhancedRuleBased_classifyMessage(message);
       return new Response(
         JSON.stringify({ ...fallbackResult, fallbackUsed: true }),
         { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
@@ -68,7 +68,7 @@ serve(async (req) => {
 });
 
 /**
- * GPT-powered classification with detailed prompt
+ * Enhanced GPT-powered classification with typo handling and intent understanding
  */
 async function gptClassifyMessage(
   message: string, 
@@ -82,31 +82,39 @@ async function gptClassifyMessage(
 }> {
   
   const contextString = conversationContext.length > 0 
-    ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
+    ? `\nConversation context: ${conversationContext.slice(-3).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
     : '';
 
-  const classificationPrompt = `You are a query classifier for SOULo, a voice journaling app that helps users analyze their personal journal entries for emotional insights and patterns.
+  const classificationPrompt = `You are an advanced query classifier for SOULo, a voice journaling app that helps users analyze their personal journal entries for emotional insights and patterns.
 
-Your task is to classify user messages into one of three categories:
+Your task is to classify user messages into one of three categories, with special attention to typos, incomplete sentences, and user intent:
 
 **JOURNAL_SPECIFIC**: Questions that require analysis of the user's personal journal entries
-- Examples: "How was I doing last week?", "What are my top emotions?", "Am I an introvert?", "Do I like people?", "How should I improve my sleep?", "What makes me happy?", "How can I deal with my anxiety?", "What are my patterns?", "How have I been feeling recently?", "What did I write about yesterday?"
-- Key indicators: Personal pronouns (I, me, my), temporal references (last week, yesterday, recently), personality questions, personal advice requests, emotion analysis requests
+- Examples: "How was I doing last week?", "How was I last week?" (missing 'doing'), "What are my top emotions?", "Am I an introvert?", "Do I like people?", "How should I improve my sleep?", "What makes me happy?", "How can I deal with my anxiety?", "What are my patterns?", "How have I been feeling recently?", "What did I write about yesterday?", "how was i yesterday" (typo/no caps), "wat makes me sad" (typo)
+- Key indicators: Personal pronouns (I, me, my), temporal references (last week, yesterday, recently), personality questions, personal advice requests, emotion analysis requests, incomplete sentences with clear personal intent
 
 **GENERAL_MENTAL_HEALTH**: General mental health information requests without personal context
-- Examples: "What is anxiety?", "How to meditate?", "What are signs of depression?", "Best practices for mental health", "What is mindfulness?"
-- Key indicators: General educational questions, no personal pronouns, requesting general information
+- Examples: "What is anxiety?", "How to meditate?", "What are signs of depression?", "Best practices for mental health", "What is mindfulness?", "how do you deal with stress" (general advice)
+- Key indicators: General educational questions, no personal pronouns, requesting general information, hypothetical scenarios
 
 **CONVERSATIONAL**: Greetings, thanks, clarifications, or general chat
-- Examples: "Hello", "Thank you", "How are you?", "Who are you?", "Can you help me?", "What can you do?"
-- Key indicators: Greetings, gratitude expressions, assistant capability questions
+- Examples: "Hello", "Thank you", "How are you?", "Who are you?", "Can you help me?", "What can you do?", "hi there", "thx" (abbreviated thanks), "wat r u" (typo/shorthand)
+- Key indicators: Greetings, gratitude expressions, assistant capability questions, social pleasantries
 
-CRITICAL RULES:
-1. ANY question with temporal references (last week, yesterday, today, recently, etc.) should be JOURNAL_SPECIFIC
-2. Questions starting with "How was I...", "Am I...", "Do I...", "What makes me..." are JOURNAL_SPECIFIC
-3. Personal advice requests ("How should I...", "What should I do...") are JOURNAL_SPECIFIC
-4. Personality or trait questions are JOURNAL_SPECIFIC
-5. When in doubt between JOURNAL_SPECIFIC and GENERAL_MENTAL_HEALTH, choose JOURNAL_SPECIFIC
+CRITICAL RULES FOR TYPO AND INTENT UNDERSTANDING:
+1. ASSUME MISSING WORDS: "How was I last week?" should be interpreted as "How was I [doing] last week?" - JOURNAL_SPECIFIC
+2. IGNORE TYPOS AND ABBREVIATIONS: "wat makes me sad", "how r u", "wat did i write" - focus on the intent
+3. TEMPORAL REFERENCES ARE STRONG SIGNALS: Any mention of time periods (last week, yesterday, today, recently, etc.) combined with personal pronouns strongly indicates JOURNAL_SPECIFIC
+4. INCOMPLETE PERSONAL QUESTIONS: "Am I...", "Do I...", "How was I..." even if incomplete - JOURNAL_SPECIFIC
+5. When in doubt between JOURNAL_SPECIFIC and GENERAL_MENTAL_HEALTH, choose JOURNAL_SPECIFIC if there are ANY personal indicators
+6. Context matters: Use conversation history to understand abbreviated or unclear messages
+
+INTENT INTERPRETATION EXAMPLES:
+- "How was I last week?" → Intent: "How was I doing last week?" → JOURNAL_SPECIFIC
+- "wat emotions do i have" → Intent: "What emotions do I have?" → JOURNAL_SPECIFIC  
+- "how 2 deal with anxiety" → Intent: "How to deal with anxiety?" → Could be GENERAL_MENTAL_HEALTH (general advice) or JOURNAL_SPECIFIC (personal advice) - lean JOURNAL_SPECIFIC if personal context
+- "am i happy person" → Intent: "Am I a happy person?" → JOURNAL_SPECIFIC
+- "thx for help" → Intent: "Thanks for help" → CONVERSATIONAL
 
 User message: "${message}"${contextString}
 
@@ -115,7 +123,7 @@ Respond with ONLY a JSON object in this exact format:
   "category": "JOURNAL_SPECIFIC" | "GENERAL_MENTAL_HEALTH" | "CONVERSATIONAL",
   "confidence": 0.0-1.0,
   "shouldUseJournal": boolean,
-  "reasoning": "Brief explanation of why this category was chosen"
+  "reasoning": "Brief explanation of interpretation and why this category was chosen, mention any typos or missing words inferred"
 }`;
 
   try {
@@ -132,7 +140,7 @@ Respond with ONLY a JSON object in this exact format:
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: classificationPrompt }],
         temperature: 0.1,
-        max_tokens: 200,
+        max_tokens: 250,
       }),
       signal: controller.signal
     });
@@ -164,7 +172,7 @@ Respond with ONLY a JSON object in this exact format:
       category: result.category,
       confidence: Math.max(0, Math.min(1, result.confidence || 0.8)),
       shouldUseJournal: result.category === 'JOURNAL_SPECIFIC',
-      reasoning: result.reasoning || 'GPT classification'
+      reasoning: result.reasoning || 'GPT classification with typo handling'
     };
 
   } catch (error) {
@@ -174,9 +182,9 @@ Respond with ONLY a JSON object in this exact format:
 }
 
 /**
- * Fallback rule-based classification (simplified version of the original)
+ * Enhanced rule-based classification with better typo and temporal pattern handling
  */
-function ruleBased_classifyMessage(message: string): {
+function enhancedRuleBased_classifyMessage(message: string): {
   category: string;
   confidence: number;
   shouldUseJournal: boolean;
@@ -184,14 +192,14 @@ function ruleBased_classifyMessage(message: string): {
 } {
   const lowerMessage = message.toLowerCase().trim();
   
-  // Conversational patterns
+  // Enhanced conversational patterns (including typos/abbreviations)
   const conversationalPatterns = [
-    /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i,
-    /^(thank you|thanks|thank u)\b/i,
-    /^(how are you|how do you)\b/i,
-    /^(what (are|is) you|who are you|tell me about yourself)\b/i,
-    /^(can you|could you|would you).{0,20}(help|assist|explain|clarify)\b/i,
-    /^(yes|no|okay|ok|sure|alright)\s*\.?\s*$/i
+    /^(hi|hello|hey|good morning|good afternoon|good evening|hii|helo)\b/i,
+    /^(thank you|thanks|thank u|thx|ty)\b/i,
+    /^(how are you|how do you|how r u|how r you)\b/i,
+    /^(what (are|is) you|who are you|tell me about yourself|wat r u)\b/i,
+    /^(can you|could you|would you|can u).{0,20}(help|assist|explain|clarify)\b/i,
+    /^(yes|no|okay|ok|sure|alright|ya|nah)\s*\.?\s*$/i
   ];
   
   for (const pattern of conversationalPatterns) {
@@ -200,35 +208,53 @@ function ruleBased_classifyMessage(message: string): {
         category: "CONVERSATIONAL",
         confidence: 0.9,
         shouldUseJournal: false,
-        reasoning: "Conversational greeting or response"
+        reasoning: "Conversational greeting or response (including common abbreviations/typos)"
       };
     }
   }
   
-  // Journal-specific indicators
+  // Enhanced journal-specific indicators (with typo tolerance and intent inference)
   const journalSpecificIndicators = [
+    // Temporal patterns with personal context - STRONGEST indicators
+    /\bhow (was|am|did) i\b.{0,15}\b(last week|yesterday|today|this week|recently|lately)\b/i,
+    /\bhow (was|am) i\b.{0,5}(last|this|yesterday)/i, // "How was I last week" (missing 'doing')
+    /\b(last week|yesterday|recently|lately|this week|last month)\b.{0,20}\bhow (was|am|did) i\b/i,
+    
+    // Personal trait/identity questions
     /\bam i\b|\bdo i\b/i,
-    /\bmy (mental health|wellbeing|anxiety|depression|stress)\b/i,
-    /\bhow (can|could|should) i\b|\bwhat should i do\b/i,
+    /\bmy (mental health|wellbeing|anxiety|depression|stress|personality|emotions)\b/i,
+    /\bhow (can|could|should) i\b|\bwhat should i do\b|\bhow do i\b/i,
     /\bhow (do|did) i feel\b|\bmy emotions\b|\bi feel\b/i,
-    /\b(last week|yesterday|recently|lately|this week|last month)\b/i,
     /\b(intro|extro)vert\b/i,
     /\bwhat (type|kind) of person\b/i,
-    /\bmy (personality|character|nature)\b/i
+    /\bmy (personality|character|nature|patterns|habits)\b/i,
+    
+    // Temporal references (even without complete sentences)
+    /\b(last week|yesterday|recently|lately|this week|last month)\b/i,
+    
+    // Personal questions with typos/missing words
+    /\bwat (makes|helps) me\b/i, // "wat makes me happy" (typo)
+    /\bhow r my\b/i, // "how r my emotions" (abbreviation)
+    /\bdo i like\b/i, // "do i like people"
   ];
   
   for (const pattern of journalSpecificIndicators) {
     if (pattern.test(lowerMessage)) {
+      // Higher confidence for temporal + personal combinations
+      const hasTemporal = /\b(last week|yesterday|recently|lately|this week|last month)\b/i.test(lowerMessage);
+      const hasPersonal = /\b(i|me|my|myself)\b/i.test(lowerMessage);
+      const confidence = (hasTemporal && hasPersonal) ? 0.95 : 0.8;
+      
       return {
         category: "JOURNAL_SPECIFIC",
-        confidence: 0.8,
+        confidence,
         shouldUseJournal: true,
-        reasoning: "Contains personal context or temporal references"
+        reasoning: "Contains personal context, temporal references, or personal trait questions (with typo tolerance)"
       };
     }
   }
   
-  // General mental health patterns
+  // General mental health patterns (without personal context)
   const mentalHealthPatterns = [
     /\b(anxiety|depression|stress|mental health|wellbeing|wellness)\b/i,
     /\b(meditation|mindfulness|self[\s-]care|therapy|counseling)\b/i,
@@ -238,6 +264,17 @@ function ruleBased_classifyMessage(message: string): {
   
   for (const pattern of mentalHealthPatterns) {
     if (pattern.test(lowerMessage)) {
+      // Check if it has personal context - if so, it should be journal specific
+      const hasPersonalContext = /\b(i|me|my|myself)\b/i.test(lowerMessage);
+      if (hasPersonalContext) {
+        return {
+          category: "JOURNAL_SPECIFIC",
+          confidence: 0.85,
+          shouldUseJournal: true,
+          reasoning: "Mental health topic with personal context"
+        };
+      }
+      
       return {
         category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.7,
@@ -251,6 +288,6 @@ function ruleBased_classifyMessage(message: string): {
     category: "GENERAL_NO_RELATION",
     confidence: 0.6,
     shouldUseJournal: false,
-    reasoning: "No clear indicators for other categories"
+    reasoning: "No clear indicators for journal-specific or mental health categories"
   };
 }
