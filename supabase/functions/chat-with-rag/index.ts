@@ -1,8 +1,8 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { processSubQuestionsInParallel, ProcessingContext } from "./utils/parallelProcessor.ts";
 import { PerformanceOptimizer } from "./utils/performanceOptimizer.ts";
+import { generateDisplayHeader } from "./utils/headerGenerator.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -264,28 +264,30 @@ serve(async (req) => {
     }
     
     if (subQuestionAnalyses.length > 1) {
-      // Multi-question query - structure by sub-question
+      // Multi-question query - structure by sub-question with user-friendly headers
       journalContext += "**MULTI-QUESTION ANALYSIS**\n\n";
       journalContext += "The user asked a multi-part question. Below is the individual analysis for each part:\n\n";
       
       subQuestionAnalyses.forEach((analysis, index) => {
-        journalContext += `## SUB-QUESTION ${index + 1}: "${analysis.subQuestion}"\n\n`;
+        // Generate a user-friendly header instead of "SUB-QUESTION N"
+        const friendlyHeader = generateDisplayHeader(analysis.subQuestion);
+        journalContext += `## ${friendlyHeader}\n\n`;
         
         if (analysis.context.length > 0) {
           journalContext += analysis.context + "\n\n";
         } else {
-          journalContext += "No specific data found for this sub-question.\n\n";
+          journalContext += "No specific data found for this analysis.\n\n";
         }
         
-        journalContext += `**Sub-question Summary:** ${analysis.reasoning}\n`;
+        journalContext += `**Analysis Summary:** ${analysis.reasoning}\n`;
         journalContext += `**Results Count:** ${analysis.emotionResults.length} emotion results, ${analysis.vectorResults.length} entry results\n\n`;
         journalContext += "---\n\n";
       });
       
       journalContext += "**SYNTHESIS INSTRUCTIONS:**\n";
-      journalContext += "1. Address each sub-question individually first\n";
-      journalContext += "2. Then provide cross-analysis and patterns between sub-questions\n";
-      journalContext += "3. Synthesize insights that span multiple sub-questions\n";
+      journalContext += "1. Address each analysis section individually first\n";
+      journalContext += "2. Then provide cross-analysis and patterns between sections\n";
+      journalContext += "3. Synthesize insights that span multiple analysis areas\n";
       journalContext += "4. Provide a comprehensive conclusion that addresses the overall query\n\n";
       
     } else {
@@ -310,11 +312,13 @@ ${hasPersonalPronouns ? 'IMPORTANT: This is a personal question about the user t
 ${hasExplicitTimeReference ? `IMPORTANT: This query is specifically about ${queryPlan.dateRange ? `the time period from ${new Date(queryPlan.dateRange.startDate).toLocaleDateString()} to ${new Date(queryPlan.dateRange.endDate).toLocaleDateString()}` : 'a specific time period'}. Focus your analysis on that timeframe.` : ''}
 
 ${subQuestionAnalyses.length > 1 ? `**MULTI-QUESTION PROCESSING:**
-You are handling a multi-part query with ${subQuestionAnalyses.length} sub-questions. Each sub-question has been analyzed separately and the results are structured below. Your task is to:
-1. Address each sub-question individually using its specific analysis
-2. Identify patterns and connections across sub-questions  
+You are handling a multi-part query with ${subQuestionAnalyses.length} analysis sections. Each section has been analyzed separately and the results are structured below with descriptive headers. Your task is to:
+1. Address each analysis section individually using its specific data
+2. Identify patterns and connections across sections  
 3. Provide synthesis insights that span multiple parts of the query
-4. Give a comprehensive response that addresses the overall multi-part question` : ''}
+4. Give a comprehensive response that addresses the overall multi-part question
+
+IMPORTANT: Use the section headers provided in the journal context. These are user-friendly headers that replace technical sub-question numbering.` : ''}
 
 ${isEmotionQuery ? `**CRITICAL EMOTION ANALYSIS INSTRUCTIONS:**
 • You have access to PRE-CALCULATED emotion scores from the database (0.0 to 1.0 scale)
@@ -345,7 +349,7 @@ FORMATTING REQUIREMENTS - YOU MUST FOLLOW THESE:
 - Break content into digestible sections with descriptive headers
 - Make the response visually scannable and well-organized
 - Use markdown formatting consistently throughout
-${subQuestionAnalyses.length > 1 ? '- Start by addressing each sub-question individually, then provide synthesis' : ''}
+${subQuestionAnalyses.length > 1 ? '- Use the provided section headers from the journal context - they are already user-friendly' : ''}
 ${isAnalysisFollowUp ? '- Acknowledge that this is an expanded analysis of all entries' : ''}
 
 Guidelines:
@@ -356,7 +360,7 @@ Guidelines:
 - ${shouldUseAllEntries ? 'Since you have access to their full journal history, provide comprehensive insights about long-term patterns' : 'Focus on the specific entries provided'}
 - End with an encouraging note or helpful suggestion
 - Structure everything with proper markdown headers and bullet points for easy reading
-${subQuestionAnalyses.length > 1 ? '- Ensure each sub-question gets adequate attention before moving to synthesis' : ''}
+${subQuestionAnalyses.length > 1 ? '- Ensure each section gets adequate attention before moving to synthesis' : ''}
 ${isAnalysisFollowUp ? '- Make it clear that this analysis covers their complete journal history' : ''}`;
 
     try {
