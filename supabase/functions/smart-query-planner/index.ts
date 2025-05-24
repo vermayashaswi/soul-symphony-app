@@ -35,28 +35,90 @@ Common Themes: work, relationships, family, health, goals, travel, creativity, l
 `;
 
 /**
- * Enhanced JSON extraction with multiple fallback methods
+ * Extract date ranges from natural language temporal references
  */
-function extractAndParseJSON(content: string): any {
+function extractDateRangeFromQuery(message: string): { startDate: string; endDate: string } | null {
+  const now = new Date();
+  const lowerMessage = message.toLowerCase();
+  
+  if (lowerMessage.includes('last week')) {
+    const lastWeekStart = new Date(now);
+    lastWeekStart.setDate(now.getDate() - now.getDay() - 7); // Start of last week (Sunday)
+    lastWeekStart.setHours(0, 0, 0, 0);
+    
+    const lastWeekEnd = new Date(lastWeekStart);
+    lastWeekEnd.setDate(lastWeekStart.getDate() + 6); // End of last week (Saturday)
+    lastWeekEnd.setHours(23, 59, 59, 999);
+    
+    return {
+      startDate: lastWeekStart.toISOString(),
+      endDate: lastWeekEnd.toISOString()
+    };
+  }
+  
+  if (lowerMessage.includes('yesterday')) {
+    const yesterday = new Date(now);
+    yesterday.setDate(now.getDate() - 1);
+    yesterday.setHours(0, 0, 0, 0);
+    
+    const yesterdayEnd = new Date(yesterday);
+    yesterdayEnd.setHours(23, 59, 59, 999);
+    
+    return {
+      startDate: yesterday.toISOString(),
+      endDate: yesterdayEnd.toISOString()
+    };
+  }
+  
+  if (lowerMessage.includes('this week')) {
+    const thisWeekStart = new Date(now);
+    thisWeekStart.setDate(now.getDate() - now.getDay()); // Start of this week (Sunday)
+    thisWeekStart.setHours(0, 0, 0, 0);
+    
+    return {
+      startDate: thisWeekStart.toISOString(),
+      endDate: now.toISOString()
+    };
+  }
+  
+  if (lowerMessage.includes('today')) {
+    const today = new Date(now);
+    today.setHours(0, 0, 0, 0);
+    
+    return {
+      startDate: today.toISOString(),
+      endDate: now.toISOString()
+    };
+  }
+  
+  return null;
+}
+
+/**
+ * Enhanced JSON extraction with better temporal query handling
+ */
+function extractAndParseJSON(content: string, originalMessage: string): any {
   try {
     return JSON.parse(content);
   } catch (error) {
-    console.log("Direct JSON parse failed, trying extraction methods");
+    console.log("Direct JSON parse failed, trying enhanced extraction methods");
     
-    let cleanedContent = content.trim();
-    cleanedContent = cleanedContent.replace(/^[^{]*/, '');
-    cleanedContent = cleanedContent.replace(/[^}]*$/, '}');
-    
-    const jsonBlockMatch = cleanedContent.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
+    // Try to extract JSON from code blocks
+    const jsonBlockMatch = content.match(/```(?:json)?\s*([\s\S]*?)\s*```/);
     if (jsonBlockMatch) {
       try {
-        return JSON.parse(jsonBlockMatch[1].trim());
+        const cleanedJson = jsonBlockMatch[1]
+          .replace(/,\s*}/g, '}')
+          .replace(/,\s*]/g, ']')
+          .replace(/([{,]\s*)(\w+):/g, '$1"$2":');
+        return JSON.parse(cleanedJson);
       } catch (e) {
         console.log("JSON block extraction failed");
       }
     }
     
-    const jsonMatch = cleanedContent.match(/\{[\s\S]*\}/);
+    // Try to find JSON pattern
+    const jsonMatch = content.match(/\{[\s\S]*\}/);
     if (jsonMatch) {
       try {
         let jsonText = jsonMatch[0];
@@ -69,35 +131,65 @@ function extractAndParseJSON(content: string): any {
       }
     }
     
-    console.error("All JSON extraction methods failed, using emergency fallback");
-    return createEmergencyFallback(content);
+    console.error("All JSON extraction methods failed, using enhanced temporal fallback");
+    return createTemporalAwareFallback(originalMessage);
   }
 }
 
 /**
- * Create emergency fallback when all JSON parsing fails
+ * Create enhanced fallback that preserves temporal context
  */
-function createEmergencyFallback(originalContent: string): any {
-  const lowerContent = originalContent.toLowerCase();
+function createTemporalAwareFallback(originalMessage: string): any {
+  const lowerMessage = originalMessage.toLowerCase();
+  
+  // Detect if this is a temporal query
+  const isTemporalQuery = /last week|yesterday|today|this week|this month|last month|recently/.test(lowerMessage);
+  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
+  
+  // Extract date range if temporal
+  const dateRange = isTemporalQuery ? extractDateRangeFromQuery(originalMessage) : null;
+  
+  const subQuestion = {
+    question: isTemporalQuery ? 
+      `Find journal entries from the specified time period with ultra-sensitive search` :
+      "Find relevant journal entries with ultra-sensitive search",
+    purpose: isTemporalQuery ? 
+      "Locate entries within the specific date range mentioned in the query" :
+      "Gather relevant information from journal entries",
+    searchPlan: {
+      vectorSearch: {
+        threshold: 0.01,
+        enabled: true,
+        dateFilter: dateRange
+      },
+      sqlQueries: isEmotionQuery ? [
+        {
+          function: "get_top_emotions_with_entries",
+          parameters: {
+            user_id_param: "USER_ID_PLACEHOLDER",
+            start_date: dateRange?.startDate || null,
+            end_date: dateRange?.endDate || null,
+            limit_count: 5
+          },
+          purpose: "Get top emotions with sample entries for the time period"
+        }
+      ] : [],
+      fallbackStrategy: isTemporalQuery ? null : "recent_entries" // No fallback for temporal queries
+    }
+  };
   
   return {
     queryType: "journal_specific",
     strategy: "intelligent_sub_query",
-    subQuestions: [
-      {
-        question: "Find relevant journal entries with ultra-sensitive search",
-        searchPlan: {
-          vectorSearch: {
-            threshold: 0.01,
-            enabled: true
-          },
-          sqlQueries: [],
-          fallbackStrategy: "recent_entries"
-        }
-      }
-    ],
-    confidence: 0.3,
-    reasoning: "Emergency fallback due to JSON parsing failure"
+    subQuestions: [subQuestion],
+    confidence: 0.4,
+    reasoning: isTemporalQuery ? 
+      "Enhanced temporal fallback preserving date constraints" : 
+      "Emergency fallback with ultra-low threshold",
+    isTemporalQuery,
+    isEmotionQuery,
+    hasDateConstraints: !!dateRange,
+    dateRange
   };
 }
 
@@ -110,7 +202,7 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
   for (let attempt = 0; attempt <= maxRetries; attempt++) {
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 seconds
+      const timeoutId = setTimeout(() => controller.abort(), 25000);
       
       const response = await promptFunction();
       clearTimeout(timeoutId);
@@ -127,7 +219,7 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
       console.log(`OpenAI attempt ${attempt + 1} failed:`, error.message);
       
       if (attempt < maxRetries) {
-        const delayMs = Math.pow(2, attempt) * 1000; // Exponential backoff
+        const delayMs = Math.pow(2, attempt) * 1000;
         await new Promise(resolve => setTimeout(resolve, delayMs));
       }
     }
@@ -137,7 +229,7 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
 }
 
 /**
- * Intelligent query analysis with sub-question generation and retry logic
+ * Intelligent query analysis with enhanced temporal handling
  */
 async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number) {
   try {
@@ -145,16 +237,25 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
       ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
       : '';
 
+    // Extract potential date range for better context
+    const extractedDateRange = extractDateRangeFromQuery(message);
+    const dateContext = extractedDateRange ? 
+      `\nDetected date range: ${extractedDateRange.startDate} to ${extractedDateRange.endDate}` : '';
+
     const prompt = `You are an intelligent query planner for a voice journaling app called SOULo. Your task is to break down user queries into executable sub-questions with detailed search plans.
 
 ${DATABASE_SCHEMA_CONTEXT}
 
 User query: "${message}"
-User has ${userEntryCount} journal entries.${contextString}
+User has ${userEntryCount} journal entries.${contextString}${dateContext}
 
-Break this query into 2-4 strategic sub-questions that will help answer the original query. For each sub-question, create a detailed search plan.
+CRITICAL RULES FOR TEMPORAL QUERIES:
+- If the query mentions "last week", "yesterday", "today", etc., you MUST include exact date filters
+- NEVER use fallback strategies for temporal queries - if no entries exist in the date range, return empty
+- Use SQL functions with start_date and end_date parameters for temporal queries
+- Set vectorSearch.dateFilter for all temporal queries
 
-CRITICAL: For personality and trait analysis queries, use ULTRA-LOW vector thresholds (0.01-0.05) to ensure results are found.
+Break this query into 1-3 strategic sub-questions that will help answer the original query.
 
 Return ONLY valid JSON with this structure:
 {
@@ -178,7 +279,7 @@ Return ONLY valid JSON with this structure:
             "purpose": "what this query achieves"
           }
         ],
-        "fallbackStrategy": "recent_entries" | "emotion_based" | "theme_based" | "keyword_search"
+        "fallbackStrategy": null | "recent_entries" | "emotion_based" | "keyword_search"
       }
     }
   ],
@@ -187,12 +288,7 @@ Return ONLY valid JSON with this structure:
   "expectedResponse": "analysis" | "direct_answer" | "clarification_needed"
 }
 
-Guidelines:
-- Use vector thresholds between 0.01-0.05 for personality/trait/behavior queries
-- Use 0.05-0.15 for general queries
-- Include SQL queries when specific emotions or patterns are mentioned
-- Each sub-question should target a specific aspect of the main query
-- Add keyword_search as fallback for personality queries`;
+For temporal queries, ALWAYS set fallbackStrategy to null to prevent analyzing entries outside the date range.`;
 
     const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -204,21 +300,21 @@ Guidelines:
         model: "gpt-4o-mini",
         messages: [{ role: "user", content: prompt }],
         temperature: 0.1,
-        max_tokens: 800,
+        max_tokens: 1000,
       })
     });
 
     const content = await retryOpenAICall(promptFunction, 2);
     console.log("Raw GPT response:", content);
     
-    const analysisResult = extractAndParseJSON(content);
+    const analysisResult = extractAndParseJSON(content, message);
     
     if (!analysisResult) {
-      console.error("Failed to parse GPT response, using fallback");
-      return createFallbackAnalysis(message);
+      console.error("Failed to parse GPT response, using temporal-aware fallback");
+      return createTemporalAwareFallback(message);
     }
     
-    // Validate and enhance the sub-questions
+    // Validate and enhance the sub-questions with temporal awareness
     const validatedResult = validateAndEnhanceSubQuestions(analysisResult, message);
     
     console.log("Final Analysis Result:", JSON.stringify(validatedResult, null, 2));
@@ -226,33 +322,36 @@ Guidelines:
 
   } catch (error) {
     console.error("Error in GPT query analysis:", error);
-    return createFallbackAnalysis(message);
+    return createTemporalAwareFallback(message);
   }
 }
 
 /**
- * Validate and enhance sub-questions with ultra-low thresholds for personality queries
+ * Validate and enhance sub-questions with strict temporal handling
  */
 function validateAndEnhanceSubQuestions(analysis: any, message: string) {
   const lowerMessage = message.toLowerCase();
   
-  // Detect query characteristics
+  // Enhanced detection
   const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate/.test(lowerMessage);
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
-  const isTemporalQuery = /last week|yesterday|today|this month|recently/.test(lowerMessage);
+  const isTemporalQuery = /last week|yesterday|today|this week|this month|recently/.test(lowerMessage);
+  
+  // Extract date range if temporal
+  const extractedDateRange = isTemporalQuery ? extractDateRangeFromQuery(message) : null;
   
   // Ensure we have valid sub-questions
   if (!analysis.subQuestions || !Array.isArray(analysis.subQuestions) || analysis.subQuestions.length === 0) {
-    analysis.subQuestions = createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery);
+    analysis.subQuestions = createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery, extractedDateRange);
   }
   
-  // Validate and enhance each sub-question with ultra-low thresholds
+  // Validate and enhance each sub-question with strict temporal handling
   analysis.subQuestions = analysis.subQuestions.map((subQ, index) => {
     if (!subQ.searchPlan) {
       subQ.searchPlan = {};
     }
     
-    // Ensure vector search configuration with ultra-low thresholds
+    // Ensure vector search configuration
     if (!subQ.searchPlan.vectorSearch) {
       subQ.searchPlan.vectorSearch = {
         enabled: true,
@@ -261,14 +360,31 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
       };
     }
     
+    // CRITICAL: Apply date filters for temporal queries
+    if (isTemporalQuery && extractedDateRange) {
+      subQ.searchPlan.vectorSearch.dateFilter = extractedDateRange;
+      
+      // Update SQL queries to include date parameters
+      if (subQ.searchPlan.sqlQueries) {
+        subQ.searchPlan.sqlQueries = subQ.searchPlan.sqlQueries.map(sqlQuery => {
+          if (sqlQuery.function === 'get_top_emotions_with_entries') {
+            sqlQuery.parameters.start_date = extractedDateRange.startDate;
+            sqlQuery.parameters.end_date = extractedDateRange.endDate;
+          } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
+            sqlQuery.parameters.start_date = extractedDateRange.startDate;
+            sqlQuery.parameters.end_date = extractedDateRange.endDate;
+          }
+          return sqlQuery;
+        });
+      }
+      
+      // CRITICAL: No fallback for temporal queries
+      subQ.searchPlan.fallbackStrategy = null;
+    }
+    
     // Force ultra-low thresholds for personality queries
     if (isPersonalityQuery && subQ.searchPlan.vectorSearch.threshold > 0.05) {
       subQ.searchPlan.vectorSearch.threshold = 0.01;
-    }
-    
-    // Cap all thresholds at reasonable maximums
-    if (subQ.searchPlan.vectorSearch.threshold > 0.15) {
-      subQ.searchPlan.vectorSearch.threshold = 0.1;
     }
     
     // Ensure SQL queries array
@@ -276,20 +392,22 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
       subQ.searchPlan.sqlQueries = [];
     }
     
-    // Add relevant SQL queries based on query type
+    // Add relevant SQL queries for emotion queries
     if (isEmotionQuery && subQ.searchPlan.sqlQueries.length === 0) {
       subQ.searchPlan.sqlQueries.push({
         function: "get_top_emotions_with_entries",
         parameters: {
           user_id_param: "USER_ID_PLACEHOLDER",
+          start_date: extractedDateRange?.startDate || null,
+          end_date: extractedDateRange?.endDate || null,
           limit_count: 5
         },
         purpose: "Get top emotions with sample entries"
       });
     }
     
-    // Enhanced fallback strategy for personality queries
-    if (!subQ.searchPlan.fallbackStrategy) {
+    // Set appropriate fallback strategy (null for temporal queries)
+    if (!subQ.searchPlan.fallbackStrategy && !isTemporalQuery) {
       subQ.searchPlan.fallbackStrategy = isPersonalityQuery ? "keyword_search" : "recent_entries";
     }
     
@@ -301,22 +419,24 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
     strategy: "intelligent_sub_query",
     subQuestions: analysis.subQuestions,
     confidence: typeof analysis.confidence === 'number' ? analysis.confidence : 0.7,
-    reasoning: analysis.reasoning || "Sub-query planning with ultra-low thresholds for personality queries",
+    reasoning: analysis.reasoning || "Enhanced sub-query planning with strict temporal constraints",
     expectedResponse: analysis.expectedResponse || "analysis",
     isPersonalityQuery,
     isEmotionQuery,
-    isTemporalQuery
+    isTemporalQuery,
+    hasDateConstraints: !!extractedDateRange,
+    dateRange: extractedDateRange
   };
   
-  console.log(`Generated ${validated.subQuestions.length} sub-questions for query type - Personality: ${isPersonalityQuery}, Emotion: ${isEmotionQuery}, Temporal: ${isTemporalQuery}`);
+  console.log(`Generated ${validated.subQuestions.length} sub-questions - Personality: ${isPersonalityQuery}, Emotion: ${isEmotionQuery}, Temporal: ${isTemporalQuery}, Date Range: ${!!extractedDateRange}`);
   
   return validated;
 }
 
 /**
- * Create default sub-questions with ultra-low thresholds
+ * Create default sub-questions with enhanced temporal awareness
  */
-function createDefaultSubQuestions(message: string, isPersonality: boolean, isEmotion: boolean, isTemporal: boolean) {
+function createDefaultSubQuestions(message: string, isPersonality: boolean, isEmotion: boolean, isTemporal: boolean, dateRange: any) {
   const subQuestions = [];
   
   if (isPersonality) {
@@ -326,79 +446,63 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
       searchPlan: {
         vectorSearch: {
           enabled: true,
-          threshold: 0.01, // Ultra-low for personality
-          query: message
+          threshold: 0.01,
+          query: message,
+          dateFilter: dateRange
         },
         sqlQueries: [],
-        fallbackStrategy: "keyword_search"
+        fallbackStrategy: isTemporal ? null : "keyword_search"
       }
     });
   }
   
   if (isEmotion) {
     subQuestions.push({
-      question: "Analyze emotional patterns and triggers",
+      question: isTemporal ? "Analyze emotional patterns within the specified time period" : "Analyze emotional patterns and triggers",
       purpose: "Understand emotional states and their contexts",
       searchPlan: {
         vectorSearch: {
           enabled: true,
           threshold: 0.05,
-          query: message
+          query: message,
+          dateFilter: dateRange
         },
         sqlQueries: [
           {
             function: "get_top_emotions_with_entries",
             parameters: {
               user_id_param: "USER_ID_PLACEHOLDER",
+              start_date: dateRange?.startDate || null,
+              end_date: dateRange?.endDate || null,
               limit_count: 5
             },
             purpose: "Get top emotions with examples"
           }
         ],
-        fallbackStrategy: "emotion_based"
+        fallbackStrategy: isTemporal ? null : "emotion_based"
       }
     });
   }
   
-  // Always add a general search sub-question with progressive threshold
+  // Always add a general search sub-question
   subQuestions.push({
-    question: "Find relevant journal entries related to the query",
+    question: isTemporal ? 
+      "Find relevant journal entries from the specified time period" :
+      "Find relevant journal entries related to the query",
     purpose: "Gather contextual information from journal entries",
     searchPlan: {
       vectorSearch: {
         enabled: true,
-        threshold: isPersonality ? 0.03 : 0.1, // Lower for personality
-        query: message
+        threshold: isPersonality ? 0.03 : 0.1,
+        query: message,
+        dateFilter: dateRange
       },
       sqlQueries: [],
-      fallbackStrategy: isPersonality ? "keyword_search" : "recent_entries"
+      fallbackStrategy: isTemporal ? null : (isPersonality ? "keyword_search" : "recent_entries")
     }
   });
   
   return subQuestions;
-}
-
-/**
- * Create fallback analysis when GPT fails
- */
-function createFallbackAnalysis(message: string) {
-  const lowerMessage = message.toLowerCase();
-  
-  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|negative|positive|improve|rate/.test(lowerMessage);
-  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed/.test(lowerMessage);
-  const isTemporalQuery = /last week|yesterday|today|this month|recently/.test(lowerMessage);
-  
-  return {
-    queryType: "journal_specific",
-    strategy: "intelligent_sub_query",
-    subQuestions: createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery),
-    confidence: 0.5,
-    reasoning: "Fallback analysis with ultra-low thresholds for personality queries",
-    expectedResponse: "analysis",
-    isPersonalityQuery,
-    isEmotionQuery,
-    isTemporalQuery
-  };
 }
 
 serve(async (req) => {
@@ -409,13 +513,13 @@ serve(async (req) => {
   try {
     const { message, userId, conversationContext = [], isFollowUp = false } = await req.json();
 
-    console.log(`[Smart Query Planner] Analyzing query with enhanced sub-questions: "${message}"`);
+    console.log(`[Smart Query Planner] Analyzing query with enhanced temporal handling: "${message}"`);
 
-    // Get user's journal entry count with 25s timeout
+    // Get user's journal entry count with timeout
     let entryCount = 0;
     try {
       const countController = new AbortController();
-      const countTimeoutId = setTimeout(() => countController.abort(), 25000); // 25 seconds
+      const countTimeoutId = setTimeout(() => countController.abort(), 25000);
       
       const { count, error } = await supabase
         .from('Journal Entries')
@@ -433,7 +537,7 @@ serve(async (req) => {
       console.error("Error fetching entry count:", error);
     }
 
-    // Use GPT to analyze the query and generate sub-questions with retry logic
+    // Use GPT to analyze the query with enhanced temporal awareness
     const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, entryCount);
 
     // Handle direct responses
@@ -455,7 +559,7 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced query plan with ultra-low thresholds
+    // Enhanced query plan with strict temporal constraints
     const enhancedPlan = {
       strategy: analysisResult.strategy,
       queryType: analysisResult.queryType,
@@ -467,11 +571,13 @@ serve(async (req) => {
       isPersonalityQuery: analysisResult.isPersonalityQuery,
       isEmotionQuery: analysisResult.isEmotionQuery,
       isTemporalQuery: analysisResult.isTemporalQuery,
+      hasDateConstraints: analysisResult.hasDateConstraints,
+      dateRange: analysisResult.dateRange,
       domainContext: analysisResult.isPersonalityQuery ? "personal_insights" : 
                    analysisResult.isEmotionQuery ? "emotional_analysis" : "general_insights"
     };
 
-    console.log("Enhanced Query Plan with Ultra-Low Thresholds:", JSON.stringify(enhancedPlan, null, 2));
+    console.log("Enhanced Query Plan with Temporal Constraints:", JSON.stringify(enhancedPlan, null, 2));
 
     return new Response(JSON.stringify({
       queryPlan: enhancedPlan,
@@ -492,7 +598,7 @@ serve(async (req) => {
           searchPlan: {
             vectorSearch: {
               enabled: true,
-              threshold: 0.01 // Ultra-low emergency threshold
+              threshold: 0.01
             },
             sqlQueries: [],
             fallbackStrategy: "keyword_search"
@@ -501,7 +607,7 @@ serve(async (req) => {
       ],
       totalEntryCount: 0,
       confidence: 0.3,
-      reasoning: "Emergency fallback plan with ultra-low thresholds",
+      reasoning: "Emergency fallback plan with enhanced error handling",
       expectedResponse: "analysis",
       isErrorFallback: true
     };

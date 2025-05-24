@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -227,7 +226,7 @@ function generateNoEntriesMessage(message: string, dateFilter?: { startDate?: st
 }
 
 /**
- * Execute a single sub-question's search plan with enhanced date filtering
+ * Execute a single sub-question's search plan with STRICT date filtering
  */
 async function executeSubQuestionPlan(
   subQuestion: any,
@@ -249,7 +248,7 @@ async function executeSubQuestionPlan(
     const { hasEntries, count } = await checkEntriesInDateRange(supabase, userId, dateFilter);
     
     if (!hasEntries) {
-      console.log(`[chat-with-rag] NO ENTRIES found in date range - returning empty result WITHOUT fallback`);
+      console.log(`[chat-with-rag] NO ENTRIES found in date range - returning empty result with strict date enforcement`);
       return {
         subQuestion: subQuestion.question,
         purpose: subQuestion.purpose,
@@ -257,7 +256,8 @@ async function executeSubQuestionPlan(
         resultCount: 0,
         dateFilterApplied: true,
         dateRange: dateFilter,
-        noEntriesInRange: true
+        noEntriesInRange: true,
+        strictDateEnforcement: true
       };
     }
     
@@ -265,14 +265,14 @@ async function executeSubQuestionPlan(
   }
   
   try {
-    // Execute SQL queries if specified
+    // Execute SQL queries if specified with enhanced date filtering
     if (searchPlan.sqlQueries && searchPlan.sqlQueries.length > 0) {
       console.log(`[chat-with-rag] Executing ${searchPlan.sqlQueries.length} SQL queries for sub-question`);
       
       const sqlPromises = searchPlan.sqlQueries.map(async (sqlQuery) => {
         try {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 25000); // 25 seconds
+          const timeoutId = setTimeout(() => controller.abort(), 25000);
           
           // Replace USER_ID_PLACEHOLDER with actual userId
           const parameters = { ...sqlQuery.parameters };
@@ -295,17 +295,39 @@ async function executeSubQuestionPlan(
             clearTimeout(timeoutId);
             
             if (!error && data) {
-              sqlResults = data.flatMap(emotion => 
-                emotion.sample_entries.map(entry => ({
-                  id: entry.id,
-                  content: entry.content,
-                  created_at: entry.created_at,
-                  similarity: 0.9,
-                  source: 'sql_emotion',
-                  emotion: emotion.emotion,
-                  emotion_score: emotion.score,
-                  subQuestion: subQuestion.question
-                }))
+              // STRICT: Filter results to ensure they're within date range
+              let filteredData = data;
+              if (dateFilter) {
+                filteredData = data.filter(emotion => {
+                  return emotion.sample_entries.some(entry => {
+                    const entryDate = new Date(entry.created_at);
+                    const startDate = new Date(dateFilter.startDate);
+                    const endDate = new Date(dateFilter.endDate);
+                    return entryDate >= startDate && entryDate <= endDate;
+                  });
+                });
+              }
+              
+              sqlResults = filteredData.flatMap(emotion => 
+                emotion.sample_entries
+                  .filter(entry => {
+                    if (!dateFilter) return true;
+                    const entryDate = new Date(entry.created_at);
+                    const startDate = new Date(dateFilter.startDate);
+                    const endDate = new Date(dateFilter.endDate);
+                    return entryDate >= startDate && entryDate <= endDate;
+                  })
+                  .map(entry => ({
+                    id: entry.id,
+                    content: entry.content,
+                    created_at: entry.created_at,
+                    similarity: 0.9,
+                    source: 'sql_emotion',
+                    emotion: emotion.emotion,
+                    emotion_score: emotion.score,
+                    subQuestion: subQuestion.question,
+                    dateFiltered: !!dateFilter
+                  }))
               );
             }
           } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
@@ -321,19 +343,31 @@ async function executeSubQuestionPlan(
             clearTimeout(timeoutId);
             
             if (!error && data) {
-              sqlResults = data.map(entry => ({
+              // STRICT: Double-check date filtering
+              let filteredData = data;
+              if (dateFilter) {
+                filteredData = data.filter(entry => {
+                  const entryDate = new Date(entry.created_at);
+                  const startDate = new Date(dateFilter.startDate);
+                  const endDate = new Date(dateFilter.endDate);
+                  return entryDate >= startDate && entryDate <= endDate;
+                });
+              }
+              
+              sqlResults = filteredData.map(entry => ({
                 id: entry.id,
                 content: entry.content,
                 created_at: entry.created_at,
                 similarity: 0.8,
                 source: 'sql_emotion_specific',
                 emotion_score: entry.emotion_score,
-                subQuestion: subQuestion.question
+                subQuestion: subQuestion.question,
+                dateFiltered: !!dateFilter
               }));
             }
           }
           
-          console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${sqlResults.length} results`);
+          console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${sqlResults.length} results (date filtered: ${!!dateFilter})`);
           return sqlResults;
           
         } catch (error) {
@@ -352,14 +386,13 @@ async function executeSubQuestionPlan(
     
     // Execute vector search with progressive threshold reduction
     if (searchPlan.vectorSearch && searchPlan.vectorSearch.enabled) {
-      console.log(`[chat-with-rag] Executing progressive vector search starting with threshold ${searchPlan.vectorSearch.threshold}`);
+      console.log(`[chat-with-rag] Executing vector search with date filter enforcement`);
       
       try {
-        // Use the optimized query from the search plan or fallback to sub-question
         const searchQuery = searchPlan.vectorSearch.query || subQuestion.question;
         
         // Generate embedding for the specific sub-question query
-        let subQuestionEmbedding = queryEmbedding; // Default to main query embedding
+        let subQuestionEmbedding = queryEmbedding;
         if (searchQuery !== subQuestion.question) {
           try {
             const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -391,21 +424,34 @@ async function executeSubQuestionPlan(
           searchPlan.vectorSearch
         );
         
-        const enhancedVectorResults = vectorResults.map(entry => ({
+        // STRICT: Filter vector results by date if date filter is present
+        let filteredVectorResults = vectorResults;
+        if (dateFilter) {
+          filteredVectorResults = vectorResults.filter(entry => {
+            const entryDate = new Date(entry.created_at);
+            const startDate = new Date(dateFilter.startDate);
+            const endDate = new Date(dateFilter.endDate);
+            return entryDate >= startDate && entryDate <= endDate;
+          });
+          console.log(`[chat-with-rag] Vector results filtered by date: ${vectorResults.length} -> ${filteredVectorResults.length}`);
+        }
+        
+        const enhancedVectorResults = filteredVectorResults.map(entry => ({
           ...entry,
-          source: searchPlan.vectorSearch.dateFilter ? 'vector_time_filtered' : 'vector_semantic',
-          subQuestion: subQuestion.question
+          source: dateFilter ? 'vector_time_filtered' : 'vector_semantic',
+          subQuestion: subQuestion.question,
+          dateFiltered: !!dateFilter
         }));
         
         results = results.concat(enhancedVectorResults);
-        console.log(`[chat-with-rag] Progressive vector search returned ${enhancedVectorResults.length} results`);
+        console.log(`[chat-with-rag] Vector search returned ${enhancedVectorResults.length} date-filtered results`);
         
       } catch (error) {
         console.error(`[chat-with-rag] Vector search error for sub-question:`, error);
       }
     }
     
-    // CRITICALLY IMPORTANT: DO NOT apply fallback strategies when date filters are present and we have no results
+    // CRITICAL: NEVER apply fallback strategies when date filters are present
     if (results.length < 3 && searchPlan.fallbackStrategy && !dateFilter) {
       console.log(`[chat-with-rag] Applying fallback strategy: ${searchPlan.fallbackStrategy} (NO date filter present)`);
       
@@ -459,13 +505,13 @@ async function executeSubQuestionPlan(
         }
         
         results = results.concat(fallbackResults);
-        console.log(`[chat-with-rag] Fallback strategy added ${fallbackResults.length} results (date filter: none)`);
+        console.log(`[chat-with-rag] Fallback strategy added ${fallbackResults.length} results (strict date enforcement: disabled)`);
         
       } catch (error) {
         console.error(`[chat-with-rag] Fallback strategy failed:`, error);
       }
-    } else if (dateFilter && results.length === 0) {
-      console.log(`[chat-with-rag] SKIPPING fallback strategies due to date filter and zero results - maintaining date constraint integrity`);
+    } else if (dateFilter) {
+      console.log(`[chat-with-rag] ENFORCING STRICT DATE CONSTRAINTS: No fallback applied due to date filter (results: ${results.length})`);
     }
     
     return {
@@ -475,7 +521,8 @@ async function executeSubQuestionPlan(
       resultCount: results.length,
       dateFilterApplied: !!dateFilter,
       dateRange: dateFilter,
-      noEntriesInRange: dateFilter && results.length === 0
+      noEntriesInRange: dateFilter && results.length === 0,
+      strictDateEnforcement: !!dateFilter
     };
     
   } catch (error) {
@@ -485,13 +532,15 @@ async function executeSubQuestionPlan(
       purpose: subQuestion.purpose,
       results: [],
       resultCount: 0,
-      error: error.message
+      error: error.message,
+      dateFilterApplied: !!dateFilter,
+      strictDateEnforcement: !!dateFilter
     };
   }
 }
 
 /**
- * Execute all sub-questions in parallel and aggregate results
+ * Execute all sub-questions in parallel and aggregate results with strict date enforcement
  */
 async function executeIntelligentSubQueries(
   message: string,
@@ -500,7 +549,7 @@ async function executeIntelligentSubQueries(
   queryPlan: any,
   queryEmbedding: number[]
 ): Promise<any> {
-  console.log(`[chat-with-rag] Executing ${queryPlan.subQuestions.length} sub-questions in parallel`);
+  console.log(`[chat-with-rag] Executing ${queryPlan.subQuestions.length} sub-questions with strict date enforcement`);
   
   try {
     // Execute all sub-questions in parallel
@@ -510,11 +559,12 @@ async function executeIntelligentSubQueries(
     
     const subQuestionResults = await Promise.allSettled(subQuestionPromises);
     
-    // Aggregate all results
+    // Aggregate all results with strict date filtering
     let allResults = [];
     const subQuestionSummary = [];
     let hasDateFilters = false;
     let noEntriesInAnyRange = false;
+    let allHaveStrictDateEnforcement = true;
     
     subQuestionResults.forEach((result, index) => {
       if (result.status === 'fulfilled') {
@@ -526,7 +576,8 @@ async function executeIntelligentSubQueries(
           resultCount: subResult.resultCount,
           status: 'success',
           dateFilterApplied: subResult.dateFilterApplied,
-          noEntriesInRange: subResult.noEntriesInRange
+          noEntriesInRange: subResult.noEntriesInRange,
+          strictDateEnforcement: subResult.strictDateEnforcement
         });
         
         if (subResult.dateFilterApplied) {
@@ -535,6 +586,10 @@ async function executeIntelligentSubQueries(
         
         if (subResult.noEntriesInRange) {
           noEntriesInAnyRange = true;
+        }
+        
+        if (!subResult.strictDateEnforcement) {
+          allHaveStrictDateEnforcement = false;
         }
       } else {
         console.error(`Sub-question ${index} failed:`, result.reason);
@@ -552,14 +607,15 @@ async function executeIntelligentSubQueries(
       index === self.findIndex(e => e.id === entry.id)
     ).sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
     
-    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${subQuestionSummary.length} sub-questions (date filters applied: ${hasDateFilters}, no entries in range: ${noEntriesInAnyRange})`);
+    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${subQuestionSummary.length} sub-questions (strict date enforcement: ${allHaveStrictDateEnforcement}, no entries in range: ${noEntriesInAnyRange})`);
     
     return {
       results: uniqueResults.slice(0, 20),
       subQuestionSummary,
       totalResults: uniqueResults.length,
       hasDateFilters,
-      noEntriesInAnyRange
+      noEntriesInAnyRange,
+      strictDateEnforcement: allHaveStrictDateEnforcement
     };
     
   } catch (error) {
@@ -757,7 +813,7 @@ serve(async (req) => {
       userTimezone 
     } = await req.json();
 
-    console.log(`[chat-with-rag] Processing intelligent sub-query for: "${message}"`);
+    console.log(`[chat-with-rag] Processing query with enhanced date constraint enforcement: "${message}"`);
 
     // Validate required parameters
     if (!message || !userId) {
@@ -784,7 +840,7 @@ serve(async (req) => {
     const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
     const supabase = createClient(supabaseUrl, supabaseKey);
 
-    // Quick entry count check with 25s timeout
+    // Quick entry count check with timeout
     let entryCount = 0;
     try {
       const controller = new AbortController();
@@ -815,7 +871,7 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] User has ${entryCount} journal entries available`);
 
-    // Get query embedding with 25s timeout
+    // Get query embedding with timeout
     let queryEmbedding;
     try {
       const controller = new AbortController();
@@ -851,7 +907,7 @@ serve(async (req) => {
       });
     }
 
-    // Execute intelligent sub-question planning
+    // Execute intelligent sub-question planning with enhanced date enforcement
     let aggregatedResults;
     if (queryPlan.strategy === 'intelligent_sub_query' && queryPlan.subQuestions && queryPlan.subQuestions.length > 0) {
       aggregatedResults = await executeIntelligentSubQueries(
@@ -886,15 +942,16 @@ serve(async (req) => {
         subQuestionSummary: [{ question: 'Direct search', resultCount: fallbackResults.length, status: 'success' }],
         totalResults: fallbackResults.length,
         hasDateFilters: false,
-        noEntriesInAnyRange: false
+        noEntriesInAnyRange: false,
+        strictDateEnforcement: false
       };
     }
 
-    console.log(`[chat-with-rag] Retrieved ${aggregatedResults.totalResults} total relevant entries from sub-questions`);
+    console.log(`[chat-with-rag] Retrieved ${aggregatedResults.totalResults} total relevant entries (strict date enforcement: ${aggregatedResults.strictDateEnforcement})`);
 
-    // Check if we have date filters but no entries in that range
-    if (aggregatedResults.hasDateFilters && aggregatedResults.noEntriesInAnyRange) {
-      console.log('[chat-with-rag] Date filters present but no entries in range - generating no entries message');
+    // ENHANCED: Check for strict date constraint violations
+    if (aggregatedResults.hasDateFilters && aggregatedResults.noEntriesInAnyRange && aggregatedResults.strictDateEnforcement) {
+      console.log('[chat-with-rag] STRICT DATE ENFORCEMENT: No entries in specified date range - generating appropriate message');
       
       const noEntriesResponse = generateNoEntriesMessage(message);
       
@@ -905,7 +962,8 @@ serve(async (req) => {
           totalEntries: 0,
           dateFilterApplied: true,
           noEntriesInRange: true,
-          reason: "No entries found in specified date range"
+          strictDateEnforcement: true,
+          reason: "No entries found in specified date range (strict enforcement)"
         }
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' },
@@ -938,11 +996,14 @@ serve(async (req) => {
     );
 
     const totalTime = Date.now() - startTime;
-    console.log(`[chat-with-rag] SUCCESSFULLY generated comprehensive response in ${totalTime}ms, length: ${response.length}`);
+    console.log(`[chat-with-rag] SUCCESSFULLY generated response with strict date enforcement in ${totalTime}ms, length: ${response.length}`);
 
     return new Response(JSON.stringify({ 
       data: response,
-      analysisMetadata: analysisMetadata
+      analysisMetadata: {
+        ...analysisMetadata,
+        strictDateEnforcement: aggregatedResults.strictDateEnforcement
+      }
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
     });
