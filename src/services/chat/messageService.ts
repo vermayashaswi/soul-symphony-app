@@ -176,9 +176,7 @@ export async function sendMessage(
           try {
             const response = await supabase.functions.invoke('smart-query-planner', {
               body: queryPlannerParams,
-              options: {
-                signal: controller.signal
-              }
+              signal: controller.signal
             });
             clearTimeout(timeoutId);
             return response;
@@ -328,9 +326,7 @@ export async function sendMessage(
               headers: {
                 'Authorization': `Bearer ${session.access_token}`
               },
-              options: {
-                signal: controller.signal
-              }
+              signal: controller.signal
             });
             clearTimeout(timeoutId);
             return response;
