@@ -86,7 +86,7 @@ function generateContextualResponse(message: string, isFollowUp: boolean, conver
 }
 
 /**
- * Process a chat message with enhanced 3-tier categorization
+ * Process a chat message with enhanced 3-tier categorization and personal pronoun handling
  */
 export async function processChatMessage(
   message: string, 
@@ -257,12 +257,12 @@ export async function processChatMessage(
     }
   }
   
-  // Enhanced classification with 3-tier system
+  // Enhanced classification with 3-tier system and personal pronoun priority
   try {
     console.log("Processing chat message:", message.substring(0, 30) + "...");
     console.log("Parameters:", parameters);
     
-    // Use server-side GPT classification directly
+    // Use server-side GPT classification with enhanced personal pronoun handling
     const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
       body: { message, conversationContext: conversationHistory }
     });
@@ -271,29 +271,33 @@ export async function processChatMessage(
       category: QueryCategory;
       confidence: number;
       reasoning: string;
+      useAllEntries?: boolean;
     };
 
     if (classificationError) {
       console.error("Classification error:", classificationError);
-      // IMPROVED: Default to journal-specific for mental health queries
-      const isMentalHealthQuery = /mental health|help|improve|advice|better|support|guidance|this week|today|yesterday/.test(message.toLowerCase());
+      // IMPROVED: Default to journal-specific for personal queries
+      const hasPersonalPronouns = /\b(i|me|my|mine|myself|we|us|our|ours)\b/i.test(message.toLowerCase());
       classification = {
-        category: isMentalHealthQuery ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.CONVERSATIONAL,
+        category: hasPersonalPronouns ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.CONVERSATIONAL,
         confidence: 0.5,
-        reasoning: 'Classification service unavailable, using heuristic classification'
+        reasoning: 'Classification service unavailable, using personal pronoun detection',
+        useAllEntries: hasPersonalPronouns
       };
     } else {
       classification = {
         category: classificationData.category as QueryCategory,
         confidence: classificationData.confidence,
-        reasoning: classificationData.reasoning
+        reasoning: classificationData.reasoning,
+        useAllEntries: classificationData.useAllEntries || false
       };
     }
     
     console.log("Message classification:", {
       category: classification.category,
       confidence: classification.confidence,
-      reasoning: classification.reasoning
+      reasoning: classification.reasoning,
+      useAllEntries: classification.useAllEntries
     });
     
     // Handle different categories appropriately
@@ -326,7 +330,7 @@ export async function processChatMessage(
         break;
     }
 
-    // Set up the parameters for the query planner with conversation history
+    // Set up the parameters for the query planner with conversation history and ALL ENTRIES flag
     const queryPlanParams = {
       message,
       userId,
@@ -334,7 +338,8 @@ export async function processChatMessage(
       isFollowUp,
       useHistoricalData: parameters.useHistoricalData || false,
       referenceDate: new Date().toISOString(),
-      messageCategory: classification.category
+      messageCategory: classification.category,
+      useAllEntries: classification.useAllEntries || false // Pass the ALL ENTRIES flag
     };
 
     // Check network status before calling Edge Function
@@ -369,7 +374,8 @@ export async function processChatMessage(
         usePersonalContext: classification.category === QueryCategory.JOURNAL_SPECIFIC,
         queryPlan,
         conversationHistory, // Always include conversation history
-        messageCategory: classification.category
+        messageCategory: classification.category,
+        useAllEntries: classification.useAllEntries || false // Pass ALL ENTRIES flag to chat processor
       };
 
       try {
@@ -405,8 +411,8 @@ export async function processChatMessage(
           throw new Error("Failed to extract valid response from chat engine");
         }
 
-        // IMPROVED: Add personalized greeting for mental health queries with data
-        if (classification.category === QueryCategory.JOURNAL_SPECIFIC && chatResponse?.references && chatResponse.references.length > 0) {
+        // IMPROVED: Add personalized greeting for journal-specific queries with personal pronouns
+        if (classification.category === QueryCategory.JOURNAL_SPECIFIC && classification.useAllEntries && chatResponse?.references && chatResponse.references.length > 0) {
           const hasRelevantData = chatResponse.references.some(ref => ref.content && ref.content.length > 50);
           if (hasRelevantData && !finalResponse.toLowerCase().includes('hello') && !finalResponse.toLowerCase().includes('hi')) {
             finalResponse = `Hello! I've analyzed your journal entries and here's what I found:\n\n${finalResponse}`;
@@ -427,9 +433,9 @@ export async function processChatMessage(
       } catch (chatError) {
         console.error("Failed to process with chat-with-rag:", chatError);
         // IMPROVED: Fallback with context awareness
-        const hasPersonalDataFallback = /this week|today|yesterday|my/.test(message.toLowerCase());
+        const hasPersonalPronouns = /\b(i|me|my|mine|myself|we|us|our|ours)\b/i.test(message.toLowerCase());
         return {
-          content: hasPersonalDataFallback ? 
+          content: hasPersonalPronouns ? 
             "I'm having trouble analyzing your journal entries right now, but I'm here to help. Please try asking about your entries again in a moment." :
             "I'm having trouble processing your request right now. Please try again in a moment.",
           role: 'assistant'
@@ -438,12 +444,11 @@ export async function processChatMessage(
     } catch (planError) {
       console.error("Failed to generate query plan:", planError);
       
-      // Check if this seems to be a time-based question but the planner failed
-      if (message.toLowerCase().includes('last week') || 
-          message.toLowerCase().includes('yesterday') || 
-          message.toLowerCase().includes('this month')) {
-        
-        // Provide a friendly fallback response for time-based queries
+      // Check if this seems to be a personal query but the planner failed
+      const hasPersonalPronouns = /\b(i|me|my|mine|myself|we|us|our|ours)\b/i.test(message.toLowerCase());
+      
+      if (hasPersonalPronouns) {
+        // Provide a friendly fallback response for personal queries
         let fallbackResponse = "I'm having trouble analyzing your entries right now. ";
         
         // Check if we can determine if there are any journal entries at all
