@@ -1,9 +1,10 @@
+
 import React, { useRef, useEffect } from "react";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReactMarkdown from "react-markdown";
-import { XIcon, InfoIcon, Sun } from "lucide-react";
+import { XIcon, InfoIcon } from "lucide-react";
 import ReferencesDisplay from "./ReferencesDisplay";
 import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
@@ -78,14 +79,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   U
                 </AvatarFallback>
               ) : (
-                <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-400 to-red-500">
-                  <Sun 
-                    className="w-5 h-5 text-yellow-100 animate-pulse" 
-                    style={{
-                      filter: 'drop-shadow(0 0 4px rgba(255, 165, 0, 0.8))'
-                    }}
-                  />
-                </div>
+                <>
+                  <div className="w-full h-full rounded-full bg-theme animate-pulse" />
+                  <AvatarFallback className="bg-orange-500">
+                  </AvatarFallback>
+                </>
               )}
             </Avatar>
 
