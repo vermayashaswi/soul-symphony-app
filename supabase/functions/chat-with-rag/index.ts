@@ -12,9 +12,29 @@ const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
 const supabaseServiceKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
 const openaiApiKey = Deno.env.get('OPENAI_API_KEY')!;
 
-// Create both client types - one for user context, one for service operations
-const supabase = createClient(supabaseUrl, supabaseAnonKey);
+// Create service client for database operations (bypasses RLS)
 const supabaseService = createClient(supabaseUrl, supabaseServiceKey);
+
+// JWT validation function
+async function validateJWTAndGetUserId(authHeader: string): Promise<string | null> {
+  try {
+    const token = authHeader.replace('Bearer ', '');
+    
+    // Use service client to verify the JWT token
+    const { data: { user }, error } = await supabaseService.auth.getUser(token);
+    
+    if (error || !user) {
+      console.error('[chat-with-rag] JWT validation failed:', error);
+      return null;
+    }
+    
+    console.log(`[chat-with-rag] JWT validated successfully for user: ${user.id}`);
+    return user.id;
+  } catch (error) {
+    console.error('[chat-with-rag] JWT validation exception:', error);
+    return null;
+  }
+}
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
@@ -33,11 +53,16 @@ serve(async (req) => {
       });
     }
 
-    // Set the auth token for the user context client
-    supabase.auth.setSession({
-      access_token: authHeader.replace('Bearer ', ''),
-      refresh_token: ''
-    });
+    // Validate JWT token and extract user ID
+    const validatedUserId = await validateJWTAndGetUserId(authHeader);
+    
+    if (!validatedUserId) {
+      console.error('[chat-with-rag] JWT validation failed');
+      return new Response(JSON.stringify({ error: 'Invalid authentication token' }), {
+        status: 401,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     const { 
       message, 
@@ -51,7 +76,17 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] PROCESSING: "${message}"`);
     console.log(`[chat-with-rag] Flags - UseAllEntries: ${useAllEntries}, PersonalPronouns: ${hasPersonalPronouns}, TimeRef: ${hasExplicitTimeReference}`);
-    console.log(`[chat-with-rag] Raw userId received:`, userId, `Type: ${typeof userId}`);
+    console.log(`[chat-with-rag] Validated userId:`, validatedUserId);
+
+    // Verify that the userId from request matches the validated JWT user
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    if (userIdString !== validatedUserId) {
+      console.error('[chat-with-rag] User ID mismatch between request and JWT');
+      return new Response(JSON.stringify({ error: 'User ID mismatch' }), {
+        status: 403,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
 
     if (!message || !userId || !queryPlan) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -60,79 +95,37 @@ serve(async (req) => {
       });
     }
 
-    // Ensure userId is a string for consistent handling
-    const userIdString = typeof userId === 'string' ? userId : String(userId);
-    console.log(`[chat-with-rag] Converted userId to string:`, userIdString);
-
-    // Test authentication by getting user profile
-    try {
-      const { data: authUser, error: authError } = await supabase.auth.getUser();
-      console.log(`[chat-with-rag] Auth user check:`, { 
-        success: !authError, 
-        userId: authUser?.user?.id,
-        matches: authUser?.user?.id === userIdString 
-      });
-      
-      if (authError) {
-        console.error(`[chat-with-rag] Auth error:`, authError);
-        return new Response(JSON.stringify({ error: 'Authentication failed' }), {
-          status: 401,
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-        });
-      }
-    } catch (error) {
-      console.error(`[chat-with-rag] Auth check failed:`, error);
-      return new Response(JSON.stringify({ error: 'Authentication check failed' }), {
-        status: 401,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
-    // Check user's journal entry count using authenticated client
-    console.log(`[chat-with-rag] Checking journal entries for user: ${userIdString}`);
+    // Check user's journal entry count using service client
+    console.log(`[chat-with-rag] Checking journal entries for user: ${validatedUserId}`);
     
     let userEntryCount = 0;
     try {
-      // Use the authenticated client for user-specific queries
-      const { count, error: countError } = await supabase
+      // Use service client with explicit user_id filter
+      const { count, error: countError } = await supabaseService
         .from('Journal Entries')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', validatedUserId);
 
       if (countError) {
-        console.error(`[chat-with-rag] Error counting entries with auth client:`, countError);
-        
-        // Fallback to service client if needed (for debugging)
-        console.log(`[chat-with-rag] Trying with service client for debugging...`);
-        const { count: serviceCount, error: serviceError } = await supabaseService
-          .from('Journal Entries')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userIdString);
-          
-        if (serviceError) {
-          console.error(`[chat-with-rag] Service client also failed:`, serviceError);
-        } else {
-          console.log(`[chat-with-rag] Service client found ${serviceCount} entries for user ${userIdString}`);
-        }
-        
+        console.error(`[chat-with-rag] Error counting entries:`, countError);
         userEntryCount = 0;
       } else {
         userEntryCount = count || 0;
-        console.log(`[chat-with-rag] Successfully counted ${userEntryCount} entries for user ${userIdString}`);
+        console.log(`[chat-with-rag] Successfully counted ${userEntryCount} entries for user ${validatedUserId}`);
       }
     } catch (error) {
       console.error(`[chat-with-rag] Exception counting entries:`, error);
       userEntryCount = 0;
     }
 
-    console.log(`[chat-with-rag] User has ${userEntryCount} journal entries available`);
-
-    // If no entries found with auth client, try a direct query for debugging
+    // If no entries found, try a direct query for debugging
     if (userEntryCount === 0) {
-      console.log(`[chat-with-rag] Double-checking entries with direct query for user: ${userIdString}...`);
+      console.log(`[chat-with-rag] Double-checking entries with direct query for user: ${validatedUserId}...`);
       try {
-        const { data: entries, error } = await supabase
+        const { data: entries, error } = await supabaseService
           .from('Journal Entries')
           .select('id, created_at, user_id')
+          .eq('user_id', validatedUserId)
           .limit(5);
 
         if (error) {
@@ -142,7 +135,7 @@ serve(async (req) => {
             entries.map(e => ({ id: e.id, user_id: e.user_id, created_at: e.created_at })));
           userEntryCount = entries.length;
         } else {
-          console.log(`[chat-with-rag] Double-check also returned 0 entries for user: ${userIdString}`);
+          console.log(`[chat-with-rag] Double-check also returned 0 entries for user: ${validatedUserId}`);
         }
       } catch (error) {
         console.error(`[chat-with-rag] Exception in double-check:`, error);
@@ -151,7 +144,7 @@ serve(async (req) => {
 
     // Only return "no entries" if we're absolutely certain
     if (userEntryCount === 0) {
-      console.log(`[chat-with-rag] Confirmed: No journal entries found for user ${userIdString}`);
+      console.log(`[chat-with-rag] Confirmed: No journal entries found for user ${validatedUserId}`);
       return new Response(JSON.stringify({
         response: "I'd love to help you analyze your journal entries, but it looks like you haven't created any entries yet. Once you start journaling, I'll be able to provide insights about your emotions, patterns, and personal growth!",
         hasData: false,
@@ -192,16 +185,17 @@ serve(async (req) => {
         console.log(`[chat-with-rag] Checking entries in date range: ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
         
         try {
-          const { count: entriesInRange, error } = await supabase
+          const { count: entriesInRange, error } = await supabaseService
             .from('Journal Entries')
             .select('*', { count: 'exact', head: true })
+            .eq('user_id', validatedUserId)
             .gte('created_at', effectiveDateFilter.startDate)
             .lte('created_at', effectiveDateFilter.endDate);
 
           if (error) {
             console.error(`[chat-with-rag] Error checking date range:`, error);
           } else {
-            console.log(`[chat-with-rag] Found ${entriesInRange || 0} entries in date range for user ${userIdString}`);
+            console.log(`[chat-with-rag] Found ${entriesInRange || 0} entries in date range for user ${validatedUserId}`);
             
             if (!entriesInRange || entriesInRange === 0) {
               console.log(`[chat-with-rag] NO ENTRIES in date range - continuing to next sub-question`);
@@ -236,15 +230,15 @@ serve(async (req) => {
             
             if (sqlQuery.function === 'get_top_emotions_with_entries') {
               console.log(`[chat-with-rag] Calling get_top_emotions_with_entries with params:`, {
-                user_id_param: userIdString,
+                user_id_param: validatedUserId,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
                 limit_count: sqlParams.limit_count || 5
               });
 
-              // Use authenticated client for SQL functions
-              const { data, error } = await supabase.rpc(sqlQuery.function, {
-                user_id_param: userIdString,
+              // Use service client for SQL functions
+              const { data, error } = await supabaseService.rpc(sqlQuery.function, {
+                user_id_param: validatedUserId,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
                 limit_count: sqlParams.limit_count || 5
@@ -257,9 +251,9 @@ serve(async (req) => {
               queryResult = data || [];
               
             } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
-              const { data, error } = await supabase.rpc(sqlQuery.function, {
+              const { data, error } = await supabaseService.rpc(sqlQuery.function, {
                 emotion_name: sqlParams.emotion_name,
-                user_id_filter: userIdString,
+                user_id_filter: validatedUserId,
                 min_score: sqlParams.min_score || 0.3,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
@@ -314,16 +308,16 @@ serve(async (req) => {
           const embeddingData = await embeddingResponse.json();
           const embedding = embeddingData.data[0].embedding;
 
-          // Perform vector search with authenticated client
+          // Perform vector search with service client
           let vectorResults = [];
           
           if (effectiveDateFilter) {
-            console.log(`[chat-with-rag] Vector search with date filter for user: ${userIdString}`);
-            const { data, error } = await supabase.rpc('match_journal_entries_with_date', {
+            console.log(`[chat-with-rag] Vector search with date filter for user: ${validatedUserId}`);
+            const { data, error } = await supabaseService.rpc('match_journal_entries_with_date', {
               query_embedding: embedding,
               match_threshold: vectorSearch.threshold || 0.1,
               match_count: 10,
-              user_id_filter: userIdString,
+              user_id_filter: validatedUserId,
               start_date: effectiveDateFilter.startDate,
               end_date: effectiveDateFilter.endDate
             });
@@ -335,12 +329,12 @@ serve(async (req) => {
             vectorResults = data || [];
             
           } else {
-            console.log(`[chat-with-rag] Vector search without date filter for user: ${userIdString}`);
-            const { data, error } = await supabase.rpc('match_journal_entries_fixed', {
+            console.log(`[chat-with-rag] Vector search without date filter for user: ${validatedUserId}`);
+            const { data, error } = await supabaseService.rpc('match_journal_entries_fixed', {
               query_embedding: embedding,
               match_threshold: vectorSearch.threshold || 0.1,
               match_count: useAllEntries ? 50 : 10,
-              user_id_filter: userIdString
+              user_id_filter: validatedUserId
             });
             
             if (error) {
