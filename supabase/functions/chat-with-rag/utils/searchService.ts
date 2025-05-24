@@ -1,4 +1,3 @@
-
 // Standard vector search without time filtering
 export async function searchEntriesWithVector(
   supabase: any,
@@ -6,7 +5,7 @@ export async function searchEntriesWithVector(
   queryEmbedding: number[]
 ) {
   try {
-    console.log(`[chat-with-rag] Searching entries with vector similarity for userId: ${userId}`);
+    console.log(`[chat-with-rag/searchService] Searching entries with vector similarity for userId: ${userId}`);
     
     const { data, error } = await supabase.rpc(
       'match_journal_entries_fixed',
@@ -19,15 +18,15 @@ export async function searchEntriesWithVector(
     );
     
     if (error) {
-      console.error(`[chat-with-rag] Error in vector search: ${error.message}`);
+      console.error(`[chat-with-rag/searchService] Error in vector search: ${error.message}`);
       throw error;
     }
     
-    console.log(`[chat-with-rag] Found ${data?.length || 0} entries with vector similarity`);
+    console.log(`[chat-with-rag/searchService] Found ${data?.length || 0} entries with vector similarity`);
     
     // Add more detailed logging of results
     if (data && data.length > 0) {
-      console.log("[chat-with-rag] Vector search results - entry dates:", 
+      console.log("[chat-with-rag/searchService] Vector search results - entry dates:", 
         data.map((entry: any) => ({
           id: entry.id,
           date: new Date(entry.created_at).toISOString(),
@@ -38,7 +37,7 @@ export async function searchEntriesWithVector(
     
     return data || [];
   } catch (error) {
-    console.error('[chat-with-rag] Error searching entries with vector:', error);
+    console.error('[chat-with-rag/searchService] Error searching entries with vector:', error);
     throw error;
   }
 }
@@ -51,28 +50,28 @@ export async function searchEntriesWithTimeRange(
   timeRange: { startDate?: string; endDate?: string }
 ) {
   try {
-    console.log(`[chat-with-rag] Searching entries with time range for userId: ${userId}`);
-    console.log(`[chat-with-rag] Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'}`);
+    console.log(`[chat-with-rag/searchService] Searching entries with time range for userId: ${userId}`);
+    console.log(`[chat-with-rag/searchService] Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'}`);
     
     // Enhanced debugging for date formats
     if (timeRange.startDate) {
       const startDate = new Date(timeRange.startDate);
-      console.log(`[chat-with-rag] Start date parsed: ${startDate.toISOString()} (${startDate.toString()})`);
+      console.log(`[chat-with-rag/searchService] Start date parsed: ${startDate.toISOString()} (${startDate.toString()})`);
     }
     
     if (timeRange.endDate) {
       const endDate = new Date(timeRange.endDate);
-      console.log(`[chat-with-rag] End date parsed: ${endDate.toISOString()} (${endDate.toString()})`);
+      console.log(`[chat-with-rag/searchService] End date parsed: ${endDate.toISOString()} (${endDate.toString()})`);
     }
     
     // Ensure dates are in ISO format for the database
     const startDate = timeRange.startDate || null;
     const endDate = timeRange.endDate || null;
     
-    console.log(`[chat-with-rag] Sending time range to database: from ${startDate || 'none'} to ${endDate || 'none'}`);
+    console.log(`[chat-with-rag/searchService] Sending time range to database: from ${startDate || 'none'} to ${endDate || 'none'}`);
     
     // Detailed logging of the actual parameters being sent to the database
-    console.log("[chat-with-rag] Database function parameters:", {
+    console.log("[chat-with-rag/searchService] Database function parameters:", {
       query_embedding: `[array with ${queryEmbedding.length} elements]`,
       match_threshold: 0.5,
       match_count: 10,
@@ -95,12 +94,12 @@ export async function searchEntriesWithTimeRange(
     );
     
     if (error) {
-      console.error(`[chat-with-rag] Error in time-filtered vector search: ${error.message}`);
-      console.error(`[chat-with-rag] Full error object:`, JSON.stringify(error));
+      console.error(`[chat-with-rag/searchService] Error in time-filtered vector search: ${error.message}`);
+      console.error(`[chat-with-rag/searchService] Full error object:`, JSON.stringify(error));
       throw error;
     }
     
-    console.log(`[chat-with-rag] Found ${data?.length || 0} entries with time-filtered vector similarity`);
+    console.log(`[chat-with-rag/searchService] Found ${data?.length || 0} entries with time-filtered vector similarity`);
     
     // Log entry dates for debugging
     if (data && data.length > 0) {
@@ -111,14 +110,14 @@ export async function searchEntriesWithTimeRange(
         localDate: new Date(entry.created_at).toString(),
         score: entry.similarity
       }));
-      console.log("[chat-with-rag] Time-filtered search - Entries found:", entryDates);
+      console.log("[chat-with-rag/searchService] Time-filtered search - Entries found:", entryDates);
     } else {
-      console.log("[chat-with-rag] No entries found within time range");
+      console.log("[chat-with-rag/searchService] No entries found within time range");
     }
     
     return data || [];
   } catch (error) {
-    console.error('[chat-with-rag] Error searching entries with time range:', error);
+    console.error('[chat-with-rag/searchService] Error searching entries with time range:', error);
     throw error;
   }
 }
@@ -136,7 +135,7 @@ export async function searchEntriesByMonth(
   try {
     // Get current year if not provided
     const targetYear = year || new Date().getFullYear();
-    console.log(`[chat-with-rag] Searching entries for month: ${monthName} ${targetYear} for userId: ${userId}`);
+    console.log(`[chat-with-rag/searchService] Searching entries for month: ${monthName} ${targetYear} for userId: ${userId}`);
     
     // Map month name to month index (0-based)
     const monthMap: Record<string, number> = {
@@ -160,12 +159,12 @@ export async function searchEntriesByMonth(
     const normalizedMonthName = monthName.toLowerCase().trim();
     if (monthMap.hasOwnProperty(normalizedMonthName)) {
       monthIndex = monthMap[normalizedMonthName];
-      console.log(`[chat-with-rag] Found exact match for month name "${monthName}" -> index ${monthIndex}`);
+      console.log(`[chat-with-rag/searchService] Found exact match for month name "${monthName}" -> index ${monthIndex}`);
     } else {
       // Try partial matches
       for (const [key, index] of Object.entries(monthMap)) {
         if (key.includes(normalizedMonthName) || normalizedMonthName.includes(key)) {
-          console.log(`[chat-with-rag] Found partial match for month "${monthName}" with "${key}"`);
+          console.log(`[chat-with-rag/searchService] Found partial match for month "${monthName}" with "${key}"`);
           monthIndex = index;
           break;
         }
@@ -173,7 +172,7 @@ export async function searchEntriesByMonth(
     }
     
     if (monthIndex === -1) {
-      console.error(`[chat-with-rag] Invalid month name: ${monthName}`);
+      console.error(`[chat-with-rag/searchService] Invalid month name: ${monthName}`);
       return [];
     }
     
@@ -181,11 +180,11 @@ export async function searchEntriesByMonth(
     const startDate = new Date(targetYear, monthIndex, 1);
     const endDate = new Date(targetYear, monthIndex + 1, 0, 23, 59, 59, 999);
     
-    console.log(`[chat-with-rag] Month date range: from ${startDate.toISOString()} to ${endDate.toISOString()}`);
-    console.log(`[chat-with-rag] Month JS dates: from ${startDate.toString()} to ${endDate.toString()}`);
+    console.log(`[chat-with-rag/searchService] Month date range: from ${startDate.toISOString()} to ${endDate.toISOString()}`);
+    console.log(`[chat-with-rag/searchService] Month JS dates: from ${startDate.toString()} to ${endDate.toString()}`);
     
     // Additional debugging for month detection
-    console.log("[chat-with-rag] Month detection details:", {
+    console.log("[chat-with-rag/searchService] Month detection details:", {
       providedMonthName: monthName,
       normalizedName: normalizedMonthName,
       detectedMonthIndex: monthIndex,
@@ -203,7 +202,7 @@ export async function searchEntriesByMonth(
       endDate: endDate.toISOString() 
     });
   } catch (error) {
-    console.error('[chat-with-rag] Error searching entries by month:', error);
+    console.error('[chat-with-rag/searchService] Error searching entries by month:', error);
     throw error;
   }
 }

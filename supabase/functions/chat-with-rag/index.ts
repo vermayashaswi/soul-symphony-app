@@ -1,7 +1,6 @@
 
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
-import { planQuery, shouldUseComprehensiveSearch, getMaxEntries } from "./utils/queryPlanner.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -25,12 +24,12 @@ serve(async (req) => {
       userId, 
       queryPlan, 
       conversationContext = [],
-      useAllEntries = false,  // NEW: Accept this flag from the planner
-      hasPersonalPronouns = false,  // NEW: Accept this flag
-      hasExplicitTimeReference = false  // NEW: Accept this flag
+      useAllEntries = false,
+      hasPersonalPronouns = false,
+      hasExplicitTimeReference = false
     } = await req.json();
 
-    console.log(`[chat-with-rag] ENHANCED PROCESSING with time override logic: "${message}"`);
+    console.log(`[chat-with-rag] PROCESSING: "${message}"`);
     console.log(`[chat-with-rag] Flags - UseAllEntries: ${useAllEntries}, PersonalPronouns: ${hasPersonalPronouns}, TimeRef: ${hasExplicitTimeReference}`);
 
     if (!message || !userId || !queryPlan) {
@@ -40,15 +39,55 @@ serve(async (req) => {
       });
     }
 
-    // Check user's journal entry count
-    const { count: userEntryCount } = await supabase
-      .from('Journal Entries')
-      .select('*', { count: 'exact', head: true })
-      .eq('user_id', userId);
+    // FIXED: Check user's journal entry count with proper table name and error handling
+    console.log(`[chat-with-rag] Checking journal entries for user: ${userId}`);
+    
+    let userEntryCount = 0;
+    try {
+      const { count, error: countError } = await supabase
+        .from('Journal Entries')
+        .select('*', { count: 'exact', head: true })
+        .eq('user_id', userId);
 
-    console.log(`[chat-with-rag] User has ${userEntryCount || 0} journal entries available`);
+      if (countError) {
+        console.error(`[chat-with-rag] Error counting entries:`, countError);
+        // Continue with count = 0 but log the error
+        userEntryCount = 0;
+      } else {
+        userEntryCount = count || 0;
+      }
+    } catch (error) {
+      console.error(`[chat-with-rag] Exception counting entries:`, error);
+      userEntryCount = 0;
+    }
 
-    if (!userEntryCount || userEntryCount === 0) {
+    console.log(`[chat-with-rag] User has ${userEntryCount} journal entries available`);
+
+    // FIXED: Only return "no entries" message if we're absolutely sure there are no entries
+    if (userEntryCount === 0) {
+      // Double-check with a different query approach
+      console.log(`[chat-with-rag] Double-checking entries with direct query...`);
+      try {
+        const { data: entries, error } = await supabase
+          .from('Journal Entries')
+          .select('id, created_at')
+          .eq('user_id', userId)
+          .limit(1);
+
+        if (error) {
+          console.error(`[chat-with-rag] Error in double-check query:`, error);
+        } else if (entries && entries.length > 0) {
+          console.log(`[chat-with-rag] Double-check found ${entries.length} entries! Updating count.`);
+          userEntryCount = entries.length; // At least 1, but we know there are more
+        }
+      } catch (error) {
+        console.error(`[chat-with-rag] Exception in double-check:`, error);
+      }
+    }
+
+    // Only return "no entries" if we're absolutely certain
+    if (userEntryCount === 0) {
+      console.log(`[chat-with-rag] Confirmed: No journal entries found for user`);
       return new Response(JSON.stringify({
         response: "I'd love to help you analyze your journal entries, but it looks like you haven't created any entries yet. Once you start journaling, I'll be able to provide insights about your emotions, patterns, and personal growth!",
         hasData: false,
@@ -59,7 +98,7 @@ serve(async (req) => {
     }
 
     // Execute sub-questions with enhanced time override logic
-    console.log(`[chat-with-rag] Executing ${queryPlan.subQuestions?.length || 0} sub-questions with time override enforcement`);
+    console.log(`[chat-with-rag] Executing ${queryPlan.subQuestions?.length || 0} sub-questions`);
     
     const allResults = [];
     const strictDateEnforcement = !useAllEntries && hasExplicitTimeReference;
@@ -74,62 +113,72 @@ serve(async (req) => {
       const vectorSearch = searchPlan.vectorSearch || {};
       const sqlQueries = searchPlan.sqlQueries || [];
       
-      // CRITICAL: Apply time override logic
+      // Apply time override logic
       let effectiveDateFilter = vectorSearch.dateFilter;
       
       if (useAllEntries && hasPersonalPronouns && !hasExplicitTimeReference) {
-        // Override: Remove date constraints for personal pronoun queries without time references
         effectiveDateFilter = null;
-        console.log(`[chat-with-rag] TIME OVERRIDE: Removing date filter for personal query without time constraint`);
+        console.log(`[chat-with-rag] TIME OVERRIDE: Removing date filter for personal query`);
       } else if (effectiveDateFilter) {
         console.log(`[chat-with-rag] Applying date filter: ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
       }
 
       // Check if we have entries in the date range for temporal queries
       if (effectiveDateFilter && strictDateEnforcement) {
-        console.log(`[chat-with-rag] Date filter detected, checking for entries in range: ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
+        console.log(`[chat-with-rag] Checking entries in date range: ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
         
-        const { count: entriesInRange } = await supabase
-          .from('Journal Entries')
-          .select('*', { count: 'exact', head: true })
-          .eq('user_id', userId)
-          .gte('created_at', effectiveDateFilter.startDate)
-          .lte('created_at', effectiveDateFilter.endDate);
+        try {
+          const { count: entriesInRange, error } = await supabase
+            .from('Journal Entries')
+            .select('*', { count: 'exact', head: true })
+            .eq('user_id', userId)
+            .gte('created_at', effectiveDateFilter.startDate)
+            .lte('created_at', effectiveDateFilter.endDate);
 
-        console.log(`[chat-with-rag] Found ${entriesInRange || 0} entries in date range ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
-
-        if (!entriesInRange || entriesInRange === 0) {
-          console.log(`[chat-with-rag] NO ENTRIES found in date range - returning empty result with strict date enforcement`);
-          hasEntriesInDateRange = false;
-          continue; // Skip this sub-question
-        } else {
-          console.log(`[chat-with-rag] Found ${entriesInRange} entries in date range, proceeding with search`);
+          if (error) {
+            console.error(`[chat-with-rag] Error checking date range:`, error);
+          } else {
+            console.log(`[chat-with-rag] Found ${entriesInRange || 0} entries in date range`);
+            
+            if (!entriesInRange || entriesInRange === 0) {
+              console.log(`[chat-with-rag] NO ENTRIES in date range - continuing to next sub-question`);
+              hasEntriesInDateRange = false;
+              continue;
+            }
+          }
+        } catch (error) {
+          console.error(`[chat-with-rag] Exception checking date range:`, error);
         }
       }
 
       // Execute SQL queries if any
       if (sqlQueries.length > 0) {
-        console.log(`[chat-with-rag] Executing ${sqlQueries.length} SQL queries for sub-question`);
+        console.log(`[chat-with-rag] Executing ${sqlQueries.length} SQL queries`);
         
         for (const sqlQuery of sqlQueries) {
           try {
             let queryResult = null;
             
-            // CRITICAL: Apply time override to SQL parameters
+            // Apply time override to SQL parameters
             let sqlParams = { ...sqlQuery.parameters };
             
             if (useAllEntries && hasPersonalPronouns && !hasExplicitTimeReference) {
-              // Override: Remove date constraints
               sqlParams.start_date = null;
               sqlParams.end_date = null;
-              console.log(`[chat-with-rag] TIME OVERRIDE: Removing SQL date constraints for personal query`);
+              console.log(`[chat-with-rag] TIME OVERRIDE: Removing SQL date constraints`);
             } else if (effectiveDateFilter) {
-              // Apply date constraints
               sqlParams.start_date = effectiveDateFilter.startDate;
               sqlParams.end_date = effectiveDateFilter.endDate;
             }
             
             if (sqlQuery.function === 'get_top_emotions_with_entries') {
+              console.log(`[chat-with-rag] Calling get_top_emotions_with_entries with params:`, {
+                user_id_param: userId,
+                start_date: sqlParams.start_date,
+                end_date: sqlParams.end_date,
+                limit_count: sqlParams.limit_count || 5
+              });
+
               const { data, error } = await supabase.rpc(sqlQuery.function, {
                 user_id_param: userId,
                 start_date: sqlParams.start_date,
@@ -137,7 +186,10 @@ serve(async (req) => {
                 limit_count: sqlParams.limit_count || 5
               });
               
-              if (error) throw error;
+              if (error) {
+                console.error(`[chat-with-rag] SQL function error:`, error);
+                throw error;
+              }
               queryResult = data || [];
               
             } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
@@ -150,11 +202,14 @@ serve(async (req) => {
                 limit_count: sqlParams.limit_count || 5
               });
               
-              if (error) throw error;
+              if (error) {
+                console.error(`[chat-with-rag] SQL function error:`, error);
+                throw error;
+              }
               queryResult = data || [];
             }
             
-            console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${queryResult?.length || 0} results (date filtered: ${!!effectiveDateFilter})`);
+            console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${queryResult?.length || 0} results`);
             
             if (queryResult && queryResult.length > 0) {
               allResults.push(...queryResult.map(result => ({
@@ -162,8 +217,6 @@ serve(async (req) => {
                 source: 'sql_query',
                 query_function: sqlQuery.function
               })));
-            } else if (strictDateEnforcement) {
-              console.log(`[chat-with-rag] ENFORCING STRICT DATE CONSTRAINTS: No fallback applied due to date filter (results: ${queryResult?.length || 0})`);
             }
             
           } catch (error) {
@@ -175,6 +228,8 @@ serve(async (req) => {
       // Execute vector search if enabled
       if (vectorSearch.enabled) {
         try {
+          console.log(`[chat-with-rag] Executing vector search for: "${vectorSearch.query || subQuestion.question}"`);
+          
           // Generate embedding for the search query
           const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
             method: 'POST',
@@ -199,6 +254,7 @@ serve(async (req) => {
           let vectorResults = [];
           
           if (effectiveDateFilter) {
+            console.log(`[chat-with-rag] Vector search with date filter`);
             const { data, error } = await supabase.rpc('match_journal_entries_with_date', {
               query_embedding: embedding,
               match_threshold: vectorSearch.threshold || 0.1,
@@ -208,22 +264,29 @@ serve(async (req) => {
               end_date: effectiveDateFilter.endDate
             });
             
-            if (error) throw error;
+            if (error) {
+              console.error(`[chat-with-rag] Vector search with date error:`, error);
+              throw error;
+            }
             vectorResults = data || [];
             
           } else {
+            console.log(`[chat-with-rag] Vector search without date filter`);
             const { data, error } = await supabase.rpc('match_journal_entries_fixed', {
               query_embedding: embedding,
               match_threshold: vectorSearch.threshold || 0.1,
-              match_count: useAllEntries ? 50 : 10, // More results for personal queries
+              match_count: useAllEntries ? 50 : 10,
               user_id_filter: userId
             });
             
-            if (error) throw error;
+            if (error) {
+              console.error(`[chat-with-rag] Vector search error:`, error);
+              throw error;
+            }
             vectorResults = data || [];
           }
 
-          console.log(`[chat-with-rag] Vector search returned ${vectorResults.length} results (threshold: ${vectorSearch.threshold}, dateFilter: ${!!effectiveDateFilter})`);
+          console.log(`[chat-with-rag] Vector search returned ${vectorResults.length} results`);
 
           if (vectorResults.length > 0) {
             allResults.push(...vectorResults.map(result => ({
@@ -244,13 +307,11 @@ serve(async (req) => {
       new Map(allResults.map(item => [item.id, item])).values()
     ).slice(0, useAllEntries ? 100 : 15);
 
-    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${queryPlan.subQuestions?.length || 0} sub-questions (strict date enforcement: ${strictDateEnforcement}, no entries in range: ${!hasEntriesInDateRange})`);
-
-    console.log(`[chat-with-rag] Retrieved ${uniqueResults.length} total relevant entries (strict date enforcement: ${strictDateEnforcement})`);
+    console.log(`[chat-with-rag] Retrieved ${uniqueResults.length} unique results from ${queryPlan.subQuestions?.length || 0} sub-questions`);
 
     // Handle case where no entries found due to strict date enforcement
     if (strictDateEnforcement && !hasEntriesInDateRange) {
-      console.log(`[chat-with-rag] STRICT DATE ENFORCEMENT: No entries in specified date range - generating appropriate message`);
+      console.log(`[chat-with-rag] STRICT DATE ENFORCEMENT: No entries in specified date range`);
       
       const temporalContext = queryPlan.dateRange ? 
         ` from ${new Date(queryPlan.dateRange.startDate).toLocaleDateString()} to ${new Date(queryPlan.dateRange.endDate).toLocaleDateString()}` : 
@@ -268,6 +329,8 @@ serve(async (req) => {
     }
 
     if (uniqueResults.length === 0) {
+      console.log(`[chat-with-rag] No results found after processing all sub-questions`);
+      
       let fallbackResponse;
       
       if (useAllEntries && hasPersonalPronouns) {
@@ -341,6 +404,8 @@ Guidelines:
 
       const gptData = await gptResponse.json();
       const response = gptData.choices[0].message.content;
+
+      console.log(`[chat-with-rag] Successfully generated response with ${uniqueResults.length} entries`);
 
       return new Response(JSON.stringify({
         response,

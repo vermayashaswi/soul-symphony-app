@@ -476,7 +476,7 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string, hasPerso
           end_date: useAllEntries ? null : extractedDateRange?.endDate,
           limit_count: 5
         },
-        purpose: "Get top emotions with sample entries"
+        purpose: "Get top emotions with examples"
       });
     }
     
