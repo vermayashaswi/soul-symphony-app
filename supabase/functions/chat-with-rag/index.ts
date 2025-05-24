@@ -566,6 +566,12 @@ ${isEmotionQuery ? `**CRITICAL EMOTION ANALYSIS INSTRUCTIONS:**
 • For co-occurrence analysis, look at which emotions appear together in the same entries
 • NEVER say "your entries don't explicitly mention emotions" - the emotions are already calculated and scored` : ''}
 
+**RESPONSE LENGTH REQUIREMENTS:**
+• Keep responses UNDER 200 WORDS unless the analysis requires greater depth
+• For complex multi-question queries or detailed emotional patterns, longer responses are acceptable
+• Prioritize key insights and actionable advice within the word limit
+• Be concise while maintaining warmth and empathy
+
 Based on these journal entries and analyses, provide a helpful, warm, and insightful response to: "${message}"
 
 Journal Data and Analysis:
