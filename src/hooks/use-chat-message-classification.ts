@@ -1,7 +1,12 @@
 
 import { useState, useCallback } from 'react';
 import { supabase } from '@/integrations/supabase/client';
-import { enhancedQueryClassification, QueryCategory } from '@/utils/chat/messageClassifier';
+
+export enum QueryCategory {
+  JOURNAL_SPECIFIC = 'JOURNAL_SPECIFIC',
+  GENERAL_MENTAL_HEALTH = 'GENERAL_MENTAL_HEALTH', 
+  CONVERSATIONAL = 'CONVERSATIONAL'
+}
 
 interface MessageClassification {
   category: QueryCategory;
@@ -14,7 +19,7 @@ interface MessageClassification {
 
 export function useChatMessageClassification() {
   const [classification, setClassification] = useState<MessageClassification>({
-    category: QueryCategory.GENERAL_NO_RELATION,
+    category: QueryCategory.CONVERSATIONAL,
     confidence: 0,
     reasoning: '',
     shouldUseJournal: false,
@@ -23,12 +28,12 @@ export function useChatMessageClassification() {
   });
 
   /**
-   * Classify a message using enhanced 3-tier categorization system
+   * Classify a message using only GPT-based server-side classification
    */
-  const classifyMessage = useCallback(async (message: string) => {
+  const classifyMessage = useCallback(async (message: string, conversationContext: any[] = []) => {
     if (!message?.trim()) {
       return {
-        category: QueryCategory.GENERAL_NO_RELATION,
+        category: QueryCategory.CONVERSATIONAL,
         confidence: 0,
         reasoning: 'Empty message',
         shouldUseJournal: false
@@ -42,59 +47,36 @@ export function useChatMessageClassification() {
     }));
 
     try {
-      // First, do client-side classification using our enhanced utility
-      const localClassification = enhancedQueryClassification(message);
-      
-      // Then try to get server-side classification for better accuracy
-      try {
-        const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
-          body: { message }
-        });
+      // Use only server-side GPT classification
+      const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
+        body: { message, conversationContext }
+      });
 
-        if (error) throw error;
+      if (error) throw error;
+      
+      if (data) {
+        const result = {
+          category: data.category as QueryCategory,
+          confidence: data.confidence,
+          reasoning: data.reasoning,
+          shouldUseJournal: data.shouldUseJournal || data.category === 'JOURNAL_SPECIFIC'
+        };
         
-        if (data) {
-          // Use server classification with local as backup
-          const result = {
-            category: data.category as QueryCategory,
-            confidence: data.confidence,
-            reasoning: data.reasoning,
-            shouldUseJournal: data.shouldUseJournal || data.category === 'JOURNAL_SPECIFIC'
-          };
-          
-          setClassification({
-            ...result,
-            isLoading: false,
-            error: null
-          });
-          
-          return result;
-        }
-      } catch (serverError) {
-        console.warn('Failed to get server classification, using local only:', serverError);
+        setClassification({
+          ...result,
+          isLoading: false,
+          error: null
+        });
+        
+        return result;
       }
       
-      // Fall back to local classification
-      const localResult = {
-        category: localClassification.category,
-        confidence: localClassification.confidence,
-        reasoning: localClassification.reasoning,
-        shouldUseJournal: localClassification.category === QueryCategory.JOURNAL_SPECIFIC || 
-                         localClassification.forceJournalSpecific
-      };
-      
-      setClassification({
-        ...localResult,
-        isLoading: false,
-        error: null
-      });
-      
-      return localResult;
+      throw new Error('No data received from classification service');
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error classifying message';
       
       setClassification({
-        category: QueryCategory.GENERAL_NO_RELATION,
+        category: QueryCategory.CONVERSATIONAL,
         confidence: 0,
         reasoning: 'Error in classification',
         shouldUseJournal: false,
@@ -103,7 +85,7 @@ export function useChatMessageClassification() {
       });
       
       return {
-        category: QueryCategory.GENERAL_NO_RELATION,
+        category: QueryCategory.CONVERSATIONAL,
         confidence: 0,
         reasoning: 'Error in classification',
         shouldUseJournal: false
