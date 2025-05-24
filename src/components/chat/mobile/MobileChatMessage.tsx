@@ -1,3 +1,4 @@
+
 import React from "react";
 import { Separator } from "@/components/ui/separator";
 import { ChevronDown, ChevronUp, FileText } from "lucide-react";
@@ -162,12 +163,6 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       
       {displayRole === 'user' && (
         <Avatar className="w-8 h-8 border border-primary/20">
-          <AvatarImage 
-            src={user?.user_metadata?.avatar_url} 
-            alt="User"
-            className="bg-primary/20"
-            loading="eager"
-          />
           <AvatarFallback className="bg-primary/20 text-primary text-xs">
             {user?.user_metadata?.full_name ? 
               user.user_metadata.full_name.charAt(0) : 
