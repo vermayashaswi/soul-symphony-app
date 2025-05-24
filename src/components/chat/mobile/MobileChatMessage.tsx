@@ -1,12 +1,12 @@
 
 import React from "react";
 import { Separator } from "@/components/ui/separator";
-import { ChevronDown, ChevronUp, FileText } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Sun } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatShortDate } from "@/utils/format-time";
 import { TranslatableText } from "@/components/translation/TranslatableText";
@@ -62,14 +62,16 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
     >
       {displayRole === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">
-          <AvatarImage 
-            src="/lovable-uploads/143bc399-4908-44a9-a153-1db39dd22d39.png" 
-            alt="Ruh"
-            className="bg-primary/10 object-cover"
-            loading="eager"
-          />
-          <AvatarFallback className="bg-primary/10 text-primary text-xs">
-            <TranslatableText text="R" forceTranslate={true} />
+          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-400 to-red-500">
+            <Sun 
+              className="w-4 h-4 text-yellow-100 animate-pulse" 
+              style={{
+                filter: 'drop-shadow(0 0 3px rgba(255, 165, 0, 0.8))'
+              }}
+            />
+          </div>
+          <AvatarFallback className="bg-orange-500 text-yellow-100 text-xs">
+            <Sun className="w-3 h-3" />
           </AvatarFallback>
         </Avatar>
       )}

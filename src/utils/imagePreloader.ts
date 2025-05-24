@@ -1,5 +1,4 @@
 
-
 export const preloadImage = (src: string): Promise<void> => {
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -11,7 +10,7 @@ export const preloadImage = (src: string): Promise<void> => {
 
 export const preloadCriticalImages = async (): Promise<void> => {
   const criticalImages = [
-    '/lovable-uploads/143bc399-4908-44a9-a153-1db39dd22d39.png', // Eye avatar for Ruh
+    // No critical images to preload since we're using SVG icons for avatars
   ];
 
   try {
