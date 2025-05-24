@@ -1,7 +1,7 @@
 
 import React from "react";
 import { Separator } from "@/components/ui/separator";
-import { ChevronDown, ChevronUp, FileText, Sun } from "lucide-react";
+import { ChevronDown, ChevronUp, FileText, Bot } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
@@ -62,16 +62,13 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
     >
       {displayRole === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">
-          <div className="w-full h-full flex items-center justify-center bg-gradient-to-br from-orange-400 to-red-500">
-            <Sun 
-              className="w-4 h-4 text-yellow-100 animate-pulse" 
-              style={{
-                filter: 'drop-shadow(0 0 3px rgba(255, 165, 0, 0.8))'
-              }}
-            />
-          </div>
-          <AvatarFallback className="bg-orange-500 text-yellow-100 text-xs">
-            <Sun className="w-3 h-3" />
+          <AvatarImage 
+            src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=100&h=100&fit=crop&crop=face" 
+            alt="Buddha Avatar"
+            className="object-cover"
+          />
+          <AvatarFallback className="bg-gradient-to-br from-orange-400 to-amber-600 text-white">
+            <Bot className="w-4 h-4" />
           </AvatarFallback>
         </Avatar>
       )}

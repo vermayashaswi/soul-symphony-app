@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { Bot, User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -57,7 +57,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
         <Avatar className="h-8 w-8 mt-1">
-          <AvatarFallback className="bg-theme text-white">
+          <AvatarImage 
+            src="https://images.unsplash.com/photo-1578662996442-48f60103fc96?w=100&h=100&fit=crop&crop=face" 
+            alt="Buddha Avatar"
+            className="object-cover"
+          />
+          <AvatarFallback className="bg-gradient-to-br from-orange-400 to-amber-600 text-white">
             <Bot className="h-4 w-4" />
           </AvatarFallback>
         </Avatar>
