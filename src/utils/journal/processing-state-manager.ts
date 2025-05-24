@@ -51,6 +51,19 @@ export class ProcessingStateManager {
       if (errorMessage) {
         entry.errorMessage = errorMessage;
       }
+      
+      // If completed, schedule cleanup after a delay to ensure UI has time to process
+      if (state === EntryProcessingState.COMPLETED) {
+        setTimeout(() => {
+          this.removeEntry(tempId);
+          
+          // Dispatch content ready event to trigger UI cleanup
+          window.dispatchEvent(new CustomEvent('entryContentReady', {
+            detail: { tempId, timestamp: Date.now() }
+          }));
+        }, 1000); // 1 second delay
+      }
+      
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Updated state for ${tempId} to ${state}`);
     }
@@ -115,13 +128,17 @@ export class ProcessingStateManager {
     try {
       const storedEntries = localStorage.getItem('processingEntries');
       if (storedEntries) {
-        this.processingEntries = JSON.parse(storedEntries);
+        const parsed = JSON.parse(storedEntries);
+        // Clean up old entries (older than 30 seconds)
+        const now = Date.now();
+        this.processingEntries = parsed.filter((entry: ProcessingEntry) => 
+          now - entry.startTime < 30000
+        );
         this.notifySubscribers();
         console.log(`[ProcessingStateManager] Restored ${this.processingEntries.length} entries from localStorage`);
       }
     } catch (error) {
       console.error('[ProcessingStateManager] Error restoring from localStorage:', error);
-      // Show error toast
       showToast("Error", "Failed to restore processing state");
     }
   }
@@ -132,7 +149,6 @@ export class ProcessingStateManager {
       console.log(`[ProcessingStateManager] Saved ${this.processingEntries.length} entries to localStorage`);
     } catch (error) {
       console.error('[ProcessingStateManager] Error saving to localStorage:', error);
-      // Show error toast
       showToast("Error", "Failed to save processing state");
     }
   }
@@ -144,7 +160,6 @@ export class ProcessingStateManager {
   }
   
   public clearAll(): void {
-    // Add the missing clearAll method
     this.processingEntries = [];
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Cleared all processing entries');
@@ -160,6 +175,8 @@ export class ProcessingStateManager {
   
   private notifySubscribers(): void {
     this.entriesSubject.next([...this.processingEntries]);
+    // Save to localStorage whenever state changes
+    this.saveToLocalStorage();
   }
   
   public handleError(tempId: string, errorMessage: string): void {
@@ -169,7 +186,6 @@ export class ProcessingStateManager {
       entry.errorMessage = errorMessage;
       this.notifySubscribers();
       
-      // Use the showToast helper function instead of direct toast call
       showToast("Error", `Processing failed: ${errorMessage}`);
       
       console.log(`[ProcessingStateManager] Error for ${tempId}: ${errorMessage}`);

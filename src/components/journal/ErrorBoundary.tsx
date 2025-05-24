@@ -1,80 +1,100 @@
 
 import React, { Component, ErrorInfo, ReactNode } from 'react';
-import { AlertCircle, RefreshCw } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { AlertTriangle, RefreshCw } from 'lucide-react';
 
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
-  onReset?: () => void;
 }
 
 interface State {
   hasError: boolean;
-  error: Error | null;
+  error?: Error;
+  errorInfo?: ErrorInfo;
 }
 
-class ErrorBoundary extends Component<Props, State> {
+export class JournalErrorBoundary extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = { hasError: false, error: null };
+    this.state = { hasError: false };
   }
 
   static getDerivedStateFromError(error: Error): State {
-    console.error('ErrorBoundary caught an error in getDerivedStateFromError:', error);
+    // Update state so the next render will show the fallback UI
     return { hasError: true, error };
   }
 
-  componentDidCatch(error: Error, info: ErrorInfo) {
-    console.error('ErrorBoundary caught an error:', error);
-    console.error('Component stack:', info.componentStack);
+  componentDidCatch(error: Error, errorInfo: ErrorInfo) {
+    // Log the error for debugging
+    console.error('[JournalErrorBoundary] Caught error:', error, errorInfo);
+    
+    this.setState({
+      error,
+      errorInfo
+    });
+    
+    // Dispatch event to clean up any stuck processing cards
+    window.dispatchEvent(new CustomEvent('journalErrorOccurred', {
+      detail: { 
+        error: error.message, 
+        timestamp: Date.now(),
+        forceCleanup: true
+      }
+    }));
   }
-  
-  resetErrorState = () => {
-    console.log('Resetting error state');
-    if (this.props.onReset) {
-      this.props.onReset();
-    }
-    this.setState({ hasError: false, error: null });
+
+  handleRetry = () => {
+    // Reset the error boundary state
+    this.setState({ hasError: false, error: undefined, errorInfo: undefined });
+    
+    // Dispatch retry event
+    window.dispatchEvent(new CustomEvent('journalRetryRequested', {
+      detail: { timestamp: Date.now() }
+    }));
   };
 
   render() {
     if (this.state.hasError) {
-      // If a custom fallback is provided, use it
       if (this.props.fallback) {
         return this.props.fallback;
       }
-      
-      // Otherwise show default error UI
+
       return (
-        <div className="p-4 rounded-lg border border-red-200 bg-red-50 dark:bg-red-900/20 dark:border-red-800">
-          <div className="flex flex-col gap-3">
-            <div className="flex items-start gap-2">
-              <AlertCircle className="w-5 h-5 text-red-600 shrink-0 mt-0.5" />
-              <div>
-                <p className="font-medium text-red-800 dark:text-red-200">
-                  Something went wrong
-                </p>
-                <p className="text-sm text-red-700 dark:text-red-300 mt-1">
-                  {this.state.error?.message || 'An unexpected error occurred'}
-                </p>
-              </div>
-            </div>
+        <Card className="w-full max-w-md mx-auto mt-8">
+          <CardHeader className="text-center">
+            <AlertTriangle className="h-12 w-12 text-yellow-500 mx-auto mb-2" />
+            <CardTitle className="text-lg">Something went wrong</CardTitle>
+          </CardHeader>
+          <CardContent className="text-center space-y-4">
+            <p className="text-sm text-muted-foreground">
+              We encountered an error while processing your journal entry. This sometimes happens with the first entry.
+            </p>
+            
             <Button 
-              variant="outline" 
-              className="w-full sm:w-auto border-red-500 text-red-700 hover:bg-red-100 dark:text-red-300 dark:hover:bg-red-900/40"
-              onClick={this.resetErrorState}
+              onClick={this.handleRetry}
+              className="w-full"
+              variant="default"
             >
-              <RefreshCw className="w-4 h-4 mr-2" /> 
-              Retry
+              <RefreshCw className="h-4 w-4 mr-2" />
+              Try Again
             </Button>
-          </div>
-        </div>
+            
+            {process.env.NODE_ENV === 'development' && this.state.error && (
+              <details className="text-left">
+                <summary className="text-xs cursor-pointer">Error Details</summary>
+                <pre className="text-xs bg-muted p-2 rounded mt-2 overflow-auto">
+                  {this.state.error.toString()}
+                  {this.state.errorInfo?.componentStack}
+                </pre>
+              </details>
+            )}
+          </CardContent>
+        </Card>
       );
     }
 
     return this.props.children;
   }
 }
-
-export default ErrorBoundary;
