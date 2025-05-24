@@ -11,11 +11,11 @@ import {
 } from '@/services/dateService';
 
 /**
- * Enhanced query planning service with personal pronoun support and fixed date calculations
+ * Enhanced query planning service with prioritized personal pronoun support and fixed date calculations
  */
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
-    console.log("[Query Planner] Enhanced planning with personal pronoun detection for:", message);
+    console.log("[Query Planner] Enhanced planning with prioritized personal pronoun detection for:", message);
     console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
     
     // For debugging timezone issues
@@ -99,7 +99,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
     // Analyze the query types for intelligent sub-query planning
     const queryTypes = analyzeQueryTypes(message);
     
-    // ENHANCED: Check for personal pronouns for all-entries analysis
+    // ENHANCED: Check for personal pronouns for all-entries analysis - HIGHEST PRIORITY
     const personalPronounPatterns = [
       /\b(i|me|my|mine|myself)\b/i,
       /\bam i\b/i,
@@ -107,11 +107,18 @@ export async function planQuery(message: string, threadId: string, userId: strin
       /\bhow am i\b/i,
       /\bhow do i\b/i,
       /\bwhat makes me\b/i,
-      /\bhow was i\b/i
+      /\bhow was i\b/i,
+      /\bwhat do i\b/i,
+      /\bwhere do i\b/i,
+      /\bwhen do i\b/i,
+      /\bwhy do i\b/i,
+      /\bwhat about me\b/i,
+      /\bam i getting\b/i,
+      /\bwhat can i\b/i
     ];
     
     const hasPersonalPronouns = personalPronounPatterns.some(pattern => pattern.test(message.toLowerCase()));
-    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message.toLowerCase());
+    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(message.toLowerCase());
     
     // Enhanced detection for personality queries requiring all entries
     const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate|worst|best/.test(message.toLowerCase());
@@ -123,14 +130,14 @@ export async function planQuery(message: string, threadId: string, userId: strin
       originalQueryTypes: queryTypes
     });
     
-    // CRITICAL: Override time range logic for personal pronoun queries
+    // CRITICAL: Override time range logic for personal pronoun queries - HIGHEST PRIORITY
     let useAllEntries = false;
     let usePersonalContext = true;
     
     if (hasPersonalPronouns) {
       // If personal pronouns detected without explicit time reference, use all entries
       useAllEntries = !hasExplicitTimeReference;
-      console.log(`[Query Planner] Personal pronouns detected. Use all entries: ${useAllEntries} (explicit time ref: ${hasExplicitTimeReference})`);
+      console.log(`[Query Planner] PERSONAL PRONOUNS DETECTED - Use all entries: ${useAllEntries} (explicit time ref: ${hasExplicitTimeReference})`);
     } else if (isPersonalityQuery) {
       // Personality queries should also use all entries
       useAllEntries = true;
@@ -213,7 +220,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
       console.log("[Query Planner] Using intelligent sub-query strategy for causal analysis");
     }
     
-    // Return enhanced plan with personal pronoun support
+    // Return enhanced plan with prioritized personal pronoun support
     return {
       strategy,
       timeRange: queryTypes.timeRange,

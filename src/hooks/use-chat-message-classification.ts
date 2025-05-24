@@ -30,7 +30,7 @@ export function useChatMessageClassification() {
   });
 
   /**
-   * Enhanced message classification with personal pronoun support
+   * Enhanced message classification with prioritized personal pronoun support
    */
   const classifyMessage = useCallback(async (message: string, conversationContext: any[] = []) => {
     if (!message?.trim()) {
@@ -50,7 +50,7 @@ export function useChatMessageClassification() {
     }));
 
     try {
-      console.log("[Classification Hook] Classifying message with enhanced personal pronoun detection:", message);
+      console.log("[Classification Hook] Classifying message with enhanced personal pronoun prioritization:", message);
       
       // Use the enhanced chat-query-classifier edge function
       const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
@@ -85,15 +85,15 @@ export function useChatMessageClassification() {
       
       console.error("[Classification Hook] Classification error:", errorMessage);
       
-      // Enhanced fallback for personal pronoun detection
-      const personalPronounPattern = /\b(i|me|my|mine|myself|am i|do i|how am i|what makes me)\b/i;
+      // Enhanced fallback for personal pronoun detection with HIGHEST PRIORITY
+      const personalPronounPattern = /\b(i|me|my|mine|myself|am i|do i|how am i|what makes me|how do i|what about me)\b/i;
       const hasPersonalPronouns = personalPronounPattern.test(message.toLowerCase());
-      const hasTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message.toLowerCase());
+      const hasTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(message.toLowerCase());
       
       const fallbackResult = {
         category: hasPersonalPronouns ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.CONVERSATIONAL,
-        confidence: hasPersonalPronouns ? 0.8 : 0.3,
-        reasoning: hasPersonalPronouns ? 'Personal pronouns detected (fallback)' : 'Error in classification (fallback)',
+        confidence: hasPersonalPronouns ? 0.9 : 0.3,
+        reasoning: hasPersonalPronouns ? 'PERSONAL PRONOUNS DETECTED (fallback) - automatically classified as journal-specific' : 'Error in classification (fallback)',
         shouldUseJournal: hasPersonalPronouns,
         useAllEntries: hasPersonalPronouns && !hasTimeReference // Use all entries if personal pronouns but no time reference
       };

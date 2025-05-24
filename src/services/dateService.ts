@@ -16,7 +16,7 @@ import {
   startOfDay, 
   endOfDay,
   format as formatDate,
-  isValid,
+  isValid as isDateValid,
   getWeek,
   getYear
 } from "date-fns";
@@ -105,7 +105,7 @@ export function getZonedDate(
 ): Date {
   const dateObj = typeof date === 'string' ? new Date(date) : date;
   
-  if (!isValid(dateObj)) {
+  if (!isDateValid(dateObj)) {
     console.error(`[DateService] Invalid date provided: ${date}`);
     return new Date();
   }
@@ -321,7 +321,7 @@ export function validateDateRange(startDate: string, endDate: string): boolean {
   const start = new Date(startDate);
   const end = new Date(endDate);
   
-  const isValid = isValid(start) && isValid(end) && start <= end;
+  const isValid = isDateValid(start) && isDateValid(end) && start <= end;
   
   if (!isValid) {
     console.warn(`[DateService] Invalid date range: ${startDate} to ${endDate}`);

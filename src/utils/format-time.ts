@@ -1,121 +1,61 @@
 
-/**
- * Unified Date Formatting Utilities
- * 
- * This file provides date formatting functions and re-exports
- * functionality from our date service for backward compatibility.
- */
-
+import { formatDate } from 'date-fns';
 import { 
-  isDirectDateQuery, 
-  getClientTimeInfo, 
-  getLastWeekDateRange,
-  getCurrentWeekDateRange,
-  debugTimezoneInfo,
-  calculateDateRange,
-  formatInTimezone as formatInTimezoneService
+  validateDateRange,
+  getDateRangeForPeriod,
+  type DateRange
 } from '@/services/dateService';
 
-import { format, isValid } from 'date-fns';
-
-// Re-export the functions from our date service
-export {
-  isDirectDateQuery,
-  getClientTimeInfo,
-  getLastWeekDateRange,
-  getCurrentWeekDateRange,
-  debugTimezoneInfo,
-  calculateDateRange
-};
-
 /**
- * Format a date in a specific timezone
- * @param date - Date to format
- * @param formatStr - Format string
- * @param timezone - Target timezone
- * @returns Formatted date string
+ * Enhanced time formatting utilities
  */
-export function formatInTimezone(
-  date: Date | string,
-  formatStr: string = 'yyyy-MM-dd HH:mm:ss',
-  timezone: string = 'UTC'
-): string {
-  return formatInTimezoneService(date, formatStr, timezone);
+
+export function formatTimeAgo(date: Date | string): string {
+  const now = new Date();
+  const inputDate = typeof date === 'string' ? new Date(date) : date;
+  const diffInSeconds = Math.floor((now.getTime() - inputDate.getTime()) / 1000);
+
+  if (diffInSeconds < 60) return 'just now';
+  if (diffInSeconds < 3600) return `${Math.floor(diffInSeconds / 60)} minutes ago`;
+  if (diffInSeconds < 86400) return `${Math.floor(diffInSeconds / 3600)} hours ago`;
+  if (diffInSeconds < 604800) return `${Math.floor(diffInSeconds / 86400)} days ago`;
+  
+  return formatDate(inputDate, 'MMM d, yyyy');
 }
 
-/**
- * Format a time value in seconds to MM:SS format
- * @param seconds - Time in seconds to format
- * @returns Formatted time string
- */
-export function formatTime(seconds: number): string {
-  if (typeof seconds !== 'number') {
-    console.error('Invalid seconds value provided to formatTime:', seconds);
-    return '00:00';
-  }
-
-  try {
-    const minutes = Math.floor(seconds / 60);
-    const remainingSeconds = Math.floor(seconds % 60);
-    return `${minutes.toString().padStart(2, '0')}:${remainingSeconds.toString().padStart(2, '0')}`;
-  } catch (error) {
-    console.error('Error in formatTime:', error);
-    return '00:00';
-  }
+export function formatDuration(seconds: number): string {
+  if (seconds < 60) return `${Math.round(seconds)}s`;
+  if (seconds < 3600) return `${Math.floor(seconds / 60)}m ${Math.round(seconds % 60)}s`;
+  
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  return `${hours}h ${minutes}m`;
 }
 
-/**
- * Format a date to a short readable format (e.g., "May 15, 2025")
- * @param date - Date to format (can be Date object or string)
- * @returns Formatted date string
- */
-export function formatShortDate(date: Date | string): string {
-  if (!date) {
-    console.error('Null or undefined date provided to formatShortDate');
-    return 'Invalid Date';
-  }
+export function isValidTimeRange(startDate: string, endDate: string): boolean {
+  return validateDateRange(startDate, endDate);
+}
 
+export function getStandardDateRange(period: string, timezone: string = 'UTC'): DateRange | null {
   try {
-    // Convert to Date object if a string is provided
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    
-    // Check if date is valid before formatting
-    if (!isValid(dateObj)) {
-      console.error('Invalid date provided to formatShortDate:', date);
-      return 'Invalid Date';
+    switch (period) {
+      case 'today':
+        return getDateRangeForPeriod('today', timezone);
+      case 'yesterday':
+        return getDateRangeForPeriod('yesterday', timezone);
+      case 'thisWeek':
+        return getDateRangeForPeriod('thisWeek', timezone);
+      case 'lastWeek':
+        return getDateRangeForPeriod('lastWeek', timezone);
+      case 'thisMonth':
+        return getDateRangeForPeriod('thisMonth', timezone);
+      case 'lastMonth':
+        return getDateRangeForPeriod('lastMonth', timezone);
+      default:
+        return null;
     }
-    
-    return format(dateObj, 'MMM d, yyyy');
   } catch (error) {
-    console.error('Error formatting short date:', error, 'Input:', date);
-    return 'Invalid Date';
-  }
-}
-
-/**
- * Format time string for display in chat messages
- * @param date - Date to format (can be Date object or string)
- * @returns Formatted time string (e.g., "3:45 PM")
- */
-export function formatMessageTime(date: Date | string): string {
-  if (!date) {
-    console.error('Null or undefined date provided to formatMessageTime');
-    return 'Invalid Time';
-  }
-
-  try {
-    // Convert to Date object if a string is provided
-    const dateObj = typeof date === 'string' ? new Date(date) : date;
-    
-    // Check if date is valid before formatting
-    if (!isValid(dateObj)) {
-      console.error('Invalid date provided to formatMessageTime:', date);
-      return 'Invalid Time';
-    }
-    
-    return format(dateObj, 'h:mm a');
-  } catch (error) {
-    console.error('Error formatting message time:', error, 'Input:', date);
-    return 'Invalid Time';
+    console.error(`Error getting date range for ${period}:`, error);
+    return null;
   }
 }

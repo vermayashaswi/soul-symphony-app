@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * Enhanced GPT-powered message classifier with personal pronoun prioritization
+ * Enhanced GPT-powered message classifier with prioritized personal pronoun detection
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Query Classifier] Classifying message: "${message}"`);
+    console.log(`[Query Classifier] Classifying message with enhanced personal pronoun prioritization: "${message}"`);
 
     // Get OpenAI API key
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -68,7 +68,7 @@ serve(async (req) => {
 });
 
 /**
- * Enhanced GPT-powered classification with prioritized personal pronoun detection
+ * Enhanced GPT-powered classification with HIGHEST PRIORITY personal pronoun detection
  */
 async function gptClassifyMessage(
   message: string, 
@@ -88,35 +88,40 @@ async function gptClassifyMessage(
 
   const classificationPrompt = `You are an advanced query classifier for SOULo, a voice journaling app that helps users analyze their personal journal entries for emotional insights and patterns.
 
-Your task is to classify user messages into one of three categories, with CRITICAL PRIORITY given to personal pronouns:
+**CRITICAL CLASSIFICATION RULE - HIGHEST PRIORITY:**
+Personal pronouns ("I", "me", "my", "mine", "myself", "am I", "do I", "how am I", "what makes me", "how do I", etc.) AUTOMATICALLY trigger JOURNAL_SPECIFIC classification with confidence 0.95+, regardless of ANY other factors.
 
-**HIGHEST PRIORITY RULE - PERSONAL PRONOUNS:**
-If the message contains ANY personal pronouns ("I", "me", "my", "mine", "myself", "am I", "do I", "how am I", "what makes me", "how do I", etc.), it is AUTOMATICALLY JOURNAL_SPECIFIC with high confidence (0.9+), regardless of other factors.
+**IMPORTANT TIME RANGE OVERRIDE LOGIC:**
+- Personal pronoun questions WITHOUT explicit time references: useAllEntries = true (analyze ALL journal entries)
+- Personal pronoun questions WITH explicit time references ("last week", "yesterday"): useAllEntries = false (respect time constraint)
+- Examples:
+  * "How am I doing?" → JOURNAL_SPECIFIC, useAllEntries: true
+  * "How was I last week?" → JOURNAL_SPECIFIC, useAllEntries: false
 
-**JOURNAL_SPECIFIC**: Questions that require analysis of the user's personal journal entries
-- CRITICAL INDICATORS: Personal pronouns (I, me, my, mine, myself, am I, do I, how am I, etc.)
-- Examples: "How am I doing?", "What makes me happy?", "Am I improving?", "How was I last week?", "Do I like people?", "My emotions", "How do I feel?", "What are my patterns?"
-- For personal pronoun questions WITHOUT explicit time references, set useAllEntries: true
-- For personal pronoun questions WITH explicit time references ("last week", "yesterday"), respect the time constraint
+**CLASSIFICATION CATEGORIES:**
 
-**GENERAL_MENTAL_HEALTH**: General mental health information requests without personal context
-- Examples: "What is anxiety?", "How to meditate?", "What are signs of depression?", "Best practices for mental health"
-- Key indicators: General educational questions, no personal pronouns, requesting general information
+**JOURNAL_SPECIFIC**: Questions requiring analysis of user's personal journal entries
+- AUTOMATIC TRIGGERS: Personal pronouns (I, me, my, mine, myself, am I, do I, how am I, etc.)
+- Additional indicators: Personal mental health patterns, emotional states, personality analysis
+- Examples: "How am I doing?", "What makes me happy?", "Am I improving?", "My emotions", "How do I feel?"
 
-**CONVERSATIONAL**: Greetings, thanks, clarifications, or general chat
+**GENERAL_MENTAL_HEALTH**: General mental health information without personal context
+- Examples: "What is anxiety?", "How to meditate?", "Signs of depression", "Mental health tips"
+- No personal pronouns, requesting general educational information
+
+**CONVERSATIONAL**: Greetings, thanks, clarifications, general chat
 - Examples: "Hello", "Thank you", "How are you?", "Who are you?", "Can you help me?"
 
-CLASSIFICATION LOGIC:
-1. FIRST: Check for personal pronouns - if found, classify as JOURNAL_SPECIFIC with high confidence
+**CLASSIFICATION PRIORITY ORDER:**
+1. FIRST: Check for personal pronouns → If found, classify as JOURNAL_SPECIFIC with high confidence
 2. SECOND: If no personal pronouns, check for general mental health topics
 3. THIRD: If neither, classify as CONVERSATIONAL
 
-IMPORTANT RULES:
-- Personal pronouns ALWAYS override other classification criteria
-- "How am I doing?" = JOURNAL_SPECIFIC, useAllEntries: true (no time constraint)
-- "How was I last week?" = JOURNAL_SPECIFIC, useAllEntries: false (time constraint respected)
-- When personal pronouns are detected, mention this explicitly in reasoning
+**CRITICAL INSTRUCTIONS:**
+- Personal pronouns OVERRIDE all other classification criteria
+- Always mention personal pronoun detection in reasoning when applicable
 - Ignore typos and focus on intent: "wat makes me sad" = JOURNAL_SPECIFIC
+- "How am I" patterns are ALWAYS journal-specific with useAllEntries: true unless time is specified
 
 User message: "${message}"${contextString}
 
@@ -176,7 +181,7 @@ Respond with ONLY a JSON object in this exact format:
       confidence: Math.max(0, Math.min(1, result.confidence || 0.8)),
       shouldUseJournal: result.category === 'JOURNAL_SPECIFIC',
       useAllEntries: result.useAllEntries || false,
-      reasoning: result.reasoning || 'GPT classification with personal pronoun prioritization'
+      reasoning: result.reasoning || 'GPT classification with enhanced personal pronoun prioritization'
     };
 
   } catch (error) {
@@ -186,7 +191,7 @@ Respond with ONLY a JSON object in this exact format:
 }
 
 /**
- * Enhanced rule-based classification with personal pronoun prioritization
+ * Enhanced rule-based classification with PRIORITIZED personal pronoun detection
  */
 function enhancedRuleBased_classifyMessage(message: string): {
   category: string;
@@ -209,20 +214,23 @@ function enhancedRuleBased_classifyMessage(message: string): {
     /\bwhat do i\b/i,
     /\bwhere do i\b/i,
     /\bwhen do i\b/i,
-    /\bwhy do i\b/i
+    /\bwhy do i\b/i,
+    /\bwhat about me\b/i,
+    /\bam i getting\b/i,
+    /\bwhat can i\b/i
   ];
   
   for (const pattern of personalPronounPatterns) {
     if (pattern.test(lowerMessage)) {
       // Check if there's an explicit temporal reference
-      const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(lowerMessage);
+      const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(lowerMessage);
       
       return {
         category: "JOURNAL_SPECIFIC",
         confidence: 0.95,
         shouldUseJournal: true,
         useAllEntries: !hasTemporalReference, // Use all entries unless there's a specific time reference
-        reasoning: `Contains personal pronouns - automatically classified as journal-specific. ${hasTemporalReference ? 'Time constraint detected.' : 'No time constraint - will analyze all entries.'}`
+        reasoning: `PERSONAL PRONOUNS DETECTED - automatically classified as journal-specific. ${hasTemporalReference ? 'Time constraint detected - will respect date range.' : 'No time constraint - will analyze ALL entries.'}`
       };
     }
   }
