@@ -77,11 +77,14 @@ serve(async (req) => {
       conversationContext = [],
       useAllEntries = false,
       hasPersonalPronouns = false,
-      hasExplicitTimeReference = false
+      hasExplicitTimeReference = false,
+      threadMetadata = {}
     } = await req.json();
 
     console.log(`[chat-with-rag] PROCESSING: "${message}"`);
-    console.log(`[chat-with-rag] Flags - UseAllEntries: ${useAllEntries}, PersonalPronouns: ${hasPersonalPronouns}, TimeRef: ${hasExplicitTimeReference}`);
+    console.log(`[chat-with-rag] Enhanced Context - UseAllEntries: ${useAllEntries}, PersonalPronouns: ${hasPersonalPronouns}, TimeRef: ${hasExplicitTimeReference}`);
+    console.log(`[chat-with-rag] Conversation Context: ${conversationContext.length} messages`);
+    console.log(`[chat-with-rag] Thread Metadata:`, threadMetadata);
     console.log(`[chat-with-rag] Validated userId: ${validatedUserId} (type: ${typeof validatedUserId})`);
     console.log(`[chat-with-rag] Request userId: ${userId} (type: ${typeof userId})`);
 
@@ -144,27 +147,39 @@ serve(async (req) => {
       });
     }
 
-    // Process sub-questions with parallel processing optimization
-    console.log(`[chat-with-rag] Processing ${queryPlan.subQuestions?.length || 0} sub-questions with parallel optimization`);
+    // Enhanced follow-up detection based on conversation context
+    const isAnalysisFollowUp = detectAnalysisFollowUpFromContext(message, conversationContext);
+    const shouldUseAllEntries = useAllEntries || isAnalysisFollowUp || queryPlan.useAllEntries;
     
-    const strictDateEnforcement = !useAllEntries && hasExplicitTimeReference;
+    console.log(`[chat-with-rag] Analysis Follow-up Detection:`, {
+      isAnalysisFollowUp,
+      shouldUseAllEntries,
+      originalUseAllEntries: useAllEntries,
+      queryPlanUseAllEntries: queryPlan.useAllEntries
+    });
+
+    // Process sub-questions with parallel processing optimization
+    console.log(`[chat-with-rag] Processing ${queryPlan.subQuestions?.length || 0} sub-questions with enhanced context awareness`);
+    
+    const strictDateEnforcement = !shouldUseAllEntries && hasExplicitTimeReference;
     console.log(`[chat-with-rag] Strict date enforcement: ${strictDateEnforcement}`);
 
     const parallelTimer = PerformanceOptimizer.startTimer('parallel_processing');
     
-    // Prepare processing context
+    // Prepare processing context with enhanced parameters
     const processingContext: ProcessingContext = {
       validatedUserId,
       openaiApiKey,
       supabaseService
     };
 
-    // Process sub-questions in parallel (no caching)
+    // Process sub-questions in parallel with enhanced context
     const subQuestionAnalyses = await processSubQuestionsInParallel(
       queryPlan.subQuestions || [],
       processingContext,
       queryPlan.dateRange,
-      strictDateEnforcement
+      strictDateEnforcement,
+      shouldUseAllEntries // Pass the enhanced scope flag
     );
     
     PerformanceOptimizer.endTimer(parallelTimer, 'parallel_processing');
@@ -205,8 +220,10 @@ serve(async (req) => {
       
       let fallbackResponse;
       
-      if (useAllEntries && hasPersonalPronouns) {
+      if (shouldUseAllEntries && hasPersonalPronouns) {
         fallbackResponse = "I'd love to help analyze your personal patterns, but I'm having trouble finding relevant entries right now. This might be because your journal entries don't contain the specific topics we're looking for, or there might be a technical issue. Could you try rephrasing your question or asking about something more specific?";
+      } else if (isAnalysisFollowUp) {
+        fallbackResponse = "I understand you'd like me to expand the analysis to all your entries. However, I'm having trouble finding relevant content for this specific query across your journal history. Could you try rephrasing your question or being more specific about what you'd like me to analyze?";
       } else {
         fallbackResponse = "I couldn't find any journal entries that match your query. This could be because you haven't journaled about this topic yet, or the entries don't contain similar content. Would you like to try asking about something else or rephrase your question?";
       }
@@ -215,8 +232,9 @@ serve(async (req) => {
         response: fallbackResponse,
         hasData: false,
         entryCount: userEntryCount,
-        useAllEntries,
-        hasPersonalPronouns
+        useAllEntries: shouldUseAllEntries,
+        hasPersonalPronouns,
+        isAnalysisFollowUp
       }), {
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
@@ -225,12 +243,29 @@ serve(async (req) => {
     // Check if this is an emotion-focused query
     const isEmotionQuery = queryPlan.isEmotionQuery || message.toLowerCase().includes('emotion');
     
-    // Prepare comprehensive context for GPT with individual sub-question analyses
+    // Prepare comprehensive context for GPT with enhanced conversation awareness
     let journalContext = '';
+    
+    // Add conversation context summary if this is a follow-up
+    if (conversationContext.length > 0 && isAnalysisFollowUp) {
+      journalContext += "**CONVERSATION CONTEXT:**\n";
+      journalContext += "This is a follow-up question to previous analysis. ";
+      
+      // Find the original analytical question
+      const originalQuestion = conversationContext
+        .filter(msg => msg.role === 'user')
+        .find(msg => /\b(when|what time|pattern|trend|analysis|most|least|often|frequency)\b/i.test(msg.content));
+      
+      if (originalQuestion) {
+        journalContext += `Original question: "${originalQuestion.content}"\n`;
+        journalContext += `Current request: "${message}"\n`;
+        journalContext += `Scope: User wants analysis expanded to ALL entries, not just recent ones.\n\n`;
+      }
+    }
     
     if (subQuestionAnalyses.length > 1) {
       // Multi-question query - structure by sub-question
-      journalContext = "**MULTI-QUESTION ANALYSIS**\n\n";
+      journalContext += "**MULTI-QUESTION ANALYSIS**\n\n";
       journalContext += "The user asked a multi-part question. Below is the individual analysis for each part:\n\n";
       
       subQuestionAnalyses.forEach((analysis, index) => {
@@ -256,13 +291,19 @@ serve(async (req) => {
     } else {
       // Single question - use the analysis directly
       const analysis = subQuestionAnalyses[0];
-      journalContext = analysis.context;
+      journalContext += analysis.context;
     }
 
-    // Enhanced system prompt for multi-question processing with performance optimization
+    // Enhanced system prompt for enhanced context processing
     const systemPrompt = `You are SOULo, a compassionate AI assistant that helps users understand their journal entries and emotional patterns.
 
-Context: The user has ${userEntryCount} total journal entries. ${useAllEntries ? 'You are analyzing ALL their entries for comprehensive personal insights.' : `You are analyzing ${totalResults} relevant results across ${subQuestionAnalyses.length} sub-question(s).`}
+Context: The user has ${userEntryCount} total journal entries. ${shouldUseAllEntries ? 'You are analyzing ALL their entries for comprehensive personal insights.' : `You are analyzing ${totalResults} relevant results across ${subQuestionAnalyses.length} sub-question(s).`}
+
+${conversationContext.length > 0 ? `**CONVERSATION AWARENESS:**
+This query is part of an ongoing conversation with ${conversationContext.length} previous messages. Pay attention to the conversation context and maintain continuity with previous discussions.` : ''}
+
+${isAnalysisFollowUp ? `**FOLLOW-UP ANALYSIS:**
+This is a follow-up request to expand or broaden a previous analysis. The user wants you to consider ALL their journal entries, not just recent ones. Provide comprehensive insights across their entire journaling history.` : ''}
 
 ${hasPersonalPronouns ? 'IMPORTANT: This is a personal question about the user themselves. Provide personalized insights and speak directly to them about their patterns, growth, and experiences.' : ''}
 
@@ -305,16 +346,18 @@ FORMATTING REQUIREMENTS - YOU MUST FOLLOW THESE:
 - Make the response visually scannable and well-organized
 - Use markdown formatting consistently throughout
 ${subQuestionAnalyses.length > 1 ? '- Start by addressing each sub-question individually, then provide synthesis' : ''}
+${isAnalysisFollowUp ? '- Acknowledge that this is an expanded analysis of all entries' : ''}
 
 Guidelines:
 - Be warm, empathetic, and supportive
 - Provide specific insights based on the actual data provided
 - ${hasPersonalPronouns ? 'Use "you" and "your" to make it personal since they asked about themselves' : 'Keep the tone conversational but not overly personal'}
 - If patterns emerge, point them out constructively using bullet points
-- ${useAllEntries ? 'Since you have access to their full journal history, provide comprehensive insights about long-term patterns' : 'Focus on the specific entries provided'}
+- ${shouldUseAllEntries ? 'Since you have access to their full journal history, provide comprehensive insights about long-term patterns' : 'Focus on the specific entries provided'}
 - End with an encouraging note or helpful suggestion
 - Structure everything with proper markdown headers and bullet points for easy reading
-${subQuestionAnalyses.length > 1 ? '- Ensure each sub-question gets adequate attention before moving to synthesis' : ''}`;
+${subQuestionAnalyses.length > 1 ? '- Ensure each sub-question gets adequate attention before moving to synthesis' : ''}
+${isAnalysisFollowUp ? '- Make it clear that this analysis covers their complete journal history' : ''}`;
 
     try {
       const gptTimer = PerformanceOptimizer.startTimer('gpt_response');
@@ -350,7 +393,7 @@ ${subQuestionAnalyses.length > 1 ? '- Ensure each sub-question gets adequate att
       const gptData = await gptResponse.json();
       const response = gptData.choices[0].message.content;
 
-      // Response data without caching
+      // Response data with enhanced context information
       const responseData = {
         response,
         hasData: true,
@@ -365,21 +408,23 @@ ${subQuestionAnalyses.length > 1 ? '- Ensure each sub-question gets adequate att
           vectorResults: analysis.vectorResults.length,
           hasData: analysis.totalResults > 0
         })),
-        useAllEntries,
+        useAllEntries: shouldUseAllEntries,
         hasPersonalPronouns,
         strictDateEnforcement,
         analyzedTimeRange: queryPlan.dateRange,
         processingFlags: {
-          useAllEntries,
+          useAllEntries: shouldUseAllEntries,
           hasPersonalPronouns,
           hasExplicitTimeReference,
           strictDateEnforcement,
-          isMultiQuestion: subQuestionAnalyses.length > 1
+          isMultiQuestion: subQuestionAnalyses.length > 1,
+          isAnalysisFollowUp,
+          conversationContextLength: conversationContext.length
         }
       };
 
       const globalDuration = PerformanceOptimizer.endTimer(globalTimer, 'complete_request');
-      console.log(`[chat-with-rag] Successfully generated response with ${subQuestionAnalyses.length} sub-question analyses, ${totalEmotionResults} emotion results and ${totalVectorResults} vector results in ${globalDuration}ms`);
+      console.log(`[chat-with-rag] Successfully generated response with enhanced context: ${subQuestionAnalyses.length} sub-question analyses, ${totalEmotionResults} emotion results and ${totalVectorResults} vector results in ${globalDuration}ms`);
 
       // Log performance stats periodically (no cache stats)
       if (Math.random() < 0.1) { // 10% chance
@@ -414,3 +459,35 @@ ${subQuestionAnalyses.length > 1 ? '- Ensure each sub-question gets adequate att
     });
   }
 });
+
+/**
+ * Enhanced function to detect analysis follow-up from conversation context
+ */
+function detectAnalysisFollowUpFromContext(message: string, conversationContext: any[]): boolean {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // Patterns that indicate wanting to expand previous analysis
+  const analysisFollowUpPatterns = [
+    /^now (analyze|look at|check|examine) (all|my|the)/i,
+    /^(analyze|look at|check|examine) all (my|the|entries)/i,
+    /what about (all|my|the) (entries|data|journal)/i,
+    /^all (my|the) (entries|data|journal)/i,
+    /^expand (the|this) (analysis|search)/i,
+    /^broaden (the|this) (analysis|search)/i
+  ];
+  
+  const isFollowUpPattern = analysisFollowUpPatterns.some(pattern => pattern.test(lowerMessage));
+  
+  if (!isFollowUpPattern) return false;
+  
+  // Check if there's a previous analytical question in the conversation
+  const hasAnalyticalContext = conversationContext.some(msg => {
+    if (msg.role !== 'user') return false;
+    const content = msg.content.toLowerCase();
+    return /\b(when|what time|pattern|trend|analysis|most|least|often|frequency)\b/.test(content);
+  });
+  
+  console.log(`[detectAnalysisFollowUpFromContext] Pattern match: ${isFollowUpPattern}, Has context: ${hasAnalyticalContext}, Context length: ${conversationContext.length}`);
+  
+  return hasAnalyticalContext;
+}

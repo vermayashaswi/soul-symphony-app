@@ -89,16 +89,16 @@ export async function sendMessage(
       userTimezone = clientTimeInfo.timezoneName;
     }
     
-    // Get previous messages from this thread for context (limit to 5 for performance)
+    // Get previous messages from this thread for context (increased to 10 for complete context)
     const { data: previousMessages, error: contextError } = await withPerformanceMonitoring(
       'fetch-conversation-context',
       async () => {
         return await supabase
           .from('chat_messages')
-          .select('content, sender, created_at')
+          .select('content, sender, role, created_at')
           .eq('thread_id', threadId)
           .order('created_at', { ascending: false })
-          .limit(5);
+          .limit(10); // Increased from 5 to 10 for complete thread context
       }
     );
     
@@ -106,15 +106,28 @@ export async function sendMessage(
       console.error('Error fetching conversation context:', contextError);
     }
     
-    // Build conversation context for the query planner
+    // Build enhanced conversation context for the query planner
     const conversationContext = [];
     if (previousMessages && previousMessages.length > 0) {
+      console.log(`[sendMessage] Building conversation context from ${previousMessages.length} previous messages`);
+      
+      // Reverse to get chronological order and include ALL messages (both user and assistant)
       for (const msg of [...previousMessages].reverse()) {
         conversationContext.push({
           role: msg.sender === 'user' ? 'user' : 'assistant',
           content: msg.content,
+          timestamp: msg.created_at
         });
       }
+      
+      // Log conversation context for debugging
+      console.log(`[sendMessage] Conversation context summary:`, {
+        totalMessages: conversationContext.length,
+        userMessages: conversationContext.filter(m => m.role === 'user').length,
+        assistantMessages: conversationContext.filter(m => m.role === 'assistant').length,
+        firstMessage: conversationContext[0]?.content.substring(0, 50) + '...',
+        lastMessage: conversationContext[conversationContext.length - 1]?.content.substring(0, 50) + '...'
+      });
     }
     
     // Get user context from the thread
@@ -130,9 +143,17 @@ export async function sendMessage(
       metadataObj = metadata;
     }
     
-    // Check if this appears to be a follow-up query with a time reference
-    const isTimeFollowUp = detectTimeFollowUp(message);
-    const preserveTopicContext = isTimeFollowUp && metadataObj.topicContext;
+    // Enhanced follow-up detection with full conversation context
+    const isTimeFollowUp = detectTimeFollowUp(message, conversationContext);
+    const isAnalysisFollowUp = detectAnalysisFollowUp(message, conversationContext);
+    const preserveTopicContext = (isTimeFollowUp || isAnalysisFollowUp) && metadataObj.topicContext;
+    
+    console.log(`[sendMessage] Follow-up detection:`, {
+      isTimeFollowUp,
+      isAnalysisFollowUp,
+      preserveTopicContext,
+      originalTopic: metadataObj.topicContext
+    });
     
     // Check if the message appears to be mental health related
     const isMentalHealthQuery = detectMentalHealthQuery(message);
@@ -150,19 +171,23 @@ export async function sendMessage(
     });
     
     // Step 1: Get intelligent query plan with enhanced monitoring and reduced timeout
-    console.log(`[sendMessage] Calling smart-query-planner`);
+    console.log(`[sendMessage] Calling smart-query-planner with complete conversation context`);
     
     const queryPlannerParams = {
       message,
       userId: userIdString,
-      conversationContext,
+      conversationContext, // Now includes up to 10 messages with full context
       isFollowUp: conversationContext.length > 0,
       timezoneOffset: clientTimeInfo.timezoneOffset,
       timezoneName: clientTimeInfo.timezoneName,
       clientTime: clientTimeInfo.timestamp,
       referenceDate,
       preserveTopicContext,
-      timeRange
+      timeRange,
+      // Enhanced context parameters
+      threadMetadata: metadataObj,
+      isAnalysisFollowUp,
+      originalQueryScope: metadataObj.lastQueryScope || null
     };
     
     // Enhanced query planner call with reduced timeout and better error handling
@@ -182,12 +207,12 @@ export async function sendMessage(
           return await Promise.race([queryPlannerPromise, timeoutPromise]);
         },
         'query-planning',
-        { message, userId: userIdString, strategy: 'enhanced' }
+        { message, userId: userIdString, strategy: 'enhanced', hasContext: conversationContext.length > 0 }
       );
     } catch (error) {
       console.error('Query planner timeout or error:', error);
       
-      // Use improved fallback plan with better parameters
+      // Improved fallback plan with context awareness
       queryPlanResponse = {
         data: {
           queryPlan: {
@@ -204,7 +229,7 @@ export async function sendMessage(
                   dateFilter: null
                 },
                 sqlQueries: [],
-                fallbackStrategy: "recent_entries"
+                fallbackStrategy: isAnalysisFollowUp ? "comprehensive_analysis" : "recent_entries"
               }
             }],
             searchParameters: {
@@ -212,14 +237,17 @@ export async function sendMessage(
               useEmotionSQL: false,
               useThemeSQL: false,
               dateRange: null,
-              fallbackStrategy: "recent_entries",
+              fallbackStrategy: isAnalysisFollowUp ? "comprehensive_analysis" : "recent_entries",
               sqlQueries: [],
               executeSQLQueries: false
             },
             filters: { date_range: null, emotions: null, themes: null },
-            domainContext: "general_insights",
+            domainContext: metadataObj.topicContext || "general_insights",
             confidence: 0.5,
-            reasoning: "Fallback due to planner timeout"
+            reasoning: "Fallback due to planner timeout",
+            // Preserve context flags
+            useAllEntries: isAnalysisFollowUp,
+            hasPersonalPronouns: /\b(my|me|i|myself)\b/i.test(message)
           }
         }
       };
@@ -243,6 +271,7 @@ export async function sendMessage(
         confidenceScore: 1.0,
         needsClarity: false,
         lastQueryType: 'direct_response',
+        lastQueryScope: null,
         lastUpdated: new Date().toISOString()
       });
       
@@ -261,7 +290,7 @@ export async function sendMessage(
     
     // Extract the enhanced query plan
     const queryPlan = queryPlanResponse.data?.queryPlan || {};
-    console.log(`[sendMessage] Enhanced query plan received`);
+    console.log(`[sendMessage] Enhanced query plan received with context awareness`);
     
     // Update processing message based on query plan
     let processingContent = "Processing your request...";
@@ -270,8 +299,10 @@ export async function sendMessage(
       processingContent = "Analyzing personality patterns...";
     } else if (queryPlan.isEmotionQuery) {
       processingContent = "Analyzing emotional patterns...";
-    } else if (queryPlan.needsComprehensiveAnalysis) {
-      processingContent = "Performing comprehensive analysis...";
+    } else if (queryPlan.needsComprehensiveAnalysis || queryPlan.useAllEntries) {
+      processingContent = "Performing comprehensive analysis of all entries...";
+    } else if (isAnalysisFollowUp) {
+      processingContent = "Expanding analysis based on conversation context...";
     }
     
     await supabase.from('chat_messages')
@@ -289,14 +320,14 @@ export async function sendMessage(
       dateRange = {
         startDate: null,
         endDate: null,
-        periodName: 'all time'
+        periodName: queryPlan.useAllEntries || isAnalysisFollowUp ? 'all time' : 'recent entries'
       };
     }
     
     console.log(`[sendMessage] Using date range:`, dateRange);
     
     // Step 2: Execute intelligent search and response generation with enhanced monitoring and reduced timeout
-    console.log(`[sendMessage] Calling chat-with-rag with auth token`);
+    console.log(`[sendMessage] Calling chat-with-rag with auth token and full context`);
     
     let queryResponse;
     try {
@@ -310,11 +341,16 @@ export async function sendMessage(
               threadId,
               timeRange: dateRange,
               referenceDate,
-              conversationContext,
+              conversationContext, // Full 10-message context
               queryPlan,
               isMentalHealthQuery,
               clientTimeInfo: clientTimeInfo,
-              userTimezone: userTimezone
+              userTimezone: userTimezone,
+              // Enhanced context parameters
+              threadMetadata: metadataObj,
+              useAllEntries: queryPlan.useAllEntries || isAnalysisFollowUp,
+              hasPersonalPronouns: queryPlan.hasPersonalPronouns || /\b(my|me|i|myself)\b/i.test(message),
+              hasExplicitTimeReference: queryPlan.hasExplicitTimeReference || false
             },
             headers: {
               'Authorization': `Bearer ${session.access_token}`
@@ -328,7 +364,7 @@ export async function sendMessage(
           return await Promise.race([chatRagPromise, timeoutPromise]);
         },
         'response-generation',
-        { message, userId: userIdString, strategy: queryPlan.strategy }
+        { message, userId: userIdString, strategy: queryPlan.strategy, hasContext: true }
       );
     } catch (error) {
       console.error('Chat-with-rag timeout or error:', error);
@@ -340,6 +376,8 @@ export async function sendMessage(
         fallbackResponse = "I'm having trouble analyzing your emotional patterns right now due to high demand. Please try again in a moment.";
       } else if (queryPlan.isPersonalityQuery) {
         fallbackResponse = "I'm temporarily unable to analyze personality patterns due to high system load. Please try again shortly.";
+      } else if (isAnalysisFollowUp) {
+        fallbackResponse = "I'm having trouble expanding the analysis based on our conversation context. Please try again in a moment.";
       }
       
       await supabase.from('chat_messages')
@@ -423,7 +461,7 @@ export async function sendMessage(
       })
       .eq('id', processingMessageId);
     
-    // Update thread metadata with enhanced information
+    // Update thread metadata with enhanced information including query scope
     const updatedMetadata = {
       intentType: 'answered',
       timeContext: dateRange?.periodName || metadataObj.timeContext,
@@ -431,9 +469,11 @@ export async function sendMessage(
       confidenceScore: queryPlan.confidence || 0.8,
       needsClarity: false,
       lastQueryType: queryPlan.queryType || 'journal_specific',
+      lastQueryScope: queryPlan.useAllEntries || isAnalysisFollowUp ? 'all_entries' : 'recent_entries',
       domainContext: queryPlan.domainContext || null,
       searchStrategy: queryPlan.strategy || 'hybrid',
-      lastUpdated: new Date().toISOString()
+      lastUpdated: new Date().toISOString(),
+      conversationLength: conversationContext.length + 1 // Track conversation depth
     };
     
     await updateThreadMetadata(threadId, updatedMetadata);
@@ -487,9 +527,9 @@ function detectMentalHealthQuery(message: string): boolean {
 }
 
 /**
- * Detect if a message is a time-based follow-up
+ * Enhanced time-based follow-up detection with conversation context
  */
-function detectTimeFollowUp(message: string): boolean {
+function detectTimeFollowUp(message: string, conversationContext: any[]): boolean {
   const lowerMessage = message.toLowerCase().trim();
   
   const timePatterns = [
@@ -498,6 +538,38 @@ function detectTimeFollowUp(message: string): boolean {
   ];
   
   return timePatterns.some(pattern => pattern.test(lowerMessage));
+}
+
+/**
+ * New: Detect analysis follow-up questions with conversation context
+ */
+function detectAnalysisFollowUp(message: string, conversationContext: any[]): boolean {
+  const lowerMessage = message.toLowerCase().trim();
+  
+  // Patterns that indicate wanting to expand previous analysis
+  const analysisFollowUpPatterns = [
+    /^now (analyze|look at|check|examine) (all|my|the)/i,
+    /^(analyze|look at|check|examine) all (my|the|entries)/i,
+    /what about (all|my|the) (entries|data|journal)/i,
+    /^all (my|the) (entries|data|journal)/i,
+    /^expand (the|this) (analysis|search)/i,
+    /^broaden (the|this) (analysis|search)/i
+  ];
+  
+  const isFollowUpPattern = analysisFollowUpPatterns.some(pattern => pattern.test(lowerMessage));
+  
+  if (!isFollowUpPattern) return false;
+  
+  // Check if there's a previous analytical question in the conversation
+  const hasAnalyticalContext = conversationContext.some(msg => {
+    if (msg.role !== 'user') return false;
+    const content = msg.content.toLowerCase();
+    return /\b(when|what time|pattern|trend|analysis|most|least|often|frequency)\b/.test(content);
+  });
+  
+  console.log(`[detectAnalysisFollowUp] Pattern match: ${isFollowUpPattern}, Has context: ${hasAnalyticalContext}`);
+  
+  return hasAnalyticalContext;
 }
 
 /**

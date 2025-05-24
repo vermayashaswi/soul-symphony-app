@@ -20,9 +20,10 @@ export async function processSubQuestionsInParallel(
   subQuestions: any[],
   context: ProcessingContext,
   effectiveDateFilter: any,
-  strictDateEnforcement: boolean
+  strictDateEnforcement: boolean,
+  useAllEntries: boolean = false
 ): Promise<SubQuestionResult[]> {
-  console.log(`[parallel-processor] Processing ${subQuestions.length} sub-questions in parallel`);
+  console.log(`[parallel-processor] Processing ${subQuestions.length} sub-questions in parallel with enhanced scope (useAllEntries: ${useAllEntries})`);
   
   // Process all sub-questions simultaneously using Promise.all
   const startTime = Date.now();
@@ -35,7 +36,8 @@ export async function processSubQuestionsInParallel(
         subQuestion,
         context,
         effectiveDateFilter,
-        strictDateEnforcement
+        strictDateEnforcement,
+        useAllEntries
       );
       
       const subDuration = Date.now() - subStartTime;
@@ -68,11 +70,12 @@ async function processIndividualSubQuestion(
   subQuestion: any,
   context: ProcessingContext,
   effectiveDateFilter: any,
-  strictDateEnforcement: boolean
+  strictDateEnforcement: boolean,
+  useAllEntries: boolean = false
 ): Promise<SubQuestionResult> {
   const { validatedUserId, openaiApiKey, supabaseService } = context;
   
-  console.log(`[parallel-processor] Processing sub-question: "${subQuestion.question}"`);
+  console.log(`[parallel-processor] Processing sub-question: "${subQuestion.question}" (useAllEntries: ${useAllEntries})`);
   
   const searchPlan = subQuestion.searchPlan || {};
   const vectorSearch = searchPlan.vectorSearch || {};
@@ -83,17 +86,25 @@ async function processIndividualSubQuestion(
   const subQuestionVectorResults = [];
   let hasEntriesInDateRange = true;
 
-  // Check if we have entries in the date range for temporal queries
-  if (effectiveDateFilter && strictDateEnforcement) {
-    console.log(`[parallel-processor] Checking entries in date range for sub-question: ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
+  // Override date filter if useAllEntries is true (for follow-up queries)
+  let actualDateFilter = effectiveDateFilter;
+  if (useAllEntries) {
+    console.log(`[parallel-processor] Using ALL entries - ignoring date filter for comprehensive analysis`);
+    actualDateFilter = null;
+    strictDateEnforcement = false;
+  }
+
+  // Check if we have entries in the date range for temporal queries (only if not using all entries)
+  if (actualDateFilter && strictDateEnforcement && !useAllEntries) {
+    console.log(`[parallel-processor] Checking entries in date range for sub-question: ${actualDateFilter.startDate} to ${actualDateFilter.endDate}`);
     
     try {
       const { count: entriesInRange, error } = await supabaseService
         .from('Journal Entries')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', validatedUserId)
-        .gte('created_at', effectiveDateFilter.startDate)
-        .lte('created_at', effectiveDateFilter.endDate);
+        .gte('created_at', actualDateFilter.startDate)
+        .lte('created_at', actualDateFilter.endDate);
 
       if (error) {
         console.error(`[parallel-processor] Error checking date range:`, error);
@@ -127,9 +138,10 @@ async function processIndividualSubQuestion(
     operationPromises.push(
       processSQLQueries(sqlQueries, {
         validatedUserId,
-        effectiveDateFilter,
+        effectiveDateFilter: actualDateFilter,
         supabaseService,
-        subQuestion
+        subQuestion,
+        useAllEntries
       })
     );
   }
@@ -139,10 +151,11 @@ async function processIndividualSubQuestion(
     operationPromises.push(
       processVectorSearch(vectorSearch, {
         validatedUserId,
-        effectiveDateFilter,
+        effectiveDateFilter: actualDateFilter,
         openaiApiKey,
         supabaseService,
-        subQuestion
+        subQuestion,
+        useAllEntries
       })
     );
   }
@@ -206,6 +219,12 @@ async function processIndividualSubQuestion(
     
     if (allSubQuestionResults.length > 0) {
       subQuestionContext = `**CONTEXT for "${subQuestion.question}":**\n\n`;
+      
+      // Add scope indicator
+      if (useAllEntries) {
+        subQuestionContext += `**SCOPE: Comprehensive analysis across ALL journal entries**\n\n`;
+      }
+      
       subQuestionContext += allSubQuestionResults.map(entry => {
         const content = entry.content || entry.sample_entries?.[0]?.content || 'No content available';
         const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString() : 'Unknown date';
@@ -222,24 +241,29 @@ async function processIndividualSubQuestion(
     vectorResults: subQuestionVectorResults,
     hasEntriesInDateRange,
     context: subQuestionContext,
-    reasoning: subQuestion.reasoning || 'Analysis completed',
+    reasoning: subQuestion.reasoning || (useAllEntries ? 'Comprehensive analysis across all entries completed' : 'Analysis completed'),
     totalResults: subQuestionEmotionResults.length + subQuestionVectorResults.length
   };
 }
 
 async function processSQLQueries(sqlQueries: any[], context: any) {
-  const { validatedUserId, effectiveDateFilter, supabaseService, subQuestion } = context;
+  const { validatedUserId, effectiveDateFilter, supabaseService, subQuestion, useAllEntries } = context;
   const emotionResults = [];
   const vectorResults = [];
   
-  console.log(`[parallel-processor] Executing ${sqlQueries.length} SQL queries for sub-question`);
+  console.log(`[parallel-processor] Executing ${sqlQueries.length} SQL queries for sub-question (useAllEntries: ${useAllEntries})`);
   
   // Process SQL queries in parallel
   const sqlPromises = sqlQueries.map(async (sqlQuery) => {
     try {
       let sqlParams = { ...sqlQuery.parameters };
       
-      if (effectiveDateFilter) {
+      // Override date parameters if using all entries
+      if (useAllEntries) {
+        console.log(`[parallel-processor] Using ALL entries - setting date range to null for SQL query`);
+        sqlParams.start_date = null;
+        sqlParams.end_date = null;
+      } else if (effectiveDateFilter) {
         sqlParams.start_date = effectiveDateFilter.startDate;
         sqlParams.end_date = effectiveDateFilter.endDate;
       }
@@ -249,7 +273,8 @@ async function processSQLQueries(sqlQueries: any[], context: any) {
           user_id_param: validatedUserId,
           start_date: sqlParams.start_date,
           end_date: sqlParams.end_date,
-          limit_count: sqlParams.limit_count || 5
+          limit_count: sqlParams.limit_count || 5,
+          useAllEntries
         });
 
         const { data, error } = await supabaseService.rpc(sqlQuery.function, {
@@ -273,7 +298,8 @@ async function processSQLQueries(sqlQueries: any[], context: any) {
           query_function: sqlQuery.function,
           unique_key: `emotion_${result.emotion}_${index}_${subQuestion.question}`,
           sub_question: subQuestion.question,
-          type: 'emotion'
+          type: 'emotion',
+          scope: useAllEntries ? 'all_entries' : 'date_filtered'
         }));
         
       } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
@@ -301,7 +327,8 @@ async function processSQLQueries(sqlQueries: any[], context: any) {
           source: 'sql_query',
           query_function: sqlQuery.function,
           sub_question: subQuestion.question,
-          type: 'vector'
+          type: 'vector',
+          scope: useAllEntries ? 'all_entries' : 'date_filtered'
         }));
       }
       
@@ -333,10 +360,10 @@ async function processSQLQueries(sqlQueries: any[], context: any) {
 }
 
 async function processVectorSearch(vectorSearch: any, context: any) {
-  const { validatedUserId, effectiveDateFilter, openaiApiKey, supabaseService, subQuestion } = context;
+  const { validatedUserId, effectiveDateFilter, openaiApiKey, supabaseService, subQuestion, useAllEntries } = context;
   
   try {
-    console.log(`[parallel-processor] Executing vector search for sub-question: "${vectorSearch.query || subQuestion.question}"`);
+    console.log(`[parallel-processor] Executing vector search for sub-question: "${vectorSearch.query || subQuestion.question}" (useAllEntries: ${useAllEntries})`);
     
     // Generate embedding for the search query (no caching)
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
@@ -361,7 +388,23 @@ async function processVectorSearch(vectorSearch: any, context: any) {
     // Perform vector search with service client
     let vectorSearchResults = [];
     
-    if (effectiveDateFilter) {
+    // Use different search strategy based on scope
+    if (useAllEntries) {
+      console.log(`[parallel-processor] Vector search across ALL entries (no date filter) for sub-question`);
+      const { data, error } = await supabaseService.rpc('match_journal_entries_fixed', {
+        query_embedding: embedding,
+        match_threshold: vectorSearch.threshold || 0.1,
+        match_count: 20, // Increase match count for comprehensive analysis
+        user_id_filter: validatedUserId
+      });
+      
+      if (error) {
+        console.error(`[parallel-processor] Vector search error for sub-question:`, error);
+        throw error;
+      }
+      vectorSearchResults = data || [];
+      
+    } else if (effectiveDateFilter) {
       console.log(`[parallel-processor] Vector search with date filter for sub-question`);
       const { data, error } = await supabaseService.rpc('match_journal_entries_with_date', {
         query_embedding: embedding,
@@ -400,7 +443,8 @@ async function processVectorSearch(vectorSearch: any, context: any) {
       ...result,
       source: 'vector_search',
       similarity: result.similarity,
-      sub_question: subQuestion.question
+      sub_question: subQuestion.question,
+      scope: useAllEntries ? 'all_entries' : 'date_filtered'
     }));
 
     return {
