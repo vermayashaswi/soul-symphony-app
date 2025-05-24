@@ -170,20 +170,16 @@ export async function sendMessage(
     try {
       queryPlanResponse = await monitorChatOperation(
         async () => {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 6000); // Reduced from 8s to 6s
+          // Create a promise race with timeout
+          const queryPlannerPromise = supabase.functions.invoke('smart-query-planner', {
+            body: queryPlannerParams
+          });
           
-          try {
-            const response = await supabase.functions.invoke('smart-query-planner', {
-              body: queryPlannerParams,
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            return response;
-          } catch (error) {
-            clearTimeout(timeoutId);
-            throw error;
-          }
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Query planner timeout')), 6000);
+          });
+          
+          return await Promise.race([queryPlannerPromise, timeoutPromise]);
         },
         'query-planning',
         { message, userId: userIdString, strategy: 'enhanced' }
@@ -306,34 +302,30 @@ export async function sendMessage(
     try {
       queryResponse = await monitorChatOperation(
         async () => {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 12000); // Reduced from 15s to 12s
+          // Create a promise race with timeout
+          const chatRagPromise = supabase.functions.invoke('chat-with-rag', {
+            body: {
+              message,
+              userId: userIdString,
+              threadId,
+              timeRange: dateRange,
+              referenceDate,
+              conversationContext,
+              queryPlan,
+              isMentalHealthQuery,
+              clientTimeInfo: clientTimeInfo,
+              userTimezone: userTimezone
+            },
+            headers: {
+              'Authorization': `Bearer ${session.access_token}`
+            }
+          });
           
-          try {
-            const response = await supabase.functions.invoke('chat-with-rag', {
-              body: {
-                message,
-                userId: userIdString,
-                threadId,
-                timeRange: dateRange,
-                referenceDate,
-                conversationContext,
-                queryPlan,
-                isMentalHealthQuery,
-                clientTimeInfo: clientTimeInfo,
-                userTimezone: userTimezone
-              },
-              headers: {
-                'Authorization': `Bearer ${session.access_token}`
-              },
-              signal: controller.signal
-            });
-            clearTimeout(timeoutId);
-            return response;
-          } catch (error) {
-            clearTimeout(timeoutId);
-            throw error;
-          }
+          const timeoutPromise = new Promise((_, reject) => {
+            setTimeout(() => reject(new Error('Chat-with-rag timeout')), 12000);
+          });
+          
+          return await Promise.race([chatRagPromise, timeoutPromise]);
         },
         'response-generation',
         { message, userId: userIdString, strategy: queryPlan.strategy }
