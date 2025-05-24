@@ -12,7 +12,7 @@ import {
   LoadingEntryContent
 } from './entry-card';
 import { EditEntryButton } from './entry-card/EditEntryButton';
-import ErrorBoundary from './ErrorBoundary';
+import { JournalErrorBoundary } from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -454,7 +454,7 @@ export function JournalEntryCard({
     console.log(`[JournalEntryCard] Rendering processing card for ${safeEntry.tempId || 'unknown'}`);
     
     return (
-      <ErrorBoundary>
+      <JournalErrorBoundary>
         <motion.div
           initial={{ opacity: 0 }}
           animate={{ opacity: 1 }}
@@ -480,7 +480,7 @@ export function JournalEntryCard({
             </div>
           </Card>
         </motion.div>
-      </ErrorBoundary>
+      </JournalErrorBoundary>
     );
   }
 
@@ -508,7 +508,7 @@ export function JournalEntryCard({
   };
 
   return (
-    <ErrorBoundary>
+    <JournalErrorBoundary>
       <motion.div
         initial={isNew ? { borderColor: 'rgba(var(--color-primary), 0.7)' } : {}}
         animate={highlightNew 
@@ -554,7 +554,7 @@ export function JournalEntryCard({
           </div>
 
           <div className="p-3 md:p-4">
-            <ErrorBoundary>
+            <JournalErrorBoundary>
               <EntryContent 
                 content={safeEntry.content} 
                 isExpanded={isExpanded} 
@@ -562,11 +562,11 @@ export function JournalEntryCard({
                 entryId={safeEntry.id}
                 onOverflowChange={handleContentOverflow}
               />
-            </ErrorBoundary>
+            </JournalErrorBoundary>
             
             {showThemes && (
               <div className="mt-2">
-                <ErrorBoundary>
+                <JournalErrorBoundary>
                   <ThemeLoader 
                     entryId={safeEntry.id}
                     initialThemes={initialThemes}
@@ -574,13 +574,13 @@ export function JournalEntryCard({
                     isProcessing={isThemesProcessing}
                     isNew={isNew}
                   />
-                </ErrorBoundary>
+                </JournalErrorBoundary>
               </div>
             )}
           </div>
         </Card>
       </motion.div>
-    </ErrorBoundary>
+    </JournalErrorBoundary>
   );
 }
 

@@ -10,7 +10,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Loader2, RefreshCw, AlertCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { clearAllToasts } from '@/services/notificationService';
-import ErrorBoundary from '@/components/journal/ErrorBoundary';
+import { JournalErrorBoundary } from '@/components/journal/ErrorBoundary';
 import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
@@ -927,7 +927,7 @@ const Journal = () => {
   }
 
   return (
-    <ErrorBoundary onReset={resetError}>
+    <JournalErrorBoundary onReset={resetError}>
       <div className="max-w-3xl mx-auto px-4 pt-4 pb-24">
         <JournalHeader />
         
@@ -1044,7 +1044,7 @@ const Journal = () => {
               </TabsContent>
               
               <TabsContent value="entries" className="mt-0" ref={entriesListRef}>
-                <ErrorBoundary>
+                <JournalErrorBoundary>
                   <JournalSearch
                     entries={displayEntries}
                     onSelectEntry={() => {}}
@@ -1058,13 +1058,13 @@ const Journal = () => {
                     onStartRecording={handleStartRecording}
                     onDeleteEntry={handleDeleteEntry}
                   />
-                </ErrorBoundary>
+                </JournalErrorBoundary>
               </TabsContent>
             </Tabs>
           </>
         )}
       </div>
-    </ErrorBoundary>
+    </JournalErrorBoundary>
   );
 };
 
