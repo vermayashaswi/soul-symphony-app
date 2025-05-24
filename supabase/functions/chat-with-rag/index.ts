@@ -101,7 +101,7 @@ serve(async (req) => {
     
     let userEntryCount = 0;
     try {
-      // Use service client with explicit user_id filter - UUID comparison
+      // Use service client with explicit user_id filter - UUID passed directly
       const { count, error: countError } = await supabaseService
         .from('Journal Entries')
         .select('*', { count: 'exact', head: true })
@@ -278,7 +278,7 @@ serve(async (req) => {
 
               const { data, error } = await supabaseService.rpc(sqlQuery.function, {
                 emotion_name: sqlParams.emotion_name,
-                user_id_filter: validatedUserId, // UUID passed directly
+                user_id_filter: validatedUserId, // UUID passed directly (FIXED!)
                 min_score: sqlParams.min_score || 0.3,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
