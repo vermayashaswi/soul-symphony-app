@@ -1,3 +1,4 @@
+
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -207,7 +208,7 @@ export async function sendMessage(
           return await Promise.race([queryPlannerPromise, timeoutPromise]);
         },
         'query-planning',
-        { message, userId: userIdString, strategy: 'enhanced', hasContext: conversationContext.length > 0 }
+        { message, userId: userIdString, strategy: 'enhanced' }
       );
     } catch (error) {
       console.error('Query planner timeout or error:', error);
@@ -364,7 +365,7 @@ export async function sendMessage(
           return await Promise.race([chatRagPromise, timeoutPromise]);
         },
         'response-generation',
-        { message, userId: userIdString, strategy: queryPlan.strategy, hasContext: true }
+        { message, userId: userIdString, strategy: queryPlan.strategy }
       );
     } catch (error) {
       console.error('Chat-with-rag timeout or error:', error);
