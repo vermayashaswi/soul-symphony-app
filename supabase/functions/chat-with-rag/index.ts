@@ -2,7 +2,6 @@
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { processSubQuestionsInParallel, ProcessingContext } from "./utils/parallelProcessor.ts";
-import { CacheManager } from "./utils/cacheManager.ts";
 import { PerformanceOptimizer } from "./utils/performanceOptimizer.ts";
 
 const corsHeaders = {
@@ -103,17 +102,6 @@ serve(async (req) => {
       });
     }
 
-    // Check cache for similar queries
-    const querySignature = CacheManager.generateQuerySignature(message, hasPersonalPronouns, hasExplicitTimeReference);
-    const cachedResponse = CacheManager.getCachedQueryPlan(querySignature);
-    
-    if (cachedResponse && !hasExplicitTimeReference) {
-      console.log(`[chat-with-rag] Using cached response for similar query`);
-      return new Response(JSON.stringify(cachedResponse), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
-      });
-    }
-
     // Check user's journal entry count using service client with performance optimization
     console.log(`[chat-with-rag] Checking journal entries for user: ${validatedUserId}`);
     
@@ -171,32 +159,13 @@ serve(async (req) => {
       supabaseService
     };
 
-    // Check emotion data cache
-    const dateKey = CacheManager.generateDateKey(
-      queryPlan.dateRange?.startDate,
-      queryPlan.dateRange?.endDate
+    // Process sub-questions in parallel (no caching)
+    const subQuestionAnalyses = await processSubQuestionsInParallel(
+      queryPlan.subQuestions || [],
+      processingContext,
+      queryPlan.dateRange,
+      strictDateEnforcement
     );
-    
-    let subQuestionAnalyses;
-    const cachedEmotionData = CacheManager.getCachedEmotionData(validatedUserId, dateKey);
-    
-    if (cachedEmotionData && queryPlan.isEmotionQuery) {
-      console.log(`[chat-with-rag] Using cached emotion data for user`);
-      subQuestionAnalyses = cachedEmotionData;
-    } else {
-      // Process sub-questions in parallel
-      subQuestionAnalyses = await processSubQuestionsInParallel(
-        queryPlan.subQuestions || [],
-        processingContext,
-        queryPlan.dateRange,
-        strictDateEnforcement
-      );
-      
-      // Cache emotion data if it's an emotion query
-      if (queryPlan.isEmotionQuery && subQuestionAnalyses.length > 0) {
-        CacheManager.setCachedEmotionData(validatedUserId, dateKey, subQuestionAnalyses);
-      }
-    }
     
     PerformanceOptimizer.endTimer(parallelTimer, 'parallel_processing');
 
@@ -381,7 +350,7 @@ ${subQuestionAnalyses.length > 1 ? '- Ensure each sub-question gets adequate att
       const gptData = await gptResponse.json();
       const response = gptData.choices[0].message.content;
 
-      // Cache successful responses
+      // Response data without caching
       const responseData = {
         response,
         hasData: true,
@@ -409,18 +378,12 @@ ${subQuestionAnalyses.length > 1 ? '- Ensure each sub-question gets adequate att
         }
       };
 
-      // Cache the response if it's not time-sensitive
-      if (!hasExplicitTimeReference) {
-        CacheManager.setCachedQueryPlan(querySignature, responseData);
-      }
-
       const globalDuration = PerformanceOptimizer.endTimer(globalTimer, 'complete_request');
       console.log(`[chat-with-rag] Successfully generated response with ${subQuestionAnalyses.length} sub-question analyses, ${totalEmotionResults} emotion results and ${totalVectorResults} vector results in ${globalDuration}ms`);
 
-      // Log performance stats periodically
+      // Log performance stats periodically (no cache stats)
       if (Math.random() < 0.1) { // 10% chance
         console.log('[chat-with-rag] Performance Report:', PerformanceOptimizer.getPerformanceReport());
-        console.log('[chat-with-rag] Cache Stats:', CacheManager.getCacheStats());
       }
 
       // Clean up large objects to help with memory

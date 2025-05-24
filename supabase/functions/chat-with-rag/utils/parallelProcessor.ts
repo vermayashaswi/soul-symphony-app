@@ -338,7 +338,7 @@ async function processVectorSearch(vectorSearch: any, context: any) {
   try {
     console.log(`[parallel-processor] Executing vector search for sub-question: "${vectorSearch.query || subQuestion.question}"`);
     
-    // Generate embedding for the search query
+    // Generate embedding for the search query (no caching)
     const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
       method: 'POST',
       headers: {
