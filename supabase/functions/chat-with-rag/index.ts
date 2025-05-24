@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -164,7 +163,9 @@ serve(async (req) => {
     // Execute sub-questions with enhanced time override logic
     console.log(`[chat-with-rag] Executing ${queryPlan.subQuestions?.length || 0} sub-questions`);
     
-    const allResults = [];
+    // Separate containers for different types of results
+    const emotionResults = [];
+    const vectorResults = [];
     const strictDateEnforcement = !useAllEntries && hasExplicitTimeReference;
     let hasEntriesInDateRange = true;
 
@@ -265,6 +266,19 @@ serve(async (req) => {
               queryResult = data || [];
               console.log(`[chat-with-rag] SQL function ${sqlQuery.function} returned ${queryResult.length} results`);
               
+              // Store emotion results separately with unique keys
+              if (queryResult && queryResult.length > 0) {
+                queryResult.forEach((result, index) => {
+                  emotionResults.push({
+                    ...result,
+                    source: 'emotion_analysis',
+                    query_function: sqlQuery.function,
+                    unique_key: `emotion_${result.emotion}_${index}` // Unique key for emotions
+                  });
+                });
+                console.log(`[chat-with-rag] Added ${queryResult.length} emotion results from SQL query ${sqlQuery.function}`);
+              }
+              
             } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
               console.log(`[chat-with-rag] Calling match_journal_entries_by_emotion with params:`, {
                 emotion_name: sqlParams.emotion_name,
@@ -297,15 +311,16 @@ serve(async (req) => {
               }
               queryResult = data || [];
               console.log(`[chat-with-rag] SQL function ${sqlQuery.function} returned ${queryResult.length} results`);
-            }
-            
-            if (queryResult && queryResult.length > 0) {
-              allResults.push(...queryResult.map(result => ({
-                ...result,
-                source: 'sql_query',
-                query_function: sqlQuery.function
-              })));
-              console.log(`[chat-with-rag] Added ${queryResult.length} results from SQL query ${sqlQuery.function}`);
+              
+              // Store as vector results since these are specific entries
+              if (queryResult && queryResult.length > 0) {
+                vectorResults.push(...queryResult.map(result => ({
+                  ...result,
+                  source: 'sql_query',
+                  query_function: sqlQuery.function
+                })));
+                console.log(`[chat-with-rag] Added ${queryResult.length} results from SQL query ${sqlQuery.function}`);
+              }
             }
             
           } catch (error) {
@@ -346,7 +361,7 @@ serve(async (req) => {
           const embedding = embeddingData.data[0].embedding;
 
           // Perform vector search with service client
-          let vectorResults = [];
+          let vectorSearchResults = [];
           
           if (effectiveDateFilter) {
             console.log(`[chat-with-rag] Vector search with date filter for user: ${validatedUserId}`);
@@ -363,7 +378,7 @@ serve(async (req) => {
               console.error(`[chat-with-rag] Vector search with date error:`, error);
               throw error;
             }
-            vectorResults = data || [];
+            vectorSearchResults = data || [];
             
           } else {
             console.log(`[chat-with-rag] Vector search without date filter for user: ${validatedUserId}`);
@@ -378,13 +393,13 @@ serve(async (req) => {
               console.error(`[chat-with-rag] Vector search error:`, error);
               throw error;
             }
-            vectorResults = data || [];
+            vectorSearchResults = data || [];
           }
 
-          console.log(`[chat-with-rag] Vector search returned ${vectorResults.length} results`);
+          console.log(`[chat-with-rag] Vector search returned ${vectorSearchResults.length} results`);
 
-          if (vectorResults.length > 0) {
-            allResults.push(...vectorResults.map(result => ({
+          if (vectorSearchResults.length > 0) {
+            vectorResults.push(...vectorSearchResults.map(result => ({
               ...result,
               source: 'vector_search',
               similarity: result.similarity
@@ -397,12 +412,15 @@ serve(async (req) => {
       }
     }
 
-    // Remove duplicates and limit results
-    const uniqueResults = Array.from(
-      new Map(allResults.map(item => [item.id, item])).values()
+    // Combine results with proper deduplication for vector results only
+    const uniqueVectorResults = Array.from(
+      new Map(vectorResults.map(item => [item.id, item])).values()
     ).slice(0, useAllEntries ? 100 : 15);
 
-    console.log(`[chat-with-rag] Retrieved ${uniqueResults.length} unique results from ${queryPlan.subQuestions?.length || 0} sub-questions`);
+    // Keep ALL emotion results since they're unique by emotion name
+    const allResults = [...emotionResults, ...uniqueVectorResults];
+
+    console.log(`[chat-with-rag] Retrieved ${emotionResults.length} emotion results and ${uniqueVectorResults.length} vector results`);
 
     // Handle case where no entries found due to strict date enforcement
     if (strictDateEnforcement && !hasEntriesInDateRange) {
@@ -423,7 +441,7 @@ serve(async (req) => {
       });
     }
 
-    if (uniqueResults.length === 0) {
+    if (allResults.length === 0) {
       console.log(`[chat-with-rag] No results found after processing all sub-questions`);
       
       let fallbackResponse;
@@ -451,10 +469,8 @@ serve(async (req) => {
     // Prepare context for GPT with enhanced emotion handling
     let journalContext = '';
     
-    if (isEmotionQuery && uniqueResults.some(r => r.source === 'sql_query' && r.query_function === 'get_top_emotions_with_entries')) {
+    if (isEmotionQuery && emotionResults.length > 0) {
       // **ENHANCED EMOTION DATA FORMATTING**
-      const emotionResults = uniqueResults.filter(r => r.source === 'sql_query' && r.query_function === 'get_top_emotions_with_entries');
-      
       journalContext = "**PRE-CALCULATED EMOTION ANALYSIS (Database Scores):**\n\n";
       journalContext += "Note: These are pre-computed emotion scores (0.0-1.0 scale) from AI analysis of journal content.\n\n";
       
@@ -479,11 +495,10 @@ serve(async (req) => {
       });
       
       // Add supporting vector search results as supplementary context
-      const vectorResults = uniqueResults.filter(r => r.source === 'vector_search');
-      if (vectorResults.length > 0) {
+      if (uniqueVectorResults.length > 0) {
         journalContext += "\n**SUPPORTING CONTEXT (Additional Journal Entries):**\n";
         journalContext += "Note: These entries provide additional context but emotion analysis should focus on the scores above.\n\n";
-        vectorResults.slice(0, 3).forEach((entry, index) => {
+        uniqueVectorResults.slice(0, 3).forEach((entry, index) => {
           const date = new Date(entry.created_at).toLocaleDateString();
           const preview = entry.content.substring(0, 150) + (entry.content.length > 150 ? '...' : '');
           journalContext += `${index + 1}. ${date}: ${preview}\n`;
@@ -491,7 +506,7 @@ serve(async (req) => {
       }
     } else {
       // Standard formatting for non-emotion queries
-      journalContext = uniqueResults.map(entry => {
+      journalContext = allResults.map(entry => {
         const content = entry.content || entry.sample_entries?.[0]?.content || 'No content available';
         const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString() : 'Unknown date';
         const emotions = entry.emotions ? Object.keys(entry.emotions).slice(0, 3).join(', ') : 'No emotions detected';
@@ -502,7 +517,7 @@ serve(async (req) => {
 
     const systemPrompt = `You are SOULo, a compassionate AI assistant that helps users understand their journal entries and emotional patterns.
 
-Context: The user has ${userEntryCount} total journal entries. ${useAllEntries ? 'You are analyzing ALL their entries for comprehensive personal insights.' : `You are analyzing ${uniqueResults.length} relevant entries.`}
+Context: The user has ${userEntryCount} total journal entries. ${useAllEntries ? 'You are analyzing ALL their entries for comprehensive personal insights.' : `You are analyzing ${allResults.length} relevant entries.`}
 
 ${hasPersonalPronouns ? 'IMPORTANT: This is a personal question about the user themselves. Provide personalized insights and speak directly to them about their patterns, growth, and experiences.' : ''}
 
@@ -516,6 +531,7 @@ ${isEmotionQuery ? `**CRITICAL EMOTION ANALYSIS INSTRUCTIONS:**
 • The emotion scores represent the intensity/strength of each emotion detected
 • Analyze relationships between emotions based on their numerical values
 • When you see "Score: 0.842" this means that emotion was detected with 84.2% intensity
+• For co-occurrence analysis, look at which emotions appear together in the same entries
 • NEVER say "your entries don't explicitly mention emotions" - the emotions are already calculated and scored` : ''}
 
 Based on these journal entries, provide a helpful, warm, and insightful response to: "${message}"
@@ -565,12 +581,14 @@ Guidelines:
       const gptData = await gptResponse.json();
       const response = gptData.choices[0].message.content;
 
-      console.log(`[chat-with-rag] Successfully generated response with ${uniqueResults.length} entries`);
+      console.log(`[chat-with-rag] Successfully generated response with ${emotionResults.length} emotion results and ${uniqueVectorResults.length} vector results`);
 
       return new Response(JSON.stringify({
         response,
         hasData: true,
-        entryCount: uniqueResults.length,
+        entryCount: allResults.length,
+        emotionResultsCount: emotionResults.length,
+        vectorResultsCount: uniqueVectorResults.length,
         totalUserEntries: userEntryCount,
         useAllEntries,
         hasPersonalPronouns,
@@ -590,8 +608,8 @@ Guidelines:
       console.error('[chat-with-rag] Error calling OpenAI:', error);
       return new Response(JSON.stringify({
         error: 'Failed to generate response',
-        hasData: uniqueResults.length > 0,
-        entryCount: uniqueResults.length
+        hasData: allResults.length > 0,
+        entryCount: allResults.length
       }), {
         status: 500,
         headers: { ...corsHeaders, 'Content-Type': 'application/json' }
