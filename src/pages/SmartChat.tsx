@@ -29,6 +29,7 @@ import {
 import { TranslatableText } from "@/components/translation/TranslatableText";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
+const INITIALIZATION_TIMEOUT = 10000; // 10 seconds timeout
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
@@ -39,10 +40,13 @@ export default function SmartChat() {
   const [showSidebar, setShowSidebar] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const [isInitializing, setIsInitializing] = useState(true);
+  const [initializationError, setInitializationError] = useState<string | null>(null);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const previousThreadIdRef = useRef<string | null>(null);
   const titleGeneratedForThreads = useRef<Set<string>>(new Set());
+  const initializationTimeoutRef = useRef<NodeJS.Timeout | null>(null);
+  const initializationAttemptedRef = useRef(false);
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -58,102 +62,167 @@ export default function SmartChat() {
     if (metaViewport) {
       metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
+  }, []);
+
+  // Simplified initialization with timeout and error handling
+  useEffect(() => {
+    if (!user?.id || initializationAttemptedRef.current) return;
+
+    initializationAttemptedRef.current = true;
+    console.log('SmartChat: Starting initialization for user:', user.id);
     
-    const initializeThread = async () => {
-      if (!user?.id) return;
-      
+    const initializeWithTimeout = async () => {
       try {
         setIsInitializing(true);
+        setInitializationError(null);
+
+        // Set up timeout
+        initializationTimeoutRef.current = setTimeout(() => {
+          console.warn('SmartChat: Initialization timeout reached, forcing fallback');
+          handleInitializationFallback();
+        }, INITIALIZATION_TIMEOUT);
+
+        const success = await attemptInitialization();
         
-        // Check for stored thread first
-        const lastActiveThreadId = localStorage.getItem("lastActiveChatThreadId");
-        
-        if (lastActiveThreadId) {
-          const { data, error } = await supabase
+        if (success) {
+          console.log('SmartChat: Initialization successful');
+          clearTimeout(initializationTimeoutRef.current!);
+          setIsInitializing(false);
+        } else {
+          throw new Error('Initialization failed');
+        }
+      } catch (error) {
+        console.error('SmartChat: Initialization error:', error);
+        handleInitializationFallback();
+      }
+    };
+
+    initializeWithTimeout();
+
+    return () => {
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+      }
+    };
+  }, [user?.id]);
+
+  const attemptInitialization = async (): Promise<boolean> => {
+    if (!user?.id) return false;
+
+    try {
+      // Try to use stored thread first
+      const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
+      
+      if (lastActiveThreadId) {
+        console.log('SmartChat: Checking stored thread:', lastActiveThreadId);
+        const { data, error } = await Promise.race([
+          supabase
             .from('chat_threads')
             .select('id')
             .eq('id', lastActiveThreadId)
             .eq('user_id', user.id)
-            .single();
-            
-          if (data && !error) {
-            console.log("Using stored thread:", lastActiveThreadId);
-            setCurrentThreadId(lastActiveThreadId);
-            window.dispatchEvent(
-              new CustomEvent('threadSelected', { 
-                detail: { threadId: lastActiveThreadId } 
-              })
-            );
-            return;
-          } else {
-            localStorage.removeItem("lastActiveChatThreadId");
-          }
-        }
+            .single(),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timeout')), 5000))
+        ]);
         
-        // Find most recent thread
-        const { data: threads, error } = await supabase
+        if (data && !error) {
+          console.log('SmartChat: Using stored thread:', lastActiveThreadId);
+          setCurrentThreadId(lastActiveThreadId);
+          dispatchThreadSelectedEvent(lastActiveThreadId);
+          return true;
+        } else {
+          localStorage.removeItem(THREAD_ID_STORAGE_KEY);
+        }
+      }
+
+      // Find most recent thread
+      console.log('SmartChat: Looking for recent threads');
+      const { data: threads, error } = await Promise.race([
+        supabase
           .from('chat_threads')
           .select('*')
           .eq('user_id', user.id)
           .order('updated_at', { ascending: false })
-          .limit(1);
+          .limit(1),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timeout')), 5000))
+      ]);
 
-        if (error) throw error;
+      if (error) throw error;
 
-        if (threads && threads.length > 0) {
-          console.log("Using most recent thread:", threads[0].id);
-          setCurrentThreadId(threads[0].id);
-          localStorage.setItem("lastActiveChatThreadId", threads[0].id);
-          window.dispatchEvent(
-            new CustomEvent('threadSelected', { 
-              detail: { threadId: threads[0].id } 
-            })
-          );
-        } else {
-          console.log("Creating new thread");
-          await createNewThread();
-        }
-      } catch (error) {
-        console.error("Error initializing thread:", error);
-        await createNewThread();
-      } finally {
-        setIsInitializing(false);
+      if (threads && threads.length > 0) {
+        console.log('SmartChat: Using most recent thread:', threads[0].id);
+        const threadId = threads[0].id;
+        setCurrentThreadId(threadId);
+        localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
+        dispatchThreadSelectedEvent(threadId);
+        return true;
+      } else {
+        console.log('SmartChat: No threads found, creating new one');
+        const newThreadId = await createNewThreadInternal();
+        return !!newThreadId;
       }
-    };
-
-    if (user?.id) {
-      initializeThread();
+    } catch (error) {
+      console.error('SmartChat: Attempt initialization failed:', error);
+      return false;
     }
-    
-    const handleCloseSidebar = () => {
-      setShowSidebar(false);
-    };
-    
-    const handleMessageCreated = async (event: CustomEvent) => {
-      if (event.detail?.threadId && event.detail?.isFirstMessage) {
-        setTimeout(async () => {
-          const title = await generateThreadTitle(event.detail.threadId, user?.id);
-          if (title) {
-            titleGeneratedForThreads.current.add(event.detail.threadId);
-            window.dispatchEvent(
-              new CustomEvent('threadTitleUpdated', { 
-                detail: { threadId: event.detail.threadId, title } 
-              })
-            );
-          }
-        }, 1000);
+  };
+
+  const handleInitializationFallback = async () => {
+    console.log('SmartChat: Running fallback initialization');
+    try {
+      const newThreadId = await createNewThreadInternal();
+      if (newThreadId) {
+        setCurrentThreadId(newThreadId);
+        localStorage.setItem(THREAD_ID_STORAGE_KEY, newThreadId);
+        dispatchThreadSelectedEvent(newThreadId);
+      } else {
+        setInitializationError('Failed to create conversation. Please refresh the page.');
       }
-    };
+    } catch (error) {
+      console.error('SmartChat: Fallback initialization failed:', error);
+      setInitializationError('Failed to initialize chat. Please refresh the page.');
+    } finally {
+      setIsInitializing(false);
+      if (initializationTimeoutRef.current) {
+        clearTimeout(initializationTimeoutRef.current);
+      }
+    }
+  };
+
+  const dispatchThreadSelectedEvent = (threadId: string) => {
+    window.dispatchEvent(
+      new CustomEvent('threadSelected', { 
+        detail: { threadId } 
+      })
+    );
+  };
+
+  const createNewThreadInternal = async (): Promise<string | null> => {
+    if (!user?.id) return null;
     
-    window.addEventListener('closeChatSidebar', handleCloseSidebar);
-    window.addEventListener('messageCreated' as any, handleMessageCreated);
-    
-    return () => {
-      window.removeEventListener('closeChatSidebar', handleCloseSidebar);
-      window.removeEventListener('messageCreated' as any, handleMessageCreated);
-    };
-  }, [isMobile, mobileDemo, user]);
-  
+    try {
+      console.log("SmartChat: Creating new thread");
+      const newThreadId = uuidv4();
+      const { error } = await supabase
+        .from('chat_threads')
+        .insert({
+          id: newThreadId,
+          user_id: user.id,
+          title: "New Conversation",
+          created_at: new Date().toISOString(),
+          updated_at: new Date().toISOString()
+        });
+      
+      if (error) throw error;
+      
+      console.log("SmartChat: Created new thread:", newThreadId);
+      return newThreadId;
+    } catch (error) {
+      console.error("SmartChat: Error creating thread:", error);
+      return null;
+    }
+  };
+
   useEffect(() => {
     const generateTitleForPreviousThread = async () => {
       if (previousThreadIdRef.current && 
@@ -308,6 +377,36 @@ export default function SmartChat() {
     }
   };
 
+  useEffect(() => {
+    const handleCloseSidebar = () => {
+      setShowSidebar(false);
+    };
+    
+    const handleMessageCreated = async (event: CustomEvent) => {
+      if (event.detail?.threadId && event.detail?.isFirstMessage) {
+        setTimeout(async () => {
+          const title = await generateThreadTitle(event.detail.threadId, user?.id);
+          if (title) {
+            titleGeneratedForThreads.current.add(event.detail.threadId);
+            window.dispatchEvent(
+              new CustomEvent('threadTitleUpdated', { 
+                detail: { threadId: event.detail.threadId, title } 
+              })
+            );
+          }
+        }, 1000);
+      }
+    };
+    
+    window.addEventListener('closeChatSidebar', handleCloseSidebar);
+    window.addEventListener('messageCreated' as any, handleMessageCreated);
+    
+    return () => {
+      window.removeEventListener('closeChatSidebar', handleCloseSidebar);
+      window.removeEventListener('messageCreated' as any, handleMessageCreated);
+    };
+  }, [user]);
+
   const desktopContent = (
     <>
       <motion.div
@@ -396,7 +495,18 @@ export default function SmartChat() {
       <div className="flex items-center justify-center h-screen">
         <div className="text-center">
           <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
-          <p className="text-muted-foreground">Initializing chat...</p>
+          <p className="text-muted-foreground">
+            {initializationError ? initializationError : "Initializing chat..."}
+          </p>
+          {initializationError && (
+            <Button 
+              onClick={() => window.location.reload()} 
+              className="mt-4"
+              variant="outline"
+            >
+              Refresh Page
+            </Button>
+          )}
         </div>
       </div>
     );
