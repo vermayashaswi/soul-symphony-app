@@ -1,3 +1,4 @@
+
 import React, { useEffect, useState } from "react";
 import { supabase } from "@/integrations/supabase/client";
 import { Button } from "@/components/ui/button";
@@ -31,7 +32,6 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
   const [isLoading, setIsLoading] = useState(true);
   const [editingThreadId, setEditingThreadId] = useState<string | null>(null);
   const [editedTitle, setEditedTitle] = useState("");
-  const [switchingThreadId, setSwitchingThreadId] = useState<string | null>(null);
   const { user } = useAuth();
   
   // Load threads when component mounts or user changes
@@ -104,18 +104,6 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
     };
   }, [user?.id]);
   
-  const handleThreadClick = (threadId: string) => {
-    if (threadId === activeThreadId) return;
-    
-    setSwitchingThreadId(threadId);
-    onSelectThread(threadId);
-    
-    // Clear switching state after a short delay
-    setTimeout(() => {
-      setSwitchingThreadId(null);
-    }, 500);
-  };
-  
   const handleEditStart = (thread: any) => {
     setEditingThreadId(thread.id);
     setEditedTitle(thread.title);
@@ -184,18 +172,12 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
             {threads.map((thread) => (
               <div
                 key={thread.id}
-                className={`group px-2 py-2 rounded-md transition-colors relative ${
+                className={`group px-2 py-2 rounded-md transition-colors ${
                   activeThreadId === thread.id
                     ? "bg-primary/10 text-primary"
                     : "hover:bg-muted/60"
-                } ${switchingThreadId === thread.id ? "opacity-50" : ""}`}
+                }`}
               >
-                {switchingThreadId === thread.id && (
-                  <div className="absolute inset-0 flex items-center justify-center">
-                    <Loader2 className="h-4 w-4 animate-spin" />
-                  </div>
-                )}
-                
                 {editingThreadId === thread.id ? (
                   <div className="flex items-center gap-1">
                     <Input
@@ -228,7 +210,7 @@ export const ChatThreadList: React.FC<ChatThreadListProps> = ({
                 ) : (
                   <div 
                     className="flex items-center justify-between cursor-pointer"
-                    onClick={() => handleThreadClick(thread.id)}
+                    onClick={() => onSelectThread(thread.id)}
                   >
                     <div className="flex-1 truncate text-sm font-medium">
                       <TranslatableText text={thread.title} />
