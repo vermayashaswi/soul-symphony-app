@@ -234,7 +234,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
         savedUserMessage = await saveMessage(threadId, message, 'user');
         debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
-        console.log("User message saved with ID:", savedUserMessage?.id);
         
         if (savedUserMessage) {
           debugLog.addEvent("UI Update", `Replacing temporary message with saved message: ${savedUserMessage.id}`, "info");
@@ -247,12 +246,10 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           ));
         } else {
           debugLog.addEvent("Database", "Failed to save user message - null response", "error");
-          console.error("Failed to save user message - null response");
           throw new Error("Failed to save message");
         }
       } catch (saveError: any) {
         debugLog.addEvent("Database", `Error saving user message: ${saveError.message || "Unknown error"}`, "error");
-        console.error("Error saving user message:", saveError);
         toast({
           title: "Error saving message",
           description: saveError.message || "Could not save your message",
@@ -265,11 +262,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       
       if (processingMessageId) {
         debugLog.addEvent("Database", `Created processing message with ID: ${processingMessageId}`, "success");
-        // We don't need to add it to the UI since it will come through the realtime subscription
       }
       
       debugLog.addEvent("Query Analysis", `Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
-      console.log("Performing comprehensive query analysis for:", message);
       updateProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
       
@@ -278,28 +273,18 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         isQuantitative: queryTypes.isQuantitative,
         isWhyQuestion: queryTypes.isWhyQuestion,
         isTemporalQuery: queryTypes.isTemporalQuery,
-        isPersonalInsightQuery: queryTypes.isPersonalInsightQuery, // New field
-        isMentalHealthQuery: queryTypes.isMentalHealthQuery,       // New field  
+        isPersonalInsightQuery: queryTypes.isPersonalInsightQuery,
+        isMentalHealthQuery: queryTypes.isMentalHealthQuery,
         timeRange: queryTypes.timeRange.periodName,
         emotion: queryTypes.emotion || 'none detected'
       };
       
       debugLog.addEvent("Query Analysis", `Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
-      console.log("Query analysis result:", queryTypes);
       
-      updateProcessingStage("Planning search strategy...");
-      debugLog.addEvent("Query Planning", "Breaking down complex query into sub-queries if needed", "info");
+      updateProcessingStage("Generating response...");
+      debugLog.addEvent("Chat Processing", "Using new chatService for message processing", "info");
       
-      updateProcessingStage("Searching for insights...");
-      debugLog.addEvent("Context-Aware Processing", "Sending query with conversation context", "info");
-      
-      // Always use personal insights for mental health and personality questions
-      const forcePersonalContext = queryTypes.isPersonalInsightQuery || queryTypes.isMentalHealthQuery;
-      if (forcePersonalContext) {
-        parameters.usePersonalContext = true;
-        debugLog.addEvent("Query Enhancement", "Forcing personal context for mental health or personality question", "info");
-      }
-      
+      // Use the new chatService which handles routing properly
       const response = await processChatMessage(
         message, 
         user.id, 
@@ -354,7 +339,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         } catch (saveError: any) {
           debugLog.addEvent("Database", `Error saving interactive message: ${saveError.message}`, "error");
           
-          // Fallback to displaying the message without saving it
           const interactiveMessage: ChatMessage = {
             id: `temp-interactive-${Date.now()}`,
             thread_id: threadId,
@@ -379,7 +363,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         };
         
         debugLog.addEvent("AI Processing", `Response received: ${JSON.stringify(responseInfo)}`, "success");
-        console.log("Response received:", responseInfo);
         
         try {
           debugLog.addEvent("Database", "Saving assistant response to database", "info");
@@ -393,7 +376,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           );
           
           debugLog.addEvent("Database", `Assistant response saved with ID: ${savedResponse?.id}`, "success");
-          console.log("Assistant response saved with ID:", savedResponse?.id);
           
           if (savedResponse) {
             debugLog.addEvent("UI Update", "Adding assistant response to chat history", "info");
@@ -408,7 +390,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           }
         } catch (saveError: any) {
           debugLog.addEvent("Database", `Error saving assistant response: ${saveError.message || "Unknown error"}`, "error");
-          console.error("Error saving assistant response:", saveError);
           const assistantMessage: ChatMessage = {
             id: `temp-response-${Date.now()}`,
             thread_id: threadId,
@@ -423,7 +404,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
           
           debugLog.addEvent("UI Update", "Adding fallback temporary assistant response to chat history", "warning");
           setChatHistory(prev => [...prev, assistantMessage]);
-          console.error("Failed to save assistant response to database, using temporary message");
           
           toast({
             title: "Warning",
@@ -434,7 +414,6 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       }
     } catch (error: any) {
       debugLog.addEvent("Error", `Error in message handling: ${error?.message || "Unknown error"}`, "error");
-      console.error("Error sending message:", error);
       
       // Update thread status to failed
       if (threadId) {
@@ -475,10 +454,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         }
         
         debugLog.addEvent("Error Handling", "Error message saved to database", "success");
-        console.log("Error message saved to database");
       } catch (e) {
         debugLog.addEvent("Error Handling", `Failed to save error message: ${e instanceof Error ? e.message : "Unknown error"}`, "error");
-        console.error("Failed to save error message:", e);
         
         const errorMessage: ChatMessage = {
           id: `error-${Date.now()}`,
