@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -10,6 +9,7 @@ import { Button } from "@/components/ui/button";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import AnalyticsDisplay from "./AnalyticsDisplay";
 import EmotionRadarChart from "./EmotionRadarChart";
+import TypingIndicator from "./TypingIndicator";
 import { ChatMessage } from "@/types/chat";
 
 interface ChatAreaProps {
@@ -107,7 +107,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                           variant="outline"
                           className="text-left justify-start"
                           onClick={() => onInteractiveOptionClick(option)}
-                          data-test-id={`interactive-option-${idx}`} // Add test id for easier debugging
+                          data-test-id={`interactive-option-${idx}`}
                         >
                           {option.text}
                         </Button>
@@ -136,27 +136,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
 
       {isLoading && (
         <div className="flex justify-start mb-4">
-          <div className="flex gap-3 max-w-[80%]">
-            <Avatar className="h-8 w-8">
-              <AvatarImage src="/images/logo.svg" />
-              <AvatarFallback className="bg-muted">AI</AvatarFallback>
-            </Avatar>
-
-            <Card>
-              <CardContent className="p-3">
-                <div className="flex items-center">
-                  <div className="animate-pulse flex space-x-2">
-                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
-                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
-                    <div className="h-2.5 w-2.5 rounded-full bg-muted-foreground"></div>
-                  </div>
-                  <span className="ml-3 text-sm text-muted-foreground">
-                    {processingStage || <TranslatableText text="Processing..." />}
-                  </span>
-                </div>
-              </CardContent>
-            </Card>
-          </div>
+          <TypingIndicator />
         </div>
       )}
 

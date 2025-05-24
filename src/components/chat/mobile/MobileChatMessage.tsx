@@ -11,6 +11,7 @@ import { useAuth } from "@/contexts/AuthContext";
 import { formatShortDate } from "@/utils/format-time";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
+import TypingIndicator from "../TypingIndicator";
 
 interface MobileChatMessageProps {
   message: {
@@ -22,11 +23,26 @@ interface MobileChatMessageProps {
     hasNumericResult?: boolean;
   };
   showAnalysis?: boolean;
+  isLoading?: boolean;
 }
 
-const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false }) => {
+const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnalysis = false, isLoading = false }) => {
   const [showReferences, setShowReferences] = useState(false);
   const { user } = useAuth();
+  
+  // Show typing indicator for loading state
+  if (isLoading) {
+    return (
+      <motion.div 
+        initial={{ opacity: 0, y: 10 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ duration: 0.3 }}
+        className="mb-3"
+      >
+        <TypingIndicator className="justify-start" />
+      </motion.div>
+    );
+  }
   
   const hasReferences = message.role === 'assistant' && message.references && message.references.length > 0;
   
