@@ -5,6 +5,7 @@ import {
   getClientTimeInfo,
   validateDateRange,
   getDateRangeForPeriod,
+  debugTimezoneInfo as debugTimezoneInfoFromService,
   type ClientTimeInfo,
   type DateRange
 } from '@/services/dateService';
@@ -90,4 +91,22 @@ export function formatDateRange(dateRange: DateRange): string {
   };
   
   return `${start.toLocaleDateString('en-US', formatOptions)} - ${end.toLocaleDateString('en-US', formatOptions)}`;
+}
+
+// NEW: Add missing functions that are imported elsewhere
+export function debugTimezoneInfo(): void {
+  return debugTimezoneInfoFromService();
+}
+
+export function getCurrentWeekDates(): string {
+  const { formattedRange } = getCurrentWeekDateRange();
+  return formattedRange;
+}
+
+export function getUserTimezoneOffset(): number {
+  return new Date().getTimezoneOffset();
+}
+
+export function getUserTimezoneName(): string {
+  return Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC';
 }

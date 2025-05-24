@@ -1,5 +1,11 @@
+
 import { supabase } from '@/integrations/supabase/client';
-import { calculateRelativeDateRange, getUserTimezoneOffset, getUserTimezoneName, debugTimezoneInfo } from './dateUtils';
+import { 
+  calculateRelativeDateRange, 
+  getUserTimezoneOffset, 
+  getUserTimezoneName, 
+  debugTimezoneInfo 
+} from './dateUtils';
 import { format, formatInTimeZone } from 'date-fns-tz';
 
 /**

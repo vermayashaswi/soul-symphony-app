@@ -32,6 +32,55 @@ export function formatDuration(seconds: number): string {
   return `${hours}h ${minutes}m`;
 }
 
+// NEW: Add formatTime function for recording duration
+export function formatTime(seconds: number): string {
+  const minutes = Math.floor(seconds / 60);
+  const remainingSeconds = Math.floor(seconds % 60);
+  return `${minutes}:${remainingSeconds.toString().padStart(2, '0')}`;
+}
+
+// NEW: Add formatShortDate function for journal entries
+export function formatShortDate(date: Date | string): string {
+  try {
+    const inputDate = typeof date === 'string' ? new Date(date) : date;
+    
+    // Validate the date
+    if (!inputDate || isNaN(inputDate.getTime())) {
+      console.error('[formatShortDate] Invalid date:', date);
+      return 'Recently';
+    }
+    
+    const now = new Date();
+    const diffInDays = Math.floor((now.getTime() - inputDate.getTime()) / (1000 * 60 * 60 * 24));
+    
+    // Today
+    if (diffInDays === 0) {
+      return 'Today';
+    }
+    
+    // Yesterday
+    if (diffInDays === 1) {
+      return 'Yesterday';
+    }
+    
+    // This week (within 6 days)
+    if (diffInDays < 7) {
+      return formatDate(inputDate, 'EEEE'); // Day name
+    }
+    
+    // This year
+    if (inputDate.getFullYear() === now.getFullYear()) {
+      return formatDate(inputDate, 'MMM d');
+    }
+    
+    // Previous years
+    return formatDate(inputDate, 'MMM d, yyyy');
+  } catch (error) {
+    console.error('[formatShortDate] Error formatting date:', error);
+    return 'Recently';
+  }
+}
+
 export function isValidTimeRange(startDate: string, endDate: string): boolean {
   return validateDateRange(startDate, endDate);
 }
