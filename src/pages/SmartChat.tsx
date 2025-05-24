@@ -29,7 +29,7 @@ import {
 import { TranslatableText } from "@/components/translation/TranslatableText";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
-const INITIALIZATION_TIMEOUT = 10000; // 10 seconds timeout
+const INITIALIZATION_TIMEOUT = 8000; // 8 seconds timeout
 
 export default function SmartChat() {
   const isMobile = useIsMobile();
@@ -86,7 +86,9 @@ export default function SmartChat() {
         
         if (success) {
           console.log('SmartChat: Initialization successful');
-          clearTimeout(initializationTimeoutRef.current!);
+          if (initializationTimeoutRef.current) {
+            clearTimeout(initializationTimeoutRef.current);
+          }
           setIsInitializing(false);
         } else {
           throw new Error('Initialization failed');
@@ -115,51 +117,68 @@ export default function SmartChat() {
       
       if (lastActiveThreadId) {
         console.log('SmartChat: Checking stored thread:', lastActiveThreadId);
-        const { data, error } = await Promise.race([
-          supabase
-            .from('chat_threads')
-            .select('id')
-            .eq('id', lastActiveThreadId)
-            .eq('user_id', user.id)
-            .single(),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timeout')), 5000))
-        ]);
         
-        if (data && !error) {
-          console.log('SmartChat: Using stored thread:', lastActiveThreadId);
-          setCurrentThreadId(lastActiveThreadId);
-          dispatchThreadSelectedEvent(lastActiveThreadId);
-          return true;
-        } else {
+        const timeoutPromise = new Promise<never>((_, reject) => 
+          setTimeout(() => reject(new Error('Database query timeout')), 5000)
+        );
+        
+        const queryPromise = supabase
+          .from('chat_threads')
+          .select('id')
+          .eq('id', lastActiveThreadId)
+          .eq('user_id', user.id)
+          .single();
+        
+        try {
+          const { data, error } = await Promise.race([queryPromise, timeoutPromise]);
+          
+          if (data && !error) {
+            console.log('SmartChat: Using stored thread:', lastActiveThreadId);
+            setCurrentThreadId(lastActiveThreadId);
+            dispatchThreadSelectedEvent(lastActiveThreadId);
+            return true;
+          } else {
+            localStorage.removeItem(THREAD_ID_STORAGE_KEY);
+          }
+        } catch (raceError) {
+          console.warn('SmartChat: Stored thread check failed:', raceError);
           localStorage.removeItem(THREAD_ID_STORAGE_KEY);
         }
       }
 
       // Find most recent thread
       console.log('SmartChat: Looking for recent threads');
-      const { data: threads, error } = await Promise.race([
-        supabase
-          .from('chat_threads')
-          .select('*')
-          .eq('user_id', user.id)
-          .order('updated_at', { ascending: false })
-          .limit(1),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('Database query timeout')), 5000))
-      ]);
+      const timeoutPromise2 = new Promise<never>((_, reject) => 
+        setTimeout(() => reject(new Error('Database query timeout')), 5000)
+      );
+      
+      const threadsQueryPromise = supabase
+        .from('chat_threads')
+        .select('*')
+        .eq('user_id', user.id)
+        .order('updated_at', { ascending: false })
+        .limit(1);
 
-      if (error) throw error;
+      try {
+        const { data: threads, error } = await Promise.race([threadsQueryPromise, timeoutPromise2]);
 
-      if (threads && threads.length > 0) {
-        console.log('SmartChat: Using most recent thread:', threads[0].id);
-        const threadId = threads[0].id;
-        setCurrentThreadId(threadId);
-        localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
-        dispatchThreadSelectedEvent(threadId);
-        return true;
-      } else {
-        console.log('SmartChat: No threads found, creating new one');
-        const newThreadId = await createNewThreadInternal();
-        return !!newThreadId;
+        if (error) throw error;
+
+        if (threads && threads.length > 0) {
+          console.log('SmartChat: Using most recent thread:', threads[0].id);
+          const threadId = threads[0].id;
+          setCurrentThreadId(threadId);
+          localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
+          dispatchThreadSelectedEvent(threadId);
+          return true;
+        } else {
+          console.log('SmartChat: No threads found, creating new one');
+          const newThreadId = await createNewThreadInternal();
+          return !!newThreadId;
+        }
+      } catch (raceError) {
+        console.error('SmartChat: Recent threads query failed:', raceError);
+        throw raceError;
       }
     } catch (error) {
       console.error('SmartChat: Attempt initialization failed:', error);
