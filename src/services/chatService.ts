@@ -115,7 +115,6 @@ export async function processChatMessage(
   // Check if this is a time pattern query
   if (queryTypes.isTimePatternQuery || message.toLowerCase().includes('what time') || 
       message.toLowerCase().includes('when do i usually')) {
-    // ... keep existing code (time pattern analysis logic)
     try {
       console.log("Executing time pattern analysis strategy");
       
@@ -259,16 +258,22 @@ export async function processChatMessage(
       body: { message, conversationContext: conversationHistory }
     });
 
+    let classification: {
+      category: QueryCategory;
+      confidence: number;
+      reasoning: string;
+    };
+
     if (classificationError) {
       console.error("Classification error:", classificationError);
       // Default to conversational if classification fails
-      var classification = {
+      classification = {
         category: QueryCategory.CONVERSATIONAL,
         confidence: 0.5,
         reasoning: 'Classification service unavailable'
       };
     } else {
-      var classification = {
+      classification = {
         category: classificationData.category as QueryCategory,
         confidence: classificationData.confidence,
         reasoning: classificationData.reasoning
@@ -283,12 +288,6 @@ export async function processChatMessage(
     
     // Handle different categories appropriately
     switch (classification.category) {
-      case QueryCategory.GENERAL_NO_RELATION:
-        return {
-          content: "I'm SOULo, your mental health assistant focused on helping with emotional wellbeing and personal insights. I'm not designed to answer general factual questions. Is there anything about your mental health or personal growth I can help you with instead?",
-          role: "assistant"
-        };
-        
       case QueryCategory.CONVERSATIONAL:
         // Handle conversational queries with simple responses and conversation history
         const conversationalResponse = generateConversationalResponse(message, isFollowUp, conversationHistory);
