@@ -65,6 +65,9 @@ export default function SmartChat() {
     processingStatus
   } = useChatRealtime(currentThreadId);
 
+  // Check if deletion should be disabled
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing';
+
   useEffect(() => {
     document.title = "Roha | SOULo";
     
