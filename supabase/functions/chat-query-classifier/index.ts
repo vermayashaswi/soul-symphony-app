@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * GPT-powered message classifier with enhanced typo handling and intent understanding
+ * Enhanced GPT-powered message classifier with personal pronoun prioritization
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -38,7 +38,7 @@ serve(async (req) => {
       );
     }
 
-    // Use GPT for classification with enhanced typo handling
+    // Use GPT for classification with enhanced personal pronoun handling
     const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
 
     console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence})`);
@@ -68,7 +68,7 @@ serve(async (req) => {
 });
 
 /**
- * Enhanced GPT-powered classification with typo handling and intent understanding
+ * Enhanced GPT-powered classification with prioritized personal pronoun detection
  */
 async function gptClassifyMessage(
   message: string, 
@@ -79,6 +79,7 @@ async function gptClassifyMessage(
   confidence: number;
   shouldUseJournal: boolean;
   reasoning: string;
+  useAllEntries?: boolean;
 }> {
   
   const contextString = conversationContext.length > 0 
@@ -87,34 +88,35 @@ async function gptClassifyMessage(
 
   const classificationPrompt = `You are an advanced query classifier for SOULo, a voice journaling app that helps users analyze their personal journal entries for emotional insights and patterns.
 
-Your task is to classify user messages into one of three categories, with special attention to typos, incomplete sentences, and user intent:
+Your task is to classify user messages into one of three categories, with CRITICAL PRIORITY given to personal pronouns:
+
+**HIGHEST PRIORITY RULE - PERSONAL PRONOUNS:**
+If the message contains ANY personal pronouns ("I", "me", "my", "mine", "myself", "am I", "do I", "how am I", "what makes me", "how do I", etc.), it is AUTOMATICALLY JOURNAL_SPECIFIC with high confidence (0.9+), regardless of other factors.
 
 **JOURNAL_SPECIFIC**: Questions that require analysis of the user's personal journal entries
-- Examples: "How was I doing last week?", "How was I last week?" (missing 'doing'), "What are my top emotions?", "Am I an introvert?", "Do I like people?", "How should I improve my sleep?", "What makes me happy?", "How can I deal with my anxiety?", "What are my patterns?", "How have I been feeling recently?", "What did I write about yesterday?", "how was i yesterday" (typo/no caps), "wat makes me sad" (typo)
-- Key indicators: Personal pronouns (I, me, my), temporal references (last week, yesterday, recently), personality questions, personal advice requests, emotion analysis requests, incomplete sentences with clear personal intent
+- CRITICAL INDICATORS: Personal pronouns (I, me, my, mine, myself, am I, do I, how am I, etc.)
+- Examples: "How am I doing?", "What makes me happy?", "Am I improving?", "How was I last week?", "Do I like people?", "My emotions", "How do I feel?", "What are my patterns?"
+- For personal pronoun questions WITHOUT explicit time references, set useAllEntries: true
+- For personal pronoun questions WITH explicit time references ("last week", "yesterday"), respect the time constraint
 
 **GENERAL_MENTAL_HEALTH**: General mental health information requests without personal context
-- Examples: "What is anxiety?", "How to meditate?", "What are signs of depression?", "Best practices for mental health", "What is mindfulness?", "how do you deal with stress" (general advice)
-- Key indicators: General educational questions, no personal pronouns, requesting general information, hypothetical scenarios
+- Examples: "What is anxiety?", "How to meditate?", "What are signs of depression?", "Best practices for mental health"
+- Key indicators: General educational questions, no personal pronouns, requesting general information
 
 **CONVERSATIONAL**: Greetings, thanks, clarifications, or general chat
-- Examples: "Hello", "Thank you", "How are you?", "Who are you?", "Can you help me?", "What can you do?", "hi there", "thx" (abbreviated thanks), "wat r u" (typo/shorthand)
-- Key indicators: Greetings, gratitude expressions, assistant capability questions, social pleasantries
+- Examples: "Hello", "Thank you", "How are you?", "Who are you?", "Can you help me?"
 
-CRITICAL RULES FOR TYPO AND INTENT UNDERSTANDING:
-1. ASSUME MISSING WORDS: "How was I last week?" should be interpreted as "How was I [doing] last week?" - JOURNAL_SPECIFIC
-2. IGNORE TYPOS AND ABBREVIATIONS: "wat makes me sad", "how r u", "wat did i write" - focus on the intent
-3. TEMPORAL REFERENCES ARE STRONG SIGNALS: Any mention of time periods (last week, yesterday, today, recently, etc.) combined with personal pronouns strongly indicates JOURNAL_SPECIFIC
-4. INCOMPLETE PERSONAL QUESTIONS: "Am I...", "Do I...", "How was I..." even if incomplete - JOURNAL_SPECIFIC
-5. When in doubt between JOURNAL_SPECIFIC and GENERAL_MENTAL_HEALTH, choose JOURNAL_SPECIFIC if there are ANY personal indicators
-6. Context matters: Use conversation history to understand abbreviated or unclear messages
+CLASSIFICATION LOGIC:
+1. FIRST: Check for personal pronouns - if found, classify as JOURNAL_SPECIFIC with high confidence
+2. SECOND: If no personal pronouns, check for general mental health topics
+3. THIRD: If neither, classify as CONVERSATIONAL
 
-INTENT INTERPRETATION EXAMPLES:
-- "How was I last week?" → Intent: "How was I doing last week?" → JOURNAL_SPECIFIC
-- "wat emotions do i have" → Intent: "What emotions do I have?" → JOURNAL_SPECIFIC  
-- "how 2 deal with anxiety" → Intent: "How to deal with anxiety?" → Could be GENERAL_MENTAL_HEALTH (general advice) or JOURNAL_SPECIFIC (personal advice) - lean JOURNAL_SPECIFIC if personal context
-- "am i happy person" → Intent: "Am I a happy person?" → JOURNAL_SPECIFIC
-- "thx for help" → Intent: "Thanks for help" → CONVERSATIONAL
+IMPORTANT RULES:
+- Personal pronouns ALWAYS override other classification criteria
+- "How am I doing?" = JOURNAL_SPECIFIC, useAllEntries: true (no time constraint)
+- "How was I last week?" = JOURNAL_SPECIFIC, useAllEntries: false (time constraint respected)
+- When personal pronouns are detected, mention this explicitly in reasoning
+- Ignore typos and focus on intent: "wat makes me sad" = JOURNAL_SPECIFIC
 
 User message: "${message}"${contextString}
 
@@ -123,7 +125,8 @@ Respond with ONLY a JSON object in this exact format:
   "category": "JOURNAL_SPECIFIC" | "GENERAL_MENTAL_HEALTH" | "CONVERSATIONAL",
   "confidence": 0.0-1.0,
   "shouldUseJournal": boolean,
-  "reasoning": "Brief explanation of interpretation and why this category was chosen, mention any typos or missing words inferred"
+  "useAllEntries": boolean,
+  "reasoning": "Brief explanation emphasizing personal pronoun detection if applicable"
 }`;
 
   try {
@@ -140,7 +143,7 @@ Respond with ONLY a JSON object in this exact format:
         model: 'gpt-4o-mini',
         messages: [{ role: 'user', content: classificationPrompt }],
         temperature: 0.1,
-        max_tokens: 250,
+        max_tokens: 300,
       }),
       signal: controller.signal
     });
@@ -172,7 +175,8 @@ Respond with ONLY a JSON object in this exact format:
       category: result.category,
       confidence: Math.max(0, Math.min(1, result.confidence || 0.8)),
       shouldUseJournal: result.category === 'JOURNAL_SPECIFIC',
-      reasoning: result.reasoning || 'GPT classification with typo handling'
+      useAllEntries: result.useAllEntries || false,
+      reasoning: result.reasoning || 'GPT classification with personal pronoun prioritization'
     };
 
   } catch (error) {
@@ -182,15 +186,46 @@ Respond with ONLY a JSON object in this exact format:
 }
 
 /**
- * Enhanced rule-based classification with better typo and temporal pattern handling
+ * Enhanced rule-based classification with personal pronoun prioritization
  */
 function enhancedRuleBased_classifyMessage(message: string): {
   category: string;
   confidence: number;
   shouldUseJournal: boolean;
   reasoning: string;
+  useAllEntries?: boolean;
 } {
   const lowerMessage = message.toLowerCase().trim();
+  
+  // PRIORITY 1: Check for personal pronouns - HIGHEST PRIORITY
+  const personalPronounPatterns = [
+    /\b(i|me|my|mine|myself)\b/i,
+    /\bam i\b/i,
+    /\bdo i\b/i,
+    /\bhow am i\b/i,
+    /\bhow do i\b/i,
+    /\bwhat makes me\b/i,
+    /\bhow was i\b/i,
+    /\bwhat do i\b/i,
+    /\bwhere do i\b/i,
+    /\bwhen do i\b/i,
+    /\bwhy do i\b/i
+  ];
+  
+  for (const pattern of personalPronounPatterns) {
+    if (pattern.test(lowerMessage)) {
+      // Check if there's an explicit temporal reference
+      const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(lowerMessage);
+      
+      return {
+        category: "JOURNAL_SPECIFIC",
+        confidence: 0.95,
+        shouldUseJournal: true,
+        useAllEntries: !hasTemporalReference, // Use all entries unless there's a specific time reference
+        reasoning: `Contains personal pronouns - automatically classified as journal-specific. ${hasTemporalReference ? 'Time constraint detected.' : 'No time constraint - will analyze all entries.'}`
+      };
+    }
+  }
   
   // Enhanced conversational patterns (including typos/abbreviations)
   const conversationalPatterns = [
@@ -213,18 +248,14 @@ function enhancedRuleBased_classifyMessage(message: string): {
     }
   }
   
-  // Enhanced journal-specific indicators (with typo tolerance and intent inference)
+  // Enhanced journal-specific indicators (with typo tolerance)
   const journalSpecificIndicators = [
-    // Temporal patterns with personal context - STRONGEST indicators
+    // Temporal patterns with personal context
     /\bhow (was|am|did) i\b.{0,15}\b(last week|yesterday|today|this week|recently|lately)\b/i,
-    /\bhow (was|am) i\b.{0,5}(last|this|yesterday)/i, // "How was I last week" (missing 'doing')
     /\b(last week|yesterday|recently|lately|this week|last month)\b.{0,20}\bhow (was|am|did) i\b/i,
     
-    // Personal trait/identity questions
-    /\bam i\b|\bdo i\b/i,
+    // Personal trait/identity questions without pronouns
     /\bmy (mental health|wellbeing|anxiety|depression|stress|personality|emotions)\b/i,
-    /\bhow (can|could|should) i\b|\bwhat should i do\b|\bhow do i\b/i,
-    /\bhow (do|did) i feel\b|\bmy emotions\b|\bi feel\b/i,
     /\b(intro|extro)vert\b/i,
     /\bwhat (type|kind) of person\b/i,
     /\bmy (personality|character|nature|patterns|habits)\b/i,
@@ -232,24 +263,21 @@ function enhancedRuleBased_classifyMessage(message: string): {
     // Temporal references (even without complete sentences)
     /\b(last week|yesterday|recently|lately|this week|last month)\b/i,
     
-    // Personal questions with typos/missing words
-    /\bwat (makes|helps) me\b/i, // "wat makes me happy" (typo)
-    /\bhow r my\b/i, // "how r my emotions" (abbreviation)
-    /\bdo i like\b/i, // "do i like people"
+    // Questions with typos/missing words (but no personal pronouns)
+    /\bwat (makes|helps)\b/i, // "wat makes" without "me"
+    /\bhow r\b/i, // "how r" abbreviations
   ];
   
   for (const pattern of journalSpecificIndicators) {
     if (pattern.test(lowerMessage)) {
-      // Higher confidence for temporal + personal combinations
       const hasTemporal = /\b(last week|yesterday|recently|lately|this week|last month)\b/i.test(lowerMessage);
-      const hasPersonal = /\b(i|me|my|myself)\b/i.test(lowerMessage);
-      const confidence = (hasTemporal && hasPersonal) ? 0.95 : 0.8;
       
       return {
         category: "JOURNAL_SPECIFIC",
-        confidence,
+        confidence: 0.8,
         shouldUseJournal: true,
-        reasoning: "Contains personal context, temporal references, or personal trait questions (with typo tolerance)"
+        useAllEntries: !hasTemporal,
+        reasoning: "Contains journal-related context or temporal references (with typo tolerance)"
       };
     }
   }
@@ -264,17 +292,6 @@ function enhancedRuleBased_classifyMessage(message: string): {
   
   for (const pattern of mentalHealthPatterns) {
     if (pattern.test(lowerMessage)) {
-      // Check if it has personal context - if so, it should be journal specific
-      const hasPersonalContext = /\b(i|me|my|myself)\b/i.test(lowerMessage);
-      if (hasPersonalContext) {
-        return {
-          category: "JOURNAL_SPECIFIC",
-          confidence: 0.85,
-          shouldUseJournal: true,
-          reasoning: "Mental health topic with personal context"
-        };
-      }
-      
       return {
         category: "GENERAL_MENTAL_HEALTH",
         confidence: 0.7,
@@ -285,7 +302,7 @@ function enhancedRuleBased_classifyMessage(message: string): {
   }
   
   return {
-    category: "GENERAL_NO_RELATION",
+    category: "CONVERSATIONAL",
     confidence: 0.6,
     shouldUseJournal: false,
     reasoning: "No clear indicators for journal-specific or mental health categories"

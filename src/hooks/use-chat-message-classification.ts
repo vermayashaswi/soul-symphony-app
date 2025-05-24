@@ -13,6 +13,7 @@ interface MessageClassification {
   confidence: number;
   reasoning: string;
   shouldUseJournal: boolean;
+  useAllEntries?: boolean; // NEW: Flag for using all entries vs time-constrained
   isLoading: boolean;
   error: string | null;
 }
@@ -23,12 +24,13 @@ export function useChatMessageClassification() {
     confidence: 0,
     reasoning: '',
     shouldUseJournal: false,
+    useAllEntries: false,
     isLoading: false,
     error: null
   });
 
   /**
-   * Classify a message using only GPT-based server-side classification
+   * Enhanced message classification with personal pronoun support
    */
   const classifyMessage = useCallback(async (message: string, conversationContext: any[] = []) => {
     if (!message?.trim()) {
@@ -36,7 +38,8 @@ export function useChatMessageClassification() {
         category: QueryCategory.CONVERSATIONAL,
         confidence: 0,
         reasoning: 'Empty message',
-        shouldUseJournal: false
+        shouldUseJournal: false,
+        useAllEntries: false
       };
     }
 
@@ -47,7 +50,9 @@ export function useChatMessageClassification() {
     }));
 
     try {
-      // Use only server-side GPT classification
+      console.log("[Classification Hook] Classifying message with enhanced personal pronoun detection:", message);
+      
+      // Use the enhanced chat-query-classifier edge function
       const { data, error } = await supabase.functions.invoke('chat-query-classifier', {
         body: { message, conversationContext }
       });
@@ -59,8 +64,11 @@ export function useChatMessageClassification() {
           category: data.category as QueryCategory,
           confidence: data.confidence,
           reasoning: data.reasoning,
-          shouldUseJournal: data.shouldUseJournal || data.category === 'JOURNAL_SPECIFIC'
+          shouldUseJournal: data.shouldUseJournal || data.category === 'JOURNAL_SPECIFIC',
+          useAllEntries: data.useAllEntries || false // NEW: Support for all entries flag
         };
+        
+        console.log("[Classification Hook] Enhanced classification result:", result);
         
         setClassification({
           ...result,
@@ -75,21 +83,28 @@ export function useChatMessageClassification() {
     } catch (error: any) {
       const errorMessage = error.message || 'Unknown error classifying message';
       
+      console.error("[Classification Hook] Classification error:", errorMessage);
+      
+      // Enhanced fallback for personal pronoun detection
+      const personalPronounPattern = /\b(i|me|my|mine|myself|am i|do i|how am i|what makes me)\b/i;
+      const hasPersonalPronouns = personalPronounPattern.test(message.toLowerCase());
+      const hasTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message.toLowerCase());
+      
+      const fallbackResult = {
+        category: hasPersonalPronouns ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.CONVERSATIONAL,
+        confidence: hasPersonalPronouns ? 0.8 : 0.3,
+        reasoning: hasPersonalPronouns ? 'Personal pronouns detected (fallback)' : 'Error in classification (fallback)',
+        shouldUseJournal: hasPersonalPronouns,
+        useAllEntries: hasPersonalPronouns && !hasTimeReference // Use all entries if personal pronouns but no time reference
+      };
+      
       setClassification({
-        category: QueryCategory.CONVERSATIONAL,
-        confidence: 0,
-        reasoning: 'Error in classification',
-        shouldUseJournal: false,
+        ...fallbackResult,
         isLoading: false,
         error: errorMessage
       });
       
-      return {
-        category: QueryCategory.CONVERSATIONAL,
-        confidence: 0,
-        reasoning: 'Error in classification',
-        shouldUseJournal: false
-      };
+      return fallbackResult;
     }
   }, []);
 

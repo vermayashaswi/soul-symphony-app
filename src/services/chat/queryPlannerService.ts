@@ -11,59 +11,11 @@ import {
 } from '@/services/dateService';
 
 /**
- * Enhance query with thread context (optimized for speed)
- * @param message User query message
- * @param threadId Chat thread ID
- * @returns Enhanced query string
- */
-async function enhanceWithThreadContext(message: string, threadId: string, queryTypes: any): Promise<string> {
-  try {
-    // Fetch only the last 3 messages for faster processing
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => controller.abort(), 3000); // Shorter timeout for context
-    
-    const { data: messages, error } = await supabase
-      .from('chat_messages')
-      .select('content, sender')
-      .eq('thread_id', threadId)
-      .order('created_at', { ascending: false })
-      .limit(3) // Reduced from 5 to 3
-      .abortSignal(controller.signal);
-
-    clearTimeout(timeoutId);
-
-    if (error) {
-      console.error("Error fetching thread messages:", error);
-      return message;
-    }
-
-    // Extract relevant context from previous messages
-    const context = messages
-      .filter(msg => msg.sender === 'user')
-      .map(msg => msg.content)
-      .slice(0, 2) // Only use last 2 user messages
-      .join('\n');
-
-    // Only enhance if we have meaningful context
-    if (context.length > 10) {
-      const enhancedQuery = `${message}\nContext:\n${context}`;
-      console.log("[Query Planner] Enhanced query with thread context");
-      return enhancedQuery;
-    }
-    
-    return message;
-  } catch (error) {
-    console.error("Error enhancing query with thread context:", error);
-    return message;
-  }
-}
-
-/**
- * Enhanced query planning service with optimized performance
+ * Enhanced query planning service with personal pronoun support and fixed date calculations
  */
 export async function planQuery(message: string, threadId: string, userId: string) {
   try {
-    console.log("[Query Planner] Planning intelligent sub-query strategy with optimized performance for:", message);
+    console.log("[Query Planner] Enhanced planning with personal pronoun detection for:", message);
     console.log(`[Query Planner] Current time: ${new Date().toISOString()}`);
     
     // For debugging timezone issues
@@ -73,14 +25,13 @@ export async function planQuery(message: string, threadId: string, userId: strin
     
     // Get client's device time information for accurate date calculations
     const clientInfo: ClientTimeInfo = getClientTimeInfo();
-    
     console.log(`[Query Planner] Client time information:`, clientInfo);
     
     // Get user's timezone from their profile with optimized timeout
-    let userTimezone;
+    let userTimezone = clientInfo.timezoneName;
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 5000); // Reduced from 25s to 5s
+      const timeoutId = setTimeout(() => controller.abort(), 5000);
       
       const { data: profileData } = await supabase
         .from('profiles')
@@ -96,11 +47,9 @@ export async function planQuery(message: string, threadId: string, userId: strin
         console.log(`[Query Planner] User timezone from profile: ${userTimezone}`);
       } else {
         console.log(`[Query Planner] No timezone found in user profile, using client timezone`);
-        userTimezone = clientInfo.timezoneName;
       }
     } catch (error) {
       console.error("Error fetching user timezone from profile:", error);
-      userTimezone = clientInfo.timezoneName;
     }
     
     // Check if this is a direct date query
@@ -134,6 +83,7 @@ export async function planQuery(message: string, threadId: string, userId: strin
         timeRange: dateRange,
         useHistoricalData: false,
         usePersonalContext: false,
+        useAllEntries: false,
         filterByEmotion: null,
         enhancedQuery: message,
         originalQuery: message,
@@ -149,10 +99,45 @@ export async function planQuery(message: string, threadId: string, userId: strin
     // Analyze the query types for intelligent sub-query planning
     const queryTypes = analyzeQueryTypes(message);
     
-    // Enhanced detection for personality queries requiring emergency fixes
+    // ENHANCED: Check for personal pronouns for all-entries analysis
+    const personalPronounPatterns = [
+      /\b(i|me|my|mine|myself)\b/i,
+      /\bam i\b/i,
+      /\bdo i\b/i,
+      /\bhow am i\b/i,
+      /\bhow do i\b/i,
+      /\bwhat makes me\b/i,
+      /\bhow was i\b/i
+    ];
+    
+    const hasPersonalPronouns = personalPronounPatterns.some(pattern => pattern.test(message.toLowerCase()));
+    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately)\b/i.test(message.toLowerCase());
+    
+    // Enhanced detection for personality queries requiring all entries
     const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate|worst|best/.test(message.toLowerCase());
     
-    // Add properties needed for intelligent planning with emergency fixes
+    console.log("[Query Planner] Enhanced analysis:", {
+      hasPersonalPronouns,
+      hasExplicitTimeReference,
+      isPersonalityQuery,
+      originalQueryTypes: queryTypes
+    });
+    
+    // CRITICAL: Override time range logic for personal pronoun queries
+    let useAllEntries = false;
+    let usePersonalContext = true;
+    
+    if (hasPersonalPronouns) {
+      // If personal pronouns detected without explicit time reference, use all entries
+      useAllEntries = !hasExplicitTimeReference;
+      console.log(`[Query Planner] Personal pronouns detected. Use all entries: ${useAllEntries} (explicit time ref: ${hasExplicitTimeReference})`);
+    } else if (isPersonalityQuery) {
+      // Personality queries should also use all entries
+      useAllEntries = true;
+      console.log("[Query Planner] Personality query detected - using all entries");
+    }
+    
+    // Add properties needed for intelligent planning
     queryTypes.needsDataAggregation = queryTypes.isQuantitative || 
                                      queryTypes.isStatisticalQuery || 
                                      message.toLowerCase().includes('how many times');
@@ -163,12 +148,6 @@ export async function planQuery(message: string, threadId: string, userId: strin
     
     queryTypes.needsEmergencyFixes = isPersonalityQuery || queryTypes.isEmotionFocused;
     
-    console.log("[Query Planner] Enhanced query type analysis:", {
-      ...queryTypes,
-      isPersonalityQuery,
-      needsEmergencyFixes: queryTypes.needsEmergencyFixes
-    });
-    
     // Check if this is a time pattern analysis query
     const isTimePatternQuery = queryTypes.isTemporalQuery && 
                              (message.toLowerCase().includes('pattern') || 
@@ -177,13 +156,41 @@ export async function planQuery(message: string, threadId: string, userId: strin
                               message.toLowerCase().includes('how often') || 
                               message.toLowerCase().includes('frequency'));
     
-    // Optimize thread context enhancement - only for complex queries
+    // Enhance query with thread context only for complex queries
     let enhancedQuery = message;
     if (queryTypes.needsMoreContext || isPersonalityQuery) {
-      enhancedQuery = await enhanceWithThreadContext(message, threadId, queryTypes);
+      try {
+        const controller = new AbortController();
+        const timeoutId = setTimeout(() => controller.abort(), 3000);
+        
+        const { data: messages, error } = await supabase
+          .from('chat_messages')
+          .select('content, sender')
+          .eq('thread_id', threadId)
+          .order('created_at', { ascending: false })
+          .limit(3)
+          .abortSignal(controller.signal);
+
+        clearTimeout(timeoutId);
+
+        if (!error && messages) {
+          const context = messages
+            .filter(msg => msg.sender === 'user')
+            .map(msg => msg.content)
+            .slice(0, 2)
+            .join('\n');
+
+          if (context.length > 10) {
+            enhancedQuery = `${message}\nContext:\n${context}`;
+            console.log("[Query Planner] Enhanced query with thread context");
+          }
+        }
+      } catch (error) {
+        console.error("Error enhancing query with thread context:", error);
+      }
     }
     
-    // Define intelligent sub-query strategy with optimized priority
+    // Define intelligent sub-query strategy
     let strategy = 'intelligent_sub_query';
     
     if (queryTypes.needsMoreContext) {
@@ -199,19 +206,20 @@ export async function planQuery(message: string, threadId: string, userId: strin
     }
     else if (queryTypes.isEmotionFocused || isPersonalityQuery) {
       strategy = 'intelligent_sub_query';
-      console.log("[Query Planner] Using intelligent sub-query strategy with emergency fixes for personality/emotion analysis");
+      console.log("[Query Planner] Using intelligent sub-query strategy for personality/emotion analysis");
     }
     else if (queryTypes.isWhyQuestion) {
       strategy = 'intelligent_sub_query';
       console.log("[Query Planner] Using intelligent sub-query strategy for causal analysis");
     }
     
-    // Return enhanced plan with optimized performance indicators
+    // Return enhanced plan with personal pronoun support
     return {
       strategy,
       timeRange: queryTypes.timeRange,
       useHistoricalData: false,
-      usePersonalContext: true,
+      usePersonalContext,
+      useAllEntries, // CRITICAL: This will override time constraints when personal pronouns are detected
       filterByEmotion: queryTypes.emotion || null,
       enhancedQuery,
       originalQuery: message,
@@ -225,22 +233,26 @@ export async function planQuery(message: string, threadId: string, userId: strin
                       queryTypes.isEmotionFocused || isPersonalityQuery ? 'medium' : 'standard',
       needsEmergencyFixes: queryTypes.needsEmergencyFixes,
       isPersonalityQuery: isPersonalityQuery,
+      hasPersonalPronouns, // NEW: Flag for personal pronoun detection
+      hasExplicitTimeReference, // NEW: Flag for explicit time references
       emergencyFixPriority: isPersonalityQuery ? 'high' : queryTypes.isEmotionFocused ? 'medium' : 'low',
-      optimizedForSpeed: true // New flag indicating performance optimizations applied
+      optimizedForSpeed: true
     };
   } catch (error) {
-    console.error("[Query Planner] Error planning intelligent sub-query:", error);
+    console.error("[Query Planner] Error planning query:", error);
     return {
       strategy: 'intelligent_sub_query',
       originalQuery: message,
       enhancedQuery: message,
+      useAllEntries: true, // Default to all entries on error for personal questions
+      usePersonalContext: true,
       errorState: true,
       timestamp: new Date().toISOString(),
       requiresIntelligentPlanning: true,
       needsEmergencyFixes: true,
       emergencyFixPriority: 'high',
       optimizedForSpeed: true,
-      fallbackMode: true // Indicates we're in error recovery mode
+      fallbackMode: true
     };
   }
 }
