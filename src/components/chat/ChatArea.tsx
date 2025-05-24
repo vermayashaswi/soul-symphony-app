@@ -79,8 +79,13 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 </AvatarFallback>
               ) : (
                 <>
-                  <AvatarImage src="/images/logo.svg" />
-                  <AvatarFallback className="bg-muted">AI</AvatarFallback>
+                  <AvatarImage 
+                    src="/lovable-uploads/f99b0ee2-bfd0-4a3e-a03e-b1c0ac064ea1.png" 
+                    alt="Ruh"
+                    className="object-cover"
+                    loading="eager"
+                  />
+                  <AvatarFallback className="bg-muted">R</AvatarFallback>
                 </>
               )}
             </Avatar>

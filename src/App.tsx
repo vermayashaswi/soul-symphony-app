@@ -8,6 +8,7 @@ import { TranslationLoadingOverlay } from '@/components/translation/TranslationL
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
+import { preloadCriticalImages } from './utils/imagePreloader';
 import './styles/emoji.css';
 import './styles/tutorial.css'; // Ensure tutorial styles are imported
 
@@ -26,6 +27,9 @@ const App: React.FC = () => {
     
     // Apply a CSS class to the document body for theme-specific overrides
     document.body.classList.add('app-initialized');
+    
+    // Preload critical images including the chat avatar
+    preloadCriticalImages();
   }, []);
 
   return (

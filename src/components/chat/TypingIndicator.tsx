@@ -10,8 +10,13 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ className = "" }) => 
   return (
     <div className={`flex items-center gap-3 ${className}`}>
       <Avatar className="h-8 w-8">
-        <AvatarImage src="/images/logo.svg" />
-        <AvatarFallback className="bg-muted">AI</AvatarFallback>
+        <AvatarImage 
+          src="/lovable-uploads/f99b0ee2-bfd0-4a3e-a03e-b1c0ac064ea1.png" 
+          alt="Ruh"
+          className="object-cover"
+          loading="eager"
+        />
+        <AvatarFallback className="bg-muted">R</AvatarFallback>
       </Avatar>
       
       <div className="flex items-center space-x-1 bg-muted/60 border border-border/50 rounded-2xl rounded-tl-none px-4 py-3">
