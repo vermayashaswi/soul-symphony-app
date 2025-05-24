@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect } from "react";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
@@ -80,7 +81,7 @@ const ChatArea: React.FC<ChatAreaProps> = ({
               ) : (
                 <>
                   <AvatarImage 
-                    src="/lovable-uploads/f99b0ee2-bfd0-4a3e-a03e-b1c0ac064ea1.png" 
+                    src="/lovable-uploads/e3578093-b94f-4002-82ad-c56fb4c32915.png" 
                     alt="Ruh"
                     className="object-cover"
                     loading="eager"
