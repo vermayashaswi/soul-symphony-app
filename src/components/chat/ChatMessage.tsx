@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Card, CardContent } from '@/components/ui/card';
 import { User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
@@ -58,7 +58,7 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
       {!isUser && (
         <Avatar className="h-8 w-8 mt-1">
           <div className="w-full h-full rounded-full bg-theme animate-pulse" />
-          <AvatarFallback className="bg-orange-500">
+          <AvatarFallback className="bg-theme">
           </AvatarFallback>
         </Avatar>
       )}
@@ -93,6 +93,12 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
 
       {isUser && (
         <Avatar className="h-8 w-8 mt-1">
+          <AvatarImage 
+            src={undefined} 
+            alt="User"
+            className="bg-muted"
+            loading="eager"
+          />
           <AvatarFallback className="bg-muted">
             <User className="h-4 w-4" />
           </AvatarFallback>

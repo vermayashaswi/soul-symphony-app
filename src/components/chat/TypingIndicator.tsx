@@ -11,7 +11,7 @@ const TypingIndicator: React.FC<TypingIndicatorProps> = ({ className = "" }) => 
     <div className={`flex items-center gap-3 ${className}`}>
       <Avatar className="h-8 w-8">
         <div className="w-full h-full rounded-full bg-theme animate-pulse" />
-        <AvatarFallback className="bg-orange-500">
+        <AvatarFallback className="bg-theme">
         </AvatarFallback>
       </Avatar>
       

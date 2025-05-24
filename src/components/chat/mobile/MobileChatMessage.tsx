@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 import { useState } from "react";
 import { Button } from "@/components/ui/button";
 import { motion, AnimatePresence } from "framer-motion";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { useAuth } from "@/contexts/AuthContext";
 import { formatShortDate } from "@/utils/format-time";
 import { TranslatableText } from "@/components/translation/TranslatableText";
@@ -63,7 +63,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       {displayRole === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">
           <div className="w-full h-full rounded-full bg-theme animate-pulse" />
-          <AvatarFallback className="bg-orange-500">
+          <AvatarFallback className="bg-theme">
           </AvatarFallback>
         </Avatar>
       )}
@@ -163,6 +163,12 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       
       {displayRole === 'user' && (
         <Avatar className="w-8 h-8 border border-primary/20">
+          <AvatarImage 
+            src={user?.user_metadata?.avatar_url} 
+            alt="User"
+            className="bg-primary/20"
+            loading="eager"
+          />
           <AvatarFallback className="bg-primary/20 text-primary text-xs">
             {user?.user_metadata?.full_name ? 
               user.user_metadata.full_name.charAt(0) : 

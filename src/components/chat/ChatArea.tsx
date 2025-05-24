@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect } from "react";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Card, CardContent } from "@/components/ui/card";
 import { Skeleton } from "@/components/ui/skeleton";
 import ReactMarkdown from "react-markdown";
@@ -75,13 +75,21 @@ const ChatArea: React.FC<ChatAreaProps> = ({
           >
             <Avatar className="h-8 w-8">
               {message.sender === "user" || message.role === "user" ? (
-                <AvatarFallback className="bg-primary text-primary-foreground">
-                  U
-                </AvatarFallback>
+                <>
+                  <AvatarImage 
+                    src={undefined} 
+                    alt="User"
+                    className="bg-primary/20"
+                    loading="eager"
+                  />
+                  <AvatarFallback className="bg-primary text-primary-foreground">
+                    U
+                  </AvatarFallback>
+                </>
               ) : (
                 <>
                   <div className="w-full h-full rounded-full bg-theme animate-pulse" />
-                  <AvatarFallback className="bg-orange-500">
+                  <AvatarFallback className="bg-theme">
                   </AvatarFallback>
                 </>
               )}
