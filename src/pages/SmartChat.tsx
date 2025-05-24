@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import { SmartChatInterface } from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -39,12 +38,11 @@ export default function SmartChat() {
   const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [showSidebar, setShowSidebar] = useState(false);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(true);
   const chatContainerRef = useRef<HTMLDivElement>(null);
   const { toast } = useToast();
   const previousThreadIdRef = useRef<string | null>(null);
   const titleGeneratedForThreads = useRef<Set<string>>(new Set());
-  const hasInitializedRef = useRef<boolean>(false);
-  const threadCheckInProgressRef = useRef<boolean>(false);
   
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
@@ -61,78 +59,72 @@ export default function SmartChat() {
       metaViewport.setAttribute('content', 'width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no');
     }
     
-    const checkOrCreateThread = async () => {
-      if (!user?.id || threadCheckInProgressRef.current || hasInitializedRef.current) return;
-      
-      threadCheckInProgressRef.current = true;
+    const initializeThread = async () => {
+      if (!user?.id) return;
       
       try {
-        const lastActiveThreadId = localStorage.getItem(THREAD_ID_STORAGE_KEY);
+        setIsInitializing(true);
+        
+        // Check for stored thread first
+        const lastActiveThreadId = localStorage.getItem("lastActiveChatThreadId");
         
         if (lastActiveThreadId) {
-          try {
-            const { data, error } = await supabase
-              .from('chat_threads')
-              .select('id')
-              .eq('id', lastActiveThreadId)
-              .eq('user_id', user.id)
-              .single();
-              
-            if (data && !error) {
-              console.log("Found stored thread ID:", lastActiveThreadId);
-              setCurrentThreadId(lastActiveThreadId);
-              previousThreadIdRef.current = lastActiveThreadId;
-              window.dispatchEvent(
-                new CustomEvent('threadSelected', { 
-                  detail: { threadId: lastActiveThreadId } 
-                })
-              );
-              hasInitializedRef.current = true;
-              return;
-            } else {
-              console.log("Stored thread ID not found or not valid:", lastActiveThreadId, error);
-              localStorage.removeItem(THREAD_ID_STORAGE_KEY);
-            }
-          } catch (error) {
-            console.error("Error checking thread existence:", error);
+          const { data, error } = await supabase
+            .from('chat_threads')
+            .select('id')
+            .eq('id', lastActiveThreadId)
+            .eq('user_id', user.id)
+            .single();
+            
+          if (data && !error) {
+            console.log("Using stored thread:", lastActiveThreadId);
+            setCurrentThreadId(lastActiveThreadId);
+            window.dispatchEvent(
+              new CustomEvent('threadSelected', { 
+                detail: { threadId: lastActiveThreadId } 
+              })
+            );
+            return;
+          } else {
+            localStorage.removeItem("lastActiveChatThreadId");
           }
         }
         
-        try {
-          console.log("Looking for most recent thread");
-          const { data: threads, error } = await supabase
-            .from('chat_threads')
-            .select('*')
-            .eq('user_id', user.id)
-            .order('updated_at', { ascending: false })
-            .limit(1);
+        // Find most recent thread
+        const { data: threads, error } = await supabase
+          .from('chat_threads')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('updated_at', { ascending: false })
+          .limit(1);
 
-          if (error) throw error;
+        if (error) throw error;
 
-          if (threads && threads.length > 0) {
-            console.log("Found most recent thread:", threads[0].id);
-            setCurrentThreadId(threads[0].id);
-            previousThreadIdRef.current = threads[0].id;
-            localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
-            window.dispatchEvent(
-              new CustomEvent('threadSelected', { 
-                detail: { threadId: threads[0].id } 
-              })
-            );
-            hasInitializedRef.current = true;
-          } else {
-            console.log("No existing threads, creating new one");
-            await createNewThread();
-            hasInitializedRef.current = true;
-          }
-        } catch (error) {
-          console.error("Error checking threads:", error);
+        if (threads && threads.length > 0) {
+          console.log("Using most recent thread:", threads[0].id);
+          setCurrentThreadId(threads[0].id);
+          localStorage.setItem("lastActiveChatThreadId", threads[0].id);
+          window.dispatchEvent(
+            new CustomEvent('threadSelected', { 
+              detail: { threadId: threads[0].id } 
+            })
+          );
+        } else {
+          console.log("Creating new thread");
+          await createNewThread();
         }
+      } catch (error) {
+        console.error("Error initializing thread:", error);
+        await createNewThread();
       } finally {
-        threadCheckInProgressRef.current = false;
+        setIsInitializing(false);
       }
     };
 
+    if (user?.id) {
+      initializeThread();
+    }
+    
     const handleCloseSidebar = () => {
       setShowSidebar(false);
     };
@@ -155,10 +147,6 @@ export default function SmartChat() {
     
     window.addEventListener('closeChatSidebar', handleCloseSidebar);
     window.addEventListener('messageCreated' as any, handleMessageCreated);
-    
-    if (user?.id && !hasInitializedRef.current && !threadCheckInProgressRef.current) {
-      checkOrCreateThread();
-    }
     
     return () => {
       window.removeEventListener('closeChatSidebar', handleCloseSidebar);
@@ -220,8 +208,7 @@ export default function SmartChat() {
       
       console.log("Created new thread:", newThreadId);
       setCurrentThreadId(newThreadId);
-      previousThreadIdRef.current = newThreadId;
-      localStorage.setItem(THREAD_ID_STORAGE_KEY, newThreadId);
+      localStorage.setItem("lastActiveChatThreadId", newThreadId);
       
       window.dispatchEvent(
         new CustomEvent('threadSelected', { 
@@ -244,7 +231,7 @@ export default function SmartChat() {
   const handleSelectThread = (threadId: string) => {
     console.log("Thread selected:", threadId);
     setCurrentThreadId(threadId);
-    localStorage.setItem(THREAD_ID_STORAGE_KEY, threadId);
+    localStorage.setItem("lastActiveChatThreadId", threadId);
     window.dispatchEvent(
       new CustomEvent('threadSelected', { 
         detail: { threadId: threadId } 
@@ -295,7 +282,7 @@ export default function SmartChat() {
       if (threads && threads.length > 0) {
         setCurrentThreadId(threads[0].id);
         previousThreadIdRef.current = threads[0].id;
-        localStorage.setItem(THREAD_ID_STORAGE_KEY, threads[0].id);
+        localStorage.setItem("lastActiveChatThreadId", threads[0].id);
         window.dispatchEvent(
           new CustomEvent('threadSelected', { 
             detail: { threadId: threads[0].id } 
@@ -403,6 +390,17 @@ export default function SmartChat() {
   
   const content = shouldRenderMobile ? mobileContent : desktopContent;
   
+  if (isInitializing) {
+    return (
+      <div className="flex items-center justify-center h-screen">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+          <p className="text-muted-foreground">Initializing chat...</p>
+        </div>
+      </div>
+    );
+  }
+
   return (
     <DebugProvider>
       {mobileDemo ? <MobilePreviewFrame>{content}</MobilePreviewFrame> : content}
