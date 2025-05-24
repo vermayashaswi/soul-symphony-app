@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import ChatInput from "./ChatInput";
 import ChatArea from "./ChatArea";
@@ -44,6 +45,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 
 export interface SmartChatInterfaceProps {
   mentalHealthInsights?: MentalHealthInsights;
@@ -520,6 +527,16 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       return;
     }
 
+    // Prevent deletion if currently processing
+    if (isProcessing || processingStatus === 'processing') {
+      toast({
+        title: "Cannot delete conversation",
+        description: "Please wait for the current request to complete before deleting this conversation.",
+        variant: "destructive"
+      });
+      return;
+    }
+
     try {
       const { error: messagesError } = await supabase
         .from('chat_messages')
@@ -602,6 +619,9 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
     }
   };
 
+  // Check if deletion should be disabled
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || loading;
+
   return (
     <div className="chat-interface flex flex-col h-full">
       <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
@@ -609,15 +629,33 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         
         <div className="flex items-center gap-2">
           {currentThreadId && (
-            <Button 
-              variant="ghost" 
-              size="icon" 
-              className="h-9 w-9 text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20" 
-              onClick={() => setShowDeleteDialog(true)}
-              aria-label="Delete conversation"
-            >
-              <Trash className="h-5 w-5" />
-            </Button>
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={`h-9 w-9 ${
+                      isDeletionDisabled 
+                        ? 'text-muted-foreground/50 cursor-not-allowed' 
+                        : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20'
+                    }`}
+                    onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
+                    disabled={isDeletionDisabled}
+                    aria-label="Delete conversation"
+                  >
+                    <Trash className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isDeletionDisabled ? (
+                    <TranslatableText text="Cannot delete while processing" />
+                  ) : (
+                    <TranslatableText text="Delete conversation" />
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
       </div>

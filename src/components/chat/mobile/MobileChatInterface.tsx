@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -18,6 +17,7 @@ import { getThreadMessages, saveMessage } from "@/services/chat";
 import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
+import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -60,6 +60,12 @@ export default function MobileChatInterface({
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const debugLog = useDebugLog();
+  
+  // Use the realtime hook to track processing status
+  const {
+    isProcessing,
+    processingStatus
+  } = useChatRealtime(threadId);
   
   const suggestionQuestions = [
     {
@@ -445,6 +451,17 @@ export default function MobileChatInterface({
       return;
     }
 
+    // Prevent deletion if currently processing
+    if (isProcessing || processingStatus === 'processing') {
+      toast({
+        title: "Cannot delete conversation",
+        description: "Please wait for the current request to complete before deleting this conversation.",
+        variant: "destructive"
+      });
+      setShowDeleteDialog(false);
+      return;
+    }
+
     try {
       const { error: messagesError } = await supabase
         .from('chat_messages')
@@ -512,6 +529,9 @@ export default function MobileChatInterface({
     }
   };
 
+  // Check if deletion should be disabled
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || loading;
+
   return (
     <div className="mobile-chat-interface h-full flex flex-col relative">
       <div className="sticky top-0 z-40 w-full bg-background border-b">
@@ -560,12 +580,17 @@ export default function MobileChatInterface({
           <Button
             variant="ghost"
             size="icon"
-            className="ml-2"
-            onClick={() => setShowDeleteDialog(true)}
+            className={`ml-2 ${
+              isDeletionDisabled 
+                ? 'text-muted-foreground/50 cursor-not-allowed' 
+                : 'text-muted-foreground hover:text-destructive'
+            }`}
+            onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
+            disabled={isDeletionDisabled}
           >
             <Trash2 className="h-5 w-5" />
             <span className="sr-only">
-              <TranslatableText text="Delete Chat" />
+              <TranslatableText text={isDeletionDisabled ? "Cannot delete while processing" : "Delete Chat"} />
             </span>
           </Button>
         </div>
@@ -655,14 +680,23 @@ export default function MobileChatInterface({
               <TranslatableText text="Delete this conversation?" />
             </AlertDialogTitle>
             <AlertDialogDescription>
-              <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
+              {isDeletionDisabled ? (
+                <TranslatableText text="Cannot delete conversation while the chatbot is processing a request. Please wait for the current request to complete." />
+              ) : (
+                <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              disabled={isDeletionDisabled}
+              className={`${
+                isDeletionDisabled 
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                  : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+              }`}
             >
               <TranslatableText text="Delete" />
             </AlertDialogAction>

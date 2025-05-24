@@ -1,4 +1,3 @@
-
 import { useEffect, useState, useRef } from "react";
 import { SmartChatInterface } from "@/components/chat/SmartChatInterface";
 import MobileChatInterface from "@/components/chat/mobile/MobileChatInterface";
@@ -17,6 +16,7 @@ import { supabase } from "@/integrations/supabase/client";
 import { generateThreadTitle } from "@/utils/chat/threadUtils";
 import { useToast } from "@/hooks/use-toast";
 import { DebugProvider } from "@/utils/debug/DebugContext";
+import { useChatRealtime } from "@/hooks/use-chat-realtime";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -27,6 +27,12 @@ import {
   AlertDialogHeader,
   AlertDialogTitle,
 } from "@/components/ui/alert-dialog";
+import {
+  Tooltip,
+  TooltipContent,
+  TooltipProvider,
+  TooltipTrigger,
+} from "@/components/ui/tooltip";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 
 const THREAD_ID_STORAGE_KEY = "lastActiveChatThreadId";
@@ -52,6 +58,12 @@ export default function SmartChat() {
 
   // Add mental health insights
   const { insights: mentalHealthInsights } = useMentalHealthInsights(user?.id);
+
+  // Use the realtime hook to track processing status
+  const {
+    isProcessing,
+    processingStatus
+  } = useChatRealtime(currentThreadId);
 
   useEffect(() => {
     document.title = "Roha | SOULo";
@@ -262,6 +274,17 @@ export default function SmartChat() {
       return;
     }
 
+    // Prevent deletion if currently processing
+    if (isProcessing || processingStatus === 'processing') {
+      toast({
+        title: "Cannot delete conversation",
+        description: "Please wait for the current request to complete before deleting this conversation.",
+        variant: "destructive"
+      });
+      setShowDeleteDialog(false);
+      return;
+    }
+
     try {
       const { error: messagesError } = await supabase
         .from('chat_messages')
@@ -341,15 +364,33 @@ export default function SmartChat() {
         <div className="flex-1 p-4 relative">
           {currentThreadId && (
             <div className="absolute top-4 right-4 z-10">
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20"
-                onClick={() => setShowDeleteDialog(true)}
-                aria-label="Delete conversation"
-              >
-                <Trash2 className="h-5 w-5" />
-              </Button>
+              <TooltipProvider>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <Button
+                      variant="ghost"
+                      size="icon"
+                      className={`${
+                        isDeletionDisabled 
+                          ? 'text-muted-foreground/50 cursor-not-allowed' 
+                          : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20'
+                      }`}
+                      onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
+                      disabled={isDeletionDisabled}
+                      aria-label="Delete conversation"
+                    >
+                      <Trash2 className="h-5 w-5" />
+                    </Button>
+                  </TooltipTrigger>
+                  <TooltipContent>
+                    {isDeletionDisabled ? (
+                      <TranslatableText text="Cannot delete while processing" />
+                    ) : (
+                      <TranslatableText text="Delete conversation" />
+                    )}
+                  </TooltipContent>
+                </Tooltip>
+              </TooltipProvider>
             </div>
           )}
           <SmartChatInterface 
@@ -363,14 +404,23 @@ export default function SmartChat() {
           <AlertDialogHeader>
             <AlertDialogTitle><TranslatableText text="Delete this conversation?" /></AlertDialogTitle>
             <AlertDialogDescription>
-              <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
+              {isDeletionDisabled ? (
+                <TranslatableText text="Cannot delete conversation while the chatbot is processing a request. Please wait for the current request to complete." />
+              ) : (
+                <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
+              )}
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
             <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
-              className="bg-destructive hover:bg-destructive/90 text-destructive-foreground"
+              disabled={isDeletionDisabled}
+              className={`${
+                isDeletionDisabled 
+                  ? 'bg-muted text-muted-foreground cursor-not-allowed' 
+                  : 'bg-destructive hover:bg-destructive/90 text-destructive-foreground'
+              }`}
             >
               <TranslatableText text="Delete" />
             </AlertDialogAction>
