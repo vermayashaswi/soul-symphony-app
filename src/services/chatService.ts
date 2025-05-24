@@ -1,7 +1,6 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
-import { enhancedQueryClassification, QueryCategory } from '../utils/chat/messageClassifier';
+import { QueryCategory } from '../hooks/use-chat-message-classification';
 import { analyzeTimePatterns } from '@/utils/chat/timePatternAnalyzer';
 import { showToast } from '@/utils/journal/toast-helper';
 import { fetchWithRetry } from '@/utils/api-client';
@@ -255,13 +254,31 @@ export async function processChatMessage(
     console.log("Processing chat message:", message.substring(0, 30) + "...");
     console.log("Parameters:", parameters);
     
-    // Use enhanced classification to determine message category
-    const classification = enhancedQueryClassification(message);
-    console.log("Enhanced message classification:", {
+    // Use server-side GPT classification directly
+    const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
+      body: { message, conversationContext: conversationHistory }
+    });
+
+    if (classificationError) {
+      console.error("Classification error:", classificationError);
+      // Default to conversational if classification fails
+      var classification = {
+        category: QueryCategory.CONVERSATIONAL,
+        confidence: 0.5,
+        reasoning: 'Classification service unavailable'
+      };
+    } else {
+      var classification = {
+        category: classificationData.category as QueryCategory,
+        confidence: classificationData.confidence,
+        reasoning: classificationData.reasoning
+      };
+    }
+    
+    console.log("Message classification:", {
       category: classification.category,
       confidence: classification.confidence,
-      reasoning: classification.reasoning,
-      forceJournalSpecific: classification.forceJournalSpecific
+      reasoning: classification.reasoning
     });
     
     // Handle different categories appropriately
