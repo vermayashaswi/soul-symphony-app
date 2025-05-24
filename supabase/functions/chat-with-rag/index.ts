@@ -31,6 +31,7 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] PROCESSING: "${message}"`);
     console.log(`[chat-with-rag] Flags - UseAllEntries: ${useAllEntries}, PersonalPronouns: ${hasPersonalPronouns}, TimeRef: ${hasExplicitTimeReference}`);
+    console.log(`[chat-with-rag] Raw userId received:`, userId, `Type: ${typeof userId}`);
 
     if (!message || !userId || !queryPlan) {
       return new Response(JSON.stringify({ error: 'Missing required fields' }), {
@@ -39,22 +40,29 @@ serve(async (req) => {
       });
     }
 
-    // FIXED: Check user's journal entry count with proper table name and error handling
-    console.log(`[chat-with-rag] Checking journal entries for user: ${userId}`);
+    // CRITICAL FIX: Ensure userId is a string for database queries
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[chat-with-rag] Converted userId to string:`, userIdString);
+
+    // FIXED: Check user's journal entry count with proper user_id handling
+    console.log(`[chat-with-rag] Checking journal entries for user: ${userIdString}`);
     
     let userEntryCount = 0;
     try {
+      // First attempt: count query with explicit string conversion
       const { count, error: countError } = await supabase
         .from('Journal Entries')
         .select('*', { count: 'exact', head: true })
-        .eq('user_id', userId);
+        .eq('user_id', userIdString);
 
       if (countError) {
         console.error(`[chat-with-rag] Error counting entries:`, countError);
+        console.error(`[chat-with-rag] Query details - table: Journal Entries, user_id: ${userIdString}`);
         // Continue with count = 0 but log the error
         userEntryCount = 0;
       } else {
         userEntryCount = count || 0;
+        console.log(`[chat-with-rag] Successfully counted ${userEntryCount} entries for user ${userIdString}`);
       }
     } catch (error) {
       console.error(`[chat-with-rag] Exception counting entries:`, error);
@@ -63,22 +71,25 @@ serve(async (req) => {
 
     console.log(`[chat-with-rag] User has ${userEntryCount} journal entries available`);
 
-    // FIXED: Only return "no entries" message if we're absolutely sure there are no entries
+    // ENHANCED: Double-check with a different query approach if count is 0
     if (userEntryCount === 0) {
-      // Double-check with a different query approach
-      console.log(`[chat-with-rag] Double-checking entries with direct query...`);
+      console.log(`[chat-with-rag] Double-checking entries with direct query for user: ${userIdString}...`);
       try {
         const { data: entries, error } = await supabase
           .from('Journal Entries')
-          .select('id, created_at')
-          .eq('user_id', userId)
-          .limit(1);
+          .select('id, created_at, user_id')
+          .eq('user_id', userIdString)
+          .limit(5);
 
         if (error) {
           console.error(`[chat-with-rag] Error in double-check query:`, error);
+          console.error(`[chat-with-rag] Double-check query details - user_id: ${userIdString}, type: ${typeof userIdString}`);
         } else if (entries && entries.length > 0) {
           console.log(`[chat-with-rag] Double-check found ${entries.length} entries! Updating count.`);
-          userEntryCount = entries.length; // At least 1, but we know there are more
+          console.log(`[chat-with-rag] Sample entries:`, entries.map(e => ({ id: e.id, user_id: e.user_id, created_at: e.created_at })));
+          userEntryCount = entries.length; // At least this many, but likely more
+        } else {
+          console.log(`[chat-with-rag] Double-check also returned 0 entries for user: ${userIdString}`);
         }
       } catch (error) {
         console.error(`[chat-with-rag] Exception in double-check:`, error);
@@ -87,7 +98,7 @@ serve(async (req) => {
 
     // Only return "no entries" if we're absolutely certain
     if (userEntryCount === 0) {
-      console.log(`[chat-with-rag] Confirmed: No journal entries found for user`);
+      console.log(`[chat-with-rag] Confirmed: No journal entries found for user ${userIdString}`);
       return new Response(JSON.stringify({
         response: "I'd love to help you analyze your journal entries, but it looks like you haven't created any entries yet. Once you start journaling, I'll be able to provide insights about your emotions, patterns, and personal growth!",
         hasData: false,
@@ -131,14 +142,14 @@ serve(async (req) => {
           const { count: entriesInRange, error } = await supabase
             .from('Journal Entries')
             .select('*', { count: 'exact', head: true })
-            .eq('user_id', userId)
+            .eq('user_id', userIdString)
             .gte('created_at', effectiveDateFilter.startDate)
             .lte('created_at', effectiveDateFilter.endDate);
 
           if (error) {
             console.error(`[chat-with-rag] Error checking date range:`, error);
           } else {
-            console.log(`[chat-with-rag] Found ${entriesInRange || 0} entries in date range`);
+            console.log(`[chat-with-rag] Found ${entriesInRange || 0} entries in date range for user ${userIdString}`);
             
             if (!entriesInRange || entriesInRange === 0) {
               console.log(`[chat-with-rag] NO ENTRIES in date range - continuing to next sub-question`);
@@ -173,14 +184,14 @@ serve(async (req) => {
             
             if (sqlQuery.function === 'get_top_emotions_with_entries') {
               console.log(`[chat-with-rag] Calling get_top_emotions_with_entries with params:`, {
-                user_id_param: userId,
+                user_id_param: userIdString,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
                 limit_count: sqlParams.limit_count || 5
               });
 
               const { data, error } = await supabase.rpc(sqlQuery.function, {
-                user_id_param: userId,
+                user_id_param: userIdString,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
                 limit_count: sqlParams.limit_count || 5
@@ -195,7 +206,7 @@ serve(async (req) => {
             } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
               const { data, error } = await supabase.rpc(sqlQuery.function, {
                 emotion_name: sqlParams.emotion_name,
-                user_id_filter: userId,
+                user_id_filter: userIdString,
                 min_score: sqlParams.min_score || 0.3,
                 start_date: sqlParams.start_date,
                 end_date: sqlParams.end_date,
@@ -254,12 +265,12 @@ serve(async (req) => {
           let vectorResults = [];
           
           if (effectiveDateFilter) {
-            console.log(`[chat-with-rag] Vector search with date filter`);
+            console.log(`[chat-with-rag] Vector search with date filter for user: ${userIdString}`);
             const { data, error } = await supabase.rpc('match_journal_entries_with_date', {
               query_embedding: embedding,
               match_threshold: vectorSearch.threshold || 0.1,
               match_count: 10,
-              user_id_filter: userId,
+              user_id_filter: userIdString,
               start_date: effectiveDateFilter.startDate,
               end_date: effectiveDateFilter.endDate
             });
@@ -271,12 +282,12 @@ serve(async (req) => {
             vectorResults = data || [];
             
           } else {
-            console.log(`[chat-with-rag] Vector search without date filter`);
+            console.log(`[chat-with-rag] Vector search without date filter for user: ${userIdString}`);
             const { data, error } = await supabase.rpc('match_journal_entries_fixed', {
               query_embedding: embedding,
               match_threshold: vectorSearch.threshold || 0.1,
               match_count: useAllEntries ? 50 : 10,
-              user_id_filter: userId
+              user_id_filter: userIdString
             });
             
             if (error) {

@@ -23,13 +23,16 @@ export async function sendMessage(
   });
   
   try {
+    // Ensure userId is a string for consistent handling
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[sendMessage] Processing query: "${message}" for user: ${userIdString}`);
+    
     // Create a message ID for this new message
     const messageId = uuidv4();
     
     // Capture client's device time and timezone information
     const clientTimeInfo = getClientTimeInfo();
     
-    console.log(`[sendMessage] Processing query: "${message}"`);
     console.log(`[sendMessage] Client time info:`, clientTimeInfo);
     
     // Save the user message to the database
@@ -56,7 +59,7 @@ export async function sendMessage(
       const { data: profileData } = await supabase
         .from('profiles')
         .select('timezone')
-        .eq('id', userId)
+        .eq('id', userIdString)
         .single();
         
       if (profileData && profileData.timezone) {
@@ -136,7 +139,7 @@ export async function sendMessage(
     
     const queryPlannerParams = {
       message,
-      userId,
+      userId: userIdString,
       conversationContext,
       isFollowUp: conversationContext.length > 0,
       timezoneOffset: clientTimeInfo.timezoneOffset,
@@ -167,7 +170,7 @@ export async function sendMessage(
           }
         },
         'query-planning',
-        { message, userId, strategy: 'enhanced' }
+        { message, userId: userIdString, strategy: 'enhanced' }
       );
     } catch (error) {
       console.error('Query planner timeout or error:', error);
@@ -281,7 +284,7 @@ export async function sendMessage(
             const response = await supabase.functions.invoke('chat-with-rag', {
               body: {
                 message,
-                userId,
+                userId: userIdString,
                 threadId,
                 timeRange: dateRange,
                 referenceDate,
@@ -300,7 +303,7 @@ export async function sendMessage(
           }
         },
         'response-generation',
-        { message, userId, strategy: queryPlan.strategy }
+        { message, userId: userIdString, strategy: queryPlan.strategy }
       );
     } catch (error) {
       console.error('Chat-with-rag timeout or error:', error);

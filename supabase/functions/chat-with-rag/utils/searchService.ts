@@ -5,7 +5,9 @@ export async function searchEntriesWithVector(
   queryEmbedding: number[]
 ) {
   try {
-    console.log(`[chat-with-rag/searchService] Searching entries with vector similarity for userId: ${userId}`);
+    // Ensure userId is a string
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[chat-with-rag/searchService] Searching entries with vector similarity for userId: ${userIdString}`);
     
     const { data, error } = await supabase.rpc(
       'match_journal_entries_fixed',
@@ -13,7 +15,7 @@ export async function searchEntriesWithVector(
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
         match_count: 10,
-        user_id_filter: userId
+        user_id_filter: userIdString
       }
     );
     
@@ -50,7 +52,9 @@ export async function searchEntriesWithTimeRange(
   timeRange: { startDate?: string; endDate?: string }
 ) {
   try {
-    console.log(`[chat-with-rag/searchService] Searching entries with time range for userId: ${userId}`);
+    // Ensure userId is a string
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    console.log(`[chat-with-rag/searchService] Searching entries with time range for userId: ${userIdString}`);
     console.log(`[chat-with-rag/searchService] Time range: from ${timeRange.startDate || 'none'} to ${timeRange.endDate || 'none'}`);
     
     // Enhanced debugging for date formats
@@ -75,7 +79,7 @@ export async function searchEntriesWithTimeRange(
       query_embedding: `[array with ${queryEmbedding.length} elements]`,
       match_threshold: 0.5,
       match_count: 10,
-      user_id_filter: userId,
+      user_id_filter: userIdString,
       start_date: startDate,
       end_date: endDate
     });
@@ -87,7 +91,7 @@ export async function searchEntriesWithTimeRange(
         query_embedding: queryEmbedding,
         match_threshold: 0.5,
         match_count: 10,
-        user_id_filter: userId,
+        user_id_filter: userIdString,
         start_date: startDate,
         end_date: endDate
       }
@@ -133,9 +137,12 @@ export async function searchEntriesByMonth(
   year?: number
 ) {
   try {
+    // Ensure userId is a string
+    const userIdString = typeof userId === 'string' ? userId : String(userId);
+    
     // Get current year if not provided
     const targetYear = year || new Date().getFullYear();
-    console.log(`[chat-with-rag/searchService] Searching entries for month: ${monthName} ${targetYear} for userId: ${userId}`);
+    console.log(`[chat-with-rag/searchService] Searching entries for month: ${monthName} ${targetYear} for userId: ${userIdString}`);
     
     // Map month name to month index (0-based)
     const monthMap: Record<string, number> = {
@@ -197,7 +204,7 @@ export async function searchEntriesByMonth(
     });
     
     // Use the existing time range function with these dates
-    return await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, { 
+    return await searchEntriesWithTimeRange(supabase, userIdString, queryEmbedding, { 
       startDate: startDate.toISOString(), 
       endDate: endDate.toISOString() 
     });
@@ -218,7 +225,9 @@ export async function searchWithStrategy(
   timeRange?: { startDate?: string; endDate?: string },
   maxEntries: number = 10
 ) {
-  console.log(`[searchService] Using search strategy: ${strategy}`);
+  // Ensure userId is a string
+  const userIdString = typeof userId === 'string' ? userId : String(userId);
+  console.log(`[searchService] Using search strategy: ${strategy} for user: ${userIdString}`);
   
   try {
     let entries = [];
@@ -227,25 +236,25 @@ export async function searchWithStrategy(
       case 'comprehensive':
         // Use larger limits for comprehensive searches
         if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-          entries = await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, timeRange);
+          entries = await searchEntriesWithTimeRange(supabase, userIdString, queryEmbedding, timeRange);
         } else {
-          entries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+          entries = await searchEntriesWithVector(supabase, userIdString, queryEmbedding);
         }
         break;
         
       case 'hybrid':
         // Combine vector and time-based search
         if (timeRange && (timeRange.startDate || timeRange.endDate)) {
-          entries = await searchEntriesWithTimeRange(supabase, userId, queryEmbedding, timeRange);
+          entries = await searchEntriesWithTimeRange(supabase, userIdString, queryEmbedding, timeRange);
         } else {
-          entries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+          entries = await searchEntriesWithVector(supabase, userIdString, queryEmbedding);
         }
         break;
         
       case 'vector':
       default:
         // Standard vector search
-        entries = await searchEntriesWithVector(supabase, userId, queryEmbedding);
+        entries = await searchEntriesWithVector(supabase, userIdString, queryEmbedding);
         break;
     }
     
