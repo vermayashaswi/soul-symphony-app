@@ -20,8 +20,31 @@ serve(async (req) => {
 
     const { message } = await req.json();
     
-    console.log('[General Mental Health Chat] Processing general question:', message);
+    console.log('[General Mental Health Chat] Processing message:', message);
 
+    // Check if this is a simple greeting or conversational message
+    const isGreeting = /^(hi|hello|hey|sup|what's up|howdy|good morning|good afternoon|good evening|how are you|how's it going)\??!?$/i.test(message.trim());
+    const isSimpleConversational = message.trim().length < 10 && !/\b(anxious|depressed|sad|help|advice|how to|why|what|mental health|stress|confidence|mood|feeling)\b/i.test(message);
+
+    if (isGreeting || isSimpleConversational) {
+      // Return a simple, friendly greeting without invoking OpenAI
+      const greetingResponses = [
+        "Hello! I'm here to help with mental health information and support. What would you like to know about?",
+        "Hi there! How can I assist you with mental health topics today?",
+        "Hey! I'm your mental health assistant. Feel free to ask me about wellness, coping strategies, or any mental health questions.",
+        "Hello! I'm here to provide mental health education and support. What's on your mind?"
+      ];
+      
+      const randomGreeting = greetingResponses[Math.floor(Math.random() * greetingResponses.length)];
+      
+      console.log('[General Mental Health Chat] Responding with greeting:', randomGreeting);
+      
+      return new Response(JSON.stringify({ response: randomGreeting }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // For actual mental health questions, use OpenAI
     const systemPrompt = `You are a helpful mental health education assistant. Provide general, evidence-based information about mental health topics. 
 
 IMPORTANT GUIDELINES:
