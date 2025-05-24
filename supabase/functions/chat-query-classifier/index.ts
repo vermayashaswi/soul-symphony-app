@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * Enhanced message classifier with 3-tier categorization system
+ * GPT-powered message classifier with enhanced contextual understanding
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -16,7 +16,7 @@ serve(async (req) => {
   }
 
   try {
-    const { message } = await req.json();
+    const { message, conversationContext = [] } = await req.json();
 
     if (!message) {
       return new Response(
@@ -25,26 +25,158 @@ serve(async (req) => {
       );
     }
 
-    // Classify message using enhanced 3-tier system
-    const classification = classifyMessage(message);
+    console.log(`[Query Classifier] Classifying message: "${message}"`);
+
+    // Get OpenAI API key
+    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
+    if (!openAiApiKey) {
+      console.error('[Query Classifier] OpenAI API key not found, falling back to rule-based classification');
+      const fallbackResult = ruleBased_classifyMessage(message);
+      return new Response(
+        JSON.stringify(fallbackResult),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Use GPT for classification
+    const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
+
+    console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence})`);
 
     return new Response(
       JSON.stringify(classification),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   } catch (error) {
-    console.error('Error processing message classification:', error);
-    return new Response(
-      JSON.stringify({ error: error.message || 'Unknown error' }),
-      { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
-    );
+    console.error('[Query Classifier] Error:', error);
+    
+    // Fallback to rule-based classification on error
+    try {
+      const { message } = await req.json();
+      const fallbackResult = ruleBased_classifyMessage(message);
+      return new Response(
+        JSON.stringify({ ...fallbackResult, fallbackUsed: true }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    } catch (fallbackError) {
+      return new Response(
+        JSON.stringify({ error: 'Classification failed' }),
+        { headers: { ...corsHeaders, 'Content-Type': 'application/json' }, status: 500 }
+      );
+    }
   }
 });
 
 /**
- * Enhanced 3-tier classification system
+ * GPT-powered classification with detailed prompt
  */
-function classifyMessage(message: string): {
+async function gptClassifyMessage(
+  message: string, 
+  conversationContext: any[], 
+  apiKey: string
+): Promise<{
+  category: string;
+  confidence: number;
+  shouldUseJournal: boolean;
+  reasoning: string;
+}> {
+  
+  const contextString = conversationContext.length > 0 
+    ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
+    : '';
+
+  const classificationPrompt = `You are a query classifier for SOULo, a voice journaling app that helps users analyze their personal journal entries for emotional insights and patterns.
+
+Your task is to classify user messages into one of three categories:
+
+**JOURNAL_SPECIFIC**: Questions that require analysis of the user's personal journal entries
+- Examples: "How was I doing last week?", "What are my top emotions?", "Am I an introvert?", "Do I like people?", "How should I improve my sleep?", "What makes me happy?", "How can I deal with my anxiety?", "What are my patterns?", "How have I been feeling recently?", "What did I write about yesterday?"
+- Key indicators: Personal pronouns (I, me, my), temporal references (last week, yesterday, recently), personality questions, personal advice requests, emotion analysis requests
+
+**GENERAL_MENTAL_HEALTH**: General mental health information requests without personal context
+- Examples: "What is anxiety?", "How to meditate?", "What are signs of depression?", "Best practices for mental health", "What is mindfulness?"
+- Key indicators: General educational questions, no personal pronouns, requesting general information
+
+**CONVERSATIONAL**: Greetings, thanks, clarifications, or general chat
+- Examples: "Hello", "Thank you", "How are you?", "Who are you?", "Can you help me?", "What can you do?"
+- Key indicators: Greetings, gratitude expressions, assistant capability questions
+
+CRITICAL RULES:
+1. ANY question with temporal references (last week, yesterday, today, recently, etc.) should be JOURNAL_SPECIFIC
+2. Questions starting with "How was I...", "Am I...", "Do I...", "What makes me..." are JOURNAL_SPECIFIC
+3. Personal advice requests ("How should I...", "What should I do...") are JOURNAL_SPECIFIC
+4. Personality or trait questions are JOURNAL_SPECIFIC
+5. When in doubt between JOURNAL_SPECIFIC and GENERAL_MENTAL_HEALTH, choose JOURNAL_SPECIFIC
+
+User message: "${message}"${contextString}
+
+Respond with ONLY a JSON object in this exact format:
+{
+  "category": "JOURNAL_SPECIFIC" | "GENERAL_MENTAL_HEALTH" | "CONVERSATIONAL",
+  "confidence": 0.0-1.0,
+  "shouldUseJournal": boolean,
+  "reasoning": "Brief explanation of why this category was chosen"
+}`;
+
+  try {
+    const controller = new AbortController();
+    const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+    const response = await fetch('https://api.openai.com/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Authorization': `Bearer ${apiKey}`,
+        'Content-Type': 'application/json',
+      },
+      body: JSON.stringify({
+        model: 'gpt-4o-mini',
+        messages: [{ role: 'user', content: classificationPrompt }],
+        temperature: 0.1,
+        max_tokens: 200,
+      }),
+      signal: controller.signal
+    });
+
+    clearTimeout(timeoutId);
+
+    if (!response.ok) {
+      throw new Error(`OpenAI API error: ${response.status}`);
+    }
+
+    const data = await response.json();
+    const content = data.choices[0]?.message?.content;
+
+    if (!content) {
+      throw new Error('No content in OpenAI response');
+    }
+
+    console.log(`[Query Classifier] GPT Response: ${content}`);
+
+    // Parse the JSON response
+    const result = JSON.parse(content);
+    
+    // Validate the response
+    if (!result.category || !['JOURNAL_SPECIFIC', 'GENERAL_MENTAL_HEALTH', 'CONVERSATIONAL'].includes(result.category)) {
+      throw new Error('Invalid category in GPT response');
+    }
+
+    return {
+      category: result.category,
+      confidence: Math.max(0, Math.min(1, result.confidence || 0.8)),
+      shouldUseJournal: result.category === 'JOURNAL_SPECIFIC',
+      reasoning: result.reasoning || 'GPT classification'
+    };
+
+  } catch (error) {
+    console.error('[Query Classifier] GPT classification failed:', error);
+    throw error;
+  }
+}
+
+/**
+ * Fallback rule-based classification (simplified version of the original)
+ */
+function ruleBased_classifyMessage(message: string): {
   category: string;
   confidence: number;
   shouldUseJournal: boolean;
@@ -52,243 +184,73 @@ function classifyMessage(message: string): {
 } {
   const lowerMessage = message.toLowerCase().trim();
   
-  // Initialize with default values
-  let category = "GENERAL_NO_RELATION";
-  let confidence = 0.5;
-  let reasoning = "No specific indicators found";
-  
-  // Step 1: Check for conversational patterns first
+  // Conversational patterns
   const conversationalPatterns = [
-    { pattern: /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i, 
-      weight: 0.95, 
-      reason: "Greeting or salutation" },
-      
-    { pattern: /^(thank you|thanks|thank u)\b/i, 
-      weight: 0.9, 
-      reason: "Expression of gratitude" },
-      
-    { pattern: /^(how are you|how do you)\b/i, 
-      weight: 0.85, 
-      reason: "Conversational inquiry" },
-      
-    { pattern: /^(what (are|is) you|who are you|tell me about yourself)\b/i, 
-      weight: 0.9, 
-      reason: "Getting to know the assistant" },
-      
-    { pattern: /^(can you|could you|would you).{0,20}(help|assist|explain|clarify)\b/i, 
-      weight: 0.8, 
-      reason: "Request for help or clarification" },
-      
-    { pattern: /^(i don't understand|can you clarify|what do you mean)\b/i, 
-      weight: 0.85, 
-      reason: "Clarification request" },
-      
-    { pattern: /^(sorry|excuse me|pardon)\b/i, 
-      weight: 0.8, 
-      reason: "Polite conversational marker" },
-      
-    { pattern: /^(yes|no|okay|ok|sure|alright)\s*\.?\s*$/i, 
-      weight: 0.75, 
-      reason: "Simple affirmation or response" },
-      
-    { pattern: /\b(please|can you).{0,30}(explain|clarify|help me understand)\b/i, 
-      weight: 0.8, 
-      reason: "Request for explanation" }
+    /^(hi|hello|hey|good morning|good afternoon|good evening)\b/i,
+    /^(thank you|thanks|thank u)\b/i,
+    /^(how are you|how do you)\b/i,
+    /^(what (are|is) you|who are you|tell me about yourself)\b/i,
+    /^(can you|could you|would you).{0,20}(help|assist|explain|clarify)\b/i,
+    /^(yes|no|okay|ok|sure|alright)\s*\.?\s*$/i
   ];
   
-  // Check for conversational patterns
-  for (const indicator of conversationalPatterns) {
-    if (indicator.pattern.test(lowerMessage)) {
+  for (const pattern of conversationalPatterns) {
+    if (pattern.test(lowerMessage)) {
       return {
         category: "CONVERSATIONAL",
-        confidence: indicator.weight,
+        confidence: 0.9,
         shouldUseJournal: false,
-        reasoning: indicator.reason
+        reasoning: "Conversational greeting or response"
       };
     }
   }
   
-  // Step 2: Check for journal-specific indicators
+  // Journal-specific indicators
   const journalSpecificIndicators = [
-    // Personal trait/personality questions
-    { pattern: /\bam i\b|\bdo i\b/i, 
-      weight: 0.5, 
-      reason: "Question about personal traits or preferences" },
-      
-    // Mental health related queries with personal context
-    { pattern: /\bmy (mental health|wellbeing|wellness|anxiety|depression|stress)\b/i, 
-      weight: 0.6, 
-      reason: "Personal mental health question" },
-    
-    // Self-improvement questions
-    { pattern: /\bhow (can|could|should) i\b|\bwhat should i do\b/i, 
-      weight: 0.45, 
-      reason: "Seeking personal advice or self-improvement" },
-      
-    // Emotion-related personal questions
-    { pattern: /\bhow (do|did) i feel\b|\bmy emotions\b|\bi feel\b/i, 
-      weight: 0.5, 
-      reason: "Question about personal emotions" },
-      
-    // Pattern recognition in behavior
-    { pattern: /\b(pattern|habit|routine|tendency|typically|usually|often)\b/i, 
-      weight: 0.4, 
-      reason: "Question about personal patterns or habits" },
-      
-    // First-person indicators with health/wellbeing terms
-    { pattern: /\bi\b.{1,30}\b(anxiety|stress|depression|mood|emotion|mental)\b/i, 
-      weight: 0.5, 
-      reason: "Personal context with mental health terms" },
-      
-    // Explicit references to journal entries
-    { pattern: /\b(journal|entry|entries|wrote|written|recorded)\b/i, 
-      weight: 0.6, 
-      reason: "Explicit reference to journal entries" },
-      
-    // Temporal questions about self
-    { pattern: /\bhow (have|did) i\b.{1,20}\b(recently|lately|past|week|month|year)\b/i, 
-      weight: 0.45, 
-      reason: "Question about personal changes over time" },
-      
-    // Personality trait specific questions
-    { pattern: /\b(intro|extro)vert\b/i,
-      weight: 0.6,
-      reason: "Question about introversion/extroversion personality traits" },
-      
-    // Social preference questions
-    { pattern: /\bdo i (like|enjoy|prefer)\b.{0,15}\bpeople\b/i,
-      weight: 0.6,
-      reason: "Question about social preferences" },
-      
-    // Personality type questions
-    { pattern: /\bwhat (type|kind) of person\b/i,
-      weight: 0.55,
-      reason: "Question about personality type" },
-      
-    // Character trait questions
-    { pattern: /\bmy (personality|character|nature|temperament)\b/i,
-      weight: 0.6,
-      reason: "Question about personal character traits" }
+    /\bam i\b|\bdo i\b/i,
+    /\bmy (mental health|wellbeing|anxiety|depression|stress)\b/i,
+    /\bhow (can|could|should) i\b|\bwhat should i do\b/i,
+    /\bhow (do|did) i feel\b|\bmy emotions\b|\bi feel\b/i,
+    /\b(last week|yesterday|recently|lately|this week|last month)\b/i,
+    /\b(intro|extro)vert\b/i,
+    /\bwhat (type|kind) of person\b/i,
+    /\bmy (personality|character|nature)\b/i
   ];
   
-  // Step 3: Check for general mental health indicators (without personal context)
-  const mentalHealthIndicators = [
-    { pattern: /\b(anxiety|depression|stress|mental health|wellbeing|wellness)\b/i,
-      weight: 0.4,
-      reason: "General mental health terminology" },
-      
-    { pattern: /\b(meditation|mindfulness|self[\s-]care|therapy|counseling)\b/i,
-      weight: 0.4,
-      reason: "Mental health practices and treatment" },
-      
-    { pattern: /\b(happiness|sadness|anger|emotion|mood|feeling)\b/i,
-      weight: 0.3,
-      reason: "Emotional terminology" },
-      
-    { pattern: /\b(coping|resilience|recovery|healing|growth)\b/i,
-      weight: 0.4,
-      reason: "Mental health recovery and growth terms" },
-      
-    { pattern: /\b(sleep|insomnia|burnout|overwhelm|worry)\b/i,
-      weight: 0.35,
-      reason: "Mental health symptoms and concerns" },
-      
-    { pattern: /\bwhat (are|is) (the )?(best|good|effective) (ways?|methods?|techniques?)\b/i,
-      weight: 0.4,
-      reason: "Request for mental health strategies" },
-      
-    { pattern: /\bhow (to|can|do).{0,30}(improve|increase|reduce|manage|cope with|deal with)\b/i,
-      weight: 0.4,
-      reason: "General improvement or management question" },
-      
-    { pattern: /\b(tips|advice|strategies|techniques) (for|to)\b/i,
-      weight: 0.35,
-      reason: "Request for general advice" }
-  ];
-  
-  // Step 4: Check for non-mental health factual questions
-  const factualIndicators = [
-    { pattern: /\b(who is|what is|where is|when (was|is)|how many)\b/i,
-      weight: 0.4,
-      reason: "Factual question format" },
-      
-    { pattern: /\b(president|capital|population|history|geography|science|math|technology)\b/i,
-      weight: 0.5,
-      reason: "Academic or factual subject matter" },
-      
-    { pattern: /\b(weather|news|sports|politics|economics|business)\b/i,
-      weight: 0.5,
-      reason: "Current events or general knowledge" },
-      
-    { pattern: /\b(recipe|cooking|food|restaurant|movie|music|book)\b/i,
-      weight: 0.4,
-      reason: "Entertainment or lifestyle topics" },
-      
-    { pattern: /\b(define|definition|meaning|translate|convert)\b/i,
-      weight: 0.5,
-      reason: "Definition or translation request" }
-  ];
-  
-  // Calculate scores for each category
-  let journalScore = 0;
-  let mentalHealthScore = 0;
-  let factualScore = 0;
-  
-  const journalReasons = [];
-  const mentalHealthReasons = [];
-  const factualReasons = [];
-  
-  // Check journal-specific indicators
-  for (const indicator of journalSpecificIndicators) {
-    if (indicator.pattern.test(lowerMessage)) {
-      journalScore += indicator.weight;
-      journalReasons.push(indicator.reason);
+  for (const pattern of journalSpecificIndicators) {
+    if (pattern.test(lowerMessage)) {
+      return {
+        category: "JOURNAL_SPECIFIC",
+        confidence: 0.8,
+        shouldUseJournal: true,
+        reasoning: "Contains personal context or temporal references"
+      };
     }
   }
   
-  // Check general mental health indicators
-  for (const indicator of mentalHealthIndicators) {
-    if (indicator.pattern.test(lowerMessage)) {
-      mentalHealthScore += indicator.weight;
-      mentalHealthReasons.push(indicator.reason);
+  // General mental health patterns
+  const mentalHealthPatterns = [
+    /\b(anxiety|depression|stress|mental health|wellbeing|wellness)\b/i,
+    /\b(meditation|mindfulness|self[\s-]care|therapy|counseling)\b/i,
+    /\bwhat (are|is) (the )?(best|good|effective) (ways?|methods?|techniques?)\b/i,
+    /\bhow (to|can|do).{0,30}(improve|increase|reduce|manage|cope with|deal with)\b/i
+  ];
+  
+  for (const pattern of mentalHealthPatterns) {
+    if (pattern.test(lowerMessage)) {
+      return {
+        category: "GENERAL_MENTAL_HEALTH",
+        confidence: 0.7,
+        shouldUseJournal: false,
+        reasoning: "General mental health question without personal context"
+      };
     }
   }
-  
-  // Check factual indicators
-  for (const indicator of factualIndicators) {
-    if (indicator.pattern.test(lowerMessage)) {
-      factualScore += indicator.weight;
-      factualReasons.push(indicator.reason);
-    }
-  }
-  
-  // Make final classification based on highest score
-  if (journalScore > 0.4) {
-    category = "JOURNAL_SPECIFIC";
-    confidence = Math.min(0.95, 0.5 + journalScore);
-    reasoning = journalReasons.slice(0, 3).join("; ");
-  } else if (mentalHealthScore > 0.3 && factualScore < 0.3) {
-    category = "GENERAL_MENTAL_HEALTH";
-    confidence = Math.min(0.9, 0.6 + mentalHealthScore);
-    reasoning = mentalHealthReasons.slice(0, 3).join("; ") || "General mental health topic without personal context";
-  } else if (factualScore > 0.3) {
-    category = "GENERAL_NO_RELATION";
-    confidence = Math.min(0.9, 0.6 + factualScore);
-    reasoning = factualReasons.slice(0, 3).join("; ") || "Factual question unrelated to mental health";
-  } else {
-    // Default case
-    category = "GENERAL_NO_RELATION";
-    confidence = 0.6;
-    reasoning = "Query doesn't clearly fit mental health or personal insight categories";
-  }
-  
-  // Ensure confidence is within bounds
-  confidence = Math.max(0, Math.min(1, confidence));
   
   return {
-    category,
-    confidence,
-    shouldUseJournal: category === "JOURNAL_SPECIFIC",
-    reasoning
+    category: "GENERAL_NO_RELATION",
+    confidence: 0.6,
+    shouldUseJournal: false,
+    reasoning: "No clear indicators for other categories"
   };
 }
