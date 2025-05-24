@@ -1,3 +1,4 @@
+
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
 import { QueryCategory } from '../hooks/use-chat-message-classification';
@@ -18,19 +19,21 @@ type ProcessedResponse = {
 };
 
 /**
- * Generate simple conversational responses for basic interactions
+ * IMPROVED: Generate contextual greetings and responses based on analysis results
  */
-function generateConversationalResponse(message: string, isFollowUp: boolean, conversationHistory: any[] = []): string {
+function generateContextualResponse(message: string, isFollowUp: boolean, conversationHistory: any[] = [], hasPersonalData: boolean = false): string {
   const lowerMessage = message.toLowerCase().trim();
   
   // Check if there's recent context from conversation history
   const hasRecentContext = conversationHistory.length > 0;
   const lastAssistantMessage = conversationHistory.slice().reverse().find(msg => msg.role === 'assistant');
   
-  // Greetings
+  // IMPROVED: Enhanced greetings with personal context awareness
   if (/^(hi|hello|hey|hiya|good morning|good afternoon|good evening)$/i.test(lowerMessage)) {
+    if (hasPersonalData) {
+      return "Hello! I've been analyzing your journal entries and I'm ready to help you explore your thoughts, emotions, and personal insights. What would you like to discover today?";
+    }
     if (isFollowUp || hasRecentContext) {
-      // If there's context, acknowledge the ongoing conversation
       if (lastAssistantMessage && lastAssistantMessage.content.includes('journal')) {
         return "Hi again! Ready to continue exploring your journal insights?";
       }
@@ -39,18 +42,24 @@ function generateConversationalResponse(message: string, isFollowUp: boolean, co
     return "Hello! I'm SOULo, your mental health assistant. How can I help you explore your journal entries today?";
   }
   
+  // IMPROVED: Mental health specific responses
+  if (/mental health|help|improve|advice|better|support|guidance/.test(lowerMessage)) {
+    if (hasPersonalData) {
+      return "Based on your journal entries, I can provide personalized mental health guidance. Let me analyze your patterns and emotions to give you tailored advice.";
+    }
+    return "I'd love to help with your mental health! To provide personalized advice, I'll analyze your journal entries for patterns and insights.";
+  }
+  
   // Thanks/appreciation
   if (/^(thanks?|thank you|ty|appreciate|awesome|great|perfect)$/i.test(lowerMessage)) {
-    // If there's context about what they're thanking for, be more specific
     if (hasRecentContext) {
       return "You're welcome! Is there anything else you'd like to explore from your journal entries?";
     }
     return "You're welcome! Is there anything else about your mental health or journal insights I can help with?";
   }
   
-  // Yes/No responses
+  // Yes/No responses with context awareness
   if (/^(yes|yeah|yep|yup|ok|okay)$/i.test(lowerMessage)) {
-    // Context-aware yes responses
     if (hasRecentContext && lastAssistantMessage) {
       if (lastAssistantMessage.content.includes('journal')) {
         return "Great! What specific aspect of your journaling would you like to dive into?";
@@ -266,11 +275,12 @@ export async function processChatMessage(
 
     if (classificationError) {
       console.error("Classification error:", classificationError);
-      // Default to conversational if classification fails
+      // IMPROVED: Default to journal-specific for mental health queries
+      const isMentalHealthQuery = /mental health|help|improve|advice|better|support|guidance|this week|today|yesterday/.test(message.toLowerCase());
       classification = {
-        category: QueryCategory.CONVERSATIONAL,
+        category: isMentalHealthQuery ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.CONVERSATIONAL,
         confidence: 0.5,
-        reasoning: 'Classification service unavailable'
+        reasoning: 'Classification service unavailable, using heuristic classification'
       };
     } else {
       classification = {
@@ -289,8 +299,19 @@ export async function processChatMessage(
     // Handle different categories appropriately
     switch (classification.category) {
       case QueryCategory.CONVERSATIONAL:
-        // Handle conversational queries with simple responses and conversation history
-        const conversationalResponse = generateConversationalResponse(message, isFollowUp, conversationHistory);
+        // IMPROVED: Check if we have personal data for better responses
+        let hasPersonalData = false;
+        try {
+          const { count } = await supabase
+            .from('Journal Entries')
+            .select('id', { count: 'exact', head: true })
+            .eq('user_id', userId);
+          hasPersonalData = (count || 0) > 0;
+        } catch (error) {
+          console.error("Error checking for personal data:", error);
+        }
+        
+        const conversationalResponse = generateContextualResponse(message, isFollowUp, conversationHistory, hasPersonalData);
         return {
           content: conversationalResponse,
           role: "assistant"
@@ -384,6 +405,14 @@ export async function processChatMessage(
           throw new Error("Failed to extract valid response from chat engine");
         }
 
+        // IMPROVED: Add personalized greeting for mental health queries with data
+        if (classification.category === QueryCategory.JOURNAL_SPECIFIC && chatResponse?.references && chatResponse.references.length > 0) {
+          const hasRelevantData = chatResponse.references.some(ref => ref.content && ref.content.length > 50);
+          if (hasRelevantData && !finalResponse.toLowerCase().includes('hello') && !finalResponse.toLowerCase().includes('hi')) {
+            finalResponse = `Hello! I've analyzed your journal entries and here's what I found:\n\n${finalResponse}`;
+          }
+        }
+
         // Prepare the response
         return {
           content: finalResponse,
@@ -397,9 +426,12 @@ export async function processChatMessage(
         };
       } catch (chatError) {
         console.error("Failed to process with chat-with-rag:", chatError);
-        // Fallback to a simple response if chat-with-rag fails
+        // IMPROVED: Fallback with context awareness
+        const hasPersonalDataFallback = /this week|today|yesterday|my/.test(message.toLowerCase());
         return {
-          content: "I'm having trouble analyzing your journal entries right now. Please try again in a moment.",
+          content: hasPersonalDataFallback ? 
+            "I'm having trouble analyzing your journal entries right now, but I'm here to help. Please try asking about your entries again in a moment." :
+            "I'm having trouble processing your request right now. Please try again in a moment.",
           role: 'assistant'
         };
       }
