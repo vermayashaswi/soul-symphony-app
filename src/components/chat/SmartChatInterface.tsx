@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import { ChatArea } from './ChatArea';
-import { ChatInput } from './ChatInput';
-import { EmptyChatState } from './EmptyChatState';
+import ChatArea from './ChatArea';
+import ChatInput from './ChatInput';
+import EmptyChatState from './EmptyChatState';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { processChatMessage } from '@/services/chatService';
-import { analyzeQuery } from '@/utils/chat/queryAnalyzer';
+import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
 import { useChatRealtime } from '@/hooks/use-chat-realtime';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -151,7 +151,7 @@ export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
 
       // Analyze query and process
-      const queryTypes = analyzeQuery(message);
+      const queryTypes = analyzeQueryTypes(message);
       const isFollowUp = messages.length > 0;
 
       const response = await processChatMessage(
@@ -215,14 +215,13 @@ export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-hidden">
         {messages.length === 0 ? (
-          <EmptyChatState 
-            onSuggestionClick={handleSendMessage}
-            mentalHealthInsights={mentalHealthInsights}
-          />
+          <EmptyChatState />
         ) : (
           <ChatArea 
-            messages={messages} 
+            chatMessages={messages} 
             isLoading={isLoading || isProcessing}
+            processingStage={isProcessing ? 'Processing...' : undefined}
+            threadId={currentThreadId}
           />
         )}
       </div>
@@ -230,8 +229,8 @@ export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <ChatInput 
           onSendMessage={handleSendMessage}
-          disabled={isLoading || isProcessing}
-          threadId={currentThreadId}
+          isLoading={isLoading || isProcessing}
+          userId={user?.id}
         />
       </div>
     </div>
