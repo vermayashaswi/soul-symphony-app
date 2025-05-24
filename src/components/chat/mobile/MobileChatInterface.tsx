@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from "react";
 import { Sheet, SheetContent, SheetHeader, SheetTrigger } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
@@ -55,7 +56,6 @@ export default function MobileChatInterface({
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
   const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
-  const [processingStage, setProcessingStage] = useState<string | null>(null);
   const [threadId, setThreadId] = useState<string | null>(initialThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
   const [showDeleteDialog, setShowDeleteDialog] = useState(false);
@@ -278,7 +278,6 @@ export default function MobileChatInterface({
     debugLog.addEvent("User Message", `[Mobile] Adding user message to UI: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
     setMessages(prev => [...prev, { role: 'user', content: message }]);
     setLoading(true);
-    setProcessingStage("Analyzing your question...");
     
     try {
       debugLog.addEvent("Database", `[Mobile] Saving user message to thread ${currentThreadId}`, "info");
@@ -298,7 +297,6 @@ export default function MobileChatInterface({
       
       debugLog.addEvent("Query Analysis", `[Mobile] Analyzing query: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
       console.log("[Mobile] Performing comprehensive query analysis for:", message);
-      setProcessingStage("Analyzing patterns in your journal...");
       const queryTypes = analyzeQueryTypes(message);
       
       const analysisDetails = {
@@ -313,7 +311,6 @@ export default function MobileChatInterface({
       debugLog.addEvent("Query Analysis", `[Mobile] Analysis result: ${JSON.stringify(analysisDetails)}`, "success");
       console.log("[Mobile] Query analysis result:", queryTypes);
       
-      setProcessingStage("Searching for insights...");
       debugLog.addEvent("AI Processing", "[Mobile] Sending query to AI for processing", "info");
       const response = await processChatMessage(
         message, 
@@ -415,7 +412,6 @@ export default function MobileChatInterface({
       }
     } finally {
       setLoading(false);
-      setProcessingStage(null);
     }
   };
 
@@ -629,15 +625,14 @@ export default function MobileChatInterface({
                 showAnalysis={false}
               />
             ))}
-          </div>
-        )}
-        
-        {loading && (
-          <div className="flex flex-col items-center justify-center space-y-2 p-4 rounded-lg bg-primary/5">
-            <div className="animate-spin h-5 w-5 border-2 border-primary border-t-transparent rounded-full"></div>
-            <p className="text-sm text-muted-foreground">
-              <TranslatableText text={processingStage || "Processing..."} />
-            </p>
+            
+            {/* Show typing indicator when loading */}
+            {loading && (
+              <MobileChatMessage 
+                message={{ role: 'assistant', content: '' }}
+                isLoading={true}
+              />
+            )}
           </div>
         )}
         
