@@ -1,4 +1,3 @@
-
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -150,7 +149,7 @@ export async function sendMessage(
       created_at: new Date().toISOString()
     });
     
-    // Step 1: Get intelligent query plan with enhanced monitoring
+    // Step 1: Get intelligent query plan with enhanced monitoring and reduced timeout
     console.log(`[sendMessage] Calling smart-query-planner`);
     
     const queryPlannerParams = {
@@ -166,17 +165,20 @@ export async function sendMessage(
       timeRange
     };
     
-    // Enhanced query planner call with monitoring
+    // Enhanced query planner call with reduced timeout and better error handling
     let queryPlanResponse;
     try {
       queryPlanResponse = await monitorChatOperation(
         async () => {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 8000); // Reduced from 10s
+          const timeoutId = setTimeout(() => controller.abort(), 6000); // Reduced from 8s to 6s
           
           try {
             const response = await supabase.functions.invoke('smart-query-planner', {
-              body: queryPlannerParams
+              body: queryPlannerParams,
+              options: {
+                signal: controller.signal
+              }
             });
             clearTimeout(timeoutId);
             return response;
@@ -191,15 +193,28 @@ export async function sendMessage(
     } catch (error) {
       console.error('Query planner timeout or error:', error);
       
-      // Use fallback plan
+      // Use improved fallback plan with better parameters
       queryPlanResponse = {
         data: {
           queryPlan: {
             strategy: "hybrid",
             queryType: "journal_specific",
             requiresJournalData: true,
+            subQuestions: [{
+              question: message,
+              searchPlan: {
+                vectorSearch: {
+                  enabled: true,
+                  threshold: 0.1,
+                  query: message,
+                  dateFilter: null
+                },
+                sqlQueries: [],
+                fallbackStrategy: "recent_entries"
+              }
+            }],
             searchParameters: {
-              vectorThreshold: 0.1, // Use low threshold for fallback
+              vectorThreshold: 0.1,
               useEmotionSQL: false,
               useThemeSQL: false,
               dateRange: null,
@@ -286,7 +301,7 @@ export async function sendMessage(
     
     console.log(`[sendMessage] Using date range:`, dateRange);
     
-    // Step 2: Execute intelligent search and response generation with enhanced monitoring
+    // Step 2: Execute intelligent search and response generation with enhanced monitoring and reduced timeout
     console.log(`[sendMessage] Calling chat-with-rag with auth token`);
     
     let queryResponse;
@@ -294,7 +309,7 @@ export async function sendMessage(
       queryResponse = await monitorChatOperation(
         async () => {
           const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 15000); // Reduced from 20s
+          const timeoutId = setTimeout(() => controller.abort(), 12000); // Reduced from 15s to 12s
           
           try {
             const response = await supabase.functions.invoke('chat-with-rag', {
@@ -312,6 +327,9 @@ export async function sendMessage(
               },
               headers: {
                 'Authorization': `Bearer ${session.access_token}`
+              },
+              options: {
+                signal: controller.signal
               }
             });
             clearTimeout(timeoutId);
@@ -327,10 +345,18 @@ export async function sendMessage(
     } catch (error) {
       console.error('Chat-with-rag timeout or error:', error);
       
-      // Provide fallback response
+      // Provide improved fallback response based on query type
+      let fallbackResponse = "I'm experiencing high demand right now. Please try your question again in a moment.";
+      
+      if (queryPlan.isEmotionQuery) {
+        fallbackResponse = "I'm having trouble analyzing your emotional patterns right now due to high demand. Please try again in a moment.";
+      } else if (queryPlan.isPersonalityQuery) {
+        fallbackResponse = "I'm temporarily unable to analyze personality patterns due to high system load. Please try again shortly.";
+      }
+      
       await supabase.from('chat_messages')
         .update({
-          content: "I'm experiencing high demand right now. Please try your question again in a moment.",
+          content: fallbackResponse,
           is_processing: false,
         })
         .eq('id', processingMessageId);
@@ -342,7 +368,7 @@ export async function sendMessage(
       performanceMonitor.endOperation(operationId, 'error', 'Chat-with-rag timeout');
       
       return {
-        response: "I'm experiencing high demand right now. Please try your question again in a moment.",
+        response: fallbackResponse,
         status: 'error',
         messageId: processingMessageId,
       };
