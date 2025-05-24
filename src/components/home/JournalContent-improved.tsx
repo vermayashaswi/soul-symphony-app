@@ -30,6 +30,11 @@ const JournalContentImproved: React.FC<JournalContentImprovedProps> = ({ refresh
     }
   }, [loading, isInitialized]);
 
+  const handleStartRecording = () => {
+    // This will be handled by the parent component or navigate to voice recorder
+    console.log('Start recording requested');
+  };
+
   // Show loading skeleton on initial load
   if (!isInitialized && loading) {
     return (
@@ -60,7 +65,7 @@ const JournalContentImproved: React.FC<JournalContentImprovedProps> = ({ refresh
   if (isInitialized && entries.length === 0) {
     return (
       <div className="h-full flex items-center justify-center">
-        <EmptyJournalState />
+        <EmptyJournalState onStartRecording={handleStartRecording} />
       </div>
     );
   }
@@ -71,8 +76,6 @@ const JournalContentImproved: React.FC<JournalContentImprovedProps> = ({ refresh
         <JournalEntryCard 
           key={entry.id} 
           entry={entry}
-          showTranslateButton={true}
-          allowEditing={true}
         />
       ))}
       

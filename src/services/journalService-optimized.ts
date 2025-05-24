@@ -1,6 +1,6 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 
 /**
  * Optimized version of journal service with better error handling and simpler logic
@@ -99,21 +99,47 @@ export const fetchJournalEntriesOptimized = async (
     
     console.log(`[JournalServiceOptimized] Successfully fetched ${data?.length || 0} entries`);
     
-    // Convert to expected format
-    const typedEntries: JournalEntry[] = (data || []).map(item => ({
-      id: item.id,
-      content: item["refined text"] || item["transcription text"] || "",
-      created_at: item.created_at,
-      audio_url: item.audio_url,
-      sentiment: item.sentiment,
-      themes: item.master_themes,
-      foreignKey: item["foreign key"],
-      entities: Array.isArray(item.entities) ? item.entities : [],
-      emotions: typeof item.emotions === 'object' ? item.emotions : {},
-      duration: item.duration,
-      user_feedback: item.user_feedback || null,
-      Edit_Status: item.Edit_Status
-    }));
+    // Convert to expected format with proper type handling
+    const typedEntries: JournalEntry[] = (data || []).map(item => {
+      // Parse entities safely
+      let parsedEntities: Array<{type: string, name: string, text?: string}> = [];
+      if (item.entities) {
+        try {
+          if (Array.isArray(item.entities)) {
+            // Filter and map entities to ensure they have the required structure
+            parsedEntities = item.entities
+              .filter((entity: any) => 
+                entity && 
+                typeof entity === 'object' && 
+                typeof entity.type === 'string' && 
+                typeof entity.name === 'string'
+              )
+              .map((entity: any) => ({
+                type: entity.type,
+                name: entity.name,
+                text: entity.text || undefined
+              }));
+          }
+        } catch (err) {
+          console.error('[JournalServiceOptimized] Error parsing entities:', err);
+        }
+      }
+
+      return {
+        id: item.id,
+        content: item["refined text"] || item["transcription text"] || "",
+        created_at: item.created_at,
+        audio_url: item.audio_url,
+        sentiment: item.sentiment,
+        themes: item.master_themes,
+        foreignKey: item["foreign key"],
+        entities: parsedEntities,
+        emotions: typeof item.emotions === 'object' ? item.emotions : {},
+        duration: item.duration,
+        user_feedback: item.user_feedback || null,
+        Edit_Status: item.Edit_Status
+      };
+    });
     
     return typedEntries;
   } catch (error: any) {
