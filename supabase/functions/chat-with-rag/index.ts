@@ -467,13 +467,22 @@ Based on these journal entries, provide a helpful, warm, and insightful response
 Journal Entries:
 ${journalContext}
 
+FORMATTING REQUIREMENTS - YOU MUST FOLLOW THESE:
+- Structure your response with clear markdown headers using ## for main sections
+- Use **bold text** for key insights, emotions, and important points
+- Organize information with bullet points using - for lists
+- Break content into digestible sections with descriptive headers
+- Make the response visually scannable and well-organized
+- Use markdown formatting consistently throughout
+
 Guidelines:
 - Be warm, empathetic, and supportive
 - Provide specific insights based on the actual journal content
 - ${hasPersonalPronouns ? 'Use "you" and "your" to make it personal since they asked about themselves' : 'Keep the tone conversational but not overly personal'}
-- If patterns emerge, point them out constructively
+- If patterns emerge, point them out constructively using bullet points
 - ${useAllEntries ? 'Since you have access to their full journal history, provide comprehensive insights about long-term patterns' : 'Focus on the specific entries provided'}
-- End with an encouraging note or helpful suggestion`;
+- End with an encouraging note or helpful suggestion
+- Structure everything with proper markdown headers and bullet points for easy reading`;
 
     try {
       const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
