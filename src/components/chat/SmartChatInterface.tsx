@@ -1,12 +1,12 @@
 
 import React, { useState, useEffect, useRef, useCallback } from 'react';
-import ChatArea from './ChatArea';
-import ChatInput from './ChatInput';
-import EmptyChatState from './EmptyChatState';
+import { ChatArea } from './ChatArea';
+import { ChatInput } from './ChatInput';
+import { EmptyChatState } from './EmptyChatState';
 import { useAuth } from '@/contexts/AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { processChatMessage } from '@/services/chatService';
-import { analyzeQueryTypes } from '@/utils/chat/queryAnalyzer';
+import { analyzeQuery } from '@/utils/chat/queryAnalyzer';
 import { useChatRealtime } from '@/hooks/use-chat-realtime';
 import { useToast } from '@/hooks/use-toast';
 import { Loader2 } from 'lucide-react';
@@ -18,17 +18,16 @@ import {
 
 interface SmartChatInterfaceProps {
   mentalHealthInsights?: any;
-  currentThreadId: string | null;
 }
 
 export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ 
-  mentalHealthInsights,
-  currentThreadId 
+  mentalHealthInsights 
 }) => {
   const { user } = useAuth();
   const { toast } = useToast();
   const [messages, setMessages] = useState<any[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [currentThreadId, setCurrentThreadId] = useState<string | null>(null);
   const [isThreadSwitching, setIsThreadSwitching] = useState(false);
   const processingRef = useRef(false);
   
@@ -67,23 +66,14 @@ export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
   }, [user?.id, toast]);
 
-  // Load messages when currentThreadId changes
-  useEffect(() => {
-    if (currentThreadId) {
-      loadThreadMessages(currentThreadId);
-    } else {
-      setMessages([]);
-    }
-  }, [currentThreadId, loadThreadMessages]);
-
-  // Handle thread selection events as supplementary sync
+  // Handle thread selection events
   useEffect(() => {
     const handleThreadSelected = (event: CustomEvent) => {
       const { threadId } = event.detail;
       console.log('SmartChatInterface: Thread selected event received:', threadId);
       
-      // Only reload if it's different from current prop
       if (threadId && threadId !== currentThreadId) {
+        setCurrentThreadId(threadId);
         loadThreadMessages(threadId);
       }
     };
@@ -161,7 +151,7 @@ export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       }
 
       // Analyze query and process
-      const queryTypes = analyzeQueryTypes(message);
+      const queryTypes = analyzeQuery(message);
       const isFollowUp = messages.length > 0;
 
       const response = await processChatMessage(
@@ -199,7 +189,17 @@ export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     }
   };
 
-  // Show loading only when switching threads, not when no thread is selected
+  if (!currentThreadId) {
+    return (
+      <div className="flex items-center justify-center h-full">
+        <div className="text-center">
+          <Loader2 className="h-8 w-8 animate-spin mx-auto mb-2" />
+          <p className="text-muted-foreground">Loading conversation...</p>
+        </div>
+      </div>
+    );
+  }
+
   if (isThreadSwitching) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -211,28 +211,18 @@ export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
     );
   }
 
-  // If no thread is selected, show a message instead of loading
-  if (!currentThreadId) {
-    return (
-      <div className="flex items-center justify-center h-full">
-        <div className="text-center">
-          <p className="text-muted-foreground">Select a conversation to start chatting</p>
-        </div>
-      </div>
-    );
-  }
-
   return (
     <div className="flex flex-col h-full">
       <div className="flex-1 overflow-hidden">
         {messages.length === 0 ? (
-          <EmptyChatState />
+          <EmptyChatState 
+            onSuggestionClick={handleSendMessage}
+            mentalHealthInsights={mentalHealthInsights}
+          />
         ) : (
           <ChatArea 
-            chatMessages={messages} 
+            messages={messages} 
             isLoading={isLoading || isProcessing}
-            processingStage={isProcessing ? 'Processing...' : undefined}
-            threadId={currentThreadId}
           />
         )}
       </div>
@@ -240,8 +230,8 @@ export const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({
       <div className="border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
         <ChatInput 
           onSendMessage={handleSendMessage}
-          isLoading={isLoading || isProcessing}
-          userId={user?.id}
+          disabled={isLoading || isProcessing}
+          threadId={currentThreadId}
         />
       </div>
     </div>

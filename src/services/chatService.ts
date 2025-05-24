@@ -1,4 +1,3 @@
-
 import { supabase } from "@/integrations/supabase/client";
 import { QueryTypes } from '../utils/chat/queryAnalyzer';
 import { QueryCategory } from '../hooks/use-chat-message-classification';
@@ -19,21 +18,19 @@ type ProcessedResponse = {
 };
 
 /**
- * IMPROVED: Generate contextual greetings and responses based on analysis results
+ * Generate simple conversational responses for basic interactions
  */
-function generateContextualResponse(message: string, isFollowUp: boolean, conversationHistory: any[] = [], hasPersonalData: boolean = false): string {
+function generateConversationalResponse(message: string, isFollowUp: boolean, conversationHistory: any[] = []): string {
   const lowerMessage = message.toLowerCase().trim();
   
   // Check if there's recent context from conversation history
   const hasRecentContext = conversationHistory.length > 0;
   const lastAssistantMessage = conversationHistory.slice().reverse().find(msg => msg.role === 'assistant');
   
-  // IMPROVED: Enhanced greetings with personal context awareness
+  // Greetings
   if (/^(hi|hello|hey|hiya|good morning|good afternoon|good evening)$/i.test(lowerMessage)) {
-    if (hasPersonalData) {
-      return "Hello! I've been analyzing your journal entries and I'm ready to help you explore your thoughts, emotions, and personal insights. What would you like to discover today?";
-    }
     if (isFollowUp || hasRecentContext) {
+      // If there's context, acknowledge the ongoing conversation
       if (lastAssistantMessage && lastAssistantMessage.content.includes('journal')) {
         return "Hi again! Ready to continue exploring your journal insights?";
       }
@@ -42,24 +39,18 @@ function generateContextualResponse(message: string, isFollowUp: boolean, conver
     return "Hello! I'm SOULo, your mental health assistant. How can I help you explore your journal entries today?";
   }
   
-  // IMPROVED: Mental health specific responses
-  if (/mental health|help|improve|advice|better|support|guidance/.test(lowerMessage)) {
-    if (hasPersonalData) {
-      return "Based on your journal entries, I can provide personalized mental health guidance. Let me analyze your patterns and emotions to give you tailored advice.";
-    }
-    return "I'd love to help with your mental health! To provide personalized advice, I'll analyze your journal entries for patterns and insights.";
-  }
-  
   // Thanks/appreciation
   if (/^(thanks?|thank you|ty|appreciate|awesome|great|perfect)$/i.test(lowerMessage)) {
+    // If there's context about what they're thanking for, be more specific
     if (hasRecentContext) {
       return "You're welcome! Is there anything else you'd like to explore from your journal entries?";
     }
     return "You're welcome! Is there anything else about your mental health or journal insights I can help with?";
   }
   
-  // Yes/No responses with context awareness
+  // Yes/No responses
   if (/^(yes|yeah|yep|yup|ok|okay)$/i.test(lowerMessage)) {
+    // Context-aware yes responses
     if (hasRecentContext && lastAssistantMessage) {
       if (lastAssistantMessage.content.includes('journal')) {
         return "Great! What specific aspect of your journaling would you like to dive into?";
@@ -86,7 +77,7 @@ function generateContextualResponse(message: string, isFollowUp: boolean, conver
 }
 
 /**
- * Process a chat message with enhanced 3-tier categorization and personal pronoun handling
+ * Process a chat message with enhanced 3-tier categorization
  */
 export async function processChatMessage(
   message: string, 
@@ -257,12 +248,12 @@ export async function processChatMessage(
     }
   }
   
-  // Enhanced classification with 3-tier system and personal pronoun priority
+  // Enhanced classification with 3-tier system
   try {
     console.log("Processing chat message:", message.substring(0, 30) + "...");
     console.log("Parameters:", parameters);
     
-    // Use server-side GPT classification with enhanced personal pronoun handling
+    // Use server-side GPT classification directly
     const { data: classificationData, error: classificationError } = await supabase.functions.invoke('chat-query-classifier', {
       body: { message, conversationContext: conversationHistory }
     });
@@ -271,51 +262,35 @@ export async function processChatMessage(
       category: QueryCategory;
       confidence: number;
       reasoning: string;
-      useAllEntries?: boolean;
     };
 
     if (classificationError) {
       console.error("Classification error:", classificationError);
-      // IMPROVED: Default to journal-specific for personal queries
-      const hasPersonalPronouns = /\b(i|me|my|mine|myself|we|us|our|ours)\b/i.test(message.toLowerCase());
+      // Default to conversational if classification fails
       classification = {
-        category: hasPersonalPronouns ? QueryCategory.JOURNAL_SPECIFIC : QueryCategory.CONVERSATIONAL,
+        category: QueryCategory.CONVERSATIONAL,
         confidence: 0.5,
-        reasoning: 'Classification service unavailable, using personal pronoun detection',
-        useAllEntries: hasPersonalPronouns
+        reasoning: 'Classification service unavailable'
       };
     } else {
       classification = {
         category: classificationData.category as QueryCategory,
         confidence: classificationData.confidence,
-        reasoning: classificationData.reasoning,
-        useAllEntries: classificationData.useAllEntries || false
+        reasoning: classificationData.reasoning
       };
     }
     
     console.log("Message classification:", {
       category: classification.category,
       confidence: classification.confidence,
-      reasoning: classification.reasoning,
-      useAllEntries: classification.useAllEntries
+      reasoning: classification.reasoning
     });
     
     // Handle different categories appropriately
     switch (classification.category) {
       case QueryCategory.CONVERSATIONAL:
-        // IMPROVED: Check if we have personal data for better responses
-        let hasPersonalData = false;
-        try {
-          const { count } = await supabase
-            .from('Journal Entries')
-            .select('id', { count: 'exact', head: true })
-            .eq('user_id', userId);
-          hasPersonalData = (count || 0) > 0;
-        } catch (error) {
-          console.error("Error checking for personal data:", error);
-        }
-        
-        const conversationalResponse = generateContextualResponse(message, isFollowUp, conversationHistory, hasPersonalData);
+        // Handle conversational queries with simple responses and conversation history
+        const conversationalResponse = generateConversationalResponse(message, isFollowUp, conversationHistory);
         return {
           content: conversationalResponse,
           role: "assistant"
@@ -330,7 +305,7 @@ export async function processChatMessage(
         break;
     }
 
-    // Set up the parameters for the query planner with conversation history and ALL ENTRIES flag
+    // Set up the parameters for the query planner with conversation history
     const queryPlanParams = {
       message,
       userId,
@@ -338,8 +313,7 @@ export async function processChatMessage(
       isFollowUp,
       useHistoricalData: parameters.useHistoricalData || false,
       referenceDate: new Date().toISOString(),
-      messageCategory: classification.category,
-      useAllEntries: classification.useAllEntries || false // Pass the ALL ENTRIES flag
+      messageCategory: classification.category
     };
 
     // Check network status before calling Edge Function
@@ -374,8 +348,7 @@ export async function processChatMessage(
         usePersonalContext: classification.category === QueryCategory.JOURNAL_SPECIFIC,
         queryPlan,
         conversationHistory, // Always include conversation history
-        messageCategory: classification.category,
-        useAllEntries: classification.useAllEntries || false // Pass ALL ENTRIES flag to chat processor
+        messageCategory: classification.category
       };
 
       try {
@@ -411,14 +384,6 @@ export async function processChatMessage(
           throw new Error("Failed to extract valid response from chat engine");
         }
 
-        // IMPROVED: Add personalized greeting for journal-specific queries with personal pronouns
-        if (classification.category === QueryCategory.JOURNAL_SPECIFIC && classification.useAllEntries && chatResponse?.references && chatResponse.references.length > 0) {
-          const hasRelevantData = chatResponse.references.some(ref => ref.content && ref.content.length > 50);
-          if (hasRelevantData && !finalResponse.toLowerCase().includes('hello') && !finalResponse.toLowerCase().includes('hi')) {
-            finalResponse = `Hello! I've analyzed your journal entries and here's what I found:\n\n${finalResponse}`;
-          }
-        }
-
         // Prepare the response
         return {
           content: finalResponse,
@@ -432,23 +397,21 @@ export async function processChatMessage(
         };
       } catch (chatError) {
         console.error("Failed to process with chat-with-rag:", chatError);
-        // IMPROVED: Fallback with context awareness
-        const hasPersonalPronouns = /\b(i|me|my|mine|myself|we|us|our|ours)\b/i.test(message.toLowerCase());
+        // Fallback to a simple response if chat-with-rag fails
         return {
-          content: hasPersonalPronouns ? 
-            "I'm having trouble analyzing your journal entries right now, but I'm here to help. Please try asking about your entries again in a moment." :
-            "I'm having trouble processing your request right now. Please try again in a moment.",
+          content: "I'm having trouble analyzing your journal entries right now. Please try again in a moment.",
           role: 'assistant'
         };
       }
     } catch (planError) {
       console.error("Failed to generate query plan:", planError);
       
-      // Check if this seems to be a personal query but the planner failed
-      const hasPersonalPronouns = /\b(i|me|my|mine|myself|we|us|our|ours)\b/i.test(message.toLowerCase());
-      
-      if (hasPersonalPronouns) {
-        // Provide a friendly fallback response for personal queries
+      // Check if this seems to be a time-based question but the planner failed
+      if (message.toLowerCase().includes('last week') || 
+          message.toLowerCase().includes('yesterday') || 
+          message.toLowerCase().includes('this month')) {
+        
+        // Provide a friendly fallback response for time-based queries
         let fallbackResponse = "I'm having trouble analyzing your entries right now. ";
         
         // Check if we can determine if there are any journal entries at all

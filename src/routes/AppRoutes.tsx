@@ -6,6 +6,7 @@ import Home from '@/pages/Home';
 import Journal from '@/pages/Journal';
 import Insights from '@/pages/Insights';
 import SmartChat from '@/pages/SmartChat';
+import Chat from '@/pages/Chat';
 import ProtectedRoute from './ProtectedRoute';
 import Auth from '@/pages/Auth';
 import Settings from '@/pages/Settings';
@@ -75,8 +76,7 @@ const AppRoutes = () => {
               <Insights />
             </React.Suspense>
           } />
-          {/* Redirect chat to smart-chat */}
-          <Route path="chat" element={<Navigate to="/app/smart-chat" replace />} />
+          <Route path="chat" element={<Chat />} />
           <Route path="smart-chat" element={<SmartChat />} />
           <Route path="settings" element={<Settings />} />
         </Route>
@@ -87,7 +87,7 @@ const AppRoutes = () => {
         <Route path="/home" element={<Navigate to="/app/home" replace />} />
         <Route path="/journal" element={<Navigate to="/app/journal" replace />} />
         <Route path="/insights" element={<Navigate to="/app/insights" replace />} />
-        <Route path="/chat" element={<Navigate to="/app/smart-chat" replace />} />
+        <Route path="/chat" element={<Navigate to="/app/chat" replace />} />
         <Route path="/smart-chat" element={<Navigate to="/app/smart-chat" replace />} />
         <Route path="/settings" element={<Navigate to="/app/settings" replace />} />
         
