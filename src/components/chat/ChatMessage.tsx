@@ -5,6 +5,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { User } from 'lucide-react';
 import ReactMarkdown from 'react-markdown';
 import { AnalysisMetadataCard } from './AnalysisMetadataCard';
+import ParticleAvatar from './ParticleAvatar';
 
 interface ChatMessageProps {
   message: {
@@ -56,11 +57,9 @@ export const ChatMessage: React.FC<ChatMessageProps> = ({ message }) => {
   return (
     <div className={`flex gap-3 ${isUser ? 'justify-end' : 'justify-start'} mb-4`}>
       {!isUser && (
-        <Avatar className="h-8 w-8 mt-1">
-          <div className="w-full h-full rounded-full bg-theme animate-pulse" />
-          <AvatarFallback className="bg-theme">
-          </AvatarFallback>
-        </Avatar>
+        <div className="mt-1">
+          <ParticleAvatar className="h-8 w-8" size={32} />
+        </div>
       )}
 
       <div className={`max-w-[80%] ${isUser ? 'order-first' : ''}`}>

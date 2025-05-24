@@ -11,6 +11,7 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import AnalyticsDisplay from "./AnalyticsDisplay";
 import EmotionRadarChart from "./EmotionRadarChart";
 import TypingIndicator from "./TypingIndicator";
+import ParticleAvatar from "./ParticleAvatar";
 import { ChatMessage } from "@/types/chat";
 
 interface ChatAreaProps {
@@ -73,9 +74,9 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                 : ""
             }`}
           >
-            <Avatar className="h-8 w-8">
+            <div className="mt-1">
               {message.sender === "user" || message.role === "user" ? (
-                <>
+                <Avatar className="h-8 w-8">
                   <AvatarImage 
                     src={undefined} 
                     alt="User"
@@ -85,15 +86,11 @@ const ChatArea: React.FC<ChatAreaProps> = ({
                   <AvatarFallback className="bg-primary text-primary-foreground">
                     U
                   </AvatarFallback>
-                </>
+                </Avatar>
               ) : (
-                <>
-                  <div className="w-full h-full rounded-full bg-theme animate-pulse" />
-                  <AvatarFallback className="bg-theme">
-                  </AvatarFallback>
-                </>
+                <ParticleAvatar className="h-8 w-8" size={32} />
               )}
-            </Avatar>
+            </div>
 
             <Card
               className={`${

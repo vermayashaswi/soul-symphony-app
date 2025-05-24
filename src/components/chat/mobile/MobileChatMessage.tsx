@@ -12,6 +12,7 @@ import { formatShortDate } from "@/utils/format-time";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { TranslatableMarkdown } from "@/components/translation/TranslatableMarkdown";
 import TypingIndicator from "../TypingIndicator";
+import ParticleAvatar from "../ParticleAvatar";
 
 interface MobileChatMessageProps {
   message: {
@@ -61,11 +62,9 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       className={`relative flex items-start gap-2 ${displayRole === 'user' ? 'justify-end' : 'justify-start'} mb-3`}
     >
       {displayRole === 'assistant' && (
-        <Avatar className="w-8 h-8 border border-primary/20">
-          <div className="w-full h-full rounded-full bg-theme animate-pulse" />
-          <AvatarFallback className="bg-theme">
-          </AvatarFallback>
-        </Avatar>
+        <div className="border border-primary/20 rounded-full">
+          <ParticleAvatar className="w-8 h-8" size={32} />
+        </div>
       )}
       
       <div
