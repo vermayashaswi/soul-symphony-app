@@ -340,7 +340,8 @@ export default function SmartChat() {
             </div>
           )}
           <SmartChatInterface 
-            mentalHealthInsights={mentalHealthInsights} 
+            mentalHealthInsights={mentalHealthInsights}
+            currentThreadId={currentThreadId}
           />
         </div>
       </motion.div>
