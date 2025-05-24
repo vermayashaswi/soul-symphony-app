@@ -15,6 +15,7 @@ interface JournalEntryLoadingSkeletonProps {
 export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: JournalEntryLoadingSkeletonProps) {
   const { addEvent } = useDebugLog();
   const mountTimeRef = useRef(Date.now());
+  const checkIntervalRef = useRef<NodeJS.Timeout | null>(null);
   
   useEffect(() => {
     if (tempId) {
@@ -30,6 +31,25 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
       if (!processingStateManager.isProcessing(tempId)) {
         processingStateManager.startProcessing(tempId);
       }
+      
+      // Set up periodic check for real entry card
+      checkIntervalRef.current = setInterval(() => {
+        const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`);
+        if (realEntryCard) {
+          console.log(`[JournalEntryLoadingSkeleton] Real entry card detected for ${tempId}, scheduling cleanup`);
+          
+          // Dispatch transition event
+          window.dispatchEvent(new CustomEvent('processingCardTransitioning', {
+            detail: { tempId, timestamp: Date.now() }
+          }));
+          
+          // Clear the interval since we found the real card
+          if (checkIntervalRef.current) {
+            clearInterval(checkIntervalRef.current);
+            checkIntervalRef.current = null;
+          }
+        }
+      }, 500); // Check every 500ms
     }
     
     return () => {
@@ -43,6 +63,11 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
           detail: { tempId, timestamp: Date.now(), visibleDuration }
         }));
       }
+      
+      // Clear interval on unmount
+      if (checkIntervalRef.current) {
+        clearInterval(checkIntervalRef.current);
+      }
     };
   }, [count, addEvent, tempId]);
   
@@ -53,7 +78,11 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
           key={`skeleton-${tempId || index}`}
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -10 }}
+          exit={{ 
+            opacity: 0, 
+            y: -10,
+            transition: { duration: 0.3 }
+          }}
           transition={{ duration: 0.3 }}
           className="overflow-hidden skeleton-container"
           data-loading-skeleton={true}
@@ -75,19 +104,22 @@ export default function JournalEntryLoadingSkeleton({ count = 1, tempId }: Journ
             
             <LoadingEntryContent />
             
-            {/* Processing indicator */}
-            <div className="absolute top-2 right-2 flex items-center justify-center h-6 w-6 bg-primary/20 rounded-full">
-              <div className="h-4 w-4 rounded-full bg-primary/40 animate-ping absolute"></div>
-              <div className="h-3 w-3 rounded-full bg-primary/80"></div>
+            {/* Enhanced processing indicator with better visibility */}
+            <div className="absolute top-2 right-2 flex items-center justify-center h-8 w-8 bg-primary/30 rounded-full border-2 border-primary/50">
+              <div className="h-5 w-5 rounded-full bg-primary/60 animate-ping absolute"></div>
+              <div className="h-4 w-4 rounded-full bg-primary relative z-10"></div>
             </div>
             
             {/* Debug info */}
             {tempId && (
-              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-0" 
+              <div className="absolute bottom-2 right-2 text-xs text-muted-foreground opacity-50" 
                    data-temp-id={tempId}>
                 {tempId.substring(0, 8)}...
               </div>
             )}
+            
+            {/* Transition overlay for smooth handoff */}
+            <div className="absolute inset-0 bg-gradient-to-b from-transparent to-primary/5 pointer-events-none transition-opacity duration-300" />
           </Card>
         </motion.div>
       ))}

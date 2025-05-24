@@ -38,6 +38,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   const [recoveringFromDelete, setRecoveringFromDelete] = useState(false);
   // Track the last action taken
   const [lastAction, setLastAction] = useState<string | null>(null);
+  // Track entries that are transitioning to prevent flickering
+  const [transitioningEntries, setTransitioningEntries] = useState<Set<string>>(new Set());
   
   // Add a tracking set for deleted entry IDs
   const deletedEntryIdsRef = useRef<Set<number>>(new Set());
@@ -61,19 +63,40 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     const handleForceRefresh = () => {
       console.log('[JournalEntriesList] Received force refresh event');
       renderedTempIdsRef.current.clear();
+      setTransitioningEntries(new Set());
       // Force re-render by updating state
       setLastAction('Force Refresh: ' + Date.now());
     };
     
+    // Listen for entry transition events
+    const handleEntryTransition = (event: CustomEvent) => {
+      const { tempId } = event.detail;
+      if (tempId) {
+        console.log(`[JournalEntriesList] Entry ${tempId} starting transition`);
+        setTransitioningEntries(prev => new Set([...prev, tempId]));
+        
+        // Remove from transitioning after a delay
+        setTimeout(() => {
+          setTransitioningEntries(prev => {
+            const newSet = new Set(prev);
+            newSet.delete(tempId);
+            return newSet;
+          });
+        }, 3000);
+      }
+    };
+    
     window.addEventListener('journalUIForceRefresh', handleForceRefresh);
+    window.addEventListener('processingEntryCompleted', handleEntryTransition as EventListener);
     
     return () => {
       console.log('[JournalEntriesList] Component unmounted');
       window.removeEventListener('journalUIForceRefresh', handleForceRefresh);
+      window.removeEventListener('processingEntryCompleted', handleEntryTransition as EventListener);
     };
   }, []);
   
-  // Update processing manager with any entries we receive from props
+  // Update processing manager with improved transition handling
   useEffect(() => {
     console.log('[JournalEntriesList] Processing entries from props:', processingEntries);
     
@@ -81,34 +104,33 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     renderedTempIdsRef.current.clear();
     renderedEntryIdsRef.current = new Set(entries.map(entry => entry.id));
     
-    // Check for entries that have IDs and tempIds - these are completed and should be removed from processing
+    // Check for entries that have IDs and tempIds - handle transition more carefully
     entries.forEach(entry => {
       if (entry.id && entry.tempId) {
-        console.log(`[JournalEntriesList] Found entry with both id and tempId: ${entry.id} / ${entry.tempId} - marking as completed`);
-        processingStateManager.updateEntryState(entry.tempId, EntryProcessingState.COMPLETED);
+        const processingEntry = processingStateManager.getEntryById(entry.tempId);
         
-        // Force remove after a short delay to ensure UI updates
-        setTimeout(() => {
-          processingStateManager.removeEntry(entry.tempId);
-          // Dispatch event to force UI update
-          window.dispatchEvent(new CustomEvent('forceRemoveProcessingCard', {
-            detail: { tempId: entry.tempId, entryId: entry.id, timestamp: Date.now(), forceCleanup: true }
-          }));
-        }, 300); // Decreased from 500ms to 300ms for faster cleanup
+        // Only mark as completed if not already in transition state
+        if (processingEntry && processingEntry.state !== EntryProcessingState.TRANSITIONING) {
+          console.log(`[JournalEntriesList] Found entry with both id and tempId: ${entry.id} / ${entry.tempId} - marking as completed`);
+          processingStateManager.updateEntryState(entry.tempId, EntryProcessingState.COMPLETED);
+          processingStateManager.setEntryId(entry.tempId, entry.id);
+        }
       }
     });
     
     // Check if any processing entries are no longer in the processingEntries list from props
-    // These may be stale entries that should be removed
     activeProcessingIds.forEach(tempId => {
       if (!processingEntries.includes(tempId)) {
-        console.log(`[JournalEntriesList] Processing entry ${tempId} is no longer in props list, removing`);
-        processingStateManager.removeEntry(tempId);
+        const processingEntry = processingStateManager.getEntryById(tempId);
+        // Only remove if it's been processing for more than 30 seconds (likely stale)
+        if (processingEntry && (Date.now() - processingEntry.startTime > 30000)) {
+          console.log(`[JournalEntriesList] Processing entry ${tempId} is stale, removing`);
+          processingStateManager.removeEntry(tempId);
+        }
       }
     });
     
     // Register any processingEntries from props with our manager
-    // But ONLY if they're not already associated with a real entry
     const entryTempIds = new Set(entries.map(entry => entry.tempId).filter(Boolean));
     
     processingEntries.forEach(tempId => {
@@ -122,22 +144,6 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       if (!isProcessing(tempId)) {
         console.log(`[JournalEntriesList] Registering new processing entry: ${tempId}`);
         processingStateManager.startProcessing(tempId);
-      } else {
-        console.log(`[JournalEntriesList] Entry ${tempId} already being tracked, skipping registration`);
-      }
-    });
-    
-    // Mark processed entries as completed
-    entries.forEach(entry => {
-      if (entry.tempId && processedEntryIds.includes(entry.id)) {
-        console.log(`[JournalEntriesList] Marking entry as completed: ${entry.tempId} -> ${entry.id}`);
-        processingStateManager.updateEntryState(entry.tempId, EntryProcessingState.COMPLETED);
-        processingStateManager.setEntryId(entry.tempId, entry.id);
-        
-        // Force remove after a short delay
-        setTimeout(() => {
-          processingStateManager.removeEntry(entry.tempId);
-        }, 500);
       }
     });
     
@@ -167,12 +173,11 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       setRecoveringFromDelete(true);
       
       // Remove from processing state manager if present
-      processingStateManager.removeEntry(entryId.toString()); // Convert number to string here
+      processingStateManager.removeEntry(entryId.toString());
       
       // Find any temporary processing entries that map to this entry ID and remove them
       const processingEntriesToRemove: string[] = [];
       
-      // Get all processing entries
       const allProcessingEntries = processingStateManager.getProcessingEntries();
       allProcessingEntries.forEach(entry => {
         if (entry.entryId === entryId) {
@@ -193,8 +198,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       
       console.log(`[JournalEntriesList] Delete handler completed for entry: ${entryId}`);
       
-      // Always reset the recovering state after a short delay, even if there are no entries left
-      // This ensures the EmptyJournalState will show properly when the last entry is deleted
+      // Reset the recovering state after a short delay
       setTimeout(() => {
         console.log('[JournalEntriesList] Resetting recovery state after deletion');
         setRecoveringFromDelete(false);
@@ -209,7 +213,6 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       
     } catch (error) {
       console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
-      // Reset recovering state even if there was an error
       setRecoveringFromDelete(false);
       return Promise.reject(error);
     }
@@ -218,25 +221,39 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   // Filter entries to remove any that have been deleted
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
   
-  // Filter active processing IDs to prevent duplicates with real entries
+  // Improved filtering for processing IDs with better transition handling
   const filteredProcessingIds = activeProcessingIds.filter(tempId => {
     // Skip if we've already seen this tempId in this render cycle
     if (renderedTempIdsRef.current.has(tempId)) {
       return false;
     }
     
-    // Skip if this tempId already exists in the real entries list
-    const alreadyInEntries = entries.some(entry => entry.tempId === tempId);
-    if (alreadyInEntries) {
-      console.log(`[JournalEntriesList] Skipping processing card for tempId ${tempId} as it's already in entries`);
-      return false;
+    // Keep showing if entry is transitioning
+    if (transitioningEntries.has(tempId)) {
+      console.log(`[JournalEntriesList] Keeping processing card for transitioning entry ${tempId}`);
+      renderedTempIdsRef.current.add(tempId);
+      return true;
     }
     
-    // Skip if this processing entry is older than 20 seconds
+    // Check if this tempId already exists in the real entries list
+    const alreadyInEntries = entries.some(entry => entry.tempId === tempId);
+    if (alreadyInEntries) {
+      // Check if the real entry card is actually rendered in the DOM
+      const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`);
+      if (realEntryCard) {
+        console.log(`[JournalEntriesList] Real entry card rendered for tempId ${tempId}, can skip processing card`);
+        return false;
+      } else {
+        console.log(`[JournalEntriesList] Real entry exists but not rendered yet for tempId ${tempId}, keeping processing card`);
+        renderedTempIdsRef.current.add(tempId);
+        return true;
+      }
+    }
+    
+    // Skip if this processing entry is older than 60 seconds (very stale)
     const entry = processingStateManager.getEntryById(tempId);
-    if (entry && (Date.now() - entry.startTime > 20000)) {
-      console.log(`[JournalEntriesList] Skipping stale processing card for tempId ${tempId} (age: ${Date.now() - entry.startTime}ms)`);
-      // Clean it up
+    if (entry && (Date.now() - entry.startTime > 60000)) {
+      console.log(`[JournalEntriesList] Skipping very stale processing card for tempId ${tempId} (age: ${Date.now() - entry.startTime}ms)`);
       processingStateManager.removeEntry(tempId);
       return false;
     }
@@ -246,11 +263,11 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     return true;
   });
   
-  console.log(`[JournalEntriesList] Rendering with: entries=${filteredEntries.length || 0} (after filtering deleted), activeProcessingIds=${activeProcessingIds.length}, filteredProcessingIds=${filteredProcessingIds.length}`);
+  console.log(`[JournalEntriesList] Rendering with: entries=${filteredEntries.length || 0} (after filtering deleted), activeProcessingIds=${activeProcessingIds.length}, filteredProcessingIds=${filteredProcessingIds.length}, transitioning=${transitioningEntries.size}`);
 
   // Determine what content to show based on filtered entries, loading state, and processing state
-  const shouldShowEmpty = !filteredEntries.length && !isLoading && filteredProcessingIds.length === 0 && !recoveringFromDelete;
-  const shouldShowEntries = filteredEntries.length > 0 || filteredProcessingIds.length > 0 || recoveringFromDelete;
+  const shouldShowEmpty = !filteredEntries.length && !isLoading && filteredProcessingIds.length === 0 && !recoveringFromDelete && transitioningEntries.size === 0;
+  const shouldShowEntries = filteredEntries.length > 0 || filteredProcessingIds.length > 0 || recoveringFromDelete || transitioningEntries.size > 0;
   
   return (
     <div className="journal-entries-list" id="journal-entries-container" data-last-action={lastAction}>
@@ -291,7 +308,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
               processing={isProcessing(entry.tempId || '')}
               processed={processedEntryIds.includes(entry.id)}
               onDelete={handleDeleteEntry}
-              setEntries={null} // Pass null since we don't want to modify entries directly here
+              setEntries={null}
             />
           ))}
         </div>

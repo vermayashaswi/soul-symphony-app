@@ -1,10 +1,10 @@
-
 import { BehaviorSubject, Observable } from 'rxjs';
 import { showToast } from './toast-helper';
 
 // Define the processing state enum
 export enum EntryProcessingState {
   PROCESSING = 'processing',
+  TRANSITIONING = 'transitioning', // New state for smooth transitions
   COMPLETED = 'completed',
   ERROR = 'error'
 }
@@ -16,6 +16,7 @@ export interface ProcessingEntry {
   startTime: number;
   state: EntryProcessingState;
   errorMessage?: string;
+  transitionStartTime?: number; // Track when transition started
 }
 
 export class ProcessingStateManager {
@@ -52,20 +53,56 @@ export class ProcessingStateManager {
         entry.errorMessage = errorMessage;
       }
       
-      // If completed, schedule cleanup after a delay to ensure UI has time to process
+      // If transitioning to completed, first set to transitioning state
       if (state === EntryProcessingState.COMPLETED) {
+        entry.state = EntryProcessingState.TRANSITIONING;
+        entry.transitionStartTime = Date.now();
+        
+        console.log(`[ProcessingStateManager] Entry ${tempId} entering transition state`);
+        
+        // Schedule the actual cleanup after a longer delay to ensure UI has rendered
         setTimeout(() => {
-          this.removeEntry(tempId);
-          
-          // Dispatch content ready event to trigger UI cleanup
-          window.dispatchEvent(new CustomEvent('entryContentReady', {
-            detail: { tempId, timestamp: Date.now() }
-          }));
-        }, 1000); // 1 second delay
+          // Check if real entry card is rendered before removing
+          this.checkAndCleanupEntry(tempId);
+        }, 2000); // Increased from 1000ms to 2000ms
       }
       
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Updated state for ${tempId} to ${state}`);
+    }
+  }
+  
+  private checkAndCleanupEntry(tempId: string): void {
+    // Check if there's a real entry card in the DOM with this tempId
+    const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`);
+    const processingCard = document.querySelector(`[data-temp-id="${tempId}"][data-loading-skeleton="true"]`);
+    
+    if (realEntryCard) {
+      console.log(`[ProcessingStateManager] Real entry card found for ${tempId}, safe to cleanup`);
+      this.removeEntry(tempId);
+      
+      // Dispatch content ready event
+      window.dispatchEvent(new CustomEvent('entryContentReady', {
+        detail: { tempId, timestamp: Date.now() }
+      }));
+    } else {
+      console.log(`[ProcessingStateManager] Real entry card not found for ${tempId}, retrying cleanup in 1s`);
+      
+      // Retry cleanup after another second if real entry not found
+      setTimeout(() => {
+        const retryRealEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`);
+        if (retryRealEntryCard) {
+          console.log(`[ProcessingStateManager] Real entry card found on retry for ${tempId}, cleaning up`);
+          this.removeEntry(tempId);
+          
+          window.dispatchEvent(new CustomEvent('entryContentReady', {
+            detail: { tempId, timestamp: Date.now() }
+          }));
+        } else {
+          console.log(`[ProcessingStateManager] Force cleanup for ${tempId} after retry timeout`);
+          this.removeEntry(tempId);
+        }
+      }, 1000);
     }
   }
   
@@ -93,7 +130,8 @@ export class ProcessingStateManager {
   }
   
   public isProcessing(tempId: string): boolean {
-    return this.processingEntries.some(entry => entry.tempId === tempId);
+    const entry = this.processingEntries.find(entry => entry.tempId === tempId);
+    return entry ? (entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING) : false;
   }
   
   public hasError(tempId: string): boolean {

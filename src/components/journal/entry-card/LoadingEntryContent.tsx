@@ -39,19 +39,25 @@ const processingSteps = [
     id: 'generating', 
     text: 'Generating insights...',
     icon: Sparkles
+  },
+  { 
+    id: 'finalizing', 
+    text: 'Finalizing your entry...',
+    icon: FileText
   }
 ];
 
 export function LoadingEntryContent({ error }: { error?: string }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [processingTakingTooLong, setProcessingTakingTooLong] = useState(false);
+  const [isTransitioning, setIsTransitioning] = useState(false);
   const componentId = useRef(`loading-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
   const stepsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const longProcessingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
   const mountTimeRef = useRef<number>(Date.now());
   const [isVisible, setIsVisible] = useState(true);
   
-  // Simplified lifecycle management - let React handle DOM cleanup
+  // Enhanced lifecycle management with better transition handling
   useEffect(() => {
     console.log('[LoadingEntryContent] Component mounted:', componentId.current);
     
@@ -66,7 +72,6 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     
     return () => {
       console.log('[LoadingEntryContent] Component unmounting:', componentId.current);
-      // Let React handle the unmounting naturally
       window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {
         detail: { 
           timestamp: Date.now(),
@@ -76,10 +81,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     };
   }, []);
   
-  // Step progression animation
+  // Enhanced step progression with better timing
   useEffect(() => {
     const stepInterval = setInterval(() => {
-      if (!isVisible) return;
+      if (!isVisible || isTransitioning) return;
       
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
       
@@ -93,13 +98,13 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         }
       }));
       
-    }, 2000); // Each step takes 2 seconds
+    }, 1800); // Slightly faster transitions
     
     stepsIntervalRef.current = stepInterval;
     
     // Set a timeout to show a message if processing is taking too long
     const longProcessingTimeout = setTimeout(() => {
-      if (isVisible) {
+      if (isVisible && !isTransitioning) {
         setProcessingTakingTooLong(true);
         
         // Notify that processing is taking a long time
@@ -110,17 +115,29 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           }
         }));
       }
-    }, 10000);
+    }, 12000); // Increased threshold slightly
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
-    // Simple content ready handler - just set state, let React handle removal
+    // Enhanced content ready handler with transition state
     const handleContentReady = (event: CustomEvent) => {
-      console.log('[LoadingEntryContent] Content ready event received');
-      setIsVisible(false);
+      console.log('[LoadingEntryContent] Content ready event received, starting transition');
+      setIsTransitioning(true);
+      
+      // Add a small delay before hiding to ensure smooth transition
+      setTimeout(() => {
+        setIsVisible(false);
+      }, 300);
+    };
+    
+    // Handle transition events
+    const handleTransition = (event: CustomEvent) => {
+      console.log('[LoadingEntryContent] Transition event received');
+      setIsTransitioning(true);
     };
     
     window.addEventListener('entryContentReady', handleContentReady as EventListener);
+    window.addEventListener('processingCardTransitioning', handleTransition as EventListener);
     
     return () => {
       if (stepsIntervalRef.current) {
@@ -132,8 +149,9 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       }
       
       window.removeEventListener('entryContentReady', handleContentReady as EventListener);
+      window.removeEventListener('processingCardTransitioning', handleTransition as EventListener);
     };
-  }, [currentStepIndex, isVisible]);
+  }, [currentStepIndex, isVisible, isTransitioning]);
   
   // Don't render if not visible - let React handle removal
   if (!isVisible) {
@@ -146,10 +164,18 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     <motion.div 
       className="space-y-2"
       initial={{ opacity: 0.7 }}
-      animate={{ opacity: 1 }}
-      exit={{ opacity: 0 }}
+      animate={{ 
+        opacity: isTransitioning ? 0.5 : 1,
+        scale: isTransitioning ? 0.98 : 1
+      }}
+      exit={{ 
+        opacity: 0,
+        scale: 0.95,
+        transition: { duration: 0.3 }
+      }}
       transition={{ duration: 0.3 }}
       data-component-id={componentId.current}
+      data-transitioning={isTransitioning}
     >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />
@@ -173,12 +199,18 @@ export function LoadingEntryContent({ error }: { error?: string }) {
             <motion.div 
               className="relative h-10 w-10"
               animate={{ 
-                rotate: 360 
+                rotate: 360,
+                scale: isTransitioning ? 0.9 : 1
               }}
               transition={{ 
-                duration: 2, 
-                repeat: Infinity, 
-                ease: "linear" 
+                rotate: {
+                  duration: 2, 
+                  repeat: Infinity, 
+                  ease: "linear"
+                },
+                scale: {
+                  duration: 0.3
+                }
               }}
             >
               <Loader2 className="h-10 w-10 text-primary absolute inset-0" />
@@ -186,7 +218,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                 <motion.div 
                   key={currentStep.id}
                   initial={{ scale: 0, opacity: 0.7 }}
-                  animate={{ scale: 1, opacity: 1 }}
+                  animate={{ scale: isTransitioning ? 0.8 : 1, opacity: isTransitioning ? 0.6 : 1 }}
                   exit={{ scale: 0, opacity: 0.7 }}
                   transition={{ duration: 0.3 }}
                   className="absolute inset-0 flex items-center justify-center"
@@ -202,19 +234,22 @@ export function LoadingEntryContent({ error }: { error?: string }) {
               <motion.div 
                 key={currentStep.id}
                 initial={{ y: 10, opacity: 0.7 }}
-                animate={{ y: 0, opacity: 1 }}
+                animate={{ 
+                  y: 0, 
+                  opacity: isTransitioning ? 0.6 : 1 
+                }}
                 exit={{ y: -10, opacity: 0.7 }}
                 transition={{ duration: 0.3 }}
                 className="text-sm text-center text-primary font-medium"
               >
                 <TranslatableText 
-                  text={currentStep.text} 
+                  text={isTransitioning ? "Finalizing your entry..." : currentStep.text} 
                   forceTranslate={true}
                 />
               </motion.div>
             </AnimatePresence>
             
-            {processingTakingTooLong && (
+            {processingTakingTooLong && !isTransitioning && (
               <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}
@@ -222,6 +257,19 @@ export function LoadingEntryContent({ error }: { error?: string }) {
               >
                 <TranslatableText 
                   text="This is taking longer than usual. Please wait a moment..." 
+                  forceTranslate={true}
+                />
+              </motion.p>
+            )}
+            
+            {isTransitioning && (
+              <motion.p 
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                className="text-xs text-primary/60 text-center mt-2"
+              >
+                <TranslatableText 
+                  text="Almost ready..." 
                   forceTranslate={true}
                 />
               </motion.p>
