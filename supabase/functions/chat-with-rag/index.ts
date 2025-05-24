@@ -1,1031 +1,383 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+import { planQuery, shouldUseComprehensiveSearch, getMaxEntries } from "./utils/queryPlanner.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-/**
- * Progressive threshold reduction for vector search
- */
-async function searchWithProgressiveThresholds(
-  supabase: any,
-  userId: string,
-  queryEmbedding: number[],
-  initialThreshold: number,
-  searchPlan: any
-): Promise<any[]> {
-  const thresholds = [initialThreshold, 0.05, 0.03, 0.01];
-  
-  for (const threshold of thresholds) {
-    console.log(`[chat-with-rag] Trying vector search with threshold ${threshold}`);
-    
-    try {
-      let results = [];
-      
-      if (searchPlan.dateFilter) {
-        const { data, error } = await supabase.rpc(
-          'match_journal_entries_with_date',
-          {
-            query_embedding: queryEmbedding,
-            match_threshold: threshold,
-            match_count: 15,
-            user_id_filter: userId,
-            start_date: searchPlan.dateFilter.startDate,
-            end_date: searchPlan.dateFilter.endDate
-          }
-        );
-        
-        if (!error && data) {
-          results = data;
-        }
-      } else {
-        const { data, error } = await supabase.rpc(
-          'match_journal_entries_fixed',
-          {
-            query_embedding: queryEmbedding,
-            match_threshold: threshold,
-            match_count: 15,
-            user_id_filter: userId
-          }
-        );
-        
-        if (!error && data) {
-          results = data;
-        }
-      }
-      
-      if (results.length > 0) {
-        console.log(`[chat-with-rag] Found ${results.length} results with threshold ${threshold}`);
-        return results;
-      }
-    } catch (error) {
-      console.error(`[chat-with-rag] Error with threshold ${threshold}:`, error);
-    }
-  }
-  
-  console.log(`[chat-with-rag] No results found with progressive thresholds`);
-  return [];
-}
+const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+const openaiApiKey = Deno.env.get('OPENAI_API_KEY')!;
 
-/**
- * Enhanced keyword-based content search with date filtering support
- */
-async function searchByKeywords(
-  supabase: any,
-  userId: string,
-  query: string,
-  dateFilter?: { startDate?: string; endDate?: string }
-): Promise<any[]> {
-  console.log(`[chat-with-rag] Attempting keyword search for: "${query}"`);
-  
-  // Extract meaningful keywords from the query
-  const keywords = query.toLowerCase()
-    .replace(/[^\w\s]/g, ' ')
-    .split(/\s+/)
-    .filter(word => word.length > 3 && !['what', 'when', 'where', 'how', 'why', 'the', 'and', 'for', 'are', 'with'].includes(word))
-    .slice(0, 5);
-  
-  if (keywords.length === 0) {
-    return [];
-  }
-  
-  try {
-    let query_builder = supabase
-      .from('Journal Entries')
-      .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
-      .eq('user_id', userId)
-      .or(keywords.map(keyword => 
-        `"refined text".ilike.%${keyword}%,"transcription text".ilike.%${keyword}%`
-      ).join(','));
-    
-    // Apply date filters if provided
-    if (dateFilter?.startDate) {
-      query_builder = query_builder.gte('created_at', dateFilter.startDate);
-      console.log(`[chat-with-rag] Applying keyword search start date filter: ${dateFilter.startDate}`);
-    }
-    
-    if (dateFilter?.endDate) {
-      query_builder = query_builder.lte('created_at', dateFilter.endDate);
-      console.log(`[chat-with-rag] Applying keyword search end date filter: ${dateFilter.endDate}`);
-    }
-    
-    const { data, error } = await query_builder
-      .order('created_at', { ascending: false })
-      .limit(10);
-      
-    if (!error && data) {
-      const results = data.map(entry => ({
-        id: entry.id,
-        content: entry['refined text'] || entry['transcription text'] || '',
-        created_at: entry.created_at,
-        similarity: 0.7,
-        source: 'keyword_search',
-        matched_keywords: keywords
-      }));
-      
-      console.log(`[chat-with-rag] Keyword search found ${results.length} results with date filtering`);
-      return results;
-    }
-  } catch (error) {
-    console.error(`[chat-with-rag] Error in keyword search:`, error);
-  }
-  
-  return [];
-}
-
-/**
- * Check if entries exist in the specified date range before processing
- */
-async function checkEntriesInDateRange(
-  supabase: any,
-  userId: string,
-  dateFilter?: { startDate?: string; endDate?: string }
-): Promise<{ hasEntries: boolean; count: number }> {
-  if (!dateFilter) {
-    return { hasEntries: true, count: 0 };
-  }
-
-  try {
-    let query = supabase
-      .from('Journal Entries')
-      .select('id', { count: 'exact', head: true })
-      .eq('user_id', userId);
-
-    if (dateFilter.startDate) {
-      query = query.gte('created_at', dateFilter.startDate);
-    }
-
-    if (dateFilter.endDate) {
-      query = query.lte('created_at', dateFilter.endDate);
-    }
-
-    const { count, error } = await query;
-
-    if (error) {
-      console.error('[chat-with-rag] Error checking entries in date range:', error);
-      return { hasEntries: false, count: 0 };
-    }
-
-    const entryCount = count || 0;
-    console.log(`[chat-with-rag] Found ${entryCount} entries in date range ${dateFilter.startDate} to ${dateFilter.endDate}`);
-    
-    return { hasEntries: entryCount > 0, count: entryCount };
-  } catch (error) {
-    console.error('[chat-with-rag] Error checking entries in date range:', error);
-    return { hasEntries: false, count: 0 };
-  }
-}
-
-/**
- * Generate appropriate "no entries found" message based on the time reference
- */
-function generateNoEntriesMessage(message: string, dateFilter?: { startDate?: string; endDate?: string }): string {
-  let timeReference = "that time period";
-  const lowerMessage = message.toLowerCase();
-  
-  if (lowerMessage.includes("last week")) {
-    timeReference = "last week";
-  } else if (lowerMessage.includes("yesterday")) {
-    timeReference = "yesterday";
-  } else if (lowerMessage.includes("last month")) {
-    timeReference = "last month";
-  } else if (lowerMessage.includes("this week")) {
-    timeReference = "this week";
-  } else if (lowerMessage.includes("this month")) {
-    timeReference = "this month";
-  } else if (lowerMessage.includes("today")) {
-    timeReference = "today";
-  }
-  
-  let response = `I don't see any journal entries from ${timeReference}`;
-  
-  if (lowerMessage.includes("emotion")) {
-    response += " to analyze your emotions";
-  } else if (lowerMessage.includes("mood")) {
-    response += " to analyze your mood patterns";
-  } else if (lowerMessage.includes("feel")) {
-    response += " to understand how you were feeling";
-  } else {
-    response += " to analyze";
-  }
-  
-  // Add encouraging follow-up based on time reference
-  if (timeReference === "yesterday" || timeReference === "today") {
-    response += ". Try journaling today and I'll be able to provide insights about your thoughts and emotions!";
-  } else if (timeReference === "this week" || timeReference === "last week") {
-    response += ". Try journaling regularly this week and I'll be able to analyze your emotional patterns and provide insights!";
-  } else if (timeReference === "this month" || timeReference === "last month") {
-    response += ". Start journaling this month and I'll be able to provide deeper insights about your emotional journey!";
-  } else {
-    response += ". Once you start journaling during the time periods you're curious about, I'll be able to give you personalized analysis!";
-  }
-  
-  return response;
-}
-
-/**
- * Execute a single sub-question's search plan with STRICT date filtering
- */
-async function executeSubQuestionPlan(
-  subQuestion: any,
-  userId: string,
-  supabase: any,
-  queryEmbedding: number[]
-): Promise<any> {
-  console.log(`[chat-with-rag] Executing sub-question: "${subQuestion.question}"`);
-  
-  let results = [];
-  const searchPlan = subQuestion.searchPlan;
-  
-  // Check if we have date filters and if entries exist in that range FIRST
-  const dateFilter = searchPlan.vectorSearch?.dateFilter || null;
-  
-  if (dateFilter) {
-    console.log(`[chat-with-rag] Date filter detected, checking for entries in range: ${dateFilter.startDate} to ${dateFilter.endDate}`);
-    
-    const { hasEntries, count } = await checkEntriesInDateRange(supabase, userId, dateFilter);
-    
-    if (!hasEntries) {
-      console.log(`[chat-with-rag] NO ENTRIES found in date range - returning empty result with strict date enforcement`);
-      return {
-        subQuestion: subQuestion.question,
-        purpose: subQuestion.purpose,
-        results: [],
-        resultCount: 0,
-        dateFilterApplied: true,
-        dateRange: dateFilter,
-        noEntriesInRange: true,
-        strictDateEnforcement: true
-      };
-    }
-    
-    console.log(`[chat-with-rag] Found ${count} entries in date range, proceeding with search`);
-  }
-  
-  try {
-    // Execute SQL queries if specified with enhanced date filtering
-    if (searchPlan.sqlQueries && searchPlan.sqlQueries.length > 0) {
-      console.log(`[chat-with-rag] Executing ${searchPlan.sqlQueries.length} SQL queries for sub-question`);
-      
-      const sqlPromises = searchPlan.sqlQueries.map(async (sqlQuery) => {
-        try {
-          const controller = new AbortController();
-          const timeoutId = setTimeout(() => controller.abort(), 25000);
-          
-          // Replace USER_ID_PLACEHOLDER with actual userId
-          const parameters = { ...sqlQuery.parameters };
-          Object.keys(parameters).forEach(key => {
-            if (parameters[key] === 'USER_ID_PLACEHOLDER') {
-              parameters[key] = userId;
-            }
-          });
-          
-          let sqlResults = [];
-          
-          if (sqlQuery.function === 'get_top_emotions_with_entries') {
-            const { data, error } = await supabase.rpc('get_top_emotions_with_entries', {
-              user_id_param: userId,
-              start_date: parameters.start_date || dateFilter?.startDate || null,
-              end_date: parameters.end_date || dateFilter?.endDate || null,
-              limit_count: parameters.limit_count || 10
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!error && data) {
-              // STRICT: Filter results to ensure they're within date range
-              let filteredData = data;
-              if (dateFilter) {
-                filteredData = data.filter(emotion => {
-                  return emotion.sample_entries.some(entry => {
-                    const entryDate = new Date(entry.created_at);
-                    const startDate = new Date(dateFilter.startDate);
-                    const endDate = new Date(dateFilter.endDate);
-                    return entryDate >= startDate && entryDate <= endDate;
-                  });
-                });
-              }
-              
-              sqlResults = filteredData.flatMap(emotion => 
-                emotion.sample_entries
-                  .filter(entry => {
-                    if (!dateFilter) return true;
-                    const entryDate = new Date(entry.created_at);
-                    const startDate = new Date(dateFilter.startDate);
-                    const endDate = new Date(dateFilter.endDate);
-                    return entryDate >= startDate && entryDate <= endDate;
-                  })
-                  .map(entry => ({
-                    id: entry.id,
-                    content: entry.content,
-                    created_at: entry.created_at,
-                    similarity: 0.9,
-                    source: 'sql_emotion',
-                    emotion: emotion.emotion,
-                    emotion_score: emotion.score,
-                    subQuestion: subQuestion.question,
-                    dateFiltered: !!dateFilter
-                  }))
-              );
-            }
-          } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
-            const { data, error } = await supabase.rpc('match_journal_entries_by_emotion', {
-              emotion_name: parameters.emotion_name,
-              user_id_filter: userId,
-              min_score: 0.05,
-              start_date: parameters.start_date || dateFilter?.startDate || null,
-              end_date: parameters.end_date || dateFilter?.endDate || null,
-              limit_count: parameters.limit_count || 10
-            });
-            
-            clearTimeout(timeoutId);
-            
-            if (!error && data) {
-              // STRICT: Double-check date filtering
-              let filteredData = data;
-              if (dateFilter) {
-                filteredData = data.filter(entry => {
-                  const entryDate = new Date(entry.created_at);
-                  const startDate = new Date(dateFilter.startDate);
-                  const endDate = new Date(dateFilter.endDate);
-                  return entryDate >= startDate && entryDate <= endDate;
-                });
-              }
-              
-              sqlResults = filteredData.map(entry => ({
-                id: entry.id,
-                content: entry.content,
-                created_at: entry.created_at,
-                similarity: 0.8,
-                source: 'sql_emotion_specific',
-                emotion_score: entry.emotion_score,
-                subQuestion: subQuestion.question,
-                dateFiltered: !!dateFilter
-              }));
-            }
-          }
-          
-          console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${sqlResults.length} results (date filtered: ${!!dateFilter})`);
-          return sqlResults;
-          
-        } catch (error) {
-          console.error(`[chat-with-rag] Error executing SQL query ${sqlQuery.function}:`, error);
-          return [];
-        }
-      });
-      
-      const sqlResultsArrays = await Promise.allSettled(sqlPromises);
-      sqlResultsArrays.forEach(result => {
-        if (result.status === 'fulfilled') {
-          results.push(...result.value);
-        }
-      });
-    }
-    
-    // Execute vector search with progressive threshold reduction
-    if (searchPlan.vectorSearch && searchPlan.vectorSearch.enabled) {
-      console.log(`[chat-with-rag] Executing vector search with date filter enforcement`);
-      
-      try {
-        const searchQuery = searchPlan.vectorSearch.query || subQuestion.question;
-        
-        // Generate embedding for the specific sub-question query
-        let subQuestionEmbedding = queryEmbedding;
-        if (searchQuery !== subQuestion.question) {
-          try {
-            const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
-              method: 'POST',
-              headers: {
-                'Authorization': `Bearer ${Deno.env.get('OPENAI_API_KEY')}`,
-                'Content-Type': 'application/json',
-              },
-              body: JSON.stringify({
-                input: searchQuery,
-                model: 'text-embedding-3-small',
-              }),
-            });
-            
-            if (embeddingResponse.ok) {
-              const embeddingData = await embeddingResponse.json();
-              subQuestionEmbedding = embeddingData.data[0].embedding;
-            }
-          } catch (embeddingError) {
-            console.error('[chat-with-rag] Failed to generate sub-question embedding:', embeddingError);
-          }
-        }
-        
-        const vectorResults = await searchWithProgressiveThresholds(
-          supabase,
-          userId,
-          subQuestionEmbedding,
-          searchPlan.vectorSearch.threshold,
-          searchPlan.vectorSearch
-        );
-        
-        // STRICT: Filter vector results by date if date filter is present
-        let filteredVectorResults = vectorResults;
-        if (dateFilter) {
-          filteredVectorResults = vectorResults.filter(entry => {
-            const entryDate = new Date(entry.created_at);
-            const startDate = new Date(dateFilter.startDate);
-            const endDate = new Date(dateFilter.endDate);
-            return entryDate >= startDate && entryDate <= endDate;
-          });
-          console.log(`[chat-with-rag] Vector results filtered by date: ${vectorResults.length} -> ${filteredVectorResults.length}`);
-        }
-        
-        const enhancedVectorResults = filteredVectorResults.map(entry => ({
-          ...entry,
-          source: dateFilter ? 'vector_time_filtered' : 'vector_semantic',
-          subQuestion: subQuestion.question,
-          dateFiltered: !!dateFilter
-        }));
-        
-        results = results.concat(enhancedVectorResults);
-        console.log(`[chat-with-rag] Vector search returned ${enhancedVectorResults.length} date-filtered results`);
-        
-      } catch (error) {
-        console.error(`[chat-with-rag] Vector search error for sub-question:`, error);
-      }
-    }
-    
-    // CRITICAL: NEVER apply fallback strategies when date filters are present
-    if (results.length < 3 && searchPlan.fallbackStrategy && !dateFilter) {
-      console.log(`[chat-with-rag] Applying fallback strategy: ${searchPlan.fallbackStrategy} (NO date filter present)`);
-      
-      try {
-        let fallbackResults = [];
-        
-        if (searchPlan.fallbackStrategy === 'keyword_search') {
-          fallbackResults = await searchByKeywords(supabase, userId, subQuestion.question, null);
-          fallbackResults = fallbackResults.map(entry => ({
-            ...entry,
-            source: 'fallback_keyword',
-            subQuestion: subQuestion.question
-          }));
-        } else if (searchPlan.fallbackStrategy === 'recent_entries') {
-          const { data, error } = await supabase
-            .from('Journal Entries')
-            .select('id, created_at, "refined text", "transcription text", emotions, master_themes')
-            .eq('user_id', userId)
-            .order('created_at', { ascending: false })
-            .limit(10);
-            
-          if (!error && data) {
-            fallbackResults = data.map(entry => ({
-              id: entry.id,
-              content: entry['refined text'] || entry['transcription text'] || '',
-              created_at: entry.created_at,
-              similarity: 0.5,
-              source: 'fallback_recent',
-              subQuestion: subQuestion.question
-            }));
-          }
-        } else if (searchPlan.fallbackStrategy === 'emotion_based') {
-          const { data, error } = await supabase.rpc('get_top_emotions_with_entries', {
-            user_id_param: userId,
-            limit_count: 3
-          });
-          
-          if (!error && data) {
-            fallbackResults = data.flatMap(emotion => 
-              emotion.sample_entries.map(entry => ({
-                id: entry.id,
-                content: entry.content,
-                created_at: entry.created_at,
-                similarity: 0.6,
-                source: 'fallback_emotion',
-                emotion: emotion.emotion,
-                subQuestion: subQuestion.question
-              }))
-            );
-          }
-        }
-        
-        results = results.concat(fallbackResults);
-        console.log(`[chat-with-rag] Fallback strategy added ${fallbackResults.length} results (strict date enforcement: disabled)`);
-        
-      } catch (error) {
-        console.error(`[chat-with-rag] Fallback strategy failed:`, error);
-      }
-    } else if (dateFilter) {
-      console.log(`[chat-with-rag] ENFORCING STRICT DATE CONSTRAINTS: No fallback applied due to date filter (results: ${results.length})`);
-    }
-    
-    return {
-      subQuestion: subQuestion.question,
-      purpose: subQuestion.purpose,
-      results: results,
-      resultCount: results.length,
-      dateFilterApplied: !!dateFilter,
-      dateRange: dateFilter,
-      noEntriesInRange: dateFilter && results.length === 0,
-      strictDateEnforcement: !!dateFilter
-    };
-    
-  } catch (error) {
-    console.error(`[chat-with-rag] Error executing sub-question plan:`, error);
-    return {
-      subQuestion: subQuestion.question,
-      purpose: subQuestion.purpose,
-      results: [],
-      resultCount: 0,
-      error: error.message,
-      dateFilterApplied: !!dateFilter,
-      strictDateEnforcement: !!dateFilter
-    };
-  }
-}
-
-/**
- * Execute all sub-questions in parallel and aggregate results with strict date enforcement
- */
-async function executeIntelligentSubQueries(
-  message: string,
-  userId: string,
-  supabase: any,
-  queryPlan: any,
-  queryEmbedding: number[]
-): Promise<any> {
-  console.log(`[chat-with-rag] Executing ${queryPlan.subQuestions.length} sub-questions with strict date enforcement`);
-  
-  try {
-    // Execute all sub-questions in parallel
-    const subQuestionPromises = queryPlan.subQuestions.map(subQuestion => 
-      executeSubQuestionPlan(subQuestion, userId, supabase, queryEmbedding)
-    );
-    
-    const subQuestionResults = await Promise.allSettled(subQuestionPromises);
-    
-    // Aggregate all results with strict date filtering
-    let allResults = [];
-    const subQuestionSummary = [];
-    let hasDateFilters = false;
-    let noEntriesInAnyRange = false;
-    let allHaveStrictDateEnforcement = true;
-    
-    subQuestionResults.forEach((result, index) => {
-      if (result.status === 'fulfilled') {
-        const subResult = result.value;
-        allResults = allResults.concat(subResult.results);
-        subQuestionSummary.push({
-          question: subResult.subQuestion,
-          purpose: subResult.purpose,
-          resultCount: subResult.resultCount,
-          status: 'success',
-          dateFilterApplied: subResult.dateFilterApplied,
-          noEntriesInRange: subResult.noEntriesInRange,
-          strictDateEnforcement: subResult.strictDateEnforcement
-        });
-        
-        if (subResult.dateFilterApplied) {
-          hasDateFilters = true;
-        }
-        
-        if (subResult.noEntriesInRange) {
-          noEntriesInAnyRange = true;
-        }
-        
-        if (!subResult.strictDateEnforcement) {
-          allHaveStrictDateEnforcement = false;
-        }
-      } else {
-        console.error(`Sub-question ${index} failed:`, result.reason);
-        subQuestionSummary.push({
-          question: queryPlan.subQuestions[index].question,
-          resultCount: 0,
-          status: 'failed',
-          error: result.reason
-        });
-      }
-    });
-    
-    // Remove duplicates and sort by relevance
-    const uniqueResults = allResults.filter((entry, index, self) => 
-      index === self.findIndex(e => e.id === entry.id)
-    ).sort((a, b) => (b.similarity || 0) - (a.similarity || 0));
-    
-    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${subQuestionSummary.length} sub-questions (strict date enforcement: ${allHaveStrictDateEnforcement}, no entries in range: ${noEntriesInAnyRange})`);
-    
-    return {
-      results: uniqueResults.slice(0, 20),
-      subQuestionSummary,
-      totalResults: uniqueResults.length,
-      hasDateFilters,
-      noEntriesInAnyRange,
-      strictDateEnforcement: allHaveStrictDateEnforcement
-    };
-    
-  } catch (error) {
-    console.error('[chat-with-rag] Error in sub-question execution:', error);
-    throw error;
-  }
-}
-
-/**
- * Enhanced response generation with improved SOULo persona and formatting
- */
-async function generateResponseWithSubQuestionContext(
-  message: string,
-  aggregatedResults: any,
-  queryPlan: any,
-  conversationContext: any[],
-  openAiApiKey: string
-): Promise<{ content: string; analysisMetadata: any }> {
-  const responseStartTime = Date.now();
-  
-  try {
-    // Enhanced system prompt with SOULo's personality and formatting instructions
-    let systemPrompt = `You are SOULo, a warm and supportive mental health assistant for the SOULo voice journaling app. You analyze users' voice journal entries to provide personalized insights and emotional support.
-
-Your personality:
-- Speak in first person, directly to the user using "you" and "your"
-- Be warm, empathetic, and understanding like a trusted friend
-- Reference yourself as "I" when appropriate (e.g., "I can see from your entries...")
-- Never use clinical terms like "the individual" - always speak directly to the user
-- Be encouraging and focus on growth and self-awareness
-
-Response formatting requirements:
-- ALWAYS use **bold headers** for main sections
-- Use bullet points (•) for key insights and observations
-- Structure your response with clear sections
-- Keep responses concise but meaningful
-- Example format:
-  **Your Emotional Patterns**
-  • Main insight here
-  • Another key observation
-  
-  **What I Notice**
-  • Specific pattern from your entries
-  • Growth opportunity or strength`;
-
-    if (queryPlan.isPersonalityQuery) {
-      systemPrompt += `\n\nFocus: Provide personality insights based on ${queryPlan.subQuestions.length} approaches to analyzing the user's journal entries.`;
-    } else if (queryPlan.isEmotionQuery) {
-      systemPrompt += `\n\nFocus: Analyze emotional patterns using ${queryPlan.subQuestions.length} targeted approaches.`;
-    }
-
-    // Check if we have date filters but no results due to missing entries in that time range
-    if (aggregatedResults.hasDateFilters && aggregatedResults.noEntriesInAnyRange) {
-      console.log('[chat-with-rag] No entries found in specified date range - generating appropriate message');
-      
-      const noEntriesResponse = generateNoEntriesMessage(message);
-      
-      return {
-        content: noEntriesResponse,
-        analysisMetadata: {
-          entriesAnalyzed: 0,
-          totalEntries: 0,
-          dateFilterApplied: true,
-          noEntriesInRange: true,
-          reason: "No entries found in specified date range"
-        }
-      };
-    }
-
-    // Optimize journal entry formatting
-    const formattedResults = aggregatedResults.results.slice(0, 12).map((entry, index) => {
-      const date = new Date(entry.created_at).toLocaleDateString('en-US', {
-        month: 'short', day: 'numeric'
-      });
-      
-      let metadata = `[${index + 1} - ${date}`;
-      if (entry.emotion) metadata += ` - ${entry.emotion}`;
-      metadata += `]`;
-      
-      return `${metadata}\n${entry.content.substring(0, 200)}...\n`;
-    }).join('\n');
-
-    // Create analysis metadata for the UI
-    const analysisMetadata = {
-      entriesAnalyzed: aggregatedResults.results.length,
-      totalEntries: aggregatedResults.totalResults,
-      dateRange: {
-        earliest: aggregatedResults.results.length > 0 ? 
-          new Date(Math.min(...aggregatedResults.results.map(r => new Date(r.created_at).getTime()))) : null,
-        latest: aggregatedResults.results.length > 0 ? 
-          new Date(Math.max(...aggregatedResults.results.map(r => new Date(r.created_at).getTime()))) : null
-      },
-      subQuestionsUsed: aggregatedResults.subQuestionSummary.length,
-      analysisApproaches: aggregatedResults.subQuestionSummary.map(sq => sq.question),
-      dateFilterApplied: aggregatedResults.hasDateFilters,
-      noEntriesInRange: aggregatedResults.noEntriesInAnyRange
-    };
-
-    const userPrompt = `Based on your ${aggregatedResults.results.length} journal entries, here's what I found:
-
-${formattedResults}
-
-Your question: "${message}"
-
-Please provide a warm, personal response with **bold headers** and bullet points. Speak directly to the user as their supportive mental health assistant.`;
-
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...conversationContext.slice(-1),
-      { role: 'user', content: userPrompt }
-    ];
-
-    console.log(`[chat-with-rag] Starting OpenAI request after ${Date.now() - responseStartTime}ms of preparation`);
-
-    const controller = new AbortController();
-    const timeoutId = setTimeout(() => {
-      console.error('[chat-with-rag] OpenAI request timed out after 25 seconds');
-      controller.abort();
-    }, 25000);
-
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: messages,
-        max_tokens: 500,
-        temperature: 0.7,
-      }),
-      signal: controller.signal
-    });
-
-    clearTimeout(timeoutId);
-    
-    const totalPreparationTime = Date.now() - responseStartTime;
-    console.log(`[chat-with-rag] OpenAI request completed after ${totalPreparationTime}ms total time`);
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error(`[chat-with-rag] OpenAI API error: ${response.status} - ${errorText}`);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
-    }
-
-    const data = await response.json();
-    const generatedResponse = data.choices[0]?.message?.content;
-    
-    if (!generatedResponse) {
-      console.error('[chat-with-rag] No content in OpenAI response');
-      throw new Error('No content in OpenAI response');
-    }
-    
-    console.log(`[chat-with-rag] Generated response successfully, length: ${generatedResponse.length}`);
-    return { content: generatedResponse, analysisMetadata };
-
-  } catch (error) {
-    const totalTime = Date.now() - responseStartTime;
-    console.error(`[chat-with-rag] Error generating response after ${totalTime}ms:`, error);
-    
-    if (error.name === 'AbortError') {
-      console.error('[chat-with-rag] Response generation timed out');
-      return { 
-        content: "I found relevant information in your journal entries, but the response took too long to generate. Please try asking a more specific question.", 
-        analysisMetadata: null 
-      };
-    }
-    
-    return { 
-      content: "I found relevant information in your journal entries but encountered an error while generating the response. Please try again.", 
-      analysisMetadata: null 
-    };
-  }
-}
+const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
 serve(async (req) => {
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
-  const startTime = Date.now();
-
   try {
     const { 
       message, 
       userId, 
-      threadId, 
-      timeRange, 
-      referenceDate, 
-      conversationContext = [], 
-      queryPlan = {},
-      isMentalHealthQuery,
-      clientTimeInfo,
-      userTimezone 
+      queryPlan, 
+      conversationContext = [],
+      useAllEntries = false,  // NEW: Accept this flag from the planner
+      hasPersonalPronouns = false,  // NEW: Accept this flag
+      hasExplicitTimeReference = false  // NEW: Accept this flag
     } = await req.json();
 
-    console.log(`[chat-with-rag] Processing query with enhanced date constraint enforcement: "${message}"`);
+    console.log(`[chat-with-rag] ENHANCED PROCESSING with time override logic: "${message}"`);
+    console.log(`[chat-with-rag] Flags - UseAllEntries: ${useAllEntries}, PersonalPronouns: ${hasPersonalPronouns}, TimeRef: ${hasExplicitTimeReference}`);
 
-    // Validate required parameters
-    if (!message || !userId) {
-      return new Response(JSON.stringify({ 
-        error: 'Missing required parameters',
-        data: "I'm missing some required information to process your request. Please try again."
-      }), {
+    if (!message || !userId || !queryPlan) {
+      return new Response(JSON.stringify({ error: 'Missing required fields' }), {
         status: 400,
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
-    if (!openAiApiKey) {
-      console.error('[chat-with-rag] CRITICAL: OpenAI API key not configured');
+    // Check user's journal entry count
+    const { count: userEntryCount } = await supabase
+      .from('Journal Entries')
+      .select('*', { count: 'exact', head: true })
+      .eq('user_id', userId);
+
+    console.log(`[chat-with-rag] User has ${userEntryCount || 0} journal entries available`);
+
+    if (!userEntryCount || userEntryCount === 0) {
       return new Response(JSON.stringify({
-        data: "The AI service is temporarily unavailable. Please try again in a moment."
+        response: "I'd love to help you analyze your journal entries, but it looks like you haven't created any entries yet. Once you start journaling, I'll be able to provide insights about your emotions, patterns, and personal growth!",
+        hasData: false,
+        entryCount: 0
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
 
-    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
-    const supabaseKey = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
-    const supabase = createClient(supabaseUrl, supabaseKey);
+    // Execute sub-questions with enhanced time override logic
+    console.log(`[chat-with-rag] Executing ${queryPlan.subQuestions?.length || 0} sub-questions with time override enforcement`);
+    
+    const allResults = [];
+    const strictDateEnforcement = !useAllEntries && hasExplicitTimeReference;
+    let hasEntriesInDateRange = true;
 
-    // Quick entry count check with timeout
-    let entryCount = 0;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+    console.log(`[chat-with-rag] Strict date enforcement: ${strictDateEnforcement}`);
+
+    for (const subQuestion of queryPlan.subQuestions || []) {
+      console.log(`[chat-with-rag] Executing sub-question: "${subQuestion.question}"`);
       
-      const { count, error: countError } = await supabase
-        .from('Journal Entries')
-        .select('id', { count: "exact", head: true })
-        .eq('user_id', userId)
-        .abortSignal(controller.signal);
-
-      clearTimeout(timeoutId);
-
-      if (countError) {
-        console.error('[chat-with-rag] Error checking entries:', countError);
-      } else if (!count || count === 0) {
-        return new Response(JSON.stringify({
-          data: "I don't have any journal entries to analyze yet. Please add some journal entries first, and then I'll be able to provide personalized insights!"
-        }), {
-          headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-        });
-      } else {
-        entryCount = count;
+      const searchPlan = subQuestion.searchPlan || {};
+      const vectorSearch = searchPlan.vectorSearch || {};
+      const sqlQueries = searchPlan.sqlQueries || [];
+      
+      // CRITICAL: Apply time override logic
+      let effectiveDateFilter = vectorSearch.dateFilter;
+      
+      if (useAllEntries && hasPersonalPronouns && !hasExplicitTimeReference) {
+        // Override: Remove date constraints for personal pronoun queries without time references
+        effectiveDateFilter = null;
+        console.log(`[chat-with-rag] TIME OVERRIDE: Removing date filter for personal query without time constraint`);
+      } else if (effectiveDateFilter) {
+        console.log(`[chat-with-rag] Applying date filter: ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
       }
-    } catch (error) {
-      console.error('[chat-with-rag] Entry count check failed:', error);
+
+      // Check if we have entries in the date range for temporal queries
+      if (effectiveDateFilter && strictDateEnforcement) {
+        console.log(`[chat-with-rag] Date filter detected, checking for entries in range: ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
+        
+        const { count: entriesInRange } = await supabase
+          .from('Journal Entries')
+          .select('*', { count: 'exact', head: true })
+          .eq('user_id', userId)
+          .gte('created_at', effectiveDateFilter.startDate)
+          .lte('created_at', effectiveDateFilter.endDate);
+
+        console.log(`[chat-with-rag] Found ${entriesInRange || 0} entries in date range ${effectiveDateFilter.startDate} to ${effectiveDateFilter.endDate}`);
+
+        if (!entriesInRange || entriesInRange === 0) {
+          console.log(`[chat-with-rag] NO ENTRIES found in date range - returning empty result with strict date enforcement`);
+          hasEntriesInDateRange = false;
+          continue; // Skip this sub-question
+        } else {
+          console.log(`[chat-with-rag] Found ${entriesInRange} entries in date range, proceeding with search`);
+        }
+      }
+
+      // Execute SQL queries if any
+      if (sqlQueries.length > 0) {
+        console.log(`[chat-with-rag] Executing ${sqlQueries.length} SQL queries for sub-question`);
+        
+        for (const sqlQuery of sqlQueries) {
+          try {
+            let queryResult = null;
+            
+            // CRITICAL: Apply time override to SQL parameters
+            let sqlParams = { ...sqlQuery.parameters };
+            
+            if (useAllEntries && hasPersonalPronouns && !hasExplicitTimeReference) {
+              // Override: Remove date constraints
+              sqlParams.start_date = null;
+              sqlParams.end_date = null;
+              console.log(`[chat-with-rag] TIME OVERRIDE: Removing SQL date constraints for personal query`);
+            } else if (effectiveDateFilter) {
+              // Apply date constraints
+              sqlParams.start_date = effectiveDateFilter.startDate;
+              sqlParams.end_date = effectiveDateFilter.endDate;
+            }
+            
+            if (sqlQuery.function === 'get_top_emotions_with_entries') {
+              const { data, error } = await supabase.rpc(sqlQuery.function, {
+                user_id_param: userId,
+                start_date: sqlParams.start_date,
+                end_date: sqlParams.end_date,
+                limit_count: sqlParams.limit_count || 5
+              });
+              
+              if (error) throw error;
+              queryResult = data || [];
+              
+            } else if (sqlQuery.function === 'match_journal_entries_by_emotion') {
+              const { data, error } = await supabase.rpc(sqlQuery.function, {
+                emotion_name: sqlParams.emotion_name,
+                user_id_filter: userId,
+                min_score: sqlParams.min_score || 0.3,
+                start_date: sqlParams.start_date,
+                end_date: sqlParams.end_date,
+                limit_count: sqlParams.limit_count || 5
+              });
+              
+              if (error) throw error;
+              queryResult = data || [];
+            }
+            
+            console.log(`[chat-with-rag] SQL query ${sqlQuery.function} returned ${queryResult?.length || 0} results (date filtered: ${!!effectiveDateFilter})`);
+            
+            if (queryResult && queryResult.length > 0) {
+              allResults.push(...queryResult.map(result => ({
+                ...result,
+                source: 'sql_query',
+                query_function: sqlQuery.function
+              })));
+            } else if (strictDateEnforcement) {
+              console.log(`[chat-with-rag] ENFORCING STRICT DATE CONSTRAINTS: No fallback applied due to date filter (results: ${queryResult?.length || 0})`);
+            }
+            
+          } catch (error) {
+            console.error(`[chat-with-rag] Error executing SQL query ${sqlQuery.function}:`, error);
+          }
+        }
+      }
+
+      // Execute vector search if enabled
+      if (vectorSearch.enabled) {
+        try {
+          // Generate embedding for the search query
+          const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+            method: 'POST',
+            headers: {
+              'Authorization': `Bearer ${openaiApiKey}`,
+              'Content-Type': 'application/json',
+            },
+            body: JSON.stringify({
+              input: vectorSearch.query || subQuestion.question,
+              model: 'text-embedding-ada-002',
+            }),
+          });
+
+          if (!embeddingResponse.ok) {
+            throw new Error(`OpenAI API error: ${embeddingResponse.status}`);
+          }
+
+          const embeddingData = await embeddingResponse.json();
+          const embedding = embeddingData.data[0].embedding;
+
+          // Perform vector search with or without date filter
+          let vectorResults = [];
+          
+          if (effectiveDateFilter) {
+            const { data, error } = await supabase.rpc('match_journal_entries_with_date', {
+              query_embedding: embedding,
+              match_threshold: vectorSearch.threshold || 0.1,
+              match_count: 10,
+              user_id_filter: userId,
+              start_date: effectiveDateFilter.startDate,
+              end_date: effectiveDateFilter.endDate
+            });
+            
+            if (error) throw error;
+            vectorResults = data || [];
+            
+          } else {
+            const { data, error } = await supabase.rpc('match_journal_entries_fixed', {
+              query_embedding: embedding,
+              match_threshold: vectorSearch.threshold || 0.1,
+              match_count: useAllEntries ? 50 : 10, // More results for personal queries
+              user_id_filter: userId
+            });
+            
+            if (error) throw error;
+            vectorResults = data || [];
+          }
+
+          console.log(`[chat-with-rag] Vector search returned ${vectorResults.length} results (threshold: ${vectorSearch.threshold}, dateFilter: ${!!effectiveDateFilter})`);
+
+          if (vectorResults.length > 0) {
+            allResults.push(...vectorResults.map(result => ({
+              ...result,
+              source: 'vector_search',
+              similarity: result.similarity
+            })));
+          }
+
+        } catch (error) {
+          console.error(`[chat-with-rag] Error in vector search:`, error);
+        }
+      }
     }
 
-    console.log(`[chat-with-rag] User has ${entryCount} journal entries available`);
+    // Remove duplicates and limit results
+    const uniqueResults = Array.from(
+      new Map(allResults.map(item => [item.id, item])).values()
+    ).slice(0, useAllEntries ? 100 : 15);
 
-    // Get query embedding with timeout
-    let queryEmbedding;
-    try {
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 25000);
+    console.log(`[chat-with-rag] Sub-question execution completed: ${uniqueResults.length} unique results from ${queryPlan.subQuestions?.length || 0} sub-questions (strict date enforcement: ${strictDateEnforcement}, no entries in range: ${!hasEntriesInDateRange})`);
+
+    console.log(`[chat-with-rag] Retrieved ${uniqueResults.length} total relevant entries (strict date enforcement: ${strictDateEnforcement})`);
+
+    // Handle case where no entries found due to strict date enforcement
+    if (strictDateEnforcement && !hasEntriesInDateRange) {
+      console.log(`[chat-with-rag] STRICT DATE ENFORCEMENT: No entries in specified date range - generating appropriate message`);
       
-      const embeddingResponse = await fetch('https://api.openai.com/v1/embeddings', {
+      const temporalContext = queryPlan.dateRange ? 
+        ` from ${new Date(queryPlan.dateRange.startDate).toLocaleDateString()} to ${new Date(queryPlan.dateRange.endDate).toLocaleDateString()}` : 
+        ' in the specified time period';
+        
+      return new Response(JSON.stringify({
+        response: `I don't see any journal entries${temporalContext}. You might want to try a different time period, or if you haven't been journaling during that time, that's completely normal! Would you like me to look at a broader time range or help you with something else?`,
+        hasData: false,
+        searchedTimeRange: queryPlan.dateRange,
+        strictDateEnforcement: true,
+        entryCount: userEntryCount
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    if (uniqueResults.length === 0) {
+      let fallbackResponse;
+      
+      if (useAllEntries && hasPersonalPronouns) {
+        fallbackResponse = "I'd love to help analyze your personal patterns, but I'm having trouble finding relevant entries right now. This might be because your journal entries don't contain the specific topics we're looking for, or there might be a technical issue. Could you try rephrasing your question or asking about something more specific?";
+      } else {
+        fallbackResponse = "I couldn't find any journal entries that match your query. This could be because you haven't journaled about this topic yet, or the entries don't contain similar content. Would you like to try asking about something else or rephrase your question?";
+      }
+      
+      return new Response(JSON.stringify({
+        response: fallbackResponse,
+        hasData: false,
+        entryCount: userEntryCount,
+        useAllEntries,
+        hasPersonalPronouns
+      }), {
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+    }
+
+    // Prepare context for GPT with enhanced personal context
+    const journalContext = uniqueResults.map(entry => {
+      const content = entry.content || entry.sample_entries?.[0]?.content || 'No content available';
+      const date = entry.created_at ? new Date(entry.created_at).toLocaleDateString() : 'Unknown date';
+      const emotions = entry.emotions ? Object.keys(entry.emotions).slice(0, 3).join(', ') : 'No emotions detected';
+      
+      return `Date: ${date}\nContent: ${content.substring(0, 300)}...\nEmotions: ${emotions}`;
+    }).join('\n\n---\n\n');
+
+    const systemPrompt = `You are SOULo, a compassionate AI assistant that helps users understand their journal entries and emotional patterns.
+
+Context: The user has ${userEntryCount} total journal entries. ${useAllEntries ? 'You are analyzing ALL their entries for comprehensive personal insights.' : `You are analyzing ${uniqueResults.length} relevant entries.`}
+
+${hasPersonalPronouns ? 'IMPORTANT: This is a personal question about the user themselves. Provide personalized insights and speak directly to them about their patterns, growth, and experiences.' : ''}
+
+${hasExplicitTimeReference ? `IMPORTANT: This query is specifically about ${queryPlan.dateRange ? `the time period from ${new Date(queryPlan.dateRange.startDate).toLocaleDateString()} to ${new Date(queryPlan.dateRange.endDate).toLocaleDateString()}` : 'a specific time period'}. Focus your analysis on that timeframe.` : ''}
+
+Based on these journal entries, provide a helpful, warm, and insightful response to: "${message}"
+
+Journal Entries:
+${journalContext}
+
+Guidelines:
+- Be warm, empathetic, and supportive
+- Provide specific insights based on the actual journal content
+- ${hasPersonalPronouns ? 'Use "you" and "your" to make it personal since they asked about themselves' : 'Keep the tone conversational but not overly personal'}
+- If patterns emerge, point them out constructively
+- ${useAllEntries ? 'Since you have access to their full journal history, provide comprehensive insights about long-term patterns' : 'Focus on the specific entries provided'}
+- End with an encouraging note or helpful suggestion`;
+
+    try {
+      const gptResponse = await fetch('https://api.openai.com/v1/chat/completions', {
         method: 'POST',
         headers: {
-          'Authorization': `Bearer ${openAiApiKey}`,
+          'Authorization': `Bearer ${openaiApiKey}`,
           'Content-Type': 'application/json',
         },
         body: JSON.stringify({
-          input: message,
-          model: 'text-embedding-3-small',
+          model: 'gpt-4o-mini',
+          messages: [
+            { role: 'system', content: systemPrompt },
+            { role: 'user', content: message }
+          ],
+          temperature: 0.7,
+          max_tokens: 1000,
         }),
-        signal: controller.signal
       });
 
-      clearTimeout(timeoutId);
-
-      if (!embeddingResponse.ok) {
-        throw new Error('Failed to get query embedding');
+      if (!gptResponse.ok) {
+        throw new Error(`OpenAI API error: ${gptResponse.status}`);
       }
 
-      const embeddingData = await embeddingResponse.json();
-      queryEmbedding = embeddingData.data[0].embedding;
-    } catch (error) {
-      console.error('[chat-with-rag] Failed to get embedding:', error);
+      const gptData = await gptResponse.json();
+      const response = gptData.choices[0].message.content;
+
       return new Response(JSON.stringify({
-        data: "I encountered an issue processing your question. Please try rephrasing it or try again in a moment."
-      }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Execute intelligent sub-question planning with enhanced date enforcement
-    let aggregatedResults;
-    if (queryPlan.strategy === 'intelligent_sub_query' && queryPlan.subQuestions && queryPlan.subQuestions.length > 0) {
-      aggregatedResults = await executeIntelligentSubQueries(
-        message,
-        userId,
-        supabase,
-        queryPlan,
-        queryEmbedding
-      );
-    } else {
-      // Fallback to single query if no sub-questions available
-      console.log('[chat-with-rag] No sub-questions available, using fallback single query');
-      
-      const { data, error } = await supabase.rpc(
-        'match_journal_entries_fixed',
-        {
-          query_embedding: queryEmbedding,
-          match_threshold: 0.1,
-          match_count: 15,
-          user_id_filter: userId
-        }
-      );
-      
-      const fallbackResults = data ? data.map(entry => ({
-        ...entry,
-        source: 'fallback_single',
-        subQuestion: 'Direct search'
-      })) : [];
-      
-      aggregatedResults = {
-        results: fallbackResults,
-        subQuestionSummary: [{ question: 'Direct search', resultCount: fallbackResults.length, status: 'success' }],
-        totalResults: fallbackResults.length,
-        hasDateFilters: false,
-        noEntriesInAnyRange: false,
-        strictDateEnforcement: false
-      };
-    }
-
-    console.log(`[chat-with-rag] Retrieved ${aggregatedResults.totalResults} total relevant entries (strict date enforcement: ${aggregatedResults.strictDateEnforcement})`);
-
-    // ENHANCED: Check for strict date constraint violations
-    if (aggregatedResults.hasDateFilters && aggregatedResults.noEntriesInAnyRange && aggregatedResults.strictDateEnforcement) {
-      console.log('[chat-with-rag] STRICT DATE ENFORCEMENT: No entries in specified date range - generating appropriate message');
-      
-      const noEntriesResponse = generateNoEntriesMessage(message);
-      
-      return new Response(JSON.stringify({ 
-        data: noEntriesResponse,
-        analysisMetadata: {
-          entriesAnalyzed: 0,
-          totalEntries: 0,
-          dateFilterApplied: true,
-          noEntriesInRange: true,
-          strictDateEnforcement: true,
-          reason: "No entries found in specified date range (strict enforcement)"
+        response,
+        hasData: true,
+        entryCount: uniqueResults.length,
+        totalUserEntries: userEntryCount,
+        useAllEntries,
+        hasPersonalPronouns,
+        strictDateEnforcement,
+        analyzedTimeRange: queryPlan.dateRange,
+        processingFlags: {
+          useAllEntries,
+          hasPersonalPronouns,
+          hasExplicitTimeReference,
+          strictDateEnforcement
         }
       }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
+      });
+
+    } catch (error) {
+      console.error('[chat-with-rag] Error calling OpenAI:', error);
+      return new Response(JSON.stringify({
+        error: 'Failed to generate response',
+        hasData: uniqueResults.length > 0,
+        entryCount: uniqueResults.length
+      }), {
+        status: 500,
+        headers: { ...corsHeaders, 'Content-Type': 'application/json' }
       });
     }
-
-    if (aggregatedResults.totalResults === 0) {
-      let noDataResponse = `I couldn't find relevant journal entries for your question about "${message}".`;
-      
-      if (queryPlan.isPersonalityQuery) {
-        noDataResponse += ` To help me analyze your personality patterns, try journaling about your thoughts, decisions, and daily experiences.`;
-      } else if (queryPlan.isEmotionQuery) {
-        noDataResponse += ` To help me understand your emotional patterns, try journaling about your feelings and what triggers them.`;
-      } else {
-        noDataResponse += ` Try adding more journal entries about your thoughts and experiences, then ask me again.`;
-      }
-      
-      return new Response(JSON.stringify({ data: noDataResponse }), {
-        headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-      });
-    }
-
-    // Generate comprehensive response with analysis metadata
-    const { content: response, analysisMetadata } = await generateResponseWithSubQuestionContext(
-      message,
-      aggregatedResults,
-      queryPlan,
-      conversationContext,
-      openAiApiKey
-    );
-
-    const totalTime = Date.now() - startTime;
-    console.log(`[chat-with-rag] SUCCESSFULLY generated response with strict date enforcement in ${totalTime}ms, length: ${response.length}`);
-
-    return new Response(JSON.stringify({ 
-      data: response,
-      analysisMetadata: {
-        ...analysisMetadata,
-        strictDateEnforcement: aggregatedResults.strictDateEnforcement
-      }
-    }), {
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
-    });
 
   } catch (error) {
-    const totalTime = Date.now() - startTime;
-    console.error(`[chat-with-rag] CRITICAL ERROR after ${totalTime}ms:`, error);
-    
-    let errorMessage = `I encountered an error while analyzing your journal entries.`;
-    
-    if (error.message.includes('timeout') || error.name === 'AbortError') {
-      errorMessage = `The analysis took too long to complete. Please try asking a more specific question or try again in a moment.`;
-    } else if (error.message.includes('OpenAI')) {
-      errorMessage = `I found relevant entries but the AI service had an issue. Please try again shortly.`;
-    }
-    
-    return new Response(JSON.stringify({ 
-      error: 'Internal server error',
-      data: errorMessage
-    }), {
+    console.error('[chat-with-rag] Error:', error);
+    return new Response(JSON.stringify({ error: 'Internal server error' }), {
       status: 500,
-      headers: { ...corsHeaders, 'Content-Type': 'application/json' },
+      headers: { ...corsHeaders, 'Content-Type': 'application/json' }
     });
   }
 });

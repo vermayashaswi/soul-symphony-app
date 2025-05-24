@@ -7,7 +7,7 @@ const corsHeaders = {
 };
 
 /**
- * Enhanced GPT-powered message classifier with prioritized personal pronoun detection
+ * ENHANCED GPT-powered message classifier with PRIORITY personal pronoun detection
  */
 serve(async (req) => {
   // Handle CORS preflight requests
@@ -25,7 +25,7 @@ serve(async (req) => {
       );
     }
 
-    console.log(`[Query Classifier] Classifying message with enhanced personal pronoun prioritization: "${message}"`);
+    console.log(`[Query Classifier] ENHANCED classification with PRIORITY personal pronoun detection: "${message}"`);
 
     // Get OpenAI API key
     const openAiApiKey = Deno.env.get('OPENAI_API_KEY');
@@ -38,10 +38,10 @@ serve(async (req) => {
       );
     }
 
-    // Use GPT for classification with enhanced personal pronoun handling
+    // Use GPT for classification with ENHANCED personal pronoun handling
     const classification = await gptClassifyMessage(message, conversationContext, openAiApiKey);
 
-    console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence})`);
+    console.log(`[Query Classifier] Result: ${classification.category} (confidence: ${classification.confidence}) - UseAllEntries: ${classification.useAllEntries}`);
 
     return new Response(
       JSON.stringify(classification),
@@ -68,7 +68,7 @@ serve(async (req) => {
 });
 
 /**
- * Enhanced GPT-powered classification with HIGHEST PRIORITY personal pronoun detection
+ * ENHANCED GPT-powered classification with HIGHEST PRIORITY personal pronoun detection
  */
 async function gptClassifyMessage(
   message: string, 
@@ -88,15 +88,17 @@ async function gptClassifyMessage(
 
   const classificationPrompt = `You are an advanced query classifier for SOULo, a voice journaling app that helps users analyze their personal journal entries for emotional insights and patterns.
 
-**CRITICAL CLASSIFICATION RULE - HIGHEST PRIORITY:**
+**CRITICAL CLASSIFICATION RULE - ABSOLUTE HIGHEST PRIORITY:**
 Personal pronouns ("I", "me", "my", "mine", "myself", "am I", "do I", "how am I", "what makes me", "how do I", etc.) AUTOMATICALLY trigger JOURNAL_SPECIFIC classification with confidence 0.95+, regardless of ANY other factors.
 
-**IMPORTANT TIME RANGE OVERRIDE LOGIC:**
-- Personal pronoun questions WITHOUT explicit time references: useAllEntries = true (analyze ALL journal entries)
-- Personal pronoun questions WITH explicit time references ("last week", "yesterday"): useAllEntries = false (respect time constraint)
+**ENHANCED TIME RANGE OVERRIDE LOGIC - CRITICAL:**
+- Personal pronoun questions WITHOUT explicit time references ("last week", "yesterday", "today", etc.): useAllEntries = true (analyze ALL journal entries, ignore any time constraints)
+- Personal pronoun questions WITH explicit time references: useAllEntries = false (respect time constraint)
 - Examples:
-  * "How am I doing?" → JOURNAL_SPECIFIC, useAllEntries: true
-  * "How was I last week?" → JOURNAL_SPECIFIC, useAllEntries: false
+  * "How am I doing?" → JOURNAL_SPECIFIC, useAllEntries: true (analyze ALL entries)
+  * "How was I last week?" → JOURNAL_SPECIFIC, useAllEntries: false (respect time constraint)
+  * "What makes me happy?" → JOURNAL_SPECIFIC, useAllEntries: true (analyze ALL entries)
+  * "How did I feel yesterday?" → JOURNAL_SPECIFIC, useAllEntries: false (respect time constraint)
 
 **CLASSIFICATION CATEGORIES:**
 
@@ -120,8 +122,9 @@ Personal pronouns ("I", "me", "my", "mine", "myself", "am I", "do I", "how am I"
 **CRITICAL INSTRUCTIONS:**
 - Personal pronouns OVERRIDE all other classification criteria
 - Always mention personal pronoun detection in reasoning when applicable
-- Ignore typos and focus on intent: "wat makes me sad" = JOURNAL_SPECIFIC
+- Ignore typos and focus on intent: "wat makes me sad" = JOURNAL_SPECIFIC with useAllEntries: true
 - "How am I" patterns are ALWAYS journal-specific with useAllEntries: true unless time is specified
+- Check VERY carefully for implicit personal references like "How am I doing?" or "Am I getting better?"
 
 User message: "${message}"${contextString}
 
@@ -131,7 +134,7 @@ Respond with ONLY a JSON object in this exact format:
   "confidence": 0.0-1.0,
   "shouldUseJournal": boolean,
   "useAllEntries": boolean,
-  "reasoning": "Brief explanation emphasizing personal pronoun detection if applicable"
+  "reasoning": "Brief explanation emphasizing personal pronoun detection and useAllEntries logic if applicable"
 }`;
 
   try {
@@ -191,7 +194,7 @@ Respond with ONLY a JSON object in this exact format:
 }
 
 /**
- * Enhanced rule-based classification with PRIORITIZED personal pronoun detection
+ * ENHANCED rule-based classification with PRIORITIZED personal pronoun detection
  */
 function enhancedRuleBased_classifyMessage(message: string): {
   category: string;
@@ -202,7 +205,9 @@ function enhancedRuleBased_classifyMessage(message: string): {
 } {
   const lowerMessage = message.toLowerCase().trim();
   
-  // PRIORITY 1: Check for personal pronouns - HIGHEST PRIORITY
+  console.log(`[Rule-Based] Analyzing message: "${message}"`);
+  
+  // PRIORITY 1: Check for personal pronouns - ABSOLUTE HIGHEST PRIORITY
   const personalPronounPatterns = [
     /\b(i|me|my|mine|myself)\b/i,
     /\bam i\b/i,
@@ -217,7 +222,8 @@ function enhancedRuleBased_classifyMessage(message: string): {
     /\bwhy do i\b/i,
     /\bwhat about me\b/i,
     /\bam i getting\b/i,
-    /\bwhat can i\b/i
+    /\bwhat can i\b/i,
+    /\bwhat should i\b/i
   ];
   
   for (const pattern of personalPronounPatterns) {
@@ -225,12 +231,16 @@ function enhancedRuleBased_classifyMessage(message: string): {
       // Check if there's an explicit temporal reference
       const hasTemporalReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(lowerMessage);
       
+      const useAllEntries = !hasTemporalReference;
+      
+      console.log(`[Rule-Based] PERSONAL PRONOUNS DETECTED - Pattern: ${pattern}, Time ref: ${hasTemporalReference}, UseAllEntries: ${useAllEntries}`);
+      
       return {
         category: "JOURNAL_SPECIFIC",
         confidence: 0.95,
         shouldUseJournal: true,
-        useAllEntries: !hasTemporalReference, // Use all entries unless there's a specific time reference
-        reasoning: `PERSONAL PRONOUNS DETECTED - automatically classified as journal-specific. ${hasTemporalReference ? 'Time constraint detected - will respect date range.' : 'No time constraint - will analyze ALL entries.'}`
+        useAllEntries: useAllEntries,
+        reasoning: `PERSONAL PRONOUNS DETECTED - automatically classified as journal-specific. ${hasTemporalReference ? 'Time constraint detected - will respect date range.' : 'No time constraint - will analyze ALL entries for comprehensive personal insights.'}`
       };
     }
   }
@@ -308,6 +318,8 @@ function enhancedRuleBased_classifyMessage(message: string): {
       };
     }
   }
+  
+  console.log(`[Rule-Based] No clear patterns found, defaulting to CONVERSATIONAL`);
   
   return {
     category: "CONVERSATIONAL",

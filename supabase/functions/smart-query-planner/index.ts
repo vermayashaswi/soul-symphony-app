@@ -1,4 +1,3 @@
-
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
@@ -35,20 +34,35 @@ Common Themes: work, relationships, family, health, goals, travel, creativity, l
 `;
 
 /**
- * Extract date ranges from natural language temporal references
+ * FIXED: Extract date ranges from natural language temporal references using current year
  */
 function extractDateRangeFromQuery(message: string): { startDate: string; endDate: string } | null {
   const now = new Date();
+  const currentYear = now.getFullYear();
   const lowerMessage = message.toLowerCase();
   
+  console.log(`[Date Extraction] Processing temporal query: "${message}" at ${now.toISOString()}`);
+  
   if (lowerMessage.includes('last week')) {
-    const lastWeekStart = new Date(now);
-    lastWeekStart.setDate(now.getDate() - now.getDay() - 7); // Start of last week (Sunday)
-    lastWeekStart.setHours(0, 0, 0, 0);
+    // FIXED: Calculate last week using Monday as week start (ISO week)
+    const currentDate = new Date(now);
+    const currentDayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Days back to this Monday
+    
+    // Start of this week (Monday)
+    const thisWeekStart = new Date(currentDate);
+    thisWeekStart.setDate(currentDate.getDate() - daysToMonday);
+    thisWeekStart.setHours(0, 0, 0, 0);
+    
+    // Last week = this week - 7 days
+    const lastWeekStart = new Date(thisWeekStart);
+    lastWeekStart.setDate(thisWeekStart.getDate() - 7);
     
     const lastWeekEnd = new Date(lastWeekStart);
-    lastWeekEnd.setDate(lastWeekStart.getDate() + 6); // End of last week (Saturday)
+    lastWeekEnd.setDate(lastWeekStart.getDate() + 6); // Sunday end
     lastWeekEnd.setHours(23, 59, 59, 999);
+    
+    console.log(`[Date Extraction] Last week calculated: ${lastWeekStart.toISOString()} to ${lastWeekEnd.toISOString()}`);
     
     return {
       startDate: lastWeekStart.toISOString(),
@@ -64,6 +78,8 @@ function extractDateRangeFromQuery(message: string): { startDate: string; endDat
     const yesterdayEnd = new Date(yesterday);
     yesterdayEnd.setHours(23, 59, 59, 999);
     
+    console.log(`[Date Extraction] Yesterday calculated: ${yesterday.toISOString()} to ${yesterdayEnd.toISOString()}`);
+    
     return {
       startDate: yesterday.toISOString(),
       endDate: yesterdayEnd.toISOString()
@@ -71,9 +87,16 @@ function extractDateRangeFromQuery(message: string): { startDate: string; endDat
   }
   
   if (lowerMessage.includes('this week')) {
-    const thisWeekStart = new Date(now);
-    thisWeekStart.setDate(now.getDate() - now.getDay()); // Start of this week (Sunday)
+    // FIXED: Calculate this week using Monday as week start
+    const currentDate = new Date(now);
+    const currentDayOfWeek = currentDate.getDay(); // 0 = Sunday, 1 = Monday, etc.
+    const daysToMonday = currentDayOfWeek === 0 ? 6 : currentDayOfWeek - 1; // Days back to Monday
+    
+    const thisWeekStart = new Date(currentDate);
+    thisWeekStart.setDate(currentDate.getDate() - daysToMonday);
     thisWeekStart.setHours(0, 0, 0, 0);
+    
+    console.log(`[Date Extraction] This week calculated: ${thisWeekStart.toISOString()} to ${now.toISOString()}`);
     
     return {
       startDate: thisWeekStart.toISOString(),
@@ -85,12 +108,15 @@ function extractDateRangeFromQuery(message: string): { startDate: string; endDat
     const today = new Date(now);
     today.setHours(0, 0, 0, 0);
     
+    console.log(`[Date Extraction] Today calculated: ${today.toISOString()} to ${now.toISOString()}`);
+    
     return {
       startDate: today.toISOString(),
       endDate: now.toISOString()
     };
   }
   
+  console.log(`[Date Extraction] No temporal pattern found in: "${message}"`);
   return null;
 }
 
@@ -229,7 +255,7 @@ async function retryOpenAICall(promptFunction: () => Promise<Response>, maxRetri
 }
 
 /**
- * Intelligent query analysis with enhanced temporal handling
+ * Intelligent query analysis with fixed temporal handling and personal pronoun prioritization
  */
 async function analyzeQueryWithSubQuestions(message: string, conversationContext: any[], userEntryCount: number) {
   try {
@@ -237,10 +263,33 @@ async function analyzeQueryWithSubQuestions(message: string, conversationContext
       ? `\nConversation context: ${conversationContext.slice(-2).map(msg => `${msg.role}: ${msg.content}`).join('\n')}`
       : '';
 
-    // Extract potential date range for better context
+    // FIXED: Extract potential date range for better context using current year
     const extractedDateRange = extractDateRangeFromQuery(message);
     const dateContext = extractedDateRange ? 
       `\nDetected date range: ${extractedDateRange.startDate} to ${extractedDateRange.endDate}` : '';
+
+    // ENHANCED: Check for personal pronouns - HIGHEST PRIORITY
+    const personalPronounPatterns = [
+      /\b(i|me|my|mine|myself)\b/i,
+      /\bam i\b/i,
+      /\bdo i\b/i,
+      /\bhow am i\b/i,
+      /\bhow do i\b/i,
+      /\bwhat makes me\b/i,
+      /\bhow was i\b/i,
+      /\bwhat do i\b/i,
+      /\bwhere do i\b/i,
+      /\bwhen do i\b/i,
+      /\bwhy do i\b/i,
+      /\bwhat about me\b/i,
+      /\bam i getting\b/i,
+      /\bwhat can i\b/i
+    ];
+    
+    const hasPersonalPronouns = personalPronounPatterns.some(pattern => pattern.test(message.toLowerCase()));
+    const hasExplicitTimeReference = /\b(last week|yesterday|this week|last month|today|recently|lately|this morning|last night)\b/i.test(message.toLowerCase());
+    
+    console.log(`[Query Analysis] Personal pronouns: ${hasPersonalPronouns}, Explicit time ref: ${hasExplicitTimeReference}`);
 
     const prompt = `You are an intelligent query planner for a voice journaling app called SOULo. Your task is to break down user queries into executable sub-questions with detailed search plans.
 
@@ -248,6 +297,11 @@ ${DATABASE_SCHEMA_CONTEXT}
 
 User query: "${message}"
 User has ${userEntryCount} journal entries.${contextString}${dateContext}
+
+CRITICAL PERSONAL PRONOUN OVERRIDE RULES:
+- If the query contains personal pronouns (I, me, my, mine, myself, am I, do I, how am I, etc.) WITHOUT explicit time references, you MUST set useAllEntries: true and ignore any date constraints
+- Personal pronoun questions like "How am I doing?" should analyze ALL entries regardless of time
+- Only apply date filters when there are BOTH personal pronouns AND explicit time references like "How was I last week?"
 
 CRITICAL RULES FOR TEMPORAL QUERIES:
 - If the query mentions "last week", "yesterday", "today", etc., you MUST include exact date filters
@@ -284,11 +338,15 @@ Return ONLY valid JSON with this structure:
     }
   ],
   "confidence": number,
-  "reasoning": "brief explanation of the approach",
-  "expectedResponse": "analysis" | "direct_answer" | "clarification_needed"
+  "reasoning": "brief explanation of the approach including personal pronoun detection",
+  "expectedResponse": "analysis" | "direct_answer" | "clarification_needed",
+  "useAllEntries": boolean,
+  "hasPersonalPronouns": boolean,
+  "hasExplicitTimeReference": boolean
 }
 
-For temporal queries, ALWAYS set fallbackStrategy to null to prevent analyzing entries outside the date range.`;
+IMPORTANT: For temporal queries, ALWAYS set fallbackStrategy to null to prevent analyzing entries outside the date range.
+For personal pronoun queries without time references, set useAllEntries: true.`;
 
     const promptFunction = () => fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -310,42 +368,53 @@ For temporal queries, ALWAYS set fallbackStrategy to null to prevent analyzing e
     const analysisResult = extractAndParseJSON(content, message);
     
     if (!analysisResult) {
-      console.error("Failed to parse GPT response, using temporal-aware fallback");
-      return createTemporalAwareFallback(message);
+      console.error("Failed to parse GPT response, using enhanced temporal-aware fallback");
+      return createEnhancedFallback(message, hasPersonalPronouns, hasExplicitTimeReference, extractedDateRange);
     }
     
-    // Validate and enhance the sub-questions with temporal awareness
-    const validatedResult = validateAndEnhanceSubQuestions(analysisResult, message);
+    // Validate and enhance the sub-questions with enhanced logic
+    const validatedResult = validateAndEnhanceSubQuestions(analysisResult, message, hasPersonalPronouns, hasExplicitTimeReference, extractedDateRange);
     
     console.log("Final Analysis Result:", JSON.stringify(validatedResult, null, 2));
     return validatedResult;
 
   } catch (error) {
     console.error("Error in GPT query analysis:", error);
-    return createTemporalAwareFallback(message);
+    return createEnhancedFallback(message, false, false, null);
   }
 }
 
 /**
- * Validate and enhance sub-questions with strict temporal handling
+ * ENHANCED: Validate and enhance sub-questions with proper personal pronoun and time handling
  */
-function validateAndEnhanceSubQuestions(analysis: any, message: string) {
+function validateAndEnhanceSubQuestions(analysis: any, message: string, hasPersonalPronouns: boolean, hasExplicitTimeReference: boolean, extractedDateRange: any) {
   const lowerMessage = message.toLowerCase();
   
   // Enhanced detection
-  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate/.test(lowerMessage);
+  const isPersonalityQuery = /trait|personality|character|behavior|habit|am i|do i|my personality|negative|positive|improve|rate|worst|best/.test(lowerMessage);
   const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
-  const isTemporalQuery = /last week|yesterday|today|this week|this month|recently/.test(lowerMessage);
+  const isTemporalQuery = hasExplicitTimeReference;
   
-  // Extract date range if temporal
-  const extractedDateRange = isTemporalQuery ? extractDateRangeFromQuery(message) : null;
+  console.log("[Validation] Enhanced analysis:", {
+    hasPersonalPronouns,
+    hasExplicitTimeReference,
+    isPersonalityQuery,
+    isEmotionQuery,
+    isTemporalQuery,
+    extractedDateRange
+  });
+  
+  // CRITICAL: Determine if we should use all entries
+  const useAllEntries = (hasPersonalPronouns && !hasExplicitTimeReference) || isPersonalityQuery;
+  
+  console.log(`[Validation] USE ALL ENTRIES: ${useAllEntries} (Personal pronouns: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference})`);
   
   // Ensure we have valid sub-questions
   if (!analysis.subQuestions || !Array.isArray(analysis.subQuestions) || analysis.subQuestions.length === 0) {
-    analysis.subQuestions = createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery, extractedDateRange);
+    analysis.subQuestions = createDefaultSubQuestions(message, isPersonalityQuery, isEmotionQuery, isTemporalQuery, extractedDateRange, useAllEntries);
   }
   
-  // Validate and enhance each sub-question with strict temporal handling
+  // Validate and enhance each sub-question
   analysis.subQuestions = analysis.subQuestions.map((subQ, index) => {
     if (!subQ.searchPlan) {
       subQ.searchPlan = {};
@@ -360,9 +429,17 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
       };
     }
     
-    // CRITICAL: Apply date filters for temporal queries
-    if (isTemporalQuery && extractedDateRange) {
+    // CRITICAL: Apply time range override logic
+    if (useAllEntries) {
+      // Override: Remove date filters for personal pronoun queries without time references
+      subQ.searchPlan.vectorSearch.dateFilter = null;
+      subQ.searchPlan.fallbackStrategy = "recent_entries";
+      console.log(`[Validation] Removing date filter for personal query: ${subQ.question}`);
+    } else if (isTemporalQuery && extractedDateRange) {
+      // Apply date filters for temporal queries
       subQ.searchPlan.vectorSearch.dateFilter = extractedDateRange;
+      subQ.searchPlan.fallbackStrategy = null; // No fallback for temporal queries
+      console.log(`[Validation] Applying date filter: ${extractedDateRange.startDate} to ${extractedDateRange.endDate}`);
       
       // Update SQL queries to include date parameters
       if (subQ.searchPlan.sqlQueries) {
@@ -377,9 +454,6 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
           return sqlQuery;
         });
       }
-      
-      // CRITICAL: No fallback for temporal queries
-      subQ.searchPlan.fallbackStrategy = null;
     }
     
     // Force ultra-low thresholds for personality queries
@@ -398,17 +472,12 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
         function: "get_top_emotions_with_entries",
         parameters: {
           user_id_param: "USER_ID_PLACEHOLDER",
-          start_date: extractedDateRange?.startDate || null,
-          end_date: extractedDateRange?.endDate || null,
+          start_date: useAllEntries ? null : extractedDateRange?.startDate,
+          end_date: useAllEntries ? null : extractedDateRange?.endDate,
           limit_count: 5
         },
         purpose: "Get top emotions with sample entries"
       });
-    }
-    
-    // Set appropriate fallback strategy (null for temporal queries)
-    if (!subQ.searchPlan.fallbackStrategy && !isTemporalQuery) {
-      subQ.searchPlan.fallbackStrategy = isPersonalityQuery ? "keyword_search" : "recent_entries";
     }
     
     return subQ;
@@ -419,25 +488,30 @@ function validateAndEnhanceSubQuestions(analysis: any, message: string) {
     strategy: "intelligent_sub_query",
     subQuestions: analysis.subQuestions,
     confidence: typeof analysis.confidence === 'number' ? analysis.confidence : 0.7,
-    reasoning: analysis.reasoning || "Enhanced sub-query planning with strict temporal constraints",
+    reasoning: analysis.reasoning || `Enhanced sub-query planning with personal pronoun prioritization (useAllEntries: ${useAllEntries})`,
     expectedResponse: analysis.expectedResponse || "analysis",
     isPersonalityQuery,
     isEmotionQuery,
     isTemporalQuery,
-    hasDateConstraints: !!extractedDateRange,
-    dateRange: extractedDateRange
+    hasDateConstraints: isTemporalQuery && !!extractedDateRange,
+    dateRange: isTemporalQuery ? extractedDateRange : null,
+    useAllEntries,
+    hasPersonalPronouns,
+    hasExplicitTimeReference
   };
   
-  console.log(`Generated ${validated.subQuestions.length} sub-questions - Personality: ${isPersonalityQuery}, Emotion: ${isEmotionQuery}, Temporal: ${isTemporalQuery}, Date Range: ${!!extractedDateRange}`);
+  console.log(`Generated ${validated.subQuestions.length} sub-questions - Personal: ${hasPersonalPronouns}, Temporal: ${isTemporalQuery}, UseAllEntries: ${useAllEntries}`);
   
   return validated;
 }
 
 /**
- * Create default sub-questions with enhanced temporal awareness
+ * ENHANCED: Create default sub-questions with proper time handling
  */
-function createDefaultSubQuestions(message: string, isPersonality: boolean, isEmotion: boolean, isTemporal: boolean, dateRange: any) {
+function createDefaultSubQuestions(message: string, isPersonality: boolean, isEmotion: boolean, isTemporal: boolean, dateRange: any, useAllEntries: boolean) {
   const subQuestions = [];
+  
+  console.log(`[Default Sub-Questions] Creating for - Personal: ${isPersonality}, Emotion: ${isEmotion}, Temporal: ${isTemporal}, UseAllEntries: ${useAllEntries}`);
   
   if (isPersonality) {
     subQuestions.push({
@@ -448,10 +522,10 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
           enabled: true,
           threshold: 0.01,
           query: message,
-          dateFilter: dateRange
+          dateFilter: useAllEntries ? null : dateRange
         },
         sqlQueries: [],
-        fallbackStrategy: isTemporal ? null : "keyword_search"
+        fallbackStrategy: useAllEntries ? "keyword_search" : (isTemporal ? null : "keyword_search")
       }
     });
   }
@@ -465,21 +539,21 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
           enabled: true,
           threshold: 0.05,
           query: message,
-          dateFilter: dateRange
+          dateFilter: useAllEntries ? null : dateRange
         },
         sqlQueries: [
           {
             function: "get_top_emotions_with_entries",
             parameters: {
               user_id_param: "USER_ID_PLACEHOLDER",
-              start_date: dateRange?.startDate || null,
-              end_date: dateRange?.endDate || null,
+              start_date: useAllEntries ? null : dateRange?.startDate,
+              end_date: useAllEntries ? null : dateRange?.endDate,
               limit_count: 5
             },
             purpose: "Get top emotions with examples"
           }
         ],
-        fallbackStrategy: isTemporal ? null : "emotion_based"
+        fallbackStrategy: useAllEntries ? "emotion_based" : (isTemporal ? null : "emotion_based")
       }
     });
   }
@@ -488,21 +562,79 @@ function createDefaultSubQuestions(message: string, isPersonality: boolean, isEm
   subQuestions.push({
     question: isTemporal ? 
       "Find relevant journal entries from the specified time period" :
-      "Find relevant journal entries related to the query",
+      (useAllEntries ? "Find all relevant journal entries for comprehensive analysis" : "Find relevant journal entries related to the query"),
     purpose: "Gather contextual information from journal entries",
     searchPlan: {
       vectorSearch: {
         enabled: true,
         threshold: isPersonality ? 0.03 : 0.1,
         query: message,
-        dateFilter: dateRange
+        dateFilter: useAllEntries ? null : dateRange
       },
       sqlQueries: [],
-      fallbackStrategy: isTemporal ? null : (isPersonality ? "keyword_search" : "recent_entries")
+      fallbackStrategy: useAllEntries ? "recent_entries" : (isTemporal ? null : (isPersonality ? "keyword_search" : "recent_entries"))
     }
   });
   
   return subQuestions;
+}
+
+/**
+ * ENHANCED: Create fallback with proper personal pronoun and time handling
+ */
+function createEnhancedFallback(message: string, hasPersonalPronouns: boolean, hasExplicitTimeReference: boolean, dateRange: any) {
+  const lowerMessage = message.toLowerCase();
+  const isEmotionQuery = /emotion|feel|mood|happy|sad|anxious|stressed|emotional/.test(lowerMessage);
+  
+  console.log(`[Enhanced Fallback] Personal pronouns: ${hasPersonalPronouns}, Time ref: ${hasExplicitTimeReference}`);
+  
+  const subQuestion = {
+    question: hasPersonalPronouns ? 
+      (hasExplicitTimeReference ? 
+        "Find journal entries from the specified time period for personal analysis" :
+        "Find all journal entries for comprehensive personal analysis") :
+      "Find relevant journal entries with ultra-sensitive search",
+    purpose: hasPersonalPronouns ? 
+      "Analyze personal patterns and insights from journal entries" :
+      "Gather relevant information from journal entries",
+    searchPlan: {
+      vectorSearch: {
+        threshold: hasPersonalPronouns ? 0.01 : 0.05,
+        enabled: true,
+        dateFilter: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : dateRange
+      },
+      sqlQueries: isEmotionQuery ? [
+        {
+          function: "get_top_emotions_with_entries",
+          parameters: {
+            user_id_param: "USER_ID_PLACEHOLDER",
+            start_date: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : dateRange?.startDate,
+            end_date: (hasPersonalPronouns && !hasExplicitTimeReference) ? null : dateRange?.endDate,
+            limit_count: 5
+          },
+          purpose: "Get top emotions with sample entries"
+        }
+      ] : [],
+      fallbackStrategy: (hasExplicitTimeReference && !hasPersonalPronouns) ? null : "recent_entries"
+    }
+  };
+  
+  return {
+    queryType: "journal_specific",
+    strategy: "intelligent_sub_query",
+    subQuestions: [subQuestion],
+    confidence: 0.4,
+    reasoning: hasPersonalPronouns ? 
+      `Enhanced fallback with personal pronoun prioritization (useAllEntries: ${!hasExplicitTimeReference})` :
+      (hasExplicitTimeReference ? "Enhanced temporal fallback preserving date constraints" : "Emergency fallback with ultra-low threshold"),
+    isTemporalQuery: hasExplicitTimeReference,
+    isEmotionQuery,
+    hasDateConstraints: !!dateRange && hasExplicitTimeReference,
+    dateRange: hasExplicitTimeReference ? dateRange : null,
+    useAllEntries: hasPersonalPronouns && !hasExplicitTimeReference,
+    hasPersonalPronouns,
+    hasExplicitTimeReference
+  };
 }
 
 serve(async (req) => {
@@ -513,7 +645,7 @@ serve(async (req) => {
   try {
     const { message, userId, conversationContext = [], isFollowUp = false } = await req.json();
 
-    console.log(`[Smart Query Planner] Analyzing query with enhanced temporal handling: "${message}"`);
+    console.log(`[Smart Query Planner] ENHANCED ANALYSIS with fixed date calculations: "${message}"`);
 
     // Get user's journal entry count with timeout
     let entryCount = 0;
@@ -537,7 +669,7 @@ serve(async (req) => {
       console.error("Error fetching entry count:", error);
     }
 
-    // Use GPT to analyze the query with enhanced temporal awareness
+    // Use GPT to analyze the query with enhanced temporal awareness and personal pronoun prioritization
     const analysisResult = await analyzeQueryWithSubQuestions(message, conversationContext, entryCount);
 
     // Handle direct responses
@@ -559,7 +691,7 @@ serve(async (req) => {
       });
     }
 
-    // Enhanced query plan with strict temporal constraints
+    // Enhanced query plan with fixed date constraints and personal pronoun handling
     const enhancedPlan = {
       strategy: analysisResult.strategy,
       queryType: analysisResult.queryType,
@@ -573,11 +705,14 @@ serve(async (req) => {
       isTemporalQuery: analysisResult.isTemporalQuery,
       hasDateConstraints: analysisResult.hasDateConstraints,
       dateRange: analysisResult.dateRange,
+      useAllEntries: analysisResult.useAllEntries, // CRITICAL: Pass this flag
+      hasPersonalPronouns: analysisResult.hasPersonalPronouns,
+      hasExplicitTimeReference: analysisResult.hasExplicitTimeReference,
       domainContext: analysisResult.isPersonalityQuery ? "personal_insights" : 
                    analysisResult.isEmotionQuery ? "emotional_analysis" : "general_insights"
     };
 
-    console.log("Enhanced Query Plan with Temporal Constraints:", JSON.stringify(enhancedPlan, null, 2));
+    console.log("ENHANCED Query Plan with Fixed Date Calculations:", JSON.stringify(enhancedPlan, null, 2));
 
     return new Response(JSON.stringify({
       queryPlan: enhancedPlan,
@@ -609,6 +744,7 @@ serve(async (req) => {
       confidence: 0.3,
       reasoning: "Emergency fallback plan with enhanced error handling",
       expectedResponse: "analysis",
+      useAllEntries: true, // Default to all entries on error
       isErrorFallback: true
     };
     
