@@ -1,3 +1,4 @@
+
 import { ChatMessage, ChatThread, MessageResponse, SubQueryResponse, isThreadMetadata, subQueryResponseToJson, jsonToSubQueryResponse } from './types';
 import { supabase } from '@/integrations/supabase/client';
 import { v4 as uuidv4 } from 'uuid';
@@ -26,6 +27,21 @@ export async function sendMessage(
     // Ensure userId is a string for consistent handling
     const userIdString = typeof userId === 'string' ? userId : String(userId);
     console.log(`[sendMessage] Processing query: "${message}" for user: ${userIdString}`);
+    
+    // Get current session and auth token
+    const { data: { session }, error: sessionError } = await supabase.auth.getSession();
+    
+    if (sessionError) {
+      console.error('Error getting session:', sessionError);
+      throw new Error('Authentication required');
+    }
+    
+    if (!session?.access_token) {
+      console.error('No valid session found');
+      throw new Error('Authentication required');
+    }
+    
+    console.log(`[sendMessage] Using authenticated session for user: ${session.user.id}`);
     
     // Create a message ID for this new message
     const messageId = uuidv4();
@@ -271,7 +287,7 @@ export async function sendMessage(
     console.log(`[sendMessage] Using date range:`, dateRange);
     
     // Step 2: Execute intelligent search and response generation with enhanced monitoring
-    console.log(`[sendMessage] Calling chat-with-rag`);
+    console.log(`[sendMessage] Calling chat-with-rag with auth token`);
     
     let queryResponse;
     try {
@@ -293,6 +309,9 @@ export async function sendMessage(
                 isMentalHealthQuery,
                 clientTimeInfo: clientTimeInfo,
                 userTimezone: userTimezone
+              },
+              headers: {
+                'Authorization': `Bearer ${session.access_token}`
               }
             });
             clearTimeout(timeoutId);
