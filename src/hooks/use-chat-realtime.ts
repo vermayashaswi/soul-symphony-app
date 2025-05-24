@@ -97,6 +97,7 @@ export function useChatRealtime(threadId: string | null) {
             setRealtimeState(prev => ({
               ...prev,
               isProcessing: false,
+              processingStatus: 'idle',
               processingStage: null
             }));
           }
