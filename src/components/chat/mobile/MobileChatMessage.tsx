@@ -63,7 +63,7 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
       {displayRole === 'assistant' && (
         <Avatar className="w-8 h-8 border border-primary/20">
           <AvatarImage 
-            src="/lovable-uploads/e3578093-b94f-4002-82ad-c56fb4c32915.png" 
+            src="/lovable-uploads/2c66f111-f440-424b-bacb-39d9a9839d32.png" 
             alt="Ruh"
             className="bg-primary/10 object-cover"
             loading="eager"

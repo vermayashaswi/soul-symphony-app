@@ -10,7 +10,7 @@ export const preloadImage = (src: string): Promise<void> => {
 
 export const preloadCriticalImages = async (): Promise<void> => {
   const criticalImages = [
-    '/lovable-uploads/e3578093-b94f-4002-82ad-c56fb4c32915.png', // Eye avatar for Ruh
+    '/lovable-uploads/2c66f111-f440-424b-bacb-39d9a9839d32.png', // Eye avatar for Ruh
   ];
 
   try {
