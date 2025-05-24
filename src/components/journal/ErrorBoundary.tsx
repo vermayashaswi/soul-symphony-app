@@ -7,6 +7,7 @@ import { AlertTriangle, RefreshCw } from 'lucide-react';
 interface Props {
   children: ReactNode;
   fallback?: ReactNode;
+  onReset?: () => void;
 }
 
 interface State {
@@ -46,6 +47,11 @@ export class JournalErrorBoundary extends Component<Props, State> {
   }
 
   handleRetry = () => {
+    // Call external reset handler if provided
+    if (this.props.onReset) {
+      this.props.onReset();
+    }
+    
     // Reset the error boundary state
     this.setState({ hasError: false, error: undefined, errorInfo: undefined });
     
