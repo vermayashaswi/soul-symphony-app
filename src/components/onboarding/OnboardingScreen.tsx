@@ -499,7 +499,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               transition={{ delay: 0.3 }}
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-medium text-theme">Mood Trends</div>
+                <div className="text-xs font-medium text-theme">
+                  <TranslatableText text="Mood Trends" forceTranslate={true} />
+                </div>
                 <LineChart className="w-4 h-4 text-theme" />
               </div>
               
@@ -553,9 +555,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
                 animate={{ opacity: 1 }}
                 transition={{ delay: 2.2 }}
               >
-                <span>Jan</span>
-                <span>Mar</span>
-                <span>Now</span>
+                <span><TranslatableText text="Jan" forceTranslate={true} /></span>
+                <span><TranslatableText text="Mar" forceTranslate={true} /></span>
+                <span><TranslatableText text="Now" forceTranslate={true} /></span>
               </motion.div>
             </motion.div>
           </div>
