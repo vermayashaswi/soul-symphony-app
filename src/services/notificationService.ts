@@ -45,6 +45,22 @@ export async function showTranslatedToast(
   });
 }
 
+// Enhanced tutorial toast function that supports translation
+export async function showTranslatedTutorialToast(
+  titleKey: string,
+  descriptionKey: string,
+  translate: (key: string, sourceLanguage?: string, entryId?: number) => Promise<string>
+) {
+  const title = await translate(titleKey);
+  const description = await translate(descriptionKey);
+  
+  toast({
+    title,
+    description,
+    duration: 500 // 0.5 seconds for tutorial
+  });
+}
+
 // Legacy functions for backward compatibility
 export function clearAllToasts() {
   // Implementation for clearing all toasts if needed

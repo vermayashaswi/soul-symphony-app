@@ -4,17 +4,19 @@ import { motion } from 'framer-motion';
 import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTutorial } from '@/contexts/TutorialContext';
-import { showToast, showTutorialToast } from '@/utils/journal/toast-helper';
+import { useTranslation } from '@/contexts/TranslationContext';
+import { showTranslatedToast, showTutorialToast } from '@/services/notificationService';
 
 const JournalNavigationButton: React.FC = () => {
   const navigate = useNavigate();
   const { isActive, currentStep, steps } = useTutorial();
+  const { translate } = useTranslation();
   const buttonRef = useRef<HTMLDivElement>(null);
   
   // Check if we're in tutorial step 2
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
 
-  const navigateToJournal = () => {
+  const navigateToJournal = async () => {
     try {
       console.log('Navigating to journal page');
       navigate('/app/journal');
@@ -26,19 +28,22 @@ const JournalNavigationButton: React.FC = () => {
           "Opening your journal space"
         );
       } else {
-        showToast(
-          "Journal", 
-          "Opening your journal space", 
+        // Use translated toast for regular navigation
+        await showTranslatedToast(
+          "navigation.journal",
+          "toasts.openingJournalSpace",
+          translate,
           3000
         );
       }
     } catch (error) {
       console.error("Navigation error:", error);
       
-      // Show an error toast
-      showToast(
-        "Error", 
-        "Could not navigate to journal. Please try again.", 
+      // Show an error toast with translation
+      await showTranslatedToast(
+        "toasts.error",
+        "toasts.navigationError",
+        translate,
         5000
       );
     }

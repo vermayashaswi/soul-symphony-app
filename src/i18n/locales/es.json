@@ -85,6 +85,8 @@
     "processing": "Procesando...",
     "saving": "Guardando...",
     "loading": "Cargando...",
-    "uploading": "Subiendo..."
+    "uploading": "Subiendo...",
+    "openingJournalSpace": "Abriendo tu espacio de diario",
+    "navigationError": "No se pudo navegar al diario. Por favor, inténtalo de nuevo."
   }
 }

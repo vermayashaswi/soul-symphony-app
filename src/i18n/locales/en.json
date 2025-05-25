@@ -91,6 +91,8 @@
     "processing": "Processing...",
     "saving": "Saving...",
     "loading": "Loading...",
-    "uploading": "Uploading..."
+    "uploading": "Uploading...",
+    "openingJournalSpace": "Opening your journal space",
+    "navigationError": "Could not navigate to journal. Please try again."
   }
 }
