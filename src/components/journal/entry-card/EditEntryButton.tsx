@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -6,9 +6,9 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { useIsMobile } from '@/hooks/use-mobile';
-import { triggerFullTextProcessing } from '@/utils/audio/theme-extractor';
 import { Loader2 } from 'lucide-react';
 import { reprocessJournalEntry } from '@/services/journalService';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -22,12 +22,45 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [updatedInBackground, setUpdatedInBackground] = useState(false);
+  const [isLoadingTranslation, setIsLoadingTranslation] = useState(false);
   const isMobile = useIsMobile();
+  const { currentLanguage, translate, getCachedTranslation } = useTranslation();
 
-  const handleOpenDialog = () => {
-    setEditedContent(content);
+  // Function to get the appropriate content for editing
+  const getContentForEditing = async (originalContent: string): Promise<string> => {
+    // If current language is English, use the original content
+    if (currentLanguage === 'en') {
+      return originalContent;
+    }
+
+    // Check if we have a cached translation first
+    const cachedTranslation = getCachedTranslation(originalContent, currentLanguage);
+    if (cachedTranslation) {
+      console.log('[EditEntryButton] Using cached translation for editing');
+      return cachedTranslation;
+    }
+
+    // If no cache, translate the content
+    try {
+      setIsLoadingTranslation(true);
+      console.log('[EditEntryButton] Translating content for editing to', currentLanguage);
+      const translatedContent = await translate(originalContent, 'en', entryId);
+      return translatedContent || originalContent;
+    } catch (error) {
+      console.error('[EditEntryButton] Error translating content for editing:', error);
+      return originalContent;
+    } finally {
+      setIsLoadingTranslation(false);
+    }
+  };
+
+  const handleOpenDialog = async () => {
     setIsDialogOpen(true);
     setUpdatedInBackground(false);
+    
+    // Get the appropriate content for editing based on current language
+    const contentForEditing = await getContentForEditing(content);
+    setEditedContent(contentForEditing);
   };
 
   const handleCloseDialog = () => {
@@ -37,7 +70,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
   };
 
   const handleSaveChanges = async () => {
-    if (!editedContent.trim() || editedContent === content) {
+    if (!editedContent.trim()) {
       handleCloseDialog();
       return;
     }
@@ -45,18 +78,41 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     try {
       setIsSubmitting(true);
       
-      const originalContent = content;
-      const newContent = editedContent;
+      let contentToSave = editedContent;
       
-      // Update UI with processing state IMMEDIATELY but keep dialog open
-      onEntryUpdated(newContent, true);
+      // If editing in a non-English language, we need to handle translation caching
+      if (currentLanguage !== 'en') {
+        // Cache the edited translation for consistency in the UI
+        const { translationCache } = await import('@/services/translationCache');
+        await translationCache.setTranslation({
+          originalText: content,
+          translatedText: editedContent,
+          language: currentLanguage,
+          timestamp: Date.now(),
+          version: 1,
+        });
+        
+        // For database storage, we save the original English content
+        // The user edited in Spanish, but we keep English as the source of truth
+        contentToSave = content;
+        
+        console.log('[EditEntryButton] Cached edited translation:', {
+          originalText: content.substring(0, 50) + '...',
+          translatedText: editedContent.substring(0, 50) + '...',
+          language: currentLanguage
+        });
+      }
+      
+      // Update UI immediately with the edited content
+      onEntryUpdated(currentLanguage === 'en' ? editedContent : content, true);
       setIsProcessing(true);
       
+      // Update the database with the appropriate content
       const { error: updateError } = await supabase
         .from('Journal Entries')
         .update({ 
-          "refined text": newContent,
-          "transcription text": newContent, // Also update the transcription text to ensure we see the difference
+          "refined text": currentLanguage === 'en' ? editedContent : content,
+          "transcription text": currentLanguage === 'en' ? editedContent : content,
           "Edit_Status": 1
         })
         .eq('id', entryId);
@@ -64,7 +120,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       if (updateError) {
         console.error("Error updating entry:", updateError);
         toast.error(`Failed to update entry: ${updateError.message}`);
-        onEntryUpdated(originalContent, false);
+        onEntryUpdated(content, false);
         setIsProcessing(false);
         setIsSubmitting(false);
         return;
@@ -74,23 +130,30 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       setUpdatedInBackground(true);
       
       try {
-        // Use the reprocessJournalEntry function to trigger all necessary processing
-        const success = await reprocessJournalEntry(entryId);
-        
-        if (!success) {
-          console.error('Reprocessing failed for entry:', entryId);
-          toast.error('Entry saved but analysis failed');
+        // Only reprocess if we actually changed the English content
+        if (currentLanguage === 'en' && editedContent !== content) {
+          const success = await reprocessJournalEntry(entryId);
+          
+          if (!success) {
+            console.error('Reprocessing failed for entry:', entryId);
+            toast.error('Entry saved but analysis failed');
+          }
         }
         
         // Ensure minimum processing time for UX consistency
-        const minProcessingTime = 1000; // 1 second minimum
+        const minProcessingTime = 1000;
         await new Promise(resolve => setTimeout(resolve, minProcessingTime));
         
         // Close dialog and update UI
         setIsDialogOpen(false);
         setIsSubmitting(false);
         setIsProcessing(false);
-        toast.success('Journal entry updated successfully');
+        
+        if (currentLanguage === 'en') {
+          toast.success('Journal entry updated successfully');
+        } else {
+          toast.success('Translation updated successfully');
+        }
         
       } catch (processingError) {
         console.error('Processing failed:', processingError);
@@ -108,6 +171,17 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
     }
   };
 
+  // Check if content has actually changed
+  const hasContentChanged = React.useMemo(() => {
+    if (currentLanguage === 'en') {
+      return editedContent !== content;
+    } else {
+      // For non-English, check if the translation has changed from cached version
+      const cachedTranslation = getCachedTranslation(content, currentLanguage);
+      return editedContent !== (cachedTranslation || content);
+    }
+  }, [editedContent, content, currentLanguage, getCachedTranslation]);
+
   return (
     <>
       <Button 
@@ -124,16 +198,25 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
         <DialogContent className="w-[90%] max-w-lg mx-auto">
           <DialogHeader>
-            <DialogTitle>Edit Journal Entry</DialogTitle>
+            <DialogTitle>
+              {currentLanguage === 'en' ? 'Edit Journal Entry' : 'Editar Entrada del Diario'}
+            </DialogTitle>
           </DialogHeader>
           
-          <Textarea
-            value={editedContent}
-            onChange={(e) => setEditedContent(e.target.value)}
-            className="min-h-[200px] mt-2"
-            placeholder="Edit your journal entry..."
-            disabled={isSubmitting}
-          />
+          {isLoadingTranslation ? (
+            <div className="flex items-center justify-center min-h-[200px]">
+              <Loader2 className="h-6 w-6 animate-spin" />
+              <span className="ml-2">Loading translation...</span>
+            </div>
+          ) : (
+            <Textarea
+              value={editedContent}
+              onChange={(e) => setEditedContent(e.target.value)}
+              className="min-h-[200px] mt-2"
+              placeholder={currentLanguage === 'en' ? "Edit your journal entry..." : "Edita tu entrada del diario..."}
+              disabled={isSubmitting}
+            />
+          )}
           
           <DialogFooter className="flex flex-row justify-end space-x-2 mt-4">
             <Button 
@@ -142,7 +225,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
               disabled={isSubmitting}
               className="rounded-full"
             >
-              Cancel
+              {currentLanguage === 'en' ? 'Cancel' : 'Cancelar'}
             </Button>
             {isSubmitting ? (
               <Button 
@@ -150,15 +233,18 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
                 className="rounded-full"
               >
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {updatedInBackground ? 'Processing...' : 'Saving...'}
+                {updatedInBackground ? 
+                  (currentLanguage === 'en' ? 'Processing...' : 'Procesando...') : 
+                  (currentLanguage === 'en' ? 'Saving...' : 'Guardando...')
+                }
               </Button>
             ) : (
               <Button 
                 onClick={handleSaveChanges}
-                disabled={!editedContent.trim() || editedContent === content}
+                disabled={!editedContent.trim() || !hasContentChanged || isLoadingTranslation}
                 className="rounded-full"
               >
-                Save Changes
+                {currentLanguage === 'en' ? 'Save Changes' : 'Guardar Cambios'}
               </Button>
             )}
           </DialogFooter>
