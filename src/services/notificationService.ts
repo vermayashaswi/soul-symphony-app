@@ -56,12 +56,19 @@ export async function ensureAllToastsCleared() {
   return Promise.resolve();
 }
 
-// Notification-related exports for Settings compatibility
-export type NotificationFrequency = 'daily' | 'weekly' | 'never';
-export type NotificationTime = 'morning' | 'afternoon' | 'evening';
+// Notification-related exports for Settings compatibility - updated types to match Settings usage
+export type NotificationFrequency = 'once' | 'twice' | 'thrice';
+export type NotificationTime = 'morning' | 'afternoon' | 'evening' | 'night';
 
-export function setupJournalReminder(frequency: NotificationFrequency, time: NotificationTime) {
-  console.log('setupJournalReminder called:', { frequency, time });
+export function setupJournalReminder(enabled: boolean, frequency: NotificationFrequency, times: NotificationTime[]) {
+  console.log('setupJournalReminder called:', { enabled, frequency, times });
+  
+  // Store settings in localStorage
+  if (typeof window !== 'undefined') {
+    localStorage.setItem('notification_enabled', enabled.toString());
+    localStorage.setItem('notification_frequency', frequency);
+    localStorage.setItem('notification_times', JSON.stringify(times));
+  }
 }
 
 export function initializeCapacitorNotifications() {
