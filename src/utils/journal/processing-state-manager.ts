@@ -64,7 +64,7 @@ export class ProcessingStateManager {
         setTimeout(() => {
           // Check if real entry card is rendered before removing
           this.checkAndCleanupEntry(tempId);
-        }, 2000); // Increased from 1000ms to 2000ms
+        }, 3000); // Increased from 2000ms to 3000ms
       }
       
       this.notifySubscribers();
@@ -73,24 +73,35 @@ export class ProcessingStateManager {
   }
   
   private checkAndCleanupEntry(tempId: string): void {
-    // Check if there's a real entry card in the DOM with this tempId
-    const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`);
+    // More robust DOM detection with multiple selectors
+    const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
+                         document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`) ||
+                         document.querySelector(`.journal-entry-card:not(.processing-card)[data-temp-id="${tempId}"]`);
+    
     const processingCard = document.querySelector(`[data-temp-id="${tempId}"][data-loading-skeleton="true"]`);
     
     if (realEntryCard) {
       console.log(`[ProcessingStateManager] Real entry card found for ${tempId}, safe to cleanup`);
-      this.removeEntry(tempId);
       
-      // Dispatch content ready event
-      window.dispatchEvent(new CustomEvent('entryContentReady', {
-        detail: { tempId, timestamp: Date.now() }
-      }));
-    } else {
-      console.log(`[ProcessingStateManager] Real entry card not found for ${tempId}, retrying cleanup in 1s`);
-      
-      // Retry cleanup after another second if real entry not found
+      // Add a small delay to ensure smooth transition
       setTimeout(() => {
-        const retryRealEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`);
+        this.removeEntry(tempId);
+        
+        // Dispatch content ready event
+        window.dispatchEvent(new CustomEvent('entryContentReady', {
+          detail: { tempId, timestamp: Date.now() }
+        }));
+      }, 500); // Small additional delay for smooth transition
+      
+    } else {
+      console.log(`[ProcessingStateManager] Real entry card not found for ${tempId}, retrying cleanup in 2s`);
+      
+      // Retry cleanup after another 2 seconds if real entry not found
+      setTimeout(() => {
+        const retryRealEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
+                                  document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`) ||
+                                  document.querySelector(`.journal-entry-card:not(.processing-card)[data-temp-id="${tempId}"]`);
+        
         if (retryRealEntryCard) {
           console.log(`[ProcessingStateManager] Real entry card found on retry for ${tempId}, cleaning up`);
           this.removeEntry(tempId);
@@ -99,10 +110,28 @@ export class ProcessingStateManager {
             detail: { tempId, timestamp: Date.now() }
           }));
         } else {
-          console.log(`[ProcessingStateManager] Force cleanup for ${tempId} after retry timeout`);
-          this.removeEntry(tempId);
+          console.log(`[ProcessingStateManager] Second retry for ${tempId} in 2s`);
+          
+          // One more retry after 2 more seconds
+          setTimeout(() => {
+            const finalRetryRealEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
+                                           document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`) ||
+                                           document.querySelector(`.journal-entry-card:not(.processing-card)[data-temp-id="${tempId}"]`);
+            
+            if (finalRetryRealEntryCard) {
+              console.log(`[ProcessingStateManager] Real entry card found on final retry for ${tempId}, cleaning up`);
+              this.removeEntry(tempId);
+              
+              window.dispatchEvent(new CustomEvent('entryContentReady', {
+                detail: { tempId, timestamp: Date.now() }
+              }));
+            } else {
+              console.log(`[ProcessingStateManager] Force cleanup for ${tempId} after all retry attempts`);
+              this.removeEntry(tempId);
+            }
+          }, 2000);
         }
-      }, 1000);
+      }, 2000);
     }
   }
   

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import { ShimmerSkeleton } from '@/components/ui/skeleton';
 import { motion, AnimatePresence } from 'framer-motion';
@@ -81,7 +80,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
     };
   }, []);
   
-  // Enhanced step progression with better timing
+  // Enhanced step progression with better timing and transition handling
   useEffect(() => {
     const stepInterval = setInterval(() => {
       if (!isVisible || isTransitioning) return;
@@ -115,25 +114,30 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           }
         }));
       }
-    }, 12000); // Increased threshold slightly
+    }, 15000); // Increased threshold for better UX
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
-    // Enhanced content ready handler with transition state
+    // Much more conservative content ready handler
     const handleContentReady = (event: CustomEvent) => {
-      console.log('[LoadingEntryContent] Content ready event received, starting transition');
-      setIsTransitioning(true);
-      
-      // Add a small delay before hiding to ensure smooth transition
+      // Add a delay before starting transition to ensure DOM is ready
       setTimeout(() => {
-        setIsVisible(false);
-      }, 300);
+        console.log('[LoadingEntryContent] Content ready event received, starting transition');
+        setIsTransitioning(true);
+        
+        // Add a longer delay before hiding to ensure smooth transition
+        setTimeout(() => {
+          setIsVisible(false);
+        }, 1000); // Increased from 300ms to 1000ms
+      }, 500); // Initial delay to ensure real content is rendered
     };
     
-    // Handle transition events
+    // Handle transition events with delays
     const handleTransition = (event: CustomEvent) => {
-      console.log('[LoadingEntryContent] Transition event received');
-      setIsTransitioning(true);
+      setTimeout(() => {
+        console.log('[LoadingEntryContent] Transition event received');
+        setIsTransitioning(true);
+      }, 300);
     };
     
     window.addEventListener('entryContentReady', handleContentReady as EventListener);
@@ -165,15 +169,15 @@ export function LoadingEntryContent({ error }: { error?: string }) {
       className="space-y-2"
       initial={{ opacity: 0.7 }}
       animate={{ 
-        opacity: isTransitioning ? 0.5 : 1,
-        scale: isTransitioning ? 0.98 : 1
+        opacity: isTransitioning ? 0.7 : 1, // Keep more visible during transition
+        scale: isTransitioning ? 0.99 : 1
       }}
       exit={{ 
         opacity: 0,
-        scale: 0.95,
-        transition: { duration: 0.3 }
+        scale: 0.98,
+        transition: { duration: 0.5 } // Slower exit animation
       }}
-      transition={{ duration: 0.3 }}
+      transition={{ duration: 0.4 }} // Slower transitions
       data-component-id={componentId.current}
       data-transitioning={isTransitioning}
     >
@@ -200,7 +204,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
               className="relative h-10 w-10"
               animate={{ 
                 rotate: 360,
-                scale: isTransitioning ? 0.9 : 1
+                scale: isTransitioning ? 0.95 : 1
               }}
               transition={{ 
                 rotate: {
@@ -209,7 +213,7 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                   ease: "linear"
                 },
                 scale: {
-                  duration: 0.3
+                  duration: 0.4
                 }
               }}
             >
@@ -218,9 +222,9 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                 <motion.div 
                   key={currentStep.id}
                   initial={{ scale: 0, opacity: 0.7 }}
-                  animate={{ scale: isTransitioning ? 0.8 : 1, opacity: isTransitioning ? 0.6 : 1 }}
+                  animate={{ scale: isTransitioning ? 0.9 : 1, opacity: isTransitioning ? 0.7 : 1 }}
                   exit={{ scale: 0, opacity: 0.7 }}
-                  transition={{ duration: 0.3 }}
+                  transition={{ duration: 0.4 }} // Slower transitions
                   className="absolute inset-0 flex items-center justify-center"
                 >
                   {React.createElement(currentStep.icon, { 
@@ -236,10 +240,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                 initial={{ y: 10, opacity: 0.7 }}
                 animate={{ 
                   y: 0, 
-                  opacity: isTransitioning ? 0.6 : 1 
+                  opacity: isTransitioning ? 0.7 : 1 
                 }}
                 exit={{ y: -10, opacity: 0.7 }}
-                transition={{ duration: 0.3 }}
+                transition={{ duration: 0.4 }} // Slower transitions
                 className="text-sm text-center text-primary font-medium"
               >
                 <TranslatableText 

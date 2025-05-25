@@ -221,14 +221,14 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   // Filter entries to remove any that have been deleted
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
   
-  // Improved filtering for processing IDs with better transition handling
+  // Improved filtering for processing IDs with much more conservative logic
   const filteredProcessingIds = activeProcessingIds.filter(tempId => {
     // Skip if we've already seen this tempId in this render cycle
     if (renderedTempIdsRef.current.has(tempId)) {
       return false;
     }
     
-    // Keep showing if entry is transitioning
+    // Always keep if entry is transitioning
     if (transitioningEntries.has(tempId)) {
       console.log(`[JournalEntriesList] Keeping processing card for transitioning entry ${tempId}`);
       renderedTempIdsRef.current.add(tempId);
@@ -238,21 +238,25 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     // Check if this tempId already exists in the real entries list
     const alreadyInEntries = entries.some(entry => entry.tempId === tempId);
     if (alreadyInEntries) {
-      // Check if the real entry card is actually rendered in the DOM
+      // Be more conservative - require multiple DOM checks before removing
       const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`);
-      if (realEntryCard) {
-        console.log(`[JournalEntriesList] Real entry card rendered for tempId ${tempId}, can skip processing card`);
+      const realEntryCardAlt = document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`);
+      const realEntryCardAlt2 = document.querySelector(`.journal-entry-card:not(.processing-card)[data-temp-id="${tempId}"]`);
+      
+      // Only remove if we can find the real entry card with multiple selectors
+      if (realEntryCard && realEntryCardAlt && document.querySelector(`[data-temp-id="${tempId}"]`)) {
+        console.log(`[JournalEntriesList] Real entry card confirmed rendered for tempId ${tempId}, can skip processing card`);
         return false;
       } else {
-        console.log(`[JournalEntriesList] Real entry exists but not rendered yet for tempId ${tempId}, keeping processing card`);
+        console.log(`[JournalEntriesList] Real entry exists but not fully rendered yet for tempId ${tempId}, keeping processing card`);
         renderedTempIdsRef.current.add(tempId);
         return true;
       }
     }
     
-    // Skip if this processing entry is older than 60 seconds (very stale)
+    // Skip if this processing entry is older than 90 seconds (very stale)
     const entry = processingStateManager.getEntryById(tempId);
-    if (entry && (Date.now() - entry.startTime > 60000)) {
+    if (entry && (Date.now() - entry.startTime > 90000)) {
       console.log(`[JournalEntriesList] Skipping very stale processing card for tempId ${tempId} (age: ${Date.now() - entry.startTime}ms)`);
       processingStateManager.removeEntry(tempId);
       return false;
@@ -298,19 +302,24 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           )}
           
           {/* Then display regular entries */}
-          {filteredEntries.map((entry) => (
-            <JournalEntryCard
-              key={entry.id || entry.tempId || Math.random()}
-              entry={{
-                ...entry,
-                content: entry.content || entry["refined text"] || entry["transcription text"] || ""
-              }}
-              processing={isProcessing(entry.tempId || '')}
-              processed={processedEntryIds.includes(entry.id)}
-              onDelete={handleDeleteEntry}
-              setEntries={null}
-            />
-          ))}
+          {filteredEntries.map((entry) => {
+            // Calculate processing state more accurately
+            const entryIsProcessing = entry.tempId ? isProcessing(entry.tempId) : false;
+            
+            return (
+              <JournalEntryCard
+                key={entry.id || entry.tempId || Math.random()}
+                entry={{
+                  ...entry,
+                  content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+                }}
+                processing={entryIsProcessing}
+                processed={processedEntryIds.includes(entry.id)}
+                onDelete={handleDeleteEntry}
+                setEntries={null}
+              />
+            );
+          })}
         </div>
       ) : shouldShowEmpty ? (
         <EmptyJournalState onStartRecording={onStartRecording} />

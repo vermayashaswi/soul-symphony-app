@@ -15,9 +15,9 @@ export function useProcessingEntries() {
     const initialEntries = processingStateManager.getProcessingEntries();
     setEntries(initialEntries);
     
-    // Extract just the ids of entries in processing state
+    // Include both PROCESSING and TRANSITIONING states in activeProcessingIds
     const initialProcessingIds = initialEntries
-      .filter(entry => entry.state === EntryProcessingState.PROCESSING)
+      .filter(entry => entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING)
       .map(entry => entry.tempId);
     
     setActiveProcessingIds(initialProcessingIds);
@@ -27,9 +27,9 @@ export function useProcessingEntries() {
       setEntries(updatedEntries);
       setLastUpdate(Date.now());
       
-      // Extract just the ids of entries in processing state
+      // Include both PROCESSING and TRANSITIONING states in activeProcessingIds
       const processingIds = updatedEntries
-        .filter(entry => entry.state === EntryProcessingState.PROCESSING)
+        .filter(entry => entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING)
         .map(entry => entry.tempId);
       
       setActiveProcessingIds(processingIds);
@@ -42,9 +42,9 @@ export function useProcessingEntries() {
       const currentEntries = processingStateManager.getProcessingEntries();
       setEntries([...currentEntries]);
       
-      // Extract just the ids of entries in processing state
+      // Include both PROCESSING and TRANSITIONING states in activeProcessingIds
       const processingIds = currentEntries
-        .filter(entry => entry.state === EntryProcessingState.PROCESSING)
+        .filter(entry => entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING)
         .map(entry => entry.tempId);
       
       setActiveProcessingIds([...processingIds]);
@@ -64,7 +64,10 @@ export function useProcessingEntries() {
     entries,
     activeProcessingIds,
     lastUpdate,
-    isProcessing: processingStateManager.isProcessing.bind(processingStateManager),
+    isProcessing: (tempId: string) => {
+      const entry = processingStateManager.getEntryById(tempId);
+      return entry ? (entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING) : false;
+    },
     hasError: processingStateManager.hasError.bind(processingStateManager),
     getEntryId: processingStateManager.getEntryId.bind(processingStateManager),
     removeEntry: processingStateManager.removeEntry.bind(processingStateManager),
