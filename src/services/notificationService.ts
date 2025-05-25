@@ -1,22 +1,52 @@
-
 import { toast } from '@/hooks/use-toast';
 
+// Component mount tracking for safe DOM operations
+const mountedComponents = new Set<string>();
+
+export function registerComponent(componentId: string) {
+  mountedComponents.add(componentId);
+}
+
+export function unregisterComponent(componentId: string) {
+  mountedComponents.delete(componentId);
+}
+
+function isComponentMounted(componentId?: string): boolean {
+  if (!componentId) return true; // If no ID provided, assume it's safe
+  return mountedComponents.has(componentId);
+}
+
+// Safe toast wrapper that checks if component is still mounted
+function safeToast(props: any, componentId?: string) {
+  if (!isComponentMounted(componentId)) {
+    console.log('Skipping toast for unmounted component:', componentId);
+    return { id: '', dismiss: () => {}, update: () => {} };
+  }
+  
+  try {
+    return toast(props);
+  } catch (error) {
+    console.error('Toast error:', error);
+    return { id: '', dismiss: () => {}, update: () => {} };
+  }
+}
+
 // Helper function to ensure toast calls are properly typed
-export function showToast(title: string, description: string, duration?: number) {
-  toast({
+export function showToast(title: string, description: string, duration?: number, componentId?: string) {
+  return safeToast({
     title,
     description,
     duration
-  });
+  }, componentId);
 }
 
 // New function specifically for tutorial toasts with short duration
-export function showTutorialToast(title: string, description: string) {
-  toast({
+export function showTutorialToast(title: string, description: string, componentId?: string) {
+  return safeToast({
     title,
     description,
     duration: 500 // 0.5 seconds
-  });
+  }, componentId);
 }
 
 // Translation-aware toast function - updated to handle async translate function
@@ -25,8 +55,14 @@ export async function showTranslatedToast(
   descriptionKey: string, 
   translate: (key: string, sourceLanguage?: string, entryId?: number) => Promise<string>,
   duration?: number,
-  interpolations?: Record<string, string>
+  interpolations?: Record<string, string>,
+  componentId?: string
 ) {
+  if (!isComponentMounted(componentId)) {
+    console.log('Skipping translated toast for unmounted component:', componentId);
+    return;
+  }
+
   let title = await translate(titleKey);
   let description = await translate(descriptionKey);
   
@@ -38,27 +74,33 @@ export async function showTranslatedToast(
     });
   }
   
-  toast({
+  return safeToast({
     title,
     description,
     duration
-  });
+  }, componentId);
 }
 
 // Enhanced tutorial toast function that supports translation
 export async function showTranslatedTutorialToast(
   titleKey: string,
   descriptionKey: string,
-  translate: (key: string, sourceLanguage?: string, entryId?: number) => Promise<string>
+  translate: (key: string, sourceLanguage?: string, entryId?: number) => Promise<string>,
+  componentId?: string
 ) {
+  if (!isComponentMounted(componentId)) {
+    console.log('Skipping translated tutorial toast for unmounted component:', componentId);
+    return;
+  }
+
   const title = await translate(titleKey);
   const description = await translate(descriptionKey);
   
-  toast({
+  return safeToast({
     title,
     description,
     duration: 500 // 0.5 seconds for tutorial
-  });
+  }, componentId);
 }
 
 // Legacy functions for backward compatibility

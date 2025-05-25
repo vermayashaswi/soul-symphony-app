@@ -5,18 +5,37 @@ import { ArrowRight } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { showTranslatedToast, showTutorialToast } from '@/services/notificationService';
+import { showTranslatedToast, showTutorialToast, registerComponent, unregisterComponent } from '@/services/notificationService';
 
 const JournalNavigationButton: React.FC = () => {
   const navigate = useNavigate();
   const { isActive, currentStep, steps } = useTutorial();
   const { translate } = useTranslation();
   const buttonRef = useRef<HTMLDivElement>(null);
+  const componentId = useRef(`journal-nav-${Date.now()}`);
+  const isMountedRef = useRef(true);
   
   // Check if we're in tutorial step 2
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
 
+  // Register component on mount and cleanup on unmount
+  useEffect(() => {
+    registerComponent(componentId.current);
+    isMountedRef.current = true;
+    
+    return () => {
+      isMountedRef.current = false;
+      unregisterComponent(componentId.current);
+    };
+  }, []);
+
   const navigateToJournal = async () => {
+    // Safety check - don't proceed if component is unmounted
+    if (!isMountedRef.current) {
+      console.log('Navigation cancelled - component unmounted');
+      return;
+    }
+
     try {
       console.log('Navigating to journal page');
       navigate('/app/journal');
@@ -25,7 +44,8 @@ const JournalNavigationButton: React.FC = () => {
       if (isActive) {
         showTutorialToast(
           "Journal", 
-          "Opening your journal space"
+          "Opening your journal space",
+          componentId.current
         );
       } else {
         // Use translated toast for regular navigation
@@ -33,25 +53,31 @@ const JournalNavigationButton: React.FC = () => {
           "navigation.journal",
           "toasts.openingJournalSpace",
           translate,
-          3000
+          3000,
+          undefined,
+          componentId.current
         );
       }
     } catch (error) {
       console.error("Navigation error:", error);
       
-      // Show an error toast with translation
-      await showTranslatedToast(
-        "toasts.error",
-        "toasts.navigationError",
-        translate,
-        5000
-      );
+      // Only show error toast if component is still mounted
+      if (isMountedRef.current) {
+        await showTranslatedToast(
+          "toasts.error",
+          "toasts.navigationError",
+          translate,
+          5000,
+          undefined,
+          componentId.current
+        );
+      }
     }
   };
 
-  // Enhanced handling for button in tutorial mode
+  // Enhanced handling for button in tutorial mode with safety checks
   useEffect(() => {
-    if (!buttonRef.current) return;
+    if (!buttonRef.current || !isMountedRef.current) return;
     
     console.log('JournalNavigationButton - Tutorial state:', {
       isActive,
@@ -61,7 +87,7 @@ const JournalNavigationButton: React.FC = () => {
     });
     
     // Apply special styling only when in tutorial step 2
-    if (isInArrowTutorialStep) {
+    if (isInArrowTutorialStep && isMountedRef.current) {
       const buttonElement = buttonRef.current.querySelector('button');
       if (buttonElement) {
         console.log('Applying enhanced tutorial styling to button');
@@ -84,7 +110,7 @@ const JournalNavigationButton: React.FC = () => {
         glowElement.style.filter = "drop-shadow(0 0 25px var(--color-theme))";
         glowElement.style.opacity = "0.95";
       }
-    } else {
+    } else if (isMountedRef.current) {
       // Remove tutorial styling when not in step 2
       const buttonElement = buttonRef.current.querySelector('button');
       if (buttonElement) {
@@ -106,6 +132,11 @@ const JournalNavigationButton: React.FC = () => {
     }
   }, [isInArrowTutorialStep, isActive, currentStep, steps]);
 
+  // Don't render if component should be unmounted
+  if (!isMountedRef.current) {
+    return null;
+  }
+
   return (
     <div 
       className="journal-arrow-button"
@@ -114,7 +145,7 @@ const JournalNavigationButton: React.FC = () => {
         top: '50%',
         left: '50%',
         transform: 'translate(-50%, -50%)',
-        zIndex: isInArrowTutorialStep ? 10000 : 40, // Increased z-index when in tutorial mode
+        zIndex: isInArrowTutorialStep ? 10000 : 40,
         margin: 0,
         padding: 0,
         pointerEvents: 'auto',
