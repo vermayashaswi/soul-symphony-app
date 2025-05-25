@@ -19,7 +19,7 @@ function App() {
         <SubscriptionProvider>
           <TranslationProvider>
             <TutorialProvider>
-              <ThemeProvider defaultTheme="light" storageKey="vite-ui-theme">
+              <ThemeProvider>
                 <div className="min-h-screen bg-background font-sans antialiased">
                   <Toaster />
                   <AppRoutes />
