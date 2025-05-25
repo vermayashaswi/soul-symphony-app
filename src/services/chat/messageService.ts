@@ -169,7 +169,8 @@ export async function sendMessage(
     
     // STAGE 1: Query Classification
     console.log(`[sendMessage] STAGE 1: Query Classification`);
-    const classificationResponse = await monitorChatOperation(
+    const classificationResponse = await withPerformanceMonitoring(
+      'query-classification',
       async () => {
         const classificationPromise = supabase.functions.invoke('chat-query-classifier', {
           body: { message, conversationContext }
@@ -180,16 +181,14 @@ export async function sendMessage(
         });
         
         return await Promise.race([classificationPromise, timeoutPromise]);
-      },
-      'query-classification',
-      { message, userId: userIdString }
+      }
     );
     
-    if (classificationResponse.error) {
-      console.error('Classification error:', classificationResponse.error);
+    if ((classificationResponse as any).error) {
+      console.error('Classification error:', (classificationResponse as any).error);
     }
     
-    const classification = classificationResponse.data || { 
+    const classification = (classificationResponse as any).data || { 
       category: 'JOURNAL_SPECIFIC', 
       shouldUseJournal: true,
       confidence: 0.7
@@ -206,7 +205,7 @@ export async function sendMessage(
           body: { message }
         });
         
-        const finalResponse = generalResponse.data?.response || getGeneralMentalHealthFallback(message);
+        const finalResponse = (generalResponse as any).data?.response || getGeneralMentalHealthFallback(message);
         
         await supabase.from('chat_messages')
           .update({
@@ -324,10 +323,10 @@ export async function sendMessage(
     console.log(`[sendMessage] Query planner response received`);
     
     // Check if we have a direct response that doesn't need further processing
-    if (queryPlanResponse.data && queryPlanResponse.data.directResponse) {
+    if ((queryPlanResponse as any).data && (queryPlanResponse as any).data.directResponse) {
       await supabase.from('chat_messages')
         .update({
-          content: queryPlanResponse.data.directResponse,
+          content: (queryPlanResponse as any).data.directResponse,
           is_processing: false
         })
         .eq('id', processingMessageId);
@@ -350,14 +349,14 @@ export async function sendMessage(
       performanceMonitor.endOperation(operationId, 'success');
       
       return {
-        response: queryPlanResponse.data.directResponse,
+        response: (queryPlanResponse as any).data.directResponse,
         status: 'success',
         messageId: processingMessageId,
       };
     }
     
     // Extract the enhanced query plan
-    const queryPlan = queryPlanResponse.data?.queryPlan || {};
+    const queryPlan = (queryPlanResponse as any).data?.queryPlan || {};
     console.log(`[sendMessage] Enhanced query plan received:`, {
       strategy: queryPlan.strategy,
       isEmotionQuery: queryPlan.isEmotionQuery,
@@ -386,8 +385,8 @@ export async function sendMessage(
           }
         });
         
-        if (segmentResponse.data && segmentResponse.data.subQuestions) {
-          finalSubQuestions = segmentResponse.data.subQuestions;
+        if ((segmentResponse as any).data && (segmentResponse as any).data.subQuestions) {
+          finalSubQuestions = (segmentResponse as any).data.subQuestions;
           console.log(`[sendMessage] Enhanced segmentation completed: ${finalSubQuestions.length} segments`);
         }
       } catch (error) {
@@ -467,7 +466,7 @@ export async function sendMessage(
           
           return await Promise.race([chatRagPromise, timeoutPromise]);
         },
-        'enhanced-response-generation',
+        'rag-pipeline',
         { message, userId: userIdString, strategy: queryPlan.strategy, subQuestions: finalSubQuestions.length }
       );
     } catch (error) {
@@ -506,18 +505,18 @@ export async function sendMessage(
     
     console.log(`[sendMessage] Enhanced RAG response received`);
     
-    if (queryResponse.error) {
-      console.error('Error from chat-with-rag:', queryResponse.error);
-      throw new Error(`Chat service error: ${queryResponse.error.message || queryResponse.error}`);
+    if ((queryResponse as any).error) {
+      console.error('Error from chat-with-rag:', (queryResponse as any).error);
+      throw new Error(`Chat service error: ${(queryResponse as any).error.message || (queryResponse as any).error}`);
     }
     
-    if (!queryResponse.data) {
+    if (!(queryResponse as any).data) {
       console.error('No data received from chat-with-rag:', queryResponse);
       throw new Error('Failed to get response from chat engine');
     }
     
     // The backend returns { data: "response string" }
-    const finalResponse = queryResponse.data;
+    const finalResponse = (queryResponse as any).data;
     
     console.log(`[sendMessage] Final response received, length: ${finalResponse?.length || 0}`);
     
