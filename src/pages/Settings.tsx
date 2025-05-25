@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { useAuth } from '@/contexts/AuthContext';
@@ -30,23 +31,19 @@ import {
   GraduationCap
 } from 'lucide-react';
 import { useTheme } from '@/hooks/use-theme';
-import ProfilePictureUpload from '@/components/settings/ProfilePictureUpload';
-import ColorPicker from '@/components/settings/ColorPicker';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
+import { ColorPicker } from '@/components/settings/ColorPicker';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
   const { translate, currentLanguage } = useTranslation();
-  const { startTutorial } = useTutorial();
+  const tutorialContext = useTutorial();
   const { theme, setTheme } = useTheme();
   const navigate = useNavigate();
   
   const [profile, setProfile] = useState({
     full_name: '',
     email: '',
-    phone: '',
-    location: '',
-    date_of_birth: '',
-    occupation: '',
     avatar_url: ''
   });
   
@@ -82,17 +79,7 @@ export default function Settings() {
         setProfile({
           full_name: data.full_name || '',
           email: data.email || '',
-          phone: data.phone || '',
-          location: data.location || '',
-          date_of_birth: data.date_of_birth || '',
-          occupation: data.occupation || '',
           avatar_url: data.avatar_url || ''
-        });
-        
-        setNotifications({
-          email_notifications: data.email_notifications || false,
-          push_notifications: data.push_notifications || false,
-          weekly_summary: data.weekly_summary || false
         });
       }
     } catch (error) {
@@ -112,14 +99,7 @@ export default function Settings() {
           id: user?.id,
           full_name: profile.full_name,
           email: profile.email,
-          phone: profile.phone,
-          location: profile.location,
-          date_of_birth: profile.date_of_birth,
-          occupation: profile.occupation,
           avatar_url: profile.avatar_url,
-          email_notifications: notifications.email_notifications,
-          push_notifications: notifications.push_notifications,
-          weekly_summary: notifications.weekly_summary,
         }, { onConflict: 'id' });
 
       if (error) {
@@ -147,9 +127,12 @@ export default function Settings() {
     }
   };
 
-  const handleRestartTutorial = () => {
-    startTutorial();
-    toast.success(await translate('Tutorial restarted!', 'en'));
+  const handleRestartTutorial = async () => {
+    if (tutorialContext?.resetTutorial) {
+      tutorialContext.resetTutorial();
+      const message = await translate('Tutorial restarted!', 'en');
+      toast.success(message);
+    }
   };
 
   return (
@@ -176,10 +159,7 @@ export default function Settings() {
               </CardDescription>
             </CardHeader>
             <CardContent className="space-y-6">
-              <ProfilePictureUpload 
-                currentAvatarUrl={profile.avatar_url}
-                onAvatarUpdate={(url) => setProfile(prev => ({ ...prev, avatar_url: url }))}
-              />
+              <ProfilePictureUpload />
               
               <div className="space-y-2">
                 <Label htmlFor="full_name"><TranslatableText text="Full Name" /></Label>
@@ -198,40 +178,6 @@ export default function Settings() {
                   onChange={(e) => setProfile({ ...profile, email: e.target.value })}
                 />
               </div>
-              <div className="space-y-2">
-                <Label htmlFor="phone"><TranslatableText text="Phone" /></Label>
-                <Input
-                  id="phone"
-                  type="tel"
-                  value={profile.phone}
-                  onChange={(e) => setProfile({ ...profile, phone: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="location"><TranslatableText text="Location" /></Label>
-                <Input
-                  id="location"
-                  value={profile.location}
-                  onChange={(e) => setProfile({ ...profile, location: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="date_of_birth"><TranslatableText text="Date of Birth" /></Label>
-                <Input
-                  id="date_of_birth"
-                  type="date"
-                  value={profile.date_of_birth}
-                  onChange={(e) => setProfile({ ...profile, date_of_birth: e.target.value })}
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="occupation"><TranslatableText text="Occupation" /></Label>
-                <Input
-                  id="occupation"
-                  value={profile.occupation}
-                  onChange={(e) => setProfile({ ...profile, occupation: e.target.value })}
-                />
-              </div>
               
               <Button 
                 onClick={saveProfile} 
@@ -243,47 +189,6 @@ export default function Settings() {
                   {loading ? <TranslatableText text="Saving..." /> : <TranslatableText text="Save Changes" />}
                 </span>
               </Button>
-            </CardContent>
-          </Card>
-
-          {/* Notifications Section */}
-          <Card className="mb-8">
-            <CardHeader>
-              <CardTitle className="flex items-center gap-2">
-                <Bell className="h-5 w-5" />
-                <TranslatableText text="Notifications" />
-              </CardTitle>
-              <CardDescription>
-                <TranslatableText text="Manage your notification preferences." />
-              </CardDescription>
-            </CardHeader>
-            <CardContent className="space-y-4">
-              <div className="flex items-center justify-between">
-                <Label htmlFor="email_notifications" className="w-2/3"><TranslatableText text="Email Notifications" /></Label>
-                <Switch
-                  id="email_notifications"
-                  checked={notifications.email_notifications}
-                  onCheckedChange={(checked) => setNotifications({ ...notifications, email_notifications: checked })}
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <Label htmlFor="push_notifications" className="w-2/3"><TranslatableText text="Push Notifications" /></Label>
-                <Switch
-                  id="push_notifications"
-                  checked={notifications.push_notifications}
-                  onCheckedChange={(checked) => setNotifications({ ...notifications, push_notifications: checked })}
-                />
-              </div>
-              <Separator />
-              <div className="flex items-center justify-between">
-                <Label htmlFor="weekly_summary" className="w-2/3"><TranslatableText text="Weekly Summary" /></Label>
-                <Switch
-                  id="weekly_summary"
-                  checked={notifications.weekly_summary}
-                  onCheckedChange={(checked) => setNotifications({ ...notifications, weekly_summary: checked })}
-                />
-              </div>
             </CardContent>
           </Card>
 
@@ -335,7 +240,7 @@ export default function Settings() {
                 </div>
               </div>
               
-              <ColorPicker />
+              <ColorPicker value="#3b82f6" onChange={(color) => console.log('Color changed:', color)} />
             </CardContent>
           </Card>
 
