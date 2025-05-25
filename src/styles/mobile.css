@@ -111,7 +111,7 @@
     padding-bottom: 70px !important;
   }
   
-  /* Year view calendar compact styling for mobile */
+  /* Year view calendar compact styling for mobile - Updated dot sizes */
   .compact-table-mobile {
     table-layout: fixed !important;
     font-size: 10px !important;
@@ -119,12 +119,12 @@
   
   .compact-table-mobile th,
   .compact-table-mobile td {
-    padding: 0 !important;
+    padding: 1px !important;
   }
   
   .compact-table-mobile div.rounded-full {
-    width: 1.5px !important;
-    height: 1.5px !important;
+    width: 12px !important;
+    height: 12px !important;
     margin: 1px auto !important;
   }
 }
@@ -141,7 +141,7 @@
     z-index: 9999 !important;
   }
   
-  /* Year view calendar compact styling */
+  /* Year view calendar compact styling - Updated dot sizes */
   .compact-year-view {
     width: 100%;
     overflow-x: hidden;
@@ -154,10 +154,18 @@
   
   .compact-year-view th:first-child,
   .compact-year-view td:first-child {
-    width: 20px;
+    width: 24px;
   }
   
   .compact-year-view td {
-    height: 14px;
+    height: 18px;
+  }
+  
+  /* Desktop year view - larger dots */
+  @media (min-width: 769px) {
+    .compact-year-view div.rounded-full {
+      width: 16px !important;
+      height: 16px !important;
+    }
   }
 }
