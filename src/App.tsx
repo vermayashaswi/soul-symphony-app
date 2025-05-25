@@ -1,6 +1,5 @@
 
 import React from 'react';
-import { BrowserRouter } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
 import { ThemeProvider } from './hooks/use-theme';
 import { Toaster } from 'sonner';
@@ -14,22 +13,20 @@ import { TutorialProvider } from '@/contexts/TutorialContext';
 
 function App() {
   return (
-    <BrowserRouter>
-      <AuthProvider>
-        <SubscriptionProvider>
-          <TranslationProvider>
-            <TutorialProvider>
-              <ThemeProvider>
-                <div className="min-h-screen bg-background font-sans antialiased">
-                  <Toaster />
-                  <AppRoutes />
-                </div>
-              </ThemeProvider>
-            </TutorialProvider>
-          </TranslationProvider>
-        </SubscriptionProvider>
-      </AuthProvider>
-    </BrowserRouter>
+    <AuthProvider>
+      <SubscriptionProvider>
+        <TranslationProvider>
+          <TutorialProvider>
+            <ThemeProvider>
+              <div className="min-h-screen bg-background font-sans antialiased">
+                <Toaster />
+                <AppRoutes />
+              </div>
+            </ThemeProvider>
+          </TutorialProvider>
+        </TranslationProvider>
+      </SubscriptionProvider>
+    </AuthProvider>
   );
 }
 
