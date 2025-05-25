@@ -120,7 +120,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         
       if (updateError) {
         console.error("Error updating entry:", updateError);
-        showTranslatedToast(
+        await showTranslatedToast(
           'toasts.error',
           'toasts.entryUpdateFailed',
           translate
@@ -141,7 +141,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
           
           if (!success) {
             console.error('Reprocessing failed for entry:', entryId);
-            showTranslatedToast(
+            await showTranslatedToast(
               'toasts.error',
               'toasts.processingError',
               translate
@@ -159,13 +159,13 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         setIsProcessing(false);
         
         if (currentLanguage === 'en') {
-          showTranslatedToast(
+          await showTranslatedToast(
             'toasts.success',
             'toasts.entryUpdated',
             translate
           );
         } else {
-          showTranslatedToast(
+          await showTranslatedToast(
             'toasts.success',
             'toasts.translationUpdated',
             translate
@@ -174,7 +174,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         
       } catch (processingError) {
         console.error('Processing failed:', processingError);
-        showTranslatedToast(
+        await showTranslatedToast(
           'toasts.error',
           'toasts.processingError',
           translate
@@ -186,7 +186,7 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       
     } catch (error) {
       console.error('Error updating journal entry:', error);
-      showTranslatedToast(
+      await showTranslatedToast(
         'toasts.error',
         'toasts.entryUpdateFailed',
         translate
