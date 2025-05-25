@@ -1,47 +1,50 @@
-
 // Enhanced response generation utilities
 export function generateSystemPrompt(
   userTimezone: string,
   timeRange?: any,
   queryType?: string
 ): string {
-  const basePrompt = `You are a supportive mental health assistant analyzing journal entries from the SOULo voice journaling app.
-
-Current date and time: ${new Date().toISOString()}
+  const currentDate = new Date().toISOString();
+  
+  let contextualInfo = `Current date and time: ${currentDate}
 User timezone: ${userTimezone || 'UTC'}`;
-
-  let contextualPrompt = basePrompt;
   
   if (timeRange) {
     const startStr = timeRange.startDate ? new Date(timeRange.startDate).toLocaleDateString() : 'start';
     const endStr = timeRange.endDate ? new Date(timeRange.endDate).toLocaleDateString() : 'end';
-    contextualPrompt += `\nQuery timeframe: ${startStr} to ${endStr}`;
+    contextualInfo += `\nQuery timeframe: ${startStr} to ${endStr}`;
   }
   
   if (queryType === 'aggregated') {
-    contextualPrompt += `\n\nThis is an aggregation query. Focus on providing statistical insights, patterns, and quantitative analysis.`;
+    contextualInfo += `\nThis is an aggregation query. Focus on providing statistical insights, patterns, and quantitative analysis.`;
   } else if (queryType === 'analysis') {
-    contextualPrompt += `\n\nThis is an analysis query. Focus on identifying patterns, trends, and providing deep insights.`;
+    contextualInfo += `\nThis is an analysis query. Focus on identifying patterns, trends, and providing deep insights.`;
   }
-  
-  contextualPrompt += `
 
-Your role is to:
-1. Analyze journal entries with empathy and understanding
-2. Provide personalized insights based on patterns and emotions
-3. Offer constructive mental health guidance
-4. Reference specific dates and timeframes accurately when relevant
-5. Be supportive while maintaining appropriate boundaries
+  return `You are SOuLO, an AI mental health assistant trained in CBT, DBT, and mindfulness. Your role is to help users understand emotional patterns in their journal entries using a structured, professional, and empathic tone.
 
-Guidelines:
-- Always be encouraging, non-judgmental, and focused on the user's wellbeing
-- When discussing emotions, provide context and patterns rather than just raw data
-- For time-based queries, clearly reference the specific timeframe
-- Provide actionable insights when appropriate
-- If asking about patterns or trends, explain what the data shows and what it might mean
-- For "top emotions" queries, identify the most prominent emotions with specific examples from the entries`;
+${contextualInfo}
 
-  return contextualPrompt;
+**Response Format (Always use):**
+
+## Current State – Concise emotional snapshot based on data
+
+## Pattern Insights – Observed trends across entries (emotion scores, timing, etc.)
+
+## Interpretation – Brief, evidence-based therapeutic meaning
+
+## Recommended Actions – 1–3 realistic, personalized next steps
+
+**Strict Guidelines:**
+- Max 200 words unless question demands complexity
+- Use only pre-analyzed emotion scores (0.0–1.0); never infer from text
+- Include insights + stats (e.g., "joy scored avg 0.68 over 2 weeks")
+- Use second-person voice unless analysis is general
+- Flag potential distress gently; avoid crisis terms unless clearly triggered
+- Format in clean Markdown; bold key terms
+- Reference specific dates and timeframes accurately when relevant
+- Provide actionable insights based on patterns rather than individual entries
+- When discussing emotions, provide context and patterns rather than raw data`;
 }
 
 export function formatJournalEntriesForAnalysis(entries: any[]): string {
@@ -94,7 +97,7 @@ export async function generateResponse(
   openAiApiKey: string
 ): Promise<string> {
   try {
-    console.log('[responseGenerator] Calling OpenAI with prompts...');
+    console.log('[responseGenerator] Calling OpenAI with refined SOuLO prompt...');
     
     const messages = [
       { role: 'system', content: systemPrompt },
@@ -111,7 +114,7 @@ export async function generateResponse(
       body: JSON.stringify({
         model: 'gpt-4o-mini',
         messages: messages,
-        max_tokens: 1000,
+        max_tokens: 800, // Increased slightly to accommodate structured format
         temperature: 0.7,
       }),
     });
@@ -125,7 +128,7 @@ export async function generateResponse(
     const data = await response.json();
     const generatedResponse = data.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response.';
     
-    console.log('[responseGenerator] Successfully generated response');
+    console.log('[responseGenerator] Successfully generated structured SOuLO response');
     return generatedResponse;
     
   } catch (error) {
