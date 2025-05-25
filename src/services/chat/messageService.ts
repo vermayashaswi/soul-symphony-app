@@ -467,7 +467,7 @@ export async function sendMessage(
           return await Promise.race([chatRagPromise, timeoutPromise]);
         },
         'rag-pipeline',
-        { message, userId: userIdString, strategy: queryPlan.strategy, subQuestions: finalSubQuestions.length }
+        { message, userId: userIdString, strategy: queryPlan.strategy }
       );
     } catch (error) {
       console.error('Chat-with-rag timeout or error:', error);
