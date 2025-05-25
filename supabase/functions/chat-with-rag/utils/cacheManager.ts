@@ -51,7 +51,40 @@ export class CacheManager {
 
   static generateQueryHash(message: string, userId: string, dateFilter?: any): string {
     const hashInput = `${message}:${userId}:${JSON.stringify(dateFilter || {})}`;
-    return btoa(hashInput).replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+    
+    try {
+      // Use UTF-8 safe encoding instead of btoa()
+      const encoder = new TextEncoder();
+      const data = encoder.encode(hashInput);
+      
+      // Convert to base64 manually for UTF-8 safety
+      const base64 = this.arrayBufferToBase64(data);
+      return base64.replace(/[^a-zA-Z0-9]/g, '').substring(0, 32);
+    } catch (error) {
+      console.error('[CacheManager] Error generating hash:', error);
+      // Fallback to simple hash if encoding fails
+      return this.simpleHash(hashInput).substring(0, 32);
+    }
+  }
+
+  private static arrayBufferToBase64(buffer: Uint8Array): string {
+    let binary = '';
+    const bytes = new Uint8Array(buffer);
+    const len = bytes.byteLength;
+    for (let i = 0; i < len; i++) {
+      binary += String.fromCharCode(bytes[i]);
+    }
+    return btoa(binary);
+  }
+
+  private static simpleHash(str: string): string {
+    let hash = 0;
+    for (let i = 0; i < str.length; i++) {
+      const char = str.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32bit integer
+    }
+    return Math.abs(hash).toString(36);
   }
 
   private static cleanExpiredEntries(): void {
@@ -69,4 +102,3 @@ export class CacheManager {
     this.responseCache.clear();
   }
 }
-
