@@ -147,57 +147,89 @@ const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, o
   }, [isFocused]);
 
   useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredEntries(entries);
-      onSearchResults(entries);
-      return;
-    }
+    const performSearch = async () => {
+      if (!searchQuery.trim()) {
+        setFilteredEntries(entries);
+        onSearchResults(entries);
+        return;
+      }
 
-    const filtered = entries.filter(entry => {
-      const content = (entry.content || '').toLowerCase();
       const query = searchQuery.toLowerCase();
+      let translatedQuery = '';
       
-      if (content.includes(query)) return true;
-      
-      if (entry.entities) {
+      // Try to translate the search query to English for better matching
+      if (translate && query !== searchQuery) {
         try {
-          const entityData = typeof entry.entities === 'string' 
-            ? JSON.parse(entry.entities) 
-            : entry.entities;
-          
-          if (entityData && Array.isArray(entityData)) {
-            return entityData.some(entity => 
-              entity.name?.toLowerCase().includes(query) || 
-              entity.type?.toLowerCase().includes(query)
-            );
-          } else if (entityData && typeof entityData === 'object') {
-            return Object.values(entityData).some(value => 
-              value && String(value).toLowerCase().includes(query)
-            );
-          }
-        } catch (e) {
-          console.error("Error parsing entities:", e);
+          translatedQuery = await translate(searchQuery, 'auto');
+          translatedQuery = translatedQuery.toLowerCase();
+        } catch (error) {
+          console.warn('Could not translate search query:', error);
         }
       }
-      
-      if (entry.themes && Array.isArray(entry.themes)) {
-        return entry.themes.some(theme => 
-          theme.toLowerCase().includes(query)
-        );
-      }
-      
-      if (entry.master_themes && Array.isArray(entry.master_themes)) {
-        return entry.master_themes.some(theme => 
-          theme.toLowerCase().includes(query)
-        );
-      }
-      
-      return false;
-    });
 
-    setFilteredEntries(filtered);
-    onSearchResults(filtered);
-  }, [searchQuery, entries, onSearchResults]);
+      const filtered = entries.filter(entry => {
+        const content = (entry.content || '').toLowerCase();
+        
+        // Search with original query
+        if (content.includes(query)) return true;
+        
+        // Search with translated query if available
+        if (translatedQuery && content.includes(translatedQuery)) return true;
+        
+        // Search in entities
+        if (entry.entities) {
+          try {
+            const entityData = typeof entry.entities === 'string' 
+              ? JSON.parse(entry.entities) 
+              : entry.entities;
+            
+            if (entityData && Array.isArray(entityData)) {
+              const entityMatch = entityData.some(entity => {
+                const entityName = entity.name?.toLowerCase() || '';
+                const entityType = entity.type?.toLowerCase() || '';
+                return entityName.includes(query) || entityType.includes(query) ||
+                       (translatedQuery && (entityName.includes(translatedQuery) || entityType.includes(translatedQuery)));
+              });
+              if (entityMatch) return true;
+            } else if (entityData && typeof entityData === 'object') {
+              const entityMatch = Object.values(entityData).some(value => {
+                const valueStr = String(value).toLowerCase();
+                return valueStr.includes(query) || (translatedQuery && valueStr.includes(translatedQuery));
+              });
+              if (entityMatch) return true;
+            }
+          } catch (e) {
+            console.error("Error parsing entities:", e);
+          }
+        }
+        
+        // Search in themes
+        if (entry.themes && Array.isArray(entry.themes)) {
+          const themeMatch = entry.themes.some(theme => {
+            const themeStr = theme.toLowerCase();
+            return themeStr.includes(query) || (translatedQuery && themeStr.includes(translatedQuery));
+          });
+          if (themeMatch) return true;
+        }
+        
+        // Search in master themes
+        if (entry.master_themes && Array.isArray(entry.master_themes)) {
+          const masterThemeMatch = entry.master_themes.some(theme => {
+            const themeStr = theme.toLowerCase();
+            return themeStr.includes(query) || (translatedQuery && themeStr.includes(translatedQuery));
+          });
+          if (masterThemeMatch) return true;
+        }
+        
+        return false;
+      });
+
+      setFilteredEntries(filtered);
+      onSearchResults(filtered);
+    };
+
+    performSearch();
+  }, [searchQuery, entries, onSearchResults, translate]);
 
   const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const value = e.target.value;
