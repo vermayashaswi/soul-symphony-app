@@ -896,7 +896,7 @@ const Journal = () => {
     setFilteredEntries(filtered);
   };
 
-  // Update the entries handling to properly show filtered results
+  // Update the entries handling to ensure types are compatible
   const displayEntries = hasLocalChanges ? localEntries : 
                         (entries && entries.length > 0) ? 
                           entries.filter(entry => !deletedEntryIds.has(entry.id)) : 
@@ -910,8 +910,8 @@ const Journal = () => {
                         
   const showLoading = loading && displayEntries.length === 0 && !hasLocalChanges;
 
-  // Fix: Use filtered entries when search is active, otherwise show all entries
-  const entriesToDisplay = filteredEntries.length > 0 || (filteredEntries.length === 0 && displayEntries.length > 0) ? 
+  // Convert entries to ensure they have the required content field
+  const entriesToDisplay = (filteredEntries.length > 0 && displayEntries.length > 0) ? 
     filteredEntries.map(entry => ({
       ...entry,
       content: entry.content || entry["refined text"] || entry["transcription text"] || ""
