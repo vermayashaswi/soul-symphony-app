@@ -29,6 +29,8 @@ export class ProcessingStateManager {
   }
   
   public startProcessing(tempId: string): void {
+    console.log(`[ProcessingStateManager] Starting processing for ${tempId}`);
+    
     // Strict duplicate prevention with active call tracking
     if (this.activeStartProcessingCalls.has(tempId)) {
       console.log(`[ProcessingStateManager] StartProcessing already in progress for ${tempId}, ignoring`);
@@ -55,8 +57,15 @@ export class ProcessingStateManager {
     };
     
     this.processingEntries.push(entry);
+    console.log(`[ProcessingStateManager] Added entry ${tempId}. Total entries: ${this.processingEntries.length}`);
+    
+    // Immediately notify subscribers
     this.notifySubscribers();
-    console.log(`[ProcessingStateManager] Started processing ${tempId}. Total entries: ${this.processingEntries.length}`);
+    
+    // Dispatch immediate event for UI updates
+    window.dispatchEvent(new CustomEvent('processingStarted', {
+      detail: { tempId, timestamp: Date.now() }
+    }));
     
     // Clean up active call tracking after a short delay
     setTimeout(() => {
@@ -277,8 +286,17 @@ export class ProcessingStateManager {
   }
   
   private notifySubscribers(): void {
+    console.log(`[ProcessingStateManager] Notifying subscribers with ${this.processingEntries.length} entries`);
     this.entriesSubject.next([...this.processingEntries]);
     this.saveToLocalStorage();
+    
+    // Also dispatch a general event for fallback listeners
+    window.dispatchEvent(new CustomEvent('processingEntriesChanged', {
+      detail: { 
+        entries: [...this.processingEntries], 
+        timestamp: Date.now() 
+      }
+    }));
   }
   
   public handleError(tempId: string, errorMessage: string): void {

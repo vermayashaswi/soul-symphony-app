@@ -28,8 +28,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   onStartRecording,
   onDeleteEntry,
 }) => {
-  const { visibleEntries, isVisible } = useProcessingEntries();
+  const { visibleEntries, isVisible, forceRefresh } = useProcessingEntries();
   const [lastAction, setLastAction] = useState<string | null>(null);
+  const [fallbackProcessingIds, setFallbackProcessingIds] = useState<string[]>([]);
   const deletedEntryIdsRef = useRef<Set<number>>(new Set());
   
   const hasEntries = entries && entries.length > 0;
@@ -39,12 +40,40 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     console.log('[JournalEntriesList] Component mounted');
     setLastAction('Component Mounted');
     
-    // NO MORE startProcessing calls here - single source of truth
+    // Listen for processing events to update fallback state
+    const handleProcessingStarted = (event: CustomEvent) => {
+      console.log('[JournalEntriesList] Processing started event received:', event.detail);
+      if (event.detail?.tempId) {
+        setFallbackProcessingIds(prev => {
+          if (!prev.includes(event.detail.tempId)) {
+            console.log('[JournalEntriesList] Adding fallback processing ID:', event.detail.tempId);
+            return [...prev, event.detail.tempId];
+          }
+          return prev;
+        });
+        // Force refresh the hook state
+        setTimeout(forceRefresh, 50);
+      }
+    };
+    
+    const handleProcessingCompleted = (event: CustomEvent) => {
+      console.log('[JournalEntriesList] Processing completed event received:', event.detail);
+      if (event.detail?.tempId) {
+        setFallbackProcessingIds(prev => prev.filter(id => id !== event.detail.tempId));
+      }
+    };
+    
+    window.addEventListener('processingStarted', handleProcessingStarted as EventListener);
+    window.addEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
+    window.addEventListener('processingEntryHidden', handleProcessingCompleted as EventListener);
     
     return () => {
       console.log('[JournalEntriesList] Component unmounted');
+      window.removeEventListener('processingStarted', handleProcessingStarted as EventListener);
+      window.removeEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
+      window.removeEventListener('processingEntryHidden', handleProcessingCompleted as EventListener);
     };
-  }, []);
+  }, [forceRefresh]);
   
   // Handle entries that have both ID and tempId (completed processing)
   useEffect(() => {
@@ -56,6 +85,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           console.log(`[JournalEntriesList] Found entry with both id and tempId: ${entry.id} / ${entry.tempId} - marking as completed`);
           processingStateManager.updateEntryState(entry.tempId, EntryProcessingState.COMPLETED);
           processingStateManager.setEntryId(entry.tempId, entry.id);
+          
+          // Remove from fallback state
+          setFallbackProcessingIds(prev => prev.filter(id => id !== entry.tempId));
         }
       }
     });
@@ -101,14 +133,20 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   // Filter entries to remove deleted ones
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
   
-  // Only show visible processing entries (smart transparency handled in state manager)
+  // Combine visible entries from hook and fallback state
   const visibleProcessingIds = visibleEntries.map(entry => entry.tempId);
+  const allProcessingIds = [...new Set([...visibleProcessingIds, ...fallbackProcessingIds])];
   
-  console.log(`[JournalEntriesList] Rendering: entries=${filteredEntries.length}, visibleProcessingIds=${visibleProcessingIds.length}`);
+  // Also check state manager directly as final fallback
+  const directProcessingEntries = processingStateManager.getVisibleProcessingEntries();
+  const directProcessingIds = directProcessingEntries.map(entry => entry.tempId);
+  const finalProcessingIds = [...new Set([...allProcessingIds, ...directProcessingIds])];
+  
+  console.log(`[JournalEntriesList] Rendering: entries=${filteredEntries.length}, visibleProcessingIds=${visibleProcessingIds.length}, fallbackIds=${fallbackProcessingIds.length}, directIds=${directProcessingIds.length}, finalIds=${finalProcessingIds.length}`);
 
   // Determine content to show
-  const shouldShowEmpty = !filteredEntries.length && !isLoading && visibleProcessingIds.length === 0;
-  const shouldShowEntries = filteredEntries.length > 0 || visibleProcessingIds.length > 0;
+  const shouldShowEmpty = !filteredEntries.length && !isLoading && finalProcessingIds.length === 0;
+  const shouldShowEntries = filteredEntries.length > 0 || finalProcessingIds.length > 0;
   
   return (
     <div className="journal-entries-list" id="journal-entries-container" data-last-action={lastAction}>
@@ -122,23 +160,23 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         </div>
       ) : shouldShowEntries ? (
         <div className="grid gap-4" data-entries-count={filteredEntries.length}>
-          {/* Show only visible processing entry skeletons */}
-          {visibleProcessingIds.length > 0 && (
+          {/* Show processing entry skeletons - using final combined list */}
+          {finalProcessingIds.length > 0 && (
             <div data-processing-cards-container="true" className="processing-cards-container">
-              {visibleProcessingIds.map((tempId) => {
+              {finalProcessingIds.map((tempId) => {
                 const entry = processingStateManager.getEntryById(tempId);
-                const shouldShow = entry && isVisible(tempId);
+                const shouldShow = entry ? isVisible(tempId) : true; // Fallback to true if no entry found
                 
-                console.log(`[JournalEntriesList] Rendering processing card for: ${tempId}, visible: ${shouldShow}`);
+                console.log(`[JournalEntriesList] Rendering processing card for: ${tempId}, visible: ${shouldShow}, hasEntry: ${!!entry}`);
                 
-                return shouldShow ? (
+                return (
                   <JournalEntryLoadingSkeleton
                     key={`processing-${tempId}`}
                     count={1}
                     tempId={tempId}
                     isVisible={shouldShow}
                   />
-                ) : null;
+                );
               })}
             </div>
           )}

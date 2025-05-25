@@ -21,11 +21,16 @@ export default function JournalEntryLoadingSkeleton({
   const { addEvent } = useDebugLog();
   const mountTimeRef = useRef(Date.now());
   const [shouldRender, setShouldRender] = React.useState(isVisible);
+  const [forceVisible, setForceVisible] = React.useState(false);
   
   useEffect(() => {
     if (tempId) {
       console.log(`[JournalEntryLoadingSkeleton] Mounted with tempId ${tempId}, visible: ${isVisible}`);
       addEvent('LoadingUI', `JournalEntryLoadingSkeleton rendered with tempId ${tempId}`, 'info');
+      
+      // Force visible for a short time to ensure it appears
+      setForceVisible(true);
+      setTimeout(() => setForceVisible(false), 1000);
       
       // Listen for hide events
       const handleHidden = (event: CustomEvent) => {
@@ -35,7 +40,7 @@ export default function JournalEntryLoadingSkeleton({
         }
       };
       
-      // Listen for real entry detection
+      // Listen for real entry detection with faster polling
       const handleRealEntryDetected = () => {
         const hasRealEntry = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
                             document.querySelector(`[data-temp-id="${tempId}"].journal-entry-card:not(.processing-card)`);
@@ -47,13 +52,13 @@ export default function JournalEntryLoadingSkeleton({
         }
       };
       
-      // Fast polling for real entry detection
-      const pollInterval = setInterval(handleRealEntryDetected, 200);
+      // Very fast polling for real entry detection
+      const pollInterval = setInterval(handleRealEntryDetected, 100);
       
       window.addEventListener('processingEntryHidden', handleHidden as EventListener);
       
       // Initial check
-      setTimeout(handleRealEntryDetected, 100);
+      setTimeout(handleRealEntryDetected, 50);
       
       return () => {
         clearInterval(pollInterval);
@@ -67,12 +72,16 @@ export default function JournalEntryLoadingSkeleton({
     }
   }, [tempId, addEvent, isVisible]);
   
-  // Update visibility when prop changes
+  // Update visibility when prop changes, but respect force visible
   useEffect(() => {
-    setShouldRender(isVisible);
-  }, [isVisible]);
+    if (!forceVisible) {
+      setShouldRender(isVisible);
+    }
+  }, [isVisible, forceVisible]);
   
-  if (!shouldRender) {
+  const finalShouldRender = shouldRender || forceVisible;
+  
+  if (!finalShouldRender) {
     return null;
   }
   
@@ -81,7 +90,7 @@ export default function JournalEntryLoadingSkeleton({
       <motion.div
         key={`skeleton-${tempId}`}
         initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: shouldRender ? 1 : 0, y: 0 }}
+        animate={{ opacity: finalShouldRender ? 1 : 0, y: 0 }}
         exit={{ 
           opacity: 0, 
           y: -10,
@@ -92,7 +101,7 @@ export default function JournalEntryLoadingSkeleton({
         data-loading-skeleton={true}
         data-temp-id={tempId}
         style={{ 
-          opacity: shouldRender ? 1 : 0,
+          opacity: finalShouldRender ? 1 : 0,
           transition: 'opacity 0.15s ease-out'
         }}
       >
