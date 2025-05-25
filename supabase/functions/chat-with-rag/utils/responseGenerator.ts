@@ -1,4 +1,7 @@
 // Enhanced response generation utilities
+import { CacheManager } from './cacheManager.ts';
+import { OptimizedApiClient } from './optimizedApiClient.ts';
+
 export function generateSystemPrompt(
   userTimezone: string,
   timeRange?: any,
@@ -48,7 +51,10 @@ ${contextualInfo}
 }
 
 export function formatJournalEntriesForAnalysis(entries: any[]): string {
-  return entries.map(entry => {
+  // Limit entries for performance while maintaining quality
+  const limitedEntries = entries.slice(0, 15);
+  
+  return limitedEntries.map(entry => {
     const date = new Date(entry.created_at).toLocaleDateString('en-US', {
       month: 'short',
       day: 'numeric',
@@ -71,10 +77,13 @@ export function formatJournalEntriesForAnalysis(entries: any[]): string {
     
     let themeInfo = '';
     if (entry.master_themes && Array.isArray(entry.master_themes)) {
-      themeInfo = `\nThemes: ${entry.master_themes.join(', ')}`;
+      themeInfo = `\nThemes: ${entry.master_themes.slice(0, 3).join(', ')}`;
     }
     
-    return `Entry from ${date}: ${entry.content}${emotionInfo}${themeInfo}`;
+    // Limit content length for performance
+    const content = entry.content.substring(0, 300) + (entry.content.length > 300 ? '...' : '');
+    
+    return `Entry from ${date}: ${content}${emotionInfo}${themeInfo}`;
   }).join('\n\n');
 }
 
@@ -97,39 +106,30 @@ export async function generateResponse(
   openAiApiKey: string
 ): Promise<string> {
   try {
-    console.log('[responseGenerator] Calling OpenAI with refined SOuLO prompt...');
+    console.log('[responseGenerator] Starting optimized response generation...');
     
-    const messages = [
-      { role: 'system', content: systemPrompt },
-      ...conversationContext.slice(-10), // Include recent conversation context
-      { role: 'user', content: userPrompt }
-    ];
+    // Check cache first
+    const cacheKey = CacheManager.generateQueryHash(userPrompt, 'system', null);
+    const cachedResponse = CacheManager.getCachedResponse(cacheKey);
     
-    const response = await fetch('https://api.openai.com/v1/chat/completions', {
-      method: 'POST',
-      headers: {
-        'Authorization': `Bearer ${openAiApiKey}`,
-        'Content-Type': 'application/json',
-      },
-      body: JSON.stringify({
-        model: 'gpt-4o-mini',
-        messages: messages,
-        max_tokens: 800, // Increased slightly to accommodate structured format
-        temperature: 0.7,
-      }),
-    });
-
-    if (!response.ok) {
-      const errorText = await response.text();
-      console.error('[responseGenerator] OpenAI API error:', errorText);
-      throw new Error(`OpenAI API error: ${response.status} - ${errorText}`);
+    if (cachedResponse) {
+      console.log('[responseGenerator] Using cached response');
+      return cachedResponse;
     }
-
-    const data = await response.json();
-    const generatedResponse = data.choices[0]?.message?.content || 'I apologize, but I was unable to generate a response.';
     
-    console.log('[responseGenerator] Successfully generated structured SOuLO response');
-    return generatedResponse;
+    // Use optimized API client
+    const response = await OptimizedApiClient.generateResponseOptimized(
+      systemPrompt,
+      userPrompt,
+      conversationContext,
+      openAiApiKey
+    );
+    
+    // Cache the response
+    CacheManager.setCachedResponse(cacheKey, response);
+    
+    console.log('[responseGenerator] Successfully generated and cached response');
+    return response;
     
   } catch (error) {
     console.error('[responseGenerator] Error generating response:', error);
