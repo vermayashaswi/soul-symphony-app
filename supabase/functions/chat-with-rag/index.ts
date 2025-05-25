@@ -49,9 +49,12 @@ serve(async (req) => {
     const validatedUserId = userId || user.id
     console.log('[chat-with-rag] Validated userId:', validatedUserId, '(type:', typeof validatedUserId, ')')
 
+    // Ensure we use the last 8 messages for context
+    const contextMessages = Array.isArray(conversationContext) ? conversationContext.slice(-8) : []
+    console.log('[chat-with-rag] Using conversation context:', contextMessages.length, 'messages (last 8)')
+
     console.log('[chat-with-rag] PROCESSING:', `"${message}"`)
     console.log('[chat-with-rag] Enhanced Context - UseAllEntries:', useAllEntries, ', PersonalPronouns:', hasPersonalPronouns, ', TimeRef:', hasExplicitTimeReference)
-    console.log('[chat-with-rag] Conversation Context:', conversationContext.length, 'messages')
     console.log('[chat-with-rag] Thread Metadata:', threadMetadata)
     console.log('[chat-with-rag] Request userId:', userId, '(type:', typeof userId, ')')
 
@@ -72,10 +75,10 @@ serve(async (req) => {
     const subQuestions = queryPlan.subQuestions || []
     console.log('[chat-with-rag] Pre-processed sub-questions:', subQuestions.length)
 
-    // Analysis follow-up detection
+    // Enhanced analysis follow-up detection using conversation context
     const isAnalysisFollowUp = message.toLowerCase().includes('also') || 
                               message.toLowerCase().includes('when') ||
-                              conversationContext.some((msg: any) => 
+                              contextMessages.some((msg: any) => 
                                 msg.content && msg.content.toLowerCase().includes('emotion'))
 
     const shouldUseAllEntries = useAllEntries || queryPlan.useAllEntries || isAnalysisFollowUp
@@ -84,10 +87,12 @@ serve(async (req) => {
       isAnalysisFollowUp,
       shouldUseAllEntries,
       originalUseAllEntries: useAllEntries,
-      queryPlanUseAllEntries: queryPlan.useAllEntries
+      queryPlanUseAllEntries: queryPlan.useAllEntries,
+      contextBasedDetection: contextMessages.some((msg: any) => 
+        msg.content && msg.content.toLowerCase().includes('emotion'))
     })
 
-    // Process sub-questions with enhanced emotion support
+    // Process sub-questions with enhanced emotion support and context
     let allEmotionResults: any[] = []
     let allVectorResults: any[] = []
     let combinedContext = ''
@@ -96,7 +101,7 @@ serve(async (req) => {
     console.log('[chat-with-rag] Strict date enforcement:', strictDateEnforcement)
 
     if (subQuestions.length > 0) {
-      console.log('[chat-with-rag] Processing', subQuestions.length, 'sub-questions with enhanced emotion support')
+      console.log('[chat-with-rag] Processing', subQuestions.length, 'sub-questions with enhanced emotion support and conversation context')
       
       // Process sub-questions sequentially to avoid overwhelming the system
       for (const subQuestion of subQuestions) {
@@ -108,7 +113,8 @@ serve(async (req) => {
             supabaseService,
             validatedUserId,
             null, // dateRange - using null for now to use all entries
-            openaiApiKey
+            openaiApiKey,
+            contextMessages // Pass conversation context to sub-query processor
           )
 
           console.log('[chat-with-rag] Sub-question analysis completed:', subQuestionResult.totalResults, 'results')
@@ -126,7 +132,7 @@ serve(async (req) => {
       }
     } else {
       // Process the main message directly if no sub-questions
-      console.log('[chat-with-rag] No sub-questions found, processing main message directly')
+      console.log('[chat-with-rag] No sub-questions found, processing main message directly with conversation context')
       
       try {
         const mainResult = await processSubQueryWithEmotionSupport(
@@ -134,7 +140,8 @@ serve(async (req) => {
           supabaseService,
           validatedUserId,
           null,
-          openaiApiKey
+          openaiApiKey,
+          contextMessages // Pass conversation context to main processing
         )
 
         allEmotionResults = mainResult.emotionResults
@@ -149,7 +156,8 @@ serve(async (req) => {
       emotionResults: allEmotionResults.length,
       vectorResults: allVectorResults.length,
       totalResults: allEmotionResults.length + allVectorResults.length,
-      subQuestionCount: subQuestions.length
+      subQuestionCount: subQuestions.length,
+      contextMessages: contextMessages.length
     })
 
     // Generate response if we have results
@@ -171,11 +179,11 @@ Please provide a thoughtful, personalized response focusing on emotional pattern
       const response = await generateResponse(
         systemPrompt,
         userPrompt,
-        conversationContext,
+        contextMessages, // Use last 8 messages for response generation
         openaiApiKey
       )
 
-      console.log('[chat-with-rag] Successfully generated response with enhanced emotion support:', subQuestions.length, 'sub-question analyses,', allEmotionResults.length, 'emotion results and', allVectorResults.length, 'vector results')
+      console.log('[chat-with-rag] Successfully generated response with enhanced emotion support and conversation context:', subQuestions.length, 'sub-question analyses,', allEmotionResults.length, 'emotion results and', allVectorResults.length, 'vector results')
 
       return new Response(
         JSON.stringify({ 
@@ -184,7 +192,8 @@ Please provide a thoughtful, personalized response focusing on emotional pattern
           analysis: {
             emotionResults: allEmotionResults.length,
             vectorResults: allVectorResults.length,
-            totalResults: allEmotionResults.length + allVectorResults.length
+            totalResults: allEmotionResults.length + allVectorResults.length,
+            contextUsed: contextMessages.length
           }
         }),
         { 
@@ -204,7 +213,8 @@ Please provide a thoughtful, personalized response focusing on emotional pattern
           analysis: {
             emotionResults: 0,
             vectorResults: 0,
-            totalResults: 0
+            totalResults: 0,
+            contextUsed: contextMessages.length
           }
         }),
         { 

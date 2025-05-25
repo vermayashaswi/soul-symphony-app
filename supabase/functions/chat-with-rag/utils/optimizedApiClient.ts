@@ -81,11 +81,13 @@ export class OptimizedApiClient {
     
     const optimizedSystemPrompt = this.optimizeSystemPrompt(systemPrompt);
     
-    // Limit conversation context to prevent token overflow
-    const limitedContext = conversationContext.slice(-5).map(msg => ({
+    // Use last 8 conversation messages instead of 5 for better context
+    const limitedContext = conversationContext.slice(-8).map(msg => ({
       role: msg.role,
       content: msg.content ? msg.content.substring(0, 1000) : '' // Limit message length and handle null content
     }));
+
+    console.log(`[OptimizedApiClient] Using ${limitedContext.length} messages for conversation context`);
 
     const messages = [
       { role: 'system', content: optimizedSystemPrompt },

@@ -2,14 +2,15 @@
 import { detectEmotionalQuery, getEmotionAnalysisForQuery, generateEmotionContext } from './emotionQueryHandler.ts';
 
 /**
- * Enhanced sub-query processor that handles emotional queries properly
+ * Enhanced sub-query processor that handles emotional queries properly with conversation context
  */
 export async function processSubQueryWithEmotionSupport(
   subQuestion: string | any,
   supabase: any,
   userId: string,
   dateRange: any = null,
-  openaiApiKey: string
+  openaiApiKey: string,
+  conversationContext: any[] = [] // New parameter for conversation context
 ): Promise<{
   subQuestion: string;
   context: string;
@@ -33,11 +34,11 @@ export async function processSubQueryWithEmotionSupport(
     processedSubQuestion = 'Invalid question format';
   }
   
-  console.log(`[enhancedSubQueryProcessor] Processing: "${processedSubQuestion}"`);
+  console.log(`[enhancedSubQueryProcessor] Processing: "${processedSubQuestion}" with ${conversationContext.length} context messages`);
   
-  // Detect if this is an emotional query
-  const emotionDetection = detectEmotionalQuery(processedSubQuestion);
-  console.log(`[enhancedSubQueryProcessor] Emotion detection:`, emotionDetection);
+  // Enhanced emotion detection using conversation context
+  const emotionDetection = detectEmotionalQuery(processedSubQuestion, conversationContext);
+  console.log(`[enhancedSubQueryProcessor] Emotion detection (with context):`, emotionDetection);
   
   let context = '';
   let emotionResults: any[] = [];
@@ -47,14 +48,15 @@ export async function processSubQueryWithEmotionSupport(
   
   // If it's an emotional query, prioritize emotion analysis
   if (emotionDetection.requiresEmotionAnalysis) {
-    console.log(`[enhancedSubQueryProcessor] Processing emotional query for ${emotionDetection.emotionType || 'general emotions'}`);
+    console.log(`[enhancedSubQueryProcessor] Processing emotional query for ${emotionDetection.emotionType || 'general emotions'} with conversation context`);
     
     try {
       const emotionAnalysis = await getEmotionAnalysisForQuery(
         supabase,
         userId,
         emotionDetection.emotionType,
-        dateRange
+        dateRange,
+        conversationContext // Pass context to emotion analysis
       );
       
       emotionResults = emotionAnalysis.emotions;
@@ -65,10 +67,11 @@ export async function processSubQueryWithEmotionSupport(
           emotionResults,
           entries,
           emotionDetection.emotionType,
-          processedSubQuestion
+          processedSubQuestion,
+          conversationContext // Pass context for correlation analysis
         );
         hasEntriesInDateRange = true;
-        reasoning = `Analyzed emotions and sentiment patterns from ${entries.length} journal entries. Found ${emotionResults.length} distinct emotions.`;
+        reasoning = `Analyzed emotions and sentiment patterns from ${entries.length} journal entries with conversation context. Found ${emotionResults.length} distinct emotions.`;
       } else {
         reasoning = 'No emotional data found in journal entries.';
       }
@@ -81,13 +84,14 @@ export async function processSubQueryWithEmotionSupport(
     }
   }
   
-  // If emotion analysis didn't yield results, try vector search
+  // If emotion analysis didn't yield results, try vector search with context enhancement
   if (!hasEntriesInDateRange) {
-    console.log(`[enhancedSubQueryProcessor] Falling back to vector search for: "${processedSubQuestion}"`);
+    console.log(`[enhancedSubQueryProcessor] Falling back to vector search for: "${processedSubQuestion}" with context enhancement`);
     
     try {
-      // Generate embedding for the sub-question
-      const queryEmbedding = await generateEmbedding(processedSubQuestion, openaiApiKey);
+      // Enhanced query embedding that considers conversation context
+      const enhancedQuery = enhanceQueryWithContext(processedSubQuestion, conversationContext);
+      const queryEmbedding = await generateEmbedding(enhancedQuery, openaiApiKey);
       
       // Perform vector search using the correct function name
       const { data: vectorData, error: vectorError } = await supabase.rpc(
@@ -132,7 +136,7 @@ export async function processSubQueryWithEmotionSupport(
           context += '\n';
         });
         
-        reasoning = `Found ${vectorData.length} relevant entries through semantic search.`;
+        reasoning = `Found ${vectorData.length} relevant entries through context-enhanced semantic search.`;
       }
       
     } catch (error) {
@@ -235,7 +239,7 @@ export async function processSubQueryWithEmotionSupport(
     reasoning = 'No journal entries found that match the query criteria.';
   }
   
-  console.log(`[enhancedSubQueryProcessor] Completed processing: ${totalResults} total results`);
+  console.log(`[enhancedSubQueryProcessor] Completed processing: ${totalResults} total results with conversation context`);
   
   return {
     subQuestion: processedSubQuestion,
@@ -246,6 +250,44 @@ export async function processSubQueryWithEmotionSupport(
     hasEntriesInDateRange,
     reasoning
   };
+}
+
+/**
+ * Enhance query with conversation context for better semantic search
+ */
+function enhanceQueryWithContext(query: string, conversationContext: any[]): string {
+  if (!conversationContext || conversationContext.length === 0) {
+    return query;
+  }
+  
+  // Extract key terms from recent conversation
+  const recentMessages = conversationContext.slice(-3); // Use last 3 messages for context
+  const contextTerms: string[] = [];
+  
+  recentMessages.forEach(msg => {
+    if (msg.content) {
+      // Extract emotion-related terms
+      const emotionMatches = msg.content.match(/\b(happy|sad|excited|anxious|content|joy|anger|fear|surprise)\b/gi);
+      if (emotionMatches) {
+        contextTerms.push(...emotionMatches);
+      }
+      
+      // Extract other relevant terms
+      const relevantMatches = msg.content.match(/\b(work|relationship|family|stress|sleep|health)\b/gi);
+      if (relevantMatches) {
+        contextTerms.push(...relevantMatches);
+      }
+    }
+  });
+  
+  // Remove duplicates and enhance query
+  const uniqueTerms = [...new Set(contextTerms.map(term => term.toLowerCase()))];
+  
+  if (uniqueTerms.length > 0) {
+    return `${query} (context: ${uniqueTerms.join(', ')})`;
+  }
+  
+  return query;
 }
 
 async function generateEmbedding(text: string, openaiApiKey: string): Promise<number[]> {

@@ -117,18 +117,22 @@ export async function generateResponse(
       return cachedResponse;
     }
     
-    // Use optimized API client
+    // Use last 8 messages for context instead of 5
+    const contextMessages = Array.isArray(conversationContext) ? conversationContext.slice(-8) : [];
+    console.log(`[responseGenerator] Using ${contextMessages.length} conversation messages for context`);
+    
+    // Use optimized API client with 8 message context
     const response = await OptimizedApiClient.generateResponseOptimized(
       systemPrompt,
       userPrompt,
-      conversationContext,
+      contextMessages, // Pass 8 messages instead of limited context
       openAiApiKey
     );
     
     // Cache the response
     CacheManager.setCachedResponse(cacheKey, response);
     
-    console.log('[responseGenerator] Successfully generated and cached response');
+    console.log('[responseGenerator] Successfully generated and cached response with 8-message context');
     return response;
     
   } catch (error) {
