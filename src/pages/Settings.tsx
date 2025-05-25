@@ -223,12 +223,11 @@ export default function Settings() {
 
   useEffect(() => {
     if (notificationsEnabled) {
-      setupJournalReminder(true, notificationFrequency, notificationTimes).then(() => {
-        if (typeof window !== 'undefined' && !('Notification' in window) || 
-            (window.Notification && window.Notification.permission !== 'granted')) {
-          initializeCapacitorNotifications();
-        }
-      });
+      setupJournalReminder(true, notificationFrequency, notificationTimes);
+      if (typeof window !== 'undefined' && !('Notification' in window) || 
+          (window.Notification && window.Notification.permission !== 'granted')) {
+        initializeCapacitorNotifications();
+      }
     }
   }, [notificationsEnabled, notificationFrequency, notificationTimes]);
 
