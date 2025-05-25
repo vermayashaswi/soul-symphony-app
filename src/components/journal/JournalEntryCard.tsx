@@ -15,8 +15,6 @@ import EntryContent from './entry-card/EntryContent';
 import EditEntryButton from './entry-card/EditEntryButton';
 import DeleteEntryDialog from './entry-card/DeleteEntryDialog';
 import ExtractThemeButton from './entry-card/ExtractThemeButton';
-import ChatSuggestionButton from './entry-card/ChatSuggestionButton';
-import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { motion } from 'framer-motion';
 import { useProcessingEntries } from '@/hooks/use-processing-entries';
 import { JournalEntry } from '@/types/journal';
@@ -39,21 +37,9 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [feedback, setFeedback] = useState(entry.user_feedback || '');
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
-  const [showDeleteDialog, setShowDeleteDialog] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
   
   const { removeEntry } = useProcessingEntries();
-  
-  const {
-    isPlaying,
-    playbackProgress,
-    audioDuration,
-    audioRef,
-    togglePlayback,
-    seekTo,
-    reset,
-    prepareAudio
-  } = useAudioPlayback({ audioUrl: entry.audio_url });
 
   const isWelcomeEntry = entry.entry_type === 'welcome';
   const isDeletable = entry.is_deletable !== false && !isWelcomeEntry;
@@ -96,18 +82,14 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
     }
   };
 
-  const handleDelete = () => {
+  const handleDelete = async () => {
     if (!isDeletable) {
       console.log('[JournalEntryCard] Cannot delete welcome entry');
       return;
     }
-    setShowDeleteDialog(true);
-  };
-
-  const confirmDelete = async () => {
+    
     try {
       await onDelete(entry.id);
-      setShowDeleteDialog(false);
     } catch (error) {
       console.error('Error deleting entry:', error);
       showToast("Error", "Failed to delete entry");
@@ -139,6 +121,16 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       opacity: 1, 
       y: 0,
       transition: { duration: 0.3, ease: "easeOut" }
+    }
+  };
+
+  const handleEntryUpdated = (newContent: string, isProcessing?: boolean) => {
+    if (setEntries) {
+      setEntries((prevEntries: JournalEntry[]) =>
+        prevEntries.map(e =>
+          e.id === entry.id ? { ...e, content: newContent } : e
+        )
+      );
     }
   };
 
@@ -199,43 +191,32 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 ml-4">
-            {entry.audio_url && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={togglePlayback}
-                className="h-8 w-8 p-0"
-              >
-                {isPlaying ? (
-                  <Pause className="h-4 w-4" />
-                ) : (
-                  <Play className="h-4 w-4" />
-                )}
-              </Button>
-            )}
-
             {!isWelcomeEntry && (
               <>
                 <EditEntryButton
                   entryId={entry.id}
-                  setEntries={setEntries}
+                  content={entry.content}
+                  onEntryUpdated={handleEntryUpdated}
                 />
                 
                 <ExtractThemeButton entryId={entry.id} />
                 
-                <ChatSuggestionButton entryId={entry.id} />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 w-8 p-0"
+                  onClick={() => {
+                    // Handle chat suggestion - could dispatch an event or navigate to chat
+                    console.log('Chat suggestion clicked for entry:', entry.id);
+                  }}
+                >
+                  <MessageSquare className="h-4 w-4" />
+                </Button>
               </>
             )}
 
             {isDeletable && (
-              <Button
-                variant="ghost"
-                size="sm"
-                onClick={handleDelete}
-                className="h-8 w-8 p-0 text-destructive hover:text-destructive hover:bg-destructive/10"
-              >
-                <Trash2 className="h-4 w-4" />
-              </Button>
+              <DeleteEntryDialog onDelete={handleDelete} />
             )}
           </div>
         </div>
@@ -243,8 +224,23 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
         <EntryContent 
           content={entry.content}
           isExpanded={isExpanded}
-          onToggle={handleToggleExpansion}
+          entryId={entry.id}
+          onOverflowChange={(hasOverflow) => {
+            // Handle overflow change if needed
+          }}
         />
+
+        {/* Add expand/collapse button if content is long */}
+        {entry.content.length > 280 && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={handleToggleExpansion}
+            className="mt-2 text-xs text-muted-foreground"
+          >
+            {isExpanded ? 'Show less' : 'Show more'}
+          </Button>
+        )}
 
         {/* Themes */}
         {entry.master_themes && entry.master_themes.length > 0 && (
@@ -312,23 +308,6 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
             )}
           </div>
         )}
-
-        {/* Audio element for playback */}
-        {entry.audio_url && (
-          <audio
-            ref={audioRef}
-            src={entry.audio_url}
-            preload="metadata"
-            style={{ display: 'none' }}
-          />
-        )}
-
-        <DeleteEntryDialog
-          open={showDeleteDialog}
-          onClose={() => setShowDeleteDialog(false)}
-          onConfirm={confirmDelete}
-          entryTitle={entry.content.substring(0, 50) + (entry.content.length > 50 ? '...' : '')}
-        />
       </Card>
     </motion.div>
   );
