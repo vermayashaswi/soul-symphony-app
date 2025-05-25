@@ -36,9 +36,14 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     hasAnyProcessing,
     isImmediatelyProcessing 
   } = useProcessingEntries();
+  
+  // CRITICAL: Add immediate React state for processing intent
+  const [hasImmediateProcessing, setHasImmediateProcessing] = useState<boolean>(false);
+  const [emergencyProcessingFlag, setEmergencyProcessingFlag] = useState<boolean>(false);
+  const processingIntentRef = useRef<boolean>(false);
+  
   const [lastAction, setLastAction] = useState<string | null>(null);
   const [fallbackProcessingIds, setFallbackProcessingIds] = useState<string[]>([]);
-  const [immediateProcessingFlag, setImmediateProcessingFlag] = useState<boolean>(false);
   const deletedEntryIdsRef = useRef<Set<number>>(new Set());
   
   const hasEntries = entries && entries.length > 0;
@@ -48,18 +53,23 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     console.log('[JournalEntriesList] Component mounted');
     setLastAction('Component Mounted');
     
-    // Listen for immediate processing events
+    // IMMEDIATE event handlers - no delays, synchronous updates
     const handleImmediateProcessingStarted = (event: CustomEvent) => {
-      console.log('[JournalEntriesList] Immediate processing started event received:', event.detail);
-      setImmediateProcessingFlag(true);
-      // Clear the flag after a short time to allow normal state to take over
-      setTimeout(() => setImmediateProcessingFlag(false), 2000);
+      console.log('[JournalEntriesList] IMMEDIATE processing started event received:', event.detail);
+      // SYNCHRONOUS state updates
+      setHasImmediateProcessing(true);
+      setEmergencyProcessingFlag(true);
+      processingIntentRef.current = true;
       forceRefresh();
     };
     
-    // Listen for processing events to update fallback state
     const handleProcessingStarted = (event: CustomEvent) => {
       console.log('[JournalEntriesList] Processing started event received:', event.detail);
+      // SYNCHRONOUS state updates
+      setHasImmediateProcessing(true);
+      setEmergencyProcessingFlag(true);
+      processingIntentRef.current = true;
+      
       if (event.detail?.tempId) {
         setFallbackProcessingIds(prev => {
           if (!prev.includes(event.detail.tempId)) {
@@ -68,23 +78,40 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           }
           return prev;
         });
-        // Force refresh the hook state
-        setTimeout(forceRefresh, 50);
       }
+      forceRefresh();
     };
     
     const handleProcessingCompleted = (event: CustomEvent) => {
       console.log('[JournalEntriesList] Processing completed event received:', event.detail);
       if (event.detail?.tempId) {
         setFallbackProcessingIds(prev => prev.filter(id => id !== event.detail.tempId));
-        setImmediateProcessingFlag(false);
       }
+      
+      // Only clear flags if no more processing
+      setTimeout(() => {
+        const stillProcessing = processingStateManager.hasAnyImmediateProcessing();
+        if (!stillProcessing) {
+          setHasImmediateProcessing(false);
+          setEmergencyProcessingFlag(false);
+          processingIntentRef.current = false;
+        }
+      }, 100);
+    };
+    
+    // Listen for processing intent events (NEW)
+    const handleProcessingIntent = (event: CustomEvent) => {
+      console.log('[JournalEntriesList] Processing intent event received:', event.detail);
+      setEmergencyProcessingFlag(true);
+      processingIntentRef.current = true;
+      setHasImmediateProcessing(true);
     };
     
     window.addEventListener('immediateProcessingStarted', handleImmediateProcessingStarted as EventListener);
     window.addEventListener('processingStarted', handleProcessingStarted as EventListener);
     window.addEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
     window.addEventListener('processingEntryHidden', handleProcessingCompleted as EventListener);
+    window.addEventListener('processingIntent', handleProcessingIntent as EventListener);
     
     return () => {
       console.log('[JournalEntriesList] Component unmounted');
@@ -92,6 +119,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       window.removeEventListener('processingStarted', handleProcessingStarted as EventListener);
       window.removeEventListener('processingEntryCompleted', handleProcessingCompleted as EventListener);
       window.removeEventListener('processingEntryHidden', handleProcessingCompleted as EventListener);
+      window.removeEventListener('processingIntent', handleProcessingIntent as EventListener);
     };
   }, [forceRefresh]);
   
@@ -108,7 +136,16 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           
           // Remove from fallback state
           setFallbackProcessingIds(prev => prev.filter(id => id !== entry.tempId));
-          setImmediateProcessingFlag(false);
+          
+          // Clear emergency flags if this was the last processing entry
+          setTimeout(() => {
+            const stillProcessing = processingStateManager.hasAnyImmediateProcessing();
+            if (!stillProcessing) {
+              setHasImmediateProcessing(false);
+              setEmergencyProcessingFlag(false);
+              processingIntentRef.current = false;
+            }
+          }, 100);
         }
       }
     });
@@ -154,24 +191,32 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   // Filter entries to remove deleted ones
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
   
-  // Combine visible entries from hook and fallback state
+  // CRITICAL: Enhanced processing detection with multiple fallbacks
   const visibleProcessingIds = visibleEntries.map(entry => entry.tempId);
   const allProcessingIds = [...new Set([...visibleProcessingIds, ...fallbackProcessingIds])];
   
-  // Also check state manager directly as final fallback
+  // Check state manager directly as final fallback
   const directProcessingEntries = processingStateManager.getVisibleProcessingEntries();
   const directProcessingIds = directProcessingEntries.map(entry => entry.tempId);
   const finalProcessingIds = [...new Set([...allProcessingIds, ...directProcessingIds])];
   
-  // Check for any immediate processing happening
-  const hasImmediateProcessing = immediateProcessingFlag || hasAnyProcessing() || immediateProcessingCount > 0;
+  // CRITICAL: Multiple checks for immediate processing
+  const isCurrentlyProcessing = 
+    hasImmediateProcessing || 
+    emergencyProcessingFlag || 
+    processingIntentRef.current ||
+    processingStateManager.hasProcessingIntent() ||
+    processingStateManager.hasAnyImmediateProcessing() ||
+    hasAnyProcessing() || 
+    immediateProcessingCount > 0 ||
+    finalProcessingIds.length > 0;
   
-  console.log(`[JournalEntriesList] Rendering: entries=${filteredEntries.length}, visibleProcessingIds=${visibleProcessingIds.length}, fallbackIds=${fallbackProcessingIds.length}, directIds=${directProcessingIds.length}, finalIds=${finalProcessingIds.length}, hasImmediateProcessing=${hasImmediateProcessing}`);
+  console.log(`[JournalEntriesList] Rendering: entries=${filteredEntries.length}, finalProcessingIds=${finalProcessingIds.length}, isCurrentlyProcessing=${isCurrentlyProcessing}, hasImmediate=${hasImmediateProcessing}, emergency=${emergencyProcessingFlag}`);
 
-  // CRITICAL FIX: Update conditional logic to prioritize loading cards over empty state
-  const shouldShowProcessing = finalProcessingIds.length > 0 || hasImmediateProcessing;
-  const shouldShowEmpty = !filteredEntries.length && !isLoading && !shouldShowProcessing;
-  const shouldShowEntries = filteredEntries.length > 0 || shouldShowProcessing;
+  // CRITICAL: Fixed conditional logic - ALWAYS prioritize loading over empty state
+  const shouldShowProcessing = isCurrentlyProcessing;
+  const shouldShowEntries = filteredEntries.length > 0;
+  const shouldShowEmpty = !shouldShowEntries && !isLoading && !shouldShowProcessing;
   
   return (
     <div className="journal-entries-list" id="journal-entries-container" data-last-action={lastAction}>
@@ -183,31 +228,41 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             <TranslatableText text="Loading journal entries..." />
           </p>
         </div>
-      ) : shouldShowEntries ? (
+      ) : shouldShowProcessing || shouldShowEntries ? (
         <div className="grid gap-4" data-entries-count={filteredEntries.length}>
-          {/* Show processing entry skeletons - using final combined list */}
+          {/* CRITICAL: Show processing cards FIRST with forced visibility */}
           {shouldShowProcessing && (
             <div data-processing-cards-container="true" className="processing-cards-container">
-              {finalProcessingIds.map((tempId) => {
-                const entry = processingStateManager.getEntryById(tempId);
-                const shouldShow = entry ? isVisible(tempId) : true; // Fallback to true if no entry found
-                
-                console.log(`[JournalEntriesList] Rendering processing card for: ${tempId}, visible: ${shouldShow}, hasEntry: ${!!entry}`);
-                
-                return (
-                  <JournalEntryLoadingSkeleton
-                    key={`processing-${tempId}`}
-                    count={1}
-                    tempId={tempId}
-                    isVisible={shouldShow}
-                  />
-                );
-              })}
+              {finalProcessingIds.length > 0 ? (
+                finalProcessingIds.map((tempId) => {
+                  const entry = processingStateManager.getEntryById(tempId);
+                  const shouldShow = entry ? isVisible(tempId) : true;
+                  
+                  console.log(`[JournalEntriesList] Rendering processing card for: ${tempId}, visible: ${shouldShow}, hasEntry: ${!!entry}`);
+                  
+                  return (
+                    <JournalEntryLoadingSkeleton
+                      key={`processing-${tempId}`}
+                      count={1}
+                      tempId={tempId}
+                      isVisible={true} // FORCE VISIBLE during immediate processing
+                    />
+                  );
+                })
+              ) : (
+                // Emergency fallback - show a loading card even without tempId
+                <JournalEntryLoadingSkeleton
+                  key="emergency-processing"
+                  count={1}
+                  tempId="emergency-loading"
+                  isVisible={true}
+                />
+              )}
             </div>
           )}
           
           {/* Display regular entries */}
-          {filteredEntries.map((entry) => {
+          {shouldShowEntries && filteredEntries.map((entry) => {
             const entryIsProcessing = entry.tempId ? processingStateManager.isProcessing(entry.tempId) : false;
             
             return (

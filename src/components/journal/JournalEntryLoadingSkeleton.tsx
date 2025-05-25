@@ -21,16 +21,11 @@ export default function JournalEntryLoadingSkeleton({
   const { addEvent } = useDebugLog();
   const mountTimeRef = useRef(Date.now());
   const [shouldRender, setShouldRender] = React.useState(isVisible);
-  const [forceVisible, setForceVisible] = React.useState(false);
   
   useEffect(() => {
     if (tempId) {
       console.log(`[JournalEntryLoadingSkeleton] Mounted with tempId ${tempId}, visible: ${isVisible}`);
       addEvent('LoadingUI', `JournalEntryLoadingSkeleton rendered with tempId ${tempId}`, 'info');
-      
-      // Force visible for a short time to ensure it appears
-      setForceVisible(true);
-      setTimeout(() => setForceVisible(false), 1000);
       
       // Listen for hide events
       const handleHidden = (event: CustomEvent) => {
@@ -72,14 +67,13 @@ export default function JournalEntryLoadingSkeleton({
     }
   }, [tempId, addEvent, isVisible]);
   
-  // Update visibility when prop changes, but respect force visible
+  // SIMPLIFIED: Always show when prop says to show
   useEffect(() => {
-    if (!forceVisible) {
-      setShouldRender(isVisible);
-    }
-  }, [isVisible, forceVisible]);
+    setShouldRender(isVisible);
+  }, [isVisible]);
   
-  const finalShouldRender = shouldRender || forceVisible;
+  // FORCE VISIBILITY during critical first moments
+  const finalShouldRender = isVisible || shouldRender;
   
   if (!finalShouldRender) {
     return null;
@@ -90,7 +84,7 @@ export default function JournalEntryLoadingSkeleton({
       <motion.div
         key={`skeleton-${tempId}`}
         initial={{ opacity: 0, y: 10 }}
-        animate={{ opacity: finalShouldRender ? 1 : 0, y: 0 }}
+        animate={{ opacity: 1, y: 0 }} // Always animate to visible
         exit={{ 
           opacity: 0, 
           y: -10,
@@ -101,7 +95,9 @@ export default function JournalEntryLoadingSkeleton({
         data-loading-skeleton={true}
         data-temp-id={tempId}
         style={{ 
-          opacity: finalShouldRender ? 1 : 0,
+          opacity: 1, // FORCE OPACITY
+          visibility: 'visible', // FORCE VISIBILITY
+          display: 'block', // FORCE DISPLAY
           transition: 'opacity 0.15s ease-out'
         }}
       >

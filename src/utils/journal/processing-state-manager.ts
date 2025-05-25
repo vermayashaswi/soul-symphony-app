@@ -23,13 +23,44 @@ export class ProcessingStateManager {
   private entriesSubject = new BehaviorSubject<ProcessingEntry[]>([]);
   private activeStartProcessingCalls = new Set<string>(); // Prevent duplicates
   private immediateProcessingState = new Set<string>(); // Track immediate processing
+  private processingIntentFlag = false; // Emergency fallback flag
   
   constructor() {
     console.log('[ProcessingStateManager] Initialized with smart transparency');
   }
   
+  // NEW: Emergency fallback methods for immediate processing detection
+  public setProcessingIntent(value: boolean): void {
+    this.processingIntentFlag = value;
+    console.log(`[ProcessingStateManager] Processing intent set to ${value}`);
+    
+    // Clear intent after short delay if not overridden
+    if (value) {
+      setTimeout(() => {
+        if (this.processingIntentFlag && this.processingEntries.length === 0) {
+          this.processingIntentFlag = false;
+          console.log('[ProcessingStateManager] Auto-cleared processing intent flag');
+        }
+      }, 3000);
+    }
+  }
+  
+  public hasProcessingIntent(): boolean {
+    return this.processingIntentFlag;
+  }
+  
+  // Enhanced immediate detection method
+  public hasAnyImmediateProcessing(): boolean {
+    return this.processingIntentFlag || 
+           this.immediateProcessingState.size > 0 || 
+           this.getVisibleProcessingEntries().length > 0;
+  }
+  
   public startProcessing(tempId: string): void {
     console.log(`[ProcessingStateManager] Starting processing for ${tempId}`);
+    
+    // Clear processing intent since we now have real processing
+    this.processingIntentFlag = false;
     
     // Strict duplicate prevention with active call tracking
     if (this.activeStartProcessingCalls.has(tempId)) {
@@ -298,6 +329,7 @@ export class ProcessingStateManager {
     this.processingEntries = [];
     this.activeStartProcessingCalls.clear();
     this.immediateProcessingState.clear();
+    this.processingIntentFlag = false;
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Disposed state manager');
   }
@@ -306,6 +338,7 @@ export class ProcessingStateManager {
     this.processingEntries = [];
     this.activeStartProcessingCalls.clear();
     this.immediateProcessingState.clear();
+    this.processingIntentFlag = false;
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Cleared all processing entries');
     
@@ -350,6 +383,7 @@ export class ProcessingStateManager {
       entry.isVisible = false;
     });
     this.immediateProcessingState.clear();
+    this.processingIntentFlag = false;
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Force hid all processing entries');
   }
