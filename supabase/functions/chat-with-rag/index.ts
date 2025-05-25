@@ -1,3 +1,4 @@
+
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { processSubQuestionsInParallel, ProcessingContext } from "./utils/parallelProcessor.ts";
@@ -75,6 +76,7 @@ serve(async (req) => {
       message, 
       userId, 
       queryPlan, 
+      subQuestions = [], // Accept pre-processed sub-questions
       conversationContext = [],
       useAllEntries = false,
       hasPersonalPronouns = false,
@@ -88,6 +90,7 @@ serve(async (req) => {
     console.log(`[chat-with-rag] Thread Metadata:`, threadMetadata);
     console.log(`[chat-with-rag] Validated userId: ${validatedUserId} (type: ${typeof validatedUserId})`);
     console.log(`[chat-with-rag] Request userId: ${userId} (type: ${typeof userId})`);
+    console.log(`[chat-with-rag] Pre-processed sub-questions: ${subQuestions.length}`);
 
     // Verify that the userId from request matches the validated JWT user
     const userIdString = typeof userId === 'string' ? userId : String(userId);
@@ -159,8 +162,10 @@ serve(async (req) => {
       queryPlanUseAllEntries: queryPlan.useAllEntries
     });
 
-    // Process sub-questions with enhanced emotion support
-    console.log(`[chat-with-rag] Processing ${queryPlan.subQuestions?.length || 0} sub-questions with enhanced emotion support`);
+    // Use pre-processed sub-questions or fall back to query plan sub-questions
+    const finalSubQuestions = subQuestions.length > 0 ? subQuestions : (queryPlan.subQuestions || [message]);
+    
+    console.log(`[chat-with-rag] Processing ${finalSubQuestions.length} sub-questions with enhanced emotion support`);
     
     const strictDateEnforcement = !shouldUseAllEntries && hasExplicitTimeReference;
     console.log(`[chat-with-rag] Strict date enforcement: ${strictDateEnforcement}`);
@@ -169,8 +174,9 @@ serve(async (req) => {
     
     // Enhanced sub-question processing with emotion support
     const subQuestionAnalyses = [];
-    for (const subQuestion of queryPlan.subQuestions || []) {
+    for (const subQuestion of finalSubQuestions) {
       try {
+        console.log(`[chat-with-rag] Processing sub-question: "${subQuestion}"`);
         const analysis = await processSubQueryWithEmotionSupport(
           subQuestion,
           supabaseService,
@@ -179,6 +185,7 @@ serve(async (req) => {
           openaiApiKey
         );
         subQuestionAnalyses.push(analysis);
+        console.log(`[chat-with-rag] Sub-question analysis completed: ${analysis.totalResults} results`);
       } catch (error) {
         console.error(`[chat-with-rag] Error processing sub-question "${subQuestion}":`, error);
         // Add fallback analysis
@@ -226,6 +233,13 @@ serve(async (req) => {
     const totalEmotionResults = subQuestionAnalyses.reduce((sum, analysis) => sum + analysis.emotionResults.length, 0);
     const totalVectorResults = subQuestionAnalyses.reduce((sum, analysis) => sum + analysis.vectorResults.length, 0);
     const totalResults = totalEmotionResults + totalVectorResults;
+
+    console.log(`[chat-with-rag] Total results summary:`, {
+      emotionResults: totalEmotionResults,
+      vectorResults: totalVectorResults,
+      totalResults,
+      subQuestionCount: subQuestionAnalyses.length
+    });
 
     if (totalResults === 0) {
       console.log(`[chat-with-rag] No results found after processing all sub-questions individually`);
@@ -459,7 +473,8 @@ ${isAnalysisFollowUp ? '- Make it clear that this therapeutic analysis covers th
           strictDateEnforcement,
           isMultiQuestion: subQuestionAnalyses.length > 1,
           isAnalysisFollowUp,
-          conversationContextLength: conversationContext.length
+          conversationContextLength: conversationContext.length,
+          enhancedRAGUsed: true
         }
       };
 

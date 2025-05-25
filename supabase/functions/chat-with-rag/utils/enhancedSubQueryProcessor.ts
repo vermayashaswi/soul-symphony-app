@@ -72,11 +72,14 @@ export async function processSubQueryWithEmotionSupport(
     console.log(`[enhancedSubQueryProcessor] Falling back to vector search for: "${subQuestion}"`);
     
     try {
-      // Perform vector search
+      // Generate embedding for the sub-question
+      const queryEmbedding = await generateEmbedding(subQuestion, openaiApiKey);
+      
+      // Perform vector search using the correct function name
       const { data: vectorData, error: vectorError } = await supabase.rpc(
-        'match_journal_entries',
+        'match_journal_entries_with_date',
         {
-          query_embedding: await generateEmbedding(subQuestion, openaiApiKey),
+          query_embedding: queryEmbedding,
           match_threshold: 0.1,
           match_count: 10,
           user_id_filter: userId,
@@ -97,6 +100,22 @@ export async function processSubQueryWithEmotionSupport(
           const date = new Date(entry.created_at).toLocaleDateString();
           const content = entry.content?.substring(0, 200) + '...';
           context += `Entry from ${date} (similarity: ${entry.similarity?.toFixed(3)}): ${content}\n\n`;
+          
+          // Add emotion information if available
+          if (entry.emotions && typeof entry.emotions === 'object') {
+            const topEmotions = Object.entries(entry.emotions)
+              .filter(([_, score]) => typeof score === 'number' && score > 0.3)
+              .sort(([_, a], [__, b]) => (b as number) - (a as number))
+              .slice(0, 3)
+              .map(([emotion, score]) => `${emotion}: ${(score as number).toFixed(2)}`)
+              .join(', ');
+            
+            if (topEmotions) {
+              context += `Emotions: ${topEmotions}\n`;
+            }
+          }
+          
+          context += '\n';
         });
         
         reasoning = `Found ${vectorData.length} relevant entries through semantic search.`;
@@ -107,14 +126,51 @@ export async function processSubQueryWithEmotionSupport(
     }
   }
   
-  // If still no results, try a broader search
+  // If still no results, try emotion-based search for specific emotion terms
+  if (!hasEntriesInDateRange && emotionDetection.emotionType) {
+    console.log(`[enhancedSubQueryProcessor] Trying emotion-specific search for: ${emotionDetection.emotionType}`);
+    
+    try {
+      const { data: emotionEntries, error: emotionError } = await supabase.rpc(
+        'get_entries_by_emotion_term',
+        {
+          emotion_term: emotionDetection.emotionType,
+          user_id_filter: userId,
+          start_date: dateRange?.startDate || null,
+          end_date: dateRange?.endDate || null,
+          limit_count: 5
+        }
+      );
+      
+      if (emotionError) {
+        console.error('[enhancedSubQueryProcessor] Emotion term search error:', emotionError);
+      } else if (emotionEntries && emotionEntries.length > 0) {
+        vectorResults = emotionEntries;
+        hasEntriesInDateRange = true;
+        
+        context += `**ENTRIES RELATED TO "${emotionDetection.emotionType.toUpperCase()}":**\n`;
+        emotionEntries.forEach((entry: any) => {
+          const date = new Date(entry.created_at).toLocaleDateString();
+          const content = entry.content?.substring(0, 200) + '...';
+          context += `Entry from ${date}: ${content}\n\n`;
+        });
+        
+        reasoning = `Found ${emotionEntries.length} entries containing "${emotionDetection.emotionType}" through emotion term search.`;
+      }
+      
+    } catch (error) {
+      console.error('[enhancedSubQueryProcessor] Emotion term search error:', error);
+    }
+  }
+  
+  // If still no results, try a broader search for recent entries
   if (!hasEntriesInDateRange) {
     console.log(`[enhancedSubQueryProcessor] Trying broader search for recent entries`);
     
     try {
       const { data: recentEntries, error: recentError } = await supabase
         .from('Journal Entries')
-        .select('id, transcription text, emotions, sentiment, created_at')
+        .select('id, "transcription text", emotions, sentiment, created_at')
         .eq('user_id', userId)
         .not('transcription text', 'is', null)
         .not('transcription text', 'eq', '')
@@ -132,6 +188,22 @@ export async function processSubQueryWithEmotionSupport(
           const date = new Date(entry.created_at).toLocaleDateString();
           const content = entry['transcription text']?.substring(0, 200) + '...';
           context += `Entry from ${date}: ${content}\n\n`;
+          
+          // Add emotion information if available
+          if (entry.emotions && typeof entry.emotions === 'object') {
+            const topEmotions = Object.entries(entry.emotions)
+              .filter(([_, score]) => typeof score === 'number' && score > 0.3)
+              .sort(([_, a], [__, b]) => (b as number) - (a as number))
+              .slice(0, 3)
+              .map(([emotion, score]) => `${emotion}: ${(score as number).toFixed(2)}`)
+              .join(', ');
+            
+            if (topEmotions) {
+              context += `Emotions: ${topEmotions}\n`;
+            }
+          }
+          
+          context += '\n';
         });
         
         reasoning = `Using ${recentEntries.length} recent journal entries as no specific matches were found.`;
