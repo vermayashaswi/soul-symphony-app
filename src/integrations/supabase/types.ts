@@ -128,8 +128,10 @@ export type Database = {
           emotions: Json | null
           entities: Json | null
           entityemotion: Json | null
+          entry_type: string | null
           "foreign key": string | null
           id: number
+          is_deletable: boolean | null
           master_themes: string[] | null
           "refined text": string | null
           sentiment: string | null
@@ -146,8 +148,10 @@ export type Database = {
           emotions?: Json | null
           entities?: Json | null
           entityemotion?: Json | null
+          entry_type?: string | null
           "foreign key"?: string | null
           id?: number
+          is_deletable?: boolean | null
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
@@ -164,8 +168,10 @@ export type Database = {
           emotions?: Json | null
           entities?: Json | null
           entityemotion?: Json | null
+          entry_type?: string | null
           "foreign key"?: string | null
           id?: number
+          is_deletable?: boolean | null
           master_themes?: string[] | null
           "refined text"?: string | null
           sentiment?: string | null
@@ -371,6 +377,18 @@ export type Database = {
           column_name: string
           data_type: string
         }[]
+      }
+      create_welcome_entry: {
+        Args: { user_id_param: string }
+        Returns: number
+      }
+      delete_welcome_entries: {
+        Args: { user_id_param: string }
+        Returns: number
+      }
+      ensure_welcome_entry: {
+        Args: { user_id_param: string }
+        Returns: number
       }
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
