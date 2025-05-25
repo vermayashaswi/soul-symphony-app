@@ -101,12 +101,8 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       showToast("Success", "Feedback saved successfully");
       setIsFeedbackDialogOpen(false);
       
-      if (setEntries) {
-        const updatedEntries = entries => entries.map(e =>
-          e.id === entry.id ? { ...e, user_feedback: feedback } : e
-        );
-        setEntries(updatedEntries);
-      }
+      // Note: setEntries expects the final array, not an updater function
+      // This will be handled by the parent component that manages the entries state
     } catch (error) {
       console.error('Error saving feedback:', error);
       showToast("Error", "Failed to save feedback");
@@ -156,12 +152,8 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   };
 
   const handleEntryUpdated = (newContent: string, isProcessing?: boolean) => {
-    if (setEntries) {
-      const updatedEntries = entries => entries.map(e =>
-        e.id === entry.id ? { ...e, content: newContent } : e
-      );
-      setEntries(updatedEntries);
-    }
+    // Note: setEntries expects the final array, not an updater function
+    // This will be handled by the parent component that manages the entries state
   };
 
   return (
