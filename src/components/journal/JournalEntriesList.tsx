@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
@@ -267,7 +268,10 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             return (
               <JournalEntryCard
                 key={entry.id || entry.tempId || Math.random()}
-                entry={entry}
+                entry={{
+                  ...entry,
+                  content: entry.content || entry["refined text"] || entry["transcription text"] || ""
+                }}
                 processing={entryIsProcessing}
                 processed={processedEntryIds.includes(entry.id)}
                 onDelete={handleDeleteEntry}

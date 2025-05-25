@@ -3,7 +3,6 @@
  * Profile management utilities for audio processing
  */
 import { supabase } from '@/integrations/supabase/client';
-import { ensureWelcomeEntry } from '@/services/journalService';
 
 /**
  * Ensures that a user profile exists for the given user ID
@@ -23,17 +22,16 @@ export async function ensureUserProfileExists(userId: string | undefined): Promi
     // Check if user has existing journal entries
     const { data: entries, error: entriesError } = await supabase
       .from('Journal Entries')
-      .select('id, entry_type')
+      .select('id')
       .eq('user_id', userId)
-      .eq('entry_type', 'regular')
       .limit(1);
       
-    const hasRegularEntries = !entriesError && entries && entries.length > 0;
-    console.log('User has previous regular entries:', hasRegularEntries);
+    const hasEntries = !entriesError && entries && entries.length > 0;
+    console.log('User has previous entries:', hasEntries);
     
     // Import setHasPreviousEntries from state management
     import('./processing-state').then(({ setHasPreviousEntries }) => {
-      setHasPreviousEntries(hasRegularEntries);
+      setHasPreviousEntries(hasEntries);
     });
       
     // If profile doesn't exist, create one
@@ -61,16 +59,8 @@ export async function ensureUserProfileExists(userId: string | undefined): Promi
       }
       
       console.log('User profile created successfully');
-      
-      // Create welcome entry for new user
-      await ensureWelcomeEntry(userId);
     } else {
       console.log('Profile exists:', profile.id);
-      
-      // Ensure welcome entry exists if user has no regular entries
-      if (!hasRegularEntries) {
-        await ensureWelcomeEntry(userId);
-      }
     }
     
     return true;

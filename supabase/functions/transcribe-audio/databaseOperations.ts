@@ -1,3 +1,4 @@
+
 import { SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2.38.4';
 import { v4 as uuidv4 } from 'https://deno.land/std@0.168.0/uuid/mod.ts';
 import { Configuration, OpenAIApi } from "https://esm.sh/openai@3.2.1";
@@ -21,86 +22,6 @@ export function getTimezoneFromRequest(req: Request): string {
   // Try to get timezone from headers if available
   const timezone = req.headers.get('x-timezone') || 'UTC';
   return timezone;
-}
-
-/**
- * Creates a welcome entry for new users
- */
-export async function createWelcomeEntry(supabase: SupabaseClient, userId: string) {
-  try {
-    console.log(`[createWelcomeEntry] Creating welcome entry for user: ${userId}`);
-    
-    const { data, error } = await supabase.rpc('create_welcome_entry', {
-      user_id_param: userId
-    });
-    
-    if (error) {
-      console.error('[createWelcomeEntry] Error creating welcome entry:', error);
-      throw error;
-    }
-    
-    if (data) {
-      console.log(`[createWelcomeEntry] Welcome entry created with ID: ${data}`);
-    } else {
-      console.log('[createWelcomeEntry] User already has entries, no welcome entry created');
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('[createWelcomeEntry] Error in createWelcomeEntry:', error);
-    throw error;
-  }
-}
-
-/**
- * Deletes welcome entries when user creates their first real entry
- */
-export async function deleteWelcomeEntries(supabase: SupabaseClient, userId: string) {
-  try {
-    console.log(`[deleteWelcomeEntries] Deleting welcome entries for user: ${userId}`);
-    
-    const { data, error } = await supabase.rpc('delete_welcome_entries', {
-      user_id_param: userId
-    });
-    
-    if (error) {
-      console.error('[deleteWelcomeEntries] Error deleting welcome entries:', error);
-      throw error;
-    }
-    
-    console.log(`[deleteWelcomeEntries] Deleted ${data || 0} welcome entries`);
-    return data;
-  } catch (error) {
-    console.error('[deleteWelcomeEntries] Error in deleteWelcomeEntries:', error);
-    throw error;
-  }
-}
-
-/**
- * Ensures welcome entry exists for users with 0 regular entries
- */
-export async function ensureWelcomeEntry(supabase: SupabaseClient, userId: string) {
-  try {
-    console.log(`[ensureWelcomeEntry] Ensuring welcome entry for user: ${userId}`);
-    
-    const { data, error } = await supabase.rpc('ensure_welcome_entry', {
-      user_id_param: userId
-    });
-    
-    if (error) {
-      console.error('[ensureWelcomeEntry] Error ensuring welcome entry:', error);
-      throw error;
-    }
-    
-    if (data) {
-      console.log(`[ensureWelcomeEntry] Welcome entry ensured with ID: ${data}`);
-    }
-    
-    return data;
-  } catch (error) {
-    console.error('[ensureWelcomeEntry] Error in ensureWelcomeEntry:', error);
-    throw error;
-  }
 }
 
 /**
@@ -134,7 +55,7 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
           email: userData.user?.email,
           full_name: userData.user?.user_metadata?.full_name || '',
           avatar_url: userData.user?.user_metadata?.avatar_url || '',
-          timezone: timezone || 'UTC',
+          timezone: timezone || 'UTC', // Use provided timezone or default to UTC
           onboarding_completed: false
         }]);
 
@@ -144,9 +65,6 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
       }
 
       console.log('Profile created successfully');
-      
-      // Create welcome entry for new user
-      await createWelcomeEntry(supabase, userId);
     } else {
       console.log('Profile already exists for user:', userId);
       
@@ -168,9 +86,6 @@ export async function createProfileIfNeeded(supabase: SupabaseClient, userId: st
           console.log('Timezone updated successfully');
         }
       }
-      
-      // Ensure welcome entry exists if user has no entries
-      await ensureWelcomeEntry(supabase, userId);
     }
   } catch (error) {
     console.error('Error in createProfileIfNeeded:', error);
@@ -251,9 +166,6 @@ export async function storeJournalEntry(
       hasSentiment: !!sentimentScore
     });
 
-    // First, delete any welcome entries since user is creating their first real entry
-    await deleteWelcomeEntries(supabase, userId);
-
     const entry = {
       "transcription text": transcribedText,
       "refined text": refinedText,
@@ -262,8 +174,6 @@ export async function storeJournalEntry(
       duration: duration,
       emotions: emotions,
       sentiment: sentimentScore,
-      entry_type: 'regular',
-      is_deletable: true,
       created_at: new Date().toISOString()
     };
 
