@@ -18,7 +18,6 @@ import ExtractThemeButton from './entry-card/ExtractThemeButton';
 import { motion } from 'framer-motion';
 import { useProcessingEntries } from '@/hooks/use-processing-entries';
 import { JournalEntry } from '@/types/journal';
-import { useAudioPlayback } from '@/hooks/use-audio-playback';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -38,13 +37,11 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   const [isExpanded, setIsExpanded] = useState(false);
   const [feedback, setFeedback] = useState(entry.user_feedback || '');
   const [isFeedbackDialogOpen, setIsFeedbackDialogOpen] = useState(false);
+  const [isPlaying, setIsPlaying] = useState(false);
   const cardRef = useRef<HTMLDivElement>(null);
+  const audioRef = useRef<HTMLAudioElement | null>(null);
   
   const { removeEntry } = useProcessingEntries();
-  const { isPlaying, play, pause } = useAudioPlayback({
-    url: entry.audio_url || '',
-    duration: entry.duration
-  });
 
   const isWelcomeEntry = entry.entry_type === 'welcome';
   const isDeletable = entry.is_deletable !== false && !isWelcomeEntry;
@@ -58,8 +55,38 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
     }
   }, [processed, entry.tempId, removeEntry]);
 
+  useEffect(() => {
+    // Initialize audio element if audio URL exists
+    if (entry.audio_url && !audioRef.current) {
+      audioRef.current = new Audio(entry.audio_url);
+      
+      audioRef.current.addEventListener('ended', () => {
+        setIsPlaying(false);
+      });
+    }
+
+    return () => {
+      if (audioRef.current) {
+        audioRef.current.pause();
+        audioRef.current = null;
+      }
+    };
+  }, [entry.audio_url]);
+
   const handleToggleExpansion = () => {
     setIsExpanded(!isExpanded);
+  };
+
+  const handleAudioToggle = () => {
+    if (!audioRef.current) return;
+
+    if (isPlaying) {
+      audioRef.current.pause();
+      setIsPlaying(false);
+    } else {
+      audioRef.current.play();
+      setIsPlaying(true);
+    }
   };
 
   const handleSaveFeedback = async () => {
@@ -75,10 +102,9 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       setIsFeedbackDialogOpen(false);
       
       if (setEntries) {
-        const updatedEntries = (prevEntries: JournalEntry[]) =>
-          prevEntries.map(e =>
-            e.id === entry.id ? { ...e, user_feedback: feedback } : e
-          );
+        const updatedEntries = entries => entries.map(e =>
+          e.id === entry.id ? { ...e, user_feedback: feedback } : e
+        );
         setEntries(updatedEntries);
       }
     } catch (error) {
@@ -131,10 +157,9 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
 
   const handleEntryUpdated = (newContent: string, isProcessing?: boolean) => {
     if (setEntries) {
-      const updatedEntries = (prevEntries: JournalEntry[]) =>
-        prevEntries.map(e =>
-          e.id === entry.id ? { ...e, content: newContent } : e
-        );
+      const updatedEntries = entries => entries.map(e =>
+        e.id === entry.id ? { ...e, content: newContent } : e
+      );
       setEntries(updatedEntries);
     }
   };
@@ -202,7 +227,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
                 variant="ghost"
                 size="sm"
                 className="h-8 w-8 p-0"
-                onClick={isPlaying ? pause : play}
+                onClick={handleAudioToggle}
               >
                 {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
               </Button>
