@@ -202,7 +202,10 @@ export async function sendMessage(
       
       try {
         const generalResponse = await supabase.functions.invoke('general-mental-health-chat', {
-          body: { message }
+          body: { 
+            message,
+            conversationContext: conversationContext.slice(-5) // Pass conversation context
+          }
         });
         
         const finalResponse = (generalResponse as any).data?.response || getGeneralMentalHealthFallback(message);
@@ -380,7 +383,7 @@ export async function sendMessage(
           body: {
             originalQuery: message,
             subQuestions: queryPlan.subQuestions,
-            conversationContext,
+            conversationContext: conversationContext.slice(-3), // Pass conversation context
             queryPlan
           }
         });
@@ -445,9 +448,9 @@ export async function sendMessage(
               threadId,
               timeRange: dateRange,
               referenceDate,
-              conversationContext,
+              conversationContext, // Already being passed
               queryPlan,
-              subQuestions: finalSubQuestions, // Pass the processed sub-questions
+              subQuestions: finalSubQuestions,
               clientTimeInfo: clientTimeInfo,
               userTimezone: userTimezone,
               threadMetadata: metadataObj,
@@ -703,7 +706,6 @@ async function processMultiPartQuery(
     
     const subQueryResponses: SubQueryResponse[] = [];
     for (const subQuery of subQueries) {
-      // Use chat-with-rag for all sub-queries too
       const queryResponse = await supabase.functions.invoke('chat-with-rag', {
         body: {
           message: subQuery,
@@ -713,7 +715,8 @@ async function processMultiPartQuery(
           referenceDate,
           subQueryMode: true,
           clientTimeInfo: clientTimeInfo,
-          userTimezone: userTimezone
+          userTimezone: userTimezone,
+          conversationContext: [] // Pass empty context for sub-queries to avoid confusion
         }
       });
       
@@ -735,7 +738,8 @@ async function processMultiPartQuery(
     const combinedResponse = await supabase.functions.invoke('combine-segment-responses', {
       body: {
         originalQuery: message,
-        subQueryResponses
+        subQueryResponses,
+        conversationContext: [] // Pass context for combining responses
       }
     });
     
