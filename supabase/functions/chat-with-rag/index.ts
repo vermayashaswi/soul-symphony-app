@@ -3,6 +3,7 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 import { processSubQuestionsInParallel, ProcessingContext } from "./utils/parallelProcessor.ts";
 import { PerformanceOptimizer } from "./utils/performanceOptimizer.ts";
 import { generateDisplayHeader } from "./utils/headerGenerator.ts";
+import { processSubQueryWithEmotionSupport } from "./utils/enhancedSubQueryProcessor.ts";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -158,29 +159,40 @@ serve(async (req) => {
       queryPlanUseAllEntries: queryPlan.useAllEntries
     });
 
-    // Process sub-questions with parallel processing optimization
-    console.log(`[chat-with-rag] Processing ${queryPlan.subQuestions?.length || 0} sub-questions with enhanced context awareness`);
+    // Process sub-questions with enhanced emotion support
+    console.log(`[chat-with-rag] Processing ${queryPlan.subQuestions?.length || 0} sub-questions with enhanced emotion support`);
     
     const strictDateEnforcement = !shouldUseAllEntries && hasExplicitTimeReference;
     console.log(`[chat-with-rag] Strict date enforcement: ${strictDateEnforcement}`);
 
     const parallelTimer = PerformanceOptimizer.startTimer('parallel_processing');
     
-    // Prepare processing context with enhanced parameters
-    const processingContext: ProcessingContext = {
-      validatedUserId,
-      openaiApiKey,
-      supabaseService
-    };
-
-    // Process sub-questions in parallel with enhanced context
-    const subQuestionAnalyses = await processSubQuestionsInParallel(
-      queryPlan.subQuestions || [],
-      processingContext,
-      queryPlan.dateRange,
-      strictDateEnforcement,
-      shouldUseAllEntries // Pass the enhanced scope flag
-    );
+    // Enhanced sub-question processing with emotion support
+    const subQuestionAnalyses = [];
+    for (const subQuestion of queryPlan.subQuestions || []) {
+      try {
+        const analysis = await processSubQueryWithEmotionSupport(
+          subQuestion,
+          supabaseService,
+          validatedUserId,
+          queryPlan.dateRange,
+          openaiApiKey
+        );
+        subQuestionAnalyses.push(analysis);
+      } catch (error) {
+        console.error(`[chat-with-rag] Error processing sub-question "${subQuestion}":`, error);
+        // Add fallback analysis
+        subQuestionAnalyses.push({
+          subQuestion,
+          context: 'Error occurred while processing this question.',
+          emotionResults: [],
+          vectorResults: [],
+          totalResults: 0,
+          hasEntriesInDateRange: false,
+          reasoning: 'Processing error occurred.'
+        });
+      }
+    }
     
     PerformanceOptimizer.endTimer(parallelTimer, 'parallel_processing');
 
@@ -241,7 +253,8 @@ serve(async (req) => {
     }
 
     // Check if this is an emotion-focused query
-    const isEmotionQuery = queryPlan.isEmotionQuery || message.toLowerCase().includes('emotion');
+    const isEmotionQuery = queryPlan.isEmotionQuery || message.toLowerCase().includes('emotion') || 
+                           /\b(am|are)\s+(i|we)\s+(happy|sad|anxious|excited)\b/i.test(message);
     
     // Prepare comprehensive context for GPT with enhanced conversation awareness
     let journalContext = '';
@@ -428,7 +441,7 @@ ${isAnalysisFollowUp ? '- Make it clear that this analysis covers their complete
       };
 
       const globalDuration = PerformanceOptimizer.endTimer(globalTimer, 'complete_request');
-      console.log(`[chat-with-rag] Successfully generated response with enhanced context: ${subQuestionAnalyses.length} sub-question analyses, ${totalEmotionResults} emotion results and ${totalVectorResults} vector results in ${globalDuration}ms`);
+      console.log(`[chat-with-rag] Successfully generated response with enhanced emotion support: ${subQuestionAnalyses.length} sub-question analyses, ${totalEmotionResults} emotion results and ${totalVectorResults} vector results in ${globalDuration}ms`);
 
       // Log performance stats periodically (no cache stats)
       if (Math.random() < 0.1) { // 10% chance
