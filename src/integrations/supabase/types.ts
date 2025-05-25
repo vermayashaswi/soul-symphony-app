@@ -224,10 +224,13 @@ export type Database = {
           email: string | null
           full_name: string | null
           id: string
+          is_premium: boolean | null
           journal_focus_areas: string[] | null
           onboarding_completed: boolean | null
           reminder_settings: Json | null
+          subscription_tier: string | null
           timezone: string | null
+          trial_ends_at: string | null
           tutorial_completed: string | null
           tutorial_step: number | null
           updated_at: string
@@ -239,10 +242,13 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id: string
+          is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
+          subscription_tier?: string | null
           timezone?: string | null
+          trial_ends_at?: string | null
           tutorial_completed?: string | null
           tutorial_step?: number | null
           updated_at?: string
@@ -254,10 +260,13 @@ export type Database = {
           email?: string | null
           full_name?: string | null
           id?: string
+          is_premium?: boolean | null
           journal_focus_areas?: string[] | null
           onboarding_completed?: boolean | null
           reminder_settings?: Json | null
+          subscription_tier?: string | null
           timezone?: string | null
+          trial_ends_at?: string | null
           tutorial_completed?: string | null
           tutorial_step?: number | null
           updated_at?: string
@@ -284,6 +293,65 @@ export type Database = {
           "subscription date"?: string | null
         }
         Relationships: []
+      }
+      subscription_transactions: {
+        Row: {
+          created_at: string
+          currency: string | null
+          expiration_date: string | null
+          id: string
+          is_trial_period: boolean | null
+          original_purchase_date: string | null
+          price: number | null
+          product_id: string
+          purchase_date: string
+          store: string | null
+          transaction_id: string
+          transaction_reason: string | null
+          updated_at: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          currency?: string | null
+          expiration_date?: string | null
+          id?: string
+          is_trial_period?: boolean | null
+          original_purchase_date?: string | null
+          price?: number | null
+          product_id: string
+          purchase_date: string
+          store?: string | null
+          transaction_id: string
+          transaction_reason?: string | null
+          updated_at?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          currency?: string | null
+          expiration_date?: string | null
+          id?: string
+          is_trial_period?: boolean | null
+          original_purchase_date?: string | null
+          price?: number | null
+          product_id?: string
+          purchase_date?: string
+          store?: string | null
+          transaction_id?: string
+          transaction_reason?: string | null
+          updated_at?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "subscription_transactions_user_id_fkey"
+            columns: ["user_id"]
+            isOneToOne: false
+            referencedRelation: "profiles"
+            referencedColumns: ["id"]
+          },
+        ]
       }
       user_sessions: {
         Row: {
@@ -338,23 +406,56 @@ export type Database = {
       }
       user_subscriptions: {
         Row: {
+          auto_renew_status: boolean | null
+          cancelled_at: string | null
           created_at: string | null
+          current_period_end: string | null
+          current_period_start: string | null
+          expires_date: string | null
           id: string
           is_subscribed: boolean | null
+          last_sync_at: string | null
+          product_identifier: string | null
+          revenuecat_customer_id: string | null
+          subscription_status: string | null
+          subscription_type: string | null
+          trial_end_date: string | null
           trial_start_date: string | null
           user_id: string
         }
         Insert: {
+          auto_renew_status?: boolean | null
+          cancelled_at?: string | null
           created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          expires_date?: string | null
           id?: string
           is_subscribed?: boolean | null
+          last_sync_at?: string | null
+          product_identifier?: string | null
+          revenuecat_customer_id?: string | null
+          subscription_status?: string | null
+          subscription_type?: string | null
+          trial_end_date?: string | null
           trial_start_date?: string | null
           user_id: string
         }
         Update: {
+          auto_renew_status?: boolean | null
+          cancelled_at?: string | null
           created_at?: string | null
+          current_period_end?: string | null
+          current_period_start?: string | null
+          expires_date?: string | null
           id?: string
           is_subscribed?: boolean | null
+          last_sync_at?: string | null
+          product_identifier?: string | null
+          revenuecat_customer_id?: string | null
+          subscription_status?: string | null
+          subscription_type?: string | null
+          trial_end_date?: string | null
           trial_start_date?: string | null
           user_id?: string
         }

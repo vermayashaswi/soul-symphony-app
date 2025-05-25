@@ -1,148 +1,139 @@
-
-import { Link } from 'react-router-dom';
-import { motion } from 'framer-motion';
-import { useNavigate } from 'react-router-dom';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
-import { useAuth } from '@/contexts/AuthContext';
-import SouloLogo from './SouloLogo';
-import { Button } from '@/components/ui/button';
-import { useIsMobile } from '@/hooks/use-mobile';
-import React from 'react';
-import { 
-  MoreVertical, 
-  LogOut,
-  Settings,
-  HelpCircle,
-  Home,
-  Moon,
-  Sun,
-} from 'lucide-react';
+import { useState } from "react";
+import { Link } from "react-router-dom";
+import { useTheme } from "@/hooks/use-theme";
+import { useTranslation } from "@/contexts/TranslationContext";
+import { useAuth } from "@/contexts/AuthContext";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
-  Popover,
-  PopoverContent,
-  PopoverTrigger,
-} from '@/components/ui/popover';
-import { useTheme } from '@/hooks/use-theme';
-import { TranslatableText } from '@/components/translation/TranslatableText';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuSeparator,
+  DropdownMenuTrigger,
+} from "@/components/ui/dropdown-menu";
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
+import { MoonIcon, SunIcon, UserIcon } from "@radix-ui/react-icons";
+import {
+  ArrowRightOnRectangleIcon,
+  Cog6ToothIcon,
+  QuestionMarkCircleIcon,
+} from "@heroicons/react/24/outline";
+import { SouloLogo } from "./SouloLogo";
+import { SubscriptionStatus } from '@/components/subscription/SubscriptionStatus';
 
-const Navbar = () => {
-  const navigate = useNavigate();
-  const { user, signOut } = useAuth(); 
+export function Navbar() {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const isMobile = useIsMobile();
+  const { currentLanguage, changeLanguage } = useTranslation();
+  const { signOut, user } = useAuth();
 
-  const handleLogout = async () => {
+  const handleSignOut = async () => {
     await signOut();
-    navigate('/auth');
-  };
-
-  const toggleTheme = () => {
-    setTheme(theme === 'dark' ? 'light' : 'dark');
   };
 
   return (
-    <motion.nav
-      className="fixed top-0 left-0 right-0 z-50 bg-background/90 backdrop-blur-md border-b px-4 py-2 shadow-sm"
-      initial={{ y: -100 }}
-      animate={{ y: 0 }}
-      transition={{ duration: 0.3 }}
-    >
-      <div className="container mx-auto flex justify-between items-center">
-        <div className="flex items-center space-x-4">
-          <Button variant="ghost" className="p-0" onClick={() => navigate('/')}>
-            <SouloLogo size="normal" useColorTheme={true} />
-          </Button>
-        </div>
+    <nav className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
+      <div className="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+        <div className="flex h-16 justify-between items-center">
+          <div className="flex items-center">
+            <Link to="/" className="flex items-center space-x-2">
+              <SouloLogo className="h-8 w-8" />
+              <span className="font-bold text-xl">Soulo</span>
+            </Link>
+          </div>
 
-        <div className="flex items-center space-x-2">
-          {!user ? (
-            <>
-              <Button variant="ghost" size="sm" onClick={() => navigate('/')}>
-                <TranslatableText text="Home" />
-              </Button>
-              <Button variant="outline" size="sm" onClick={() => navigate('/auth')}>
-                <TranslatableText text="Sign In" />
-              </Button>
-            </>
-          ) : (
-            <>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="rounded-full"
-                onClick={toggleTheme}
-                title={theme === 'dark' ? 'Switch to light mode' : 'Switch to dark mode'}
-              >
-                {theme === 'dark' ? (
-                  <Sun className="h-5 w-5" />
-                ) : (
-                  <Moon className="h-5 w-5" />
-                )}
-              </Button>
+          <div className="hidden md:flex items-center space-x-8">
+            <Link to="/journal" className="text-sm font-medium hover:underline">
+              Journal
+            </Link>
+            <Link to="/insights" className="text-sm font-medium hover:underline">
+              Insights
+            </Link>
+            <Link to="/chat" className="text-sm font-medium hover:underline">
+              Chat
+            </Link>
+            <Link to="/settings" className="text-sm font-medium hover:underline">
+              Settings
+            </Link>
+          </div>
 
-              <Popover>
-                <PopoverTrigger asChild>
-                  <Button variant="ghost" size="icon" className="rounded-full">
-                    <MoreVertical className="h-5 w-5" />
-                  </Button>
-                </PopoverTrigger>
-                <PopoverContent className="w-48 mr-4">
-                  <div className="grid gap-1">
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start"
-                      onClick={() => navigate('/')}
-                    >
-                      <Home className="mr-2 h-4 w-4" />
-                      <TranslatableText text="Home" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start"
-                      onClick={() => navigate('/settings')}
-                    >
-                      <Settings className="mr-2 h-4 w-4" />
-                      <TranslatableText text="Settings" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start"
-                      onClick={() => navigate('/help')}
-                    >
-                      <HelpCircle className="mr-2 h-4 w-4" />
-                      <TranslatableText text="Help" />
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      size="sm"
-                      className="justify-start text-red-500 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-950"
-                      onClick={handleLogout}
-                    >
-                      <LogOut className="mr-2 h-4 w-4" />
-                      <TranslatableText text="Logout" />
-                    </Button>
+          <div className="flex items-center space-x-4">
+            <SubscriptionStatus />
+            
+            <Select
+              value={currentLanguage}
+              onValueChange={(value) => changeLanguage(value)}
+            >
+              <SelectTrigger className="w-[120px] text-sm">
+                <SelectValue placeholder="Theme" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="en">English</SelectItem>
+                <SelectItem value="es">Español</SelectItem>
+                <SelectItem value="fr">Français</SelectItem>
+                <SelectItem value="de">Deutsch</SelectItem>
+              </SelectContent>
+            </Select>
+
+            <Button
+              variant="outline"
+              size="icon"
+              onClick={() =>
+                setTheme(theme === "light" ? "dark" : "light")
+              }
+            >
+              <SunIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <MoonIcon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <span className="sr-only">Toggle theme</span>
+            </Button>
+
+            <DropdownMenu open={isMenuOpen} onOpenChange={setIsMenuOpen}>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" className="relative h-8 w-8 rounded-full">
+                  <Avatar className="h-8 w-8">
+                    <AvatarImage src={user?.user_metadata?.avatar_url} />
+                    <AvatarFallback>
+                      <UserIcon className="h-4 w-4" />
+                    </AvatarFallback>
+                  </Avatar>
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent className="w-56" align="end" forceMount>
+                <DropdownMenuItem disabled>
+                  <div className="flex flex-col space-y-1 leading-none">
+                    <span>{user?.email}</span>
+                    <span className="line-clamp-1 text-sm text-muted-foreground">
+                      {user?.user_metadata?.full_name}
+                    </span>
                   </div>
-                </PopoverContent>
-              </Popover>
-
-              <Avatar
-                className="cursor-pointer"
-                onClick={() => navigate('/profile')}
-              >
-                <AvatarImage src={user.user_metadata?.avatar_url || user.user_metadata?.picture} />
-                <AvatarFallback>
-                  {user.user_metadata?.name ? user.user_metadata.name.charAt(0).toUpperCase() : user.email?.charAt(0).toUpperCase() || 'U'}
-                </AvatarFallback>
-              </Avatar>
-            </>
-          )}
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem>
+                  <Cog6ToothIcon className="mr-2 h-4 w-4" />
+                  <span>Settings</span>
+                  <Link to="/settings" />
+                </DropdownMenuItem>
+                <DropdownMenuItem>
+                  <QuestionMarkCircleIcon className="mr-2 h-4 w-4" />
+                  <span>Support</span>
+                </DropdownMenuItem>
+                <DropdownMenuSeparator />
+                <DropdownMenuItem onClick={handleSignOut}>
+                  <ArrowRightOnRectangleIcon className="mr-2 h-4 w-4" />
+                  <span>Logout</span>
+                </DropdownMenuItem>
+              </DropdownMenuContent>
+            </DropdownMenu>
+          </div>
         </div>
       </div>
-    </motion.nav>
+    </nav>
   );
-};
-
-export default Navbar;
+}
