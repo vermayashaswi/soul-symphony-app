@@ -1,3 +1,4 @@
+
 import { useState, useEffect } from 'react';
 import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -7,6 +8,7 @@ import { toast } from 'sonner';
 import SouloLogo from '@/components/SouloLogo';
 import { signInWithGoogle } from '@/services/authService';
 import { useOnboarding } from '@/hooks/use-onboarding';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 export default function Auth() {
   const location = useLocation();
@@ -125,10 +127,11 @@ export default function Auth() {
       >
         <div className="text-center mb-8">
           <h1 className="text-3xl font-bold mb-2">
-            Welcome to <SouloLogo size="large" className="text-blue-600" />
+            <TranslatableText text="Welcome to" forceTranslate={true} />{" "}
+            <SouloLogo size="large" className="text-blue-600" />
           </h1>
           <p className="text-muted-foreground">
-            Sign in to start your journaling journey and track your emotional wellbeing
+            <TranslatableText text="Sign in to start your journaling journey and track your emotional wellbeing" forceTranslate={true} />
           </p>
         </div>
         
@@ -157,11 +160,13 @@ export default function Auth() {
                 </g>
               </svg>
             )}
-            Sign in with Google
+            <TranslatableText text="Sign in with Google" forceTranslate={true} />
           </Button>
           
           <div className="text-center text-sm text-muted-foreground">
-            <p>By signing in, you agree to our Terms of Service and Privacy Policy</p>
+            <p>
+              <TranslatableText text="By signing in, you agree to our Terms of Service and Privacy Policy" forceTranslate={true} />
+            </p>
           </div>
         </div>
       </motion.div>
