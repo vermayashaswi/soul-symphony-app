@@ -7,8 +7,7 @@ import {
   analyzeEmotions,
   generateEmbedding 
 } from './aiProcessing.ts';
-import { storeJournalEntry } from './databaseOperations.ts';
-import { extractThemes } from './themeExtraction.ts';
+import { storeJournalEntry, extractThemes } from './databaseOperations.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -174,12 +173,9 @@ serve(async (req) => {
     }
 
     // Extract themes (existing logic)
-    const themes = await extractThemes(refinedText, openAiApiKey);
-    console.log('Extracted themes:', themes);
+    await extractThemes(supabase, refinedText, entryId);
+    console.log('Themes extracted successfully');
 
-    // Trigger comprehensive theme generation for entry
-    console.log('Triggering comprehensive theme generation for entry', entryId);
-    
     // Generate and store embedding
     try {
       console.log('[AI] Generating embedding for text:', refinedText.substring(0, 50) + "....");
@@ -205,22 +201,6 @@ serve(async (req) => {
       console.error('Error generating embedding:', error);
     }
 
-    // Trigger generate-themes function
-    console.log('Triggering generate-themes for entry ID:', entryId);
-    try {
-      const { error: themeError } = await supabase.functions.invoke('generate-themes', {
-        body: { entryIds: [entryId] }
-      });
-      
-      if (themeError) {
-        console.error('[extractThemes] Error calling generate-themes:', themeError);
-      } else {
-        console.log('[extractThemes] Successfully triggered theme generation');
-      }
-    } catch (error) {
-      console.error('[extractThemes] Exception calling generate-themes:', error);
-    }
-
     console.log('Theme generation triggered successfully');
 
     return new Response(JSON.stringify({
@@ -231,7 +211,7 @@ serve(async (req) => {
       duration: calculatedDuration,
       emotions,
       sentiment,
-      themes: themes || [],
+      themes: [],
       detectedLanguages
     }), {
       headers: { ...corsHeaders, 'Content-Type': 'application/json' },
