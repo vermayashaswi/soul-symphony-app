@@ -570,56 +570,76 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     title: "What Should We Call You?",
     subtitle: "",
     description: "Your name helps us make your journey more personal.",
-    illustration: (props: NameStepProps) => (
-      <div className="flex flex-col justify-center items-center my-2 w-full">
-        <motion.div 
-          className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex flex-col items-center justify-center overflow-hidden p-8"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ duration: 0.5 }}
-        >
-          <motion.div
-            className="w-20 h-20 bg-theme/20 rounded-full flex items-center justify-center mb-6"
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ type: "spring", delay: 0.3 }}
-          >
-            <User className="w-10 h-10 text-theme" />
-          </motion.div>
-          
+    illustration: (props: NameStepProps) => {
+      const { translate } = useTranslation();
+      const [placeholderText, setPlaceholderText] = useState("Enter your name");
+      
+      // Get translated placeholder text
+      useEffect(() => {
+        const getTranslatedPlaceholder = async () => {
+          try {
+            const translated = await translate("Enter your name", "en");
+            setPlaceholderText(translated);
+          } catch (error) {
+            console.error("Failed to translate placeholder:", error);
+            setPlaceholderText("Enter your name"); // fallback
+          }
+        };
+        
+        getTranslatedPlaceholder();
+      }, [translate]);
+      
+      return (
+        <div className="flex flex-col justify-center items-center my-2 w-full">
           <motion.div 
-            className="w-full space-y-4"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.5 }}
+            className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex flex-col items-center justify-center overflow-hidden p-8"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.5 }}
           >
-            <Input
-              placeholder="Enter your name"
-              value={props.name}
-              onChange={(e) => props.setName(e.target.value)}
-              className="bg-background/80 border-theme/20 focus:border-theme text-white"
-              autoFocus
-            />
+            <motion.div
+              className="w-20 h-20 bg-theme/20 rounded-full flex items-center justify-center mb-6"
+              initial={{ scale: 0 }}
+              animate={{ scale: 1 }}
+              transition={{ type: "spring", delay: 0.3 }}
+            >
+              <User className="w-10 h-10 text-theme" />
+            </motion.div>
             
-            <div className="text-sm text-muted-foreground text-center">
-              This is how SOuLO will address you
-            </div>
+            <motion.div 
+              className="w-full space-y-4"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.5 }}
+            >
+              <Input
+                placeholder={placeholderText}
+                value={props.name}
+                onChange={(e) => props.setName(e.target.value)}
+                className="bg-background/80 border-theme/20 focus:border-theme text-white"
+                autoFocus
+              />
+              
+              <div className="text-sm text-muted-foreground text-center">
+                <TranslatableText text="This is how SOuLO will address you" forceTranslate={true} />
+              </div>
+            </motion.div>
+            
+            <motion.div 
+              className="absolute -z-10 inset-0 opacity-20"
+              animate={{ 
+                background: [
+                  "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)",
+                  "radial-gradient(circle at 80% 80%, var(--color-theme-dark) 0%, transparent 70%)",
+                  "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)"
+                ]
+              }}
+              transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+            />
           </motion.div>
-          
-          <motion.div 
-            className="absolute -z-10 inset-0 opacity-20"
-            animate={{ 
-              background: [
-                "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)",
-                "radial-gradient(circle at 80% 80%, var(--color-theme-dark) 0%, transparent 70%)",
-                "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)"
-              ]
-            }}
-            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
-          />
-        </motion.div>
-      </div>
-    ),
+        </div>
+      );
+    },
     buttonText: "Continue"
   },
   {
