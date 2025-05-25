@@ -19,28 +19,7 @@ import ChatSuggestionButton from './entry-card/ChatSuggestionButton';
 import { useAudioPlayback } from '@/hooks/use-audio-playback';
 import { motion } from 'framer-motion';
 import { useProcessingEntries } from '@/hooks/use-processing-entries';
-
-export interface JournalEntry {
-  id: number;
-  content: string;
-  created_at: string;
-  audio_url?: string;
-  sentiment?: string;
-  themes?: string[];
-  foreignKey?: string;
-  entities?: Array<{
-    type: string;
-    name: string;
-    text?: string;
-  }>;
-  emotions?: Record<string, number>;
-  duration?: number;
-  user_feedback?: string | null;
-  Edit_Status?: number | null;
-  tempId?: string;
-  entry_type?: 'regular' | 'welcome';
-  is_deletable?: boolean;
-}
+import { JournalEntry } from '@/types/journal';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -67,11 +46,14 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   
   const {
     isPlaying,
-    currentTime,
-    duration,
+    playbackProgress,
+    audioDuration,
+    audioRef,
     togglePlayback,
-    setAudioElement
-  } = useAudioPlayback(entry.audio_url);
+    seekTo,
+    reset,
+    prepareAudio
+  } = useAudioPlayback({ audioUrl: entry.audio_url });
 
   const isWelcomeEntry = entry.entry_type === 'welcome';
   const isDeletable = entry.is_deletable !== false && !isWelcomeEntry;
@@ -102,7 +84,6 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       setIsFeedbackDialogOpen(false);
       
       if (setEntries) {
-        // Update the local state to reflect the change
         setEntries((prevEntries: JournalEntry[]) =>
           prevEntries.map(e =>
             e.id === entry.id ? { ...e, user_feedback: feedback } : e
@@ -236,13 +217,13 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
             {!isWelcomeEntry && (
               <>
                 <EditEntryButton
-                  entry={entry}
+                  entryId={entry.id}
                   setEntries={setEntries}
                 />
                 
                 <ExtractThemeButton entryId={entry.id} />
                 
-                <ChatSuggestionButton entry={entry} />
+                <ChatSuggestionButton entryId={entry.id} />
               </>
             )}
 
@@ -262,13 +243,13 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
         <EntryContent 
           content={entry.content}
           isExpanded={isExpanded}
-          onToggleExpansion={handleToggleExpansion}
+          onToggle={handleToggleExpansion}
         />
 
         {/* Themes */}
-        {entry.themes && entry.themes.length > 0 && (
+        {entry.master_themes && entry.master_themes.length > 0 && (
           <div className="flex flex-wrap gap-1 mt-3">
-            {entry.themes.map((theme, index) => (
+            {entry.master_themes.map((theme, index) => (
               <Badge key={index} variant="outline" className="text-xs">
                 #{theme}
               </Badge>
@@ -335,7 +316,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
         {/* Audio element for playback */}
         {entry.audio_url && (
           <audio
-            ref={setAudioElement}
+            ref={audioRef}
             src={entry.audio_url}
             preload="metadata"
             style={{ display: 'none' }}
@@ -343,7 +324,7 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
         )}
 
         <DeleteEntryDialog
-          isOpen={showDeleteDialog}
+          open={showDeleteDialog}
           onClose={() => setShowDeleteDialog(false)}
           onConfirm={confirmDelete}
           entryTitle={entry.content.substring(0, 50) + (entry.content.length > 50 ? '...' : '')}

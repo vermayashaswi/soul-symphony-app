@@ -1,11 +1,15 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { Input } from "@/components/ui/input";
-import { Card, CardContent } from "@/components/ui/card";
-import { JournalEntry } from './JournalEntryCard';
-import { Search } from 'lucide-react';
-import { useIsMobile } from '@/hooks/use-mobile';
+
+import React, { useState, useEffect, useMemo } from 'react';
+import { Search, Calendar, X } from 'lucide-react';
+import { Input } from '@/components/ui/input';
+import { Button } from '@/components/ui/button';
+import { JournalEntry } from '@/types/journal';
+import { Badge } from '@/components/ui/badge';
+import { Card } from '@/components/ui/card';
+import { Collapsible, CollapsibleContent, CollapsibleTrigger } from '@/components/ui/collapsible';
+import { motion, AnimatePresence } from 'framer-motion';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useTranslation } from '@/contexts/TranslationContext';
+import { useDebounce } from 'use-debounce';
 
 interface JournalSearchProps {
   entries: JournalEntry[];
@@ -13,222 +17,249 @@ interface JournalSearchProps {
   onSearchResults: (filteredEntries: JournalEntry[]) => void;
 }
 
-const searchPrompts = [
-  "emotions",
-  "memories",
-  "places",
-  "people",
-  "thoughts",
-  "events",
-  "feelings",
-  "themes",
-  "issues",
-  "entities"
-];
-
-const JournalSearch: React.FC<JournalSearchProps> = ({ entries, onSelectEntry, onSearchResults }) => {
-  const { translate } = useTranslation();
+const JournalSearch: React.FC<JournalSearchProps> = ({
+  entries,
+  onSelectEntry,
+  onSearchResults
+}) => {
   const [searchQuery, setSearchQuery] = useState('');
-  const [filteredEntries, setFilteredEntries] = useState<JournalEntry[]>([]);
-  const [placeholderIndex, setPlaceholderIndex] = useState(0);
-  const [typingPlaceholder, setTypingPlaceholder] = useState("");
-  const [isTyping, setIsTyping] = useState(true);
-  const [typingIndex, setTypingIndex] = useState(0);
-  const [isFocused, setIsFocused] = useState(false);
-  const [translatedPrompts, setTranslatedPrompts] = useState<string[]>([]);
-  const inputRef = useRef<HTMLInputElement>(null);
-  const mobile = useIsMobile();
+  const [selectedThemes, setSelectedThemes] = useState<string[]>([]);
+  const [selectedEmotions, setSelectedEmotions] = useState<string[]>([]);
+  const [dateRange, setDateRange] = useState<{start: string, end: string}>({start: '', end: ''});
+  const [isAdvancedOpen, setIsAdvancedOpen] = useState(false);
+  const [debouncedSearchQuery] = useDebounce(searchQuery, 300);
 
-  // Translate the search prompts when language changes
-  useEffect(() => {
-    const translatePrompts = async () => {
-      if (translate) {
-        const translated = await Promise.all(
-          searchPrompts.map(prompt => translate(prompt, "en"))
-        );
-        setTranslatedPrompts(translated);
+  // Extract all unique themes from entries
+  const allThemes = useMemo(() => {
+    const themes = new Set<string>();
+    entries.forEach(entry => {
+      if (entry.master_themes) {
+        entry.master_themes.forEach(theme => themes.add(theme));
       }
-    };
-    
-    translatePrompts();
-    
-    // Reset the animation when language changes
-    setTypingPlaceholder("");
-    setTypingIndex(0);
-    setIsTyping(true);
-    setPlaceholderIndex(0);
-    
-    window.addEventListener('languageChange', translatePrompts as EventListener);
-    return () => {
-      window.removeEventListener('languageChange', translatePrompts as EventListener);
-    };
-  }, [translate]);
-
-  useEffect(() => {
-    if (isTyping) {
-      const currentWord = translatedPrompts.length > placeholderIndex 
-        ? translatedPrompts[placeholderIndex] 
-        : searchPrompts[placeholderIndex];
-      
-      if (typingIndex < currentWord.length) {
-        const typingTimeout = setTimeout(() => {
-          setTypingPlaceholder(currentWord.substring(0, typingIndex + 1));
-          setTypingIndex(typingIndex + 1);
-        }, 100);
-        
-        return () => clearTimeout(typingTimeout);
-      } else {
-        const pauseTimeout = setTimeout(() => {
-          setIsTyping(false);
-        }, 1500);
-        
-        return () => clearTimeout(pauseTimeout);
-      }
-    } else {
-      if (typingIndex > 0) {
-        const erasingTimeout = setTimeout(() => {
-          const currentWord = translatedPrompts.length > placeholderIndex 
-            ? translatedPrompts[placeholderIndex] 
-            : searchPrompts[placeholderIndex];
-          setTypingPlaceholder(currentWord.substring(0, typingIndex - 1));
-          setTypingIndex(typingIndex - 1);
-        }, 60);
-        
-        return () => clearTimeout(erasingTimeout);
-      } else {
-        const nextWordTimeout = setTimeout(() => {
-          setPlaceholderIndex((prevIndex) => (prevIndex + 1) % searchPrompts.length);
-          setIsTyping(true);
-        }, 300);
-        
-        return () => clearTimeout(nextWordTimeout);
-      }
-    }
-  }, [isTyping, typingIndex, placeholderIndex, translatedPrompts]);
-
-  useEffect(() => {
-    const handleBackButton = (event: PopStateEvent) => {
-      if (isFocused) {
-        event.preventDefault();
-        if (inputRef.current) {
-          inputRef.current.blur();
-        }
-        setIsFocused(false);
-        window.history.pushState(null, '', window.location.pathname);
-      }
-    };
-    
-    if (isFocused) {
-      window.history.pushState(null, '', window.location.pathname);
-      window.addEventListener('popstate', handleBackButton);
-    }
-    
-    return () => {
-      window.removeEventListener('popstate', handleBackButton);
-    };
-  }, [isFocused]);
-
-  useEffect(() => {
-    if (!searchQuery.trim()) {
-      setFilteredEntries(entries);
-      onSearchResults(entries);
-      return;
-    }
-
-    const filtered = entries.filter(entry => {
-      const content = (entry.content || '').toLowerCase();
-      const query = searchQuery.toLowerCase();
-      
-      if (content.includes(query)) return true;
-      
-      if (entry.entities) {
-        try {
-          const entityData = typeof entry.entities === 'string' 
-            ? JSON.parse(entry.entities) 
-            : entry.entities;
-          
-          if (entityData && Array.isArray(entityData)) {
-            return entityData.some(entity => 
-              entity.name?.toLowerCase().includes(query) || 
-              entity.type?.toLowerCase().includes(query)
-            );
-          } else if (entityData && typeof entityData === 'object') {
-            return Object.values(entityData).some(value => 
-              value && String(value).toLowerCase().includes(query)
-            );
-          }
-        } catch (e) {
-          console.error("Error parsing entities:", e);
-        }
-      }
-      
-      if (entry.themes && Array.isArray(entry.themes)) {
-        return entry.themes.some(theme => 
-          theme.toLowerCase().includes(query)
-        );
-      }
-      
-      if (entry.master_themes && Array.isArray(entry.master_themes)) {
-        return entry.master_themes.some(theme => 
-          theme.toLowerCase().includes(query)
-        );
-      }
-      
-      return false;
     });
+    return Array.from(themes).sort();
+  }, [entries]);
 
-    setFilteredEntries(filtered);
-    onSearchResults(filtered);
-  }, [searchQuery, entries, onSearchResults]);
+  // Extract all unique emotions from entries
+  const allEmotions = useMemo(() => {
+    const emotions = new Set<string>();
+    entries.forEach(entry => {
+      if (entry.emotions) {
+        Object.keys(entry.emotions).forEach(emotion => emotions.add(emotion));
+      }
+    });
+    return Array.from(emotions).sort();
+  }, [entries]);
 
-  const handleSearchChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const value = e.target.value;
-    setSearchQuery(value);
+  // Filter entries based on search criteria
+  const filteredEntries = useMemo(() => {
+    let filtered = entries;
+
+    // Text search
+    if (debouncedSearchQuery.trim()) {
+      const query = debouncedSearchQuery.toLowerCase();
+      filtered = filtered.filter(entry => 
+        entry.content.toLowerCase().includes(query) ||
+        (entry.master_themes && entry.master_themes.some(theme => 
+          theme.toLowerCase().includes(query)
+        )) ||
+        (entry.sentiment && entry.sentiment.toLowerCase().includes(query))
+      );
+    }
+
+    // Theme filtering
+    if (selectedThemes.length > 0) {
+      filtered = filtered.filter(entry => 
+        entry.master_themes && entry.master_themes.some(theme => 
+          selectedThemes.includes(theme)
+        )
+      );
+    }
+
+    // Emotion filtering
+    if (selectedEmotions.length > 0) {
+      filtered = filtered.filter(entry => 
+        entry.emotions && Object.keys(entry.emotions).some(emotion => 
+          selectedEmotions.includes(emotion)
+        )
+      );
+    }
+
+    // Date filtering
+    if (dateRange.start) {
+      filtered = filtered.filter(entry => 
+        new Date(entry.created_at) >= new Date(dateRange.start)
+      );
+    }
+    if (dateRange.end) {
+      filtered = filtered.filter(entry => 
+        new Date(entry.created_at) <= new Date(dateRange.end + 'T23:59:59')
+      );
+    }
+
+    return filtered;
+  }, [entries, debouncedSearchQuery, selectedThemes, selectedEmotions, dateRange]);
+
+  // Update parent component with filtered results
+  useEffect(() => {
+    onSearchResults(filteredEntries);
+  }, [filteredEntries, onSearchResults]);
+
+  const handleThemeToggle = (theme: string) => {
+    setSelectedThemes(prev => 
+      prev.includes(theme) 
+        ? prev.filter(t => t !== theme)
+        : [...prev, theme]
+    );
   };
 
-  const handleEntrySelect = (entry: JournalEntry) => {
-    onSelectEntry(entry);
+  const handleEmotionToggle = (emotion: string) => {
+    setSelectedEmotions(prev => 
+      prev.includes(emotion) 
+        ? prev.filter(e => e !== emotion)
+        : [...prev, emotion]
+    );
   };
 
-  const handleFocus = () => {
-    setIsFocused(true);
+  const clearAllFilters = () => {
+    setSearchQuery('');
+    setSelectedThemes([]);
+    setSelectedEmotions([]);
+    setDateRange({start: '', end: ''});
   };
 
-  const handleBlur = () => {
-    setIsFocused(false);
-  };
+  const hasActiveFilters = searchQuery || selectedThemes.length > 0 || selectedEmotions.length > 0 || dateRange.start || dateRange.end;
 
   return (
-    <Card 
-      className={`w-full transition-all duration-300 bg-transparent border-none shadow-none ${isFocused 
-        ? 'fixed top-0 left-0 right-0 z-50 rounded-none' 
-        : 'sticky top-0 z-10'}`}
-    >
-      <CardContent className="p-1 py-1">
-        <div className="flex flex-col space-y-0.5">
-          <div className="relative">
-            <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-            <Input
-              ref={inputRef}
-              type="text"
-              placeholder={`Search for ${typingPlaceholder}${isTyping ? '|' : ''}`}
-              value={searchQuery}
-              onChange={handleSearchChange}
-              onFocus={handleFocus}
-              onBlur={handleBlur}
-              className="w-full pl-9"
-            />
-          </div>
+    <Card className="p-4 mb-4">
+      {/* Main search input */}
+      <div className="relative mb-3">
+        <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 text-muted-foreground h-4 w-4" />
+        <Input
+          type="text"
+          placeholder="Search your journal entries..."
+          value={searchQuery}
+          onChange={(e) => setSearchQuery(e.target.value)}
+          className="pl-10 pr-10"
+        />
+        {searchQuery && (
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={() => setSearchQuery('')}
+            className="absolute right-1 top-1/2 transform -translate-y-1/2 h-8 w-8 p-0"
+          >
+            <X className="h-4 w-4" />
+          </Button>
+        )}
+      </div>
 
-          <div className="flex flex-wrap items-center justify-end gap-1 py-0.5"> 
-            <div className="text-xs text-muted-foreground">
-              <TranslatableText 
-                text={`${filteredEntries.length} total ${filteredEntries.length === 1 ? 'entry' : 'entries'}`} 
-              />
-            </div>
-          </div>
+      {/* Advanced filters toggle */}
+      <Collapsible open={isAdvancedOpen} onOpenChange={setIsAdvancedOpen}>
+        <div className="flex items-center justify-between">
+          <CollapsibleTrigger asChild>
+            <Button variant="ghost" size="sm" className="p-0 h-auto">
+              <Calendar className="h-4 w-4 mr-2" />
+              <TranslatableText text="Advanced filters" />
+            </Button>
+          </CollapsibleTrigger>
+          
+          {hasActiveFilters && (
+            <Button variant="ghost" size="sm" onClick={clearAllFilters}>
+              <X className="h-4 w-4 mr-1" />
+              <TranslatableText text="Clear all" />
+            </Button>
+          )}
         </div>
-      </CardContent>
+
+        <CollapsibleContent>
+          <AnimatePresence>
+            <motion.div
+              initial={{ opacity: 0, height: 0 }}
+              animate={{ opacity: 1, height: 'auto' }}
+              exit={{ opacity: 0, height: 0 }}
+              className="mt-4 space-y-4"
+            >
+              {/* Date range */}
+              <div className="grid grid-cols-2 gap-2">
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">
+                    <TranslatableText text="From date" />
+                  </label>
+                  <Input
+                    type="date"
+                    value={dateRange.start}
+                    onChange={(e) => setDateRange(prev => ({...prev, start: e.target.value}))}
+                    className="text-sm"
+                  />
+                </div>
+                <div>
+                  <label className="text-sm text-muted-foreground mb-1 block">
+                    <TranslatableText text="To date" />
+                  </label>
+                  <Input
+                    type="date"
+                    value={dateRange.end}
+                    onChange={(e) => setDateRange(prev => ({...prev, end: e.target.value}))}
+                    className="text-sm"
+                  />
+                </div>
+              </div>
+
+              {/* Themes filter */}
+              {allThemes.length > 0 && (
+                <div>
+                  <label className="text-sm text-muted-foreground mb-2 block">
+                    <TranslatableText text="Filter by themes" />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {allThemes.slice(0, 8).map(theme => (
+                      <Badge
+                        key={theme}
+                        variant={selectedThemes.includes(theme) ? "default" : "outline"}
+                        className="cursor-pointer text-xs"
+                        onClick={() => handleThemeToggle(theme)}
+                      >
+                        #{theme}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              {/* Emotions filter */}
+              {allEmotions.length > 0 && (
+                <div>
+                  <label className="text-sm text-muted-foreground mb-2 block">
+                    <TranslatableText text="Filter by emotions" />
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {allEmotions.slice(0, 8).map(emotion => (
+                      <Badge
+                        key={emotion}
+                        variant={selectedEmotions.includes(emotion) ? "default" : "outline"}
+                        className="cursor-pointer text-xs capitalize"
+                        onClick={() => handleEmotionToggle(emotion)}
+                      >
+                        {emotion}
+                      </Badge>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </CollapsibleContent>
+      </Collapsible>
+
+      {/* Results summary */}
+      {hasActiveFilters && (
+        <div className="mt-3 pt-3 border-t text-sm text-muted-foreground">
+          <TranslatableText 
+            text={`Showing ${filteredEntries.length} of ${entries.length} entries`} 
+          />
+        </div>
+      )}
     </Card>
   );
 };

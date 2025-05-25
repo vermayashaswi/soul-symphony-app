@@ -1,5 +1,5 @@
 import { supabase } from '@/integrations/supabase/client';
-import { JournalEntry } from '@/components/journal/JournalEntryCard';
+import { JournalEntry } from '@/types/journal';
 
 /**
  * Creates a welcome entry for users with no entries
@@ -251,27 +251,20 @@ export const fetchJournalEntries = async (
  */
 const processEntries = (data: any[]): JournalEntry[] => {
   return data.map(item => {
-    // Convert emotions if needed
-    let convertedEmotions: Record<string, number> = {};
+    // Convert emotions to proper format
+    let convertedEmotions: Record<string, number> | null = null;
     
     if (item.emotions) {
       if (Array.isArray(item.emotions)) {
         console.log('[JournalService] Converting emotions from array to object format');
         
-        // Handle array format
+        const emotionObj: Record<string, number> = {};
         item.emotions.forEach(emotion => {
           if (hasNameAndIntensity(emotion)) {
-            convertedEmotions[emotion.name.toLowerCase()] = emotion.intensity;
-          } else if (typeof emotion === 'object' && emotion !== null) {
-            // Try to extract name and intensity if available
-            const name = 'name' in emotion ? String(emotion.name) : null;
-            const intensity = 'intensity' in emotion ? Number(emotion.intensity) : null;
-            
-            if (name && intensity !== null) {
-              convertedEmotions[name.toLowerCase()] = intensity;
-            }
+            emotionObj[emotion.name.toLowerCase()] = emotion.intensity;
           }
         });
+        convertedEmotions = emotionObj;
       } 
       else if (typeof item.emotions === 'object' && !Array.isArray(item.emotions)) {
         // If emotions is already in object format {joy: 0.7, sadness: 0.5}
@@ -327,8 +320,8 @@ const processEntries = (data: any[]): JournalEntry[] => {
       created_at: item.created_at,
       audio_url: item.audio_url,
       sentiment: item.sentiment,
-      themes: item.master_themes,
-      foreignKey: item["foreign key"],
+      master_themes: item.master_themes,
+      "foreign key": item["foreign key"],
       entities: parsedEntities,
       emotions: convertedEmotions,
       duration: item.duration,

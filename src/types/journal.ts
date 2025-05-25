@@ -9,7 +9,7 @@ export interface JournalEntry {
   "refined text"?: string;
   audio_url?: string;
   duration?: number;
-  emotions?: Json;
+  emotions?: Record<string, number> | null;
   sentiment?: string;
   entities?: Array<{
     type: string;
@@ -21,12 +21,12 @@ export interface JournalEntry {
   themes?: string[];
   user_feedback?: string | null;
   Edit_Status?: number | null;
-  content: string; // Changed from optional to required
-  original_language?: string; // Keep as optional
-  translation_text?: string; // Keep as optional
-  tempId?: string; // Temporary ID for tracking processing entries
-  entry_type?: 'regular' | 'welcome'; // New field
-  is_deletable?: boolean; // New field
+  content: string;
+  original_language?: string;
+  translation_text?: string;
+  tempId?: string;
+  entry_type?: 'regular' | 'welcome';
+  is_deletable?: boolean;
 }
 
 export interface JournalEntryFormData extends JournalEntry {

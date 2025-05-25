@@ -909,16 +909,9 @@ const Journal = () => {
                         
   const showLoading = loading && displayEntries.length === 0 && !hasLocalChanges;
 
-  // Convert entries to ensure they have the required content field
+  // Convert entries to ensure they have the required content field and proper type structure
   const entriesToDisplay = (filteredEntries.length > 0 && displayEntries.length > 0) ? 
-    filteredEntries.map(entry => ({
-      ...entry,
-      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
-    })) : 
-    displayEntries.map(entry => ({
-      ...entry,
-      content: entry.content || entry["refined text"] || entry["transcription text"] || ""
-    }));
+    filteredEntries : displayEntries;
 
   if (hasRenderError) {
     console.error('[Journal] Recovering from render error');
