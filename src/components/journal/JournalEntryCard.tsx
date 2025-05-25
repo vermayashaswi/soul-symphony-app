@@ -16,6 +16,7 @@ import { JournalErrorBoundary } from './ErrorBoundary';
 import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { TranslatableDate } from '@/components/translation/TranslatableDate';
 import { textWillOverflow } from '@/utils/textUtils';
 
 export interface JournalEntry {
@@ -530,10 +531,12 @@ export function JournalEntryCard({
             <div className="flex items-center space-x-3">
               <div className="flex flex-col">
                 <h3 className="scroll-m-20 text-base md:text-lg font-semibold tracking-tight">
-                  {createdAtFormatted}
+                  <TranslatableDate date={safeEntry.created_at} />
                 </h3>
                 {entry.Edit_Status === 1 && (
-                  <span className="text-xs text-muted-foreground">(edited)</span>
+                  <span className="text-xs text-muted-foreground">
+                    (<TranslatableText text="edited" forceTranslate={true} />)
+                  </span>
                 )}
               </div>
             </div>
