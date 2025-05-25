@@ -7,7 +7,7 @@ import {
   analyzeEmotions,
   generateEmbedding 
 } from './aiProcessing.ts';
-import { storeJournalEntry } from './journalStorage.ts';
+import { storeJournalEntry } from './databaseOperations.ts';
 import { extractThemes } from './themeExtraction.ts';
 
 const corsHeaders = {
@@ -149,16 +149,16 @@ serve(async (req) => {
       .from('journal-audio')
       .getPublicUrl(audioFileName);
 
-    const entryId = await storeJournalEntry({
+    const entryId = await storeJournalEntry(
+      supabase,
       transcribedText,
       refinedText,
-      audioUrl: publicUrl,
+      publicUrl,
       userId,
-      duration: calculatedDuration,
+      calculatedDuration,
       emotions,
-      sentiment,
-      createdAt: new Date().toISOString()
-    });
+      sentiment
+    );
 
     console.log('Journal entry stored with ID:', entryId);
 
