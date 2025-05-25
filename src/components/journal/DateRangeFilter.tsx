@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Calendar } from '@/components/ui/calendar';
@@ -6,6 +7,7 @@ import { CalendarIcon } from 'lucide-react';
 import { format } from 'date-fns';
 import { cn } from '@/lib/utils';
 import { JournalEntry } from '@/types/journal';
+import { DateRange } from 'react-day-picker';
 
 interface DateRangeFilterProps {
   entries: JournalEntry[];
@@ -16,12 +18,9 @@ const DateRangeFilter: React.FC<DateRangeFilterProps> = ({
   entries,
   onFilteredEntries
 }) => {
-  const [date, setDate] = useState<undefined | {
-    from?: Date;
-    to?: Date;
-  }>();
+  const [date, setDate] = useState<DateRange | undefined>();
 
-  const handleDateChange = (newDate: { from?: Date; to?: Date } | undefined) => {
+  const handleDateChange = (newDate: DateRange | undefined) => {
     setDate(newDate);
 
     if (newDate && newDate.from && newDate.to) {

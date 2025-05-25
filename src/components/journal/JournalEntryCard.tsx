@@ -18,6 +18,7 @@ import ExtractThemeButton from './entry-card/ExtractThemeButton';
 import { motion } from 'framer-motion';
 import { useProcessingEntries } from '@/hooks/use-processing-entries';
 import { JournalEntry } from '@/types/journal';
+import { useAudioPlayback } from '@/hooks/use-audio-playback';
 
 interface JournalEntryCardProps {
   entry: JournalEntry;
@@ -40,6 +41,10 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
   const cardRef = useRef<HTMLDivElement>(null);
   
   const { removeEntry } = useProcessingEntries();
+  const { isPlaying, play, pause } = useAudioPlayback({
+    url: entry.audio_url || '',
+    duration: entry.duration
+  });
 
   const isWelcomeEntry = entry.entry_type === 'welcome';
   const isDeletable = entry.is_deletable !== false && !isWelcomeEntry;
@@ -70,11 +75,11 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
       setIsFeedbackDialogOpen(false);
       
       if (setEntries) {
-        setEntries((prevEntries: JournalEntry[]) =>
+        const updatedEntries = (prevEntries: JournalEntry[]) =>
           prevEntries.map(e =>
             e.id === entry.id ? { ...e, user_feedback: feedback } : e
-          )
-        );
+          );
+        setEntries(updatedEntries);
       }
     } catch (error) {
       console.error('Error saving feedback:', error);
@@ -126,11 +131,11 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
 
   const handleEntryUpdated = (newContent: string, isProcessing?: boolean) => {
     if (setEntries) {
-      setEntries((prevEntries: JournalEntry[]) =>
+      const updatedEntries = (prevEntries: JournalEntry[]) =>
         prevEntries.map(e =>
           e.id === entry.id ? { ...e, content: newContent } : e
-        )
-      );
+        );
+      setEntries(updatedEntries);
     }
   };
 
@@ -191,6 +196,18 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
           </div>
 
           <div className="flex items-center space-x-2 ml-4">
+            {/* Audio controls */}
+            {entry.audio_url && (
+              <Button
+                variant="ghost"
+                size="sm"
+                className="h-8 w-8 p-0"
+                onClick={isPlaying ? pause : play}
+              >
+                {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
+              </Button>
+            )}
+
             {!isWelcomeEntry && (
               <>
                 <EditEntryButton
@@ -206,7 +223,6 @@ const JournalEntryCard: React.FC<JournalEntryCardProps> = ({
                   size="sm"
                   className="h-8 w-8 p-0"
                   onClick={() => {
-                    // Handle chat suggestion - could dispatch an event or navigate to chat
                     console.log('Chat suggestion clicked for entry:', entry.id);
                   }}
                 >
