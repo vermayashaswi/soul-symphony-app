@@ -13,7 +13,6 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import ErrorBoundary from '@/components/insights/ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { FeatureGuard } from '@/components/subscription/FeatureGuard';
 
 export default function Insights() {
   console.log("Rendering Insights page");
@@ -132,8 +131,8 @@ export default function Insights() {
   };
 
   return (
-    <FeatureGuard feature="advanced-insights">
-      <div className="min-h-screen bg-background">
+    <ErrorBoundary>
+      <div className="min-h-screen pb-20 insights-container">
         {isSticky && (
           <div className="fixed top-0 left-0 right-0 z-50 py-3 px-4 bg-background border-b shadow-sm flex justify-center insights-sticky-header">
             <div className={cn(
@@ -393,6 +392,6 @@ export default function Insights() {
           )}
         </div>
       </div>
-    </FeatureGuard>
+    </ErrorBoundary>
   );
 }
