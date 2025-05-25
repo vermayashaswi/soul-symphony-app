@@ -1,4 +1,3 @@
-
 import { BehaviorSubject, Observable } from 'rxjs';
 import { showToast } from './toast-helper';
 
@@ -23,6 +22,7 @@ export class ProcessingStateManager {
   private processingEntries: ProcessingEntry[] = [];
   private entriesSubject = new BehaviorSubject<ProcessingEntry[]>([]);
   private activeStartProcessingCalls = new Set<string>(); // Prevent duplicates
+  private immediateProcessingState = new Set<string>(); // Track immediate processing
   
   constructor() {
     console.log('[ProcessingStateManager] Initialized with smart transparency');
@@ -42,12 +42,16 @@ export class ProcessingStateManager {
     if (existingEntry) {
       console.log(`[ProcessingStateManager] Entry ${tempId} already exists, making visible instead`);
       existingEntry.isVisible = true;
+      this.immediateProcessingState.add(tempId);
       this.notifySubscribers();
       return;
     }
     
     // Mark as active to prevent race conditions
     this.activeStartProcessingCalls.add(tempId);
+    
+    // Add to immediate state for instant detection
+    this.immediateProcessingState.add(tempId);
     
     const entry: ProcessingEntry = {
       tempId,
@@ -59,11 +63,16 @@ export class ProcessingStateManager {
     this.processingEntries.push(entry);
     console.log(`[ProcessingStateManager] Added entry ${tempId}. Total entries: ${this.processingEntries.length}`);
     
-    // Immediately notify subscribers
+    // Immediately notify subscribers SYNCHRONOUSLY
     this.notifySubscribers();
     
-    // Dispatch immediate event for UI updates
+    // Dispatch immediate event for UI updates SYNCHRONOUSLY
     window.dispatchEvent(new CustomEvent('processingStarted', {
+      detail: { tempId, timestamp: Date.now(), immediate: true }
+    }));
+    
+    // Also dispatch immediate processing state change
+    window.dispatchEvent(new CustomEvent('immediateProcessingStarted', {
       detail: { tempId, timestamp: Date.now() }
     }));
     
@@ -71,6 +80,21 @@ export class ProcessingStateManager {
     setTimeout(() => {
       this.activeStartProcessingCalls.delete(tempId);
     }, 1000);
+  }
+  
+  // New method to check immediate processing state
+  public isImmediatelyProcessing(tempId: string): boolean {
+    return this.immediateProcessingState.has(tempId) || this.isProcessing(tempId);
+  }
+  
+  // New method to get immediate processing count
+  public getImmediateProcessingCount(): number {
+    return this.immediateProcessingState.size + this.getVisibleProcessingEntries().length;
+  }
+  
+  // New method to check if any processing is happening right now
+  public hasAnyProcessing(): boolean {
+    return this.immediateProcessingState.size > 0 || this.getVisibleProcessingEntries().length > 0;
   }
   
   public updateEntryState(tempId: string, state: EntryProcessingState, errorMessage?: string): void {
@@ -85,8 +109,9 @@ export class ProcessingStateManager {
       entry.errorMessage = errorMessage;
     }
     
-    // If completed, immediately check for real entry and hide if found
+    // Clear from immediate state when completing
     if (state === EntryProcessingState.COMPLETED) {
+      this.immediateProcessingState.delete(tempId);
       console.log(`[ProcessingStateManager] Entry ${tempId} completed, checking for real entry`);
       this.checkAndHideEntry(tempId);
     }
@@ -151,6 +176,7 @@ export class ProcessingStateManager {
     const entry = this.processingEntries.find(e => e.tempId === tempId);
     if (entry) {
       entry.isVisible = false;
+      this.immediateProcessingState.delete(tempId);
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Hidden entry ${tempId}`);
       
@@ -165,6 +191,7 @@ export class ProcessingStateManager {
     const entry = this.processingEntries.find(e => e.tempId === tempId);
     if (entry) {
       entry.entryId = entryId;
+      this.immediateProcessingState.delete(tempId);
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Set entry ID for ${tempId} to ${entryId}`);
       
@@ -179,6 +206,7 @@ export class ProcessingStateManager {
     this.processingEntries = this.processingEntries.filter(entry => entry.tempId !== tempId);
     
     if (initialLength !== this.processingEntries.length) {
+      this.immediateProcessingState.delete(tempId);
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Removed entry ${tempId}. Remaining entries: ${this.processingEntries.length}`);
       
@@ -229,6 +257,7 @@ export class ProcessingStateManager {
       entry.state = EntryProcessingState.PROCESSING;
       entry.errorMessage = undefined;
       entry.isVisible = true;
+      this.immediateProcessingState.add(tempId);
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Retrying processing for ${tempId}`);
     }
@@ -268,6 +297,7 @@ export class ProcessingStateManager {
   public dispose(): void {
     this.processingEntries = [];
     this.activeStartProcessingCalls.clear();
+    this.immediateProcessingState.clear();
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Disposed state manager');
   }
@@ -275,6 +305,7 @@ export class ProcessingStateManager {
   public clearAll(): void {
     this.processingEntries = [];
     this.activeStartProcessingCalls.clear();
+    this.immediateProcessingState.clear();
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Cleared all processing entries');
     
@@ -305,6 +336,7 @@ export class ProcessingStateManager {
       entry.state = EntryProcessingState.ERROR;
       entry.errorMessage = errorMessage;
       entry.isVisible = true; // Make sure error is visible
+      this.immediateProcessingState.delete(tempId);
       this.notifySubscribers();
       
       showToast("Error", `Processing failed: ${errorMessage}`);
@@ -317,6 +349,7 @@ export class ProcessingStateManager {
     this.processingEntries.forEach(entry => {
       entry.isVisible = false;
     });
+    this.immediateProcessingState.clear();
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Force hid all processing entries');
   }
