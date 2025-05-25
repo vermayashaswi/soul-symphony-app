@@ -4,7 +4,7 @@ import { showToast } from './toast-helper';
 // Define the processing state enum
 export enum EntryProcessingState {
   PROCESSING = 'processing',
-  TRANSITIONING = 'transitioning', // New state for smooth transitions
+  TRANSITIONING = 'transitioning',
   COMPLETED = 'completed',
   ERROR = 'error'
 }
@@ -16,7 +16,7 @@ export interface ProcessingEntry {
   startTime: number;
   state: EntryProcessingState;
   errorMessage?: string;
-  transitionStartTime?: number; // Track when transition started
+  transitionStartTime?: number;
 }
 
 export class ProcessingStateManager {
@@ -28,9 +28,16 @@ export class ProcessingStateManager {
   }
   
   public startProcessing(tempId: string): void {
-    // Don't add if already exists
+    // Strict duplicate prevention - don't add if already exists
     if (this.isProcessing(tempId)) {
-      console.log(`[ProcessingStateManager] Entry ${tempId} already being processed, skipping`);
+      console.log(`[ProcessingStateManager] Entry ${tempId} already being processed, skipping duplicate`);
+      return;
+    }
+    
+    // Additional check to prevent race conditions
+    const existingEntry = this.processingEntries.find(e => e.tempId === tempId);
+    if (existingEntry) {
+      console.log(`[ProcessingStateManager] Entry ${tempId} already exists in array, skipping duplicate`);
       return;
     }
     
@@ -42,7 +49,7 @@ export class ProcessingStateManager {
     
     this.processingEntries.push(entry);
     this.notifySubscribers();
-    console.log(`[ProcessingStateManager] Started processing ${tempId}`);
+    console.log(`[ProcessingStateManager] Started processing ${tempId}. Total entries: ${this.processingEntries.length}`);
   }
   
   public updateEntryState(tempId: string, state: EntryProcessingState, errorMessage?: string): void {
@@ -60,11 +67,10 @@ export class ProcessingStateManager {
         
         console.log(`[ProcessingStateManager] Entry ${tempId} entering transition state`);
         
-        // Schedule the actual cleanup after a longer delay to ensure UI has rendered
+        // Much faster cleanup - reduced from 3000ms to 800ms
         setTimeout(() => {
-          // Check if real entry card is rendered before removing
           this.checkAndCleanupEntry(tempId);
-        }, 3000); // Increased from 2000ms to 3000ms
+        }, 800);
       }
       
       this.notifySubscribers();
@@ -73,30 +79,27 @@ export class ProcessingStateManager {
   }
   
   private checkAndCleanupEntry(tempId: string): void {
-    // More robust DOM detection with multiple selectors
+    // Faster, more efficient DOM detection
     const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
                          document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`) ||
                          document.querySelector(`.journal-entry-card:not(.processing-card)[data-temp-id="${tempId}"]`);
     
-    const processingCard = document.querySelector(`[data-temp-id="${tempId}"][data-loading-skeleton="true"]`);
-    
     if (realEntryCard) {
-      console.log(`[ProcessingStateManager] Real entry card found for ${tempId}, safe to cleanup`);
+      console.log(`[ProcessingStateManager] Real entry card found for ${tempId}, cleaning up immediately`);
       
-      // Add a small delay to ensure smooth transition
+      // Immediate cleanup with shorter delay
       setTimeout(() => {
         this.removeEntry(tempId);
         
-        // Dispatch content ready event
         window.dispatchEvent(new CustomEvent('entryContentReady', {
           detail: { tempId, timestamp: Date.now() }
         }));
-      }, 500); // Small additional delay for smooth transition
+      }, 200); // Reduced from 500ms to 200ms
       
     } else {
-      console.log(`[ProcessingStateManager] Real entry card not found for ${tempId}, retrying cleanup in 2s`);
+      console.log(`[ProcessingStateManager] Real entry card not found for ${tempId}, trying once more`);
       
-      // Retry cleanup after another 2 seconds if real entry not found
+      // Only one retry attempt with shorter delay
       setTimeout(() => {
         const retryRealEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
                                   document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`) ||
@@ -110,28 +113,10 @@ export class ProcessingStateManager {
             detail: { tempId, timestamp: Date.now() }
           }));
         } else {
-          console.log(`[ProcessingStateManager] Second retry for ${tempId} in 2s`);
-          
-          // One more retry after 2 more seconds
-          setTimeout(() => {
-            const finalRetryRealEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
-                                           document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`) ||
-                                           document.querySelector(`.journal-entry-card:not(.processing-card)[data-temp-id="${tempId}"]`);
-            
-            if (finalRetryRealEntryCard) {
-              console.log(`[ProcessingStateManager] Real entry card found on final retry for ${tempId}, cleaning up`);
-              this.removeEntry(tempId);
-              
-              window.dispatchEvent(new CustomEvent('entryContentReady', {
-                detail: { tempId, timestamp: Date.now() }
-              }));
-            } else {
-              console.log(`[ProcessingStateManager] Force cleanup for ${tempId} after all retry attempts`);
-              this.removeEntry(tempId);
-            }
-          }, 2000);
+          console.log(`[ProcessingStateManager] Force cleanup for ${tempId} after retry attempt`);
+          this.removeEntry(tempId);
         }
-      }, 2000);
+      }, 1000); // Reduced from 2000ms to 1000ms
     }
   }
   
@@ -150,7 +135,7 @@ export class ProcessingStateManager {
     
     if (initialLength !== this.processingEntries.length) {
       this.notifySubscribers();
-      console.log(`[ProcessingStateManager] Removed entry ${tempId}`);
+      console.log(`[ProcessingStateManager] Removed entry ${tempId}. Remaining entries: ${this.processingEntries.length}`);
     }
   }
   
@@ -231,7 +216,6 @@ export class ProcessingStateManager {
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Cleared all processing entries');
     
-    // Also clear from localStorage
     try {
       localStorage.removeItem('processingEntries');
       console.log('[ProcessingStateManager] Cleared processing entries from localStorage');
@@ -242,7 +226,6 @@ export class ProcessingStateManager {
   
   private notifySubscribers(): void {
     this.entriesSubject.next([...this.processingEntries]);
-    // Save to localStorage whenever state changes
     this.saveToLocalStorage();
   }
   

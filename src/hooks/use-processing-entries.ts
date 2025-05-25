@@ -38,11 +38,9 @@ export function useProcessingEntries() {
     // Handle force refresh events
     const handleForceRefresh = () => {
       console.log('[useProcessingEntries] Force refresh requested');
-      // Force update of all entries
       const currentEntries = processingStateManager.getProcessingEntries();
       setEntries([...currentEntries]);
       
-      // Include both PROCESSING and TRANSITIONING states in activeProcessingIds
       const processingIds = currentEntries
         .filter(entry => entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING)
         .map(entry => entry.tempId);
