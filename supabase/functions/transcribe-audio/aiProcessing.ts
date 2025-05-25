@@ -1,3 +1,4 @@
+
 // Import necessary Deno modules
 import { encode as base64Encode } from "https://deno.land/std@0.132.0/encoding/base64.ts";
 
@@ -116,8 +117,8 @@ export async function translateAndRefineText(
     // Call the OpenAI API with the appropriate system message
     // Include detected language information in both prompts
     const systemMessage = isNonEnglish 
-      ? `You are a multilingual expert that translates and refines text from any language to English. The text was detected to be in language(s): ${detectedLanguagesInfo}. Please use this language information when translating. Translate the following text into clear, natural English while preserving all meaning and emotion.`
-      : `You are an expert at refining transcribed text. The text was detected to be in language(s): ${detectedLanguagesInfo}. Clean up the input text into clear, well-structured sentences. Fix grammar issues, remove filler words, and make it sound more natural, but preserve ALL the original meaning and information.`;
+      ? `You are a multilingual translator. Translate the following text exactly into natural, fluent English. Do not add any explanation, interpretation, or additional context. Preserve all original meaning, tone, and emotion as closely as possible. The original language was detected as: ${detectedLanguagesInfo}.`
+      : `You are a transcription refinement assistant. Improve the grammar and sentence structure of the following English text without changing its meaning. Do not add, infer, or rephrase anything beyond clarity and correctness. Remove filler words only where it doesn't affect the speaker's intent. Keep tone and phrasing as close to the original as possible.`;
     
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
