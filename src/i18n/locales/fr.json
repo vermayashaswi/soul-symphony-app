@@ -79,5 +79,33 @@
       "description": "Téléchargez SOULo aujourd'hui et transformez votre façon de tenir un journal.",
       "buttonText": "Commencer"
     }
+  },
+  "toasts": {
+    "success": "Succès",
+    "error": "Erreur",
+    "warning": "Avertissement",
+    "info": "Info",
+    "conversationDeleted": "Conversation supprimée avec succès",
+    "entryDeleted": "Entrée supprimée avec succès",
+    "entryUpdated": "Entrée de journal mise à jour avec succès",
+    "translationUpdated": "Traduction mise à jour avec succès",
+    "languageChanged": "Langue changée avec succès",
+    "profileUpdated": "Profil mis à jour avec succès",
+    "settingsSaved": "Paramètres sauvegardés avec succès",
+    "signInSuccess": "Connexion réussie",
+    "signOutSuccess": "Déconnexion réussie",
+    "uploadSuccess": "Téléchargement terminé avec succès",
+    "entryDeleteFailed": "Échec de la suppression de l'entrée",
+    "entryUpdateFailed": "Échec de la mise à jour de l'entrée",
+    "authRequired": "Authentification requise",
+    "uploadFailed": "Échec du téléchargement",
+    "connectionError": "Erreur de connexion",
+    "processingError": "Échec du traitement",
+    "savingError": "Échec de la sauvegarde",
+    "loadingError": "Échec du chargement des données",
+    "processing": "Traitement en cours...",
+    "saving": "Sauvegarde...",
+    "loading": "Chargement...",
+    "uploading": "Téléchargement..."
   }
 }

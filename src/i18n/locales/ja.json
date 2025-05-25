@@ -79,5 +79,33 @@
       "description": "今日SOULoをダウンロードして、日記のつけ方を変革しましょう。",
       "buttonText": "始める"
     }
+  },
+  "toasts": {
+    "success": "成功",
+    "error": "エラー",
+    "warning": "警告",
+    "info": "情報",
+    "conversationDeleted": "会話が正常に削除されました",
+    "entryDeleted": "エントリが正常に削除されました",
+    "entryUpdated": "日記エントリが正常に更新されました",
+    "translationUpdated": "翻訳が正常に更新されました",
+    "languageChanged": "言語が正常に変更されました",
+    "profileUpdated": "プロフィールが正常に更新されました",
+    "settingsSaved": "設定が正常に保存されました",
+    "signInSuccess": "正常にサインインしました",
+    "signOutSuccess": "正常にサインアウトしました",
+    "uploadSuccess": "アップロードが完了しました",
+    "entryDeleteFailed": "エントリの削除に失敗しました",
+    "entryUpdateFailed": "エントリの更新に失敗しました",
+    "authRequired": "認証が必要です",
+    "uploadFailed": "アップロードに失敗しました",
+    "connectionError": "接続エラーが発生しました",
+    "processingError": "処理に失敗しました",
+    "savingError": "変更の保存に失敗しました",
+    "loadingError": "データの読み込みに失敗しました",
+    "processing": "処理中...",
+    "saving": "保存中...",
+    "loading": "読み込み中...",
+    "uploading": "アップロード中..."
   }
 }

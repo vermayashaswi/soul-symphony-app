@@ -64,5 +64,33 @@
       "noData": "No life areas found in this time period",
       "colorInfo": "Color indicates sentiment: red (negative), yellow (neutral), green (positive)"
     }
+  },
+  "toasts": {
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info",
+    "conversationDeleted": "Conversation deleted successfully",
+    "entryDeleted": "Entry deleted successfully", 
+    "entryUpdated": "Journal entry updated successfully",
+    "translationUpdated": "Translation updated successfully",
+    "languageChanged": "Language changed successfully",
+    "profileUpdated": "Profile updated successfully",
+    "settingsSaved": "Settings saved successfully",
+    "signInSuccess": "Signed in successfully",
+    "signOutSuccess": "Signed out successfully",
+    "uploadSuccess": "Upload completed successfully",
+    "entryDeleteFailed": "Failed to delete entry",
+    "entryUpdateFailed": "Failed to update entry",
+    "authRequired": "Authentication required",
+    "uploadFailed": "Upload failed",
+    "connectionError": "Connection error occurred",
+    "processingError": "Processing failed",
+    "savingError": "Failed to save changes",
+    "loadingError": "Failed to load data",
+    "processing": "Processing...",
+    "saving": "Saving...",
+    "loading": "Loading...",
+    "uploading": "Uploading..."
   }
 }

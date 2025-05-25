@@ -79,5 +79,33 @@
       "description": "Baixe o SOULo hoje e transforme como você mantém um diário.",
       "buttonText": "Começar"
     }
+  },
+  "toasts": {
+    "success": "Sucesso",
+    "error": "Erro",
+    "warning": "Aviso",
+    "info": "Informação",
+    "conversationDeleted": "Conversa excluída com sucesso",
+    "entryDeleted": "Entrada excluída com sucesso",
+    "entryUpdated": "Entrada de diário atualizada com sucesso",
+    "translationUpdated": "Tradução atualizada com sucesso",
+    "languageChanged": "Idioma alterado com sucesso",
+    "profileUpdated": "Perfil atualizado com sucesso",
+    "settingsSaved": "Configurações salvas com sucesso",
+    "signInSuccess": "Login realizado com sucesso",
+    "signOutSuccess": "Logout realizado com sucesso",
+    "uploadSuccess": "Upload concluído com sucesso",
+    "entryDeleteFailed": "Falha ao excluir entrada",
+    "entryUpdateFailed": "Falha ao atualizar entrada",
+    "authRequired": "Autenticação necessária",
+    "uploadFailed": "Falha no upload",
+    "connectionError": "Erro de conexão ocorreu",
+    "processingError": "Falha no processamento",
+    "savingError": "Falha ao salvar alterações",
+    "loadingError": "Falha ao carregar dados",
+    "processing": "Processando...",
+    "saving": "Salvando...",
+    "loading": "Carregando...",
+    "uploading": "Fazendo upload..."
   }
 }

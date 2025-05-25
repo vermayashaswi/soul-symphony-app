@@ -79,5 +79,33 @@
       "description": "قم بتنزيل SOULo اليوم وغيّر طريقة كتابة اليوميات.",
       "buttonText": "ابدأ الآن"
     }
+  },
+  "toasts": {
+    "success": "نجح",
+    "error": "خطأ",
+    "warning": "تحذير",
+    "info": "معلومات",
+    "conversationDeleted": "تم حذف المحادثة بنجاح",
+    "entryDeleted": "تم حذف الإدخال بنجاح",
+    "entryUpdated": "تم تحديث إدخال اليومية بنجاح",
+    "translationUpdated": "تم تحديث الترجمة بنجاح",
+    "languageChanged": "تم تغيير اللغة بنجاح",
+    "profileUpdated": "تم تحديث الملف الشخصي بنجاح",
+    "settingsSaved": "تم حفظ الإعدادات بنجاح",
+    "signInSuccess": "تم تسجيل الدخول بنجاح",
+    "signOutSuccess": "تم تسجيل الخروج بنجاح",
+    "uploadSuccess": "تم التحميل بنجاح",
+    "entryDeleteFailed": "فشل في حذف الإدخال",
+    "entryUpdateFailed": "فشل في تحديث الإدخال",
+    "authRequired": "المصادقة مطلوبة",
+    "uploadFailed": "فشل التحميل",
+    "connectionError": "حدث خطأ في الاتصال",
+    "processingError": "فشل في المعالجة",
+    "savingError": "فشل في حفظ التغييرات",
+    "loadingError": "فشل في تحميل البيانات",
+    "processing": "جاري المعالجة...",
+    "saving": "جاري الحفظ...",
+    "loading": "جاري التحميل...",
+    "uploading": "جاري الرفع..."
   }
 }

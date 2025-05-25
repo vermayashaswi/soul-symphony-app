@@ -82,5 +82,33 @@
   "download": {
     "appStore": "ऐप स्टोर पर डाउनलोड करें",
     "googlePlay": "Google Play पर प्राप्त करें"
+  },
+  "toasts": {
+    "success": "सफलता",
+    "error": "त्रुटि",
+    "warning": "चेतावनी",
+    "info": "जानकारी",
+    "conversationDeleted": "बातचीत सफलतापूर्वक हटाई गई",
+    "entryDeleted": "प्रविष्टि सफलतापूर्वक हटाई गई",
+    "entryUpdated": "डायरी प्रविष्टि सफलतापूर्वक अपडेट की गई",
+    "translationUpdated": "अनुवाद सफलतापूर्वक अपडेट किया गया",
+    "languageChanged": "भाषा सफलतापूर्वक बदली गई",
+    "profileUpdated": "प्रोफ़ाइल सफलतापूर्वक अपडेट की गई",
+    "settingsSaved": "सेटिंग्स सफलतापूर्वक सहेजी गईं",
+    "signInSuccess": "सफलतापूर्वक साइन इन किया गया",
+    "signOutSuccess": "सफलतापूर्वक साइन आउट किया गया",
+    "uploadSuccess": "अपलोड सफलतापूर्वक पूरा हुआ",
+    "entryDeleteFailed": "प्रविष्टि हटाने में विफल",
+    "entryUpdateFailed": "प्रविष्टि अपडेट करने में विफल",
+    "authRequired": "प्रमाणीकरण आवश्यक",
+    "uploadFailed": "अपलोड विफल",
+    "connectionError": "कनेक्शन त्रुटि हुई",
+    "processingError": "प्रसंस्करण विफल",
+    "savingError": "परिवर्तन सहेजने में विफल",
+    "loadingError": "डेटा लोड करने में विफल",
+    "processing": "प्रसंस्करण...",
+    "saving": "सहेजा जा रहा है...",
+    "loading": "लोड हो रहा है...",
+    "uploading": "अपलोड हो रहा है..."
   }
 }

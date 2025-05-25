@@ -1,14 +1,15 @@
+
 import React, { useState, useEffect } from 'react';
 import { Edit } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
 import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { useIsMobile } from '@/hooks/use-mobile';
 import { Loader2 } from 'lucide-react';
 import { reprocessJournalEntry } from '@/services/journalService';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { showTranslatedToast } from '@/services/notificationService';
+import { useIsMobile } from '@/hooks/use-mobile';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -119,7 +120,11 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         
       if (updateError) {
         console.error("Error updating entry:", updateError);
-        toast.error(`Failed to update entry: ${updateError.message}`);
+        showTranslatedToast(
+          'toasts.error',
+          'toasts.entryUpdateFailed',
+          translate
+        );
         onEntryUpdated(content, false);
         setIsProcessing(false);
         setIsSubmitting(false);
@@ -136,7 +141,11 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
           
           if (!success) {
             console.error('Reprocessing failed for entry:', entryId);
-            toast.error('Entry saved but analysis failed');
+            showTranslatedToast(
+              'toasts.error',
+              'toasts.processingError',
+              translate
+            );
           }
         }
         
@@ -150,14 +159,26 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         setIsProcessing(false);
         
         if (currentLanguage === 'en') {
-          toast.success('Journal entry updated successfully');
+          showTranslatedToast(
+            'toasts.success',
+            'toasts.entryUpdated',
+            translate
+          );
         } else {
-          toast.success('Translation updated successfully');
+          showTranslatedToast(
+            'toasts.success',
+            'toasts.translationUpdated',
+            translate
+          );
         }
         
       } catch (processingError) {
         console.error('Processing failed:', processingError);
-        toast.error('Entry saved but analysis failed');
+        showTranslatedToast(
+          'toasts.error',
+          'toasts.processingError',
+          translate
+        );
         setIsDialogOpen(false);
         setIsSubmitting(false);
         setIsProcessing(false);
@@ -165,7 +186,11 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
       
     } catch (error) {
       console.error('Error updating journal entry:', error);
-      toast.error('Failed to update entry');
+      showTranslatedToast(
+        'toasts.error',
+        'toasts.entryUpdateFailed',
+        translate
+      );
       setIsSubmitting(false);
       setIsProcessing(false);
     }

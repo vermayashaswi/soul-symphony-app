@@ -79,5 +79,33 @@
       "description": "Laden Sie SOULo heute herunter und verändern Sie, wie Sie Tagebuch führen.",
       "buttonText": "Loslegen"
     }
+  },
+  "toasts": {
+    "success": "Erfolg",
+    "error": "Fehler",
+    "warning": "Warnung",
+    "info": "Info",
+    "conversationDeleted": "Unterhaltung erfolgreich gelöscht",
+    "entryDeleted": "Eintrag erfolgreich gelöscht",
+    "entryUpdated": "Tagebucheintrag erfolgreich aktualisiert",
+    "translationUpdated": "Übersetzung erfolgreich aktualisiert",
+    "languageChanged": "Sprache erfolgreich geändert",
+    "profileUpdated": "Profil erfolgreich aktualisiert",
+    "settingsSaved": "Einstellungen erfolgreich gespeichert",
+    "signInSuccess": "Erfolgreich angemeldet",
+    "signOutSuccess": "Erfolgreich abgemeldet",
+    "uploadSuccess": "Upload erfolgreich abgeschlossen",
+    "entryDeleteFailed": "Löschen des Eintrags fehlgeschlagen",
+    "entryUpdateFailed": "Aktualisierung des Eintrags fehlgeschlagen",
+    "authRequired": "Authentifizierung erforderlich",
+    "uploadFailed": "Upload fehlgeschlagen",
+    "connectionError": "Verbindungsfehler aufgetreten",
+    "processingError": "Verarbeitung fehlgeschlagen",
+    "savingError": "Speichern der Änderungen fehlgeschlagen",
+    "loadingError": "Laden der Daten fehlgeschlagen",
+    "processing": "Wird verarbeitet...",
+    "saving": "Wird gespeichert...",
+    "loading": "Wird geladen...",
+    "uploading": "Wird hochgeladen..."
   }
 }
