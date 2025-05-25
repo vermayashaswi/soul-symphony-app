@@ -4,71 +4,60 @@ import { processingStateManager, ProcessingEntry, EntryProcessingState } from '@
 
 export function useProcessingEntries() {
   const [entries, setEntries] = useState<ProcessingEntry[]>([]);
-  const [activeProcessingIds, setActiveProcessingIds] = useState<string[]>([]);
+  const [visibleEntries, setVisibleEntries] = useState<ProcessingEntry[]>([]);
   const [lastUpdate, setLastUpdate] = useState<number>(Date.now());
   
   useEffect(() => {
     // Initialize from localStorage on first mount
     processingStateManager.restoreFromLocalStorage();
     
-    // Update the state immediately to prevent blank screens
+    // Update the state immediately
     const initialEntries = processingStateManager.getProcessingEntries();
+    const initialVisible = processingStateManager.getVisibleProcessingEntries();
+    
     setEntries(initialEntries);
-    
-    // Include both PROCESSING and TRANSITIONING states in activeProcessingIds
-    const initialProcessingIds = initialEntries
-      .filter(entry => entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING)
-      .map(entry => entry.tempId);
-    
-    setActiveProcessingIds(initialProcessingIds);
+    setVisibleEntries(initialVisible);
     
     // Subscribe to entries changes
     const subscription = processingStateManager.entriesChanges().subscribe(updatedEntries => {
       setEntries(updatedEntries);
+      setVisibleEntries(updatedEntries.filter(entry => entry.isVisible));
       setLastUpdate(Date.now());
-      
-      // Include both PROCESSING and TRANSITIONING states in activeProcessingIds
-      const processingIds = updatedEntries
-        .filter(entry => entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING)
-        .map(entry => entry.tempId);
-      
-      setActiveProcessingIds(processingIds);
     });
     
-    // Handle force refresh events
-    const handleForceRefresh = () => {
-      console.log('[useProcessingEntries] Force refresh requested');
+    // Handle immediate hide events
+    const handleEntryHidden = (event: CustomEvent) => {
+      console.log('[useProcessingEntries] Entry hidden event received');
       const currentEntries = processingStateManager.getProcessingEntries();
+      const currentVisible = processingStateManager.getVisibleProcessingEntries();
       setEntries([...currentEntries]);
-      
-      const processingIds = currentEntries
-        .filter(entry => entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING)
-        .map(entry => entry.tempId);
-      
-      setActiveProcessingIds([...processingIds]);
-      setLastUpdate(Date.now());
+      setVisibleEntries([...currentVisible]);
     };
     
-    window.addEventListener('journalUIForceRefresh', handleForceRefresh);
+    window.addEventListener('processingEntryHidden', handleEntryHidden as EventListener);
     
     return () => {
       subscription.unsubscribe();
-      window.removeEventListener('journalUIForceRefresh', handleForceRefresh);
+      window.removeEventListener('processingEntryHidden', handleEntryHidden as EventListener);
     };
   }, []);
   
-  // Return the entries and helper functions
+  // Return simplified interface focused on visible entries
   return {
     entries,
-    activeProcessingIds,
+    visibleEntries, // Only visible processing entries
+    activeProcessingIds: visibleEntries.map(entry => entry.tempId),
     lastUpdate,
     isProcessing: (tempId: string) => {
-      const entry = processingStateManager.getEntryById(tempId);
-      return entry ? (entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING) : false;
+      return processingStateManager.isProcessing(tempId);
+    },
+    isVisible: (tempId: string) => {
+      return processingStateManager.isVisible(tempId);
     },
     hasError: processingStateManager.hasError.bind(processingStateManager),
     getEntryId: processingStateManager.getEntryId.bind(processingStateManager),
     removeEntry: processingStateManager.removeEntry.bind(processingStateManager),
+    hideEntry: processingStateManager.hideEntry.bind(processingStateManager),
     retryProcessing: processingStateManager.retryProcessing.bind(processingStateManager)
   };
 }

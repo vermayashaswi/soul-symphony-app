@@ -50,7 +50,6 @@ const processingSteps = [
 export function LoadingEntryContent({ error }: { error?: string }) {
   const [currentStepIndex, setCurrentStepIndex] = useState(0);
   const [processingTakingTooLong, setProcessingTakingTooLong] = useState(false);
-  const [isTransitioning, setIsTransitioning] = useState(false);
   const componentId = useRef(`loading-${Date.now()}-${Math.random().toString(36).substring(2, 9)}`);
   const stepsIntervalRef = useRef<NodeJS.Timeout | null>(null);
   const longProcessingTimeoutRef = useRef<NodeJS.Timeout | null>(null);
@@ -60,84 +59,32 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   useEffect(() => {
     console.log('[LoadingEntryContent] Component mounted:', componentId.current);
     
-    window.dispatchEvent(new CustomEvent('loadingContentMounted', {
-      detail: { 
-        timestamp: Date.now(),
-        componentId: componentId.current,
-        visible: true
-      }
-    }));
-    
-    return () => {
-      console.log('[LoadingEntryContent] Component unmounting:', componentId.current);
-      window.dispatchEvent(new CustomEvent('loadingContentUnmounted', {
-        detail: { 
-          timestamp: Date.now(),
-          componentId: componentId.current
-        }
-      }));
-    };
-  }, []);
-  
-  // Faster step progression and quicker transitions
-  useEffect(() => {
+    // Step progression
     const stepInterval = setInterval(() => {
-      if (!isVisible || isTransitioning) return;
+      if (!isVisible) return;
       
       setCurrentStepIndex(prev => (prev + 1) % processingSteps.length);
-      
-      const currentStep = processingSteps[(currentStepIndex + 1) % processingSteps.length];
-      window.dispatchEvent(new CustomEvent('processingStepChanged', {
-        detail: { 
-          step: currentStep.id, 
-          text: currentStep.text,
-          componentId: componentId.current
-        }
-      }));
-      
-    }, 1500); // Slightly faster transitions
+    }, 1200); // Faster transitions
     
     stepsIntervalRef.current = stepInterval;
     
     // Reduced timeout for "taking too long" message
     const longProcessingTimeout = setTimeout(() => {
-      if (isVisible && !isTransitioning) {
+      if (isVisible) {
         setProcessingTakingTooLong(true);
-        
-        window.dispatchEvent(new CustomEvent('processingTakingLong', {
-          detail: { 
-            timestamp: Date.now(),
-            componentId: componentId.current
-          }
-        }));
       }
-    }, 12000); // Reduced from 15000ms to 12000ms
+    }, 10000); // Reduced timeout
     
     longProcessingTimeoutRef.current = longProcessingTimeout;
     
-    // Much faster content ready handler
-    const handleContentReady = (event: CustomEvent) => {
-      console.log('[LoadingEntryContent] Content ready event received, starting immediate transition');
-      setIsTransitioning(true);
-      
-      // Much faster transition
-      setTimeout(() => {
-        setIsVisible(false);
-      }, 300); // Reduced from 1000ms to 300ms
+    // Listen for immediate hide events
+    const handleHide = () => {
+      console.log('[LoadingEntryContent] Hide event received, immediate transition');
+      setIsVisible(false);
     };
     
-    const handleTransition = (event: CustomEvent) => {
-      console.log('[LoadingEntryContent] Transition event received');
-      setIsTransitioning(true);
-      
-      // Immediate transition
-      setTimeout(() => {
-        setIsVisible(false);
-      }, 100); // Very fast transition
-    };
-    
-    window.addEventListener('entryContentReady', handleContentReady as EventListener);
-    window.addEventListener('processingCardTransitioning', handleTransition as EventListener);
+    window.addEventListener('processingEntryHidden', handleHide);
+    window.addEventListener('entryContentReady', handleHide);
     
     return () => {
       if (stepsIntervalRef.current) {
@@ -148,10 +95,10 @@ export function LoadingEntryContent({ error }: { error?: string }) {
         clearTimeout(longProcessingTimeoutRef.current);
       }
       
-      window.removeEventListener('entryContentReady', handleContentReady as EventListener);
-      window.removeEventListener('processingCardTransitioning', handleTransition as EventListener);
+      window.removeEventListener('processingEntryHidden', handleHide);
+      window.removeEventListener('entryContentReady', handleHide);
     };
-  }, [currentStepIndex, isVisible, isTransitioning]);
+  }, [isVisible]);
   
   if (!isVisible) {
     return null;
@@ -162,19 +109,18 @@ export function LoadingEntryContent({ error }: { error?: string }) {
   return (
     <motion.div 
       className="space-y-2"
-      initial={{ opacity: 0.7 }}
-      animate={{ 
-        opacity: isTransitioning ? 0.5 : 1, // Faster fade during transition
-        scale: isTransitioning ? 0.98 : 1
-      }}
+      initial={{ opacity: 1 }}
+      animate={{ opacity: isVisible ? 1 : 0 }}
       exit={{ 
         opacity: 0,
-        scale: 0.96,
-        transition: { duration: 0.2 } // Much faster exit animation
+        transition: { duration: 0.1 }
       }}
-      transition={{ duration: 0.2 }} // Faster transitions
+      transition={{ duration: 0.1 }}
       data-component-id={componentId.current}
-      data-transitioning={isTransitioning}
+      style={{ 
+        opacity: isVisible ? 1 : 0,
+        transition: 'opacity 0.1s ease-out'
+      }}
     >
       <div className="flex items-center gap-2 mb-4">
         <ShimmerSkeleton className="h-4 w-4 rounded-full" />
@@ -197,18 +143,12 @@ export function LoadingEntryContent({ error }: { error?: string }) {
           <>
             <motion.div 
               className="relative h-10 w-10"
-              animate={{ 
-                rotate: 360,
-                scale: isTransitioning ? 0.9 : 1
-              }}
+              animate={{ rotate: 360 }}
               transition={{ 
                 rotate: {
                   duration: 2, 
                   repeat: Infinity, 
                   ease: "linear"
-                },
-                scale: {
-                  duration: 0.2
                 }
               }}
             >
@@ -217,9 +157,9 @@ export function LoadingEntryContent({ error }: { error?: string }) {
                 <motion.div 
                   key={currentStep.id}
                   initial={{ scale: 0, opacity: 0.7 }}
-                  animate={{ scale: isTransitioning ? 0.85 : 1, opacity: isTransitioning ? 0.5 : 1 }}
+                  animate={{ scale: 1, opacity: 1 }}
                   exit={{ scale: 0, opacity: 0.7 }}
-                  transition={{ duration: 0.2 }} // Faster transitions
+                  transition={{ duration: 0.15 }}
                   className="absolute inset-0 flex items-center justify-center"
                 >
                   {React.createElement(currentStep.icon, { 
@@ -233,22 +173,19 @@ export function LoadingEntryContent({ error }: { error?: string }) {
               <motion.div 
                 key={currentStep.id}
                 initial={{ y: 10, opacity: 0.7 }}
-                animate={{ 
-                  y: 0, 
-                  opacity: isTransitioning ? 0.5 : 1 
-                }}
+                animate={{ y: 0, opacity: 1 }}
                 exit={{ y: -10, opacity: 0.7 }}
-                transition={{ duration: 0.2 }} // Faster transitions
+                transition={{ duration: 0.15 }}
                 className="text-sm text-center text-primary font-medium"
               >
                 <TranslatableText 
-                  text={isTransitioning ? "Almost ready..." : currentStep.text} 
+                  text={currentStep.text} 
                   forceTranslate={true}
                 />
               </motion.div>
             </AnimatePresence>
             
-            {processingTakingTooLong && !isTransitioning && (
+            {processingTakingTooLong && (
               <motion.p 
                 initial={{ opacity: 0 }}
                 animate={{ opacity: 1 }}

@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
@@ -27,82 +28,40 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   onStartRecording,
   onDeleteEntry,
 }) => {
-  const { activeProcessingIds, isProcessing } = useProcessingEntries();
-  const renderedTempIdsRef = useRef<Set<string>>(new Set());
-  const renderedEntryIdsRef = useRef<Set<number>>(new Set());
-  const [recoveringFromDelete, setRecoveringFromDelete] = useState(false);
+  const { visibleEntries, isVisible } = useProcessingEntries();
   const [lastAction, setLastAction] = useState<string | null>(null);
   const deletedEntryIdsRef = useRef<Set<number>>(new Set());
   
   const hasEntries = entries && entries.length > 0;
-  const isLoading = loading && !hasEntries && !recoveringFromDelete;
+  const isLoading = loading && !hasEntries;
   
   useEffect(() => {
     console.log('[JournalEntriesList] Component mounted');
     setLastAction('Component Mounted');
     
-    const handleForceRefresh = () => {
-      console.log('[JournalEntriesList] Received force refresh event');
-      renderedTempIdsRef.current.clear();
-      setLastAction('Force Refresh: ' + Date.now());
-    };
-    
-    window.addEventListener('journalUIForceRefresh', handleForceRefresh);
+    // NO MORE startProcessing calls here - single source of truth
     
     return () => {
       console.log('[JournalEntriesList] Component unmounted');
-      window.removeEventListener('journalUIForceRefresh', handleForceRefresh);
     };
   }, []);
   
-  // Improved processing management with better deduplication
+  // Handle entries that have both ID and tempId (completed processing)
   useEffect(() => {
-    console.log('[JournalEntriesList] Processing entries from props:', processingEntries);
-    
-    // Clear tracking sets
-    renderedTempIdsRef.current.clear();
-    renderedEntryIdsRef.current = new Set(entries.map(entry => entry.id));
-    
-    // Handle entries that have both ID and tempId (completed processing)
     entries.forEach(entry => {
       if (entry.id && entry.tempId) {
         const processingEntry = processingStateManager.getEntryById(entry.tempId);
         
-        if (processingEntry && processingEntry.state !== EntryProcessingState.TRANSITIONING) {
+        if (processingEntry && processingEntry.state !== EntryProcessingState.COMPLETED) {
           console.log(`[JournalEntriesList] Found entry with both id and tempId: ${entry.id} / ${entry.tempId} - marking as completed`);
           processingStateManager.updateEntryState(entry.tempId, EntryProcessingState.COMPLETED);
           processingStateManager.setEntryId(entry.tempId, entry.id);
         }
       }
     });
-    
-    // Only register truly new processing entries - don't duplicate existing ones
-    const entryTempIds = new Set(entries.map(entry => entry.tempId).filter(Boolean));
-    
-    processingEntries.forEach(tempId => {
-      // Skip if this tempId is already associated with a real entry
-      if (entryTempIds.has(tempId)) {
-        console.log(`[JournalEntriesList] Skipping ${tempId} as it's already associated with a real entry`);
-        return;
-      }
-      
-      // Only add if not already tracked AND not already in state manager
-      if (!isProcessing(tempId) && !processingStateManager.getEntryById(tempId)) {
-        console.log(`[JournalEntriesList] Registering new processing entry: ${tempId}`);
-        processingStateManager.startProcessing(tempId);
-      } else {
-        console.log(`[JournalEntriesList] Skipping duplicate processing entry: ${tempId}`);
-      }
-    });
-    
-    if (hasEntries && recoveringFromDelete) {
-      setRecoveringFromDelete(false);
-      console.log('[JournalEntriesList] Reset recovery state - entries exist');
-    }
-    
-  }, [processingEntries, entries, processedEntryIds, isProcessing, activeProcessingIds, hasEntries, recoveringFromDelete]);
+  }, [entries]);
   
-  // Handle entry deletion with improved cleanup logic
+  // Handle entry deletion
   const handleDeleteEntry = async (entryId: number) => {
     try {
       console.log(`[JournalEntriesList] Handling delete for entry: ${entryId}`);
@@ -114,10 +73,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       }
       
       deletedEntryIdsRef.current.add(entryId);
-      setRecoveringFromDelete(true);
       
-      processingStateManager.removeEntry(entryId.toString());
-      
+      // Remove any processing entries associated with this entry
       const allProcessingEntries = processingStateManager.getProcessingEntries();
       allProcessingEntries.forEach(entry => {
         if (entry.entryId === entryId) {
@@ -129,11 +86,6 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       
       console.log(`[JournalEntriesList] Delete handler completed for entry: ${entryId}`);
       
-      setTimeout(() => {
-        console.log('[JournalEntriesList] Resetting recovery state after deletion');
-        setRecoveringFromDelete(false);
-      }, 300);
-      
       window.dispatchEvent(new CustomEvent('journalEntryDeleted', {
         detail: { entryId, timestamp: Date.now() }
       }));
@@ -142,56 +94,21 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
       
     } catch (error) {
       console.error(`[JournalEntriesList] Error when deleting entry ${entryId}:`, error);
-      setRecoveringFromDelete(false);
       return Promise.reject(error);
     }
   };
   
-  // Filter entries to remove any that have been deleted
+  // Filter entries to remove deleted ones
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
   
-  // Much more conservative filtering to prevent duplicate loading cards
-  const filteredProcessingIds = activeProcessingIds.filter(tempId => {
-    // Prevent duplicates in this render cycle
-    if (renderedTempIdsRef.current.has(tempId)) {
-      console.log(`[JournalEntriesList] Already rendered ${tempId} in this cycle, skipping`);
-      return false;
-    }
-    
-    // Check if this tempId already exists in the real entries list
-    const alreadyInEntries = entries.some(entry => entry.tempId === tempId);
-    if (alreadyInEntries) {
-      // Be very conservative - only skip if we can definitively confirm the real entry is fully rendered
-      const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`);
-      const hasVisibleContent = document.querySelector(`[data-temp-id="${tempId}"] .journal-entry-content`);
-      
-      if (realEntryCard && hasVisibleContent) {
-        console.log(`[JournalEntriesList] Real entry card confirmed fully rendered for tempId ${tempId}, skipping processing card`);
-        return false;
-      } else {
-        console.log(`[JournalEntriesList] Real entry exists but not fully rendered yet for tempId ${tempId}, keeping processing card`);
-        renderedTempIdsRef.current.add(tempId);
-        return true;
-      }
-    }
-    
-    // Skip very stale entries (older than 60 seconds)
-    const entry = processingStateManager.getEntryById(tempId);
-    if (entry && (Date.now() - entry.startTime > 60000)) {
-      console.log(`[JournalEntriesList] Removing stale processing card for tempId ${tempId}`);
-      processingStateManager.removeEntry(tempId);
-      return false;
-    }
-    
-    renderedTempIdsRef.current.add(tempId);
-    return true;
-  });
+  // Only show visible processing entries (smart transparency handled in state manager)
+  const visibleProcessingIds = visibleEntries.map(entry => entry.tempId);
   
-  console.log(`[JournalEntriesList] Rendering: entries=${filteredEntries.length}, activeProcessingIds=${activeProcessingIds.length}, filteredProcessingIds=${filteredProcessingIds.length}`);
+  console.log(`[JournalEntriesList] Rendering: entries=${filteredEntries.length}, visibleProcessingIds=${visibleProcessingIds.length}`);
 
-  // Determine what content to show based on filtered entries, loading state, and processing state
-  const shouldShowEmpty = !filteredEntries.length && !isLoading && filteredProcessingIds.length === 0 && !recoveringFromDelete;
-  const shouldShowEntries = filteredEntries.length > 0 || filteredProcessingIds.length > 0 || recoveringFromDelete;
+  // Determine content to show
+  const shouldShowEmpty = !filteredEntries.length && !isLoading && visibleProcessingIds.length === 0;
+  const shouldShowEntries = filteredEntries.length > 0 || visibleProcessingIds.length > 0;
   
   return (
     <div className="journal-entries-list" id="journal-entries-container" data-last-action={lastAction}>
@@ -205,25 +122,30 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
         </div>
       ) : shouldShowEntries ? (
         <div className="grid gap-4" data-entries-count={filteredEntries.length}>
-          {/* Show processing entry skeletons - with strict deduplication */}
-          {filteredProcessingIds.length > 0 && (
+          {/* Show only visible processing entry skeletons */}
+          {visibleProcessingIds.length > 0 && (
             <div data-processing-cards-container="true" className="processing-cards-container">
-              {filteredProcessingIds.map((tempId) => {
-                console.log(`[JournalEntriesList] Rendering processing card for: ${tempId}`);
-                return (
+              {visibleProcessingIds.map((tempId) => {
+                const entry = processingStateManager.getEntryById(tempId);
+                const shouldShow = entry && isVisible(tempId);
+                
+                console.log(`[JournalEntriesList] Rendering processing card for: ${tempId}, visible: ${shouldShow}`);
+                
+                return shouldShow ? (
                   <JournalEntryLoadingSkeleton
                     key={`processing-${tempId}`}
                     count={1}
                     tempId={tempId}
+                    isVisible={shouldShow}
                   />
-                );
+                ) : null;
               })}
             </div>
           )}
           
           {/* Display regular entries */}
           {filteredEntries.map((entry) => {
-            const entryIsProcessing = entry.tempId ? isProcessing(entry.tempId) : false;
+            const entryIsProcessing = entry.tempId ? processingStateManager.isProcessing(entry.tempId) : false;
             
             return (
               <JournalEntryCard

@@ -1,10 +1,10 @@
+
 import { BehaviorSubject, Observable } from 'rxjs';
 import { showToast } from './toast-helper';
 
-// Define the processing state enum
+// Define the processing state enum - simplified
 export enum EntryProcessingState {
   PROCESSING = 'processing',
-  TRANSITIONING = 'transitioning',
   COMPLETED = 'completed',
   ERROR = 'error'
 }
@@ -16,107 +16,139 @@ export interface ProcessingEntry {
   startTime: number;
   state: EntryProcessingState;
   errorMessage?: string;
-  transitionStartTime?: number;
+  isVisible: boolean; // New field for smart transparency
 }
 
 export class ProcessingStateManager {
   private processingEntries: ProcessingEntry[] = [];
   private entriesSubject = new BehaviorSubject<ProcessingEntry[]>([]);
+  private activeStartProcessingCalls = new Set<string>(); // Prevent duplicates
   
   constructor() {
-    console.log('[ProcessingStateManager] Initialized');
+    console.log('[ProcessingStateManager] Initialized with smart transparency');
   }
   
   public startProcessing(tempId: string): void {
-    // Strict duplicate prevention - don't add if already exists
-    if (this.isProcessing(tempId)) {
-      console.log(`[ProcessingStateManager] Entry ${tempId} already being processed, skipping duplicate`);
+    // Strict duplicate prevention with active call tracking
+    if (this.activeStartProcessingCalls.has(tempId)) {
+      console.log(`[ProcessingStateManager] StartProcessing already in progress for ${tempId}, ignoring`);
       return;
     }
     
-    // Additional check to prevent race conditions
+    // Additional check for existing entries
     const existingEntry = this.processingEntries.find(e => e.tempId === tempId);
     if (existingEntry) {
-      console.log(`[ProcessingStateManager] Entry ${tempId} already exists in array, skipping duplicate`);
+      console.log(`[ProcessingStateManager] Entry ${tempId} already exists, making visible instead`);
+      existingEntry.isVisible = true;
+      this.notifySubscribers();
       return;
     }
+    
+    // Mark as active to prevent race conditions
+    this.activeStartProcessingCalls.add(tempId);
     
     const entry: ProcessingEntry = {
       tempId,
       startTime: Date.now(),
-      state: EntryProcessingState.PROCESSING
+      state: EntryProcessingState.PROCESSING,
+      isVisible: true
     };
     
     this.processingEntries.push(entry);
     this.notifySubscribers();
     console.log(`[ProcessingStateManager] Started processing ${tempId}. Total entries: ${this.processingEntries.length}`);
+    
+    // Clean up active call tracking after a short delay
+    setTimeout(() => {
+      this.activeStartProcessingCalls.delete(tempId);
+    }, 1000);
   }
   
   public updateEntryState(tempId: string, state: EntryProcessingState, errorMessage?: string): void {
     const entry = this.processingEntries.find(e => e.tempId === tempId);
-    if (entry) {
-      entry.state = state;
-      if (errorMessage) {
-        entry.errorMessage = errorMessage;
-      }
+    if (!entry) {
+      console.log(`[ProcessingStateManager] Entry ${tempId} not found for state update`);
+      return;
+    }
+    
+    entry.state = state;
+    if (errorMessage) {
+      entry.errorMessage = errorMessage;
+    }
+    
+    // If completed, immediately check for real entry and hide if found
+    if (state === EntryProcessingState.COMPLETED) {
+      console.log(`[ProcessingStateManager] Entry ${tempId} completed, checking for real entry`);
+      this.checkAndHideEntry(tempId);
+    }
+    
+    this.notifySubscribers();
+    console.log(`[ProcessingStateManager] Updated state for ${tempId} to ${state}`);
+  }
+  
+  private checkAndHideEntry(tempId: string): void {
+    // Immediate DOM check with smart selectors
+    const realEntryExists = this.hasRealEntryInDOM(tempId);
+    
+    if (realEntryExists) {
+      console.log(`[ProcessingStateManager] Real entry found for ${tempId}, hiding immediately`);
+      this.hideEntry(tempId);
       
-      // If transitioning to completed, first set to transitioning state
-      if (state === EntryProcessingState.COMPLETED) {
-        entry.state = EntryProcessingState.TRANSITIONING;
-        entry.transitionStartTime = Date.now();
-        
-        console.log(`[ProcessingStateManager] Entry ${tempId} entering transition state`);
-        
-        // Much faster cleanup - reduced from 3000ms to 800ms
-        setTimeout(() => {
-          this.checkAndCleanupEntry(tempId);
-        }, 800);
-      }
-      
-      this.notifySubscribers();
-      console.log(`[ProcessingStateManager] Updated state for ${tempId} to ${state}`);
+      // Remove after brief delay for smooth transition
+      setTimeout(() => {
+        this.removeEntry(tempId);
+      }, 200);
+    } else {
+      // Quick retry with shorter timeout
+      setTimeout(() => {
+        const retryCheck = this.hasRealEntryInDOM(tempId);
+        if (retryCheck) {
+          console.log(`[ProcessingStateManager] Real entry found on retry for ${tempId}`);
+          this.hideEntry(tempId);
+          setTimeout(() => this.removeEntry(tempId), 200);
+        } else {
+          // Force cleanup if no real entry found
+          console.log(`[ProcessingStateManager] Force cleanup for ${tempId} - no real entry detected`);
+          this.removeEntry(tempId);
+        }
+      }, 500);
     }
   }
   
-  private checkAndCleanupEntry(tempId: string): void {
-    // Faster, more efficient DOM detection
-    const realEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
-                         document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`) ||
-                         document.querySelector(`.journal-entry-card:not(.processing-card)[data-temp-id="${tempId}"]`);
+  private hasRealEntryInDOM(tempId: string): boolean {
+    // Multiple strategies to detect real entry
+    const selectors = [
+      `[data-temp-id="${tempId}"][data-processing="false"]`,
+      `[data-temp-id="${tempId}"].journal-entry-card:not(.processing-card)`,
+      `[data-entry-id]:not([data-loading-skeleton="true"])[data-temp-id="${tempId}"]`,
+    ];
     
-    if (realEntryCard) {
-      console.log(`[ProcessingStateManager] Real entry card found for ${tempId}, cleaning up immediately`);
-      
-      // Immediate cleanup with shorter delay
-      setTimeout(() => {
-        this.removeEntry(tempId);
-        
-        window.dispatchEvent(new CustomEvent('entryContentReady', {
-          detail: { tempId, timestamp: Date.now() }
-        }));
-      }, 200); // Reduced from 500ms to 200ms
-      
-    } else {
-      console.log(`[ProcessingStateManager] Real entry card not found for ${tempId}, trying once more`);
-      
-      // Only one retry attempt with shorter delay
-      setTimeout(() => {
-        const retryRealEntryCard = document.querySelector(`[data-temp-id="${tempId}"][data-processing="false"]`) ||
-                                  document.querySelector(`[data-entry-id]:not([data-loading-skeleton="true"])`) ||
-                                  document.querySelector(`.journal-entry-card:not(.processing-card)[data-temp-id="${tempId}"]`);
-        
-        if (retryRealEntryCard) {
-          console.log(`[ProcessingStateManager] Real entry card found on retry for ${tempId}, cleaning up`);
-          this.removeEntry(tempId);
-          
-          window.dispatchEvent(new CustomEvent('entryContentReady', {
-            detail: { tempId, timestamp: Date.now() }
-          }));
-        } else {
-          console.log(`[ProcessingStateManager] Force cleanup for ${tempId} after retry attempt`);
-          this.removeEntry(tempId);
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element) {
+        // Additional check for content
+        const hasContent = element.querySelector('.journal-entry-content') || 
+                          element.textContent?.trim().length > 20;
+        if (hasContent) {
+          return true;
         }
-      }, 1000); // Reduced from 2000ms to 1000ms
+      }
+    }
+    
+    return false;
+  }
+  
+  public hideEntry(tempId: string): void {
+    const entry = this.processingEntries.find(e => e.tempId === tempId);
+    if (entry) {
+      entry.isVisible = false;
+      this.notifySubscribers();
+      console.log(`[ProcessingStateManager] Hidden entry ${tempId}`);
+      
+      // Dispatch event for immediate UI update
+      window.dispatchEvent(new CustomEvent('processingEntryHidden', {
+        detail: { tempId, timestamp: Date.now() }
+      }));
     }
   }
   
@@ -126,6 +158,10 @@ export class ProcessingStateManager {
       entry.entryId = entryId;
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Set entry ID for ${tempId} to ${entryId}`);
+      
+      // Immediately hide since we have a real entry ID
+      this.hideEntry(tempId);
+      setTimeout(() => this.removeEntry(tempId), 300);
     }
   }
   
@@ -136,6 +172,9 @@ export class ProcessingStateManager {
     if (initialLength !== this.processingEntries.length) {
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Removed entry ${tempId}. Remaining entries: ${this.processingEntries.length}`);
+      
+      // Clean up active call tracking
+      this.activeStartProcessingCalls.delete(tempId);
     }
   }
   
@@ -145,7 +184,12 @@ export class ProcessingStateManager {
   
   public isProcessing(tempId: string): boolean {
     const entry = this.processingEntries.find(entry => entry.tempId === tempId);
-    return entry ? (entry.state === EntryProcessingState.PROCESSING || entry.state === EntryProcessingState.TRANSITIONING) : false;
+    return entry ? entry.state === EntryProcessingState.PROCESSING : false;
+  }
+  
+  public isVisible(tempId: string): boolean {
+    const entry = this.processingEntries.find(entry => entry.tempId === tempId);
+    return entry ? entry.isVisible : false;
   }
   
   public hasError(tempId: string): boolean {
@@ -166,11 +210,16 @@ export class ProcessingStateManager {
     return [...this.processingEntries];
   }
   
+  public getVisibleProcessingEntries(): ProcessingEntry[] {
+    return this.processingEntries.filter(entry => entry.isVisible);
+  }
+  
   public retryProcessing(tempId: string): void {
     const entry = this.processingEntries.find(e => e.tempId === tempId);
     if (entry && entry.state === EntryProcessingState.ERROR) {
       entry.state = EntryProcessingState.PROCESSING;
       entry.errorMessage = undefined;
+      entry.isVisible = true;
       this.notifySubscribers();
       console.log(`[ProcessingStateManager] Retrying processing for ${tempId}`);
     }
@@ -181,11 +230,14 @@ export class ProcessingStateManager {
       const storedEntries = localStorage.getItem('processingEntries');
       if (storedEntries) {
         const parsed = JSON.parse(storedEntries);
-        // Clean up old entries (older than 30 seconds)
+        // Clean up old entries and add isVisible field if missing
         const now = Date.now();
-        this.processingEntries = parsed.filter((entry: ProcessingEntry) => 
-          now - entry.startTime < 30000
-        );
+        this.processingEntries = parsed
+          .filter((entry: ProcessingEntry) => now - entry.startTime < 30000)
+          .map((entry: ProcessingEntry) => ({
+            ...entry,
+            isVisible: entry.isVisible !== undefined ? entry.isVisible : true
+          }));
         this.notifySubscribers();
         console.log(`[ProcessingStateManager] Restored ${this.processingEntries.length} entries from localStorage`);
       }
@@ -198,7 +250,6 @@ export class ProcessingStateManager {
   public saveToLocalStorage(): void {
     try {
       localStorage.setItem('processingEntries', JSON.stringify(this.processingEntries));
-      console.log(`[ProcessingStateManager] Saved ${this.processingEntries.length} entries to localStorage`);
     } catch (error) {
       console.error('[ProcessingStateManager] Error saving to localStorage:', error);
       showToast("Error", "Failed to save processing state");
@@ -207,18 +258,19 @@ export class ProcessingStateManager {
   
   public dispose(): void {
     this.processingEntries = [];
+    this.activeStartProcessingCalls.clear();
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Disposed state manager');
   }
   
   public clearAll(): void {
     this.processingEntries = [];
+    this.activeStartProcessingCalls.clear();
     this.notifySubscribers();
     console.log('[ProcessingStateManager] Cleared all processing entries');
     
     try {
       localStorage.removeItem('processingEntries');
-      console.log('[ProcessingStateManager] Cleared processing entries from localStorage');
     } catch (error) {
       console.error('[ProcessingStateManager] Error clearing localStorage:', error);
     }
@@ -234,12 +286,21 @@ export class ProcessingStateManager {
     if (entry) {
       entry.state = EntryProcessingState.ERROR;
       entry.errorMessage = errorMessage;
+      entry.isVisible = true; // Make sure error is visible
       this.notifySubscribers();
       
       showToast("Error", `Processing failed: ${errorMessage}`);
-      
       console.log(`[ProcessingStateManager] Error for ${tempId}: ${errorMessage}`);
     }
+  }
+  
+  // New method to force hide all processing entries (emergency cleanup)
+  public forceHideAll(): void {
+    this.processingEntries.forEach(entry => {
+      entry.isVisible = false;
+    });
+    this.notifySubscribers();
+    console.log('[ProcessingStateManager] Force hid all processing entries');
   }
 }
 
