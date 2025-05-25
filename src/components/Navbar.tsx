@@ -1,3 +1,4 @@
+
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { useTheme } from "@/hooks/use-theme";
@@ -19,19 +20,14 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
-import { MoonIcon, SunIcon, UserIcon } from "@radix-ui/react-icons";
-import {
-  ArrowRightOnRectangleIcon,
-  Cog6ToothIcon,
-  QuestionMarkCircleIcon,
-} from "@heroicons/react/24/outline";
-import { SouloLogo } from "./SouloLogo";
+import { Moon, Sun, User, Settings, HelpCircle, LogOut } from "lucide-react";
+import SouloLogo from "./SouloLogo";
 import { SubscriptionStatus } from '@/components/subscription/SubscriptionStatus';
 
 export function Navbar() {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const { theme, setTheme } = useTheme();
-  const { currentLanguage, changeLanguage } = useTranslation();
+  const { currentLanguage, setLanguage } = useTranslation();
   const { signOut, user } = useAuth();
 
   const handleSignOut = async () => {
@@ -69,10 +65,10 @@ export function Navbar() {
             
             <Select
               value={currentLanguage}
-              onValueChange={(value) => changeLanguage(value)}
+              onValueChange={(value) => setLanguage(value)}
             >
               <SelectTrigger className="w-[120px] text-sm">
-                <SelectValue placeholder="Theme" />
+                <SelectValue placeholder="Language" />
               </SelectTrigger>
               <SelectContent>
                 <SelectItem value="en">English</SelectItem>
@@ -89,8 +85,8 @@ export function Navbar() {
                 setTheme(theme === "light" ? "dark" : "light")
               }
             >
-              <SunIcon className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
-              <MoonIcon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
+              <Sun className="h-[1.2rem] w-[1.2rem] rotate-0 scale-100 transition-all dark:-rotate-90 dark:scale-0" />
+              <Moon className="absolute h-[1.2rem] w-[1.2rem] rotate-90 scale-0 transition-all dark:rotate-0 dark:scale-100" />
               <span className="sr-only">Toggle theme</span>
             </Button>
 
@@ -100,7 +96,7 @@ export function Navbar() {
                   <Avatar className="h-8 w-8">
                     <AvatarImage src={user?.user_metadata?.avatar_url} />
                     <AvatarFallback>
-                      <UserIcon className="h-4 w-4" />
+                      <User className="h-4 w-4" />
                     </AvatarFallback>
                   </Avatar>
                 </Button>
@@ -110,23 +106,23 @@ export function Navbar() {
                   <div className="flex flex-col space-y-1 leading-none">
                     <span>{user?.email}</span>
                     <span className="line-clamp-1 text-sm text-muted-foreground">
-                      {user?.user_metadata?.full_name}
                     </span>
                   </div>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
-                <DropdownMenuItem>
-                  <Cog6ToothIcon className="mr-2 h-4 w-4" />
-                  <span>Settings</span>
-                  <Link to="/settings" />
+                <DropdownMenuItem asChild>
+                  <Link to="/settings" className="flex items-center">
+                    <Settings className="mr-2 h-4 w-4" />
+                    <span>Settings</span>
+                  </Link>
                 </DropdownMenuItem>
                 <DropdownMenuItem>
-                  <QuestionMarkCircleIcon className="mr-2 h-4 w-4" />
+                  <HelpCircle className="mr-2 h-4 w-4" />
                   <span>Support</span>
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
                 <DropdownMenuItem onClick={handleSignOut}>
-                  <ArrowRightOnRectangleIcon className="mr-2 h-4 w-4" />
+                  <LogOut className="mr-2 h-4 w-4" />
                   <span>Logout</span>
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -137,3 +133,5 @@ export function Navbar() {
     </nav>
   );
 }
+
+export default Navbar;

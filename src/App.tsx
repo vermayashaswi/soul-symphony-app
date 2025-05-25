@@ -1,11 +1,11 @@
+
 import React from 'react';
 import { BrowserRouter } from 'react-router-dom';
-import AppRoutes from './AppRoutes';
-import { ThemeProvider } from './contexts/ThemeContext';
+import AppRoutes from './routes/AppRoutes';
+import { ThemeProvider } from './hooks/use-theme';
 import { Toaster } from 'sonner';
 import './App.css';
 import './styles/mobile.css';
-import { SouloLogo } from '@/components/icons';
 
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
