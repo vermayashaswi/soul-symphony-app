@@ -5,7 +5,7 @@ import { detectEmotionalQuery, getEmotionAnalysisForQuery, generateEmotionContex
  * Enhanced sub-query processor that handles emotional queries properly
  */
 export async function processSubQueryWithEmotionSupport(
-  subQuestion: string,
+  subQuestion: string | any,
   supabase: any,
   userId: string,
   dateRange: any = null,
@@ -19,10 +19,24 @@ export async function processSubQueryWithEmotionSupport(
   hasEntriesInDateRange: boolean;
   reasoning: string;
 }> {
-  console.log(`[enhancedSubQueryProcessor] Processing: "${subQuestion}"`);
+  // Type validation and conversion for sub-question
+  let processedSubQuestion: string;
+  
+  if (typeof subQuestion === 'string') {
+    processedSubQuestion = subQuestion;
+  } else if (typeof subQuestion === 'object' && subQuestion !== null) {
+    // Extract question from object if it exists
+    processedSubQuestion = subQuestion.question || JSON.stringify(subQuestion);
+    console.log(`[enhancedSubQueryProcessor] Converted object to string: "${processedSubQuestion}"`);
+  } else {
+    console.error(`[enhancedSubQueryProcessor] Invalid subQuestion type: ${typeof subQuestion}`);
+    processedSubQuestion = 'Invalid question format';
+  }
+  
+  console.log(`[enhancedSubQueryProcessor] Processing: "${processedSubQuestion}"`);
   
   // Detect if this is an emotional query
-  const emotionDetection = detectEmotionalQuery(subQuestion);
+  const emotionDetection = detectEmotionalQuery(processedSubQuestion);
   console.log(`[enhancedSubQueryProcessor] Emotion detection:`, emotionDetection);
   
   let context = '';
@@ -51,7 +65,7 @@ export async function processSubQueryWithEmotionSupport(
           emotionResults,
           entries,
           emotionDetection.emotionType,
-          subQuestion
+          processedSubQuestion
         );
         hasEntriesInDateRange = true;
         reasoning = `Analyzed emotions and sentiment patterns from ${entries.length} journal entries. Found ${emotionResults.length} distinct emotions.`;
@@ -69,11 +83,11 @@ export async function processSubQueryWithEmotionSupport(
   
   // If emotion analysis didn't yield results, try vector search
   if (!hasEntriesInDateRange) {
-    console.log(`[enhancedSubQueryProcessor] Falling back to vector search for: "${subQuestion}"`);
+    console.log(`[enhancedSubQueryProcessor] Falling back to vector search for: "${processedSubQuestion}"`);
     
     try {
       // Generate embedding for the sub-question
-      const queryEmbedding = await generateEmbedding(subQuestion, openaiApiKey);
+      const queryEmbedding = await generateEmbedding(processedSubQuestion, openaiApiKey);
       
       // Perform vector search using the correct function name
       const { data: vectorData, error: vectorError } = await supabase.rpc(
@@ -172,8 +186,8 @@ export async function processSubQueryWithEmotionSupport(
         .from('Journal Entries')
         .select('id, "transcription text", emotions, sentiment, created_at')
         .eq('user_id', userId)
-        .not('transcription text', 'is', null)
-        .not('transcription text', 'eq', '')
+        .not('"transcription text"', 'is', null)
+        .not('"transcription text"', 'eq', '')
         .order('created_at', { ascending: false })
         .limit(5);
       
@@ -224,7 +238,7 @@ export async function processSubQueryWithEmotionSupport(
   console.log(`[enhancedSubQueryProcessor] Completed processing: ${totalResults} total results`);
   
   return {
-    subQuestion,
+    subQuestion: processedSubQuestion,
     context,
     emotionResults,
     vectorResults,

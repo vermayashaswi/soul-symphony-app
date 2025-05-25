@@ -73,13 +73,13 @@ export async function getEmotionAnalysisForQuery(
       return { emotions: [], entries: [] };
     }
     
-    // Get entries with sentiment analysis
+    // Get entries with sentiment analysis - FIXED column name
     const { data: entriesData, error: entriesError } = await supabase
       .from('Journal Entries')
-      .select('id, transcription text, sentiment, emotions, created_at')
+      .select('id, "transcription text", sentiment, emotions, created_at')
       .eq('user_id', userId)
-      .not('transcription text', 'is', null)
-      .not('transcription text', 'eq', '')
+      .not('"transcription text"', 'is', null)
+      .not('"transcription text"', 'eq', '')
       .order('created_at', { ascending: false })
       .limit(20);
     
