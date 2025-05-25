@@ -62,13 +62,13 @@ const AppRoutes = () => {
         <Route path="/blog" element={<BlogPage />} />
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
-        {/* App Routes */}
-        <Route path="/app" element={<AppRootRedirect />} />
+        {/* App Routes - reordered to fix routing issue */}
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
         {/* Protected App Routes */}
         <Route path="/app" element={<ProtectedRoute />}>
+          <Route index element={<AppRootRedirect />} />
           <Route path="home" element={<Home />} />
           <Route path="journal" element={<Journal />} />
           <Route path="insights" element={

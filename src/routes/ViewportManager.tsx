@@ -20,18 +20,14 @@ const ViewportManager: React.FC = () => {
     '/app/auth',
     '/onboarding',
     '/auth',
-    '/app',
     '/' // Also hide on root path
   ];
   
   // Check if current path is in the list of paths where navigation should be hidden
   const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
   
-  // Explicit check for app root path with authenticated user - needs special handling
-  const isAppRootWithUser = location.pathname === '/app' && !!user;
-  
   // Is this the home page where scrolling should be disabled?
-  const isHomePage = location.pathname === '/app/home' || location.pathname === '/app';
+  const isHomePage = location.pathname === '/app/home';
   
   // Debug log to understand route detection
   console.log('ViewportManager - Path:', location.pathname, {
@@ -41,7 +37,6 @@ const ViewportManager: React.FC = () => {
     user: !!user,
     isOnboardingOrAuth,
     onboardingComplete,
-    isAppRootWithUser,
     hideNavigation: 
       isOnboardingOrAuth || 
       !user || 
@@ -81,12 +76,6 @@ const ViewportManager: React.FC = () => {
     };
   }, [location.pathname, isHomePage]);
   
-  // If we're at /app and the user is logged in, redirect to /app/home
-  if (isAppRootWithUser && onboardingComplete) {
-    console.log('Redirecting authenticated user from /app to /app/home');
-    return <Navigate to="/app/home" replace />;
-  }
-  
   // Render the appropriate layout based on route and device
   return (
     <>
@@ -102,7 +91,7 @@ const ViewportManager: React.FC = () => {
       {isAppRoute(location.pathname) && 
        user && 
        !isOnboardingOrAuth && 
-       !(location.pathname === '/app' && !onboardingComplete) && (
+       onboardingComplete && (
         <MobileNavigation onboardingComplete={onboardingComplete} />
       )}
     </>
