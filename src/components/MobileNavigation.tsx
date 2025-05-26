@@ -1,120 +1,175 @@
 
-import React from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
-import { 
-  Home, 
-  BookOpen, 
-  MessageSquare, 
-  BarChart3, 
-  Settings 
-} from 'lucide-react';
+import { Home, MessageCircle, BookOpen, BarChart2, Settings } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useAuth } from '@/contexts/AuthContext';
-import { useTutorial } from '@/contexts/TutorialContext';
+import { isNativeApp, isAppRoute } from '@/routes/RouteHelpers';
+import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { useTutorial } from '@/contexts/TutorialContext';
+import { useAuth } from '@/contexts/AuthContext';
 
-const MobileNavigation = () => {
+interface MobileNavigationProps {
+  onboardingComplete: boolean | null;
+}
+
+const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete }) => {
   const location = useLocation();
-  const navigate = useNavigate();
-  const { user } = useAuth();
+  const isMobile = useIsMobile();
+  const [isVisible, setIsVisible] = useState(false);
+  const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { isActive: isTutorialActive } = useTutorial();
-
-  // Don't show navigation on auth/onboarding pages or when not authenticated
-  const isOnboardingOrAuth = 
-    location.pathname === '/app/onboarding' || 
-    location.pathname === '/app/auth' ||
-    location.pathname === '/onboarding' ||
-    location.pathname === '/auth' ||
-    location.pathname === '/app' ||
-    location.pathname === '/';
-
-  if (isOnboardingOrAuth || !user) {
+  const { user } = useAuth();
+  
+  useEffect(() => {
+    const handleVisualViewportResize = () => {
+      if (window.visualViewport) {
+        const isKeyboard = window.visualViewport.height < window.innerHeight * 0.75;
+        setIsKeyboardVisible(isKeyboard);
+      }
+    };
+    
+    handleVisualViewportResize();
+    
+    if (window.visualViewport) {
+      window.visualViewport.addEventListener('resize', handleVisualViewportResize);
+      window.addEventListener('resize', handleVisualViewportResize);
+    }
+    
+    const handleKeyboardOpen = () => setIsKeyboardVisible(true);
+    const handleKeyboardClose = () => setIsKeyboardVisible(false);
+    
+    window.addEventListener('keyboardOpen', handleKeyboardOpen);
+    window.addEventListener('keyboardClose', handleKeyboardClose);
+    
+    return () => {
+      if (window.visualViewport) {
+        window.visualViewport.removeEventListener('resize', handleVisualViewportResize);
+        window.removeEventListener('resize', handleVisualViewportResize);
+      }
+      
+      window.removeEventListener('keyboardOpen', handleKeyboardOpen);
+      window.removeEventListener('keyboardClose', handleKeyboardClose);
+    };
+  }, []);
+  
+  useEffect(() => {
+    // Comprehensive list of paths where navigation should be hidden - must match ViewportManager
+    const onboardingOrAuthPaths = [
+      '/app/onboarding',
+      '/app/auth',
+      '/onboarding',
+      '/auth',
+      '/app',
+      '/' // Also hide on root path
+    ];
+    
+    // Check if current path is in the list of paths where navigation should be hidden
+    const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+    
+    // Explicit check for app root path - hide navigation here regardless of onboarding status
+    const isAppRoot = location.pathname === '/app';
+    
+    // Only show navigation if:
+    // 1. We're on mobile or in native app
+    // 2. Keyboard is not visible
+    // 3. We're not on an onboarding/auth screen
+    // 4. User is authenticated
+    // 5. Onboarding is complete if we're checking
+    const shouldShowNav = (isMobile || isNativeApp()) && 
+                          !isKeyboardVisible && 
+                          !isOnboardingOrAuth &&
+                          !!user &&
+                          onboardingComplete !== false;
+    
+    console.log('MobileNavigation visibility check:', { 
+      shouldShowNav, 
+      isMobile, 
+      isNativeApp: isNativeApp(),
+      path: location.pathname,
+      isKeyboardVisible,
+      isOnboardingOrAuth,
+      isAppRoot,
+      hasUser: !!user,
+      onboardingComplete,
+      isTutorialActive
+    });
+    
+    setIsVisible(shouldShowNav);
+  }, [location.pathname, isMobile, isKeyboardVisible, isTutorialActive, user, onboardingComplete]);
+  
+  if (!isVisible) {
     return null;
   }
-
+  
+  // Additional safety check - don't show if onboarding is not complete
+  if (onboardingComplete === false || location.pathname === '/app') {
+    console.log('MobileNavigation: Not rendering due to onboarding status or /app path');
+    return null;
+  }
+  
   const navItems = [
-    { 
-      icon: Home, 
-      label: 'Home', 
-      path: '/app/home',
-      tutorialId: 'nav-home'
-    },
-    { 
-      icon: BookOpen, 
-      label: 'Journal', 
-      path: '/app/journal',
-      tutorialId: 'nav-journal'
-    },
-    { 
-      icon: MessageSquare, 
-      label: 'Chat', 
-      path: '/app/chat',
-      tutorialId: 'nav-chat'
-    },
-    { 
-      icon: BarChart3, 
-      label: 'Insights', 
-      path: '/app/insights',
-      tutorialId: 'nav-insights'
-    },
-    { 
-      icon: Settings, 
-      label: 'Settings', 
-      path: '/app/settings',
-      tutorialId: 'nav-settings'
-    },
+    { path: '/app/home', icon: Home, label: 'Home' },
+    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
+    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
+    { path: '/app/insights', icon: BarChart2, label: 'Insights' },
+    { path: '/app/settings', icon: Settings, label: 'Settings' },
   ];
 
-  const isActive = (path: string) => {
-    return location.pathname === path || 
-           (path === '/app/home' && location.pathname === '/app');
+  const getActiveStatus = (path: string) => {
+    return location.pathname.startsWith(path);
   };
-
+  
   return (
-    <motion.nav
+    <motion.div 
       className={cn(
-        "fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t z-40 safe-area-bottom",
-        isTutorialActive && "opacity-30 pointer-events-none"
+        "fixed bottom-0 left-0 right-0 bg-background border-t border-muted",
+        isTutorialActive && "opacity-30 pointer-events-none" // Fade out and disable interaction during tutorial
       )}
+      style={{
+        zIndex: 9998, // Lower z-index than tutorial overlay (9999)
+        paddingTop: '0.40rem',
+        paddingBottom: 'max(0.40rem, env(safe-area-inset-bottom))',
+        height: 'calc(3.6rem + env(safe-area-inset-bottom))'
+      }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-around items-center py-2 px-4">
+      <div className="flex justify-around items-center">
         {navItems.map((item) => {
-          const Icon = item.icon;
-          const active = isActive(item.path);
+          const isActive = getActiveStatus(item.path);
           
           return (
-            <button
+            <Link
               key={item.path}
-              onClick={() => navigate(item.path)}
+              to={item.path}
               className={cn(
-                "flex flex-col items-center justify-center p-2 rounded-lg transition-all duration-200 min-w-[60px]",
-                active
-                  ? "text-theme-color bg-theme-color/10" 
-                  : "text-muted-foreground hover:text-foreground hover:bg-secondary/50"
+                "flex flex-col items-center py-1 transition-colors",
+                isActive 
+                  ? "text-primary" 
+                  : "text-muted-foreground hover:text-primary"
               )}
-              data-tutorial-id={item.tutorialId}
             >
-              <Icon 
-                className={cn(
-                  "h-5 w-5 mb-1 transition-all duration-200",
-                  active && "scale-110"
-                )} 
-              />
-              <span className={cn(
-                "text-xs font-medium transition-all duration-200",
-                active && "font-semibold"
-              )}>
-                <TranslatableText text={item.label} forceTranslate={true} />
+              <div className="relative">
+                <item.icon size={22} />
+                {isActive && (
+                  <motion.div
+                    layoutId="mobileNavIndicator"
+                    className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"
+                    transition={{ type: "spring", bounce: 0.3 }}
+                  />
+                )}
+              </div>
+              <span className="text-xs mt-0.5">
+                <TranslatableText text={item.label} />
               </span>
-            </button>
+            </Link>
           );
         })}
       </div>
-    </motion.nav>
+    </motion.div>
   );
 };
 

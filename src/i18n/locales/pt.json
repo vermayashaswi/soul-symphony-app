@@ -1,0 +1,111 @@
+
+{
+  "navbar": {
+    "home": "Início",
+    "blog": "Blog",
+    "faq": "Perguntas Frequentes",
+    "download": "Baixar",
+    "openApp": "Abrir App",
+    "tryWebApp": "Experimentar Web App",
+    "signIn": "Entrar"
+  },
+  "hero": {
+    "welcome": "Bem-vindo ao",
+    "tagline": "Seu companheiro de IA pessoal para bem-estar emocional e autorreflexão usando diário por VOZ",
+    "getStarted": "Começar",
+    "exploreMore": "Descobrir Mais"
+  },
+  "features": {
+    "title": "Como o SOULo Funciona",
+    "subtitle": "Nossa abordagem inovadora combina diário por voz com tecnologia de IA para fornecer insights significativos sobre você mesmo."
+  },
+  "feature1": {
+    "title": "Diário por Voz",
+    "description": "Grave seus pensamentos com voz e deixe o SOULo transcrevê-los e analisá-los automaticamente."
+  },
+  "feature2": {
+    "title": "Análise de IA",
+    "description": "Obtenha insights sobre seus padrões e emoções através de análise avançada de IA."
+  },
+  "feature3": {
+    "title": "Acompanhamento Emocional",
+    "description": "Visualize sua jornada emocional ao longo do tempo com gráficos interativos."
+  },
+  "feature4": {
+    "title": "Assistente de IA",
+    "description": "Converse com seu diário e obtenha insights personalizados de suas entradas anteriores."
+  },
+  "download": {
+    "title": "Obtenha o SOULo Hoje",
+    "subtitle": "Disponível para iOS e Android",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "Você pode nos contatar a qualquer momento em",
+    "rights": "Todos os direitos reservados.",
+    "privacy": "Política de Privacidade",
+    "terms": "Termos de Serviço"
+  },
+  "mainTagline": "Mantenha um diário e capture seu dia sem escrever uma única palavra!",
+  "homepage": {
+    "expressReflectGrow": "Expressar. Refletir. Crescer.",
+    "appFeatures": "Recursos do Aplicativo",
+    "process": {
+      "title": "Processo: Como Funciona",
+      "step1Title": "Gravar",
+      "step1Description": "Fale seus pensamentos em voz alta - sem necessidade de digitar",
+      "step2Title": "Analisar",
+      "step2Description": "A IA processa suas entradas para identificar padrões e insights",
+      "step3Title": "Refletir",
+      "step3Description": "Revise insights personalizados e acompanhe sua jornada emocional"
+    },
+    "privacy": {
+      "title": "Sua Privacidade É Nossa Prioridade",
+      "description": "Usamos criptografia de ponta para garantir que suas entradas de diário permaneçam completamente privadas e seguras.",
+      "featuresList": [
+        "Criptografia de ponta a ponta",
+        "Opções de armazenamento local",
+        "Sem compartilhamento com terceiros",
+        "Controle total sobre seus dados"
+      ]
+    },
+    "testimonials": {
+      "title": "O Que Nossos Usuários Dizem",
+      "subtitle": "Junte-se a milhares de pessoas que estão transformando sua jornada de bem-estar mental."
+    },
+    "cta": {
+      "title": "Pronto para começar sua jornada?",
+      "description": "Baixe o SOULo hoje e transforme como você mantém um diário.",
+      "buttonText": "Começar"
+    }
+  },
+  "toasts": {
+    "success": "Sucesso",
+    "error": "Erro",
+    "warning": "Aviso",
+    "info": "Informação",
+    "conversationDeleted": "Conversa excluída com sucesso",
+    "entryDeleted": "Entrada excluída com sucesso",
+    "entryUpdated": "Entrada de diário atualizada com sucesso",
+    "translationUpdated": "Tradução atualizada com sucesso",
+    "languageChanged": "Idioma alterado com sucesso",
+    "profileUpdated": "Perfil atualizado com sucesso",
+    "settingsSaved": "Configurações salvas com sucesso",
+    "signInSuccess": "Login realizado com sucesso",
+    "signOutSuccess": "Logout realizado com sucesso",
+    "uploadSuccess": "Upload concluído com sucesso",
+    "entryDeleteFailed": "Falha ao excluir entrada",
+    "entryUpdateFailed": "Falha ao atualizar entrada",
+    "authRequired": "Autenticação necessária",
+    "uploadFailed": "Falha no upload",
+    "connectionError": "Erro de conexão ocorreu",
+    "processingError": "Falha no processamento",
+    "savingError": "Falha ao salvar alterações",
+    "loadingError": "Falha ao carregar dados",
+    "processing": "Processando...",
+    "saving": "Salvando...",
+    "loading": "Carregando...",
+    "uploading": "Fazendo upload..."
+  }
+}

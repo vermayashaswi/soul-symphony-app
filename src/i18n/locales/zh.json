@@ -1,0 +1,111 @@
+
+{
+  "navbar": {
+    "home": "主页",
+    "blog": "博客",
+    "faq": "常见问题",
+    "download": "下载",
+    "openApp": "打开应用",
+    "tryWebApp": "尝试网页应用",
+    "signIn": "登录"
+  },
+  "hero": {
+    "welcome": "欢迎使用",
+    "tagline": "您的个人AI伴侣，使用语音日记进行情感健康和自我反思",
+    "getStarted": "开始使用",
+    "exploreMore": "了解更多"
+  },
+  "features": {
+    "title": "SOULo如何工作",
+    "subtitle": "我们创新的方法将语音日记与AI技术相结合，为您提供有关自己的有意义的见解。"
+  },
+  "feature1": {
+    "title": "语音日记",
+    "description": "用语音记录您的想法，让SOULo自动转录和分析它们。"
+  },
+  "feature2": {
+    "title": "AI分析",
+    "description": "通过高级AI分析了解您的模式和情绪。"
+  },
+  "feature3": {
+    "title": "情感追踪",
+    "description": "通过交互式图表可视化您的情感旅程。"
+  },
+  "feature4": {
+    "title": "AI助手",
+    "description": "与您的日记聊天，从过去的条目中获取个性化的见解。"
+  },
+  "download": {
+    "title": "今天就获取SOULo",
+    "subtitle": "iOS和Android均可使用",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "您可以随时通过以下方式联系我们",
+    "rights": "保留所有权利。",
+    "privacy": "隐私政策",
+    "terms": "服务条款"
+  },
+  "mainTagline": "记录日记并捕捉您的一天，无需写下一个字！",
+  "homepage": {
+    "expressReflectGrow": "表达。反思。成长。",
+    "appFeatures": "应用特点",
+    "process": {
+      "title": "流程：它是如何工作的",
+      "step1Title": "记录",
+      "step1Description": "大声说出您的想法 - 无需打字",
+      "step2Title": "分析",
+      "step2Description": "AI处理您的条目以识别模式和见解",
+      "step3Title": "反思",
+      "step3Description": "查看个性化的见解并跟踪您的情感旅程"
+    },
+    "privacy": {
+      "title": "您的隐私是我们的首要任务",
+      "description": "我们使用最先进的加密技术确保您的日记条目完全私密和安全。",
+      "featuresList": [
+        "端到端加密",
+        "本地存储选项",
+        "不与第三方分享",
+        "完全控制您的数据"
+      ]
+    },
+    "testimonials": {
+      "title": "用户们怎么说",
+      "subtitle": "加入数千名正在改变他们心理健康旅程的人。"
+    },
+    "cta": {
+      "title": "准备开始您的旅程？",
+      "description": "今天下载SOULo，改变您记日记的方式。",
+      "buttonText": "开始使用"
+    }
+  },
+  "toasts": {
+    "success": "成功",
+    "error": "错误",
+    "warning": "警告",
+    "info": "信息",
+    "conversationDeleted": "对话删除成功",
+    "entryDeleted": "条目删除成功",
+    "entryUpdated": "日记条目更新成功",
+    "translationUpdated": "翻译更新成功",
+    "languageChanged": "语言更改成功",
+    "profileUpdated": "个人资料更新成功",
+    "settingsSaved": "设置保存成功",
+    "signInSuccess": "登录成功",
+    "signOutSuccess": "退出成功",
+    "uploadSuccess": "上传完成",
+    "entryDeleteFailed": "删除条目失败",
+    "entryUpdateFailed": "更新条目失败",
+    "authRequired": "需要身份验证",
+    "uploadFailed": "上传失败",
+    "connectionError": "连接错误",
+    "processingError": "处理失败",
+    "savingError": "保存更改失败",
+    "loadingError": "加载数据失败",
+    "processing": "处理中...",
+    "saving": "保存中...",
+    "loading": "加载中...",
+    "uploading": "上传中..."
+  }
+}

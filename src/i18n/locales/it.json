@@ -1,0 +1,83 @@
+
+{
+  "navbar": {
+    "home": "Home",
+    "blog": "Blog",
+    "faq": "FAQ",
+    "download": "Scarica",
+    "openApp": "Apri App",
+    "tryWebApp": "Prova Web App",
+    "signIn": "Accedi"
+  },
+  "hero": {
+    "welcome": "Benvenuto su",
+    "tagline": "Il tuo compagno IA personale per il benessere emotivo e l'autoriflessione utilizzando il journaling VOCALE",
+    "getStarted": "Inizia",
+    "exploreMore": "Scopri di più"
+  },
+  "features": {
+    "title": "Come Funziona SOULo",
+    "subtitle": "Il nostro approccio innovativo combina il journaling vocale con la tecnologia IA per fornirti insight significativi su te stesso."
+  },
+  "feature1": {
+    "title": "Journaling Vocale",
+    "description": "Registra i tuoi pensieri con la voce e lascia che SOULo li trascriva e li analizzi automaticamente."
+  },
+  "feature2": {
+    "title": "Analisi IA",
+    "description": "Ottieni insight sui tuoi schemi ed emozioni attraverso l'analisi avanzata dell'IA."
+  },
+  "feature3": {
+    "title": "Tracciamento Emotivo",
+    "description": "Visualizza il tuo percorso emotivo nel tempo con grafici interattivi."
+  },
+  "feature4": {
+    "title": "Assistente IA",
+    "description": "Chatta con il tuo diario e ottieni insight personalizzati dalle tue voci precedenti."
+  },
+  "download": {
+    "title": "Ottieni SOULo Oggi",
+    "subtitle": "Disponibile su iOS e Android",
+    "appStore": "App Store",
+    "googlePlay": "Google Play"
+  },
+  "footer": {
+    "contact": "Puoi contattarci in qualsiasi momento a",
+    "rights": "Tutti i diritti riservati.",
+    "privacy": "Informativa sulla Privacy",
+    "terms": "Termini di Servizio"
+  },
+  "mainTagline": "Tieni un diario e cattura la tua giornata senza scrivere una sola parola!",
+  "homepage": {
+    "expressReflectGrow": "Esprimi. Rifletti. Cresci.",
+    "appFeatures": "Funzionalità dell'App",
+    "process": {
+      "title": "Processo: Come Funziona",
+      "step1Title": "Registra",
+      "step1Description": "Parla ad alta voce dei tuoi pensieri - nessuna digitazione necessaria",
+      "step2Title": "Analizza",
+      "step2Description": "L'IA elabora le tue voci per identificare schemi e insight",
+      "step3Title": "Rifletti",
+      "step3Description": "Rivedi insight personalizzati e monitora il tuo percorso emotivo"
+    },
+    "privacy": {
+      "title": "La Tua Privacy È La Nostra Priorità",
+      "description": "Utilizziamo crittografia all'avanguardia per garantire che le tue voci di diario rimangano completamente private e sicure.",
+      "featuresList": [
+        "Crittografia end-to-end",
+        "Opzioni di archiviazione locale",
+        "Nessuna condivisione con terze parti",
+        "Controllo completo sui tuoi dati"
+      ]
+    },
+    "testimonials": {
+      "title": "Cosa Dicono I Nostri Utenti",
+      "subtitle": "Unisciti a migliaia di persone che stanno trasformando il loro percorso di benessere mentale."
+    },
+    "cta": {
+      "title": "Pronto a iniziare il tuo percorso?",
+      "description": "Scarica SOULo oggi e trasforma il modo in cui tieni un diario.",
+      "buttonText": "Inizia"
+    }
+  }
+}

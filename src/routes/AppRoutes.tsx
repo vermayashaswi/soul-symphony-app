@@ -13,7 +13,6 @@ import Settings from '@/pages/Settings';
 import AppDownload from '@/pages/AppDownload';
 import NotFound from '@/pages/NotFound';
 import ViewportManager from './ViewportManager';
-import MobileNavigation from '@/components/MobileNavigation';
 import PrivacyPolicyPage from '@/pages/legal/PrivacyPolicyPage';
 import FAQPage from '@/pages/website/FAQPage';
 import BlogPage from '@/pages/website/BlogPage';
@@ -50,20 +49,11 @@ const AppRoutes = () => {
       return <Navigate to="/app/onboarding" replace />;
     }
   };
-
-  // App Layout wrapper for authenticated routes
-  const AppLayout = () => {
-    return (
-      <>
-        <Outlet />
-        <MobileNavigation />
-      </>
-    );
-  };
   
   return (
-    <ViewportManager>
-      <Routes>
+    <Routes>
+      {/* Wrap all routes that need ViewportManager in a parent Route */}
+      <Route element={<ViewportManager />}>
         {/* Website Routes */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
@@ -76,21 +66,19 @@ const AppRoutes = () => {
         <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
-        {/* Protected App Routes with Layout */}
+        {/* Protected App Routes */}
         <Route path="/app" element={<ProtectedRoute />}>
-          <Route element={<AppLayout />}>
-            <Route index element={<AppRootRedirect />} />
-            <Route path="home" element={<Home />} />
-            <Route path="journal" element={<Journal />} />
-            <Route path="insights" element={
-              <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
-                <Insights />
-              </React.Suspense>
-            } />
-            <Route path="chat" element={<Chat />} />
-            <Route path="smart-chat" element={<SmartChat />} />
-            <Route path="settings" element={<Settings />} />
-          </Route>
+          <Route index element={<AppRootRedirect />} />
+          <Route path="home" element={<Home />} />
+          <Route path="journal" element={<Journal />} />
+          <Route path="insights" element={
+            <React.Suspense fallback={<div className="flex items-center justify-center h-screen">Loading...</div>}>
+              <Insights />
+            </React.Suspense>
+          } />
+          <Route path="chat" element={<Chat />} />
+          <Route path="smart-chat" element={<SmartChat />} />
+          <Route path="settings" element={<Settings />} />
         </Route>
         
         {/* Legacy Route Redirects - all app features redirect to /app/ routes */}
@@ -105,8 +93,8 @@ const AppRoutes = () => {
         
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
-      </Routes>
-    </ViewportManager>
+      </Route>
+    </Routes>
   );
 };
 

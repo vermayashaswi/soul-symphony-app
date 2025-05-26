@@ -36,17 +36,17 @@ const Navbar = () => {
         {/* Desktop Navigation */}
         <div className="hidden md:flex items-center space-x-6">
           <Link to="/" className="text-gray-600 hover:text-primary text-sm">
-            <TranslatableText text="Home" forceTranslate={true} />
+            <TranslatableText text="Home" />
           </Link>
           <Link to="/blog" className="text-gray-600 hover:text-primary text-sm">
-            <TranslatableText text="Blog" forceTranslate={true} />
+            <TranslatableText text="Blog" />
           </Link>
           <Link to="/faq" className="text-gray-600 hover:text-primary text-sm">
-            <TranslatableText text="FAQ" forceTranslate={true} />
+            <TranslatableText text="FAQ" />
           </Link>
           <Button size="sm" asChild>
             <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
-              <TranslatableText text="Download on App Store" forceTranslate={true} />
+              <TranslatableText text="Download on App Store" />
             </a>
           </Button>
           <LanguageSelector />
@@ -65,17 +65,17 @@ const Navbar = () => {
         <div className="md:hidden bg-white border-t border-gray-100 py-4">
           <div className="container mx-auto flex flex-col space-y-4 px-4">
             <Link to="/" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              <TranslatableText text="Home" forceTranslate={true} />
+              <TranslatableText text="Home" />
             </Link>
             <Link to="/blog" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              <TranslatableText text="Blog" forceTranslate={true} />
+              <TranslatableText text="Blog" />
             </Link>
             <Link to="/faq" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
-              <TranslatableText text="FAQ" forceTranslate={true} />
+              <TranslatableText text="FAQ" />
             </Link>
             <Button size="sm" className="w-full" asChild>
               <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
-                <TranslatableText text="Download on App Store" forceTranslate={true} />
+                <TranslatableText text="Download on App Store" />
               </a>
             </Button>
             <LanguageSelector />

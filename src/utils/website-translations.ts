@@ -1,48 +1,99 @@
 
-// Translation cache class with required methods
-class OnDemandTranslationCache {
-  private cache = new Map<string, string>();
+import { staticTranslationService } from '@/services/staticTranslationService';
 
-  private getCacheKey(text: string, language: string): string {
-    return `${text}:${language}`;
+// This utility helps preload common website translations
+export const preloadWebsiteTranslations = async (language: string) => {
+  if (language === 'en') return; // Skip for English
+  
+  console.log(`Preloading website translations for ${language}`);
+  
+  const commonTexts = [
+    // Navigation
+    'Home', 'Features', 'Pricing', 'Blog', 'Download', 'Login', 
+    
+    // Homepage
+    'Your Voice, Your Journey', 
+    'Discover deeper self-awareness through voice journaling',
+    'Start your free trial',
+    'No credit card required',
+    'Learn more',
+    'Download App',
+    
+    // Features
+    'Features', 
+    'Why SOuLO?',
+    'Voice Journaling',
+    'AI Insights',
+    'Mood Tracking',
+    'Private & Secure',
+    
+    // Footer
+    'Download on App Store',
+    'Get it on Google Play',
+    'Contact us at',
+    'Privacy Policy',
+    'Terms of Service',
+    'FAQ',
+    'All rights reserved.'
+  ];
+  
+  try {
+    // Batch translate all common texts
+    const translations = await staticTranslationService.preTranslate(commonTexts);
+    console.log(`Preloaded ${translations.size} website translations`);
+    return translations;
+  } catch (error) {
+    console.error('Failed to preload website translations:', error);
+    return new Map();
   }
+};
 
+export const translateWebsiteText = async (text: string): Promise<string> => {
+  if (!text) return '';
+  
+  try {
+    return await staticTranslationService.translateText(text, 'en');
+  } catch (error) {
+    console.error(`Failed to translate website text: "${text}"`, error);
+    return text;
+  }
+};
+
+// Singleton for caching on-demand translations
+class TranslationCache {
+  private cache = new Map<string, Map<string, string>>();
+  
   getTranslation(text: string, language: string): string | null {
-    const key = this.getCacheKey(text, language);
-    return this.cache.get(key) || null;
-  }
-
-  setTranslation(text: string, translation: string, language: string): void {
-    const key = this.getCacheKey(text, language);
-    this.cache.set(key, translation);
-  }
-
-  clearLanguage(language: string): void {
-    // Remove all entries for a specific language
-    const keysToDelete: string[] = [];
-    for (const [key] of this.cache) {
-      if (key.endsWith(`:${language}`)) {
-        keysToDelete.push(key);
-      }
+    if (language === 'en') return text;
+    
+    const languageCache = this.cache.get(language);
+    if (languageCache) {
+      return languageCache.get(text) || null;
     }
-    keysToDelete.forEach(key => this.cache.delete(key));
+    return null;
   }
-
-  clear(): void {
+  
+  setTranslation(text: string, translatedText: string, language: string): void {
+    if (language === 'en' || !text || !translatedText) return;
+    
+    let languageCache = this.cache.get(language);
+    if (!languageCache) {
+      languageCache = new Map<string, string>();
+      this.cache.set(language, languageCache);
+    }
+    
+    languageCache.set(text, translatedText);
+  }
+  
+  // Clear all translations for a specific language
+  clearLanguage(language: string): void {
+    this.cache.delete(language);
+  }
+  
+  // Clear all translations
+  clearAll(): void {
     this.cache.clear();
   }
 }
 
-// Simple website translations utility
-export const getWebsiteTranslation = (key: string, language: string = 'en'): string => {
-  // For now, just return the key as we're using Google Translate API
-  // This can be expanded later if needed for specific website translations
-  return key;
-};
-
-// Export the translation cache instance
-export const onDemandTranslationCache = new OnDemandTranslationCache();
-
-export const websiteTranslations = {
-  get: getWebsiteTranslation
-};
+export const onDemandTranslationCache = new TranslationCache();

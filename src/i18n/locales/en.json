@@ -1,0 +1,98 @@
+
+{
+  "app": {
+    "name": "SOULo",
+    "tagline": "Your Soulful Journal"
+  },
+  "navigation": {
+    "home": "Home",
+    "journal": "Journal",
+    "insights": "Insights",
+    "chat": "Chat",
+    "settings": "Settings"
+  },
+  "assistant": {
+    "name": "Ruh"
+  },
+  "chat": {
+    "newChat": "New Chat",
+    "yourMessage": "Your message...",
+    "send": "Send",
+    "typing": "Typing...",
+    "errorOccurred": "An error occurred",
+    "tryAgain": "Try again",
+    "journalEntries": "journal entries",
+    "moreEntries": "more entries",
+    "unknownDate": "Unknown date",
+    "chatHistory": "Chat History",
+    "loadingConversation": "Loading conversation...",
+    "howCanIHelp": "How can I help you?",
+    "askMeAnything": "Ask me anything about your mental well-being and journal entries",
+    "deleteConversation": "Delete this conversation?",
+    "deleteWarning": "This will permanently delete this conversation and all its messages. This action cannot be undone.",
+    "cancel": "Cancel",
+    "delete": "Delete",
+    "processing": "Processing...",
+    "noJournalEntries": "No journal entries found",
+    "createJournalEntries": "Create journal entries to get personalized insights.",
+    "goToJournal": "Go to Journal",
+    "analysis": "Analysis:"
+  },
+  "journal": {
+    "entry": "entry",
+    "entries": "entries",
+    "searchFor": "Search for"
+  },
+  "insights": {
+    "moodTrends": "Mood Trends",
+    "sentimentChanges": "Your sentiment changes over time",
+    "positive": "Positive",
+    "neutral": "Neutral",
+    "negative": "Negative",
+    "noData": "No data available for this timeframe",
+    "soulNet": {
+      "title": "Soul-Net",
+      "description": "Explore connections between life areas and emotions in your journal",
+      "loading": "Loading visualization...",
+      "noConnections": "No connections found",
+      "addMore": "Add more journal entries to visualize connections between life areas and emotions in your journaling.",
+      "dragInfo": "Drag to rotate • Scroll to zoom • Tap/Click a node to highlight connections"
+    },
+    "lifeAreas": {
+      "title": "Life Areas",
+      "description": "Important areas mentioned in your journal",
+      "noData": "No life areas found in this time period",
+      "colorInfo": "Color indicates sentiment: red (negative), yellow (neutral), green (positive)"
+    }
+  },
+  "toasts": {
+    "success": "Success",
+    "error": "Error",
+    "warning": "Warning",
+    "info": "Info",
+    "conversationDeleted": "Conversation deleted successfully",
+    "entryDeleted": "Entry deleted successfully", 
+    "entryUpdated": "Journal entry updated successfully",
+    "translationUpdated": "Translation updated successfully",
+    "languageChanged": "Language changed successfully",
+    "profileUpdated": "Profile updated successfully",
+    "settingsSaved": "Settings saved successfully",
+    "signInSuccess": "Signed in successfully",
+    "signOutSuccess": "Signed out successfully",
+    "uploadSuccess": "Upload completed successfully",
+    "entryDeleteFailed": "Failed to delete entry",
+    "entryUpdateFailed": "Failed to update entry",
+    "authRequired": "Authentication required",
+    "uploadFailed": "Upload failed",
+    "connectionError": "Connection error occurred",
+    "processingError": "Processing failed",
+    "savingError": "Failed to save changes",
+    "loadingError": "Failed to load data",
+    "processing": "Processing...",
+    "saving": "Saving...",
+    "loading": "Loading...",
+    "uploading": "Uploading...",
+    "openingJournalSpace": "Opening your journal space",
+    "navigationError": "Could not navigate to journal. Please try again."
+  }
+}

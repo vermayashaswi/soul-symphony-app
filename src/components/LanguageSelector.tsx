@@ -73,12 +73,12 @@ const languages = [
 ];
 
 const LanguageSelector = () => {
-  const { currentLanguage, setCurrentLanguage, isTranslating } = useTranslation();
+  const { currentLanguage, setLanguage, isTranslating } = useTranslation();
   const [isOpen, setIsOpen] = useState(false);
 
   const handleLanguageChange = async (languageCode: string) => {
     debug.info('Language change requested:', languageCode);
-    await setCurrentLanguage(languageCode);
+    await setLanguage(languageCode);
     setIsOpen(false);
     
     // Store recently used language
