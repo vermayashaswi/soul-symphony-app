@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
@@ -111,12 +110,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return null;
   }
   
+  // Updated navItems to use translation keys that match the Hindi locale file
   const navItems = [
-    { path: '/app/home', icon: Home, label: 'Home' },
-    { path: '/app/journal', icon: BookOpen, label: 'Journal' },
-    { path: '/app/smart-chat', icon: MessageCircle, label: 'Chat' },
-    { path: '/app/insights', icon: BarChart2, label: 'Insights' },
-    { path: '/app/settings', icon: Settings, label: 'Settings' },
+    { path: '/app/home', icon: Home, label: 'navigation.home' },
+    { path: '/app/journal', icon: BookOpen, label: 'navigation.journal' },
+    { path: '/app/smart-chat', icon: MessageCircle, label: 'navigation.chat' },
+    { path: '/app/insights', icon: BarChart2, label: 'navigation.insights' },
+    { path: '/app/settings', icon: Settings, label: 'navigation.settings' },
   ];
 
   const getActiveStatus = (path: string) => {
