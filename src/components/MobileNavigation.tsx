@@ -95,6 +95,11 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const getActiveStatus = (path: string) => {
     return location.pathname.startsWith(path);
   };
+
+  // Helper function to determine if text is likely to be long (for translation-aware styling)
+  const isLongText = (text: string) => {
+    return text.length > 8;
+  };
   
   return (
     <motion.div 
@@ -104,15 +109,15 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       )}
       style={{
         zIndex: 9998,
-        paddingTop: '8px',
-        paddingBottom: 'max(8px, env(safe-area-inset-bottom))',
-        height: 'calc(60px + env(safe-area-inset-bottom))'
+        paddingTop: '6px',
+        paddingBottom: 'max(6px, env(safe-area-inset-bottom))',
+        height: 'calc(58px + env(safe-area-inset-bottom))'
       }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}
       transition={{ duration: 0.3 }}
     >
-      <div className="flex justify-around items-center px-2">
+      <div className="flex justify-around items-center px-1">
         {navItems.map((item) => {
           const isActive = getActiveStatus(item.path);
           
@@ -121,28 +126,50 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
               key={item.path}
               to={item.path}
               className={cn(
-                "flex flex-col items-center py-1 px-2 transition-colors min-w-0 flex-1",
+                "flex flex-col items-center justify-center py-1 px-1 transition-colors min-w-0 flex-1",
+                "hover:bg-muted/50 rounded-md",
                 isActive 
                   ? "text-primary" 
                   : "text-muted-foreground hover:text-primary"
               )}
             >
-              <div className="relative mb-1">
-                <item.icon size={20} />
+              <div className="relative mb-0.5 flex-shrink-0">
+                <item.icon size={18} className="flex-shrink-0" />
                 {isActive && (
                   <motion.div
                     layoutId="mobileNavIndicator"
-                    className="absolute -bottom-1 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"
+                    className="absolute -bottom-0.5 left-1/2 transform -translate-x-1/2 w-1 h-1 bg-primary rounded-full"
                     transition={{ type: "spring", bounce: 0.3 }}
                   />
                 )}
               </div>
-              <span className="text-xs text-center leading-tight">
+              <div className="text-center w-full min-h-[2.5rem] flex items-center justify-center">
                 <TranslatableText 
                   text={item.label} 
                   forceTranslate={true}
+                  className={cn(
+                    "leading-tight font-medium transition-all duration-200",
+                    // Responsive font sizing
+                    "text-[10px] sm:text-xs",
+                    // Text truncation and wrapping
+                    "max-w-full break-words hyphens-auto",
+                    // Dynamic spacing based on potential text length
+                    isLongText(item.label) && "text-[9px] sm:text-[10px] leading-[1.1]",
+                    // Better letter spacing for readability
+                    "tracking-tight"
+                  )}
+                  style={{
+                    wordBreak: 'break-word',
+                    overflowWrap: 'break-word',
+                    textAlign: 'center',
+                    display: '-webkit-box',
+                    WebkitLineClamp: 2,
+                    WebkitBoxOrient: 'vertical',
+                    overflow: 'hidden',
+                    lineHeight: isLongText(item.label) ? '1.1' : '1.2'
+                  }}
                 />
-              </span>
+              </div>
             </Link>
           );
         })}
