@@ -741,23 +741,27 @@ export default function Settings() {
               </Button>
             </div>
             
-            <div className="mt-6 text-center flex justify-center gap-3">
+            <div className="mt-6 flex flex-col sm:flex-row justify-center gap-3">
               <Button 
                 variant="default" 
-                className="gap-2 bg-theme-color hover:bg-theme-color/90" 
+                className="gap-2 bg-theme-color hover:bg-theme-color/90 flex-1 sm:flex-none whitespace-normal text-center min-h-[44px] px-6" 
                 onClick={handleContactSupport}
               >
-                <Mail className="h-4 w-4" />
-                <TranslatableText text="Contact Support" />
+                <Mail className="h-4 w-4 flex-shrink-0" />
+                <span className="leading-tight">
+                  <TranslatableText text="Contact Support" />
+                </span>
               </Button>
               
               <Button 
                 variant="outline" 
-                className="gap-2 border-theme-color text-theme-color hover:bg-theme-color/10" 
+                className="gap-2 border-theme-color text-theme-color hover:bg-theme-color/10 flex-1 sm:flex-none whitespace-normal text-center min-h-[44px] px-6" 
                 onClick={resetTutorial}
               >
-                <RefreshCw className="h-4 w-4" />
-                <TranslatableText text="Restart Tutorial" />
+                <RefreshCw className="h-4 w-4 flex-shrink-0" />
+                <span className="leading-tight">
+                  <TranslatableText text="Restart Tutorial" />
+                </span>
               </Button>
             </div>
           </motion.div>
