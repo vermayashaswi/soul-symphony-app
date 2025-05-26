@@ -133,18 +133,26 @@ const MobileChatMessage: React.FC<MobileChatMessageProps> = ({ message, showAnal
                   exit={{ opacity: 0, height: 0 }}
                   className="mt-1 text-xs max-h-32 overflow-y-auto border-l-2 border-primary/30 pl-2 pr-1"
                 >
-                  {message.references!.slice(0, 2).map((ref, idx) => (
-                    <div key={idx} className="mb-1 py-1">
-                      <div className="font-medium dark:text-white/90">
-                        {ref.date && !isNaN(new Date(ref.date).getTime()) 
-                          ? formatShortDate(new Date(ref.date))
-                          : <TranslatableText text="Unknown date" forceTranslate={true} />}
+                  {message.references!.slice(0, 2).map((ref, idx) => {
+                    // Handle the new formatShortDate return type
+                    const formattedDate = ref.date && !isNaN(new Date(ref.date).getTime()) 
+                      ? formatShortDate(new Date(ref.date))
+                      : { type: 'translatable' as const, text: 'Unknown date' };
+                    
+                    return (
+                      <div key={idx} className="mb-1 py-1">
+                        <div className="font-medium dark:text-white/90">
+                          <TranslatableText 
+                            text={formattedDate.text} 
+                            forceTranslate={formattedDate.type === 'translatable'}
+                          />
+                        </div>
+                        <div className="text-muted-foreground dark:text-white/70">
+                          <TranslatableText text={ref.snippet} forceTranslate={true} />
+                        </div>
                       </div>
-                      <div className="text-muted-foreground dark:text-white/70">
-                        <TranslatableText text={ref.snippet} forceTranslate={true} />
-                      </div>
-                    </div>
-                  ))}
+                    );
+                  })}
                   {message.references!.length > 2 && (
                     <div className="text-xs text-muted-foreground dark:text-white/60">
                       <TranslatableText 
