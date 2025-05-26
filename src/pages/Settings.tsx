@@ -396,7 +396,7 @@ export default function Settings() {
       <div className={cn("max-w-3xl mx-auto px-4", isMobile ? "pt-0" : "pt-2")}>
         <div className="mb-6">
           <h1 className="text-3xl font-bold mb-2 text-theme-color">
-            <TranslatableText text="Settings" forceTranslate={true} />
+            <TranslatableText text="settings" forceTranslate={true} />
           </h1>
           <p className="text-muted-foreground">
             <TranslatableText text="Personalize your SOuLO experience" />
@@ -505,7 +505,7 @@ export default function Settings() {
                   onClick={handleLogout}
                 >
                   <LogOut className="h-4 w-4" />
-                  <TranslatableText text="Logout" />
+                  <TranslatableText text="logout" forceTranslate={true} />
                 </Button>
               </div>
             </div>
