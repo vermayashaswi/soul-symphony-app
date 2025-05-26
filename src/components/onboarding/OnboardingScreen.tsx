@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -13,7 +12,7 @@ import { toast } from "sonner";
 import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
-import { useAuth } from "@/contexts/AuthContext"; // Add import for useAuth
+import { useAuth } from "@/contexts/AuthContext";
 import { 
   Select,
   SelectContent,
@@ -50,9 +49,7 @@ const createWavePath = (
   return path;
 };
 
-// Add expanded languages array
 const LANGUAGES = [
-  // Currently implemented languages
   { code: 'en', label: 'English', region: 'European' },
   { code: 'es', label: 'Español', region: 'European' },
   { code: 'fr', label: 'Français', region: 'European' },
@@ -63,11 +60,9 @@ const LANGUAGES = [
   { code: 'ru', label: 'Русский', region: 'European' },
   { code: 'ar', label: 'العربية', region: 'Middle Eastern' },
   { code: 'pt', label: 'Português', region: 'European' },
-
-  // Additional Indian regional languages
   { code: 'bn', label: 'বাংলা', region: 'Indian' },
   { code: 'ta', label: 'தமிழ்', region: 'Indian' },
-  { code: 'te', label: 'తెలুగు', region: 'Indian' },
+  { code: 'te', label: 'తెలుగు', region: 'Indian' },
   { code: 'mr', label: 'मराठी', region: 'Indian' },
   { code: 'gu', label: 'ગુજરાતી', region: 'Indian' },
   { code: 'kn', label: 'ಕನ್ನಡ', region: 'Indian' },
@@ -80,8 +75,6 @@ const LANGUAGES = [
   { code: 'ks', label: 'कॉशुर', region: 'Indian' },
   { code: 'kok', label: 'कोंकणी', region: 'Indian' },
   { code: 'mai', label: 'मैथिली', region: 'Indian' },
-
-  // Other major global languages
   { code: 'it', label: 'Italiano', region: 'European' },
   { code: 'ko', label: '한국어', region: 'Asian' },
   { code: 'tr', label: 'Türkçe', region: 'European' },
@@ -594,12 +587,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             animate={{ opacity: 1 }}
             transition={{ delay: 0.5 }}
           >
-            <Input
-              placeholder="Enter your name"
-              value={props.name}
-              onChange={(e) => props.setName(e.target.value)}
-              className="bg-background/80 border-theme/20 focus:border-theme text-white"
-              autoFocus
+            <NameInput
+              name={props.name}
+              setName={props.setName}
             />
             
             <div className="text-sm text-muted-foreground text-center">
@@ -664,6 +654,40 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     buttonText: "Sign In"
   }
 ];
+
+// Create a separate component for the name input with proper translation handling
+const NameInput: React.FC<{ name: string; setName: (name: string) => void }> = ({ name, setName }) => {
+  const { translate, currentLanguage } = useTranslation();
+  const [placeholder, setPlaceholder] = useState("Enter your name");
+  
+  useEffect(() => {
+    const translatePlaceholder = async () => {
+      if (currentLanguage !== 'en') {
+        try {
+          const translatedPlaceholder = await translate("Enter your name", "en");
+          setPlaceholder(translatedPlaceholder);
+        } catch (error) {
+          console.error('Failed to translate placeholder:', error);
+          setPlaceholder("Enter your name");
+        }
+      } else {
+        setPlaceholder("Enter your name");
+      }
+    };
+    
+    translatePlaceholder();
+  }, [currentLanguage, translate]);
+  
+  return (
+    <Input
+      placeholder={placeholder}
+      value={name}
+      onChange={(e) => setName(e.target.value)}
+      className="bg-background/80 border-theme/20 focus:border-theme text-white"
+      autoFocus
+    />
+  );
+};
 
 // Enhanced Language Selector component for onboarding - simplified without search
 const LanguageSelector = () => {
@@ -743,7 +767,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth(); // Get authentication status
+  const { user } = useAuth();
   
   // Define isNameStep before it's used in useSwipeGesture
   const isFirstStep = currentStep === 0;
@@ -818,7 +842,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       }
     },
     minDistance: 50,
-    disabled: isNameStep // Disable swipe gestures on the name entry step
+    disabled: isNameStep
   });
 
   const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
