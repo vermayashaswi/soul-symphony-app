@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -66,7 +67,7 @@ const LANGUAGES = [
   // Additional Indian regional languages
   { code: 'bn', label: 'বাংলা', region: 'Indian' },
   { code: 'ta', label: 'தமிழ்', region: 'Indian' },
-  { code: 'te', label: 'తెలుగు', region: 'Indian' },
+  { code: 'te', label: 'తెలুగు', region: 'Indian' },
   { code: 'mr', label: 'मराठी', region: 'Indian' },
   { code: 'gu', label: 'ગુજરાતી', region: 'Indian' },
   { code: 'kn', label: 'ಕನ್ನಡ', region: 'Indian' },
@@ -499,7 +500,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               transition={{ delay: 0.3 }}
             >
               <div className="flex items-center justify-between mb-2">
-                <div className="text-xs font-medium text-theme">Mood Trends</div>
+                <div className="text-xs font-medium text-theme">
+                  <TranslatableText text="Mood Trends" forceTranslate={true} />
+                </div>
                 <LineChart className="w-4 h-4 text-theme" />
               </div>
               
@@ -553,9 +556,9 @@ const ONBOARDING_STEPS: StepIllustration[] = [
                 animate={{ opacity: 1 }}
                 transition={{ delay: 2.2 }}
               >
-                <span>Jan</span>
-                <span>Mar</span>
-                <span>Now</span>
+                <span><TranslatableText text="Jan" forceTranslate={true} /></span>
+                <span><TranslatableText text="Mar" forceTranslate={true} /></span>
+                <span><TranslatableText text="Now" forceTranslate={true} /></span>
               </motion.div>
             </motion.div>
           </div>
@@ -600,7 +603,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             />
             
             <div className="text-sm text-muted-foreground text-center">
-              This is how SOuLO will address you
+              <TranslatableText text="This is how SOuLO will address you" forceTranslate={true} />
             </div>
           </motion.div>
           
@@ -652,7 +655,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             transition={{ delay: 1 }}
           >
             <div className="text-theme text-sm font-medium text-center">
-              Emotional wellness through voice
+              <TranslatableText text="Emotional wellness through voice" forceTranslate={true} />
             </div>
           </motion.div>
         </motion.div>
