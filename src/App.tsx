@@ -10,7 +10,7 @@ import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
 import { preloadCriticalImages } from './utils/imagePreloader';
 import './styles/emoji.css';
-import './styles/tutorial.css'; // Ensure tutorial styles are imported
+import './styles/tutorial.css';
 
 const App: React.FC = () => {
   useEffect(() => {
@@ -38,7 +38,6 @@ const App: React.FC = () => {
         <TranslationLoadingOverlay />
         <JournalProcessingInitializer />
         <AppRoutes />
-        {/* TutorialOverlay has internal logic to only render on app routes */}
         <TutorialOverlay />
         <Toaster />
         <SonnerToaster position="top-right" />

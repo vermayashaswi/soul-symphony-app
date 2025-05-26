@@ -18,14 +18,14 @@ const MobileNavbar = () => {
   const location = useLocation();
   const { isActive: isTutorialActive } = useTutorial();
 
-  // Enhanced check for onboarding or auth routes - make consistent with other components
+  // Enhanced check for onboarding or auth routes
   const isOnboardingOrAuth = 
     location.pathname === '/app/onboarding' || 
     location.pathname === '/app/auth' ||
     location.pathname === '/onboarding' ||
     location.pathname === '/auth' ||
     location.pathname === '/app' ||
-    location.pathname === '/'; // Don't show on root path either
+    location.pathname === '/';
   
   // Don't render if we're on onboarding/auth screens
   if (isOnboardingOrAuth) {
@@ -37,10 +37,10 @@ const MobileNavbar = () => {
     <motion.nav
       className={cn(
         "fixed bottom-0 left-0 right-0 bg-background/90 backdrop-blur-md border-t px-4 py-2",
-        isTutorialActive && "opacity-30 pointer-events-none" // Fade out and disable interaction during tutorial
+        isTutorialActive && "opacity-30 pointer-events-none"
       )}
       style={{
-        zIndex: 9998, // Lower z-index than tutorial overlay (9999)
+        zIndex: 9998,
       }}
       initial={{ y: 100 }}
       animate={{ y: 0 }}

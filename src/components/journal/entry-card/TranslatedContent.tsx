@@ -1,15 +1,13 @@
 import React, { useState, useEffect } from 'react';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { LoadingEntryContent } from './LoadingEntryContent';
 
 interface TranslatedContentProps {
   content: string;
   isExpanded: boolean;
-  language?: string; // We'll keep this parameter but ignore it for translation source
   entryId?: number;
 }
 
-export function TranslatedContent({ content, isExpanded, language, entryId }: TranslatedContentProps) {
+export function TranslatedContent({ content, isExpanded, entryId }: TranslatedContentProps) {
   const [translatedContent, setTranslatedContent] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const { currentLanguage, translate } = useTranslation();
@@ -33,8 +31,7 @@ export function TranslatedContent({ content, isExpanded, language, entryId }: Tr
         // Always keep the original content initially
         setTranslatedContent(content);
         
-        // IMPORTANT: Always translate from English regardless of the detected language
-        // This is the key change - we always assume the refined text is in English
+        // Always translate from English (refined journal text is in English)
         const translated = await translate(content, "en", entryId);
         
         if (translated) {
