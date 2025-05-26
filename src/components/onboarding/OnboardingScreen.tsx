@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -414,7 +413,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
                   }
                 }}
               >
-                {theme}
+                <TranslatableText text={theme} forceTranslate={true} />
               </motion.div>
             ))}
           </motion.div>
@@ -447,7 +446,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.3 }}
             >
-              How have I been feeling lately?
+              <TranslatableText text="How have I been feeling lately?" forceTranslate={true} />
             </motion.div>
             
             <motion.div 
@@ -456,7 +455,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
               animate={{ x: 0, opacity: 1 }}
               transition={{ delay: 0.9 }}
             >
-              Based on your recent entries, you've been feeling more positive and energetic this week...
+              <TranslatableText text="Based on your recent entries, you've been feeling more positive and energetic this week..." forceTranslate={true} />
             </motion.div>
             
             <motion.div
