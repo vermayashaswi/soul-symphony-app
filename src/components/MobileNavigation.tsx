@@ -123,9 +123,13 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return location.pathname.startsWith(path);
   };
   
-  // Debug logging for translation
+  // Enhanced debug logging for translation
   console.log('MobileNavigation: Current language:', currentLanguage);
-  console.log('MobileNavigation: Nav items:', navItems.map(item => item.label));
+  console.log('MobileNavigation: Location pathname:', location.pathname);
+  console.log('MobileNavigation: Nav items with labels:', navItems.map(item => ({
+    path: item.path,
+    label: item.label
+  })));
   
   return (
     <motion.div 
@@ -147,7 +151,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
         {navItems.map((item) => {
           const isActive = getActiveStatus(item.path);
           
-          console.log(`MobileNavigation: Rendering item ${item.label} with forceTranslate=true`);
+          console.log(`MobileNavigation: Rendering nav item "${item.label}" for path ${item.path} with forceTranslate=true`);
           
           return (
             <Link
@@ -174,8 +178,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 <TranslatableText 
                   text={item.label} 
                   forceTranslate={true}
-                  onTranslationStart={() => console.log(`MobileNavigation: Starting translation for ${item.label}`)}
-                  onTranslationEnd={() => console.log(`MobileNavigation: Finished translation for ${item.label}`)}
+                  onTranslationStart={() => console.log(`MobileNavigation: Translation started for "${item.label}"`)}
+                  onTranslationEnd={() => console.log(`MobileNavigation: Translation completed for "${item.label}"`)}
                 />
               </span>
             </Link>
