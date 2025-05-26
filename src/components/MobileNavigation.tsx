@@ -163,7 +163,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 )}
               </div>
               <span className="text-xs mt-0.5">
-                <TranslatableText text={item.label} />
+                <TranslatableText text={item.label} forceTranslate={true} />
               </span>
             </Link>
           );
