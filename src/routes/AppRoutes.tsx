@@ -51,9 +51,8 @@ const AppRoutes = () => {
   };
   
   return (
-    <Routes>
-      {/* Wrap all routes that need ViewportManager in a parent Route */}
-      <Route element={<ViewportManager />}>
+    <ViewportManager>
+      <Routes>
         {/* Website Routes */}
         <Route path="/" element={<Index />} />
         <Route path="/privacy-policy" element={<PrivacyPolicyPage />} />
@@ -93,8 +92,8 @@ const AppRoutes = () => {
         
         {/* Catch-all route */}
         <Route path="*" element={<NotFound />} />
-      </Route>
-    </Routes>
+      </Routes>
+    </ViewportManager>
   );
 };
 

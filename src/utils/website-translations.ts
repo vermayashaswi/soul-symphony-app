@@ -6,6 +6,9 @@ export const getWebsiteTranslation = (key: string, language: string = 'en'): str
   return key;
 };
 
+// Export the missing onDemandTranslationCache for compatibility
+export const onDemandTranslationCache = new Map<string, string>();
+
 export const websiteTranslations = {
   get: getWebsiteTranslation
 };
