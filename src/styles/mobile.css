@@ -1,171 +1,80 @@
 
-/* Mobile-specific styles */
-@media (max-width: 768px) {
-  /* Rounded corners for mobile UI elements */
-  .mobile-chat-interface .rounded-full {
-    border-radius: 9999px !important; /* Force perfect circles */
-  }
-  
-  /* Add padding to the bottom of the page content to make room for the navigation bar */
-  .smart-chat-container,
-  .journal-container,
-  .insights-container,
-  .settings-container {
-    padding-bottom: 4.5rem !important; /* Increased to ensure content doesn't get cut off */
-  }
+/* Mobile-specific styles and safe area handling */
 
-  /* Make cards take full width in mobile view and remove horizontal padding */
-  .insights-container .grid-cols-1 > div,
-  .insights-container .bg-background,
-  .insights-container .mb-8 > div {
-    width: 100% !important;
-    max-width: 100% !important;
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-    border-radius: 10px !important;
-  }
-  
-  /* Ensure insights page has minimal horizontal padding */
-  .insights-page-content {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    overflow-x: hidden !important; /* Prevent horizontal scrolling */
-  }
-  
-  /* Remove horizontal margins on cards */
-  .insights-container .max-w-5xl > div {
-    margin-left: 0 !important;
-    margin-right: 0 !important;
-  }
-  
-  /* Remove padding in SoulNet component when in normal (non-fullscreen) view */
-  .insights-container .mb-8 .bg-background .rounded-xl:not(.fixed) {
-    padding: 0 !important;
-  }
-  
-  /* Prevent horizontal scrolling at the root level */
-  html, body {
-    overflow-x: hidden !important;
-    width: 100% !important;
-    position: relative !important;
-  }
-  
-  /* Fix for the App.css padding causing overflow */
-  #root {
-    padding-left: 0 !important;
-    padding-right: 0 !important;
-    max-width: 100% !important;
-    overflow-x: hidden !important;
-  }
-  
-  /* iOS-specific padding for safe areas */
-  @supports (padding: max(0px)) {
-    .smart-chat-container,
-    .journal-container,
-    .insights-container,
-    .settings-container {
-      padding-bottom: max(4.5rem, env(safe-area-inset-bottom) + 3.6rem) !important;
-      padding-left: max(8px, env(safe-area-inset-left) + 0px) !important;
-      padding-right: max(8px, env(safe-area-inset-right) + 0px) !important;
-    }
-  }
+/* Safe area support for devices with notches */
+.safe-area-bottom {
+  padding-bottom: env(safe-area-inset-bottom);
+}
 
-  /* SoulNet fullscreen behavior improvements */
-  .fixed.inset-0.z-\[9999\] {
-    position: fixed !important;
-    top: 0 !important;
-    left: 0 !important;
-    right: 0 !important;
-    bottom: 0 !important;
-    width: 100vw !important;
-    height: 100vh !important;
-    z-index: 9998 !important; /* Decreased to be below the navigation bar */
-    margin: 0 !important;
-    padding: 0 !important;
-    background-color: hsl(var(--background)) !important;
-  }
+.safe-area-top {
+  padding-top: env(safe-area-inset-top);
+}
 
-  /* Ensure entity info panel stays on top */
-  .z-\[10000\] {
-    z-index: 10000 !important;
-  }
+/* Ensure content doesn't overlap with mobile navigation */
+.mobile-container {
+  padding-bottom: calc(70px + env(safe-area-inset-bottom));
+}
 
-  /* Make SoulNet visualization clickable and fully interactive */
-  canvas {
-    touch-action: none !important;
-  }
+/* iOS-specific fixes */
+.ios-device {
+  -webkit-overflow-scrolling: touch;
+}
 
-  /* Fix any styling issues with SoulNet info panel on mobile */
-  .absolute.top-2.right-2.p-2.rounded-lg.shadow-lg {
-    z-index: 10000 !important;
-    max-width: 170px !important;
-  }
+.ios-device .mobile-container {
+  /* Additional padding for iOS home indicator */
+  padding-bottom: calc(90px + env(safe-area-inset-bottom));
+}
 
-  /* Ensure the mobile chat input is fully visible */
-  .mobile-chat-input-container {
-    bottom: 4.5rem !important; /* Adjusted to match the increased bottom padding */
-  }
+/* Android-specific fixes */
+.android-device {
+  /* Android-specific styles if needed */
+}
 
-  /* Add more space at the bottom of the chat content */
-  .mobile-chat-content {
-    padding-bottom: 70px !important;
-  }
-  
-  /* Year view calendar compact styling for mobile - Updated dot sizes */
-  .compact-table-mobile {
-    table-layout: fixed !important;
-    font-size: 10px !important;
-  }
-  
-  .compact-table-mobile th,
-  .compact-table-mobile td {
-    padding: 1px !important;
-  }
-  
-  .compact-table-mobile div.rounded-full {
-    width: 12px !important;
-    height: 12px !important;
-    margin: 1px auto !important;
+/* Mobile navigation specific styles */
+.mobile-navigation {
+  background: rgba(255, 255, 255, 0.95);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+@supports (-webkit-backdrop-filter: blur(10px)) {
+  .mobile-navigation {
+    background: rgba(255, 255, 255, 0.8);
   }
 }
 
-/* Styles for both mobile and desktop */
-@media all {
-  /* Ensure SoulNet container has proper padding when not in fullscreen */
-  .soulnet-container:not(.fixed) {
-    margin: 0 8px !important;
+/* Dark mode support for mobile navigation */
+@media (prefers-color-scheme: dark) {
+  .mobile-navigation {
+    background: rgba(0, 0, 0, 0.95);
   }
   
-  /* Fix for mobile navigation to stay on top */
-  .fixed.bottom-0.left-0.right-0.bg-background.border-t.border-muted {
-    z-index: 9999 !important;
-  }
-  
-  /* Year view calendar compact styling - Updated dot sizes */
-  .compact-year-view {
-    width: 100%;
-    overflow-x: hidden;
-  }
-  
-  .compact-year-view table {
-    table-layout: fixed;
-    width: 100%;
-  }
-  
-  .compact-year-view th:first-child,
-  .compact-year-view td:first-child {
-    width: 24px;
-  }
-  
-  .compact-year-view td {
-    height: 18px;
-  }
-  
-  /* Desktop year view - larger dots */
-  @media (min-width: 769px) {
-    .compact-year-view div.rounded-full {
-      width: 16px !important;
-      height: 16px !important;
+  @supports (-webkit-backdrop-filter: blur(10px)) {
+    .mobile-navigation {
+      background: rgba(0, 0, 0, 0.8);
     }
   }
+}
+
+/* Prevent scroll bounce on iOS */
+.mobile-container,
+.mobile-page {
+  overscroll-behavior: none;
+  -webkit-overflow-scrolling: touch;
+}
+
+/* Touch-friendly button sizing */
+.mobile-nav-button {
+  min-height: 44px;
+  min-width: 44px;
+}
+
+/* Hide scrollbars on mobile */
+.mobile-scrollable::-webkit-scrollbar {
+  display: none;
+}
+
+.mobile-scrollable {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
 }

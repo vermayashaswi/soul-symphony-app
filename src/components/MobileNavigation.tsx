@@ -37,7 +37,7 @@ const MobileNavigation = () => {
     { 
       icon: Home, 
       label: 'Home', 
-      path: '/app/dashboard',
+      path: '/app/home',
       tutorialId: 'nav-home'
     },
     { 
@@ -68,13 +68,13 @@ const MobileNavigation = () => {
 
   const isActive = (path: string) => {
     return location.pathname === path || 
-           (path === '/app/dashboard' && location.pathname === '/app');
+           (path === '/app/home' && location.pathname === '/app');
   };
 
   return (
     <motion.nav
       className={cn(
-        "fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t z-40",
+        "fixed bottom-0 left-0 right-0 bg-background/95 backdrop-blur-md border-t z-40 safe-area-bottom",
         isTutorialActive && "opacity-30 pointer-events-none"
       )}
       initial={{ y: 100 }}
