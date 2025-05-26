@@ -10,6 +10,7 @@ import { reprocessJournalEntry } from '@/services/journalService';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { showTranslatedToast } from '@/services/notificationService';
 import { useIsMobile } from '@/hooks/use-mobile';
+import { TranslatableText } from '@/components/translation/TranslatableText';
 
 interface EditEntryButtonProps {
   entryId: number;
@@ -224,21 +225,29 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
         <DialogContent className="w-[90%] max-w-lg mx-auto">
           <DialogHeader>
             <DialogTitle>
-              {currentLanguage === 'en' ? 'Edit Journal Entry' : 'Editar Entrada del Diario'}
+              <TranslatableText 
+                text="Edit Journal Entry" 
+                forceTranslate={true}
+              />
             </DialogTitle>
           </DialogHeader>
           
           {isLoadingTranslation ? (
             <div className="flex items-center justify-center min-h-[200px]">
               <Loader2 className="h-6 w-6 animate-spin" />
-              <span className="ml-2">Loading translation...</span>
+              <span className="ml-2">
+                <TranslatableText 
+                  text="Loading translation..." 
+                  forceTranslate={true}
+                />
+              </span>
             </div>
           ) : (
             <Textarea
               value={editedContent}
               onChange={(e) => setEditedContent(e.target.value)}
               className="min-h-[200px] mt-2"
-              placeholder={currentLanguage === 'en' ? "Edit your journal entry..." : "Edita tu entrada del diario..."}
+              placeholder={currentLanguage === 'en' ? "Edit your journal entry..." : undefined}
               disabled={isSubmitting}
             />
           )}
@@ -250,7 +259,10 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
               disabled={isSubmitting}
               className="rounded-full"
             >
-              {currentLanguage === 'en' ? 'Cancel' : 'Cancelar'}
+              <TranslatableText 
+                text="Cancel" 
+                forceTranslate={true}
+              />
             </Button>
             {isSubmitting ? (
               <Button 
@@ -258,10 +270,17 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
                 className="rounded-full"
               >
                 <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                {updatedInBackground ? 
-                  (currentLanguage === 'en' ? 'Processing...' : 'Procesando...') : 
-                  (currentLanguage === 'en' ? 'Saving...' : 'Guardando...')
-                }
+                {updatedInBackground ? (
+                  <TranslatableText 
+                    text="Processing..." 
+                    forceTranslate={true}
+                  />
+                ) : (
+                  <TranslatableText 
+                    text="Saving..." 
+                    forceTranslate={true}
+                  />
+                )}
               </Button>
             ) : (
               <Button 
@@ -269,7 +288,10 @@ export function EditEntryButton({ entryId, content, onEntryUpdated }: EditEntryB
                 disabled={!editedContent.trim() || !hasContentChanged || isLoadingTranslation}
                 className="rounded-full"
               >
-                {currentLanguage === 'en' ? 'Save Changes' : 'Guardar Cambios'}
+                <TranslatableText 
+                  text="Save Changes" 
+                  forceTranslate={true}
+                />
               </Button>
             )}
           </DialogFooter>
