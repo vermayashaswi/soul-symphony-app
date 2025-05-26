@@ -168,9 +168,12 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const translate = async (text: string, sourceLanguage?: string, entryId?: number): Promise<string> => {
     if (currentLanguage === 'en' || !text || text.trim() === '') return text;
     
+    console.log(`TranslationContext: translate() called with "${text}" to ${currentLanguage}`);
+    
     // Check memory cache first
     const cachedTranslation = getCachedTranslation(text, currentLanguage);
     if (cachedTranslation) {
+      console.log(`TranslationContext: Found cached translation for "${text}": "${cachedTranslation}"`);
       return cachedTranslation;
     }
     
@@ -178,16 +181,17 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
     try {
       const cachedEntry = await translationCache.getTranslation(text, currentLanguage);
       if (cachedEntry) {
+        console.log(`TranslationContext: Found persistent cache for "${text}": "${cachedEntry.translatedText}"`);
         // Store in memory cache for faster access next time
         cacheTranslation(text, cachedEntry.translatedText, currentLanguage);
         return cachedEntry.translatedText;
       }
     } catch (err) {
-      console.error('Error checking translation cache:', err);
+      console.error('TranslationContext: Cache check failed:', err);
     }
     
     try {
-      console.log(`Translating text: "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'en'}${entryId ? ` for entry ${entryId}` : ''}`);
+      console.log(`TranslationContext: Calling staticTranslationService for "${text.substring(0, 30)}..." to ${currentLanguage} from ${sourceLanguage || 'en'}${entryId ? ` for entry ${entryId}` : ''}`);
       const translated = await staticTranslationService.translateText(text, sourceLanguage, entryId);
       
       // Clean the result in case the service didn't do it
@@ -196,10 +200,10 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       // Cache the result for future use
       cacheTranslation(text, cleanedTranslation || text, currentLanguage);
       
-      console.log(`Translation result: "${cleanedTranslation?.substring(0, 30) || 'empty'}..."`);
+      console.log(`TranslationContext: Translation result: "${cleanedTranslation?.substring(0, 30) || 'empty'}..."`);
       return cleanedTranslation || text;
     } catch (error) {
-      console.error('Translation error in context:', error);
+      console.error('TranslationContext: Translation error:', error);
       return text; // Fallback to original
     }
   };
@@ -214,14 +218,22 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   const setLanguage = async (lang: string) => {
     if (lang === currentLanguage) return;
     
-    console.log(`Changing language from ${currentLanguage} to ${lang}`);
+    console.log(`TranslationContext: Changing language from ${currentLanguage} to ${lang}`);
     setIsTranslating(true);
     setTranslationProgress(0);
     
     try {
       // Clear memory cache when language changes
       memoryCache.clear();
-      console.log(`Cleared translation memory cache`);
+      console.log(`TranslationContext: Cleared translation memory cache`);
+      
+      // Clear persistent cache for the new language
+      try {
+        await translationCache.clearCache(lang);
+        console.log(`TranslationContext: Cleared persistent cache for ${lang}`);
+      } catch (cacheError) {
+        console.error(`TranslationContext: Failed to clear persistent cache:`, cacheError);
+      }
       
       // Store language preference
       localStorage.setItem('preferredLanguage', lang);
@@ -240,20 +252,23 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
         try {
           // Preload common website translations in the background
           preloadWebsiteTranslations(lang).catch(err => {
-            console.error('Failed to preload website translations:', err);
+            console.error('TranslationContext: Failed to preload website translations:', err);
           });
         } catch (error) {
-          console.error('Error preloading translations:', error);
+          console.error('TranslationContext: Error preloading translations:', error);
         }
       }
       
       // Dispatch language change event for components to react
-      window.dispatchEvent(new CustomEvent('languageChange', { 
+      const event = new CustomEvent('languageChange', { 
         detail: { 
           language: lang,
           timestamp: Date.now()
         } 
-      }));
+      });
+      
+      console.log(`TranslationContext: Dispatching languageChange event for ${lang}`);
+      window.dispatchEvent(event);
       
       const selectedLang = languages.find(l => l.code === lang);
       toast.success(`Language changed to ${selectedLang?.label || lang}`);
@@ -263,9 +278,10 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
       setTimeout(() => {
         setTranslationProgress(100);
         setIsTranslating(false);
-      }, 300);
+        console.log(`TranslationContext: Language change to ${lang} completed`);
+      }, 500); // Increased timeout to allow for translation processing
     } catch (error) {
-      console.error('Language change error:', error);
+      console.error('TranslationContext: Language change error:', error);
       toast.error('Failed to change language');
       setIsTranslating(false);
     }
@@ -275,7 +291,7 @@ export function TranslationProvider({ children }: { children: React.ReactNode })
   useEffect(() => {
     const storedLang = localStorage.getItem('preferredLanguage');
     if (storedLang) {
-      console.log(`Initializing with stored language preference: ${storedLang}`);
+      console.log(`TranslationContext: Initializing with stored language preference: ${storedLang}`);
       // Set HTML lang attribute immediately
       updateHtmlLang(storedLang);
       setLanguage(storedLang);
