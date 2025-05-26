@@ -69,12 +69,12 @@ export const websiteRoutes: RouteConfig[] = [
 export const appRoutes: RouteConfig[] = [
   {
     path: '/app',
-    element: <OnboardingScreen onComplete={() => {}} />,
+    element: <OnboardingScreen />,
     requiresAuth: false, // Important: This should not require auth
   },
   {
     path: '/app/onboarding',
-    element: <OnboardingScreen onComplete={() => {}} />,
+    element: <OnboardingScreen />,
     requiresAuth: false, // Important: This should not require auth
   },
   {

@@ -1,660 +1,926 @@
 
-import React, { useState, useEffect, useRef } from 'react';
-import { motion, AnimatePresence } from 'framer-motion';
-import { ArrowRight, ArrowLeft, Mic, Play, Pause, User, Palette, Bell, Shield, Heart, Sparkles, Zap, Target, Calendar, TrendingUp, BarChart3, Brain, MessageCircle, Globe, CheckCircle, Star, Coffee, Sun, Moon, Cloud, Rainbow } from 'lucide-react';
+import React, { useState, useEffect, useRef, useCallback } from "react";
+import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { Card } from "@/components/ui/card";
-import { Progress } from "@/components/ui/progress";
-import { Badge } from "@/components/ui/badge";
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
-import { cn } from '@/lib/utils';
-import { toast } from 'sonner';
-import { useTheme } from '@/hooks/use-theme';
-import { useOnboarding } from '@/hooks/use-onboarding';
-import { useTranslation } from '@/contexts/TranslationContext';
-import { languages } from '@/contexts/TranslationContext';
-import { TranslatableText } from '@/components/translation/TranslatableText';
-import SouloLogo from '@/components/SouloLogo';
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User, Languages, Search, X } from "lucide-react";
+import SouloLogo from "@/components/SouloLogo";
+import { cn } from "@/lib/utils";
+import { useTheme } from "@/hooks/use-theme";
+import { RecordingVisualizer } from "@/components/voice-recorder/RecordingVisualizer";
+import { toast } from "sonner";
+import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
+import { useTranslation } from "@/contexts/TranslationContext";
+import { TranslatableText } from "@/components/translation/TranslatableText";
+import { useAuth } from "@/contexts/AuthContext"; // Add import for useAuth
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface OnboardingScreenProps {
-  onComplete: () => void;
+  onComplete?: () => void;
 }
 
-export default function OnboardingScreen({ onComplete }: OnboardingScreenProps) {
-  const [currentStep, setCurrentStep] = useState(0);
-  const [userName, setUserName] = useState('');
-  const [selectedLanguage, setSelectedLanguage] = useState('en');
-  const [isRecording, setIsRecording] = useState(false);
-  const [recordingTime, setRecordingTime] = useState(0);
-  const [isPlaying, setIsPlaying] = useState(false);
-  const { setColorTheme } = useTheme();
-  const { completeOnboarding } = useOnboarding();
-  const { setLanguage, translate } = useTranslation();
-  const [nameInputPlaceholder, setNameInputPlaceholder] = useState('Enter your name');
-  const [languageSelectorPlaceholder, setLanguageSelectorPlaceholder] = useState('Select a language');
+interface NameStepProps {
+  name: string;
+  setName: React.Dispatch<React.SetStateAction<string>>;
+}
+
+const createWavePath = (
+  width: number, 
+  height: number, 
+  amplitude: number, 
+  frequency: number, 
+  phase: number
+): string => {
+  let path = `M 0 ${height / 2}`;
+  const segments = 30;
   
-  const recordingInterval = useRef<NodeJS.Timeout>();
-  const playbackTimeout = useRef<NodeJS.Timeout>();
+  for (let i = 0; i <= segments; i++) {
+    const x = (i / segments) * width;
+    const y = (height / 2) + Math.sin(((i / segments) * Math.PI * 2 * frequency) + phase) * amplitude;
+    path += ` L ${x} ${y}`;
+  }
+  
+  return path;
+};
 
-  const totalSteps = 6;
+// Add expanded languages array
+const LANGUAGES = [
+  // Currently implemented languages
+  { code: 'en', label: 'English', region: 'European' },
+  { code: 'es', label: 'Español', region: 'European' },
+  { code: 'fr', label: 'Français', region: 'European' },
+  { code: 'de', label: 'Deutsch', region: 'European' },
+  { code: 'hi', label: 'हिन्दी', region: 'Indian' },
+  { code: 'zh', label: '中文', region: 'Asian' },
+  { code: 'ja', label: '日本語', region: 'Asian' },
+  { code: 'ru', label: 'Русский', region: 'European' },
+  { code: 'ar', label: 'العربية', region: 'Middle Eastern' },
+  { code: 'pt', label: 'Português', region: 'European' },
 
-  // Update placeholders when language changes
-  useEffect(() => {
-    const updatePlaceholders = async () => {
-      if (selectedLanguage !== 'en') {
-        const translatedNamePlaceholder = await translate('Enter your name');
-        const translatedLanguagePlaceholder = await translate('Select a language');
-        setNameInputPlaceholder(translatedNamePlaceholder);
-        setLanguageSelectorPlaceholder(translatedLanguagePlaceholder);
-      } else {
-        setNameInputPlaceholder('Enter your name');
-        setLanguageSelectorPlaceholder('Select a language');
-      }
-    };
+  // Additional Indian regional languages
+  { code: 'bn', label: 'বাংলা', region: 'Indian' },
+  { code: 'ta', label: 'தமிழ்', region: 'Indian' },
+  { code: 'te', label: 'తెలుగు', region: 'Indian' },
+  { code: 'mr', label: 'मराठी', region: 'Indian' },
+  { code: 'gu', label: 'ગુજરાતી', region: 'Indian' },
+  { code: 'kn', label: 'ಕನ್ನಡ', region: 'Indian' },
+  { code: 'ml', label: 'മലയാളം', region: 'Indian' },
+  { code: 'pa', label: 'ਪੰਜਾਬੀ', region: 'Indian' },
+  { code: 'as', label: 'অসমীয়া', region: 'Indian' },
+  { code: 'or', label: 'ଓଡ଼ିଆ', region: 'Indian' },
+  { code: 'ur', label: 'اردو', region: 'Indian' },
+  { code: 'sd', label: 'سنڌي', region: 'Indian' },
+  { code: 'ks', label: 'कॉशुर', region: 'Indian' },
+  { code: 'kok', label: 'कोंकणी', region: 'Indian' },
+  { code: 'mai', label: 'मैथिली', region: 'Indian' },
+
+  // Other major global languages
+  { code: 'it', label: 'Italiano', region: 'European' },
+  { code: 'ko', label: '한국어', region: 'Asian' },
+  { code: 'tr', label: 'Türkçe', region: 'European' },
+  { code: 'nl', label: 'Nederlands', region: 'European' },
+  { code: 'pl', label: 'Polski', region: 'European' },
+  { code: 'sv', label: 'Svenska', region: 'European' },
+  { code: 'th', label: 'ไทย', region: 'Asian' },
+  { code: 'vi', label: 'Tiếng Việt', region: 'Asian' },
+  { code: 'id', label: 'Bahasa Indonesia', region: 'Asian' },
+  { code: 'uk', label: 'Українська', region: 'European' },
+  { code: 'el', label: 'Ελληνικά', region: 'European' },
+  { code: 'ro', label: 'Română', region: 'European' },
+  { code: 'hu', label: 'Magyar', region: 'European' },
+  { code: 'cs', label: 'Čeština', region: 'European' },
+  { code: 'he', label: 'עברית', region: 'Middle Eastern' },
+];
+
+interface StepIllustration {
+  title: string;
+  subtitle: string;
+  description: string;
+  illustration: React.FC<any>;
+  buttonText: string;
+}
+
+const ONBOARDING_STEPS: StepIllustration[] = [
+  {
+    title: "Welcome to SOuLO",
+    subtitle: "",
+    description: "Welcome to Voice Journaling - Just speak and we'll do the rest",
+    illustration: (props: {}) => (
+      <div className="flex flex-col justify-center items-center my-2">
+        <motion.div 
+          className="relative w-full h-64"
+          initial={{ opacity: 0, scale: 0.8 }}
+          animate={{ opacity: 1, scale: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <div className="absolute inset-0 flex items-center justify-center z-10 mb-20">
+            <div className="relative z-20">
+              <SouloLogo size="large" className="scale-[2.2]" useColorTheme={false} textClassName="font-bold text-white" />
+            </div>
+          </div>
+          
+          <div className="absolute inset-0 flex items-center justify-center z-5 mt-20">
+            <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
+              <RecordingVisualizer 
+                isRecording={false} 
+                audioLevel={0.5} 
+                ripples={[]} 
+                fullWidth={true} 
+              />
+            </div>
+          </div>
+        </motion.div>
+        
+        <motion.h1 
+          className="text-2xl font-bold mb-3 mt-8 text-foreground"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.2 }}
+        >
+          <TranslatableText text="Welcome to SOuLO" forceTranslate={true} />
+        </motion.h1>
+        
+        <motion.p 
+          className="text-muted-foreground mb-6 max-w-xs font-medium text-theme animate-pulse"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ 
+            opacity: 1, 
+            y: 0,
+            scale: [1, 1.05, 1]
+          }}
+          transition={{ 
+            delay: 0.4,
+            scale: {
+              repeat: Infinity,
+              duration: 2,
+              ease: "easeInOut"
+            }
+          }}
+        >
+          <TranslatableText text="Express your thoughts and feelings with voice notes - we'll do the rest." forceTranslate={true} />
+        </motion.p>
+        
+        {/* Language selector */}
+        <motion.div
+          className="mt-4 w-full max-w-xs"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.6 }}
+        >
+          <div className="flex flex-col gap-2 bg-background/90 p-4 rounded-lg border border-theme-light">
+            <label className="text-sm font-medium text-foreground">
+              <TranslatableText text="Preferred Language" forceTranslate={true} />
+            </label>
+            <LanguageSelector />
+          </div>
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Get Started"
+  },
+  {
+    title: "Your Data is Private",
+    subtitle: "",
+    description: "Your journal entries are securely stored and only accessible to you. We take your privacy seriously.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <motion.div 
+          className="relative w-64 h-64 flex items-center justify-center"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div 
+            className="relative z-10 bg-white/90 dark:bg-gray-800/90 rounded-xl p-5 shadow-lg border border-theme-light"
+            initial={{ y: 20, opacity: 0 }}
+            animate={{ y: 0, opacity: 1 }}
+            transition={{ delay: 0.3 }}
+          >
+            <div className="w-44 h-44 flex flex-col items-center justify-center">
+              <motion.div
+                initial={{ scale: 0 }}
+                animate={{ scale: 1 }}
+                transition={{ type: "spring", delay: 0.5 }}
+                className="w-20 h-20 bg-theme-light rounded-full flex items-center justify-center mb-4"
+              >
+                <motion.div className="relative w-10 h-10">
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ 
+                      opacity: [0, 1, 1, 0],
+                    }}
+                    transition={{ 
+                      times: [0, 0.2, 0.8, 1],
+                      duration: 2.5,
+                      repeat: Infinity,
+                      repeatDelay: 1.5
+                    }}
+                    className="absolute inset-0 flex justify-center items-center z-20"
+                  >
+                    <LockOpen className="w-10 h-10 text-theme" />
+                  </motion.div>
+                  
+                  <motion.div
+                    initial={{ opacity: 0 }}
+                    animate={{ 
+                      opacity: [0, 0, 1, 1],
+                    }}
+                    transition={{ 
+                      times: [0, 0.8, 0.9, 1],
+                      duration: 2.5,
+                      repeat: Infinity,
+                      repeatDelay: 1.5
+                    }}
+                    className="absolute inset-0 flex justify-center items-center z-10"
+                  >
+                    <Lock className="w-10 h-10 text-theme" />
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="absolute top-0 left-0 w-full h-full overflow-hidden"
+                    initial={{ opacity: 0 }}
+                    animate={{ opacity: 1 }}
+                  >
+                    {[...Array(12)].map((_, i) => (
+                      <motion.div
+                        key={`data-particle-${i}`}
+                        className="absolute w-1.5 h-1.5 rounded-full bg-theme"
+                        style={{
+                          left: `${40 + (Math.random() * 20)}%`,
+                          top: i % 2 === 0 ? '-20%' : '-30%',
+                        }}
+                        initial={{ opacity: 0 }}
+                        animate={{ 
+                          y: [0, 55],
+                          opacity: [0, 1, 0],
+                        }}
+                        transition={{
+                          y: { duration: 1 },
+                          opacity: { duration: 1, times: [0, 0.3, 1] },
+                          delay: i * 0.1,
+                          repeat: Infinity,
+                          repeatDelay: 2
+                        }}
+                      />
+                    ))}
+                  </motion.div>
+                  
+                  <motion.div 
+                    className="absolute top-0 left-0 w-full h-full pointer-events-none"
+                    animate={{ 
+                      scale: [1, 1.3, 1],
+                      opacity: [0, 0.7, 0] 
+                    }}
+                    transition={{ 
+                      duration: 0.8,
+                      delay: 2,
+                      repeat: Infinity,
+                      repeatDelay: 2.2
+                    }}
+                  >
+                    <div className="w-full h-full rounded-full border-2 border-theme"></div>
+                  </motion.div>
+                </motion.div>
+              </motion.div>
+              
+              <motion.div 
+                className="w-full h-2 bg-muted rounded-full overflow-hidden mt-2"
+                initial={{ width: 0 }}
+                animate={{ width: "100%" }}
+                transition={{ delay: 0.7, duration: 0.5 }}
+              >
+                <motion.div 
+                  className="h-full bg-theme"
+                  initial={{ width: "0%" }}
+                  animate={{ width: "100%" }}
+                  transition={{ delay: 0.9, duration: 0.7 }}
+                />
+              </motion.div>
+              
+              <motion.div 
+                className="mt-4 flex space-x-1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 1.2 }}
+              >
+                {[...Array(3)].map((_, i) => (
+                  <div key={i} className="w-2 h-2 rounded-full bg-theme-light" />
+                ))}
+              </motion.div>
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Next"
+  },
+  {
+    title: "Voice Journaling",
+    subtitle: "",
+    description: "Record your thoughts with voice notes that are automatically transcribed and analyzed for emotional patterns.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
+          {[45, 60, 80, 100].map((size, index) => (
+            <motion.div
+              key={`circle-${index}`}
+              className={`absolute rounded-full ${index % 2 === 0 ? 'bg-theme/30 dark:bg-theme/30' : 'bg-theme-light/30 dark:bg-theme-light/30'}`}
+              style={{ width: size, height: size }}
+              animate={{
+                scale: [1, 1.2, 1],
+                opacity: [0.15, 0.25, 0.15]
+              }}
+              transition={{
+                duration: 2 + index * 0.5,
+                repeat: Infinity,
+                ease: "easeInOut",
+                delay: index * 0.2
+              }}
+            />
+          ))}
+          
+          <motion.div
+            className="relative w-28 h-28 rounded-full bg-theme-light flex items-center justify-center"
+            animate={{
+              scale: [1, 1.1, 1],
+              boxShadow: [
+                "0 0 0 0 rgba(var(--color-theme), 0.7)",
+                "0 0 0 15px rgba(var(--color-theme), 0)",
+                "0 0 0 0 rgba(var(--color-theme), 0)"
+              ]
+            }}
+            transition={{
+              duration: 1.5,
+              repeat: Infinity,
+              ease: "easeInOut"
+            }}
+          >
+            <div className="w-20 h-20 rounded-full bg-theme flex items-center justify-center text-white">
+              <Mic className="w-10 h-10 animate-pulse" />
+            </div>
+          </motion.div>
+        </div>
+      </div>
+    ),
+    buttonText: "Next"
+  },
+  {
+    title: "AI Analysis",
+    subtitle: "",
+    description: "Get insights into your emotional patterns and growth through advanced AI analysis.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <div className="relative w-64 h-64 flex flex-col items-center justify-center overflow-hidden p-4">
+          <motion.div
+            className="relative z-10 mb-3"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", delay: 0.2 }}
+          >
+            <Brain className="w-12 h-12 text-theme" />
+          </motion.div>
+          
+          <motion.div 
+            className="flex flex-wrap gap-2 max-w-[200px] justify-center relative z-10"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.4 }}
+          >
+            {["Joy", "Growth", "Progress", "Health", "Focus", "Connection", "Creativity"].map((theme, index) => (
+              <motion.div
+                key={theme}
+                className="px-3 py-1 bg-theme/20 rounded-full text-sm font-medium text-theme"
+                initial={{ scale: 0, opacity: 0 }}
+                animate={{ 
+                  scale: 1, 
+                  opacity: 1,
+                  y: [0, index % 2 === 0 ? -5 : 5, 0]
+                }}
+                transition={{ 
+                  delay: index * 0.1 + 0.5,
+                  y: {
+                    duration: 2,
+                    repeat: Infinity,
+                    repeatType: "reverse",
+                    ease: "easeInOut",
+                    delay: index * 0.2
+                  }
+                }}
+              >
+                {theme}
+              </motion.div>
+            ))}
+          </motion.div>
+        </div>
+      </div>
+    ),
+    buttonText: "Next"
+  },
+  {
+    title: "Chat with Your Journal",
+    subtitle: "",
+    description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2 w-full">
+        <div className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex items-center justify-center overflow-hidden p-4">
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-b from-transparent to-theme/10"
+            animate={{ opacity: [0.3, 0.5, 0.3] }}
+            transition={{ 
+              duration: 3, 
+              repeat: Infinity,
+              ease: "easeInOut" 
+            }}
+          />
+          
+          <div className="relative z-10 flex flex-col gap-3 w-full mt-4 mb-2">
+            <motion.div 
+              className="self-start max-w-[90%] bg-white dark:bg-white p-2.5 rounded-2xl rounded-bl-none text-sm text-gray-800"
+              initial={{ x: -20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.3 }}
+            >
+              How have I been feeling lately?
+            </motion.div>
+            
+            <motion.div 
+              className="self-end max-w-[90%] bg-theme text-white p-2.5 rounded-2xl rounded-br-none text-sm"
+              initial={{ x: 20, opacity: 0 }}
+              animate={{ x: 0, opacity: 1 }}
+              transition={{ delay: 0.9 }}
+            >
+              Based on your recent entries, you've been feeling more positive and energetic this week...
+            </motion.div>
+            
+            <motion.div
+              className="self-start flex items-center justify-center w-10 h-10 bg-muted rounded-full mt-1.5"
+              initial={{ opacity: 0, scale: 0 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 1.5, type: "spring" }}
+            >
+              <MessageSquare className="w-5 h-5 text-primary" />
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    ),
+    buttonText: "Next"
+  },
+  {
+    title: "Track Your Emotional Journey",
+    subtitle: "",
+    description: "See your emotional patterns and growth over time with beautiful visualizations.",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
+          <motion.div
+            className="absolute inset-0 bg-gradient-to-b from-theme/10 to-theme/30 dark:from-theme/10 dark:to-theme/30"
+            animate={{ 
+              opacity: [0.3, 0.5, 0.3],
+              rotate: [0, 5, 0, -5, 0]
+            }}
+            transition={{ 
+              opacity: { duration: 3, repeat: Infinity, ease: "easeInOut" },
+              rotate: { duration: 10, repeat: Infinity, ease: "easeInOut" }
+            }}
+          />
+          
+          <div className="relative z-10 w-48 h-48 flex items-center justify-center">
+            <motion.div
+              className="w-44 h-32 bg-white/90 dark:bg-gray-800/90 rounded-xl p-3 shadow-lg"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+            >
+              <div className="flex items-center justify-between mb-2">
+                <div className="text-xs font-medium text-theme">Mood Trends</div>
+                <LineChart className="w-4 h-4 text-theme" />
+              </div>
+              
+              <svg viewBox="0 0 100 50" className="w-full h-16">
+                <defs>
+                  <linearGradient id="gradient" x1="0%" y1="0%" x2="0%" y2="100%">
+                    <stop offset="0%" stopColor="var(--color-theme)" stopOpacity="0.5" />
+                    <stop offset="100%" stopColor="var(--color-theme)" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                
+                <motion.path
+                  d="M0,40 C10,35 20,25 30,30 C40,35 50,20 60,15 C70,10 80,5 100,10"
+                  fill="none"
+                  stroke="var(--color-theme)"
+                  strokeWidth="2"
+                  initial={{ pathLength: 0 }}
+                  animate={{ pathLength: 1 }}
+                  transition={{ duration: 2, delay: 0.5 }}
+                />
+                
+                <motion.path
+                  d="M0,40 C10,35 20,25 30,30 C40,35 50,20 60,15 C70,10 80,5 100,10 V50 H0 Z"
+                  fill="url(#gradient)"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  transition={{ duration: 1, delay: 2 }}
+                />
+                
+                {[
+                  { x: 30, y: 30, delay: 1.5 },
+                  { x: 60, y: 15, delay: 1.8 },
+                  { x: 80, y: 5, delay: 2.1 }
+                ].map((point, i) => (
+                  <motion.circle
+                    key={`point-${i}`}
+                    cx={point.x}
+                    cy={point.y}
+                    r="3"
+                    fill="var(--color-theme)"
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    transition={{ delay: point.delay }}
+                  />
+                ))}
+              </svg>
+              
+              <motion.div
+                className="flex justify-between text-xs text-muted-foreground mt-1"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                transition={{ delay: 2.2 }}
+              >
+                <span>Jan</span>
+                <span>Mar</span>
+                <span>Now</span>
+              </motion.div>
+            </motion.div>
+          </div>
+        </div>
+      </div>
+    ),
+    buttonText: "Next"
+  },
+  {
+    title: "What Should We Call You?",
+    subtitle: "",
+    description: "Your name helps us make your journey more personal.",
+    illustration: (props: NameStepProps) => (
+      <div className="flex flex-col justify-center items-center my-2 w-full">
+        <motion.div 
+          className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex flex-col items-center justify-center overflow-hidden p-8"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+        >
+          <motion.div
+            className="w-20 h-20 bg-theme/20 rounded-full flex items-center justify-center mb-6"
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", delay: 0.3 }}
+          >
+            <User className="w-10 h-10 text-theme" />
+          </motion.div>
+          
+          <motion.div 
+            className="w-full space-y-4"
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.5 }}
+          >
+            <Input
+              placeholder="Enter your name"
+              value={props.name}
+              onChange={(e) => props.setName(e.target.value)}
+              className="bg-background/80 border-theme/20 focus:border-theme text-white"
+              autoFocus
+            />
+            
+            <div className="text-sm text-muted-foreground text-center">
+              This is how SOuLO will address you
+            </div>
+          </motion.div>
+          
+          <motion.div 
+            className="absolute -z-10 inset-0 opacity-20"
+            animate={{ 
+              background: [
+                "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)",
+                "radial-gradient(circle at 80% 80%, var(--color-theme-dark) 0%, transparent 70%)",
+                "radial-gradient(circle at 20% 20%, var(--color-theme-dark) 0%, transparent 70%)"
+              ]
+            }}
+            transition={{ duration: 8, repeat: Infinity, ease: "easeInOut" }}
+          />
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Continue"
+  },
+  {
+    title: "Ready to Start Your Journey?",
+    subtitle: "",
+    description: "",
+    illustration: (props: {}) => (
+      <div className="flex justify-center items-center my-2">
+        <motion.div 
+          className="relative w-64 h-64 rounded-xl flex items-center justify-center overflow-hidden"
+          animate={{ 
+            boxShadow: ["0 0 0 0px rgba(var(--color-theme), 0.2)", "0 0 0 20px rgba(var(--color-theme), 0)", "0 0 0 0px rgba(var(--color-theme), 0.2)"]
+          }}
+          transition={{ 
+            repeat: Infinity, 
+            duration: 2.5,
+            ease: "easeInOut" 
+          }}
+        >
+          <motion.div
+            initial={{ scale: 0 }}
+            animate={{ scale: 1 }}
+            transition={{ type: "spring", stiffness: 100, delay: 0.3 }}
+          >
+            <SouloLogo size="large" className="scale-[2.5]" useColorTheme={false} animate={true} textClassName="font-bold text-white" />
+          </motion.div>
+          
+          <motion.div
+            className="absolute bottom-5 w-full flex justify-center"
+            initial={{ opacity: 0, y: 20 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 1 }}
+          >
+            <div className="text-theme text-sm font-medium text-center">
+              Emotional wellness through voice
+            </div>
+          </motion.div>
+        </motion.div>
+      </div>
+    ),
+    buttonText: "Sign In"
+  }
+];
+
+// Enhanced Language Selector component for onboarding - simplified without search
+const LanguageSelector = () => {
+  const { currentLanguage, setLanguage } = useTranslation();
+
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value);
     
-    updatePlaceholders();
-  }, [selectedLanguage, translate]);
-
-  const demoEmotions = [
-    { name: 'Joy', intensity: 85, color: '#10B981', icon: '😊' },
-    { name: 'Growth', intensity: 72, color: '#3B82F6', icon: '🌱' },
-    { name: 'Progress', intensity: 68, color: '#8B5CF6', icon: '🚀' },
-    { name: 'Clarity', intensity: 91, color: '#F59E0B', icon: '💡' },
-    { name: 'Peace', intensity: 76, color: '#06B6D4', icon: '☮️' },
-    { name: 'Gratitude', intensity: 89, color: '#EC4899', icon: '🙏' },
-    { name: 'Energy', intensity: 82, color: '#EF4444', icon: '⚡' },
-    { name: 'Focus', intensity: 74, color: '#84CC16', icon: '🎯' }
-  ];
-
-  const demoMoodData = [
-    { month: 'Jan', happiness: 65, energy: 58, clarity: 62 },
-    { month: 'Feb', happiness: 68, energy: 63, clarity: 65 },
-    { month: 'Mar', happiness: 72, energy: 67, clarity: 70 },
-    { month: 'Apr', happiness: 75, energy: 71, clarity: 74 },
-    { month: 'May', happiness: 78, energy: 75, clarity: 77 },
-    { month: 'Now', happiness: 82, energy: 79, clarity: 81 }
-  ];
-
-  useEffect(() => {
-    if (isRecording) {
-      recordingInterval.current = setInterval(() => {
-        setRecordingTime(prev => prev + 1);
-      }, 1000);
-    } else {
-      if (recordingInterval.current) {
-        clearInterval(recordingInterval.current);
-      }
-    }
-
-    return () => {
-      if (recordingInterval.current) {
-        clearInterval(recordingInterval.current);
-      }
-    };
-  }, [isRecording]);
-
-  const handleNext = () => {
-    if (currentStep < totalSteps - 1) {
-      setCurrentStep(currentStep + 1);
-    } else {
-      handleComplete();
+    // Store recently used language
+    try {
+      const recentLangs = localStorage.getItem('recentLanguages') || '[]';
+      const parsed = JSON.parse(recentLangs);
+      const updated = [
+        value,
+        ...parsed.filter((code: string) => code !== value)
+      ].slice(0, 3);
+      localStorage.setItem('recentLanguages', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to store recent language:', err);
     }
   };
 
+  // Group languages by region
+  const languagesByRegion = () => {
+    const regions = {};
+    
+    LANGUAGES.forEach(lang => {
+      if (!regions[lang.region]) {
+        regions[lang.region] = [];
+      }
+      regions[lang.region].push(lang);
+    });
+    
+    return regions;
+  };
+
+  const grouped = languagesByRegion();
+  const regions = Object.keys(grouped);
+
+  // Find the current language label
+  const currentLanguageLabel = LANGUAGES.find(lang => lang.code === currentLanguage)?.label || 'Select a language';
+
+  return (
+    <div className="w-full">
+      <Select value={currentLanguage} onValueChange={handleLanguageChange}>
+        <SelectTrigger className="w-full bg-background/80 border-theme/20 text-white">
+          <SelectValue placeholder="Select a language" className="text-white">
+            {currentLanguageLabel}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="max-h-[300px] bg-background/90 border-theme/30">
+          {regions.map(region => (
+            <React.Fragment key={region}>
+              <SelectItem value={`group_${region}`} disabled className="font-semibold text-muted-foreground">
+                {region}
+              </SelectItem>
+              {grouped[region].map(language => (
+                <SelectItem 
+                  key={language.code} 
+                  value={language.code} 
+                  className="pl-6 hover:bg-theme/20 data-[state=checked]:bg-theme/40 data-[state=checked]:text-white"
+                >
+                  {language.label}
+                </SelectItem>
+              ))}
+            </React.Fragment>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+};
+
+const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
+  const [currentStep, setCurrentStep] = useState(0);
+  const [name, setName] = useState('');
+  const navigate = useNavigate();
+  const { setColorTheme } = useTheme();
+  const contentRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth(); // Get authentication status
+  
+  // Define isNameStep before it's used in useSwipeGesture
+  const isFirstStep = currentStep === 0;
+  const isNameStep = currentStep === 6;
+  const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
+  
+  useEffect(() => {
+    setColorTheme('Calm');
+  }, [setColorTheme]);
+  
+  const handleNext = () => {
+    if (currentStep < ONBOARDING_STEPS.length - 1) {
+      if (currentStep === 6 && !name.trim()) {
+        toast.error("Please enter your name to continue");
+        return;
+      }
+      
+      setCurrentStep(prev => prev + 1);
+    } else {
+      if (name) {
+        localStorage.setItem("user_display_name", name.trim());
+      }
+      
+      localStorage.setItem("onboardingComplete", "true");
+      
+      if (onComplete) {
+        onComplete();
+      } else {
+        navigate("/app/auth");
+      }
+    }
+  };
+  
   const handlePrevious = () => {
     if (currentStep > 0) {
-      setCurrentStep(currentStep - 1);
+      setCurrentStep(prev => prev - 1);
     }
   };
-
-  const handleComplete = async () => {
-    // Save the user's name to localStorage for later use
-    if (userName) {
-      localStorage.setItem('user_display_name', userName);
+  
+  const handleSkip = () => {
+    console.log("Skip button clicked, user auth status:", !!user);
+    
+    if (name) {
+      localStorage.setItem("user_display_name", name.trim());
     }
     
-    // Set the selected language
-    if (selectedLanguage !== 'en') {
-      await setLanguage(selectedLanguage);
-    }
+    localStorage.setItem("onboardingComplete", "true");
     
-    completeOnboarding();
-    onComplete();
-    toast.success(<TranslatableText text="Welcome to SOuLO! Your journey begins now." forceTranslate={true} />);
+    if (onComplete) {
+      onComplete();
+    } else {
+      // Check if user is already authenticated
+      if (user) {
+        console.log("User is authenticated, navigating to /app/home");
+        navigate("/app/home");
+      } else {
+        console.log("User is not authenticated, navigating to /app/auth");
+        navigate("/app/auth");
+      }
+    }
   };
 
-  const startRecording = () => {
-    setIsRecording(true);
-    setRecordingTime(0);
-    setTimeout(() => {
-      setIsRecording(false);
-      toast.success(<TranslatableText text="Great! Your voice sample has been captured." forceTranslate={true} />);
-    }, 3000);
-  };
+  useSwipeGesture(contentRef, {
+    onSwipeLeft: () => {
+      if (currentStep < ONBOARDING_STEPS.length - 1) {
+        handleNext();
+      }
+    },
+    onSwipeRight: () => {
+      if (currentStep > 0) {
+        handlePrevious();
+      }
+    },
+    minDistance: 50,
+    disabled: isNameStep // Disable swipe gestures on the name entry step
+  });
 
-  const playRecording = () => {
-    setIsPlaying(true);
-    playbackTimeout.current = setTimeout(() => {
-      setIsPlaying(false);
-    }, 2000);
-  };
+  const CurrentIllustration = ONBOARDING_STEPS[currentStep].illustration;
+  const currentStepData = ONBOARDING_STEPS[currentStep];
 
-  const formatTime = (seconds: number) => {
-    const mins = Math.floor(seconds / 60);
-    const secs = seconds % 60;
-    return `${mins}:${secs.toString().padStart(2, '0')}`;
-  };
-
-  const renderLanguageStep = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-center space-y-8"
-    >
-      <div className="space-y-4">
-        <Globe className="h-16 w-16 mx-auto text-theme-color" />
-        <h2 className="text-3xl font-bold text-foreground">
-          <TranslatableText text="Choose Your Language" />
-        </h2>
-        <p className="text-xl text-muted-foreground max-w-md mx-auto">
-          <TranslatableText text="Select your preferred language for the best experience" />
-        </p>
-      </div>
-
-      <div className="max-w-sm mx-auto">
-        <Select value={selectedLanguage} onValueChange={(value) => {
-          setSelectedLanguage(value);
-          if (value !== 'en') {
-            setLanguage(value);
-          }
-        }}>
-          <SelectTrigger className="w-full h-12 text-lg">
-            <SelectValue placeholder={languageSelectorPlaceholder} />
-          </SelectTrigger>
-          <SelectContent>
-            {languages.map((lang) => (
-              <SelectItem key={lang.code} value={lang.code}>
-                {lang.label}
-              </SelectItem>
-            ))}
-          </SelectContent>
-        </Select>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto pt-4">
-        {['🌍', '🗣️', '💬', '🌐'].map((emoji, index) => (
-          <motion.div
-            key={index}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.1 * index, type: "spring" }}
-            className="bg-secondary/50 rounded-xl p-4 text-center"
-          >
-            <span className="text-2xl">{emoji}</span>
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
-
-  const renderNameStep = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-center space-y-8"
-    >
-      <div className="space-y-4">
-        <User className="h-16 w-16 mx-auto text-theme-color" />
-        <h2 className="text-3xl font-bold text-foreground">
-          <TranslatableText text="What should we call you?" />
-        </h2>
-        <p className="text-xl text-muted-foreground max-w-md mx-auto">
-          <TranslatableText text="Help us personalize your SOuLO experience" />
-        </p>
-      </div>
-
-      <div className="max-w-sm mx-auto space-y-3">
-        <Input
-          value={userName}
-          onChange={(e) => setUserName(e.target.value)}
-          placeholder={nameInputPlaceholder}
-          className="text-center text-lg h-12 border-2 focus:border-theme-color"
-          maxLength={25}
-        />
-        <p className="text-sm text-muted-foreground">
-          <TranslatableText text="This is how SOuLO will address you" />
-        </p>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
-        {['👋', '😊', '🌟', '💫'].map((emoji, index) => (
-          <motion.div
-            key={index}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.1 * index, type: "spring" }}
-            className="bg-secondary/50 rounded-xl p-4 text-center"
-          >
-            <span className="text-2xl">{emoji}</span>
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
-
-  const renderVoiceStep = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-center space-y-8"
-    >
-      <div className="space-y-4">
-        <Mic className="h-16 w-16 mx-auto text-theme-color" />
-        <h2 className="text-3xl font-bold text-foreground">
-          <TranslatableText text="Let's hear your voice" />
-        </h2>
-        <p className="text-xl text-muted-foreground max-w-md mx-auto">
-          <TranslatableText text="Record a quick sample so SOuLO can learn your voice patterns" />
-        </p>
-      </div>
-
-      <div className="space-y-6">
-        <div className="relative">
-          <Button
-            onClick={startRecording}
-            disabled={isRecording || recordingTime > 0}
-            size="lg"
-            className={cn(
-              "h-24 w-24 rounded-full text-white relative overflow-hidden",
-              isRecording ? "bg-red-500 hover:bg-red-600" : "bg-theme hover:bg-theme/90"
-            )}
-          >
-            <motion.div
-              animate={isRecording ? { scale: [1, 1.2, 1] } : {}}
-              transition={{ repeat: Infinity, duration: 1 }}
-            >
-              <Mic className="h-8 w-8" />
-            </motion.div>
-            {isRecording && (
-              <motion.div
-                className="absolute inset-0 border-4 border-white rounded-full"
-                animate={{ scale: [1, 1.5], opacity: [1, 0] }}
-                transition={{ repeat: Infinity, duration: 1 }}
+  return (
+    <div className="flex flex-col h-[100dvh] bg-background dark">
+      <div 
+        ref={contentRef}
+        className="flex-1 flex flex-col overflow-hidden relative"
+      >
+        <div className="absolute inset-0 bg-gradient-to-b from-background to-theme/5 pointer-events-none" />
+        
+        <div className="absolute top-4 left-0 right-0 z-10 flex justify-center">
+          <div className="flex space-x-2">
+            {ONBOARDING_STEPS.map((_, index) => (
+              <motion.div 
+                key={index} 
+                className={cn(
+                  "w-2 h-2 rounded-full transition-all duration-300",
+                  currentStep === index ? "bg-theme w-6" : "bg-muted"
+                )}
+                animate={currentStep === index ? { scale: [1, 1.2, 1] } : {}}
+                transition={{ duration: 0.5, repeat: currentStep === index ? Infinity : 0, repeatDelay: 1.5 }}
               />
-            )}
+            ))}
+          </div>
+        </div>
+        
+        <div className="absolute top-4 right-4 z-10">
+          <Button variant="ghost" size="sm" onClick={handleSkip} className="text-foreground hover:text-theme">
+            <TranslatableText text="Skip" forceTranslate={true} />
           </Button>
         </div>
 
-        {(isRecording || recordingTime > 0) && (
-          <motion.div
-            initial={{ opacity: 0, scale: 0.9 }}
-            animate={{ opacity: 1, scale: 1 }}
-            className="space-y-3"
-          >
-            <div className="text-2xl font-mono text-theme-color">
-              {formatTime(recordingTime)}
-            </div>
-            {isRecording && (
-              <p className="text-muted-foreground">
-                <TranslatableText text="Recording... speak naturally" />
-              </p>
-            )}
-            {!isRecording && recordingTime > 0 && (
-              <div className="space-y-3">
-                <p className="text-green-600 font-medium">
-                  <TranslatableText text="Recording complete!" />
-                </p>
-                <Button
-                  onClick={playRecording}
-                  disabled={isPlaying}
-                  variant="outline"
-                  className="gap-2"
-                >
-                  {isPlaying ? <Pause className="h-4 w-4" /> : <Play className="h-4 w-4" />}
-                  <TranslatableText text={isPlaying ? "Playing..." : "Play Recording"} />
-                </Button>
-              </div>
-            )}
-          </motion.div>
-        )}
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
-        {['🎤', '🔊', '🎵', '📢'].map((emoji, index) => (
-          <motion.div
-            key={index}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.1 * index, type: "spring" }}
-            className="bg-secondary/50 rounded-xl p-4 text-center"
-          >
-            <span className="text-2xl">{emoji}</span>
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
-
-  const renderAIAnalysisStep = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-center space-y-8"
-    >
-      <div className="space-y-4">
-        <Brain className="h-16 w-16 mx-auto text-theme-color" />
-        <h2 className="text-3xl font-bold text-foreground">
-          <TranslatableText text="AI Analysis Preview" />
-        </h2>
-        <p className="text-xl text-muted-foreground max-w-md mx-auto">
-          <TranslatableText text="See how SOuLO will analyze your emotions and themes" />
-        </p>
-      </div>
-
-      <div className="max-w-4xl mx-auto">
-        <Card className="p-6 space-y-6">
-          <h3 className="text-xl font-semibold text-theme-color">
-            <TranslatableText text="Detected Emotions & Themes" />
-          </h3>
-          
-          <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-            {demoEmotions.map((emotion, index) => (
-              <motion.div
-                key={emotion.name}
-                initial={{ opacity: 0, scale: 0.8 }}
-                animate={{ opacity: 1, scale: 1 }}
-                transition={{ delay: 0.1 * index }}
-                className="bg-secondary/50 rounded-xl p-4 space-y-2"
-              >
-                <div className="text-2xl">{emotion.icon}</div>
-                <div className="space-y-1">
-                  <h4 className="font-medium text-sm">
-                    <TranslatableText text={emotion.name} />
-                  </h4>
-                  <div className="w-full bg-background rounded-full h-2">
-                    <motion.div
-                      className="h-2 rounded-full"
-                      style={{ backgroundColor: emotion.color }}
-                      initial={{ width: 0 }}
-                      animate={{ width: `${emotion.intensity}%` }}
-                      transition={{ delay: 0.2 * index, duration: 0.8 }}
-                    />
-                  </div>
-                  <p className="text-xs text-muted-foreground">{emotion.intensity}%</p>
-                </div>
-              </motion.div>
-            ))}
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
-        {['🧠', '💡', '📊', '🎯'].map((emoji, index) => (
-          <motion.div
-            key={index}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.1 * index, type: "spring" }}
-            className="bg-secondary/50 rounded-xl p-4 text-center"
-          >
-            <span className="text-2xl">{emoji}</span>
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
-
-  const renderInsightsStep = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-center space-y-8"
-    >
-      <div className="space-y-4">
-        <BarChart3 className="h-16 w-16 mx-auto text-theme-color" />
-        <h2 className="text-3xl font-bold text-foreground">
-          <TranslatableText text="Track Your Progress" />
-        </h2>
-        <p className="text-xl text-muted-foreground max-w-md mx-auto">
-          <TranslatableText text="Visualize your emotional journey over time" />
-        </p>
-      </div>
-
-      <div className="max-w-4xl mx-auto">
-        <Card className="p-6 space-y-6">
-          <h3 className="text-xl font-semibold text-theme-color">
-            <TranslatableText text="Mood Trends" />
-          </h3>
-          
-          <div className="h-64 flex items-end justify-between gap-2 px-4">
-            {demoMoodData.map((data, index) => (
-              <div key={data.month} className="flex-1 space-y-2">
-                <div className="space-y-1 h-48 flex flex-col justify-end">
-                  {/* Happiness */}
-                  <motion.div
-                    className="bg-blue-500 rounded-t-sm"
-                    initial={{ height: 0 }}
-                    animate={{ height: `${data.happiness}%` }}
-                    transition={{ delay: 0.1 * index, duration: 0.8 }}
-                  />
-                  {/* Energy */}
-                  <motion.div
-                    className="bg-green-500 rounded-t-sm"
-                    initial={{ height: 0 }}
-                    animate={{ height: `${data.energy}%` }}
-                    transition={{ delay: 0.1 * index + 0.2, duration: 0.8 }}
-                  />
-                  {/* Clarity */}
-                  <motion.div
-                    className="bg-purple-500 rounded-t-sm"
-                    initial={{ height: 0 }}
-                    animate={{ height: `${data.clarity}%` }}
-                    transition={{ delay: 0.1 * index + 0.4, duration: 0.8 }}
-                  />
-                </div>
-                <p className="text-xs text-muted-foreground font-medium">
-                  <TranslatableText text={data.month} />
-                </p>
-              </div>
-            ))}
-          </div>
-          
-          <div className="flex justify-center gap-6 text-sm">
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-blue-500 rounded-full"></div>
-              <TranslatableText text="Happiness" />
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-green-500 rounded-full"></div>
-              <TranslatableText text="Energy" />
-            </div>
-            <div className="flex items-center gap-2">
-              <div className="w-3 h-3 bg-purple-500 rounded-full"></div>
-              <TranslatableText text="Clarity" />
-            </div>
-          </div>
-        </Card>
-      </div>
-
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4 max-w-2xl mx-auto">
-        {['📈', '📊', '🎯', '🏆'].map((emoji, index) => (
-          <motion.div
-            key={index}
-            initial={{ scale: 0 }}
-            animate={{ scale: 1 }}
-            transition={{ delay: 0.1 * index, type: "spring" }}
-            className="bg-secondary/50 rounded-xl p-4 text-center"
-          >
-            <span className="text-2xl">{emoji}</span>
-          </motion.div>
-        ))}
-      </div>
-    </motion.div>
-  );
-
-  const renderWelcomeStep = () => (
-    <motion.div
-      initial={{ opacity: 0, y: 20 }}
-      animate={{ opacity: 1, y: 0 }}
-      className="text-center space-y-8"
-    >
-      <div className="space-y-6">
-        <motion.div
-          initial={{ scale: 0 }}
-          animate={{ scale: 1 }}
-          transition={{ type: "spring", duration: 0.8 }}
-        >
-          <SouloLogo size="large" useColorTheme={true} />
-        </motion.div>
-        
-        <div className="space-y-4">
-          <h2 className="text-4xl font-bold text-foreground">
-            <TranslatableText text="Welcome to SOuLO" />
-            {userName && (
-              <>
-                , <span className="text-theme-color">{userName}</span>!
-              </>
-            )}
-          </h2>
-          <p className="text-xl text-muted-foreground max-w-2xl mx-auto">
-            <TranslatableText text="Your journey of self-discovery through voice journaling begins now" />
-          </p>
-        </div>
-
-        <div className="grid grid-cols-1 sm:grid-cols-3 gap-6 max-w-4xl mx-auto">
-          <Card className="p-6 space-y-4">
-            <MessageCircle className="h-12 w-12 mx-auto text-theme-color" />
-            <h3 className="font-semibold">
-              <TranslatableText text="Voice Journaling" />
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              <TranslatableText text="Speak your thoughts and let AI understand your emotions" />
-            </p>
-          </Card>
-          
-          <Card className="p-6 space-y-4">
-            <Brain className="h-12 w-12 mx-auto text-theme-color" />
-            <h3 className="font-semibold">
-              <TranslatableText text="AI Insights" />
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              <TranslatableText text="Get personalized insights about your emotional patterns" />
-            </p>
-          </Card>
-          
-          <Card className="p-6 space-y-4">
-            <TrendingUp className="h-12 w-12 mx-auto text-theme-color" />
-            <h3 className="font-semibold">
-              <TranslatableText text="Track Progress" />
-            </h3>
-            <p className="text-sm text-muted-foreground">
-              <TranslatableText text="Watch your emotional wellness journey unfold over time" />
-            </p>
-          </Card>
-        </div>
-      </div>
-
-      <div className="bg-secondary/30 rounded-2xl p-6 max-w-2xl mx-auto">
-        <p className="text-lg font-medium text-theme-color mb-2">
-          <TranslatableText text="Ready to start?" />
-        </p>
-        <p className="text-muted-foreground">
-          <TranslatableText text="Create your first journal entry and discover the power of voice-driven emotional awareness" />
-        </p>
-      </div>
-    </motion.div>
-  );
-
-  const steps = [
-    renderLanguageStep,
-    renderNameStep,
-    renderVoiceStep,
-    renderAIAnalysisStep,
-    renderInsightsStep,
-    renderWelcomeStep
-  ];
-
-  const canProceed = () => {
-    switch (currentStep) {
-      case 0: return selectedLanguage !== '';
-      case 1: return userName.trim().length > 0;
-      case 2: return recordingTime > 0;
-      default: return true;
-    }
-  };
-
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-background via-background to-secondary/20 flex flex-col">
-      {/* Progress Bar */}
-      <div className="w-full bg-secondary/30 h-2">
-        <motion.div
-          className="h-full bg-theme-color rounded-r-full"
-          initial={{ width: 0 }}
-          animate={{ width: `${((currentStep + 1) / totalSteps) * 100}%` }}
-          transition={{ duration: 0.3 }}
-        />
-      </div>
-
-      {/* Main Content */}
-      <div className="flex-1 container max-w-6xl mx-auto px-4 py-12">
-        <AnimatePresence mode="wait">
-          <motion.div
-            key={currentStep}
-            initial={{ opacity: 0, x: 50 }}
-            animate={{ opacity: 1, x: 0 }}
-            exit={{ opacity: 0, x: -50 }}
-            transition={{ duration: 0.3 }}
-            className="h-full flex flex-col justify-center"
-          >
-            {steps[currentStep]()}
-          </motion.div>
-        </AnimatePresence>
-      </div>
-
-      {/* Navigation */}
-      <div className="border-t bg-background/80 backdrop-blur-sm">
-        <div className="container max-w-6xl mx-auto px-4 py-6">
-          <div className="flex justify-between items-center">
-            <div className="flex items-center gap-3">
-              <Button
-                onClick={handlePrevious}
-                disabled={currentStep === 0}
-                variant="outline"
-                size="lg"
-                className="gap-2"
-              >
-                <ArrowLeft className="h-4 w-4" />
-                <TranslatableText text="Previous" />
-              </Button>
-              
-              <div className="hidden sm:flex items-center gap-2 text-sm text-muted-foreground">
-                <span>{currentStep + 1}</span>
-                <span>/</span>
-                <span>{totalSteps}</span>
-              </div>
-            </div>
-
-            <Button
-              onClick={currentStep === totalSteps - 1 ? handleComplete : handleNext}
-              disabled={!canProceed()}
-              size="lg"
-              className="gap-2 bg-theme hover:bg-theme/90"
+        <div className="flex-1 relative pt-12">
+          <AnimatePresence mode="wait">
+            <motion.div
+              key={currentStep}
+              initial={{ opacity: 0, x: 100 }}
+              animate={{ opacity: 1, x: 0 }}
+              exit={{ opacity: 0, x: -100 }}
+              transition={{ duration: 0.3 }}
+              className="absolute inset-0 flex flex-col justify-center items-center px-6 text-center"
             >
-              <TranslatableText text={currentStep === totalSteps - 1 ? "Get Started" : "Next"} />
-              {currentStep !== totalSteps - 1 && <ArrowRight className="h-4 w-4" />}
+              {currentStep === 0 ? (
+                <CurrentIllustration />
+              ) : isNameStep ? (
+                <>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">
+                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                  </h2>
+                  {currentStepData.description && (
+                    <p className="mb-8 text-muted-foreground max-w-xs">
+                      <TranslatableText text={currentStepData.description} forceTranslate={true} />
+                    </p>
+                  )}
+                  <CurrentIllustration name={name} setName={setName} />
+                </>
+              ) : (
+                <>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">
+                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                  </h2>
+                  {currentStepData.description && (
+                    <p className="mb-8 text-muted-foreground max-w-xs">
+                      <TranslatableText text={currentStepData.description} forceTranslate={true} />
+                    </p>
+                  )}
+                  <CurrentIllustration />
+                </>
+              )}
+            </motion.div>
+          </AnimatePresence>
+        </div>
+        
+        <div className="pb-12 pt-4 px-6 relative z-10">
+          <div className="flex justify-between items-center">
+            {currentStep > 0 ? (
+              <Button 
+                variant="outline" 
+                size="icon" 
+                onClick={handlePrevious}
+                className="bg-background/50 dark:bg-muted/20 border-muted hover:bg-muted/30 h-10 w-10"
+              >
+                <ChevronLeft className="w-5 h-5 text-foreground" />
+              </Button>
+            ) : (
+              <div className="w-10"></div>
+            )}
+            
+            <Button 
+              size="lg" 
+              onClick={handleNext} 
+              className="bg-theme hover:bg-theme-dark text-white"
+            >
+              <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
+              {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
             </Button>
           </div>
         </div>
       </div>
-
-      {/* Footer */}
-      <div className="text-center py-4 text-sm text-muted-foreground border-t">
-        <p className="flex items-center justify-center gap-1">
-          <SouloLogo size="small" useColorTheme={true} />
-          <TranslatableText text="Emotional wellness through voice" />
-        </p>
-      </div>
     </div>
   );
-}
+};
+
+export default OnboardingScreen;

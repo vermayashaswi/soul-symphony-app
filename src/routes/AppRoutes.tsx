@@ -20,17 +20,11 @@ import BlogPostPage from '@/pages/website/BlogPostPage';
 import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 import { useAuth } from '@/contexts/AuthContext';
 import { useOnboarding } from '@/hooks/use-onboarding';
-import { useNavigate } from 'react-router-dom';
 
 const AppRoutes = () => {
   console.log('Rendering AppRoutes component');
   const { user } = useAuth();
   const { onboardingComplete } = useOnboarding();
-  const navigate = useNavigate();
-  
-  const handleOnboardingComplete = () => {
-    navigate('/app/home');
-  };
   
   // This will be used for conditional rendering of the /app route
   const AppRootRedirect = () => {
@@ -69,7 +63,7 @@ const AppRoutes = () => {
         <Route path="/blog/:slug" element={<BlogPostPage />} />
         
         {/* App Routes - reordered to fix routing issue */}
-        <Route path="/app/onboarding" element={<OnboardingScreen onComplete={handleOnboardingComplete} />} />
+        <Route path="/app/onboarding" element={<OnboardingScreen />} />
         <Route path="/app/auth" element={<Auth />} />
         
         {/* Protected App Routes */}
