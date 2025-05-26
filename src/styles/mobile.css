@@ -6,12 +6,12 @@
     border-radius: 9999px !important; /* Force perfect circles */
   }
   
-  /* Add padding to the bottom of page content to make room for the navigation bar */
+  /* Add padding to the bottom of the page content to make room for the navigation bar */
   .smart-chat-container,
   .journal-container,
   .insights-container,
   .settings-container {
-    padding-bottom: calc(70px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: 4.5rem !important; /* Increased to ensure content doesn't get cut off */
   }
 
   /* Make cards take full width in mobile view and remove horizontal padding */
@@ -58,9 +58,16 @@
     overflow-x: hidden !important;
   }
   
-  /* Safe area support for navigation */
-  .safe-area-bottom {
-    padding-bottom: env(safe-area-inset-bottom);
+  /* iOS-specific padding for safe areas */
+  @supports (padding: max(0px)) {
+    .smart-chat-container,
+    .journal-container,
+    .insights-container,
+    .settings-container {
+      padding-bottom: max(4.5rem, env(safe-area-inset-bottom) + 3.6rem) !important;
+      padding-left: max(8px, env(safe-area-inset-left) + 0px) !important;
+      padding-right: max(8px, env(safe-area-inset-right) + 0px) !important;
+    }
   }
 
   /* SoulNet fullscreen behavior improvements */
@@ -96,12 +103,12 @@
 
   /* Ensure the mobile chat input is fully visible */
   .mobile-chat-input-container {
-    bottom: calc(70px + env(safe-area-inset-bottom)) !important;
+    bottom: 4.5rem !important; /* Adjusted to match the increased bottom padding */
   }
 
   /* Add more space at the bottom of the chat content */
   .mobile-chat-content {
-    padding-bottom: calc(80px + env(safe-area-inset-bottom)) !important;
+    padding-bottom: 70px !important;
   }
   
   /* Year view calendar compact styling for mobile - Updated dot sizes */
@@ -119,11 +126,6 @@
     width: 12px !important;
     height: 12px !important;
     margin: 1px auto !important;
-  }
-
-  /* Ensure mobile navigation doesn't interfere with content */
-  .mobile-nav-bottom-spacing {
-    margin-bottom: calc(60px + env(safe-area-inset-bottom));
   }
 }
 

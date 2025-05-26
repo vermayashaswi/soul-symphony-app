@@ -8,6 +8,7 @@ class StaticTranslationService {
 
   setLanguage(language: string) {
     if (this.currentLanguage !== language) {
+      console.log(`StaticTranslationService: Language changed from ${this.currentLanguage} to ${language}`);
       this.currentLanguage = language;
       // Clear pending promises when language changes
       this.translationPromises.clear();
@@ -20,10 +21,12 @@ class StaticTranslationService {
 
   async translateText(text: string, sourceLanguage: string = 'en', entryId?: number): Promise<string> {
     if (!text || text.trim() === '') {
+      console.log('StaticTranslationService: Empty text provided');
       return text;
     }
 
     if (this.currentLanguage === 'en') {
+      console.log('StaticTranslationService: Current language is English, returning original text');
       return text;
     }
 
@@ -31,6 +34,7 @@ class StaticTranslationService {
     
     // Check if we already have a translation in progress for this text
     if (this.translationPromises.has(cacheKey)) {
+      console.log(`StaticTranslationService: Translation in progress for "${text.substring(0, 30)}...", waiting for result`);
       return this.translationPromises.get(cacheKey)!;
     }
 
@@ -38,6 +42,7 @@ class StaticTranslationService {
     try {
       const cached = await translationCache.getTranslation(text, this.currentLanguage);
       if (cached) {
+        console.log(`StaticTranslationService: Cache hit for "${text.substring(0, 30)}...": "${cached.translatedText.substring(0, 30)}..."`);
         return cached.translatedText;
       }
     } catch (error) {
@@ -50,6 +55,7 @@ class StaticTranslationService {
 
     try {
       const result = await translationPromise;
+      console.log(`StaticTranslationService: Translation completed for "${text.substring(0, 30)}...": "${result.substring(0, 30)}..."`);
       return result;
     } catch (error) {
       console.error(`StaticTranslationService: Translation failed for "${text.substring(0, 30)}..."`, error);
@@ -61,6 +67,8 @@ class StaticTranslationService {
   }
 
   private async performTranslation(text: string, sourceLanguage: string, entryId?: number): Promise<string> {
+    console.log(`StaticTranslationService: Performing translation for "${text.substring(0, 30)}..." from ${sourceLanguage} to ${this.currentLanguage}`);
+    
     try {
       const { data, error } = await supabase.functions.invoke('translate-text', {
         body: {
@@ -79,7 +87,7 @@ class StaticTranslationService {
 
       if (!data || !data.translatedText) {
         console.error('StaticTranslationService: Invalid response format:', data);
-        throw new Error('Invalid translation response format');
+        throw new Error('Invalid translation response');
       }
 
       // Cache the result
@@ -91,6 +99,7 @@ class StaticTranslationService {
           timestamp: Date.now(),
           version: 1,
         });
+        console.log(`StaticTranslationService: Cached translation for "${text.substring(0, 30)}..."`);
       } catch (cacheError) {
         console.error('StaticTranslationService: Failed to cache translation:', cacheError);
       }
@@ -126,44 +135,8 @@ class StaticTranslationService {
   }
 
   async preTranslate(texts: string[]): Promise<Map<string, string>> {
+    console.log(`StaticTranslationService: Pre-translating ${texts.length} texts to ${this.currentLanguage}`);
     return this.batchTranslateTexts(texts);
-  }
-
-  // Method to test edge function connectivity
-  async testConnection(): Promise<boolean> {
-    try {
-      const { data, error } = await supabase.functions.invoke('translate-text', {
-        body: {
-          text: 'test',
-          sourceLanguage: 'en',
-          targetLanguage: 'hi',
-          cleanResult: true
-        },
-      });
-
-      if (error) {
-        console.error('StaticTranslationService: Connection test failed:', error);
-        return false;
-      }
-
-      return true;
-    } catch (error) {
-      console.error('StaticTranslationService: Connection test error:', error);
-      return false;
-    }
-  }
-
-  // Method to clear all translation caches
-  async clearAllCaches(): Promise<void> {
-    try {
-      // Clear memory cache
-      this.translationPromises.clear();
-      
-      // Clear IndexedDB cache for current language
-      await translationCache.clearCache(this.currentLanguage);
-    } catch (error) {
-      console.error('StaticTranslationService: Failed to clear caches:', error);
-    }
   }
 }
 
