@@ -9,6 +9,7 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTutorial } from '@/contexts/TutorialContext';
 import { useAuth } from '@/contexts/AuthContext';
+import { useTranslation } from '@/contexts/TranslationContext';
 
 interface MobileNavigationProps {
   onboardingComplete: boolean | null;
@@ -21,6 +22,7 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   const [isKeyboardVisible, setIsKeyboardVisible] = useState(false);
   const { isActive: isTutorialActive } = useTutorial();
   const { user } = useAuth();
+  const { currentLanguage } = useTranslation();
   
   useEffect(() => {
     const handleVisualViewportResize = () => {
@@ -121,6 +123,14 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     return location.pathname.startsWith(path);
   };
   
+  // Enhanced debug logging for translation
+  console.log('MobileNavigation: Current language:', currentLanguage);
+  console.log('MobileNavigation: Location pathname:', location.pathname);
+  console.log('MobileNavigation: Nav items with labels:', navItems.map(item => ({
+    path: item.path,
+    label: item.label
+  })));
+  
   return (
     <motion.div 
       className={cn(
@@ -140,6 +150,8 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
       <div className="flex justify-around items-center">
         {navItems.map((item) => {
           const isActive = getActiveStatus(item.path);
+          
+          console.log(`MobileNavigation: Rendering nav item "${item.label}" for path ${item.path} with forceTranslate=true`);
           
           return (
             <Link
@@ -163,7 +175,12 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
                 )}
               </div>
               <span className="text-xs mt-0.5">
-                <TranslatableText text={item.label} forceTranslate={true} />
+                <TranslatableText 
+                  text={item.label} 
+                  forceTranslate={true}
+                  onTranslationStart={() => console.log(`MobileNavigation: Translation started for "${item.label}"`)}
+                  onTranslationEnd={() => console.log(`MobileNavigation: Translation completed for "${item.label}"`)}
+                />
               </span>
             </Link>
           );
