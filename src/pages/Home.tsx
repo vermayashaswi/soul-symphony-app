@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -17,7 +16,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { entries, loading } = useJournalEntries({}, { enabled: !!user });
+  const { entries, loading } = useJournalEntries(user?.id, 0);
 
   const recentEntries = entries?.slice(0, 3) || [];
   const totalEntries = entries?.length || 0;
