@@ -47,9 +47,8 @@ const Settings = () => {
       }
 
       setProfile(data);
-      // Handle accent_color safely since it might not exist in the database
-      if (data && typeof data === 'object' && 'accent_color' in data && data.accent_color) {
-        setAccentColor(data.accent_color as string);
+      if (data?.accent_color) {
+        setAccentColor(data.accent_color);
       }
     } catch (error) {
       console.error('Error:', error);

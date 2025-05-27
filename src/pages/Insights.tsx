@@ -25,27 +25,24 @@ const Insights = () => {
   const {
     insights,
     refreshInsights
-  } = useMentalHealthInsights(user?.id, { periodName: selectedTimeframe });
+  } = useMentalHealthInsights(selectedTimeframe);
 
   const {
     insightsData,
     loading: dataLoading
-  } = useInsightsData(user?.id, selectedTimeframe as any);
+  } = useInsightsData(selectedTimeframe);
 
-  // Extract data from insights object - using correct property names
-  const emotionTrends = insights?.dominantEmotions || [];
-  const topThemes = insights?.themes || [];
-  const journalingSummary = {
-    totalEntries: insights?.entryCount || 0,
-    averageLength: null // Not available in current insights structure
-  };
-  const insightsLoading = insights?.loading || false;
-  const insightsError = insights?.error || null;
+  // Extract data from insights object
+  const emotionTrends = insights?.emotionTrends || [];
+  const topThemes = insights?.topThemes || [];
+  const journalingSummary = insights?.journalingSummary || null;
+  const insightsLoading = false; // Since we're using the insights object directly
+  const insightsError = null; // Since we're using the insights object directly
 
-  // Extract data from insightsData object - using correct property names
-  const entities = insightsData?.allEntries || [];
-  const emotionData = insightsData?.aggregatedEmotionData || {};
-  const timeSeriesData = []; // Not available in current structure
+  // Extract data from insightsData object
+  const entities = insightsData?.entities || [];
+  const emotionData = insightsData?.emotionData || [];
+  const timeSeriesData = insightsData?.timeSeriesData || [];
   const dataError = null; // Since we're using the insightsData object directly
 
   useEffect(() => {
@@ -163,7 +160,7 @@ const Insights = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold capitalize">
-                        {emotionTrends?.[0]?.name || 'N/A'}
+                        {emotionTrends?.[0]?.emotion || 'N/A'}
                       </div>
                       <p className="text-xs text-muted-foreground">
                         {emotionTrends?.[0]?.score && 
@@ -179,10 +176,12 @@ const Insights = () => {
                     </CardHeader>
                     <CardContent>
                       <div className="text-2xl font-bold">
-                        {topThemes?.[0] || 'N/A'}
+                        {topThemes?.[0]?.theme || 'N/A'}
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Most common theme
+                        {topThemes?.[0]?.frequency && 
+                          `Mentioned ${topThemes[0].frequency} times`
+                        }
                       </p>
                     </CardContent>
                   </Card>
@@ -217,7 +216,7 @@ const Insights = () => {
 
               <TabsContent value="emotions" className="space-y-6">
                 <MoodCalendar 
-                  sentimentData={insightsData?.allEntries || []} 
+                  sentimentData={emotionData} 
                   timeRange={selectedTimeframe as any}
                 />
               </TabsContent>
@@ -243,10 +242,10 @@ const Insights = () => {
                         {topThemes.map((theme, index) => (
                           <div key={index} className="flex items-center justify-between">
                             <div className="flex items-center gap-2">
-                              <Badge variant="outline">{theme}</Badge>
+                              <Badge variant="outline">{theme.theme}</Badge>
                             </div>
                             <span className="text-sm text-muted-foreground">
-                              Theme {index + 1}
+                              {theme.frequency} mentions
                             </span>
                           </div>
                         ))}
