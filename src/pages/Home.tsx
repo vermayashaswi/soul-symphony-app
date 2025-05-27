@@ -17,7 +17,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { entries, loading } = useJournalEntries();
+  const { entries, loading } = useJournalEntries({}, { enabled: !!user });
 
   const recentEntries = entries?.slice(0, 3) || [];
   const totalEntries = entries?.length || 0;
