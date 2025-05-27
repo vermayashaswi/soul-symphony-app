@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -16,7 +17,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
-import { JournalSummaryCard } from '@/components/home/JournalSummaryCard';
+import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useSubscription } from '@/hooks/use-subscription';
 import { TrialCountdown } from '@/components/subscription/TrialCountdown';
@@ -194,7 +195,7 @@ const Home = () => {
             animate={{ opacity: 1, y: 0 }}
             transition={{ delay: 0.4 }}
           >
-            <JournalSummaryCard entries={recentEntries} />
+            <JournalSummaryCard />
           </motion.div>
         )}
 

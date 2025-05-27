@@ -45,19 +45,27 @@ export function useUsageLimits() {
     try {
       setLoading(true);
 
-      // Get journal entries count
+      // Get journal entries count - using the correct table name "Journal Entries"
       const { count: journalCount } = await supabase
-        .from('journal_entries')
+        .from('Journal Entries')
         .select('*', { count: 'exact', head: true })
         .eq('user_id', user.id);
 
-      // Get chat messages count
-      const { count: chatCount } = await supabase
-        .from('chat_messages')
-        .select('cm.*, ct.user_id', { count: 'exact', head: true })
-        .from('chat_messages as cm')
-        .leftJoin('chat_threads as ct', 'cm.thread_id', 'ct.id')
-        .eq('ct.user_id', user.id);
+      // Get chat messages count - simplified query to avoid type complexity
+      const { data: userThreads } = await supabase
+        .from('chat_threads')
+        .select('id')
+        .eq('user_id', user.id);
+
+      let chatCount = 0;
+      if (userThreads && userThreads.length > 0) {
+        const threadIds = userThreads.map(thread => thread.id);
+        const { count } = await supabase
+          .from('chat_messages')
+          .select('*', { count: 'exact', head: true })
+          .in('thread_id', threadIds);
+        chatCount = count || 0;
+      }
 
       const journalUsage = {
         current: journalCount || 0,
@@ -66,9 +74,9 @@ export function useUsageLimits() {
       };
 
       const chatUsage = {
-        current: chatCount || 0,
+        current: chatCount,
         limit: FREE_TIER_LIMITS.chatMessages,
-        percentage: Math.min(((chatCount || 0) / FREE_TIER_LIMITS.chatMessages) * 100, 100)
+        percentage: Math.min((chatCount / FREE_TIER_LIMITS.chatMessages) * 100, 100)
       };
 
       setUsage({
