@@ -1,3 +1,4 @@
+
 import React, { useEffect, useRef, useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
@@ -7,10 +8,8 @@ import { Plus } from 'lucide-react';
 import JournalEntriesHeader from './JournalEntriesHeader';
 import EmptyJournalState from './EmptyJournalState';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
-import SampleEntryCard from './SampleEntryCard';
 import { useProcessingEntries } from '@/hooks/use-processing-entries';
 import { processingStateManager, EntryProcessingState } from '@/utils/journal/processing-state-manager';
-import { createMockEntry, shouldShowMockEntry, isMockEntry, filterOutMockEntries } from '@/utils/journal/mock-entry';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -48,7 +47,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   const deletedEntryIdsRef = useRef<Set<number>>(new Set());
   
   const hasEntries = entries && entries.length > 0;
-  const isInitialLoading = loading && !hasEntries;
+  const isLoading = loading && !hasEntries;
   
   useEffect(() => {
     console.log('[JournalEntriesList] Component mounted');
@@ -189,9 +188,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     }
   };
   
-  // Filter entries to remove deleted ones and separate real entries from mock entries
+  // Filter entries to remove deleted ones
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
-  const realEntries = filterOutMockEntries(filteredEntries);
   
   // CRITICAL: Enhanced processing detection with multiple fallbacks
   const visibleProcessingIds = visibleEntries.map(entry => entry.tempId);
@@ -212,30 +210,26 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     hasAnyProcessing() || 
     immediateProcessingCount > 0 ||
     finalProcessingIds.length > 0;
-
-  // Determine what to show
-  const hasRealEntries = realEntries.length > 0;
-  const showMockEntry = shouldShowMockEntry(realEntries) && !loading && !isCurrentlyProcessing;
   
-  console.log(`[JournalEntriesList] Rendering: realEntries=${realEntries.length}, showMockEntry=${showMockEntry}, finalProcessingIds=${finalProcessingIds.length}, isCurrentlyProcessing=${isCurrentlyProcessing}, hasImmediate=${hasImmediateProcessing}, emergency=${emergencyProcessingFlag}`);
+  console.log(`[JournalEntriesList] Rendering: entries=${filteredEntries.length}, finalProcessingIds=${finalProcessingIds.length}, isCurrentlyProcessing=${isCurrentlyProcessing}, hasImmediate=${hasImmediateProcessing}, emergency=${emergencyProcessingFlag}`);
 
   // CRITICAL: Fixed conditional logic - ALWAYS prioritize loading over empty state
   const shouldShowProcessing = isCurrentlyProcessing;
-  const shouldShowEntries = hasRealEntries || showMockEntry;
-  const shouldShowEmpty = !shouldShowEntries && !isInitialLoading && !shouldShowProcessing;
+  const shouldShowEntries = filteredEntries.length > 0;
+  const shouldShowEmpty = !shouldShowEntries && !isLoading && !shouldShowProcessing;
   
   return (
     <div className="journal-entries-list" id="journal-entries-container" data-last-action={lastAction}>
       <JournalEntriesHeader onStartRecording={onStartRecording} />
 
-      {isInitialLoading ? (
+      {isLoading ? (
         <div className="flex items-center justify-center h-48">
           <p className="text-muted-foreground">
             <TranslatableText text="Loading journal entries..." />
           </p>
         </div>
       ) : shouldShowProcessing || shouldShowEntries ? (
-        <div className="grid gap-4" data-entries-count={realEntries.length}>
+        <div className="grid gap-4" data-entries-count={filteredEntries.length}>
           {/* CRITICAL: Show processing cards FIRST with forced visibility */}
           {shouldShowProcessing && (
             <div data-processing-cards-container="true" className="processing-cards-container">
@@ -267,16 +261,8 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             </div>
           )}
           
-          {/* Show mock entry if no real entries exist */}
-          {showMockEntry && (
-            <SampleEntryCard 
-              entry={createMockEntry()} 
-              onStartRecording={onStartRecording}
-            />
-          )}
-          
           {/* Display regular entries */}
-          {hasRealEntries && realEntries.map((entry) => {
+          {shouldShowEntries && filteredEntries.map((entry) => {
             const entryIsProcessing = entry.tempId ? processingStateManager.isProcessing(entry.tempId) : false;
             
             return (
