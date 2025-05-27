@@ -1,4 +1,3 @@
-
 import React, { useEffect, useRef, useState } from 'react';
 import { JournalEntry } from '@/types/journal';
 import JournalEntryCard from './JournalEntryCard';
@@ -8,8 +7,10 @@ import { Plus } from 'lucide-react';
 import JournalEntriesHeader from './JournalEntriesHeader';
 import EmptyJournalState from './EmptyJournalState';
 import JournalEntryLoadingSkeleton from './JournalEntryLoadingSkeleton';
+import SampleEntryCard from './SampleEntryCard';
 import { useProcessingEntries } from '@/hooks/use-processing-entries';
 import { processingStateManager, EntryProcessingState } from '@/utils/journal/processing-state-manager';
+import { createMockEntry, shouldShowMockEntry, isMockEntry, filterOutMockEntries } from '@/utils/journal/mock-entry';
 
 interface JournalEntriesListProps {
   entries: JournalEntry[];
@@ -188,8 +189,9 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     }
   };
   
-  // Filter entries to remove deleted ones
+  // Filter entries to remove deleted ones and separate real entries from mock entries
   const filteredEntries = entries.filter(entry => !deletedEntryIdsRef.current.has(entry.id));
+  const realEntries = filterOutMockEntries(filteredEntries);
   
   // CRITICAL: Enhanced processing detection with multiple fallbacks
   const visibleProcessingIds = visibleEntries.map(entry => entry.tempId);
@@ -210,12 +212,17 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
     hasAnyProcessing() || 
     immediateProcessingCount > 0 ||
     finalProcessingIds.length > 0;
+
+  // Determine what to show
+  const hasRealEntries = realEntries.length > 0;
+  const showMockEntry = shouldShowMockEntry(realEntries) && !loading && !isCurrentlyProcessing;
+  const isLoading = loading && !hasRealEntries;
   
-  console.log(`[JournalEntriesList] Rendering: entries=${filteredEntries.length}, finalProcessingIds=${finalProcessingIds.length}, isCurrentlyProcessing=${isCurrentlyProcessing}, hasImmediate=${hasImmediateProcessing}, emergency=${emergencyProcessingFlag}`);
+  console.log(`[JournalEntriesList] Rendering: realEntries=${realEntries.length}, showMockEntry=${showMockEntry}, finalProcessingIds=${finalProcessingIds.length}, isCurrentlyProcessing=${isCurrentlyProcessing}, hasImmediate=${hasImmediateProcessing}, emergency=${emergencyProcessingFlag}`);
 
   // CRITICAL: Fixed conditional logic - ALWAYS prioritize loading over empty state
   const shouldShowProcessing = isCurrentlyProcessing;
-  const shouldShowEntries = filteredEntries.length > 0;
+  const shouldShowEntries = hasRealEntries || showMockEntry;
   const shouldShowEmpty = !shouldShowEntries && !isLoading && !shouldShowProcessing;
   
   return (
@@ -229,7 +236,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
           </p>
         </div>
       ) : shouldShowProcessing || shouldShowEntries ? (
-        <div className="grid gap-4" data-entries-count={filteredEntries.length}>
+        <div className="grid gap-4" data-entries-count={realEntries.length}>
           {/* CRITICAL: Show processing cards FIRST with forced visibility */}
           {shouldShowProcessing && (
             <div data-processing-cards-container="true" className="processing-cards-container">
@@ -261,8 +268,16 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
             </div>
           )}
           
+          {/* Show mock entry if no real entries exist */}
+          {showMockEntry && (
+            <SampleEntryCard 
+              entry={createMockEntry()} 
+              onStartRecording={onStartRecording}
+            />
+          )}
+          
           {/* Display regular entries */}
-          {shouldShowEntries && filteredEntries.map((entry) => {
+          {hasRealEntries && realEntries.map((entry) => {
             const entryIsProcessing = entry.tempId ? processingStateManager.isProcessing(entry.tempId) : false;
             
             return (
