@@ -27,7 +27,7 @@ import { useToast } from '@/hooks/use-toast';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { SubscriptionSettings } from '@/components/subscription/SubscriptionSettings';
 import { useSubscription } from '@/hooks/use-subscription';
-import ProfilePictureUpload from '@/components/settings/ProfilePictureUpload';
+import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import LanguageSelector from '@/components/LanguageSelector';
 
 export default function Settings() {

@@ -57,7 +57,7 @@ export function useSubscription() {
 
         setSubscriptionStatus({
           isActive: profile.is_premium || false,
-          tier: profile.subscription_tier || 'free',
+          tier: (profile.subscription_tier as 'free' | 'premium') || 'free',
           isInTrial,
           trialEndsAt: trialEndsAt || undefined
         });
@@ -81,7 +81,9 @@ export function useSubscription() {
           expirationDate: customerInfo.latestExpirationDate 
             ? new Date(customerInfo.latestExpirationDate)
             : undefined,
-          isInTrial: activeEntitlement?.isInIntroOfferPeriod || false
+          isInTrial: activeEntitlement && typeof activeEntitlement === 'object' && 'isInIntroOfferPeriod' in activeEntitlement 
+            ? activeEntitlement.isInIntroOfferPeriod as boolean 
+            : false
         }));
       }
     } catch (error) {
