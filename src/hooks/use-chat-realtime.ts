@@ -41,6 +41,7 @@ export function useChatRealtime(threadId: string | null) {
           
           setRealtimeState(prev => ({
             ...prev,
+            isLoading: processingStatus === 'processing',
             isProcessing: processingStatus === 'processing',
             processingStatus: processingStatus,
             processingStage: processingStatus === 'processing' ? 'Retrieving information...' : null
@@ -69,6 +70,7 @@ export function useChatRealtime(threadId: string | null) {
           
           setRealtimeState(prev => ({
             ...prev,
+            isLoading: processingStatus === 'processing',
             isProcessing: processingStatus === 'processing',
             processingStatus: processingStatus,
             // Keep the current processing stage if we're still processing
@@ -96,6 +98,7 @@ export function useChatRealtime(threadId: string | null) {
           if (messageData.sender === 'assistant' && !messageData.is_processing) {
             setRealtimeState(prev => ({
               ...prev,
+              isLoading: false,
               isProcessing: false,
               processingStatus: 'idle',
               processingStage: null
@@ -119,8 +122,18 @@ export function useChatRealtime(threadId: string | null) {
     }));
   };
 
+  // Set local loading state for immediate UI feedback
+  const setLocalLoading = (loading: boolean, stage?: string) => {
+    setRealtimeState(prev => ({
+      ...prev,
+      isLoading: loading,
+      processingStage: loading ? (stage || prev.processingStage || 'Processing...') : null
+    }));
+  };
+
   return {
     ...realtimeState,
-    updateProcessingStage
+    updateProcessingStage,
+    setLocalLoading
   };
 }

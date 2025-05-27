@@ -18,6 +18,7 @@ import { analyzeQueryTypes } from "@/utils/chat/queryAnalyzer";
 import { processChatMessage } from "@/services/chatService";
 import { MentalHealthInsights } from "@/hooks/use-mental-health-insights";
 import { useChatRealtime } from "@/hooks/use-chat-realtime";
+import { updateThreadProcessingStatus } from "@/utils/chat/threadUtils";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -54,7 +55,6 @@ export default function MobileChatInterface({
   mentalHealthInsights,
 }: MobileChatInterfaceProps) {
   const [messages, setMessages] = useState<UIChatMessage[]>([]);
-  const [loading, setLoading] = useState(false);
   const [initialLoading, setInitialLoading] = useState(true);
   const [threadId, setThreadId] = useState<string | null>(initialThreadId || null);
   const [showSuggestions, setShowSuggestions] = useState(true);
@@ -63,8 +63,10 @@ export default function MobileChatInterface({
   
   // Use the realtime hook to track processing status
   const {
+    isLoading,
     isProcessing,
-    processingStatus
+    processingStatus,
+    setLocalLoading
   } = useChatRealtime(threadId);
   
   const suggestionQuestions = [
@@ -132,7 +134,7 @@ export default function MobileChatInterface({
 
   useEffect(() => {
     scrollToBottom();
-  }, [messages, loading]);
+  }, [messages, isLoading, isProcessing]);
 
   const scrollToBottom = () => {
     setTimeout(() => {
@@ -223,6 +225,16 @@ export default function MobileChatInterface({
       return;
     }
 
+    // Prevent multiple concurrent requests
+    if (isProcessing || isLoading) {
+      toast({
+        title: "Please wait",
+        description: "Another request is currently being processed.",
+        variant: "default"
+      });
+      return;
+    }
+
     let currentThreadId = threadId;
     let isFirstMessage = false;
     
@@ -283,9 +295,14 @@ export default function MobileChatInterface({
     
     debugLog.addEvent("User Message", `[Mobile] Adding user message to UI: "${message.substring(0, 30)}${message.length > 30 ? '...' : ''}"`, "info");
     setMessages(prev => [...prev, { role: 'user', content: message }]);
-    setLoading(true);
+    
+    // Set local loading state for immediate UI feedback
+    setLocalLoading(true, "Processing your request...");
     
     try {
+      // Update thread processing status to 'processing'
+      await updateThreadProcessingStatus(currentThreadId, 'processing');
+      
       debugLog.addEvent("Database", `[Mobile] Saving user message to thread ${currentThreadId}`, "info");
       const savedUserMessage = await saveMessage(currentThreadId, message, 'user');
       debugLog.addEvent("Database", `[Mobile] User message saved: ${savedUserMessage?.id}`, "success");
@@ -325,6 +342,9 @@ export default function MobileChatInterface({
         currentThreadId,
         false
       );
+      
+      // Update thread processing status to 'idle'
+      await updateThreadProcessingStatus(currentThreadId, 'idle');
       
       const responseInfo = {
         role: response.role,
@@ -391,6 +411,11 @@ export default function MobileChatInterface({
       debugLog.addEvent("Error", `[Mobile] Error in message handling: ${error?.message || "Unknown error"}`, "error");
       console.error("[Mobile] Error sending message:", error);
       
+      // Update thread status to failed
+      if (currentThreadId) {
+        await updateThreadProcessingStatus(currentThreadId, 'failed');
+      }
+      
       const errorMessageContent = "I'm having trouble processing your request. Please try again later. " + 
                  (error?.message ? `Error: ${error.message}` : "");
       
@@ -417,7 +442,8 @@ export default function MobileChatInterface({
         console.error("[Mobile] Failed to save error message:", e);
       }
     } finally {
-      setLoading(false);
+      // Clear local loading state - the realtime hook will handle the final state
+      setLocalLoading(false);
     }
   };
 
@@ -529,11 +555,12 @@ export default function MobileChatInterface({
     }
   };
 
-  // Check if deletion should be disabled
-  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || loading;
+  // Check if deletion should be disabled - use realtime processing state
+  const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
     <div className="mobile-chat-interface h-full flex flex-col relative">
+      {/* ... keep existing code (header with navigation) */}
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -628,6 +655,7 @@ export default function MobileChatInterface({
                       size="sm"
                       className="px-3 py-2 h-auto justify-start text-sm text-left bg-muted/50 hover:bg-muted w-full"
                       onClick={() => handleSendMessage(question.text)}
+                      disabled={isLoading || isProcessing}
                     >
                       <div className="flex items-start w-full">
                         <span className="flex-shrink-0 mt-0.5">{question.icon}</span>
@@ -651,8 +679,8 @@ export default function MobileChatInterface({
               />
             ))}
             
-            {/* Show typing indicator when loading */}
-            {loading && (
+            {/* Show typing indicator when processing - use realtime state */}
+            {(isLoading || isProcessing) && (
               <MobileChatMessage 
                 message={{ role: 'assistant', content: '' }}
                 isLoading={true}
@@ -668,11 +696,12 @@ export default function MobileChatInterface({
       <div className="fixed bottom-14 left-0 right-0 z-50">
         <MobileChatInput 
           onSendMessage={handleSendMessage} 
-          isLoading={loading}
+          isLoading={isLoading || isProcessing}
           userId={userId || user?.id}
         />
       </div>
       
+      {/* ... keep existing code (AlertDialog for deletion) */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
