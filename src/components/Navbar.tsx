@@ -24,6 +24,7 @@ import {
 } from '@/components/ui/popover';
 import { useTheme } from '@/hooks/use-theme';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { TrialCountdown } from '@/components/subscription/TrialCountdown';
 
 const Navbar = () => {
   const navigate = useNavigate();
@@ -66,6 +67,9 @@ const Navbar = () => {
             </>
           ) : (
             <>
+              {/* Trial Countdown */}
+              <TrialCountdown variant="badge" />
+
               <Button
                 variant="ghost"
                 size="icon"
