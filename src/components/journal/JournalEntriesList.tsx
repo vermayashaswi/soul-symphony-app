@@ -48,7 +48,7 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   const deletedEntryIdsRef = useRef<Set<number>>(new Set());
   
   const hasEntries = entries && entries.length > 0;
-  const isLoading = loading && !hasEntries;
+  const isInitialLoading = loading && !hasEntries;
   
   useEffect(() => {
     console.log('[JournalEntriesList] Component mounted');
@@ -216,20 +216,19 @@ const JournalEntriesList: React.FC<JournalEntriesListProps> = ({
   // Determine what to show
   const hasRealEntries = realEntries.length > 0;
   const showMockEntry = shouldShowMockEntry(realEntries) && !loading && !isCurrentlyProcessing;
-  const isLoading = loading && !hasRealEntries;
   
   console.log(`[JournalEntriesList] Rendering: realEntries=${realEntries.length}, showMockEntry=${showMockEntry}, finalProcessingIds=${finalProcessingIds.length}, isCurrentlyProcessing=${isCurrentlyProcessing}, hasImmediate=${hasImmediateProcessing}, emergency=${emergencyProcessingFlag}`);
 
   // CRITICAL: Fixed conditional logic - ALWAYS prioritize loading over empty state
   const shouldShowProcessing = isCurrentlyProcessing;
   const shouldShowEntries = hasRealEntries || showMockEntry;
-  const shouldShowEmpty = !shouldShowEntries && !isLoading && !shouldShowProcessing;
+  const shouldShowEmpty = !shouldShowEntries && !isInitialLoading && !shouldShowProcessing;
   
   return (
     <div className="journal-entries-list" id="journal-entries-container" data-last-action={lastAction}>
       <JournalEntriesHeader onStartRecording={onStartRecording} />
 
-      {isLoading ? (
+      {isInitialLoading ? (
         <div className="flex items-center justify-center h-48">
           <p className="text-muted-foreground">
             <TranslatableText text="Loading journal entries..." />
