@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -44,7 +43,7 @@ const Home = () => {
     }, 5000); // Show after 5 seconds
 
     return () => clearTimeout(timer);
-  }, []);
+  }, []); // Fixed: Added proper dependency array
 
   const recentEntries = entries?.slice(0, 3) || [];
   const totalEntries = entries?.length || 0;
