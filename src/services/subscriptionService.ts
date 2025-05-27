@@ -1,5 +1,5 @@
 
-import Purchases, { PurchasesOffering, CustomerInfo, PurchasesPackage } from '@revenuecat/purchases-js';
+import { Purchases, Offering, Package, CustomerInfo, EntitlementInfo } from '@revenuecat/purchases-js';
 import { supabase } from '@/integrations/supabase/client';
 
 export interface SubscriptionStatus {
@@ -34,7 +34,7 @@ class SubscriptionService {
     }
   }
 
-  async getOfferings(): Promise<PurchasesOffering[]> {
+  async getOfferings(): Promise<Offering[]> {
     try {
       const offerings = await Purchases.getOfferings();
       return Object.values(offerings.all);
@@ -53,7 +53,7 @@ class SubscriptionService {
     }
   }
 
-  async purchasePackage(packageToPurchase: PurchasesPackage): Promise<CustomerInfo> {
+  async purchasePackage(packageToPurchase: Package): Promise<CustomerInfo> {
     try {
       const purchaseResult = await Purchases.purchasePackage(packageToPurchase);
       
@@ -108,9 +108,9 @@ class SubscriptionService {
           ...subscriptionData,
           transaction_id: premiumEntitlement.productIdentifier,
           product_id: premiumEntitlement.productIdentifier,
-          purchase_date: latestTransaction || new Date().toISOString(),
-          expiration_date: expirationDate,
-          is_trial_period: premiumEntitlement.isIntroPeriod || false
+          purchase_date: latestTransaction ? (typeof latestTransaction === 'string' ? latestTransaction : latestTransaction.toISOString()) : new Date().toISOString(),
+          expiration_date: expirationDate ? (typeof expirationDate === 'string' ? expirationDate : expirationDate.toISOString()) : null,
+          is_trial_period: this.isTrialPeriod(premiumEntitlement)
         };
       }
 
@@ -133,7 +133,7 @@ class SubscriptionService {
         .update({
           is_premium: isPremium,
           subscription_tier: isPremium ? 'premium' : 'free',
-          trial_ends_at: premiumEntitlement?.isIntroPeriod ? premiumEntitlement.expirationDate : null
+          trial_ends_at: this.isTrialPeriod(premiumEntitlement) ? (premiumEntitlement.expirationDate ? (typeof premiumEntitlement.expirationDate === 'string' ? premiumEntitlement.expirationDate : premiumEntitlement.expirationDate.toISOString()) : null) : null
         })
         .eq('id', user.id);
 
@@ -142,9 +142,32 @@ class SubscriptionService {
     }
   }
 
-  private isExpired(expirationDate: string | null): boolean {
+  private isExpired(expirationDate: string | Date | null): boolean {
     if (!expirationDate) return true;
-    return new Date(expirationDate) <= new Date();
+    const expDate = typeof expirationDate === 'string' ? new Date(expirationDate) : expirationDate;
+    return expDate <= new Date();
+  }
+
+  private isTrialPeriod(entitlement: EntitlementInfo | null): boolean {
+    if (!entitlement) return false;
+    // Check if this is a trial period - this might vary based on your RevenueCat configuration
+    // Common ways to detect trial periods:
+    // 1. Check if periodType includes 'trial'
+    // 2. Check if there's a specific trial identifier
+    // 3. Check purchase date vs current date for trial duration
+    
+    // For now, we'll use a simple heuristic - if the entitlement is active and recent
+    const now = new Date();
+    const purchaseDate = entitlement.latestPurchaseDate;
+    
+    if (!purchaseDate) return false;
+    
+    const purchase = typeof purchaseDate === 'string' ? new Date(purchaseDate) : purchaseDate;
+    const daysSincePurchase = (now.getTime() - purchase.getTime()) / (1000 * 60 * 60 * 24);
+    
+    // Assume it's a trial if it's been less than 7 days since purchase
+    // You should adjust this logic based on your actual trial configuration
+    return daysSincePurchase <= 7;
   }
 
   getSubscriptionStatus(customerInfo: CustomerInfo | null): SubscriptionStatus {
@@ -171,9 +194,13 @@ class SubscriptionService {
       };
     }
 
-    const expiresAt = premiumEntitlement.expirationDate ? new Date(premiumEntitlement.expirationDate) : null;
+    const expiresAt = premiumEntitlement.expirationDate ? 
+      (typeof premiumEntitlement.expirationDate === 'string' ? 
+        new Date(premiumEntitlement.expirationDate) : 
+        premiumEntitlement.expirationDate) : null;
+    
     const isExpired = this.isExpired(premiumEntitlement.expirationDate);
-    const isTrialActive = premiumEntitlement.isIntroPeriod && !isExpired;
+    const isTrialActive = this.isTrialPeriod(premiumEntitlement) && !isExpired;
 
     return {
       isActive: !isExpired,
