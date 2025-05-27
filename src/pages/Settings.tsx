@@ -25,6 +25,7 @@ const Settings = () => {
   const [profile, setProfile] = useState<any>(null);
   const [loading, setLoading] = useState(true);
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [accentColor, setAccentColor] = useState('#3b82f6');
 
   useEffect(() => {
     fetchProfile();
@@ -46,6 +47,9 @@ const Settings = () => {
       }
 
       setProfile(data);
+      if (data?.accent_color) {
+        setAccentColor(data.accent_color);
+      }
     } catch (error) {
       console.error('Error:', error);
     } finally {
@@ -82,6 +86,11 @@ const Settings = () => {
     const currentSettings = profile?.reminder_settings || { morning: true, evening: true };
     const newSettings = { ...currentSettings, [type]: enabled };
     updateProfile({ reminder_settings: newSettings });
+  };
+
+  const handleColorChange = (hexColor: string) => {
+    setAccentColor(hexColor);
+    updateProfile({ accent_color: hexColor });
   };
 
   const handleSignOut = async () => {
@@ -217,7 +226,10 @@ const Settings = () => {
 
             <Separator />
 
-            <ColorPicker />
+            <ColorPicker 
+              value={accentColor}
+              onChange={handleColorChange}
+            />
           </CardContent>
         </Card>
 

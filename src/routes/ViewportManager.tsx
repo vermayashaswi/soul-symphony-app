@@ -92,7 +92,7 @@ const ViewportManager: React.FC = () => {
        user && 
        !isOnboardingOrAuth && 
        onboardingComplete && (
-        <MobileNavigation onboardingComplete={onboardingComplete} />
+        <MobileNavigation />
       )}
     </>
   );

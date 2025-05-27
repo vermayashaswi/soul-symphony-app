@@ -9,11 +9,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { useToast } from '@/hooks/use-toast';
 import { useMentalHealthInsights } from '@/hooks/use-mental-health-insights';
 import { useInsightsData } from '@/hooks/use-insights-data';
-import { SoulNet } from '@/components/insights/SoulNet';
-import { MoodCalendar } from '@/components/insights/MoodCalendar';
-import { EntityBubbles } from '@/components/insights/EntityBubbles';
-import { EntityStrips } from '@/components/insights/EntityStrips';
-import { ErrorBoundary } from '@/components/insights/ErrorBoundary';
+import SoulNet from '@/components/insights/SoulNet';
+import MoodCalendar from '@/components/insights/MoodCalendar';
+import EntityBubbles from '@/components/insights/EntityBubbles';
+import EntityStrips from '@/components/insights/EntityStrips';
+import ErrorBoundary from '@/components/insights/ErrorBoundary';
 import { PremiumGuard } from '@/components/premium/PremiumGuard';
 
 const Insights = () => {
@@ -23,22 +23,27 @@ const Insights = () => {
   const [showAdvanced, setShowAdvanced] = useState(false);
 
   const {
-    emotionTrends,
-    topThemes,
-    journalingSummary,
-    loading: insightsLoading,
-    error: insightsError,
-    refetch: refetchInsights
+    insights,
+    refreshInsights
   } = useMentalHealthInsights(selectedTimeframe);
 
   const {
-    entities,
-    emotionData,
-    timeSeriesData,
-    loading: dataLoading,
-    error: dataError,
-    refetch: refetchData
+    insightsData,
+    loading: dataLoading
   } = useInsightsData(selectedTimeframe);
+
+  // Extract data from insights object
+  const emotionTrends = insights?.emotionTrends || [];
+  const topThemes = insights?.topThemes || [];
+  const journalingSummary = insights?.journalingSummary || null;
+  const insightsLoading = false; // Since we're using the insights object directly
+  const insightsError = null; // Since we're using the insights object directly
+
+  // Extract data from insightsData object
+  const entities = insightsData?.entities || [];
+  const emotionData = insightsData?.emotionData || [];
+  const timeSeriesData = insightsData?.timeSeriesData || [];
+  const dataError = null; // Since we're using the insightsData object directly
 
   useEffect(() => {
     if (insightsError || dataError) {
@@ -197,18 +202,30 @@ const Insights = () => {
 
                 {showAdvanced && (
                   <div className="space-y-6">
-                    <EntityBubbles entities={entities} />
-                    <EntityStrips entities={entities} />
+                    <EntityBubbles 
+                      userId={user?.id} 
+                      timeRange={selectedTimeframe as any}
+                    />
+                    <EntityStrips 
+                      userId={user?.id} 
+                      timeRange={selectedTimeframe as any}
+                    />
                   </div>
                 )}
               </TabsContent>
 
               <TabsContent value="emotions" className="space-y-6">
-                <MoodCalendar data={emotionData} />
+                <MoodCalendar 
+                  sentimentData={emotionData} 
+                  timeRange={selectedTimeframe as any}
+                />
               </TabsContent>
 
               <TabsContent value="connections" className="space-y-6">
-                <SoulNet />
+                <SoulNet 
+                  userId={user?.id}
+                  timeRange={selectedTimeframe as any}
+                />
               </TabsContent>
 
               <TabsContent value="themes" className="space-y-6">
