@@ -50,7 +50,6 @@ import {
   TooltipProvider,
   TooltipTrigger,
 } from "@/components/ui/tooltip";
-import { PremiumFeatureGate } from '@/components/subscription/PremiumFeatureGate';
 
 export interface SmartChatInterfaceProps {
   mentalHealthInsights?: MentalHealthInsights;
@@ -629,203 +628,101 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
   const isDeletionDisabled = isProcessing || processingStatus === 'processing' || isLoading;
 
   return (
-    <PremiumFeatureGate
-      feature="Advanced AI Chat"
-      description="Get personalized insights from your journal entries with our advanced AI assistant"
-      fallback={
-        <div className="chat-interface flex flex-col h-full">
-          <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
-            <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
-            
-            <div className="flex items-center gap-2">
-              {currentThreadId && (
-                <TooltipProvider>
-                  <Tooltip>
-                    <TooltipTrigger asChild>
-                      <Button 
-                        variant="ghost" 
-                        size="icon" 
-                        className={`h-9 w-9 ${
-                          isDeletionDisabled 
-                            ? 'text-muted-foreground/50 cursor-not-allowed' 
-                            : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20'
-                        }`}
-                        onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
-                        disabled={isDeletionDisabled}
-                        aria-label="Delete conversation"
-                      >
-                        <Trash className="h-5 w-5" />
-                      </Button>
-                    </TooltipTrigger>
-                    <TooltipContent>
-                      {isDeletionDisabled ? (
-                        <TranslatableText text="Cannot delete while processing" />
-                      ) : (
-                        <TranslatableText text="Delete conversation" />
-                      )}
-                    </TooltipContent>
-                  </Tooltip>
-                </TooltipProvider>
-              )}
-            </div>
-          </div>
-          
-          <div className="chat-content flex-1 overflow-hidden">
-            {initialLoading ? (
-              <div className="flex items-center justify-center h-full">
-                <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-                <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
-              </div>
-            ) : chatHistory.length === 0 ? (
-              <EmptyChatState />
-            ) : (
-              <ChatArea 
-                chatMessages={chatHistory}
-                isLoading={isLoading || isProcessing}
-                processingStage={processingStage || undefined}
-                threadId={currentThreadId}
-                onInteractiveOptionClick={handleInteractiveOptionClick}
-              />
-            )}
-          </div>
-          
-          <div className="chat-input-container bg-white border-t p-4">
-            <div className="flex items-end gap-2">
-              <div className="flex-1">
-                <ChatInput 
-                  onSendMessage={handleSendMessage} 
-                  isLoading={isLoading || isProcessing} 
-                  userId={user?.id}
-                />
-              </div>
-              <VoiceRecordingButton 
-                isLoading={isLoading || isProcessing}
-                isRecording={false}
-                recordingTime={0}
-                onStartRecording={() => {}}
-                onStopRecording={() => {}}
-              />
-            </div>
-          </div>
-          
-          <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-            <AlertDialogContent>
-              <AlertDialogHeader>
-                <AlertDialogTitle><TranslatableText text="Delete this conversation?" /></AlertDialogTitle>
-                <AlertDialogDescription>
-                  <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
-                </AlertDialogDescription>
-              </AlertDialogHeader>
-              <AlertDialogFooter>
-                <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
-                <AlertDialogAction 
-                  onClick={handleDeleteCurrentThread}
-                  className="bg-red-500 hover:bg-red-600 text-white"
-                >
-                  <TranslatableText text="Delete" />
-                </AlertDialogAction>
-              </AlertDialogFooter>
-            </AlertDialogContent>
-          </AlertDialog>
-        </div>
-      }
-    >
-      <div className="chat-interface flex flex-col h-full">
-        <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
-          <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
-          
-          <div className="flex items-center gap-2">
-            {currentThreadId && (
-              <TooltipProvider>
-                <Tooltip>
-                  <TooltipTrigger asChild>
-                    <Button 
-                      variant="ghost" 
-                      size="icon" 
-                      className={`h-9 w-9 ${
-                        isDeletionDisabled 
-                          ? 'text-muted-foreground/50 cursor-not-allowed' 
-                          : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20'
-                      }`}
-                      onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
-                      disabled={isDeletionDisabled}
-                      aria-label="Delete conversation"
-                    >
-                      <Trash className="h-5 w-5" />
-                    </Button>
-                  </TooltipTrigger>
-                  <TooltipContent>
-                    {isDeletionDisabled ? (
-                      <TranslatableText text="Cannot delete while processing" />
-                    ) : (
-                      <TranslatableText text="Delete conversation" />
-                    )}
-                  </TooltipContent>
-                </Tooltip>
-              </TooltipProvider>
-            )}
-          </div>
-        </div>
+    <div className="chat-interface flex flex-col h-full">
+      <div className="chat-header flex items-center justify-between py-3 px-4 border-b">
+        <h2 className="text-xl font-semibold"><TranslatableText text="Rūḥ" /></h2>
         
-        <div className="chat-content flex-1 overflow-hidden">
-          {initialLoading ? (
-            <div className="flex items-center justify-center h-full">
-              <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
-              <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
-            </div>
-          ) : chatHistory.length === 0 ? (
-            <EmptyChatState />
-          ) : (
-            <ChatArea 
-              chatMessages={chatHistory}
-              isLoading={isLoading || isProcessing}
-              processingStage={processingStage || undefined}
-              threadId={currentThreadId}
-              onInteractiveOptionClick={handleInteractiveOptionClick}
-            />
+        <div className="flex items-center gap-2">
+          {currentThreadId && (
+            <TooltipProvider>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <Button 
+                    variant="ghost" 
+                    size="icon" 
+                    className={`h-9 w-9 ${
+                      isDeletionDisabled 
+                        ? 'text-muted-foreground/50 cursor-not-allowed' 
+                        : 'text-muted-foreground hover:text-destructive hover:bg-destructive/10 dark:hover:bg-destructive/20'
+                    }`}
+                    onClick={() => !isDeletionDisabled && setShowDeleteDialog(true)}
+                    disabled={isDeletionDisabled}
+                    aria-label="Delete conversation"
+                  >
+                    <Trash className="h-5 w-5" />
+                  </Button>
+                </TooltipTrigger>
+                <TooltipContent>
+                  {isDeletionDisabled ? (
+                    <TranslatableText text="Cannot delete while processing" />
+                  ) : (
+                    <TranslatableText text="Delete conversation" />
+                  )}
+                </TooltipContent>
+              </Tooltip>
+            </TooltipProvider>
           )}
         </div>
-        
-        <div className="chat-input-container bg-white border-t p-4">
-          <div className="flex items-end gap-2">
-            <div className="flex-1">
-              <ChatInput 
-                onSendMessage={handleSendMessage} 
-                isLoading={isLoading || isProcessing} 
-                userId={user?.id}
-              />
-            </div>
-            <VoiceRecordingButton 
-              isLoading={isLoading || isProcessing}
-              isRecording={false}
-              recordingTime={0}
-              onStartRecording={() => {}}
-              onStopRecording={() => {}}
+      </div>
+      
+      <div className="chat-content flex-1 overflow-hidden">
+        {initialLoading ? (
+          <div className="flex items-center justify-center h-full">
+            <div className="animate-spin h-6 w-6 border-2 border-primary border-t-transparent rounded-full"></div>
+            <span className="ml-2 text-muted-foreground"><TranslatableText text="Loading conversation..." /></span>
+          </div>
+        ) : chatHistory.length === 0 ? (
+          <EmptyChatState />
+        ) : (
+          <ChatArea 
+            chatMessages={chatHistory}
+            isLoading={isLoading || isProcessing}
+            processingStage={processingStage || undefined}
+            threadId={currentThreadId}
+            onInteractiveOptionClick={handleInteractiveOptionClick}
+          />
+        )}
+      </div>
+      
+      <div className="chat-input-container bg-white border-t p-4">
+        <div className="flex items-end gap-2">
+          <div className="flex-1">
+            <ChatInput 
+              onSendMessage={handleSendMessage} 
+              isLoading={isLoading || isProcessing} 
+              userId={user?.id}
             />
           </div>
+          <VoiceRecordingButton 
+            isLoading={isLoading || isProcessing}
+            isRecording={false}
+            recordingTime={0}
+            onStartRecording={() => {}}
+            onStopRecording={() => {}}
+          />
         </div>
-        
-        <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
-          <AlertDialogContent>
-            <AlertDialogHeader>
-              <AlertDialogTitle><TranslatableText text="Delete this conversation?" /></AlertDialogTitle>
-              <AlertDialogDescription>
-                <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
-              </AlertDialogDescription>
-            </AlertDialogHeader>
-            <AlertDialogFooter>
-              <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
-              <AlertDialogAction 
-                onClick={handleDeleteCurrentThread}
-                className="bg-red-500 hover:bg-red-600 text-white"
-              >
-                <TranslatableText text="Delete" />
-              </AlertDialogAction>
-            </AlertDialogFooter>
-          </AlertDialogContent>
-        </AlertDialog>
       </div>
-    </PremiumFeatureGate>
+      
+      <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
+        <AlertDialogContent>
+          <AlertDialogHeader>
+            <AlertDialogTitle><TranslatableText text="Delete this conversation?" /></AlertDialogTitle>
+            <AlertDialogDescription>
+              <TranslatableText text="This will permanently delete this conversation and all its messages. This action cannot be undone." />
+            </AlertDialogDescription>
+          </AlertDialogHeader>
+          <AlertDialogFooter>
+            <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
+            <AlertDialogAction 
+              onClick={handleDeleteCurrentThread}
+              className="bg-red-500 hover:bg-red-600 text-white"
+            >
+              <TranslatableText text="Delete" />
+            </AlertDialogAction>
+          </AlertDialogFooter>
+        </AlertDialogContent>
+      </AlertDialog>
+    </div>
   );
 };
 
