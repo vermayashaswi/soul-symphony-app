@@ -11,6 +11,7 @@ import { ChatMessage } from '@/types/chat';
 import { debugTimezoneInfo, getCurrentWeekDates } from '@/utils/chat/dateUtils';
 import { format } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
+import { PremiumGuard } from '@/components/premium/PremiumGuard';
 
 const Chat = () => {
   const { user } = useAuth();
@@ -341,9 +342,14 @@ const Chat = () => {
   }, []);
 
   return (
-    <div className="w-full h-full flex flex-col">
-      <SmartChatInterface />
-    </div>
+    <PremiumGuard 
+      feature="Chat with Rūḥ" 
+      description="Unlimited conversations with your AI companion require a premium subscription."
+    >
+      <div className="w-full h-full flex flex-col">
+        <SmartChatInterface />
+      </div>
+    </PremiumGuard>
   );
 };
 

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { Link, useLocation } from 'react-router-dom';
 import { Menu, X } from 'lucide-react';
@@ -7,6 +6,7 @@ import SouloLogo from '@/components/SouloLogo';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { LanguageSelector } from '@/components/translation/LanguageSelector';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { PremiumBadge } from '@/components/premium/PremiumBadge';
 
 const Navbar = () => {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
@@ -44,6 +44,14 @@ const Navbar = () => {
           <Link to="/faq" className="text-gray-600 hover:text-primary text-sm">
             <TranslatableText text="FAQ" />
           </Link>
+          <Link to="/chat" className="text-gray-600 hover:text-primary text-sm flex items-center gap-1">
+            <TranslatableText text="Chat" />
+            <PremiumBadge variant="premium" size="sm" showIcon={false} className="scale-75" />
+          </Link>
+          <Link to="/insights" className="text-gray-600 hover:text-primary text-sm flex items-center gap-1">
+            <TranslatableText text="Insights" />
+            <PremiumBadge variant="premium" size="sm" showIcon={false} className="scale-75" />
+          </Link>
           <Button size="sm" asChild>
             <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
               <TranslatableText text="Download on App Store" />
@@ -72,6 +80,14 @@ const Navbar = () => {
             </Link>
             <Link to="/faq" className="text-gray-600 hover:text-primary" onClick={toggleMenu}>
               <TranslatableText text="FAQ" />
+            </Link>
+            <Link to="/chat" className="text-gray-600 hover:text-primary flex items-center gap-1" onClick={toggleMenu}>
+              <TranslatableText text="Chat" />
+              <PremiumBadge variant="premium" size="sm" showIcon={false} className="scale-75" />
+            </Link>
+            <Link to="/insights" className="text-gray-600 hover:text-primary flex items-center gap-1" onClick={toggleMenu}>
+              <TranslatableText text="Insights" />
+              <PremiumBadge variant="premium" size="sm" showIcon={false} className="scale-75" />
             </Link>
             <Button size="sm" className="w-full" asChild>
               <a href="https://apps.apple.com/app/soulo" target="_blank" rel="noopener noreferrer">
