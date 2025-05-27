@@ -15,6 +15,7 @@ import { supabase } from '@/integrations/supabase/client';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { JournalEntry } from '@/types/journal';
 import JournalSearch from '@/components/journal/JournalSearch';
+import { setProcessingIntent } from '@/utils/journal/processing-intent';
 
 const logInfo = (message: string, source: string) => {
   console.log(`[${source}] ${message}`);
@@ -471,6 +472,10 @@ const Journal = () => {
     }
     
     try {
+      // CRITICAL: Set processing intent IMMEDIATELY before any async operations
+      console.log('[Journal] Setting processing intent immediately');
+      setProcessingIntent(true);
+      
       await new Promise<void>((resolve) => {
         clearAllToasts();
         setTimeout(() => {
@@ -487,6 +492,15 @@ const Journal = () => {
       setSafeToSwitchTab(false);
       setEntriesReady(false);
       
+      // Dispatch immediate processing events for instant UI feedback
+      window.dispatchEvent(new CustomEvent('immediateProcessingStarted', {
+        detail: { 
+          tempId: 'immediate-processing',
+          timestamp: Date.now(),
+          immediate: true 
+        }
+      }));
+      
       setTimeout(() => {
         setActiveTab('entries');
       }, 50);
@@ -498,6 +512,9 @@ const Journal = () => {
         console.log('[Journal] Processing started with tempId:', tempId);
         setProcessingEntries(prev => [...prev, tempId]);
         setLastAction(`Processing Started (${tempId})`);
+        
+        // Clear processing intent as real processing has started
+        setProcessingIntent(false);
         
         // Create a temporary processing entry to be displayed while the real one is being processed
         const tempEntry: JournalEntry = {
@@ -562,6 +579,9 @@ const Journal = () => {
         setProcessingError(error || 'Unknown error occurred');
         setLastAction(`Processing Failed: ${error || 'Unknown'}`);
         
+        // Clear processing intent on failure
+        setProcessingIntent(false);
+        
         await new Promise(resolve => setTimeout(resolve, 150));
         
         toast.error(`Failed to process recording: ${error || 'Unknown error'}`, { 
@@ -581,6 +601,9 @@ const Journal = () => {
       console.error('Error processing recording:', error);
       setProcessingError(error?.message || 'Unknown error occurred');
       setLastAction(`Exception: ${error?.message || 'Unknown'}`);
+      
+      // Clear processing intent on exception
+      setProcessingIntent(false);
       
       clearAllToasts();
       
@@ -983,6 +1006,7 @@ const Journal = () => {
                     processedEntryIds={processedEntryIds}
                     onStartRecording={handleStartRecording}
                     onDeleteEntry={handleDeleteEntry}
+                    isSavingRecording={isSavingRecording}
                   />
                 </JournalErrorBoundary>
               </TabsContent>
