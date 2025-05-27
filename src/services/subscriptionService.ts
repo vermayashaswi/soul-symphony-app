@@ -1,4 +1,5 @@
 
+
 import { Purchases, Offering, Package, CustomerInfo, EntitlementInfo } from '@revenuecat/purchases-js';
 import { supabase } from '@/integrations/supabase/client';
 
@@ -12,6 +13,7 @@ export interface SubscriptionStatus {
 
 class SubscriptionService {
   private initialized = false;
+  private purchasesInstance: any = null;
 
   async initialize(userId: string): Promise<void> {
     if (this.initialized) return;
@@ -21,11 +23,7 @@ class SubscriptionService {
       // You'll need to add this as a secret in Supabase
       const publicKey = 'your_revenuecat_public_key'; // This will be configured via secrets
       
-      await Purchases.configure({
-        apiKey: publicKey,
-        appUserId: userId
-      });
-
+      this.purchasesInstance = await Purchases.configure(publicKey, userId);
       this.initialized = true;
       console.log('RevenueCat initialized successfully');
     } catch (error) {
@@ -36,7 +34,10 @@ class SubscriptionService {
 
   async getOfferings(): Promise<Offering[]> {
     try {
-      const offerings = await Purchases.getOfferings();
+      if (!this.purchasesInstance) {
+        throw new Error('RevenueCat not initialized');
+      }
+      const offerings = await this.purchasesInstance.getOfferings();
       return Object.values(offerings.all);
     } catch (error) {
       console.error('Failed to get offerings:', error);
@@ -46,7 +47,10 @@ class SubscriptionService {
 
   async getCustomerInfo(): Promise<CustomerInfo | null> {
     try {
-      return await Purchases.getCustomerInfo();
+      if (!this.purchasesInstance) {
+        throw new Error('RevenueCat not initialized');
+      }
+      return await this.purchasesInstance.getCustomerInfo();
     } catch (error) {
       console.error('Failed to get customer info:', error);
       return null;
@@ -55,7 +59,10 @@ class SubscriptionService {
 
   async purchasePackage(packageToPurchase: Package): Promise<CustomerInfo> {
     try {
-      const purchaseResult = await Purchases.purchasePackage(packageToPurchase);
+      if (!this.purchasesInstance) {
+        throw new Error('RevenueCat not initialized');
+      }
+      const purchaseResult = await this.purchasesInstance.purchasePackage(packageToPurchase);
       
       // Sync with our database
       await this.syncSubscriptionStatus(purchaseResult.customerInfo);
@@ -69,7 +76,10 @@ class SubscriptionService {
 
   async restorePurchases(): Promise<CustomerInfo> {
     try {
-      const customerInfo = await Purchases.restorePurchases();
+      if (!this.purchasesInstance) {
+        throw new Error('RevenueCat not initialized');
+      }
+      const customerInfo = await this.purchasesInstance.restorePurchases();
       await this.syncSubscriptionStatus(customerInfo);
       return customerInfo;
     } catch (error) {
@@ -213,3 +223,4 @@ class SubscriptionService {
 }
 
 export const subscriptionService = new SubscriptionService();
+
