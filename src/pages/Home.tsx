@@ -3,25 +3,21 @@ import React from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
-import { Badge } from '@/components/ui/badge';
 import { 
   BookOpen, 
   MessageSquare, 
-  LineChart, 
-  Crown
+  LineChart
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { useSubscription } from '@/hooks/use-subscription';
 
 const Home = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { entries, loading } = useJournalEntries();
-  const { subscriptionStatus } = useSubscription();
 
   const recentEntries = entries?.slice(0, 3) || [];
   const totalEntries = entries?.length || 0;
@@ -35,18 +31,10 @@ const Home = () => {
           animate={{ opacity: 1, y: 0 }}
           className="text-center space-y-4"
         >
-          <div className="flex items-center justify-center space-x-4">
-            <h1 className="text-3xl font-bold">
-              <TranslatableText text="Welcome back" />
-              {user?.user_metadata?.name && `, ${user.user_metadata.name}`}
-            </h1>
-            {(subscriptionStatus.isActive || subscriptionStatus.isInTrial) && (
-              <Badge className="bg-gradient-to-r from-purple-600 to-blue-600">
-                <Crown className="h-3 w-3 mr-1" />
-                {subscriptionStatus.isInTrial ? "Trial" : "Premium"}
-              </Badge>
-            )}
-          </div>
+          <h1 className="text-3xl font-bold">
+            <TranslatableText text="Welcome back" />
+            {user?.user_metadata?.name && `, ${user.user_metadata.name}`}
+          </h1>
         </motion.div>
 
         {/* Quick Actions */}

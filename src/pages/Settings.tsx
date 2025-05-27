@@ -8,32 +8,27 @@ import { Label } from '@/components/ui/label';
 import { Switch } from '@/components/ui/switch';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Separator } from '@/components/ui/separator';
-import { Badge } from '@/components/ui/badge';
 import { 
   User, 
   Bell, 
-  Palette, 
-  Globe, 
-  Crown,
   Shield,
   Download,
   Trash2,
   Save,
-  Loader2
+  Loader2,
+  Crown
 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useToast } from '@/hooks/use-toast';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { SubscriptionSettings } from '@/components/subscription/SubscriptionSettings';
-import { useSubscription } from '@/hooks/use-subscription';
 import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import LanguageSelector from '@/components/LanguageSelector';
+import { SubscriptionPaywall } from '@/components/subscription/SubscriptionPaywall';
 
 export default function Settings() {
   const { user, signOut } = useAuth();
   const { displayName, timezone, updateDisplayName, updateTimezone } = useUserProfile();
-  const { subscriptionStatus } = useSubscription();
   const { toast } = useToast();
   
   const [formData, setFormData] = useState({
@@ -44,6 +39,7 @@ export default function Settings() {
     dataExport: false
   });
   const [saving, setSaving] = useState(false);
+  const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
 
   useEffect(() => {
     if (displayName || timezone) {
@@ -99,22 +95,24 @@ export default function Settings() {
     }
   };
 
+  if (showSubscriptionModal) {
+    return (
+      <SubscriptionPaywall
+        onSuccess={() => setShowSubscriptionModal(false)}
+        onClose={() => setShowSubscriptionModal(false)}
+        showTrialOption={true}
+      />
+    );
+  }
+
   return (
     <div className="min-h-screen pb-20 p-4">
       <div className="max-w-4xl mx-auto">
         {/* Header */}
         <div className="mb-8">
-          <div className="flex items-center justify-between mb-4">
-            <h1 className="text-3xl font-bold">
-              <TranslatableText text="Settings" />
-            </h1>
-            {(subscriptionStatus.isActive || subscriptionStatus.isInTrial) && (
-              <Badge className="bg-gradient-to-r from-purple-600 to-blue-600">
-                <Crown className="h-3 w-3 mr-1" />
-                {subscriptionStatus.isInTrial ? "Trial" : "Premium"}
-              </Badge>
-            )}
-          </div>
+          <h1 className="text-3xl font-bold mb-4">
+            <TranslatableText text="Settings" />
+          </h1>
           <p className="text-muted-foreground">
             <TranslatableText text="Manage your account preferences and subscription" />
           </p>
@@ -250,7 +248,26 @@ export default function Settings() {
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
             >
-              <SubscriptionSettings />
+              <Card>
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Crown className="h-5 w-5 text-yellow-500" />
+                    <TranslatableText text="Premium Subscription" />
+                  </CardTitle>
+                  <CardDescription>
+                    <TranslatableText text="Manage your subscription and unlock premium features" />
+                  </CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <Button 
+                    onClick={() => setShowSubscriptionModal(true)}
+                    className="w-full bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700"
+                  >
+                    <Crown className="h-4 w-4 mr-2" />
+                    <TranslatableText text="Manage Subscription" />
+                  </Button>
+                </CardContent>
+              </Card>
             </motion.div>
           </TabsContent>
 
