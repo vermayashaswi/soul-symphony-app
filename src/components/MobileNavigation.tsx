@@ -3,7 +3,7 @@ import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { Home, BookOpen, BarChart3, MessageCircle, Settings, Crown } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { useUserProfile } from '@/hooks/useUserProfile';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 
 interface NavigationItem {
   icon: React.ElementType;
@@ -23,14 +23,7 @@ const navigationItems: NavigationItem[] = [
 const MobileNavigation: React.FC = () => {
   const location = useLocation();
   const navigate = useNavigate();
-  const { profile } = useUserProfile();
-
-  const isPremium = profile?.is_premium || false;
-  const subscriptionStatus = profile?.subscription_status || 'free';
-  const trialEndsAt = profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null;
-  const isTrialExpired = trialEndsAt ? new Date() > trialEndsAt : false;
-  const isTrialActive = subscriptionStatus === 'trial' && !isTrialExpired;
-  const hasAccess = isPremium && (subscriptionStatus === 'active' || isTrialActive);
+  const { hasAccess } = useSubscriptionStatus();
 
   const handleNavigation = (path: string, requiresPremium?: boolean) => {
     if (requiresPremium && !hasAccess) {

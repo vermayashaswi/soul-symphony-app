@@ -1,9 +1,9 @@
 
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
-import { useUserProfile } from '@/hooks/useUserProfile';
 import { useJournalEntries } from '@/hooks/useJournalEntries';
 import { useMobile } from '@/hooks/use-mobile';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import JournalContent from '@/components/home/JournalContent';
 import JournalHeader from '@/components/home/JournalHeader';
@@ -15,23 +15,14 @@ import { Crown } from 'lucide-react';
 
 const Home = () => {
   const { user } = useAuth();
-  const { profile } = useUserProfile();
   const { isMobile } = useMobile();
   const { data: journalEntries, isLoading } = useJournalEntries();
-
-  // Check subscription status
-  const subscriptionStatus = profile?.subscription_status || 'free';
-  const trialEndsAt = profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null;
-  const isTrialExpired = trialEndsAt ? new Date() > trialEndsAt : false;
-  const isTrialActive = subscriptionStatus === 'trial' && !isTrialExpired;
-  const isPremium = profile?.is_premium && (subscriptionStatus === 'active' || isTrialActive);
-
-  const daysRemainingInTrial = trialEndsAt && isTrialActive 
-    ? Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
-    : 0;
-
-  // Show subscription manager if user needs to upgrade
-  const shouldShowSubscriptionManager = !isPremium || (isTrialActive && daysRemainingInTrial <= 3);
+  
+  const {
+    isTrialActive,
+    daysRemainingInTrial,
+    shouldShowSubscriptionManager
+  } = useSubscriptionStatus();
 
   if (!user) {
     return (

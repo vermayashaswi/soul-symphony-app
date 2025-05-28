@@ -1,13 +1,13 @@
 
 import React from 'react';
-import { useSubscriptionProtection } from '@/hooks/useSubscriptionProtection';
+import { useSubscriptionStatus } from '@/hooks/useSubscriptionStatus';
 import Chat from './Chat';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Lock } from 'lucide-react';
 
 const ProtectedChat: React.FC = () => {
-  const { hasAccess, isTrialActive, daysRemainingInTrial } = useSubscriptionProtection(true);
+  const { hasAccess, isTrialActive, daysRemainingInTrial } = useSubscriptionStatus();
 
   if (!hasAccess) {
     return (
