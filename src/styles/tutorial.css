@@ -59,6 +59,13 @@ body.tutorial-active {
   background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 1 */
 }
 
+/* Step 2: Position at the very top to ensure arrow button visibility */
+.tutorial-step-container[data-step="2"] {
+  top: 10% !important; /* Move to very top */
+  left: 50% !important;
+  transform: translate(-50%, 0) !important; /* Don't center vertically */
+}
+
 /* Step 5: Fully opaque background for step 5 */
 .tutorial-step-container[data-step="5"] {
   background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 5 */
@@ -87,10 +94,15 @@ body.tutorial-active {
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
 }
 
-/* Steps 2-4: Semi-transparent with blur */
-.tutorial-step-container:not([data-step="1"]):not([data-step="5"]):not([data-step="6"]):not([data-step="7"]):not([data-step="8"]):not([data-step="9"]) {
+/* Steps 2-4: Semi-transparent with blur (except step 2 which should be fully opaque for visibility) */
+.tutorial-step-container:not([data-step="1"]):not([data-step="2"]):not([data-step="5"]):not([data-step="6"]):not([data-step="7"]):not([data-step="8"]):not([data-step="9"]) {
   background-color: rgba(26, 31, 44, 0.2) !important;
   backdrop-filter: blur(2px) !important;
+}
+
+/* Step 2: Make it fully opaque for better visibility */
+.tutorial-step-container[data-step="2"] {
+  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 2 */
 }
 
 /* Step 1: Journal header styling */
@@ -414,6 +426,12 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
     margin-bottom: 0.75rem !important;
   }
   
+  /* Special positioning for step 2 on mobile - keep at top */
+  .tutorial-step-container[data-step="2"] {
+    top: 10% !important; /* Keep at top on mobile */
+    transform: translate(-50%, 0) !important; /* Don't center vertically */
+  }
+  
   /* Special width override for infographic-containing steps on mobile */
   .tutorial-step-container[data-step="6"],
   .tutorial-step-container[data-step="7"],
@@ -459,6 +477,11 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
   .tutorial-step-container button {
     padding: 4px 8px !important;
     font-size: 0.8rem !important;
+  }
+  
+  /* Special override for step 2 on small mobile - keep at top */
+  .tutorial-step-container[data-step="2"] {
+    top: 10% !important; /* Keep at top on small mobile */
   }
   
   /* Special override for step 5 on small mobile */

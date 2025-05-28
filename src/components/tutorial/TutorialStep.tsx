@@ -134,12 +134,12 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   
   // Improved modal positioning based on step ID - use fixed positioning for consistency
   const getPositionStyle = () => {
-    // Special positioning for step 2 to move it slightly higher so it doesn't cover the arrow
+    // Special positioning for step 2 to move it to the very top so arrow button is visible
     if (step.id === 2) {
       return {
-        top: '35%',  // Moved higher (from 50% to 35%)
+        top: '10%',  // Moved to very top (from 35% to 10%)
         left: '50%',
-        transform: 'translate(-50%, -50%)',
+        transform: 'translate(-50%, 0)', // Changed from -50% for y to avoid centering
         position: 'fixed' as const
       };
     }
