@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
 import { useMobile } from '@/hooks/use-mobile';
 import MobileNavigation from '@/components/MobileNavigation';
 
@@ -9,9 +9,9 @@ interface ViewportManagerProps {
 
 const ViewportManager: React.FC<ViewportManagerProps> = ({ children }) => {
   const { isMobile } = useMobile();
-  const [mounted, setMounted] = useState(false);
+  const [mounted, setMounted] = React.useState(false);
 
-  useEffect(() => {
+  React.useEffect(() => {
     setMounted(true);
   }, []);
 
