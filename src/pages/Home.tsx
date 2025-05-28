@@ -2,7 +2,7 @@
 import React from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useUserProfile } from '@/hooks/useUserProfile';
-import { useJournalEntries } from '@/hooks/use-journal-entries';
+import { useJournalEntries } from '@/hooks/useJournalEntries';
 import { useMobile } from '@/hooks/use-mobile';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import JournalContent from '@/components/home/JournalContent';
@@ -17,7 +17,7 @@ const Home = () => {
   const { user } = useAuth();
   const { profile } = useUserProfile();
   const { isMobile } = useMobile();
-  const { data: journalEntries = [], isLoading } = useJournalEntries();
+  const { data: journalEntries, isLoading } = useJournalEntries();
 
   // Check subscription status
   const subscriptionStatus = profile?.subscription_status || 'free';
@@ -76,7 +76,7 @@ const Home = () => {
         <JournalSummaryCard />
 
         {/* Entity Bubbles - show for all users */}
-        <EntityBubbles />
+        <EntityBubbles entities={[]} />
 
         {/* Journal Content */}
         <JournalContent 

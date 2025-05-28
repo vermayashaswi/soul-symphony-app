@@ -6,15 +6,22 @@ import { supabase } from '@/integrations/supabase/client';
 export interface UserProfileData {
   displayName: string | null;
   timezone: string | null;
+  is_premium?: boolean | null;
+  subscription_status?: string | null;
+  trial_ends_at?: string | null;
 }
 
 export const useUserProfile = (): UserProfileData & { 
   updateDisplayName: (name: string) => Promise<void>,
-  updateTimezone: (timezone: string) => Promise<void>
+  updateTimezone: (timezone: string) => Promise<void>,
+  profile: UserProfileData | null
 } => {
   const { user } = useAuth();
   const [displayName, setDisplayName] = useState<string | null>(null);
   const [timezone, setTimezone] = useState<string | null>(null);
+  const [isPremium, setIsPremium] = useState<boolean | null>(null);
+  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
+  const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -25,7 +32,7 @@ export const useUserProfile = (): UserProfileData & {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, full_name, timezone')
+          .select('display_name, full_name, timezone, is_premium, subscription_status, trial_ends_at')
           .eq('id', user.id)
           .single();
 
@@ -54,6 +61,13 @@ export const useUserProfile = (): UserProfileData & {
             await updateTimezone(browserTimezone);
             setTimezone(browserTimezone);
           }
+        }
+
+        // Set subscription data
+        if (data) {
+          setIsPremium(data.is_premium);
+          setSubscriptionStatus(data.subscription_status);
+          setTrialEndsAt(data.trial_ends_at);
         }
       } catch (error) {
         console.error('Error in profile fetching', error);
@@ -116,5 +130,22 @@ export const useUserProfile = (): UserProfileData & {
     }
   };
 
-  return { displayName, timezone, updateDisplayName, updateTimezone };
+  const profile: UserProfileData = {
+    displayName,
+    timezone,
+    is_premium: isPremium,
+    subscription_status: subscriptionStatus,
+    trial_ends_at: trialEndsAt
+  };
+
+  return { 
+    displayName, 
+    timezone, 
+    is_premium: isPremium,
+    subscription_status: subscriptionStatus,
+    trial_ends_at: trialEndsAt,
+    updateDisplayName, 
+    updateTimezone,
+    profile
+  };
 };

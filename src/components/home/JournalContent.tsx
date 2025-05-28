@@ -4,7 +4,13 @@ import { motion } from 'framer-motion';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 
-const JournalContent: React.FC = () => {
+interface JournalContentProps {
+  entries?: any[];
+  isLoading?: boolean;
+  isMobile?: boolean;
+}
+
+const JournalContent: React.FC<JournalContentProps> = ({ entries, isLoading, isMobile }) => {
   const containerVariants = {
     hidden: { opacity: 0 },
     show: {
