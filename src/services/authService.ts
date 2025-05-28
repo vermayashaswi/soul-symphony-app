@@ -19,8 +19,8 @@ export const getRedirectUrl = (): string => {
     return standaloneCheck || iosSafariStandalone;
   };
   
-  // All auth redirects should go to /app/auth
-  return `${window.location.origin}/app/auth`;
+  // Redirect directly to /app/home after successful authentication
+  return `${window.location.origin}/app/home`;
 };
 
 /**
@@ -170,9 +170,9 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
       // Clear any auth-related items from local storage
       localStorage.removeItem('authRedirectTo');
       
-      // Redirect to onboarding page if navigate function is provided
+      // Redirect to auth page if navigate function is provided
       if (navigate) {
-        navigate('/app/onboarding');
+        navigate('/app/auth');
       }
       return;
     }
@@ -186,16 +186,16 @@ export const signOut = async (navigate?: (path: string) => void): Promise<void> 
     // Clear any auth-related items from local storage
     localStorage.removeItem('authRedirectTo');
     
-    // Always redirect to onboarding page if navigate function is provided
+    // Always redirect to auth page if navigate function is provided
     if (navigate) {
-      navigate('/app/onboarding');
+      navigate('/app/auth');
     }
   } catch (error: any) {
     console.error('Error signing out:', error.message);
     
-    // Still navigate to onboarding page even if there's an error
+    // Still navigate to auth page even if there's an error
     if (navigate) {
-      navigate('/app/onboarding');
+      navigate('/app/auth');
     }
     localStorage.removeItem('authRedirectTo');
     

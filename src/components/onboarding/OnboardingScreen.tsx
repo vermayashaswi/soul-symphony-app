@@ -767,7 +767,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
-  const { user } = useAuth();
   
   // Define isNameStep before it's used in useSwipeGesture
   const isFirstStep = currentStep === 0;
@@ -797,14 +796,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       if (onComplete) {
         onComplete();
       } else {
-        // Navigate based on auth status
-        if (user) {
-          console.log("User is authenticated, navigating to /app/home");
-          navigate("/app/home", { replace: true });
-        } else {
-          console.log("User is not authenticated, navigating to /app/auth");
-          navigate("/app/auth", { replace: true });
-        }
+        // Always navigate to auth page for sign in
+        console.log("Onboarding complete, navigating to /app/auth for sign in");
+        navigate("/app/auth", { replace: true });
       }
     }
   };
@@ -816,7 +810,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   };
   
   const handleSkip = () => {
-    console.log("Skip button clicked, user auth status:", !!user);
+    console.log("Skip button clicked, redirecting to auth");
     
     if (name) {
       localStorage.setItem("user_display_name", name.trim());
@@ -827,14 +821,9 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     if (onComplete) {
       onComplete();
     } else {
-      // Navigate based on auth status
-      if (user) {
-        console.log("User is authenticated, navigating to /app/home");
-        navigate("/app/home", { replace: true });
-      } else {
-        console.log("User is not authenticated, navigating to /app/auth");
-        navigate("/app/auth", { replace: true });
-      }
+      // Always navigate to auth page regardless of authentication status
+      console.log("Skipping onboarding, navigating to /app/auth");
+      navigate("/app/auth", { replace: true });
     }
   };
 

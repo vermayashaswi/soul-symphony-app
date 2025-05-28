@@ -24,7 +24,7 @@ export default function Auth() {
   const fromLocation = location.state?.from?.pathname;
   const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  // Get valid redirect path with priority
+  // Get valid redirect path with priority - default to home if onboarding is complete
   const getValidRedirectPath = (path: string | null) => {
     if (!path) {
       return onboardingComplete ? '/app/home' : '/app/onboarding';
@@ -57,7 +57,7 @@ export default function Auth() {
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
-      console.log('User is logged in, redirecting to:', redirectTo);
+      console.log('User is logged in, redirecting...');
       setRedirecting(true);
       
       // Clean up stored redirect
@@ -66,17 +66,18 @@ export default function Auth() {
       // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
         // If onboarding is not complete, redirect to onboarding
-        if (!onboardingComplete && !redirectTo.includes('onboarding')) {
+        if (!onboardingComplete) {
           console.log('Redirecting to onboarding as it is not complete');
           navigate('/app/onboarding', { replace: true });
         } else {
-          navigate(redirectTo, { replace: true });
+          console.log('Redirecting to home as onboarding is complete');
+          navigate('/app/home', { replace: true });
         }
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
+  }, [user, authLoading, navigate, redirecting, onboardingComplete]);
 
   const handleSignIn = async () => {
     try {
@@ -103,16 +104,13 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect to target page
+  // If already logged in, redirect to appropriate page
   if (user) {
-    // If onboarding is not complete, redirect to onboarding instead
-    const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
-      ? '/app/onboarding'
-      : redirectTo;
+    const finalRedirect = !onboardingComplete ? '/app/onboarding' : '/app/home';
       
     console.log('User already logged in, redirecting to:', finalRedirect, {
       onboardingComplete,
-      originalRedirect: redirectTo
+      user: !!user
     });
     return <Navigate to={finalRedirect} replace />;
   }
