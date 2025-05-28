@@ -13,6 +13,8 @@ import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useAuth } from "@/contexts/AuthContext";
+import { useRevenueCat } from "@/hooks/useRevenueCat";
+import PremiumFeaturesStep from "./PremiumFeaturesStep";
 import { 
   Select,
   SelectContent,
@@ -98,6 +100,7 @@ interface StepIllustration {
   description: string;
   illustration: React.FC<any>;
   buttonText: string;
+  isPremiumStep?: boolean;
 }
 
 const ONBOARDING_STEPS: StepIllustration[] = [
@@ -614,6 +617,19 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     buttonText: "Continue"
   },
   {
+    title: "Unlock Premium Features",
+    subtitle: "",
+    description: "",
+    illustration: (props: { onStartTrial: () => void; isLoading: boolean }) => (
+      <PremiumFeaturesStep 
+        onStartTrial={props.onStartTrial}
+        isLoading={props.isLoading}
+      />
+    ),
+    buttonText: "Start Free Trial",
+    isPremiumStep: true
+  },
+  {
     title: "Ready to Start Your Journey?",
     subtitle: "",
     description: "",
@@ -768,20 +784,40 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
+  const { purchaseProduct, isLoading: revenueCatLoading } = useRevenueCat();
   
-  // Define isNameStep before it's used in useSwipeGesture
+  // Define step checks
   const isFirstStep = currentStep === 0;
   const isNameStep = currentStep === 6;
+  const isPremiumStep = currentStep === 7;
   const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
   
   useEffect(() => {
     setColorTheme('Calm');
   }, [setColorTheme]);
   
+  const handleStartTrial = async () => {
+    try {
+      const success = await purchaseProduct('soulo_premium_monthly');
+      if (success) {
+        // Continue to next step after successful trial start
+        setCurrentStep(prev => prev + 1);
+      }
+    } catch (error) {
+      console.error('Failed to start trial:', error);
+      toast.error("Failed to start trial. Please try again.");
+    }
+  };
+  
   const handleNext = () => {
     if (currentStep < ONBOARDING_STEPS.length - 1) {
       if (currentStep === 6 && !name.trim()) {
         toast.error("Please enter your name to continue");
+        return;
+      }
+      
+      // For premium step, the trial start is handled by the CTA button
+      if (isPremiumStep) {
         return;
       }
       
@@ -902,6 +938,16 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                   )}
                   <CurrentIllustration name={name} setName={setName} />
                 </>
+              ) : isPremiumStep ? (
+                <>
+                  <h2 className="text-2xl font-bold mb-2 text-theme">
+                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                  </h2>
+                  <CurrentIllustration 
+                    onStartTrial={handleStartTrial}
+                    isLoading={revenueCatLoading}
+                  />
+                </>
               ) : (
                 <>
                   <h2 className="text-2xl font-bold mb-2 text-theme">
@@ -934,14 +980,28 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               <div className="w-10"></div>
             )}
             
-            <Button 
-              size="lg" 
-              onClick={handleNext} 
-              className="bg-theme hover:bg-theme-dark text-white"
-            >
-              <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
-              {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
-            </Button>
+            {isPremiumStep ? (
+              <Button 
+                size="lg" 
+                onClick={handleStartTrial}
+                disabled={revenueCatLoading}
+                className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
+              >
+                {revenueCatLoading ? (
+                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+                ) : null}
+                <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
+              </Button>
+            ) : (
+              <Button 
+                size="lg" 
+                onClick={handleNext} 
+                className="bg-theme hover:bg-theme-dark text-white"
+              >
+                <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
+                {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
+              </Button>
+            )}
           </div>
         </div>
       </div>
