@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User, Languages, Search, X } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -15,13 +15,7 @@ import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useAuth } from "@/contexts/AuthContext";
 import { useRevenueCat } from "@/hooks/useRevenueCat";
 import PremiumFeaturesStep from "./PremiumFeaturesStep";
-import { 
-  Select,
-  SelectContent,
-  SelectItem,
-  SelectTrigger,
-  SelectValue,
-} from "@/components/ui/select";
+import { OnboardingLanguageSelector } from "./OnboardingLanguageSelector";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -174,7 +168,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             <label className="text-sm font-medium text-foreground">
               <TranslatableText text="Preferred Language" forceTranslate={true} />
             </label>
-            <LanguageSelector />
+            <OnboardingLanguageSelector />
           </div>
         </motion.div>
       </div>
@@ -620,13 +614,14 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     title: "Unlock Premium Features",
     subtitle: "",
     description: "",
-    illustration: (props: { onStartTrial: () => void; isLoading: boolean }) => (
+    illustration: (props: { onStartTrial: () => void; onContinueFree: () => void; isLoading: boolean }) => (
       <PremiumFeaturesStep 
         onStartTrial={props.onStartTrial}
+        onContinueFree={props.onContinueFree}
         isLoading={props.isLoading}
       />
     ),
-    buttonText: "Start Free Trial",
+    buttonText: "",
     isPremiumStep: true
   },
   {
@@ -706,7 +701,7 @@ const NameInput: React.FC<{ name: string; setName: (name: string) => void }> = (
 };
 
 // Enhanced Language Selector component for onboarding - simplified without search
-const LanguageSelector = () => {
+const OnboardingLanguageSelector = () => {
   const { currentLanguage, setLanguage } = useTranslation();
 
   const handleLanguageChange = (value: string) => {
@@ -808,6 +803,11 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       toast.error("Failed to start trial. Please try again.");
     }
   };
+
+  const handleContinueFree = () => {
+    // Skip the premium trial and continue to next step
+    setCurrentStep(prev => prev + 1);
+  };
   
   const handleNext = () => {
     if (currentStep < ONBOARDING_STEPS.length - 1) {
@@ -816,7 +816,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
         return;
       }
       
-      // For premium step, the trial start is handled by the CTA button
+      // For premium step, navigation is handled by the buttons in the component
       if (isPremiumStep) {
         return;
       }
@@ -945,6 +945,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                   </h2>
                   <CurrentIllustration 
                     onStartTrial={handleStartTrial}
+                    onContinueFree={handleContinueFree}
                     isLoading={revenueCatLoading}
                   />
                 </>
@@ -981,17 +982,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
             )}
             
             {isPremiumStep ? (
-              <Button 
-                size="lg" 
-                onClick={handleStartTrial}
-                disabled={revenueCatLoading}
-                className="bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white"
-              >
-                {revenueCatLoading ? (
-                  <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
-                ) : null}
-                <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
-              </Button>
+              <div className="w-10"></div>
             ) : (
               <Button 
                 size="lg" 

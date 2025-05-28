@@ -2,17 +2,23 @@
 import React from 'react';
 import { motion } from 'framer-motion';
 import { Crown, Sparkles, MessageSquare, TrendingUp, Shield } from 'lucide-react';
+import { Button } from '@/components/ui/button';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { usePricing } from '@/contexts/PricingContext';
 
 interface PremiumFeaturesStepProps {
   onStartTrial: () => void;
+  onContinueFree: () => void;
   isLoading: boolean;
 }
 
 const PremiumFeaturesStep: React.FC<PremiumFeaturesStepProps> = ({ 
   onStartTrial, 
+  onContinueFree,
   isLoading 
 }) => {
+  const { pricing, formatPrice, isLoading: pricingLoading } = usePricing();
+
   const features = [
     {
       icon: MessageSquare,
@@ -88,7 +94,7 @@ const PremiumFeaturesStep: React.FC<PremiumFeaturesStepProps> = ({
 
         {/* Trial Offer */}
         <motion.div
-          className="text-center space-y-2"
+          className="text-center space-y-3 mb-6"
           initial={{ opacity: 0, y: 10 }}
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.8 }}
@@ -97,8 +103,43 @@ const PremiumFeaturesStep: React.FC<PremiumFeaturesStepProps> = ({
             <TranslatableText text="7 Days Free" forceTranslate={true} />
           </div>
           <div className="text-sm text-muted-foreground">
-            <TranslatableText text="Then $9.99/month • Cancel anytime" forceTranslate={true} />
+            {pricingLoading ? (
+              <div className="animate-pulse">Loading pricing...</div>
+            ) : (
+              <TranslatableText 
+                text={`Then ${formatPrice(pricing.monthly)}/month • Cancel anytime`} 
+                forceTranslate={true} 
+              />
+            )}
           </div>
+        </motion.div>
+
+        {/* Action Buttons */}
+        <motion.div
+          className="space-y-3"
+          initial={{ opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 1.0 }}
+        >
+          <Button 
+            onClick={onStartTrial}
+            disabled={isLoading || pricingLoading}
+            className="w-full bg-gradient-to-r from-yellow-500 to-orange-500 hover:from-yellow-600 hover:to-orange-600 text-white font-semibold"
+          >
+            {isLoading ? (
+              <div className="animate-spin w-4 h-4 border-2 border-white border-t-transparent rounded-full mr-2" />
+            ) : null}
+            <TranslatableText text="Start Free Trial" forceTranslate={true} />
+          </Button>
+          
+          <Button 
+            onClick={onContinueFree}
+            variant="outline"
+            disabled={isLoading}
+            className="w-full border-theme/40 text-theme hover:bg-theme/10"
+          >
+            <TranslatableText text="Continue Free" forceTranslate={true} />
+          </Button>
         </motion.div>
 
         {/* Floating particles */}
