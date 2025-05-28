@@ -136,7 +136,7 @@ const SubscriptionManager: React.FC<SubscriptionManagerProps> = ({ className = '
                 <div className="mt-2">
                   <span className="text-lg font-semibold">7 days free</span>
                   <span className="text-sm text-muted-foreground ml-2">
-                    then {products[0].price}/month
+                    then {products[0].priceString}/month
                   </span>
                 </div>
               </div>

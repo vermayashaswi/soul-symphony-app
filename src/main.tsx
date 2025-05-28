@@ -6,8 +6,6 @@ import './index.css'
 import './styles/mobile.css' // Import mobile-specific styles
 import './styles/tutorial.css' // Import tutorial-specific styles
 import { AuthProvider } from './contexts/AuthContext'
-import { SubscriptionProvider } from './contexts/SubscriptionContext'
-import { PricingProvider } from './contexts/PricingContext'
 import { ThemeProvider } from './hooks/use-theme'
 import { BrowserRouter } from 'react-router-dom'
 
@@ -68,11 +66,7 @@ ReactDOM.createRoot(document.getElementById('root')!).render(
     <BrowserRouter>
       <ThemeProvider>
         <AuthProvider>
-          <PricingProvider>
-            <SubscriptionProvider>
-              <App />
-            </SubscriptionProvider>
-          </PricingProvider>
+          <App />
         </AuthProvider>
       </ThemeProvider>
     </BrowserRouter>

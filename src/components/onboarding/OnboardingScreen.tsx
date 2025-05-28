@@ -3,7 +3,7 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
-import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User } from "lucide-react";
+import { ChevronLeft, ChevronRight, Mic, MessageSquare, Brain, LineChart, LockOpen, Lock, User, Languages, Search, X } from "lucide-react";
 import SouloLogo from "@/components/SouloLogo";
 import { cn } from "@/lib/utils";
 import { useTheme } from "@/hooks/use-theme";
@@ -13,9 +13,13 @@ import { useSwipeGesture } from "@/hooks/use-swipe-gesture";
 import { useTranslation } from "@/contexts/TranslationContext";
 import { TranslatableText } from "@/components/translation/TranslatableText";
 import { useAuth } from "@/contexts/AuthContext";
-import { useRevenueCat } from "@/hooks/useRevenueCat";
-import PremiumFeaturesStep from "./PremiumFeaturesStep";
-import { OnboardingLanguageSelector } from "./OnboardingLanguageSelector";
+import { 
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from "@/components/ui/select";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -94,7 +98,6 @@ interface StepIllustration {
   description: string;
   illustration: React.FC<any>;
   buttonText: string;
-  isPremiumStep?: boolean;
 }
 
 const ONBOARDING_STEPS: StepIllustration[] = [
@@ -168,7 +171,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
             <label className="text-sm font-medium text-foreground">
               <TranslatableText text="Preferred Language" forceTranslate={true} />
             </label>
-            <OnboardingLanguageSelector />
+            <LanguageSelector />
           </div>
         </motion.div>
       </div>
@@ -611,20 +614,6 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     buttonText: "Continue"
   },
   {
-    title: "Unlock Premium Features",
-    subtitle: "",
-    description: "",
-    illustration: (props: { onStartTrial: () => void; onContinueFree: () => void; isLoading: boolean }) => (
-      <PremiumFeaturesStep 
-        onStartTrial={props.onStartTrial}
-        onContinueFree={props.onContinueFree}
-        isLoading={props.isLoading}
-      />
-    ),
-    buttonText: "",
-    isPremiumStep: true
-  },
-  {
     title: "Ready to Start Your Journey?",
     subtitle: "",
     description: "",
@@ -700,6 +689,78 @@ const NameInput: React.FC<{ name: string; setName: (name: string) => void }> = (
   );
 };
 
+// Enhanced Language Selector component for onboarding - simplified without search
+const LanguageSelector = () => {
+  const { currentLanguage, setLanguage } = useTranslation();
+
+  const handleLanguageChange = (value: string) => {
+    setLanguage(value);
+    
+    // Store recently used language
+    try {
+      const recentLangs = localStorage.getItem('recentLanguages') || '[]';
+      const parsed = JSON.parse(recentLangs);
+      const updated = [
+        value,
+        ...parsed.filter((code: string) => code !== value)
+      ].slice(0, 3);
+      localStorage.setItem('recentLanguages', JSON.stringify(updated));
+    } catch (err) {
+      console.error('Failed to store recent language:', err);
+    }
+  };
+
+  // Group languages by region
+  const languagesByRegion = () => {
+    const regions = {};
+    
+    LANGUAGES.forEach(lang => {
+      if (!regions[lang.region]) {
+        regions[lang.region] = [];
+      }
+      regions[lang.region].push(lang);
+    });
+    
+    return regions;
+  };
+
+  const grouped = languagesByRegion();
+  const regions = Object.keys(grouped);
+
+  // Find the current language label
+  const currentLanguageLabel = LANGUAGES.find(lang => lang.code === currentLanguage)?.label || 'Select a language';
+
+  return (
+    <div className="w-full">
+      <Select value={currentLanguage} onValueChange={handleLanguageChange}>
+        <SelectTrigger className="w-full bg-background/80 border-theme/20 text-white">
+          <SelectValue placeholder="Select a language" className="text-white">
+            {currentLanguageLabel}
+          </SelectValue>
+        </SelectTrigger>
+        <SelectContent className="max-h-[300px] bg-background/90 border-theme/30">
+          {regions.map(region => (
+            <React.Fragment key={region}>
+              <SelectItem value={`group_${region}`} disabled className="font-semibold text-muted-foreground">
+                {region}
+              </SelectItem>
+              {grouped[region].map(language => (
+                <SelectItem 
+                  key={language.code} 
+                  value={language.code} 
+                  className="pl-6 hover:bg-theme/20 data-[state=checked]:bg-theme/40 data-[state=checked]:text-white"
+                >
+                  {language.label}
+                </SelectItem>
+              ))}
+            </React.Fragment>
+          ))}
+        </SelectContent>
+      </Select>
+    </div>
+  );
+};
+
 const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const [currentStep, setCurrentStep] = useState(0);
   const [name, setName] = useState('');
@@ -707,45 +768,20 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
   const { user } = useAuth();
-  const { purchaseProduct, isLoading: revenueCatLoading } = useRevenueCat();
   
-  // Define step checks
+  // Define isNameStep before it's used in useSwipeGesture
   const isFirstStep = currentStep === 0;
   const isNameStep = currentStep === 6;
-  const isPremiumStep = currentStep === 7;
   const isLastStep = currentStep === ONBOARDING_STEPS.length - 1;
   
   useEffect(() => {
     setColorTheme('Calm');
   }, [setColorTheme]);
   
-  const handleStartTrial = async () => {
-    try {
-      const success = await purchaseProduct('soulo_premium_monthly');
-      if (success) {
-        // Continue to next step after successful trial start
-        setCurrentStep(prev => prev + 1);
-      }
-    } catch (error) {
-      console.error('Failed to start trial:', error);
-      toast.error("Failed to start trial. Please try again.");
-    }
-  };
-
-  const handleContinueFree = () => {
-    // Skip the premium trial and continue to next step
-    setCurrentStep(prev => prev + 1);
-  };
-  
   const handleNext = () => {
     if (currentStep < ONBOARDING_STEPS.length - 1) {
       if (currentStep === 6 && !name.trim()) {
         toast.error("Please enter your name to continue");
-        return;
-      }
-      
-      // For premium step, navigation is handled by the buttons in the component
-      if (isPremiumStep) {
         return;
       }
       
@@ -866,17 +902,6 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                   )}
                   <CurrentIllustration name={name} setName={setName} />
                 </>
-              ) : isPremiumStep ? (
-                <>
-                  <h2 className="text-2xl font-bold mb-2 text-theme">
-                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
-                  </h2>
-                  <CurrentIllustration 
-                    onStartTrial={handleStartTrial}
-                    onContinueFree={handleContinueFree}
-                    isLoading={revenueCatLoading}
-                  />
-                </>
               ) : (
                 <>
                   <h2 className="text-2xl font-bold mb-2 text-theme">
@@ -909,18 +934,14 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
               <div className="w-10"></div>
             )}
             
-            {isPremiumStep ? (
-              <div className="w-10"></div>
-            ) : (
-              <Button 
-                size="lg" 
-                onClick={handleNext} 
-                className="bg-theme hover:bg-theme-dark text-white"
-              >
-                <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
-                {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
-              </Button>
-            )}
+            <Button 
+              size="lg" 
+              onClick={handleNext} 
+              className="bg-theme hover:bg-theme-dark text-white"
+            >
+              <TranslatableText text={currentStepData.buttonText} forceTranslate={true} />
+              {!isLastStep && <ChevronRight className="w-4 h-4 ml-2" />}
+            </Button>
           </div>
         </div>
       </div>
