@@ -9,6 +9,7 @@ export interface UserProfileData {
   is_premium?: boolean | null;
   subscription_status?: string | null;
   trial_ends_at?: string | null;
+  tutorial_completed?: string | null; // Add this property
 }
 
 export const useUserProfile = (): UserProfileData & { 
@@ -22,6 +23,7 @@ export const useUserProfile = (): UserProfileData & {
   const [isPremium, setIsPremium] = useState<boolean | null>(null);
   const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
   const [trialEndsAt, setTrialEndsAt] = useState<string | null>(null);
+  const [tutorialCompleted, setTutorialCompleted] = useState<string | null>(null); // Add this state
 
   useEffect(() => {
     const fetchUserProfile = async () => {
@@ -32,7 +34,7 @@ export const useUserProfile = (): UserProfileData & {
 
         const { data, error } = await supabase
           .from('profiles')
-          .select('display_name, full_name, timezone, is_premium, subscription_status, trial_ends_at')
+          .select('display_name, full_name, timezone, is_premium, subscription_status, trial_ends_at, tutorial_completed') // Add tutorial_completed to the select
           .eq('id', user.id)
           .single();
 
@@ -68,6 +70,7 @@ export const useUserProfile = (): UserProfileData & {
           setIsPremium(data.is_premium);
           setSubscriptionStatus(data.subscription_status);
           setTrialEndsAt(data.trial_ends_at);
+          setTutorialCompleted(data.tutorial_completed); // Set tutorial_completed state
         }
       } catch (error) {
         console.error('Error in profile fetching', error);
@@ -135,7 +138,8 @@ export const useUserProfile = (): UserProfileData & {
     timezone,
     is_premium: isPremium,
     subscription_status: subscriptionStatus,
-    trial_ends_at: trialEndsAt
+    trial_ends_at: trialEndsAt,
+    tutorial_completed: tutorialCompleted // Add this to the profile object
   };
 
   return { 
@@ -144,6 +148,7 @@ export const useUserProfile = (): UserProfileData & {
     is_premium: isPremium,
     subscription_status: subscriptionStatus,
     trial_ends_at: trialEndsAt,
+    tutorial_completed: tutorialCompleted, // Add this to the return object
     updateDisplayName, 
     updateTimezone,
     profile
