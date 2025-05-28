@@ -2,8 +2,8 @@
 import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User, Session } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
-import { ensureProfileExists } from '@/services/profileService';
-import { handleAuthCallback } from '@/services/authService';
+import { ensureProfileExists, updateUserProfile } from '@/services/profileService';
+import { handleAuthCallback, signInWithGoogle, signInWithEmail, signUp, resetPassword } from '@/services/authService';
 import { toast } from 'sonner';
 
 interface AuthContextType {
@@ -11,6 +11,15 @@ interface AuthContextType {
   session: Session | null;
   isLoading: boolean;
   signOut: () => Promise<void>;
+  signInWithGoogle: () => Promise<void>;
+  signInWithEmail: (email: string, password: string) => Promise<void>;
+  signUp: (email: string, password: string) => Promise<void>;
+  resetPassword: (email: string) => Promise<void>;
+  refreshSession: () => Promise<void>;
+  updateUserProfile: (metadata: Record<string, any>) => Promise<boolean>;
+  ensureProfileExists: () => Promise<boolean>;
+  // Legacy aliases for backward compatibility
+  signIn: (email: string, password: string) => Promise<void>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -153,11 +162,41 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const refreshSession = async () => {
+    try {
+      const { data: { session }, error } = await supabase.auth.refreshSession();
+      if (error) throw error;
+      
+      setSession(session);
+      setUser(session?.user ?? null);
+    } catch (error: any) {
+      console.error('AuthProvider: Error refreshing session:', error);
+      throw error;
+    }
+  };
+
+  const handleUpdateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
+    return await updateUserProfile(user, metadata);
+  };
+
+  const handleEnsureProfileExists = async (): Promise<boolean> => {
+    return await ensureProfileExists(user);
+  };
+
   const value = {
     user,
     session,
     isLoading,
-    signOut
+    signOut,
+    signInWithGoogle,
+    signInWithEmail,
+    signUp,
+    resetPassword,
+    refreshSession,
+    updateUserProfile: handleUpdateUserProfile,
+    ensureProfileExists: handleEnsureProfileExists,
+    // Legacy aliases for backward compatibility
+    signIn: signInWithEmail
   };
 
   return (
