@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -32,23 +33,25 @@ import { useSubscription } from '@/contexts/SubscriptionContext';
 import PremiumBadge from '@/components/subscription/PremiumBadge';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
 
+interface ReminderSettings {
+  morning: boolean;
+  evening: boolean;
+  morningTime: string;
+  eveningTime: string;
+}
+
 interface UserProfile {
   id: string;
   email: string | null;
   full_name: string | null;
   avatar_url: string | null;
   display_name: string | null;
-  reminder_settings: {
-    morning: boolean;
-    evening: boolean;
-    morningTime: string;
-    eveningTime: string;
-  };
+  reminder_settings: ReminderSettings;
 }
 
 const Settings: React.FC = () => {
   const { user, signOut } = useAuth();
-  const { theme, setTheme, colorTheme } = useTheme();
+  const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
   const { currentLanguage } = useTranslation();
   const { isPremium } = useSubscription();
   const navigate = useNavigate();
@@ -73,33 +76,30 @@ const Settings: React.FC = () => {
 
         if (error) {
           console.error('Error fetching profile:', error);
-          toast({
-            title: 'Error',
-            description: 'Failed to load profile. Please try again.',
-            variant: 'destructive'
-          });
+          toast.error('Failed to load profile. Please try again.');
         } else {
+          // Handle the reminder_settings type properly
+          const reminderSettings: ReminderSettings = typeof data.reminder_settings === 'object' && data.reminder_settings
+            ? data.reminder_settings as ReminderSettings
+            : {
+                morning: false,
+                evening: false,
+                morningTime: '08:00',
+                eveningTime: '20:00'
+              };
+
           setProfile({
             id: data.id,
             email: user.email,
             full_name: data.full_name,
             avatar_url: data.avatar_url,
             display_name: data.display_name,
-            reminder_settings: data.reminder_settings || {
-              morning: false,
-              evening: false,
-              morningTime: '08:00',
-              eveningTime: '20:00'
-            }
+            reminder_settings: reminderSettings
           });
         }
       } catch (error) {
         console.error('Error in fetchProfile:', error);
-        toast({
-          title: 'Error',
-          description: 'An unexpected error occurred. Please try again.',
-          variant: 'destructive'
-        });
+        toast.error('An unexpected error occurred. Please try again.');
       } finally {
         setLoading(false);
       }
@@ -108,7 +108,7 @@ const Settings: React.FC = () => {
     fetchProfile();
   }, [user?.id, user?.email]);
 
-  const updateReminderSettings = async (newSettings: any) => {
+  const updateReminderSettings = async (newSettings: ReminderSettings) => {
     if (!user?.id) return;
 
     try {
@@ -119,26 +119,14 @@ const Settings: React.FC = () => {
 
       if (error) {
         console.error('Error updating reminder settings:', error);
-        toast({
-          title: 'Error',
-          description: 'Failed to update reminder settings. Please try again.',
-          variant: 'destructive'
-        });
+        toast.error('Failed to update reminder settings. Please try again.');
       } else {
         setProfile(prev => prev ? { ...prev, reminder_settings: newSettings } : null);
-        toast({
-          title: 'Success',
-          description: 'Reminder settings updated successfully.',
-          variant: 'default'
-        });
+        toast.success('Reminder settings updated successfully.');
       }
     } catch (error) {
       console.error('Error in updateReminderSettings:', error);
-      toast({
-        title: 'Error',
-        description: 'An unexpected error occurred. Please try again.',
-        variant: 'destructive'
-      });
+      toast.error('An unexpected error occurred. Please try again.');
     }
   };
 
@@ -148,16 +136,17 @@ const Settings: React.FC = () => {
       navigate('/app/auth');
     } catch (error) {
       console.error('Sign out failed:', error);
-      toast({
-        title: 'Sign Out Failed',
-        description: 'Failed to sign out. Please try again.',
-        variant: 'destructive'
-      });
+      toast.error('Failed to sign out. Please try again.');
     }
   };
 
   const handleUpgradeClick = () => {
     setShowSubscriptionManager(true);
+  };
+
+  const handleColorChange = (newColor: string) => {
+    setColorTheme(newColor);
+    toast.success('Color theme updated successfully.');
   };
 
   if (loading) {
@@ -308,7 +297,10 @@ const Settings: React.FC = () => {
               <Label className="text-sm font-medium">
                 <TranslatableText text="Color Theme" forceTranslate={true} />
               </Label>
-              <ColorPicker />
+              <ColorPicker 
+                value={colorTheme || '#3b82f6'} 
+                onChange={handleColorChange}
+              />
             </div>
           </CardContent>
         </Card>
@@ -357,7 +349,7 @@ const Settings: React.FC = () => {
                   updateReminderSettings({
                     ...profile?.reminder_settings,
                     morning: checked
-                  });
+                  } as ReminderSettings);
                 }}
               />
             </div>
@@ -378,7 +370,7 @@ const Settings: React.FC = () => {
                   updateReminderSettings({
                     ...profile?.reminder_settings,
                     evening: checked
-                  });
+                  } as ReminderSettings);
                 }}
               />
             </div>
