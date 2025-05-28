@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate, useLocation } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,24 +13,41 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 export default function Auth() {
   const location = useLocation();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [hasRedirected, setHasRedirected] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
   
-  // Check if user has seen onboarding screens
-  const hasSeenOnboardingScreens = localStorage.getItem("onboardingScreensSeen") === "true";
+  const redirectParam = searchParams.get('redirectTo');
+  const fromLocation = location.state?.from?.pathname;
+  const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
   
-  console.log('Auth page render:', { 
+  // Get valid redirect path with priority
+  const getValidRedirectPath = (path: string | null) => {
+    if (!path) {
+      return onboardingComplete ? '/app/home' : '/app/onboarding';
+    }
+    
+    // Normalize legacy paths
+    if (path === '/home') return '/app/home';
+    if (path === '/onboarding') return '/app/onboarding';
+    
+    return path;
+  };
+  
+  // Determine where to redirect after auth
+  const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
+
+  console.log('Auth page mounted', { 
+    redirectTo, 
+    redirectParam, 
+    fromLocation,
+    storedRedirect,
     hasUser: !!user,
-    userId: user?.id,
     currentPath: location.pathname,
-    onboardingComplete,
-    hasSeenOnboardingScreens,
-    authLoading,
-    hasRedirected,
-    isLoading
+    onboardingComplete
   });
 
   useEffect(() => {
@@ -38,34 +55,39 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
-    // Only redirect if user is authenticated and we haven't already redirected
-    if (user && !authLoading && !hasRedirected) {
-      console.log('Auth: User is authenticated, preparing redirect...');
-      setHasRedirected(true);
+    // If user is logged in and page has finished initial loading, redirect
+    if (user && !authLoading && !redirecting) {
+      console.log('User is logged in, redirecting to:', redirectTo);
+      setRedirecting(true);
       
-      // Clean up any stored redirect
+      // Clean up stored redirect
       localStorage.removeItem('authRedirectTo');
       
-      // Use a longer delay to ensure state is settled
+      // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
-        console.log('Auth: Executing redirect to /app/home');
-        navigate('/app/home', { replace: true });
-      }, 1000);
+        // If onboarding is not complete, redirect to onboarding
+        if (!onboardingComplete && !redirectTo.includes('onboarding')) {
+          console.log('Redirecting to onboarding as it is not complete');
+          navigate('/app/onboarding', { replace: true });
+        } else {
+          navigate(redirectTo, { replace: true });
+        }
+      }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, hasRedirected]);
+  }, [user, authLoading, navigate, redirecting, redirectTo, onboardingComplete]);
 
   const handleSignIn = async () => {
     try {
       setIsLoading(true);
       setAuthError(null);
-      console.log('Auth: Initiating Google sign-in');
+      console.log('Initiating Google sign-in');
       
       await signInWithGoogle();
       // The page will be redirected by Supabase, so no need to do anything else here
     } catch (error: any) {
-      console.error('Auth: Sign-in error:', error.message);
+      console.error('Sign-in error:', error.message);
       setAuthError(error.message);
       toast.error('Failed to initiate sign-in. Please try again.');
       setIsLoading(false);
@@ -74,7 +96,6 @@ export default function Auth() {
 
   // If still checking auth state, show loading
   if (authLoading) {
-    console.log('Auth: Auth is loading, showing loading state');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -82,27 +103,20 @@ export default function Auth() {
     );
   }
 
-  // If already logged in and we've redirected, show loading
-  if (user && hasRedirected) {
-    console.log('Auth: User logged in and redirected, showing loading state');
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  // If already logged in but haven't redirected yet, show this to prevent flash
+  // If already logged in, redirect to target page
   if (user) {
-    console.log('Auth: User already logged in, will redirect soon');
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
+    // If onboarding is not complete, redirect to onboarding instead
+    const finalRedirect = !onboardingComplete && !redirectTo.includes('onboarding') 
+      ? '/app/onboarding'
+      : redirectTo;
+      
+    console.log('User already logged in, redirecting to:', finalRedirect, {
+      onboardingComplete,
+      originalRedirect: redirectTo
+    });
+    return <Navigate to={finalRedirect} replace />;
   }
 
-  console.log('Auth: Rendering auth form');
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <motion.div

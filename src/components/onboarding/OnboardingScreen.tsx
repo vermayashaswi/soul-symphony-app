@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -768,6 +767,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   const navigate = useNavigate();
   const { setColorTheme } = useTheme();
   const contentRef = useRef<HTMLDivElement>(null);
+  const { user } = useAuth();
   
   // Define isNameStep before it's used in useSwipeGesture
   const isFirstStep = currentStep === 0;
@@ -787,20 +787,16 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       
       setCurrentStep(prev => prev + 1);
     } else {
-      // Last step - handle completion without setting onboardingComplete yet
       if (name) {
         localStorage.setItem("user_display_name", name.trim());
       }
       
-      // Mark that user has seen onboarding screens but don't complete onboarding
-      localStorage.setItem("onboardingScreensSeen", "true");
+      localStorage.setItem("onboardingComplete", "true");
       
       if (onComplete) {
         onComplete();
       } else {
-        // Navigate to auth page for sign in - onboarding will be completed after auth
-        console.log("Onboarding screens complete, navigating to /app/auth for sign in");
-        navigate("/app/auth", { replace: true });
+        navigate("/app/auth");
       }
     }
   };
@@ -812,21 +808,25 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
   };
   
   const handleSkip = () => {
-    console.log("Skip button clicked, redirecting to auth");
+    console.log("Skip button clicked, user auth status:", !!user);
     
     if (name) {
       localStorage.setItem("user_display_name", name.trim());
     }
     
-    // Mark that user has seen onboarding screens but don't complete onboarding
-    localStorage.setItem("onboardingScreensSeen", "true");
+    localStorage.setItem("onboardingComplete", "true");
     
     if (onComplete) {
       onComplete();
     } else {
-      // Navigate to auth page - onboarding will be completed after auth
-      console.log("Skipping onboarding, navigating to /app/auth");
-      navigate("/app/auth", { replace: true });
+      // Check if user is already authenticated
+      if (user) {
+        console.log("User is authenticated, navigating to /app/home");
+        navigate("/app/home");
+      } else {
+        console.log("User is not authenticated, navigating to /app/auth");
+        navigate("/app/auth");
+      }
     }
   };
 

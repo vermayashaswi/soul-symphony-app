@@ -13,6 +13,4 @@ export type AuthContextType = {
   resetPassword: (email: string) => Promise<void>;
   updateUserProfile: (metadata: Record<string, any>) => Promise<boolean>;
   ensureProfileExists: () => Promise<boolean>;
-  // Legacy aliases for backward compatibility
-  signIn: (email: string, password: string) => Promise<void>;
 };

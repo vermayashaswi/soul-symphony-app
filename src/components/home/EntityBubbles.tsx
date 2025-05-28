@@ -1,65 +1,132 @@
 
-import React from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
-import { useQuery } from '@tanstack/react-query';
-import { supabase } from '@/integrations/supabase/client';
-import { useAuth } from '@/contexts/AuthContext';
+import { cn } from '@/lib/utils';
 
-export interface EntityBubblesProps {
-  entities?: any[];
+interface Entity {
+  name: string;
+  count: number;
+  type?: string; // Add type property to the interface
 }
 
-const EntityBubbles: React.FC<EntityBubblesProps> = ({ entities = [] }) => {
-  const { user } = useAuth();
+interface EntityBubblesProps {
+  entities: Entity[];
+  className?: string;
+}
 
-  const { data: journalEntities = [] } = useQuery({
-    queryKey: ['journal-entities', user?.id],
-    queryFn: async () => {
-      if (!user?.id) return [];
+const EntityBubbles: React.FC<EntityBubblesProps> = ({ entities, className }) => {
+  const containerRef = useRef<HTMLDivElement>(null);
+  const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
+  const [highlightedBubble, setHighlightedBubble] = useState<string | null>(null);
+  
+  useEffect(() => {
+    if (containerRef.current) {
+      const updateDimensions = () => {
+        setDimensions({
+          width: containerRef.current?.offsetWidth || 0,
+          height: containerRef.current?.offsetHeight || 0
+        });
+      };
+      
+      updateDimensions();
+      window.addEventListener('resize', updateDimensions);
+      
+      return () => {
+        window.removeEventListener('resize', updateDimensions);
+      };
+    }
+  }, []);
 
-      const { data, error } = await supabase
-        .from('Journal Entries')
-        .select('entities')
-        .eq('user_id', user.id)
-        .not('entities', 'is', null);
-
-      if (error) {
-        console.error('Error fetching entities:', error);
-        return [];
-      }
-
-      // Extract all entities from journal entries
-      const allEntities = data.flatMap(entry => 
-        entry.entities ? Object.keys(entry.entities) : []
-      );
-
-      // Get unique entities
-      return [...new Set(allEntities)];
-    },
-    enabled: !!user?.id,
-  });
-
-  const displayEntities = entities.length > 0 ? entities : journalEntities;
-
-  if (displayEntities.length === 0) {
-    return null;
+  // Filter out entities with type "others" and skip rendering if no valid entities or container not measured yet
+  const filteredEntities = entities.filter(entity => entity.type !== 'others');
+  
+  if (!filteredEntities.length || dimensions.width === 0) {
+    return <div ref={containerRef} className={cn("w-full h-24", className)}></div>;
   }
 
+  // Find the max count to normalize sizes
+  const maxCount = Math.max(...filteredEntities.map(e => e.count));
+  
+  // Calculate bubble size to fit three vertically
+  const maxSize = Math.min(dimensions.width / 3, dimensions.height / 3);
+  
+  // Generate positions ensuring they spread across width
+  const positions = filteredEntities.map((entity, index) => {
+    // Size based on count but ensuring it's large enough to fit text
+    const size = Math.max(
+      30, // Minimum size
+      (entity.count / maxCount) * maxSize // Proportional size
+    );
+    
+    // Distribute across the width 
+    const section = dimensions.width / filteredEntities.length;
+    const baseX = index * section + (section / 2);
+    
+    // Random vertical position
+    const maxTop = dimensions.height - size;
+    const top = Math.random() * maxTop;
+    
+    // Random offset within the section to prevent overlapping
+    const xOffset = (Math.random() - 0.5) * (section * 0.7);
+    
+    // Ensure the bubble stays within the container bounds
+    const x = Math.max(size/2, Math.min(dimensions.width - size/2, baseX + xOffset));
+    const y = Math.max(size/2, Math.min(dimensions.height - size/2, top + size/2));
+    
+    return { x, y, size };
+  });
+
   return (
-    <div className="relative h-32 overflow-hidden rounded-lg bg-gradient-to-r from-blue-50 to-purple-50 dark:from-blue-900/20 dark:to-purple-900/20">
-      <div className="flex flex-wrap gap-2 p-4">
-        {displayEntities.slice(0, 8).map((entity, index) => (
+    <div 
+      ref={containerRef} 
+      className={cn("relative w-full overflow-hidden", className)}
+    >
+      {filteredEntities.map((entity, index) => {
+        const { x, y, size } = positions[index];
+        const opacity = 0.6 + (entity.count / maxCount) * 0.4; // Between 0.6 and 1.0
+        const isHighlighted = highlightedBubble === entity.name;
+        
+        return (
           <motion.div
-            key={entity}
-            initial={{ opacity: 0, scale: 0.8 }}
-            animate={{ opacity: 1, scale: 1 }}
-            transition={{ delay: index * 0.1 }}
-            className="px-3 py-1 bg-white/70 dark:bg-gray-800/70 rounded-full text-sm font-medium text-gray-700 dark:text-gray-300 backdrop-blur-sm"
+            key={entity.name}
+            className={cn(
+              "absolute flex items-center justify-center rounded-full text-xs font-medium text-primary shadow-sm transition-all duration-300",
+              isHighlighted ? "bg-primary/30 ring-2 ring-primary/50" : "bg-primary/10",
+              "cursor-pointer"
+            )}
+            initial={{ scale: 0, x: dimensions.width / 2, y: dimensions.height / 2 }}
+            animate={{ 
+              scale: isHighlighted ? 1.05 : 1, 
+              x: [x, x + (Math.random() - 0.5) * 30, x - (Math.random() - 0.5) * 30, x],
+              y: [y, y - (Math.random() - 0.5) * 20, y + (Math.random() - 0.5) * 30, y],
+              opacity: isHighlighted ? 1 : opacity,
+              boxShadow: isHighlighted ? "0 0 15px rgba(var(--primary), 0.5)" : "none"
+            }}
+            transition={{ 
+              type: "spring",
+              stiffness: 50,
+              damping: 10,
+              repeat: Infinity,
+              repeatType: "mirror",
+              duration: 4 + Math.random() * 3,
+              delay: index * 0.1
+            }}
+            style={{
+              width: size,
+              height: size,
+              transform: `translate(-50%, -50%)`,
+            }}
+            onMouseEnter={() => setHighlightedBubble(entity.name)}
+            onMouseLeave={() => setHighlightedBubble(null)}
+            onTouchStart={() => setHighlightedBubble(entity.name)}
+            onTouchEnd={() => setHighlightedBubble(null)}
           >
-            {entity}
+            <span className="text-2xs px-1 text-center" style={{ fontSize: '0.7rem' }}>
+              {entity.name}
+            </span>
           </motion.div>
-        ))}
-      </div>
+        );
+      })}
     </div>
   );
 };

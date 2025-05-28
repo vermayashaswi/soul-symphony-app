@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -188,11 +189,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       currentStep,
       currentStepID: steps[currentStep]?.id,
       currentPath: location.pathname,
-      navigationState,
-      tutorialChecked,
-      tutorialCompleted
+      navigationState
     });
-  }, [isActive, currentStep, steps, location.pathname, navigationState, tutorialChecked, tutorialCompleted]);
+  }, [isActive, currentStep, steps, location.pathname, navigationState]);
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
@@ -200,8 +199,6 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       if (!user || tutorialChecked) return;
       
       try {
-        console.log('TutorialProvider: Checking tutorial status for user:', user.id);
-        
         const { data, error } = await supabase
           .from('profiles')
           .select('tutorial_completed, tutorial_step')
@@ -210,11 +207,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         
         if (error) {
           console.error('Error fetching tutorial status:', error);
-          setTutorialChecked(true);
           return;
         }
-        
-        console.log('TutorialProvider: Profile data:', data);
         
         // Only activate tutorial if tutorial is not completed
         const shouldActivate = data?.tutorial_completed === 'NO';
@@ -222,26 +216,22 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         // Set the current tutorial step (default to 0 if null)
         const startingStep = data?.tutorial_step || 0;
         
-        setTutorialCompleted(data?.tutorial_completed === 'YES');
-        
         if (shouldActivate) {
-          console.log('TutorialProvider: Activating tutorial at step:', startingStep);
+          console.log('Activating tutorial at step:', startingStep);
           setCurrentStep(startingStep);
           setIsActive(true);
           
           // If we're not on an app route, navigate to the app home
           if (!isAppRoute(location.pathname)) {
-            console.log('TutorialProvider: Not on app route, will navigate to /app/home');
+            console.log('Not on app route, will navigate to /app/home');
             navigate('/app/home');
           }
-        } else {
-          console.log('TutorialProvider: Tutorial already completed or not needed');
         }
         
+        setTutorialCompleted(data?.tutorial_completed === 'YES');
         setTutorialChecked(true);
       } catch (error) {
-        console.error('TutorialProvider: Error in tutorial check:', error);
-        setTutorialChecked(true);
+        console.error('Error in tutorial check:', error);
       }
     };
     
@@ -268,7 +258,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         }, 500);
       }
     }
-  }, [location.pathname, navigationState.inProgress, navigationState.targetRoute, currentStep, steps]);
+  }, [location.pathname, navigationState.inProgress, navigationState.targetRoute]);
   
   // Helper function to check for target elements and apply highlighting
   const checkForTargetElement = (stepData: TutorialStep) => {
@@ -438,6 +428,8 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Update state after database update
       setTutorialCompleted(true);
+      
+      // REMOVED TOAST NOTIFICATION
       
       console.log('Tutorial marked as completed');
       

@@ -1,114 +1,98 @@
-import React, { useEffect, useState } from 'react';
-import { Navigate } from 'react-router-dom';
-import { useAuth } from '@/contexts/AuthContext';
-import { useUserProfile } from '@/hooks/useUserProfile';
-import { useAutoTrialActivation } from '@/hooks/useAutoTrialActivation';
 
-export interface OnboardingCheckProps {
+import React from 'react';
+import { useLocation, Navigate } from 'react-router-dom';
+import { User } from '@supabase/supabase-js';
+import { isAppRoute, isWebsiteRoute } from './RouteHelpers';
+import { useTranslation } from '@/contexts/TranslationContext';
+
+interface OnboardingCheckProps {
+  onboardingComplete: boolean | null;
+  onboardingLoading: boolean;
+  user: User | null;
   children: React.ReactNode;
-  onboardingComplete?: boolean | null;
-  onboardingLoading?: boolean;
-  user?: any;
 }
 
-const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
-  const { user, isLoading: authLoading } = useAuth();
-  const { profile } = useUserProfile();
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [profileCheckComplete, setProfileCheckComplete] = useState(false);
+const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ 
+  onboardingComplete, 
+  onboardingLoading, 
+  user,
+  children 
+}) => {
+  const location = useLocation();
+  const { currentLanguage } = useTranslation();
   
-  // Auto-activate trial for new users
-  useAutoTrialActivation();
-
-  // Get onboarding state from localStorage
-  const hasSeenOnboardingScreens = localStorage.getItem("onboardingScreensSeen") === "true";
-  const isOnboardingComplete = localStorage.getItem("onboardingComplete") === "true";
-
-  console.log('OnboardingCheck render:', { 
-    hasUser: !!user, 
-    userId: user?.id,
-    profileSubscriptionStatus: profile?.subscription_status,
-    hasSeenOnboardingScreens,
-    isOnboardingComplete,
-    isProcessing,
-    authLoading,
-    profileCheckComplete,
-    shouldRedirectToOnboarding: !hasSeenOnboardingScreens && !isOnboardingComplete
+  // Expanded list of onboarding/auth paths
+  const onboardingOrAuthPaths = [
+    '/app/onboarding',
+    '/app/auth',
+    '/onboarding',
+    '/auth',
+    '/app',
+    '/' // Also consider root path
+  ];
+  
+  // Check if current path is in the list
+  const isOnboardingOrAuth = onboardingOrAuthPaths.includes(location.pathname);
+  
+  console.log('OnboardingCheck rendering at path:', location.pathname, {
+    user: !!user, 
+    onboardingComplete,
+    isAppRoute: isAppRoute(location.pathname),
+    isWebsiteRoute: isWebsiteRoute(location.pathname),
+    isOnboardingOrAuth,
+    language: currentLanguage
   });
-
-  // Wait for profile to be loaded before making decisions
-  useEffect(() => {
-    if (user && !authLoading) {
-      // Give some time for profile to load
-      const timer = setTimeout(() => {
-        setProfileCheckComplete(true);
-      }, 1000);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [user, authLoading]);
-
-  // Handle onboarding completion when user signs in after seeing screens
-  useEffect(() => {
-    if (hasSeenOnboardingScreens && !isOnboardingComplete && user && !isProcessing && profileCheckComplete) {
-      console.log('OnboardingCheck: User authenticated after seeing onboarding screens, completing onboarding');
-      setIsProcessing(true);
-      
-      // Complete onboarding
-      localStorage.setItem("onboardingComplete", "true");
-      localStorage.removeItem("onboardingScreensSeen");
-      
-      // Reset processing state after a brief delay
-      setTimeout(() => {
-        setIsProcessing(false);
-      }, 100);
-    }
-  }, [hasSeenOnboardingScreens, isOnboardingComplete, user, isProcessing, profileCheckComplete]);
-
-  // Show loading while auth is loading or profile is being checked
-  if (authLoading || (user && !profileCheckComplete)) {
-    console.log('OnboardingCheck: Loading auth or profile...');
+  
+  // For website routes, no checks needed - just render children
+  if (isWebsiteRoute(location.pathname)) {
+    console.log('Website route detected, no onboarding check needed');
+    return <>{children}</>;
+  }
+  
+  const isAuthRoute = location.pathname === '/app/auth' || location.pathname === '/auth';
+  const isOnboardingRoute = location.pathname === '/app/onboarding' || location.pathname === '/onboarding';
+  const isRootAppRoute = location.pathname === '/app';
+  
+  // Do not run checks on special routes
+  const isOnboardingBypassedRoute = isAuthRoute || isOnboardingRoute ||
+    location.pathname.includes('debug') || 
+    location.pathname.includes('admin');
+    
+  if (onboardingLoading) {
     return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      <div className="flex items-center justify-center h-screen w-screen">
+        <div className="animate-spin w-8 h-8 border-4 border-theme border-t-transparent rounded-full"></div>
       </div>
     );
   }
 
-  // If user is not logged in, redirect to auth
-  if (!user) {
-    console.log('OnboardingCheck: No user, redirecting to /app/auth');
-    return <Navigate to="/app/auth" replace />;
-  }
-
-  // If user hasn't seen onboarding screens and onboarding isn't complete, redirect to onboarding
-  // BUT ONLY if we're not processing and tutorial isn't active
-  if (!hasSeenOnboardingScreens && !isOnboardingComplete && !isProcessing) {
-    // Check if tutorial is active from localStorage/profile
-    const tutorialActive = profile?.tutorial_completed !== 'YES';
-    
-    // If tutorial is active, render children (Home component) so tutorial can overlay
-    if (tutorialActive) {
-      console.log('OnboardingCheck: Tutorial is active, rendering children with tutorial overlay');
-      return <>{children}</>;
+  // Special handling for the root /app route
+  if (isRootAppRoute) {
+    console.log('Root app route detected, user:', !!user);
+    // If user is logged in, redirect to home
+    if (user) {
+      console.log('User is logged in, redirecting to /app/home');
+      return <Navigate to="/app/home" replace />;
+    } else {
+      // If user is not logged in, redirect to onboarding
+      console.log('User not logged in, redirecting to /app/onboarding');
+      return <Navigate to="/app/onboarding" replace />;
     }
+  }
+  
+  // For other app routes, check if user should be redirected to auth
+  if (isAppRoute(location.pathname)) {
+    const shouldRedirectToAuth = 
+      !user && 
+      !isOnboardingBypassedRoute;
     
-    // Otherwise redirect to onboarding screens
-    console.log('OnboardingCheck: Onboarding screens not seen, redirecting to /app/onboarding');
-    return <Navigate to="/app/onboarding" replace />;
+    // If user is not logged in and it's a protected route (not auth or onboarding)
+    if (shouldRedirectToAuth) {
+      console.log('Redirecting to auth from:', location.pathname);
+      return <Navigate to="/app/auth" replace />;
+    }
   }
-
-  // Show loading state while processing onboarding completion
-  if (isProcessing) {
-    console.log('OnboardingCheck: Processing onboarding completion');
-    return (
-      <div className="min-h-screen flex items-center justify-center">
-        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-
-  console.log('OnboardingCheck: All checks passed, rendering children');
+  
   return <>{children}</>;
 };
 

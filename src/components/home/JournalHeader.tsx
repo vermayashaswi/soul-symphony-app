@@ -8,22 +8,7 @@ import { useTranslation } from '@/contexts/TranslationContext';
 import LanguageSelector from '@/components/LanguageSelector';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { useAuth } from '@/contexts/AuthContext';
-
-// Optional tutorial hook with error handling
-const useTutorialSafe = () => {
-  try {
-    const { useTutorial } = require('@/contexts/TutorialContext');
-    return useTutorial();
-  } catch (error) {
-    console.warn('Tutorial context not available:', error);
-    return {
-      isActive: false,
-      currentStep: 0,
-      steps: [],
-      isInStep: () => false
-    };
-  }
-};
+import { useTutorial } from '@/contexts/TutorialContext';
 
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
@@ -35,27 +20,16 @@ const JournalHeader: React.FC = () => {
   const today = new Date();
   const formattedDate = format(today, 'EEE, MMM d');
   
-  // Get tutorial context safely
-  const tutorialData = useTutorialSafe();
-  const isInWelcomeTutorialStep = tutorialData?.isActive && tutorialData?.steps?.[tutorialData?.currentStep]?.id === 1;
-
-  console.log('JournalHeader: Rendering with tutorial state:', {
-    isActive: tutorialData?.isActive,
-    currentStep: tutorialData?.currentStep,
-    isInWelcomeTutorialStep,
-    hasUser: !!user
-  });
+  // Get tutorial context to check if we're in step 1
+  const { isActive, currentStep, steps } = useTutorial();
+  const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
 
   // Pre-translate common labels
   useEffect(() => {
     const loadTranslations = async () => {
       if (translate) {
-        try {
-          setJournalLabel(await translate("Journal", "en"));
-          setYourJournalLabel(await translate("Your Journal", "en"));
-        } catch (error) {
-          console.warn('Translation failed, using fallback:', error);
-        }
+        setJournalLabel(await translate("Journal", "en"));
+        setYourJournalLabel(await translate("Your Journal", "en"));
       }
     };
     
@@ -66,12 +40,8 @@ const JournalHeader: React.FC = () => {
   useEffect(() => {
     const handleLanguageChange = async () => {
       if (translate) {
-        try {
-          setJournalLabel(await translate("Journal", "en"));
-          setYourJournalLabel(await translate("Your Journal", "en"));
-        } catch (error) {
-          console.warn('Translation failed on language change, using fallback:', error);
-        }
+        setJournalLabel(await translate("Journal", "en"));
+        setYourJournalLabel(await translate("Your Journal", "en"));
       }
     };
     
