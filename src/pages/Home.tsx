@@ -10,10 +10,11 @@ import JournalHeader from '@/components/home/JournalHeader';
 import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
 import EntityBubbles from '@/components/home/EntityBubbles';
 import SubscriptionManager from '@/components/subscription/SubscriptionManager';
+import { HomeErrorBoundary } from '@/components/home/HomeErrorBoundary';
 import { Card, CardContent } from '@/components/ui/card';
 import { Crown } from 'lucide-react';
 
-const Home = () => {
+const HomeContent = () => {
   const { user } = useAuth();
   const { isMobile } = useMobile();
   const { data: journalEntries, isLoading } = useJournalEntries();
@@ -24,7 +25,17 @@ const Home = () => {
     shouldShowSubscriptionManager
   } = useSubscriptionStatus();
 
+  console.log('Home page rendering:', { 
+    hasUser: !!user,
+    userId: user?.id,
+    journalEntriesCount: journalEntries?.length,
+    isLoading,
+    isTrialActive,
+    shouldShowSubscriptionManager
+  });
+
   if (!user) {
+    console.log('Home: No user found, showing sign-in message');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="text-center space-y-4">
@@ -77,6 +88,16 @@ const Home = () => {
         />
       </div>
     </div>
+  );
+};
+
+const Home = () => {
+  console.log('Home wrapper component rendering');
+  
+  return (
+    <HomeErrorBoundary>
+      <HomeContent />
+    </HomeErrorBoundary>
   );
 };
 

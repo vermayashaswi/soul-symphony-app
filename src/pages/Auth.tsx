@@ -1,6 +1,6 @@
 
 import { useState, useEffect } from 'react';
-import { Navigate, useNavigate, useLocation, useSearchParams } from 'react-router-dom';
+import { Navigate, useNavigate, useLocation } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
@@ -13,9 +13,8 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 export default function Auth() {
   const location = useLocation();
   const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
-  const [redirecting, setRedirecting] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [hasRedirected, setHasRedirected] = useState(false);
   const { user, isLoading: authLoading } = useAuth();
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
@@ -23,11 +22,15 @@ export default function Auth() {
   // Check if user has seen onboarding screens
   const hasSeenOnboardingScreens = localStorage.getItem("onboardingScreensSeen") === "true";
   
-  console.log('Auth page mounted', { 
+  console.log('Auth page render:', { 
     hasUser: !!user,
+    userId: user?.id,
     currentPath: location.pathname,
     onboardingComplete,
-    hasSeenOnboardingScreens
+    hasSeenOnboardingScreens,
+    authLoading,
+    hasRedirected,
+    isLoading
   });
 
   useEffect(() => {
@@ -35,36 +38,34 @@ export default function Auth() {
   }, []);
 
   useEffect(() => {
-    // If user is logged in and page has finished initial loading, redirect
-    if (user && !authLoading && !redirecting) {
-      console.log('User is logged in, determining redirect...');
-      setRedirecting(true);
+    // Only redirect if user is authenticated and we haven't already redirected
+    if (user && !authLoading && !hasRedirected) {
+      console.log('Auth: User is authenticated, preparing redirect...');
+      setHasRedirected(true);
       
-      // Clean up stored redirect
+      // Clean up any stored redirect
       localStorage.removeItem('authRedirectTo');
       
-      // Add small delay to ensure state updates before navigation
+      // Use a longer delay to ensure state is settled
       const timer = setTimeout(() => {
-        // If user came from onboarding screens or onboarding is not complete, go to home
-        // OnboardingCheck will handle the completion logic
-        console.log('Redirecting to /app/home');
+        console.log('Auth: Executing redirect to /app/home');
         navigate('/app/home', { replace: true });
-      }, 500);
+      }, 1000);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting]);
+  }, [user, authLoading, navigate, hasRedirected]);
 
   const handleSignIn = async () => {
     try {
       setIsLoading(true);
       setAuthError(null);
-      console.log('Initiating Google sign-in');
+      console.log('Auth: Initiating Google sign-in');
       
       await signInWithGoogle();
       // The page will be redirected by Supabase, so no need to do anything else here
     } catch (error: any) {
-      console.error('Sign-in error:', error.message);
+      console.error('Auth: Sign-in error:', error.message);
       setAuthError(error.message);
       toast.error('Failed to initiate sign-in. Please try again.');
       setIsLoading(false);
@@ -73,6 +74,7 @@ export default function Auth() {
 
   // If still checking auth state, show loading
   if (authLoading) {
+    console.log('Auth: Auth is loading, showing loading state');
     return (
       <div className="min-h-screen flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
@@ -80,12 +82,27 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect to home
-  if (user) {
-    console.log('User already logged in, redirecting to /app/home');
-    return <Navigate to="/app/home" replace />;
+  // If already logged in and we've redirected, show loading
+  if (user && hasRedirected) {
+    console.log('Auth: User logged in and redirected, showing loading state');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
   }
 
+  // If already logged in but haven't redirected yet, show this to prevent flash
+  if (user) {
+    console.log('Auth: User already logged in, will redirect soon');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  console.log('Auth: Rendering auth form');
   return (
     <div className="min-h-screen bg-background flex flex-col items-center justify-center px-4 py-12">
       <motion.div

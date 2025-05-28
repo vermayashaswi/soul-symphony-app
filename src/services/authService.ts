@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -20,7 +21,9 @@ export const getRedirectUrl = (): string => {
   };
   
   // Redirect directly to /app/home after successful authentication
-  return `${window.location.origin}/app/home`;
+  const redirectUrl = `${window.location.origin}/app/home`;
+  console.log('getRedirectUrl: Generated redirect URL:', redirectUrl);
+  return redirectUrl;
 };
 
 /**
@@ -28,6 +31,8 @@ export const getRedirectUrl = (): string => {
  */
 async function createUserSession(userId: string) {
   try {
+    console.log('createUserSession: Creating session for user:', userId);
+    
     // Get device and location info
     const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
     
@@ -44,10 +49,12 @@ async function createUserSession(userId: string) {
       });
     
     if (error) {
-      console.error('Error creating user session:', error);
+      console.error('createUserSession: Error creating user session:', error);
+    } else {
+      console.log('createUserSession: Successfully created user session');
     }
   } catch (e) {
-    console.error('Exception creating user session:', e);
+    console.error('createUserSession: Exception creating user session:', e);
   }
 }
 
@@ -57,7 +64,7 @@ async function createUserSession(userId: string) {
 export const signInWithGoogle = async (): Promise<void> => {
   try {
     const redirectUrl = getRedirectUrl();
-    console.log('Using redirect URL:', redirectUrl);
+    console.log('signInWithGoogle: Using redirect URL:', redirectUrl);
     
     const { data, error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
@@ -72,18 +79,21 @@ export const signInWithGoogle = async (): Promise<void> => {
     });
 
     if (error) {
+      console.error('signInWithGoogle: Supabase OAuth error:', error);
       throw error;
     }
     
+    console.log('signInWithGoogle: OAuth data received:', data);
+    
     // If we have a URL, manually redirect to it (as a backup)
     if (data?.url) {
-      console.log('Redirecting to OAuth URL:', data.url);
+      console.log('signInWithGoogle: Redirecting to OAuth URL:', data.url);
       setTimeout(() => {
         window.location.href = data.url;
       }, 100);
     }
   } catch (error: any) {
-    console.error('Error signing in with Google:', error.message);
+    console.error('signInWithGoogle: Error signing in with Google:', error.message);
     toast.error(`Error signing in with Google: ${error.message}`);
     throw error;
   }
@@ -257,19 +267,20 @@ export const handleAuthCallback = async () => {
                          window.location.hash.includes('error') ||
                          window.location.search.includes('error');
     
-    console.log('Checking for auth callback params:', hasHashParams);
+    console.log('handleAuthCallback: Checking for auth callback params:', hasHashParams);
+    console.log('handleAuthCallback: Current URL:', window.location.href);
     
     if (hasHashParams) {
       // Get the session
       const { data, error } = await supabase.auth.getSession();
       
       if (error) {
-        console.error('Error in auth callback session check:', error);
+        console.error('handleAuthCallback: Error in auth callback session check:', error);
         return null;
       } 
       
       if (data.session?.user) {
-        console.log('User authenticated in callback handler');
+        console.log('handleAuthCallback: User authenticated in callback handler, user ID:', data.session.user.id);
         // Create a user session record
         await createUserSession(data.session.user.id);
         
@@ -279,7 +290,7 @@ export const handleAuthCallback = async () => {
     
     return null;
   } catch (error) {
-    console.error('Error in handleAuthCallback:', error);
+    console.error('handleAuthCallback: Error in handleAuthCallback:', error);
     return null;
   }
 };
