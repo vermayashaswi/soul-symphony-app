@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -231,11 +232,7 @@ const Settings: React.FC = () => {
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            <ProfilePictureUpload 
-              onUploadSuccess={(url) => {
-                setProfile(prev => prev ? { ...prev, avatar_url: url } : null);
-              }}
-            />
+            <ProfilePictureUpload />
             
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               <div>
