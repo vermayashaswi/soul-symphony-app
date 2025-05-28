@@ -188,8 +188,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   // Determine whether to show the infographic and which type
   const shouldShowInfographic = !!step.infographicType && step.id >= 6 && step.id <= 9;
   
-  // Determine whether to show premium badge (steps 6-9)
-  const shouldShowPremiumBadge = step.id >= 6 && step.id <= 9;
+  // Determine whether to show premium badge (steps 5-9)
+  const shouldShowPremiumBadge = step.id >= 5 && step.id <= 9;
   
   return (
     <motion.div
