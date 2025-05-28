@@ -17,6 +17,7 @@ import Settings from '@/pages/Settings';
 import Auth from '@/pages/Auth';
 import NotFound from '@/pages/NotFound';
 import HomePage from '@/pages/website/HomePage';
+import OnboardingScreen from '@/components/onboarding/OnboardingScreen';
 
 const AppRoutes: React.FC = () => {
   const { user, isLoading } = useAuth();
@@ -39,8 +40,9 @@ const AppRoutes: React.FC = () => {
         {/* Website routes - root should go to marketing website */}
         <Route path="/" element={<HomePage />} />
         
-        {/* Public app route - onboarding/auth */}
-        <Route path="/app/onboarding" element={<Auth />} />
+        {/* Public app routes - onboarding and auth */}
+        <Route path="/app/onboarding" element={<OnboardingScreen />} />
+        <Route path="/app/auth" element={<Auth />} />
         
         {/* Protected app routes */}
         <Route path="/app/*" element={

@@ -787,6 +787,7 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       
       setCurrentStep(prev => prev + 1);
     } else {
+      // Last step - handle completion
       if (name) {
         localStorage.setItem("user_display_name", name.trim());
       }
@@ -796,7 +797,14 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       if (onComplete) {
         onComplete();
       } else {
-        navigate("/app/auth");
+        // Navigate based on auth status
+        if (user) {
+          console.log("User is authenticated, navigating to /app/home");
+          navigate("/app/home", { replace: true });
+        } else {
+          console.log("User is not authenticated, navigating to /app/auth");
+          navigate("/app/auth", { replace: true });
+        }
       }
     }
   };
@@ -819,13 +827,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
     if (onComplete) {
       onComplete();
     } else {
-      // Check if user is already authenticated
+      // Navigate based on auth status
       if (user) {
         console.log("User is authenticated, navigating to /app/home");
-        navigate("/app/home");
+        navigate("/app/home", { replace: true });
       } else {
         console.log("User is not authenticated, navigating to /app/auth");
-        navigate("/app/auth");
+        navigate("/app/auth", { replace: true });
       }
     }
   };

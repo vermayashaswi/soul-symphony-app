@@ -19,9 +19,9 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
   // Auto-activate trial for new users
   useAutoTrialActivation();
 
-  // If user is not logged in, redirect to onboarding
+  // If user is not logged in, redirect to auth (not onboarding)
   if (!user) {
-    return <Navigate to="/app/onboarding" replace />;
+    return <Navigate to="/app/auth" replace />;
   }
 
   // If onboarding is not completed (subscription_status is null), redirect to onboarding
