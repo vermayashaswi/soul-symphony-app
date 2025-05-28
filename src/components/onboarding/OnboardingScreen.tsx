@@ -20,6 +20,7 @@ import {
   SelectTrigger,
   SelectValue,
 } from "@/components/ui/select";
+import { PremiumBadge } from "@/components/onboarding/PremiumBadge";
 
 interface OnboardingScreenProps {
   onComplete?: () => void;
@@ -98,6 +99,7 @@ interface StepIllustration {
   description: string;
   illustration: React.FC<any>;
   buttonText: string;
+  isPremium?: boolean;
 }
 
 const ONBOARDING_STEPS: StepIllustration[] = [
@@ -368,6 +370,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     title: "AI Analysis",
     subtitle: "",
     description: "Get insights into your emotional patterns and growth through advanced AI analysis.",
+    isPremium: true,
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 flex flex-col items-center justify-center overflow-hidden p-4">
@@ -420,6 +423,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     title: "Chat with Your Journal",
     subtitle: "",
     description: "Ask questions about your emotions, patterns, and growth through natural conversation with AI.",
+    isPremium: true,
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2 w-full">
         <div className="relative w-full max-w-xs bg-theme-dark/30 dark:bg-theme-dark/30 rounded-xl flex items-center justify-center overflow-hidden p-4">
@@ -470,6 +474,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     title: "Track Your Emotional Journey",
     subtitle: "",
     description: "See your emotional patterns and growth over time with beautiful visualizations.",
+    isPremium: true,
     illustration: (props: {}) => (
       <div className="flex justify-center items-center my-2">
         <div className="relative w-64 h-64 flex items-center justify-center overflow-hidden">
@@ -892,9 +897,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 <CurrentIllustration />
               ) : isNameStep ? (
                 <>
-                  <h2 className="text-2xl font-bold mb-2 text-theme">
-                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
-                  </h2>
+                  <div className="flex items-center justify-center mb-2">
+                    <h2 className="text-2xl font-bold text-theme">
+                      <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                    </h2>
+                    {currentStepData.isPremium && <PremiumBadge />}
+                  </div>
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">
                       <TranslatableText text={currentStepData.description} forceTranslate={true} />
@@ -904,9 +912,12 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
                 </>
               ) : (
                 <>
-                  <h2 className="text-2xl font-bold mb-2 text-theme">
-                    <TranslatableText text={currentStepData.title} forceTranslate={true} />
-                  </h2>
+                  <div className="flex items-center justify-center mb-2">
+                    <h2 className="text-2xl font-bold text-theme">
+                      <TranslatableText text={currentStepData.title} forceTranslate={true} />
+                    </h2>
+                    {currentStepData.isPremium && <PremiumBadge />}
+                  </div>
                   {currentStepData.description && (
                     <p className="mb-8 text-muted-foreground max-w-xs">
                       <TranslatableText text={currentStepData.description} forceTranslate={true} />
