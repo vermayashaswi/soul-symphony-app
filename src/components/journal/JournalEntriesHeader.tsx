@@ -3,7 +3,7 @@ import React from 'react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { Button } from '@/components/ui/button';
 import { Plus } from 'lucide-react';
-import { useTutorial } from '@/contexts/TutorialContext';
+import { useTutorialSafe } from '@/hooks/useTutorialSafe';
 
 interface JournalEntriesHeaderProps {
   onStartRecording: () => void;
@@ -12,8 +12,14 @@ interface JournalEntriesHeaderProps {
 export const JournalEntriesHeader: React.FC<JournalEntriesHeaderProps> = ({ 
   onStartRecording 
 }) => {
-  const { isInStep, tutorialCompleted } = useTutorial();
-  const shouldAddTutorialClass = isInStep(3) && !tutorialCompleted;
+  const tutorialData = useTutorialSafe();
+  const shouldAddTutorialClass = tutorialData?.isInStep?.(3) && !tutorialData?.tutorialCompleted;
+  
+  console.log('JournalEntriesHeader: Tutorial state:', {
+    isInStep3: tutorialData?.isInStep?.(3),
+    tutorialCompleted: tutorialData?.tutorialCompleted,
+    shouldAddTutorialClass
+  });
   
   return (
     <div className="flex items-center justify-between mb-6">

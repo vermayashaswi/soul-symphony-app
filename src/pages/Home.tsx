@@ -98,7 +98,9 @@ const HomeContent = () => {
         )}
 
         {/* Header - This is where tutorial will look for journal-header-container */}
-        <JournalHeader />
+        <HomeErrorBoundary>
+          <JournalHeader />
+        </HomeErrorBoundary>
 
         {/* Inspirational Quote */}
         <InspirationalQuote />
