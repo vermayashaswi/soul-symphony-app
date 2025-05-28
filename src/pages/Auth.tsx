@@ -20,34 +20,14 @@ export default function Auth() {
   const { onboardingComplete } = useOnboarding();
   const [authError, setAuthError] = useState<string | null>(null);
   
-  const redirectParam = searchParams.get('redirectTo');
-  const fromLocation = location.state?.from?.pathname;
-  const storedRedirect = typeof window !== 'undefined' ? localStorage.getItem('authRedirectTo') : null;
+  // Check if user has seen onboarding screens
+  const hasSeenOnboardingScreens = localStorage.getItem("onboardingScreensSeen") === "true";
   
-  // Get valid redirect path with priority - default to home if onboarding is complete
-  const getValidRedirectPath = (path: string | null) => {
-    if (!path) {
-      return onboardingComplete ? '/app/home' : '/app/onboarding';
-    }
-    
-    // Normalize legacy paths
-    if (path === '/home') return '/app/home';
-    if (path === '/onboarding') return '/app/onboarding';
-    
-    return path;
-  };
-  
-  // Determine where to redirect after auth
-  const redirectTo = getValidRedirectPath(redirectParam || fromLocation || storedRedirect);
-
   console.log('Auth page mounted', { 
-    redirectTo, 
-    redirectParam, 
-    fromLocation,
-    storedRedirect,
     hasUser: !!user,
     currentPath: location.pathname,
-    onboardingComplete
+    onboardingComplete,
+    hasSeenOnboardingScreens
   });
 
   useEffect(() => {
@@ -57,7 +37,7 @@ export default function Auth() {
   useEffect(() => {
     // If user is logged in and page has finished initial loading, redirect
     if (user && !authLoading && !redirecting) {
-      console.log('User is logged in, redirecting...');
+      console.log('User is logged in, determining redirect...');
       setRedirecting(true);
       
       // Clean up stored redirect
@@ -65,19 +45,15 @@ export default function Auth() {
       
       // Add small delay to ensure state updates before navigation
       const timer = setTimeout(() => {
-        // If onboarding is not complete, redirect to onboarding
-        if (!onboardingComplete) {
-          console.log('Redirecting to onboarding as it is not complete');
-          navigate('/app/onboarding', { replace: true });
-        } else {
-          console.log('Redirecting to home as onboarding is complete');
-          navigate('/app/home', { replace: true });
-        }
+        // If user came from onboarding screens or onboarding is not complete, go to home
+        // OnboardingCheck will handle the completion logic
+        console.log('Redirecting to /app/home');
+        navigate('/app/home', { replace: true });
       }, 500);
       
       return () => clearTimeout(timer);
     }
-  }, [user, authLoading, navigate, redirecting, onboardingComplete]);
+  }, [user, authLoading, navigate, redirecting]);
 
   const handleSignIn = async () => {
     try {
@@ -104,15 +80,10 @@ export default function Auth() {
     );
   }
 
-  // If already logged in, redirect to appropriate page
+  // If already logged in, redirect to home
   if (user) {
-    const finalRedirect = !onboardingComplete ? '/app/onboarding' : '/app/home';
-      
-    console.log('User already logged in, redirecting to:', finalRedirect, {
-      onboardingComplete,
-      user: !!user
-    });
-    return <Navigate to={finalRedirect} replace />;
+    console.log('User already logged in, redirecting to /app/home');
+    return <Navigate to="/app/home" replace />;
   }
 
   return (

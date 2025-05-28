@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef, useCallback } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
@@ -786,18 +787,19 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       
       setCurrentStep(prev => prev + 1);
     } else {
-      // Last step - handle completion
+      // Last step - handle completion without setting onboardingComplete yet
       if (name) {
         localStorage.setItem("user_display_name", name.trim());
       }
       
-      localStorage.setItem("onboardingComplete", "true");
+      // Mark that user has seen onboarding screens but don't complete onboarding
+      localStorage.setItem("onboardingScreensSeen", "true");
       
       if (onComplete) {
         onComplete();
       } else {
-        // Always navigate to auth page for sign in
-        console.log("Onboarding complete, navigating to /app/auth for sign in");
+        // Navigate to auth page for sign in - onboarding will be completed after auth
+        console.log("Onboarding screens complete, navigating to /app/auth for sign in");
         navigate("/app/auth", { replace: true });
       }
     }
@@ -816,12 +818,13 @@ const OnboardingScreen: React.FC<OnboardingScreenProps> = ({ onComplete }) => {
       localStorage.setItem("user_display_name", name.trim());
     }
     
-    localStorage.setItem("onboardingComplete", "true");
+    // Mark that user has seen onboarding screens but don't complete onboarding
+    localStorage.setItem("onboardingScreensSeen", "true");
     
     if (onComplete) {
       onComplete();
     } else {
-      // Always navigate to auth page regardless of authentication status
+      // Navigate to auth page - onboarding will be completed after auth
       console.log("Skipping onboarding, navigating to /app/auth");
       navigate("/app/auth", { replace: true });
     }

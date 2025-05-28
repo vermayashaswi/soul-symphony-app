@@ -19,10 +19,16 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
   // Auto-activate trial for new users
   useAutoTrialActivation();
 
+  // Check if user has seen onboarding screens
+  const hasSeenOnboardingScreens = localStorage.getItem("onboardingScreensSeen") === "true";
+  const isOnboardingComplete = localStorage.getItem("onboardingComplete") === "true";
+
   console.log('OnboardingCheck:', { 
     hasUser: !!user, 
     profileSubscriptionStatus: profile?.subscription_status,
-    shouldRedirectToOnboarding: profile && profile.subscription_status === null
+    hasSeenOnboardingScreens,
+    isOnboardingComplete,
+    shouldRedirectToOnboarding: !hasSeenOnboardingScreens && !isOnboardingComplete
   });
 
   // If user is not logged in, redirect to auth
@@ -31,10 +37,17 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
     return <Navigate to="/app/auth" replace />;
   }
 
-  // If onboarding is not completed (subscription_status is null), redirect to onboarding
-  if (profile && profile.subscription_status === null) {
-    console.log('OnboardingCheck: Onboarding not complete, redirecting to /app/onboarding');
+  // If user hasn't seen onboarding screens and onboarding isn't complete, redirect to onboarding
+  if (!hasSeenOnboardingScreens && !isOnboardingComplete) {
+    console.log('OnboardingCheck: Onboarding screens not seen, redirecting to /app/onboarding');
     return <Navigate to="/app/onboarding" replace />;
+  }
+
+  // If user has seen onboarding screens but onboarding isn't complete, complete it now
+  if (hasSeenOnboardingScreens && !isOnboardingComplete && user) {
+    console.log('OnboardingCheck: User authenticated after seeing onboarding screens, completing onboarding');
+    localStorage.setItem("onboardingComplete", "true");
+    localStorage.removeItem("onboardingScreensSeen"); // Clean up
   }
 
   console.log('OnboardingCheck: All checks passed, rendering children');

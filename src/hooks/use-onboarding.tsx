@@ -23,11 +23,13 @@ export function useOnboarding() {
 
   const completeOnboarding = () => {
     localStorage.setItem('onboardingComplete', 'true');
+    localStorage.removeItem('onboardingScreensSeen'); // Clean up intermediate state
     setOnboardingComplete(true);
   };
 
   const resetOnboarding = () => {
     localStorage.removeItem('onboardingComplete');
+    localStorage.removeItem('onboardingScreensSeen');
     setOnboardingComplete(false);
   };
 
