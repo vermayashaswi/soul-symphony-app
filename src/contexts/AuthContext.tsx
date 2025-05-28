@@ -3,6 +3,7 @@ import React, { createContext, useContext, useEffect, useState } from 'react';
 import { User } from '@supabase/supabase-js';
 import { supabase } from '@/integrations/supabase/client';
 import { initializeSubscriptionService, cleanupSubscriptionService } from '@/services/subscriptionService';
+import { ensureProfileExists as ensureProfileExistsService, updateUserProfile as updateUserProfileService } from '@/services/profileService';
 
 interface AuthContextType {
   user: User | null;
@@ -11,6 +12,8 @@ interface AuthContextType {
   signUp: (email: string, password: string) => Promise<void>;
   signOut: () => Promise<void>;
   resetPassword: (email: string) => Promise<void>;
+  updateUserProfile: (metadata: Record<string, any>) => Promise<boolean>;
+  ensureProfileExists: () => Promise<boolean>;
 }
 
 const AuthContext = createContext<AuthContextType | undefined>(undefined);
@@ -102,6 +105,14 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
     }
   };
 
+  const updateUserProfile = async (metadata: Record<string, any>): Promise<boolean> => {
+    return await updateUserProfileService(user, metadata);
+  };
+
+  const ensureProfileExists = async (): Promise<boolean> => {
+    return await ensureProfileExistsService(user);
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -111,6 +122,8 @@ export const AuthProvider: React.FC<{ children: React.ReactNode }> = ({ children
         signUp,
         signOut,
         resetPassword,
+        updateUserProfile,
+        ensureProfileExists,
       }}
     >
       {children}
