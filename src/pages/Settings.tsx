@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -49,6 +48,18 @@ interface UserProfile {
   reminder_settings: ReminderSettings;
 }
 
+// Type guard function to check if data is ReminderSettings
+const isReminderSettings = (data: any): data is ReminderSettings => {
+  return (
+    data &&
+    typeof data === 'object' &&
+    typeof data.morning === 'boolean' &&
+    typeof data.evening === 'boolean' &&
+    typeof data.morningTime === 'string' &&
+    typeof data.eveningTime === 'string'
+  );
+};
+
 const Settings: React.FC = () => {
   const { user, signOut } = useAuth();
   const { theme, setTheme, colorTheme, setColorTheme } = useTheme();
@@ -78,9 +89,9 @@ const Settings: React.FC = () => {
           console.error('Error fetching profile:', error);
           toast.error('Failed to load profile. Please try again.');
         } else {
-          // Handle the reminder_settings type properly
-          const reminderSettings: ReminderSettings = typeof data.reminder_settings === 'object' && data.reminder_settings
-            ? data.reminder_settings as ReminderSettings
+          // Handle the reminder_settings type properly with type guard
+          const reminderSettings: ReminderSettings = isReminderSettings(data.reminder_settings)
+            ? data.reminder_settings
             : {
                 morning: false,
                 evening: false,
@@ -112,9 +123,17 @@ const Settings: React.FC = () => {
     if (!user?.id) return;
 
     try {
+      // Convert ReminderSettings to a plain object for JSON storage
+      const settingsForDb = {
+        morning: newSettings.morning,
+        evening: newSettings.evening,
+        morningTime: newSettings.morningTime,
+        eveningTime: newSettings.eveningTime
+      };
+
       const { error } = await supabase
         .from('profiles')
-        .update({ reminder_settings: newSettings })
+        .update({ reminder_settings: settingsForDb })
         .eq('id', user.id);
 
       if (error) {
@@ -145,7 +164,8 @@ const Settings: React.FC = () => {
   };
 
   const handleColorChange = (newColor: string) => {
-    setColorTheme(newColor);
+    // setColorTheme expects a specific type, so we cast the string to that type
+    setColorTheme(newColor as any);
     toast.success('Color theme updated successfully.');
   };
 
@@ -212,7 +232,6 @@ const Settings: React.FC = () => {
           </CardHeader>
           <CardContent className="space-y-4">
             <ProfilePictureUpload 
-              currentAvatarUrl={profile?.avatar_url || null}
               onUploadSuccess={(url) => {
                 setProfile(prev => prev ? { ...prev, avatar_url: url } : null);
               }}
