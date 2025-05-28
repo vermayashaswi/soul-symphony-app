@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { Navigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -83,7 +82,18 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
   }
 
   // If user hasn't seen onboarding screens and onboarding isn't complete, redirect to onboarding
+  // BUT ONLY if we're not processing and tutorial isn't active
   if (!hasSeenOnboardingScreens && !isOnboardingComplete && !isProcessing) {
+    // Check if tutorial is active from localStorage/profile
+    const tutorialActive = profile?.tutorial_completed !== 'YES';
+    
+    // If tutorial is active, render children (Home component) so tutorial can overlay
+    if (tutorialActive) {
+      console.log('OnboardingCheck: Tutorial is active, rendering children with tutorial overlay');
+      return <>{children}</>;
+    }
+    
+    // Otherwise redirect to onboarding screens
     console.log('OnboardingCheck: Onboarding screens not seen, redirecting to /app/onboarding');
     return <Navigate to="/app/onboarding" replace />;
   }

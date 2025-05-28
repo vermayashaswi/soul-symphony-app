@@ -33,7 +33,8 @@ const HomeContent = () => {
     journalError: journalError?.message,
     authLoading,
     isTrialActive,
-    shouldShowSubscriptionManager
+    shouldShowSubscriptionManager,
+    currentPath: window.location.pathname
   });
 
   // Show loading state while auth is loading
@@ -58,12 +59,13 @@ const HomeContent = () => {
     );
   }
 
-  // Show journal error if there's an issue
-  if (journalError) {
-    console.error('Home: Journal error:', journalError);
-    return (
-      <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-        <div className="container mx-auto px-4 py-6 space-y-6">
+  // Always render the home content, even if there are journal errors
+  // This ensures tutorial can overlay properly on the home page
+  return (
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Show journal error if there's an issue, but don't stop rendering */}
+        {journalError && (
           <Card className="border-red-200 bg-red-50 dark:bg-red-900/20">
             <CardContent className="pt-4">
               <div className="flex items-center gap-2">
@@ -74,18 +76,8 @@ const HomeContent = () => {
               </div>
             </CardContent>
           </Card>
-          
-          {/* Still show basic components */}
-          <JournalHeader />
-          <InspirationalQuote />
-        </div>
-      </div>
-    );
-  }
+        )}
 
-  return (
-    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
-      <div className="container mx-auto px-4 py-6 space-y-6">
         {/* Subscription Status Card */}
         {isTrialActive && (
           <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
@@ -105,7 +97,7 @@ const HomeContent = () => {
           <SubscriptionManager className="mb-6" />
         )}
 
-        {/* Header */}
+        {/* Header - This is where tutorial will look for journal-header-container */}
         <JournalHeader />
 
         {/* Inspirational Quote */}
@@ -117,9 +109,9 @@ const HomeContent = () => {
         {/* Entity Bubbles - show for all users */}
         <EntityBubbles entities={[]} />
 
-        {/* Journal Content */}
+        {/* Journal Content - Always render even if loading or error */}
         <JournalContent 
-          entries={journalEntries} 
+          entries={journalEntries || []} 
           isLoading={journalLoading}
           isMobile={isMobile}
         />

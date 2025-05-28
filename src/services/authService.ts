@@ -1,296 +1,80 @@
 
 import { supabase } from '@/integrations/supabase/client';
-import { toast } from 'sonner';
-import { isAppRoute } from '@/routes/RouteHelpers';
 
-/**
- * Gets the redirect URL for authentication
- */
-export const getRedirectUrl = (): string => {
-  // For iOS in standalone mode (PWA), we need to handle redirects differently
-  // Check for standalone mode in a type-safe way
-  const isInStandaloneMode = () => {
-    // Check for display-mode: standalone media query (PWA)
-    const standaloneCheck = window.matchMedia('(display-mode: standalone)').matches;
-    
-    // Check for navigator.standalone (iOS Safari)
-    // @ts-ignore - This is valid on iOS Safari but not in the TypeScript types
-    const iosSafariStandalone = window.navigator.standalone;
-    
-    return standaloneCheck || iosSafariStandalone;
-  };
-  
-  // Redirect directly to /app/home after successful authentication
-  const redirectUrl = `${window.location.origin}/app/home`;
-  console.log('getRedirectUrl: Generated redirect URL:', redirectUrl);
-  return redirectUrl;
-};
-
-/**
- * Function to create a user session record in the database
- */
-async function createUserSession(userId: string) {
+export const handleAuthCallback = async () => {
   try {
-    console.log('createUserSession: Creating session for user:', userId);
-    
-    // Get device and location info
-    const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
-    
-    // Create session entry
-    const { error } = await supabase
-      .from('user_sessions')
-      .insert({
-        user_id: userId,
-        device_type: deviceType,
-        user_agent: navigator.userAgent,
-        entry_page: window.location.pathname,
-        last_active_page: window.location.pathname,
-        is_active: true
-      });
+    const { data, error } = await supabase.auth.getSession();
     
     if (error) {
-      console.error('createUserSession: Error creating user session:', error);
-    } else {
-      console.log('createUserSession: Successfully created user session');
+      console.error('Auth callback error:', error);
+      return null;
     }
-  } catch (e) {
-    console.error('createUserSession: Exception creating user session:', e);
-  }
-}
 
-/**
- * Sign in with Google
- */
-export const signInWithGoogle = async (): Promise<void> => {
+    // Clean up hash fragment from URL after OAuth callback
+    if (window.location.hash && (window.location.hash.includes('access_token') || window.location.hash.includes('#'))) {
+      console.log('Cleaning up OAuth hash fragment from URL');
+      const cleanUrl = window.location.pathname + window.location.search;
+      window.history.replaceState({}, document.title, cleanUrl);
+    }
+
+    return data.session;
+  } catch (error) {
+    console.error('Error handling auth callback:', error);
+    return null;
+  }
+};
+
+export const signInWithGoogle = async () => {
   try {
-    const redirectUrl = getRedirectUrl();
-    console.log('signInWithGoogle: Using redirect URL:', redirectUrl);
-    
-    const { data, error } = await supabase.auth.signInWithOAuth({
+    const { error } = await supabase.auth.signInWithOAuth({
       provider: 'google',
       options: {
-        redirectTo: redirectUrl,
-        queryParams: {
-          // Force refresh of Google access tokens
-          access_type: 'offline',
-          prompt: 'consent',
-        },
-      },
+        redirectTo: `${window.location.origin}/app/home`
+      }
     });
 
-    if (error) {
-      console.error('signInWithGoogle: Supabase OAuth error:', error);
-      throw error;
-    }
-    
-    console.log('signInWithGoogle: OAuth data received:', data);
-    
-    // If we have a URL, manually redirect to it (as a backup)
-    if (data?.url) {
-      console.log('signInWithGoogle: Redirecting to OAuth URL:', data.url);
-      setTimeout(() => {
-        window.location.href = data.url;
-      }, 100);
-    }
-  } catch (error: any) {
-    console.error('signInWithGoogle: Error signing in with Google:', error.message);
-    toast.error(`Error signing in with Google: ${error.message}`);
+    if (error) throw error;
+  } catch (error) {
+    console.error('Google sign-in error:', error);
     throw error;
   }
 };
 
-/**
- * Sign in with email and password
- */
-export const signInWithEmail = async (email: string, password: string): Promise<void> => {
+export const signInWithEmail = async (email: string, password: string) => {
   try {
-    const { error, data } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
-      password,
+      password
     });
 
-    if (error) {
-      throw error;
-    }
-    
-    // Create a user session record after successful sign-in
-    if (data.user) {
-      await createUserSession(data.user.id);
-    }
-  } catch (error: any) {
-    console.error('Error signing in with email:', error.message);
-    toast.error(`Error signing in with email: ${error.message}`);
+    if (error) throw error;
+  } catch (error) {
+    console.error('Email sign-in error:', error);
     throw error;
   }
 };
 
-/**
- * Sign up with email and password
- */
-export const signUp = async (email: string, password: string): Promise<void> => {
+export const signUp = async (email: string, password: string) => {
   try {
-    const { error, data } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
-      password,
+      password
     });
 
-    if (error) {
-      throw error;
-    }
-    
-    // Create a user session record after successful sign-up
-    if (data.user) {
-      await createUserSession(data.user.id);
-    }
-  } catch (error: any) {
-    console.error('Error signing up:', error.message);
-    toast.error(`Error signing up: ${error.message}`);
+    if (error) throw error;
+  } catch (error) {
+    console.error('Sign-up error:', error);
     throw error;
   }
 };
 
-/**
- * Reset password
- */
-export const resetPassword = async (email: string): Promise<void> => {
+export const resetPassword = async (email: string) => {
   try {
     const { error } = await supabase.auth.resetPasswordForEmail(email);
 
-    if (error) {
-      throw error;
-    }
-  } catch (error: any) {
-    console.error('Error resetting password:', error.message);
-    toast.error(`Error resetting password: ${error.message}`);
+    if (error) throw error;
+  } catch (error) {
+    console.error('Password reset error:', error);
     throw error;
-  }
-};
-
-/**
- * Sign out
- * @param navigate Optional navigation function to redirect after logout
- */
-export const signOut = async (navigate?: (path: string) => void): Promise<void> => {
-  try {
-    // Check if there's a session before trying to sign out
-    const { data: sessionData } = await supabase.auth.getSession();
-    
-    // If no session exists, just clean up local state and redirect
-    if (!sessionData?.session) {
-      // Clear any auth-related items from local storage
-      localStorage.removeItem('authRedirectTo');
-      
-      // Redirect to auth page if navigate function is provided
-      if (navigate) {
-        navigate('/app/auth');
-      }
-      return;
-    }
-    
-    // If session exists, proceed with normal sign out
-    const { error } = await supabase.auth.signOut();
-    if (error) {
-      throw error;
-    }
-    
-    // Clear any auth-related items from local storage
-    localStorage.removeItem('authRedirectTo');
-    
-    // Always redirect to auth page if navigate function is provided
-    if (navigate) {
-      navigate('/app/auth');
-    }
-  } catch (error: any) {
-    console.error('Error signing out:', error.message);
-    
-    // Still navigate to auth page even if there's an error
-    if (navigate) {
-      navigate('/app/auth');
-    }
-    localStorage.removeItem('authRedirectTo');
-    
-    // Show error toast but don't prevent logout flow
-    toast.error(`Error while logging out: ${error.message}`);
-  }
-};
-
-/**
- * Refresh session
- */
-export const refreshSession = async () => {
-  try {
-    const { data: { session }, error } = await supabase.auth.getSession();
-    if (error) {
-      throw error;
-    }
-    return session;
-  } catch (error: any) {
-    console.error('Error refreshing session:', error.message);
-    throw error;
-  }
-};
-
-/**
- * Check if user is authenticated
- */
-export const isAuthenticated = async () => {
-  try {
-    const { data } = await supabase.auth.getSession();
-    return !!data.session;
-  } catch (error) {
-    console.error('Error checking authentication status:', error);
-    return false;
-  }
-};
-
-/**
- * Get current user
- */
-export const getCurrentUser = async () => {
-  try {
-    const { data } = await supabase.auth.getUser();
-    return data.user;
-  } catch (error) {
-    console.error('Error getting current user:', error);
-    return null;
-  }
-};
-
-/**
- * Handle auth callback
- * This is specifically added to fix the auth flow
- */
-export const handleAuthCallback = async () => {
-  try {
-    // Check if we have hash params that might indicate an auth callback
-    const hasHashParams = window.location.hash.includes('access_token') || 
-                         window.location.hash.includes('error') ||
-                         window.location.search.includes('error');
-    
-    console.log('handleAuthCallback: Checking for auth callback params:', hasHashParams);
-    console.log('handleAuthCallback: Current URL:', window.location.href);
-    
-    if (hasHashParams) {
-      // Get the session
-      const { data, error } = await supabase.auth.getSession();
-      
-      if (error) {
-        console.error('handleAuthCallback: Error in auth callback session check:', error);
-        return null;
-      } 
-      
-      if (data.session?.user) {
-        console.log('handleAuthCallback: User authenticated in callback handler, user ID:', data.session.user.id);
-        // Create a user session record
-        await createUserSession(data.session.user.id);
-        
-        return data.session;
-      }
-    }
-    
-    return null;
-  } catch (error) {
-    console.error('handleAuthCallback: Error in handleAuthCallback:', error);
-    return null;
   }
 };
