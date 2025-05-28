@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -7,6 +6,7 @@ import { TutorialStep as TutorialStepType } from '@/contexts/TutorialContext';
 import { AspectRatio } from '@/components/ui/aspect-ratio';
 import TutorialInfographic from './TutorialInfographic';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { PremiumBadge } from '@/components/onboarding/PremiumBadge';
 
 interface TutorialStepProps {
   step: TutorialStepType;
@@ -188,6 +188,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   // Determine whether to show the infographic and which type
   const shouldShowInfographic = !!step.infographicType && step.id >= 6 && step.id <= 9;
   
+  // Determine whether to show premium badge (steps 6-9)
+  const shouldShowPremiumBadge = step.id >= 6 && step.id <= 9;
+  
   return (
     <motion.div
       ref={stepRef}
@@ -211,12 +214,17 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     >
       {/* Step indicator */}
       <div className="flex justify-between items-center mb-2">
-        <div className="bg-theme text-white text-xs px-2 py-1 rounded-md">
-          <TranslatableText 
-            text={`Step ${stepNumber} of ${totalSteps}`} 
-            forceTranslate={true}
-            className="text-white" 
-          />
+        <div className="flex items-center">
+          <div className="bg-theme text-white text-xs px-2 py-1 rounded-md">
+            <TranslatableText 
+              text={`Step ${stepNumber} of ${totalSteps}`} 
+              forceTranslate={true}
+              className="text-white" 
+            />
+          </div>
+          {shouldShowPremiumBadge && (
+            <PremiumBadge className="ml-2" />
+          )}
         </div>
         <Button 
           variant="ghost" 
