@@ -102,7 +102,7 @@ interface StepIllustration {
 
 const ONBOARDING_STEPS: StepIllustration[] = [
   {
-    title: "Welcome to SOuLO",
+    title: "Your Voice Journaling Companion",
     subtitle: "",
     description: "Welcome to Voice Journaling - Just speak and we'll do the rest",
     illustration: (props: {}) => (
@@ -137,7 +137,7 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           animate={{ opacity: 1, y: 0 }}
           transition={{ delay: 0.2 }}
         >
-          <TranslatableText text="Welcome to SOuLO" forceTranslate={true} />
+          <TranslatableText text="Your Voice Journaling Companion" forceTranslate={true} />
         </motion.h1>
         
         <motion.p 

@@ -573,6 +573,10 @@ export type Database = {
           data_type: string
         }[]
       }
+      check_trial_expiry: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
         Returns: Json
