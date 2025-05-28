@@ -1,4 +1,5 @@
 
+
 import { useContext } from 'react';
 
 // Define the tutorial context type to match what's in TutorialContext
@@ -70,3 +71,4 @@ export const useTutorialSafe = (): TutorialContextType => {
     };
   }
 };
+
