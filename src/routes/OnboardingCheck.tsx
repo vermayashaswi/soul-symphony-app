@@ -13,9 +13,10 @@ export interface OnboardingCheckProps {
 }
 
 const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
-  const { user } = useAuth();
+  const { user, isLoading: authLoading } = useAuth();
   const { profile } = useUserProfile();
   const [isProcessing, setIsProcessing] = useState(false);
+  const [profileCheckComplete, setProfileCheckComplete] = useState(false);
   
   // Auto-activate trial for new users
   useAutoTrialActivation();
@@ -31,12 +32,26 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
     hasSeenOnboardingScreens,
     isOnboardingComplete,
     isProcessing,
+    authLoading,
+    profileCheckComplete,
     shouldRedirectToOnboarding: !hasSeenOnboardingScreens && !isOnboardingComplete
   });
 
+  // Wait for profile to be loaded before making decisions
+  useEffect(() => {
+    if (user && !authLoading) {
+      // Give some time for profile to load
+      const timer = setTimeout(() => {
+        setProfileCheckComplete(true);
+      }, 1000);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [user, authLoading]);
+
   // Handle onboarding completion when user signs in after seeing screens
   useEffect(() => {
-    if (hasSeenOnboardingScreens && !isOnboardingComplete && user && !isProcessing) {
+    if (hasSeenOnboardingScreens && !isOnboardingComplete && user && !isProcessing && profileCheckComplete) {
       console.log('OnboardingCheck: User authenticated after seeing onboarding screens, completing onboarding');
       setIsProcessing(true);
       
@@ -49,7 +64,17 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({ children }) => {
         setIsProcessing(false);
       }, 100);
     }
-  }, [hasSeenOnboardingScreens, isOnboardingComplete, user, isProcessing]);
+  }, [hasSeenOnboardingScreens, isOnboardingComplete, user, isProcessing, profileCheckComplete]);
+
+  // Show loading while auth is loading or profile is being checked
+  if (authLoading || (user && !profileCheckComplete)) {
+    console.log('OnboardingCheck: Loading auth or profile...');
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
 
   // If user is not logged in, redirect to auth
   if (!user) {

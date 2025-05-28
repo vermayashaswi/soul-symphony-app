@@ -11,26 +11,46 @@ export interface UseJournalEntriesReturn {
 }
 
 export const useJournalEntries = (): UseJournalEntriesReturn => {
-  const { user } = useAuth();
+  const { user, session } = useAuth();
 
   const { data, isLoading, error, refetch } = useQuery({
     queryKey: ['journal-entries', user?.id],
     queryFn: async () => {
-      if (!user?.id) return [];
-
-      const { data, error } = await supabase
-        .from('Journal Entries')
-        .select('*')
-        .eq('user_id', user.id)
-        .order('created_at', { ascending: false });
-
-      if (error) {
-        throw error;
+      if (!user?.id || !session) {
+        console.log('useJournalEntries: No user or session, returning empty array');
+        return [];
       }
 
-      return data || [];
+      console.log('useJournalEntries: Fetching entries for user:', user.id);
+
+      try {
+        const { data, error } = await supabase
+          .from('Journal Entries')
+          .select('*')
+          .eq('user_id', user.id)
+          .order('created_at', { ascending: false });
+
+        if (error) {
+          console.error('useJournalEntries: Supabase error:', error);
+          throw error;
+        }
+
+        console.log('useJournalEntries: Successfully fetched entries:', data?.length || 0);
+        return data || [];
+      } catch (error) {
+        console.error('useJournalEntries: Error fetching journal entries:', error);
+        throw error;
+      }
     },
-    enabled: !!user?.id,
+    enabled: !!(user?.id && session),
+    retry: (failureCount, error) => {
+      // Don't retry on auth-related errors
+      if (error?.message?.includes('JWT') || error?.message?.includes('auth')) {
+        return false;
+      }
+      return failureCount < 2;
+    },
+    retryDelay: 1000,
   });
 
   return {
