@@ -1,73 +1,89 @@
 
-import React, { useEffect } from 'react';
-import { useTutorial } from '@/contexts/TutorialContext';
-import JournalHeader from '@/components/home/JournalHeader';
-import JournalNavigationButton from '@/components/home/JournalNavigationButton';
+import React from 'react';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUserProfile } from '@/hooks/useUserProfile';
+import { useJournalEntries } from '@/hooks/use-journal-entries';
+import { useMobile } from '@/hooks/use-mobile';
+import JournalSummaryCard from '@/components/home/JournalSummaryCard';
 import JournalContent from '@/components/home/JournalContent';
-import BackgroundElements from '@/components/home/BackgroundElements';
+import JournalHeader from '@/components/home/JournalHeader';
+import { InspirationalQuote } from '@/components/quotes/InspirationalQuote';
+import EntityBubbles from '@/components/home/EntityBubbles';
+import SubscriptionManager from '@/components/subscription/SubscriptionManager';
+import { Card, CardContent } from '@/components/ui/card';
+import { Crown } from 'lucide-react';
 
 const Home = () => {
-  const { isActive, currentStep, steps, navigationState } = useTutorial();
-  
-  // Check if we're in specific tutorial steps
-  const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
-  const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
-  
-  useEffect(() => {
-    console.log('Home component mounted, tutorial state:', {
-      isActive, 
-      currentStep, 
-      stepId: steps[currentStep]?.id,
-      navigationInProgress: navigationState.inProgress
-    });
-    
-    // Always prevent scrolling on home page - regardless of tutorial state
-    document.body.style.overflow = 'hidden';
-    document.body.style.position = 'fixed';
-    document.body.style.width = '100%';
-    document.body.style.height = '100%';
-    document.body.style.top = '0';
-    document.body.style.left = '0';
-    
-    // Cleanup function to restore scrolling when navigating away
-    return () => {
-      document.body.style.overflow = '';
-      document.body.style.position = '';
-      document.body.style.width = '';
-      document.body.style.height = '';
-      document.body.style.top = '';
-      document.body.style.left = '';
-    };
-  }, [isActive, currentStep, steps, navigationState]);
+  const { user } = useAuth();
+  const { profile } = useUserProfile();
+  const { isMobile } = useMobile();
+  const { data: journalEntries = [], isLoading } = useJournalEntries();
+
+  // Check subscription status
+  const subscriptionStatus = profile?.subscription_status || 'free';
+  const trialEndsAt = profile?.trial_ends_at ? new Date(profile.trial_ends_at) : null;
+  const isTrialExpired = trialEndsAt ? new Date() > trialEndsAt : false;
+  const isTrialActive = subscriptionStatus === 'trial' && !isTrialExpired;
+  const isPremium = profile?.is_premium && (subscriptionStatus === 'active' || isTrialActive);
+
+  const daysRemainingInTrial = trialEndsAt && isTrialActive 
+    ? Math.ceil((trialEndsAt.getTime() - Date.now()) / (1000 * 60 * 60 * 24))
+    : 0;
+
+  // Show subscription manager if user needs to upgrade
+  const shouldShowSubscriptionManager = !isPremium || (isTrialActive && daysRemainingInTrial <= 3);
+
+  if (!user) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="text-center space-y-4">
+          <h1 className="text-2xl font-semibold">Welcome to Soulo</h1>
+          <p className="text-muted-foreground">Please sign in to continue</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div 
-      className="min-h-screen bg-background text-foreground relative overflow-hidden"
-      style={{ 
-        // Always apply fixed positioning on home page (not just during tutorial)
-        touchAction: 'none',
-        overflow: 'hidden',
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        width: '100%',
-        height: '100%'
-      }}
-    >
-      {/* Background elements including animations */}
-      <BackgroundElements />
+    <div className="min-h-screen bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50 dark:from-slate-900 dark:via-slate-800 dark:to-slate-900">
+      <div className="container mx-auto px-4 py-6 space-y-6">
+        {/* Subscription Status Card */}
+        {isTrialActive && (
+          <Card className="border-blue-200 bg-blue-50 dark:bg-blue-900/20">
+            <CardContent className="pt-4">
+              <div className="flex items-center gap-2">
+                <Crown className="h-4 w-4 text-blue-600" />
+                <span className="text-sm font-medium text-blue-700 dark:text-blue-300">
+                  Free Trial Active - {daysRemainingInTrial} days remaining
+                </span>
+              </div>
+            </CardContent>
+          </Card>
+        )}
 
-      {/* Central navigation button - positioned in the center of the screen */}
-      <JournalNavigationButton />
+        {/* Subscription Manager - show if needed */}
+        {shouldShowSubscriptionManager && (
+          <SubscriptionManager className="mb-6" />
+        )}
 
-      {/* Journal content with summary and quote */}
-      <JournalContent />
-
-      {/* Header with journal name and date - ensure visibility during tutorial */}
-      <div className={`relative ${isInWelcomeTutorialStep ? 'z-[9999]' : 'z-20'} flex flex-col`}>
+        {/* Header */}
         <JournalHeader />
+
+        {/* Inspirational Quote */}
+        <InspirationalQuote />
+
+        {/* Journal Summary */}
+        <JournalSummaryCard />
+
+        {/* Entity Bubbles - show for all users */}
+        <EntityBubbles />
+
+        {/* Journal Content */}
+        <JournalContent 
+          entries={journalEntries} 
+          isLoading={isLoading}
+          isMobile={isMobile}
+        />
       </div>
     </div>
   );
