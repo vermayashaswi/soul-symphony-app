@@ -109,19 +109,29 @@ const ONBOARDING_STEPS: StepIllustration[] = [
     description: "Welcome to Voice Journaling - Just speak and we'll do the rest",
     illustration: (props: {}) => (
       <div className="flex flex-col justify-center items-center my-2">
+        {/* Move title to the top with more prominent positioning */}
+        <motion.h1 
+          className="text-2xl font-bold mb-6 text-foreground text-center"
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ delay: 0.1 }}
+        >
+          <TranslatableText text="Your Voice Journaling Companion" forceTranslate={true} />
+        </motion.h1>
+        
         <motion.div 
-          className="relative w-full h-64"
+          className="relative w-full h-48"
           initial={{ opacity: 0, scale: 0.8 }}
           animate={{ opacity: 1, scale: 1 }}
-          transition={{ duration: 0.5 }}
+          transition={{ duration: 0.5, delay: 0.2 }}
         >
-          <div className="absolute inset-0 flex items-center justify-center z-10 mb-20">
+          <div className="absolute inset-0 flex items-center justify-center z-10 mb-12">
             <div className="relative z-20">
               <SouloLogo size="large" className="scale-[2.2]" useColorTheme={false} textClassName="font-bold text-white" />
             </div>
           </div>
           
-          <div className="absolute inset-0 flex items-center justify-center z-5 mt-20">
+          <div className="absolute inset-0 flex items-center justify-center z-5 mt-12">
             <div className="absolute w-full h-16 flex items-center justify-center overflow-hidden">
               <RecordingVisualizer 
                 isRecording={false} 
@@ -133,17 +143,8 @@ const ONBOARDING_STEPS: StepIllustration[] = [
           </div>
         </motion.div>
         
-        <motion.h1 
-          className="text-2xl font-bold mb-3 mt-8 text-foreground"
-          initial={{ opacity: 0, y: 20 }}
-          animate={{ opacity: 1, y: 0 }}
-          transition={{ delay: 0.2 }}
-        >
-          <TranslatableText text="Your Voice Journaling Companion" forceTranslate={true} />
-        </motion.h1>
-        
         <motion.p 
-          className="text-muted-foreground mb-6 max-w-xs font-medium text-theme animate-pulse"
+          className="text-muted-foreground mb-6 max-w-xs font-medium text-theme animate-pulse text-center"
           initial={{ opacity: 0, y: 20 }}
           animate={{ 
             opacity: 1, 
