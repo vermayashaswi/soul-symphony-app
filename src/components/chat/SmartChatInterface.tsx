@@ -149,7 +149,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       }
       
       debugLog.addEvent("Thread Loading", `Thread ${threadId} found, fetching messages`, "success");
-      const messages = await getThreadMessages(threadId);
+      const messages = await getThreadMessages(threadId, user.id);
       
       if (messages && messages.length > 0) {
         debugLog.addEvent("Thread Loading", `Loaded ${messages.length} messages for thread ${threadId}`, "success");
@@ -243,7 +243,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
       let savedUserMessage: ChatMessage | null = null;
       try {
         debugLog.addEvent("Database", `Saving user message to thread ${threadId}`, "info");
-        savedUserMessage = await saveMessage(threadId, message, 'user');
+        savedUserMessage = await saveMessage(threadId, message, 'user', user.id);
         debugLog.addEvent("Database", `User message saved with ID: ${savedUserMessage?.id}`, "success");
         
         if (savedUserMessage) {
@@ -327,7 +327,7 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             threadId,
             response.content,
             'assistant',
-            undefined,
+            user.id,
             undefined,
             false,
             true,
@@ -381,8 +381,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
             threadId,
             response.content,
             'assistant',
+            user.id,
             response.references,
-            response.analysis,
             response.hasNumericResult
           );
           
@@ -439,7 +439,8 @@ const SmartChatInterface: React.FC<SmartChatInterfaceProps> = ({ mentalHealthIns
         const savedErrorMessage = await saveMessage(
           threadId,
           errorContent,
-          'assistant'
+          'assistant',
+          user.id
         );
         
         if (savedErrorMessage) {

@@ -23,7 +23,11 @@ export const createJournalEntry = async (entryData: Partial<JournalEntry>, userI
     return {
       ...data,
       content: data['refined text'] || data['transcription text'] || '',
-      entities: Array.isArray(data.entities) ? data.entities : []
+      entities: Array.isArray(data.entities) ? data.entities.map((entity: any) => ({
+        type: entity.type || '',
+        name: entity.name || '',
+        text: entity.text
+      })) : []
     } as JournalEntry;
   } catch (error) {
     console.error('Exception creating journal entry:', error);
@@ -50,7 +54,11 @@ export const updateJournalEntry = async (entryId: number, entryData: Partial<Jou
     return {
       ...data,
       content: data['refined text'] || data['transcription text'] || '',
-      entities: Array.isArray(data.entities) ? data.entities : []
+      entities: Array.isArray(data.entities) ? data.entities.map((entity: any) => ({
+        type: entity.type || '',
+        name: entity.name || '',
+        text: entity.text
+      })) : []
     } as JournalEntry;
   } catch (error) {
     console.error('Exception updating journal entry:', error);
@@ -105,7 +113,11 @@ export const getJournalEntries = async (userId: string, limit?: number, offset?:
     return (data || []).map(entry => ({
       ...entry,
       content: entry['refined text'] || entry['transcription text'] || '',
-      entities: Array.isArray(entry.entities) ? entry.entities : []
+      entities: Array.isArray(entry.entities) ? entry.entities.map((entity: any) => ({
+        type: entity.type || '',
+        name: entity.name || '',
+        text: entity.text
+      })) : []
     })) as JournalEntry[];
   } catch (error) {
     console.error('Exception fetching journal entries:', error);

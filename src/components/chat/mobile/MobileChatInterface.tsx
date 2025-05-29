@@ -176,7 +176,7 @@ export default function MobileChatInterface({
       }
       
       debugLog.addEvent("Thread Loading", `[Mobile] Thread ${currentThreadId} found, fetching messages`, "success");
-      const chatMessages = await getThreadMessages(currentThreadId);
+      const chatMessages = await getThreadMessages(currentThreadId, user.id);
       
       if (chatMessages && chatMessages.length > 0) {
         debugLog.addEvent("Thread Loading", `[Mobile] Loaded ${chatMessages.length} messages for thread ${currentThreadId}`, "success");
@@ -304,7 +304,7 @@ export default function MobileChatInterface({
       await updateThreadProcessingStatus(currentThreadId, 'processing');
       
       debugLog.addEvent("Database", `[Mobile] Saving user message to thread ${currentThreadId}`, "info");
-      const savedUserMessage = await saveMessage(currentThreadId, message, 'user');
+      const savedUserMessage = await saveMessage(currentThreadId, message, 'user', user.id);
       debugLog.addEvent("Database", `[Mobile] User message saved: ${savedUserMessage?.id}`, "success");
       console.log("[Mobile] User message saved:", savedUserMessage?.id);
       
@@ -376,8 +376,8 @@ export default function MobileChatInterface({
         currentThreadId,
         response.content,
         'assistant',
+        user.id,
         response.references || null,
-        response.analysis || null,
         response.hasNumericResult || false
       );
       
@@ -433,7 +433,8 @@ export default function MobileChatInterface({
         const savedErrorMessage = await saveMessage(
           currentThreadId,
           errorMessageContent,
-          'assistant'
+          'assistant',
+          user.id
         );
         debugLog.addEvent("Database", `[Mobile] Error message saved to database: ${savedErrorMessage?.id}`, "success");
         console.log("[Mobile] Error message saved to database:", savedErrorMessage?.id);
@@ -560,7 +561,6 @@ export default function MobileChatInterface({
 
   return (
     <div className="mobile-chat-interface h-full flex flex-col relative">
-      {/* ... keep existing code (header with navigation) */}
       <div className="sticky top-0 z-40 w-full bg-background border-b">
         <div className="container flex h-14 max-w-screen-lg items-center">
           <Sheet open={sheetOpen} onOpenChange={setSheetOpen}>
@@ -701,7 +701,6 @@ export default function MobileChatInterface({
         />
       </div>
       
-      {/* ... keep existing code (AlertDialog for deletion) */}
       <AlertDialog open={showDeleteDialog} onOpenChange={setShowDeleteDialog}>
         <AlertDialogContent>
           <AlertDialogHeader>
@@ -717,7 +716,9 @@ export default function MobileChatInterface({
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
-            <AlertDialogCancel><TranslatableText text="Cancel" /></AlertDialogCancel>
+            <AlertDialogCancel>
+              <TranslatableText text="Cancel" />
+            </AlertDialogCancel>
             <AlertDialogAction 
               onClick={handleDeleteCurrentThread}
               disabled={isDeletionDisabled}

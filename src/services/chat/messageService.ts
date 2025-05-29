@@ -182,12 +182,30 @@ export const deleteChatMessage = async (messageId: string, userId: string): Prom
 
 // Legacy function aliases for backward compatibility
 export const getThreadMessages = getChatMessages;
-export const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string) => {
+
+// Updated saveMessage function with correct signature
+export const saveMessage = async (
+  threadId: string, 
+  content: string, 
+  sender: 'user' | 'assistant', 
+  userId?: string,
+  references?: any[] | null,
+  hasNumericResult?: boolean,
+  isInteractive?: boolean,
+  interactiveOptions?: any[]
+) => {
   if (!userId) {
     console.error('User ID is required for saveMessage');
     return null;
   }
-  return createChatMessage(threadId, content, sender, userId);
+
+  const additionalData: Partial<ChatMessage> = {};
+  if (references) additionalData.reference_entries = references;
+  if (hasNumericResult !== undefined) additionalData.has_numeric_result = hasNumericResult;
+  if (isInteractive) additionalData.isInteractive = isInteractive;
+  if (interactiveOptions) additionalData.interactiveOptions = interactiveOptions;
+
+  return createChatMessage(threadId, content, sender, userId, additionalData);
 };
 
 // Thread management functions
