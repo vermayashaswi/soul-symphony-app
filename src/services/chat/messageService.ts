@@ -48,11 +48,12 @@ export const createChatMessage = async (
       .eq('id', threadId)
       .eq('user_id', userId);
 
-    // Cast sender to proper type
+    // Cast sender and role to proper types and handle sub_query_responses
     return {
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
-      role: data.role as 'user' | 'assistant' | 'error'
+      role: data.role as 'user' | 'assistant' | 'error',
+      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
     };
   } catch (error) {
     console.error('Exception creating chat message:', error);
@@ -86,11 +87,12 @@ export const getChatMessages = async (threadId: string, userId: string): Promise
       return [];
     }
 
-    // Cast sender and role to proper types
+    // Cast sender and role to proper types and handle sub_query_responses
     return (data || []).map(msg => ({
       ...msg,
       sender: msg.sender as 'user' | 'assistant' | 'error',
-      role: msg.role as 'user' | 'assistant' | 'error'
+      role: msg.role as 'user' | 'assistant' | 'error',
+      sub_query_responses: Array.isArray(msg.sub_query_responses) ? msg.sub_query_responses : []
     }));
   } catch (error) {
     console.error('Exception fetching chat messages:', error);
@@ -131,11 +133,12 @@ export const updateChatMessage = async (
       return null;
     }
 
-    // Cast sender and role to proper types
+    // Cast sender and role to proper types and handle sub_query_responses
     return {
       ...data,
       sender: data.sender as 'user' | 'assistant' | 'error',
-      role: data.role as 'user' | 'assistant' | 'error'
+      role: data.role as 'user' | 'assistant' | 'error',
+      sub_query_responses: Array.isArray(data.sub_query_responses) ? data.sub_query_responses : []
     };
   } catch (error) {
     console.error('Exception updating chat message:', error);
