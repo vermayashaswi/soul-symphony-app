@@ -49,6 +49,82 @@ const TutorialOverlay: React.FC = () => {
     });
   }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent]);
   
+  // Enhanced function to completely clean up ALL tutorial highlighting
+  const cleanupAllTutorialHighlighting = () => {
+    console.log('Running comprehensive tutorial cleanup');
+    
+    // Get ALL elements that might have tutorial classes
+    const allTutorialElements = document.querySelectorAll(
+      '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, ' +
+      '.chat-question-highlight, .insights-header-highlight, .emotion-chart-highlight, ' +
+      '.mood-calendar-highlight, .soul-net-highlight, .empty-chat-suggestion, ' +
+      '[class*="tutorial-"], [data-tutorial-target]'
+    );
+    
+    console.log(`Found ${allTutorialElements.length} elements to clean up`);
+    
+    allTutorialElements.forEach(el => {
+      if (el instanceof HTMLElement) {
+        // Remove ALL tutorial-related classes
+        el.classList.remove(
+          'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
+          'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
+          'mood-calendar-highlight', 'soul-net-highlight', 'empty-chat-suggestion'
+        );
+        
+        // Reset ALL inline styles that might have been applied by tutorial
+        el.style.boxShadow = '';
+        el.style.animation = '';
+        el.style.border = '';
+        el.style.transform = '';
+        el.style.zIndex = '';
+        el.style.position = '';
+        el.style.visibility = '';
+        el.style.opacity = '';
+        el.style.backgroundColor = '';
+        el.style.color = '';
+        el.style.textShadow = '';
+        el.style.top = '';
+        el.style.left = '';
+        el.style.right = '';
+        el.style.bottom = '';
+        el.style.margin = '';
+        el.style.padding = '';
+        el.style.display = '';
+        el.style.backgroundImage = '';
+        el.style.borderRadius = '';
+      }
+    });
+    
+    // Also specifically target common button selectors that might be highlighted
+    const commonButtonSelectors = [
+      '[data-value="record"]', '[data-value="entries"]', '[value="record"]', '[value="entries"]',
+      '.record-entry-button', '.entries-tab-button', 'button[role="tab"]'
+    ];
+    
+    commonButtonSelectors.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (el instanceof HTMLElement) {
+          el.classList.remove(
+            'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
+            'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
+            'mood-calendar-highlight', 'soul-net-highlight'
+          );
+          
+          // Reset styles
+          el.style.boxShadow = '';
+          el.style.animation = '';
+          el.style.border = '';
+          el.style.transform = '';
+          el.style.zIndex = '';
+          el.style.backgroundColor = '';
+          el.style.color = '';
+        }
+      });
+    });
+  };
+  
   // Enhanced scrolling prevention with data attribute for current step
   useEffect(() => {
     if (!shouldShowTutorial) return;
@@ -124,39 +200,8 @@ const TutorialOverlay: React.FC = () => {
       window.scrollTo(0, scrollPos);
       console.log('Tutorial inactive, restored page scrolling');
       
-      // CRITICAL: Thorough cleanup of ALL tutorial target elements
-      const tutorialElements = document.querySelectorAll(
-        '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, ' +
-        '.chat-question-highlight, .insights-header-highlight, .emotion-chart-highlight, ' +
-        '.mood-calendar-highlight, .soul-net-highlight'
-      );
-      
-      tutorialElements.forEach(el => {
-        if (el instanceof HTMLElement) {
-          // Remove all tutorial classes
-          el.classList.remove(
-            'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
-            'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
-            'mood-calendar-highlight', 'soul-net-highlight'
-          );
-          
-          // Reset ALL inline styles that might have been applied
-          el.style.boxShadow = '';
-          el.style.animation = '';
-          el.style.border = '';
-          el.style.transform = '';
-          el.style.zIndex = '';
-          el.style.position = '';
-          el.style.visibility = '';
-          el.style.opacity = '';
-          el.style.top = '';
-          el.style.left = '';
-          el.style.right = '';
-          el.style.bottom = '';
-          el.style.margin = '';
-          el.style.padding = '';
-        }
-      });
+      // Run comprehensive cleanup
+      cleanupAllTutorialHighlighting();
       
       // SPECIAL: Reset the arrow button specifically to ensure it's centered
       const arrowButton = document.querySelector('.journal-arrow-button');
@@ -195,38 +240,17 @@ const TutorialOverlay: React.FC = () => {
     };
   }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // Step-specific element highlighting with chat step improvements
+  // Enhanced step-specific element highlighting with improved cleanup
   useEffect(() => {
     if (!shouldShowTutorial || navigationState.inProgress) return;
     
     const currentStepData = steps[currentStep];
     console.log(`Setting up highlighting for step ${currentStepData?.id}`);
     
-    // Remove any existing highlight classes first
-    const existingHighlights = document.querySelectorAll(
-      '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, ' +
-      '.entries-tab, .chat-question-highlight, .insights-header-highlight, ' +
-      '.emotion-chart-highlight, .mood-calendar-highlight, .soul-net-highlight'
-    );
+    // CRITICAL: Always clean up ALL tutorial highlighting first before applying new highlighting
+    cleanupAllTutorialHighlighting();
     
-    existingHighlights.forEach(el => {
-      el.classList.remove(
-        'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab',
-        'entries-tab', 'chat-question-highlight', 'insights-header-highlight',
-        'emotion-chart-highlight', 'mood-calendar-highlight', 'soul-net-highlight'
-      );
-      
-      // Clear any inline styles that might have been applied
-      if (el instanceof HTMLElement) {
-        el.style.boxShadow = '';
-        el.style.animation = '';
-        el.style.border = '';
-        el.style.transform = '';
-        el.style.zIndex = '';
-      }
-    });
-    
-    // Apply the appropriate highlighting based on step ID
+    // Apply the appropriate highlighting based on step ID ONLY after cleanup
     const highlightTimeout = setTimeout(() => {
       if (currentStepData?.id === 1) {
         // Step 1: Journal Header
@@ -256,86 +280,104 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       else if (currentStepData?.id === 3) {
-        // Step 3: Record Entry Tab
+        // Step 3: Record Entry Tab - ONLY highlight this, never the Past Entries
+        console.log('Step 3: Applying highlighting ONLY to Record Entry button');
+        
         let foundElement = false;
         
         for (const selector of RECORD_ENTRY_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            element.classList.add('tutorial-target', 'record-entry-tab', 'tutorial-button-highlight');
+            // Double-check this is NOT the Past Entries button
+            const elementText = element.textContent?.toLowerCase().trim();
+            const isRecordEntry = elementText?.includes('record') || elementText?.includes('new') || elementText?.includes('entry');
+            const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history');
             
-            // Apply enhanced styling
-            if (element instanceof HTMLElement) {
-              element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
-              element.style.animation = "button-pulse 1.5s infinite alternate";
-              element.style.border = "2px solid white";
-              element.style.transform = "scale(1.05)";
-              element.style.zIndex = "10000";
+            if (isRecordEntry && !isPastEntries) {
+              element.classList.add('tutorial-target', 'record-entry-tab', 'tutorial-button-highlight');
+              
+              // Apply enhanced styling
+              if (element instanceof HTMLElement) {
+                element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+                element.style.animation = "button-pulse 1.5s infinite alternate";
+                element.style.border = "2px solid white";
+                element.style.transform = "scale(1.05)";
+                element.style.zIndex = "10000";
+              }
+              
+              foundElement = true;
+              console.log(`Applied highlighting to Record Entry button using selector: ${selector}, text: "${elementText}"`);
+              break;
             }
-            
-            foundElement = true;
-            console.log(`Applied enhanced highlighting to record entry element using selector: ${selector}`);
-            break;
           }
         }
         
         if (!foundElement) {
-          console.warn('Record entry element not found with any selector');
+          console.warn('Record entry element not found with any selector for step 3');
         }
       }
       else if (currentStepData?.id === 4) {
         // Step 4: Past Entries Tab - Enhanced with identical styling as record entry
+        console.log('Step 4: Applying highlighting ONLY to Past Entries button');
+        
         let foundElement = false;
         
         for (const selector of ENTRIES_TAB_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            element.classList.add('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
+            // Double-check this is the Past Entries button and NOT Record Entry
+            const elementText = element.textContent?.toLowerCase().trim();
+            const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history') || selector.includes('entries');
+            const isRecordEntry = elementText?.includes('record') || elementText?.includes('new');
             
-            // Apply identical styling to record entry button
-            if (element instanceof HTMLElement) {
-              element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
-              element.style.animation = "button-pulse 1.5s infinite alternate";
-              element.style.border = "2px solid white";
-              element.style.transform = "scale(1.05)";
-              element.style.zIndex = "10000";
+            if (isPastEntries && !isRecordEntry) {
+              element.classList.add('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
               
-              // Make sure it's fully visible with high opacity
-              element.style.opacity = "1";
-              element.style.visibility = "visible";
-              element.style.position = "relative";
-              
-              // Explicit white background
-              element.style.backgroundColor = "white";
-              
-              // Fix text color for light mode
-              const isDarkMode = document.body.classList.contains('dark');
-              if (!isDarkMode) {
-                element.style.color = "#000";
+              // Apply identical styling to record entry button
+              if (element instanceof HTMLElement) {
+                element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
+                element.style.animation = "button-pulse 1.5s infinite alternate";
+                element.style.border = "2px solid white";
+                element.style.transform = "scale(1.05)";
+                element.style.zIndex = "10000";
                 
-                // Also apply to child elements
-                const textElements = element.querySelectorAll('span, div');
-                textElements.forEach(textEl => {
-                  if (textEl instanceof HTMLElement) {
-                    textEl.style.color = "#000";
-                    textEl.style.textShadow = "none";
-                    textEl.style.backgroundColor = "white";
-                  }
-                });
+                // Make sure it's fully visible with high opacity
+                element.style.opacity = "1";
+                element.style.visibility = "visible";
+                element.style.position = "relative";
+                
+                // Explicit white background
+                element.style.backgroundColor = "white";
+                
+                // Fix text color for light mode
+                const isDarkMode = document.body.classList.contains('dark');
+                if (!isDarkMode) {
+                  element.style.color = "#000";
+                  
+                  // Also apply to child elements
+                  const textElements = element.querySelectorAll('span, div');
+                  textElements.forEach(textEl => {
+                    if (textEl instanceof HTMLElement) {
+                      textEl.style.color = "#000";
+                      textEl.style.textShadow = "none";
+                      textEl.style.backgroundColor = "white";
+                    }
+                  });
+                }
               }
+              
+              foundElement = true;
+              console.log(`Applied highlighting to Past Entries button using selector: ${selector}, text: "${elementText}"`);
+              break;
             }
-            
-            foundElement = true;
-            console.log(`Applied enhanced highlighting to entries tab using selector: ${selector}`);
-            break;
           }
         }
         
         if (!foundElement) {
-          console.warn('Entries tab element not found with any selector');
+          console.warn('Past Entries tab element not found with any selector for step 4');
         }
       }
-      // Improved Step 5 handling for better visibility with purple background
+      // ... keep existing code (steps 5-9 remain the same)
       else if (currentStepData?.id === 5) {
         console.log('Setting up highlight for chat question (step 5) with purple background');
         
