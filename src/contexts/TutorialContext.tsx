@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -11,7 +12,6 @@ import {
   EMOTION_CHART_SELECTORS,
   MOOD_CALENDAR_SELECTORS,
   SOULNET_SELECTORS,
-  THEME_STRIPS_SELECTORS,
   findAndHighlightElement,
   logPotentialTutorialElements
 } from '@/utils/tutorial/tutorial-elements-finder';
@@ -54,7 +54,7 @@ interface TutorialContextType {
 // Create the context with a default undefined value
 const TutorialContext = createContext<TutorialContextType | undefined>(undefined);
 
-// Define the initial tutorial steps with the new theme strips step
+// Define the initial tutorial steps with enhanced robustness and custom infographics
 const initialTutorialSteps: TutorialStep[] = [
   {
     id: 1,
@@ -78,18 +78,6 @@ const initialTutorialSteps: TutorialStep[] = [
   },
   {
     id: 3,
-    title: 'Your Emotional Themes',
-    content: 'These moving strips represent themes from your journal entries. Watch how they flow and change, reflecting your emotional journey over time.',
-    targetElement: '.floating-theme-strips',
-    alternativeSelectors: THEME_STRIPS_SELECTORS,
-    position: 'center',
-    showNextButton: true,
-    showSkipButton: true,
-    navigateTo: '/app/home',
-    waitForElement: true
-  },
-  {
-    id: 4,
     title: 'Multilingual Recording',
     content: 'The New Entry button lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
     targetElement: '.tutorial-record-entry-button',
@@ -101,7 +89,7 @@ const initialTutorialSteps: TutorialStep[] = [
     waitForElement: true // Wait for the element to be present before proceeding
   },
   {
-    id: 5,
+    id: 4,
     title: 'Your Journal History',
     content: 'View and explore all your past journal entries here. You can search, filter, and reflect on your emotional journey over time.',
     targetElement: '[value="entries"]', // Target the Past Entries tab
@@ -113,7 +101,7 @@ const initialTutorialSteps: TutorialStep[] = [
     waitForElement: true
   },
   {
-    id: 6,
+    id: 5,
     title: 'Chat with Your Journal',
     content: 'Ask questions about your journal entries and track your wellbeing across all areas of life. Our AI can analyze patterns and provide insights from your emotional journey.',
     targetElement: '.chat-suggestion-button',
@@ -124,9 +112,9 @@ const initialTutorialSteps: TutorialStep[] = [
     navigateTo: '/app/chat',
     waitForElement: true
   },
-  // Enhanced steps 7-10 with custom infographics (renumbered from 6-9)
+  // Enhanced steps 6-9 with custom infographics
   {
-    id: 7,
+    id: 6,
     title: 'Your Emotional Insights',
     content: 'Welcome to the Insights page! Here you\'ll find visual representations of your emotional journey and patterns over time.',
     targetElement: '.insights-container h1',
@@ -139,7 +127,7 @@ const initialTutorialSteps: TutorialStep[] = [
     infographicType: 'insights-overview'
   },
   {
-    id: 8,
+    id: 7,
     title: 'Emotion Trends',
     content: 'This chart shows how your emotions trend over time. See which emotions appear most frequently in your journal and how they change.',
     targetElement: '.recharts-responsive-container',
@@ -152,7 +140,7 @@ const initialTutorialSteps: TutorialStep[] = [
     infographicType: 'emotion-trends'
   },
   {
-    id: 9,
+    id: 8,
     title: 'Mood Calendar',
     content: 'The Mood Calendar visualizes your daily sentiment changes. Spot patterns in how your mood fluctuates throughout weeks and months.',
     targetElement: '[class*="MoodCalendar"]',
@@ -165,7 +153,7 @@ const initialTutorialSteps: TutorialStep[] = [
     infographicType: 'mood-calendar'
   },
   {
-    id: 10,
+    id: 9,
     title: 'Soul-Net Visualization',
     content: 'This neural visualization shows connections between life areas and emotions. Explore how different aspects of your life influence your emotional state.',
     targetElement: 'canvas',
@@ -287,14 +275,13 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     // Attempt to find and highlight the element
     const found = findAndHighlightElement(
       selectors, 
-      stepData.id === 3 ? 'theme-strips-highlight' :
-      stepData.id === 4 ? 'record-entry-tab' : 
-      stepData.id === 5 ? 'entries-tab' :
-      stepData.id === 6 ? 'chat-question-highlight' :
-      stepData.id === 7 ? 'insights-header-highlight' :
-      stepData.id === 8 ? 'emotion-chart-highlight' :
-      stepData.id === 9 ? 'mood-calendar-highlight' :
-      stepData.id === 10 ? 'soul-net-highlight' : ''
+      stepData.id === 3 ? 'record-entry-tab' : 
+      stepData.id === 4 ? 'entries-tab' :
+      stepData.id === 5 ? 'chat-question-highlight' :
+      stepData.id === 6 ? 'insights-header-highlight' :
+      stepData.id === 7 ? 'emotion-chart-highlight' :
+      stepData.id === 8 ? 'mood-calendar-highlight' :
+      stepData.id === 9 ? 'soul-net-highlight' : ''
     );
     
     if (!found) {
@@ -346,7 +333,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
         const targetElements = document.querySelectorAll(
           '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, ' +
           '.entries-tab, .chat-question-highlight, .tutorial-overlay, ' + 
-          '.empty-chat-suggestion, .chat-suggestion-button, .theme-strips-highlight, ' +
+          '.empty-chat-suggestion, .chat-suggestion-button, ' +
           '[class*="tutorial-"]'
         );
         
@@ -361,8 +348,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
             'entries-tab',
             'chat-question-highlight',
             'tutorial-overlay',
-            'empty-chat-suggestion',
-            'theme-strips-highlight'
+            'empty-chat-suggestion'
           );
           
           // Clear any inline styles
@@ -486,9 +472,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       updateTutorialStep(newStep);
       
       // Clean up any existing highlight classes
-      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, .theme-strips-highlight');
+      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
       targetElements.forEach(el => {
-        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab', 'theme-strips-highlight');
+        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
         
         // Also clear any inline styles
         if (el instanceof HTMLElement) {
@@ -539,9 +525,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       updateTutorialStep(newStep);
       
       // Clean up any existing highlight classes
-      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, .theme-strips-highlight');
+      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
       targetElements.forEach(el => {
-        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab', 'theme-strips-highlight');
+        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
         
         // Also clear any inline styles
         if (el instanceof HTMLElement) {
@@ -595,9 +581,9 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       
       // Clean up any lingering tutorial classes
       document.body.classList.remove('tutorial-active');
-      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, .theme-strips-highlight');
+      const targetElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab');
       targetElements.forEach(el => {
-        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab', 'theme-strips-highlight');
+        el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab');
         
         // Also clear any inline styles
         if (el instanceof HTMLElement) {

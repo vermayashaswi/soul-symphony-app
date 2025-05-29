@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -14,7 +13,6 @@ import {
   EMOTION_CHART_SELECTORS,
   MOOD_CALENDAR_SELECTORS,
   SOULNET_SELECTORS,
-  THEME_STRIPS_SELECTORS,
   findAndHighlightElement,
   logPotentialTutorialElements,
   applyTutorialHighlight
@@ -39,8 +37,8 @@ const TutorialOverlay: React.FC = () => {
   const isAppRouteCurrent = isAppRoute(location.pathname);
   const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted;
   
-  // Check if we're in step 6 (chat interface step) - was step 5
-  const isStep6 = shouldShowTutorial && steps[currentStep]?.id === 6;
+  // Check if we're in step 5 (chat interface step)
+  const isStep5 = shouldShowTutorial && steps[currentStep]?.id === 5;
   
   // Log important state changes
   useEffect(() => {
@@ -50,11 +48,11 @@ const TutorialOverlay: React.FC = () => {
       currentStepId: steps[currentStep]?.id,
       navigationState,
       shouldShowTutorial,
-      isStep6,
+      isStep5,
       pathname: location.pathname,
       isAppRoute: isAppRouteCurrent
     });
-  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, isStep6, location.pathname, isAppRouteCurrent]);
+  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, isStep5, location.pathname, isAppRouteCurrent]);
   
   // Enhanced function to completely clean up ALL tutorial highlighting
   const cleanupAllTutorialHighlighting = () => {
@@ -65,7 +63,7 @@ const TutorialOverlay: React.FC = () => {
       '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, ' +
       '.chat-question-highlight, .insights-header-highlight, .emotion-chart-highlight, ' +
       '.mood-calendar-highlight, .soul-net-highlight, .empty-chat-suggestion, ' +
-      '.theme-strips-highlight, [class*="tutorial-"], [data-tutorial-target]'
+      '[class*="tutorial-"], [data-tutorial-target]'
     );
     
     console.log(`Found ${allTutorialElements.length} elements to clean up`);
@@ -76,7 +74,7 @@ const TutorialOverlay: React.FC = () => {
         el.classList.remove(
           'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
           'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
-          'mood-calendar-highlight', 'soul-net-highlight', 'empty-chat-suggestion', 'theme-strips-highlight'
+          'mood-calendar-highlight', 'soul-net-highlight', 'empty-chat-suggestion'
         );
         
         // Reset ALL inline styles that might have been applied by tutorial
@@ -116,7 +114,7 @@ const TutorialOverlay: React.FC = () => {
           el.classList.remove(
             'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
             'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
-            'mood-calendar-highlight', 'soul-net-highlight', 'theme-strips-highlight'
+            'mood-calendar-highlight', 'soul-net-highlight'
           );
           
           // Reset styles
@@ -138,17 +136,22 @@ const TutorialOverlay: React.FC = () => {
     
     console.log('Tutorial active, disabling page scrolling');
     
+    // Save current scroll position
     const scrollPos = window.scrollY;
     
+    // Add classes to the body to prevent scrolling
     document.body.classList.add('tutorial-active');
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
     
+    // Add data attribute for current step to enable more specific CSS targeting
     document.body.setAttribute('data-current-step', String(steps[currentStep]?.id || ''));
     
+    // Clean up when tutorial is deactivated
     return () => {
       console.log('Cleaning up tutorial styles');
       
+      // Enhanced cleanup for body element
       document.body.classList.remove('tutorial-active');
       document.body.style.overflow = '';
       document.body.style.touchAction = '';
@@ -157,11 +160,14 @@ const TutorialOverlay: React.FC = () => {
       document.body.style.height = '';
       document.body.removeAttribute('data-current-step');
       
+      // Restore scroll position
       window.scrollTo(0, scrollPos);
       console.log('Tutorial inactive, restored page scrolling');
       
+      // Run comprehensive cleanup
       cleanupAllTutorialHighlighting();
       
+      // SPECIAL: Reset the arrow button specifically to ensure it's centered
       const arrowButton = document.querySelector('.journal-arrow-button');
       if (arrowButton instanceof HTMLElement) {
         console.log('Resetting arrow button position after tutorial cleanup');
@@ -173,6 +179,7 @@ const TutorialOverlay: React.FC = () => {
         arrowButton.style.margin = '0';
         arrowButton.style.padding = '0';
         
+        // Also reset the button element inside
         const buttonElement = arrowButton.querySelector('button');
         if (buttonElement instanceof HTMLElement) {
           buttonElement.style.boxShadow = '';
@@ -184,9 +191,11 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       
+      // Small delay to ensure chat interface re-renders properly
       setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
         
+        // Force chat interface to refresh
         if (location.pathname === '/app/chat') {
           console.log('Triggering chat refresh after tutorial');
           window.dispatchEvent(new CustomEvent('chatRefreshNeeded'));
@@ -195,7 +204,7 @@ const TutorialOverlay: React.FC = () => {
     };
   }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // Enhanced step-specific element highlighting with improved cleanup - Updated step numbers
+  // Enhanced step-specific element highlighting with improved cleanup
   useEffect(() => {
     if (!shouldShowTutorial || navigationState.inProgress) return;
     
@@ -235,45 +244,15 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       else if (currentStepData?.id === 3) {
-        // Step 3: Theme Strips
-        console.log('Step 3: Applying highlighting to theme strips');
-        
-        let foundElement = false;
-        
-        for (const selector of THEME_STRIPS_SELECTORS) {
-          const element = document.querySelector(selector);
-          if (element) {
-            element.classList.add('tutorial-target', 'theme-strips-highlight');
-            
-            // Apply theme strips specific styling
-            if (element instanceof HTMLElement) {
-              element.style.border = "3px solid var(--color-theme)";
-              element.style.borderRadius = "12px";
-              element.style.boxShadow = "0 0 25px 10px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3)";
-              element.style.zIndex = "9998";
-              element.style.position = "relative";
-              element.style.animation = "theme-strips-pulse 2s infinite alternate";
-            }
-            
-            foundElement = true;
-            console.log(`Applied highlighting to theme strips using selector: ${selector}`);
-            break;
-          }
-        }
-        
-        if (!foundElement) {
-          console.warn('Theme strips element not found with any selector for step 3');
-        }
-      }
-      else if (currentStepData?.id === 4) {
-        // Step 4: Record Entry Tab (was step 3)
-        console.log('Step 4: Applying highlighting ONLY to Record Entry button');
+        // Step 3: Record Entry Tab - ONLY highlight this, never the Past Entries
+        console.log('Step 3: Applying highlighting ONLY to Record Entry button');
         
         let foundElement = false;
         
         for (const selector of RECORD_ENTRY_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
+            // Double-check this is NOT the Past Entries button
             const elementText = element.textContent?.toLowerCase().trim();
             const isRecordEntry = elementText?.includes('record') || elementText?.includes('new') || elementText?.includes('entry');
             const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history');
@@ -281,6 +260,7 @@ const TutorialOverlay: React.FC = () => {
             if (isRecordEntry && !isPastEntries) {
               element.classList.add('tutorial-target', 'record-entry-tab', 'tutorial-button-highlight');
               
+              // Apply enhanced styling
               if (element instanceof HTMLElement) {
                 element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
                 element.style.animation = "button-pulse 1.5s infinite alternate";
@@ -297,18 +277,19 @@ const TutorialOverlay: React.FC = () => {
         }
         
         if (!foundElement) {
-          console.warn('Record entry element not found with any selector for step 4');
+          console.warn('Record entry element not found with any selector for step 3');
         }
       }
-      else if (currentStepData?.id === 5) {
-        // Step 5: Past Entries Tab (was step 4)
-        console.log('Step 5: Applying highlighting ONLY to Past Entries button');
+      else if (currentStepData?.id === 4) {
+        // Step 4: Past Entries Tab - Enhanced with identical styling as record entry
+        console.log('Step 4: Applying highlighting ONLY to Past Entries button');
         
         let foundElement = false;
         
         for (const selector of ENTRIES_TAB_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
+            // Double-check this is the Past Entries button and NOT Record Entry
             const elementText = element.textContent?.toLowerCase().trim();
             const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history') || selector.includes('entries');
             const isRecordEntry = elementText?.includes('record') || elementText?.includes('new');
@@ -316,21 +297,28 @@ const TutorialOverlay: React.FC = () => {
             if (isPastEntries && !isRecordEntry) {
               element.classList.add('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
               
+              // Apply identical styling to record entry button
               if (element instanceof HTMLElement) {
                 element.style.boxShadow = "0 0 35px 20px var(--color-theme)";
                 element.style.animation = "button-pulse 1.5s infinite alternate";
                 element.style.border = "2px solid white";
                 element.style.transform = "scale(1.05)";
                 element.style.zIndex = "10000";
+                
+                // Make sure it's fully visible with high opacity
                 element.style.opacity = "1";
                 element.style.visibility = "visible";
                 element.style.position = "relative";
+                
+                // Explicit white background
                 element.style.backgroundColor = "white";
                 
+                // Fix text color for light mode
                 const isDarkMode = document.body.classList.contains('dark');
                 if (!isDarkMode) {
                   element.style.color = "#000";
                   
+                  // Also apply to child elements
                   const textElements = element.querySelectorAll('span, div');
                   textElements.forEach(textEl => {
                     if (textEl instanceof HTMLElement) {
@@ -350,17 +338,19 @@ const TutorialOverlay: React.FC = () => {
         }
         
         if (!foundElement) {
-          console.warn('Past Entries tab element not found with any selector for step 5');
+          console.warn('Past Entries tab element not found with any selector for step 4');
         }
       }
-      else if (currentStepData?.id === 6) {
-        // Step 6: Chat question highlighting (was step 5)
-        console.log('Setting up highlight for chat question (step 6) with real chat interface');
+      else if (currentStepData?.id === 5) {
+        // Step 5: Chat question highlighting - focus on the tutorial chat interface
+        console.log('Setting up highlight for chat question (step 5) with real chat interface');
         
+        // Wait for the tutorial chat interface to render, then highlight suggestion buttons
         setTimeout(() => {
           const suggestionButtons = document.querySelectorAll('.tutorial-chat-interface .empty-chat-suggestion, .tutorial-chat-interface button');
           
           if (suggestionButtons.length > 0) {
+            // Highlight the first suggestion button
             const firstButton = suggestionButtons[0];
             if (firstButton) {
               firstButton.classList.add('chat-question-highlight', 'tutorial-target');
@@ -371,7 +361,7 @@ const TutorialOverlay: React.FC = () => {
                 firstButton.style.border = '2px solid white';
                 firstButton.style.transform = 'scale(1.1)';
                 firstButton.style.zIndex = '20000';
-                firstButton.style.pointerEvents = 'none';
+                firstButton.style.pointerEvents = 'none'; // Prevent clicks in tutorial
               }
               
               console.log('Applied highlighting to first chat suggestion in tutorial interface');
@@ -379,33 +369,33 @@ const TutorialOverlay: React.FC = () => {
           }
         }, 500);
       }
-      // Updated step numbers for insights steps (7-10, was 6-9)
-      else if (currentStepData?.id === 7) {
-        console.log('Setting up highlight for insights header (step 7)');
+      // ... keep existing code (steps 6-9 remain the same)
+      else if (currentStepData?.id === 6) {
+        console.log('Setting up highlight for insights header (step 6)');
         const found = findAndHighlightElement(INSIGHTS_HEADER_SELECTORS, 'insights-header-highlight');
         
         if (!found) {
           console.warn('Failed to find insights header with any selector');
         }
       }
-      else if (currentStepData?.id === 8) {
-        console.log('Setting up highlight for emotion chart (step 8)');
+      else if (currentStepData?.id === 7) {
+        console.log('Setting up highlight for emotion chart (step 7)');
         const found = findAndHighlightElement(EMOTION_CHART_SELECTORS, 'emotion-chart-highlight');
         
         if (!found) {
           console.warn('Failed to find emotion chart with any selector');
         }
       }
-      else if (currentStepData?.id === 9) {
-        console.log('Setting up highlight for mood calendar (step 9)');
+      else if (currentStepData?.id === 8) {
+        console.log('Setting up highlight for mood calendar (step 8)');
         const found = findAndHighlightElement(MOOD_CALENDAR_SELECTORS, 'mood-calendar-highlight');
         
         if (!found) {
           console.warn('Failed to find mood calendar with any selector');
         }
       }
-      else if (currentStepData?.id === 10) {
-        console.log('Setting up highlight for soul-net visualization (step 10)');
+      else if (currentStepData?.id === 9) {
+        console.log('Setting up highlight for soul-net visualization (step 9)');
         const found = findAndHighlightElement(SOULNET_SELECTORS, 'soul-net-highlight');
         
         if (!found) {
@@ -431,14 +421,14 @@ const TutorialOverlay: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto">
-      {/* Render actual chat interface for step 6 (was step 5) */}
-      {isStep6 && <TutorialChatInterface />}
+      {/* Render actual chat interface for step 5 */}
+      {isStep5 && <TutorialChatInterface />}
       
       {/* Semi-transparent overlay */}
       <motion.div
         className="tutorial-overlay absolute inset-0"
         initial={{ opacity: 0 }}
-        animate={{ opacity: isStep6 ? 0.3 : 0.75 }} // Less opacity for step 6 to show chat interface
+        animate={{ opacity: isStep5 ? 0.3 : 0.75 }} // Less opacity for step 5 to show chat interface
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind

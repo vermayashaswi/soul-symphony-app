@@ -1,5 +1,5 @@
 
-/* Tutorial Overlay Styles - Viewport-aware mobile positioning */
+/* Tutorial Overlay Styles - Revised for better visibility and improved infographics display */
 
 /* Base Tutorial Classes */
 .tutorial-target {
@@ -22,7 +22,7 @@
   overflow: hidden !important;
 }
 
-/* Tutorial Chat Interface - Full screen chat for step 6 */
+/* Tutorial Chat Interface - Full screen chat for step 5 */
 .tutorial-chat-interface {
   position: fixed !important;
   top: 0 !important;
@@ -31,11 +31,11 @@
   bottom: 0 !important;
   z-index: 9998 !important;
   background: linear-gradient(to bottom, #1A1F2C, #2D243A) !important;
-  pointer-events: none !important;
+  pointer-events: none !important; /* Prevent interactions in tutorial mode */
 }
 
 .tutorial-chat-interface * {
-  pointer-events: none !important;
+  pointer-events: none !important; /* Disable all interactions */
 }
 
 /* Make suggestion buttons visible and highlighted in tutorial chat */
@@ -55,21 +55,16 @@ body.tutorial-active {
   height: 100% !important;
 }
 
-/* Tutorial step container - viewport-aware positioning */
+/* Tutorial step container - styling customized per step */
 .tutorial-step-container {
   position: fixed !important;
   z-index: 30000 !important;
+  max-width: 320px;
+  width: calc(100% - 40px);
   color: white !important;
   border: 3px solid var(--color-theme) !important;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.7) !important;
   pointer-events: auto !important;
-  /* Remove fixed dimensions - now handled by viewport hook */
-  max-width: none !important;
-  width: auto !important;
-  /* Ensure content is scrollable if needed */
-  overflow-y: auto !important;
-  /* Ensure proper box-sizing */
-  box-sizing: border-box !important;
 }
 
 /* Force all tutorial step content to be visible */
@@ -80,40 +75,62 @@ body.tutorial-active {
   color: white !important;
   opacity: 1 !important;
   visibility: visible !important;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important;
+  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important; /* Text shadow for all steps */
 }
 
-/* Remove step-specific positioning - now handled by viewport hook */
-.tutorial-step-container[data-step="1"],
-.tutorial-step-container[data-step="2"],
-.tutorial-step-container[data-step="3"],
-.tutorial-step-container[data-step="4"],
-.tutorial-step-container[data-step="5"],
+/* Step 1: Special styling for first step - fully opaque */
+.tutorial-step-container[data-step="1"] {
+  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 1 */
+}
+
+/* Step 2: Position at the very top to ensure arrow button visibility */
+.tutorial-step-container[data-step="2"] {
+  top: 10% !important; /* Move to very top */
+  left: 50% !important;
+  transform: translate(-50%, 0) !important; /* Don't center vertically */
+  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 2 */
+}
+
+/* Step 5: Position at bottom right to show chat interface */
+.tutorial-step-container[data-step="5"] {
+  bottom: 20px !important;
+  right: 20px !important;
+  top: auto !important;
+  left: auto !important;
+  transform: none !important;
+  background-color: rgba(26, 31, 44, 0.95) !important; /* Slightly transparent to show chat behind */
+}
+
+/* Insights steps: Fully opaque background for steps 6-9 with infographics */
 .tutorial-step-container[data-step="6"],
 .tutorial-step-container[data-step="7"],
 .tutorial-step-container[data-step="8"],
-.tutorial-step-container[data-step="9"],
-.tutorial-step-container[data-step="10"] {
-  /* Remove fixed positioning styles - controlled by viewport hook */
-  top: auto !important;
-  left: auto !important;
-  right: auto !important;
-  bottom: auto !important;
-  transform: none !important;
-  max-width: none !important;
-  width: auto !important;
+.tutorial-step-container[data-step="9"] {
+  background-color: rgba(26, 31, 44, 1) !important;
+  max-width: 350px !important; /* Wider for steps with images */
+  transform: translate(-50%, -50%) !important; /* Ensure these are centered properly */
+  top: 50% !important;
+  left: 50% !important;
 }
 
 /* Ensure infographic containers are properly displayed */
-.tutorial-step-container .tutorial-infographic {
+.tutorial-step-container[data-step="6"] .tutorial-infographic,
+.tutorial-step-container[data-step="7"] .tutorial-infographic,
+.tutorial-step-container[data-step="8"] .tutorial-infographic,
+.tutorial-step-container[data-step="9"] .tutorial-infographic {
   border-radius: 6px !important;
   overflow: hidden !important;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
-  max-width: 100% !important;
-  height: auto !important;
 }
 
-/* Step-specific element highlighting styles */
+/* Steps 3-4: Semi-transparent with blur */
+.tutorial-step-container[data-step="3"],
+.tutorial-step-container[data-step="4"] {
+  background-color: rgba(26, 31, 44, 0.2) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+/* Step 1: Journal header styling */
 .journal-header-container.tutorial-target {
   z-index: 9999 !important;
   position: relative !important;
@@ -122,77 +139,91 @@ body.tutorial-active {
   box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.5) !important;
 }
 
+/* Step 2: Arrow button styling - INCREASED z-index to ensure it's visible but behind the tutorial */
 .journal-arrow-button.tutorial-target {
   position: fixed !important;
   top: 50% !important;
   left: 50% !important;
   transform: translate(-50%, -50%) !important;
-  z-index: 10000 !important;
+  z-index: 10000 !important; /* Increased from 9999 but still below tutorial popup */
   visibility: visible !important;
   opacity: 1 !important;
 }
 
-.theme-strips-highlight.tutorial-target {
-  z-index: 9998 !important;
-  position: relative !important;
-  border: 3px solid var(--color-theme) !important;
-  border-radius: 12px !important;
-  box-shadow: 0 0 25px 10px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3) !important;
-  animation: theme-strips-pulse 2s infinite alternate !important;
-}
-
-/* Common button highlight styling */
-.tutorial-button-highlight,
-.record-entry-tab.tutorial-target,
-.entries-tab.tutorial-target {
+/* Common button highlight styling for both Record Entry and Past Entries buttons */
+.tutorial-button-highlight {
   box-shadow: 0 0 35px 20px var(--color-theme) !important;
   animation: button-pulse 1.5s infinite alternate !important;
   border: 2px solid white !important;
   transform: scale(1.05) !important;
   position: relative !important;
   z-index: 10000 !important;
+}
+
+/* Steps 3 & 4: Tab highlighting styling - Identical styling for both record and entries tabs */
+.record-entry-tab.tutorial-target,
+.entries-tab.tutorial-target {
+  z-index: 10000 !important;
+  position: relative !important;
+  box-shadow: 0 0 35px 20px var(--color-theme) !important; 
+  animation: strong-tab-pulse 1.5s infinite alternate !important;
+  outline: 2px solid white !important;
   opacity: 1 !important;
-  visibility: visible !important;
+  transform: translateZ(0) scale(1.05) !important; /* Force a new stacking context and scale */
+  border: 2px solid white !important;
+  background-color: white !important; /* Add explicit white background */
 }
 
-/* Fix for Record Entry tab text visibility */
+/* Fix for Record Entry tab text visibility in both modes */
 .record-entry-tab.tutorial-target * {
-  color: #000 !important;
-  text-shadow: none !important;
-  font-weight: bold !important;
+  color: #000 !important; /* Black text for better visibility */
+  text-shadow: none !important; /* Remove text shadow */
+  font-weight: bold !important; /* Make text bold */
 }
 
-/* Special fix for record entry tab in dark mode */
+/* Special fix for record entry tab span/div elements in dark mode to increase visibility */
 body.dark .record-entry-tab.tutorial-target span,
 body.dark .record-entry-tab.tutorial-target div {
-  color: #ffffff !important;
-  text-shadow: 0 1px 2px rgba(0,0,0,0.9) !important;
-  background-color: rgba(26, 31, 44, 0.7) !important;
-  padding: 2px 5px !important;
-  border-radius: 4px !important;
+  color: #ffffff !important; /* Force white in dark mode */
+  text-shadow: 0 1px 2px rgba(0,0,0,0.9) !important; /* Add shadow for contrast */
+  background-color: rgba(26, 31, 44, 0.7) !important; /* Dark semi-transparent background */
+  padding: 2px 5px !important; /* Add padding */
+  border-radius: 4px !important; /* Rounded corners */
   font-weight: bold !important;
 }
 
-/* Entries tab styling */
-.entries-tab.tutorial-target {
-  color: #000 !important;
-  background-color: white !important;
+/* Fix specifically for "Record Entry" text label */
+body.dark [value="record"] span:contains("Record") {
+  color: #ffffff !important;
+  background-color: var(--color-theme) !important;
+  padding: 2px 5px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 10px rgba(155, 135, 245, 0.6) !important;
+  text-shadow: none !important;
+  font-weight: bold !important;
 }
 
+/* Ensure proper text coloring for entries tab in light mode */
+.entries-tab.tutorial-target {
+  color: #000 !important; /* Black text in light mode */
+  background-color: white !important; /* Explicit white background */
+}
+
+/* Specific fix for Step 4 text visibility in light mode */
 body:not(.dark) .entries-tab.tutorial-target span,
 body:not(.dark) .entries-tab.tutorial-target div {
-  color: #000 !important;
-  text-shadow: none !important;
-  background-color: white !important;
+  color: #000 !important; /* Black text for light mode */
+  text-shadow: none !important; /* Remove text shadow in light mode */
+  background-color: white !important; /* Explicit white background */
 }
 
 body.dark .entries-tab.tutorial-target span,
 body.dark .entries-tab.tutorial-target div {
-  color: #fff !important;
-  background-color: transparent !important;
+  color: #fff !important; /* White text for dark mode */
+  background-color: transparent !important; /* No background in dark mode */
 }
 
-/* Chat question highlight styling */
+/* Step 5: Chat question highlight styling - Enhanced for maximum visibility in tutorial chat */
 .chat-question-highlight.tutorial-target {
   z-index: 20000 !important;
   position: relative !important;
@@ -203,19 +234,21 @@ body.dark .entries-tab.tutorial-target div {
   visibility: visible !important;
   transform: translateZ(0) scale(1.1) !important;
   border: 2px solid white !important;
-  pointer-events: none !important;
+  pointer-events: none !important; /* Prevent interactions in tutorial */
   cursor: default !important;
   display: block !important;
+  max-height: none !important;
+  overflow: visible !important;
 }
 
-/* Insights pages highlight styling */
+/* Steps 6-9: Insights pages highlight styling */
 .insights-header-highlight.tutorial-target,
 .emotion-chart-highlight.tutorial-target,
 .mood-calendar-highlight.tutorial-target,
 .soul-net-highlight.tutorial-target {
   z-index: 10000 !important;
   position: relative !important;
-  box-shadow: 0 0 35px 20px var(--color-theme) !important;
+  box-shadow: 0 0 35px 20px var(--color-theme) !important; 
   animation: strong-tab-pulse 1.5s infinite alternate !important;
   outline: 2px solid white !important;
   opacity: 1 !important;
@@ -224,7 +257,7 @@ body.dark .entries-tab.tutorial-target div {
   pointer-events: none !important;
 }
 
-/* Additional highlight for chat questions */
+/* Special additional highlight for chat questions to make them more visible */
 .chat-question-highlight.tutorial-target::before {
   content: '';
   position: absolute;
@@ -238,21 +271,21 @@ body.dark .entries-tab.tutorial-target div {
 
 /* Tutorial navigation buttons */
 .tutorial-buttons {
-  z-index: 30001 !important;
+  z-index: 30001 !important; /* Above everything else */
   pointer-events: auto !important;
 }
 
 .tutorial-step-container button {
   position: relative;
-  z-index: 30001 !important;
+  z-index: 30001 !important; /* Above everything else */
   pointer-events: auto !important;
   cursor: pointer !important;
 }
 
-/* Back button styling */
+/* Specifically style the back button to have good contrast in all themes */
 .tutorial-buttons button[variant="outline"] {
   color: white !important;
-  background-color: rgba(51,51,51,0.8) !important;
+  background-color: rgba(51,51,51,0.8) !important; /* More opaque for all buttons */
   border-color: rgba(255,255,255,0.5) !important;
 }
 
@@ -273,7 +306,7 @@ body.dark .entries-tab.tutorial-target div {
   touch-action: none !important;
 }
 
-/* Animation keyframes */
+/* Animation keyframes - pulsating effects */
 @keyframes button-pulse {
   0% { box-shadow: 0 0 25px 12px var(--color-theme); }
   100% { box-shadow: 0 0 45px 20px var(--color-theme); }
@@ -294,18 +327,12 @@ body.dark .entries-tab.tutorial-target div {
   100% { opacity: 0.6; transform: scale(1.15); }
 }
 
-@keyframes theme-strips-pulse {
-  0% { box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3); }
-  100% { box-shadow: 0 0 30px 15px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.6); }
-}
-
-/* Mobile-specific optimizations */
+/* Responsive styling for different screen sizes */
 @media (max-width: 640px) {
   .tutorial-step-container {
+    max-width: 280px;
     padding: 12px !important;
     font-size: 0.9rem;
-    /* Ensure proper spacing from viewport edges */
-    margin: 10px !important;
   }
   
   .tutorial-step-container p {
@@ -314,31 +341,43 @@ body.dark .entries-tab.tutorial-target div {
     margin-bottom: 0.75rem !important;
   }
   
-  .tutorial-step-container h3 {
-    font-size: 1rem !important;
-    margin-bottom: 0.5rem !important;
+  /* Special positioning for step 2 on mobile - keep at top */
+  .tutorial-step-container[data-step="2"] {
+    top: 10% !important; /* Keep at top on mobile */
+    transform: translate(-50%, 0) !important; /* Don't center vertically */
   }
   
-  .tutorial-step-container button {
-    padding: 6px 12px !important;
-    font-size: 0.85rem !important;
+  /* Special positioning for step 5 on mobile - adjust for smaller screens */
+  .tutorial-step-container[data-step="5"] {
+    bottom: 20px !important;
+    right: 10px !important;
+    left: 10px !important;
+    max-width: calc(100% - 20px) !important;
+    width: auto !important;
   }
   
-  /* Ensure infographics are responsive on mobile */
-  .tutorial-step-container .tutorial-infographic {
-    max-width: 100% !important;
-    height: auto !important;
+  /* Special width override for infographic-containing steps on mobile */
+  .tutorial-step-container[data-step="6"],
+  .tutorial-step-container[data-step="7"],
+  .tutorial-step-container[data-step="8"],
+  .tutorial-step-container[data-step="9"] {
+    max-width: 300px !important;
+    width: 90% !important;
+    padding: 10px !important;
+    top: 50% !important; /* Center vertically for infographic steps */
+    transform: translate(-50%, -50%) !important;
   }
 }
 
 @media (max-width: 360px) {
   .tutorial-step-container {
+    max-width: 90% !important;
+    width: 90% !important;
     padding: 10px !important;
-    margin: 8px !important;
   }
   
   .tutorial-step-container h3 {
-    font-size: 0.9rem !important;
+    font-size: 1rem !important;
   }
   
   .tutorial-step-container p {
@@ -350,27 +389,24 @@ body.dark .entries-tab.tutorial-target div {
     padding: 4px 8px !important;
     font-size: 0.8rem !important;
   }
-}
-
-/* Landscape orientation adjustments */
-@media (max-height: 500px) and (orientation: landscape) {
-  .tutorial-step-container {
-    font-size: 0.8rem;
+  
+  /* Special override for step 2 on small mobile - keep at top */
+  .tutorial-step-container[data-step="2"] {
+    top: 10% !important; /* Keep at top on small mobile */
+  }
+  
+  /* Special override for step 5 on small mobile */
+  .tutorial-step-container[data-step="5"] {
+    bottom: 10px !important;
+    right: 10px !important;
+    left: 10px !important;
+  }
+  
+  /* Adjust size for infographic containers on very small screens */
+  .tutorial-step-container[data-step="6"],
+  .tutorial-step-container[data-step="7"],
+  .tutorial-step-container[data-step="8"],
+  .tutorial-step-container[data-step="9"] {
     padding: 8px !important;
-  }
-  
-  .tutorial-step-container h3 {
-    font-size: 0.9rem !important;
-    margin-bottom: 0.25rem !important;
-  }
-  
-  .tutorial-step-container p {
-    font-size: 0.75rem !important;
-    line-height: 1.3 !important;
-    margin-bottom: 0.5rem !important;
-  }
-  
-  .tutorial-step-container .tutorial-infographic {
-    max-height: 150px !important;
   }
 }

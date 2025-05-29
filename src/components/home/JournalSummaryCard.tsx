@@ -4,7 +4,6 @@ import { supabase } from '@/integrations/supabase/client';
 import { useTheme } from '@/hooks/use-theme';
 import FloatingThemeStrips from './FloatingThemeStrips';
 import { getClientTimeInfo } from '@/services/dateService';
-import { useTutorial } from '@/contexts/TutorialContext';
 
 interface SummaryResponse {
   summary: string | null;
@@ -23,7 +22,6 @@ interface ThemeData {
 const JournalSummaryCard: React.FC = () => {
   const { user } = useAuth();
   const { colorTheme, customColor } = useTheme();
-  const { isActive, currentStep, steps } = useTutorial();
   const [summaryData, setSummaryData] = useState<SummaryResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -32,9 +30,6 @@ const JournalSummaryCard: React.FC = () => {
   const [retryCount, setRetryCount] = useState(0);
   const MAX_RETRIES = 3;
   const RETRY_DELAY = 2000; // 2 seconds
-
-  // Check if we're in tutorial step 3 (theme strips step)
-  const isInThemeStripsStep = isActive && steps[currentStep]?.id === 3;
 
   const getThemeColorHex = (): string => {
     switch (colorTheme) {
@@ -63,10 +58,12 @@ const JournalSummaryCard: React.FC = () => {
         setLoading(true);
         setError(null);
         
+        // Get client timezone info from centralized service
         const clientInfo = getClientTimeInfo();
         
         console.log('JournalSummaryCard: Client timezone info', clientInfo);
         
+        // Fetch journal summary with error handling
         let summaryData;
         try {
           const { data, error: summaryError } = await supabase.functions.invoke('journal-summary', {
@@ -88,10 +85,12 @@ const JournalSummaryCard: React.FC = () => {
           setError('Failed to connect to the journal summary service');
         }
         
+        // Calculate date 7 days ago for filtering - use our new service
         const sevenDaysAgo = new Date();
         sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
         
         try {
+          // Fetch journal entries for theme data with proper date formatting
           const { data: journalEntries, error: entriesError } = await supabase
             .from('Journal Entries')
             .select('master_themes, sentiment')
@@ -108,6 +107,7 @@ const JournalSummaryCard: React.FC = () => {
           if (entriesError) {
             console.error('Error fetching master themes:', entriesError);
           } else if (journalEntries && journalEntries.length > 0) {
+            // Process journal entries to extract theme data
             const themesWithSentiment: ThemeData[] = [];
             
             journalEntries.forEach(entry => {
@@ -130,18 +130,22 @@ const JournalSummaryCard: React.FC = () => {
               samples: themesWithSentiment.slice(0, 3).map(t => t.theme)
             });
             
+            // Ensure we have valid data before setting state
             if (themesWithSentiment.length > 0) {
               setThemeData(themesWithSentiment);
             } else {
               console.log('JournalSummaryCard: No valid theme data after processing');
+              // Set some fallback data to ensure smooth UI experience
               setThemeData(getFallbackThemeData());
             }
           } else {
             console.log('JournalSummaryCard: No journal entries with themes found');
+            // Set fallback data
             setThemeData(getFallbackThemeData());
           }
         } catch (entriesFetchError) {
           console.error('Error fetching or processing journal entries:', entriesFetchError);
+          // Set fallback data
           setThemeData(getFallbackThemeData());
         }
         
@@ -151,8 +155,10 @@ const JournalSummaryCard: React.FC = () => {
       } catch (err) {
         console.error('Exception in journal summary fetch:', err);
         setError('Unexpected error loading your journal summary');
+        // Use fallback data for theme display
         setThemeData(getFallbackThemeData());
         
+        // If we've tried less than MAX_RETRIES times, try again after a delay
         if (retryCount < MAX_RETRIES) {
           console.log(`JournalSummaryCard: Retry attempt ${retryCount + 1} of ${MAX_RETRIES} in ${RETRY_DELAY}ms`);
           setRetryCount(count => count + 1);
@@ -192,10 +198,7 @@ const JournalSummaryCard: React.FC = () => {
   const themeColor = getThemeColorHex();
 
   return (
-    <div 
-      className="h-full w-full"
-      data-tutorial-target={isInThemeStripsStep ? "theme-strips" : undefined}
-    >
+    <div className="h-full w-full">
       {isReady && !loading && (
         <FloatingThemeStrips 
           themesData={safeThemeData} 
