@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -125,14 +124,23 @@ const TutorialOverlay: React.FC = () => {
       window.scrollTo(0, scrollPos);
       console.log('Tutorial inactive, restored page scrolling');
       
-      // Thorough cleanup of tutorial target elements
-      const tutorialElements = document.querySelectorAll('.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, .chat-question-highlight');
+      // CRITICAL: Thorough cleanup of ALL tutorial target elements
+      const tutorialElements = document.querySelectorAll(
+        '.tutorial-target, .tutorial-button-highlight, .record-entry-tab, .entries-tab, ' +
+        '.chat-question-highlight, .insights-header-highlight, .emotion-chart-highlight, ' +
+        '.mood-calendar-highlight, .soul-net-highlight'
+      );
+      
       tutorialElements.forEach(el => {
         if (el instanceof HTMLElement) {
-          // Remove classes
-          el.classList.remove('tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab', 'chat-question-highlight');
+          // Remove all tutorial classes
+          el.classList.remove(
+            'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
+            'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
+            'mood-calendar-highlight', 'soul-net-highlight'
+          );
           
-          // Reset inline styles
+          // Reset ALL inline styles that might have been applied
           el.style.boxShadow = '';
           el.style.animation = '';
           el.style.border = '';
@@ -141,8 +149,38 @@ const TutorialOverlay: React.FC = () => {
           el.style.position = '';
           el.style.visibility = '';
           el.style.opacity = '';
+          el.style.top = '';
+          el.style.left = '';
+          el.style.right = '';
+          el.style.bottom = '';
+          el.style.margin = '';
+          el.style.padding = '';
         }
       });
+      
+      // SPECIAL: Reset the arrow button specifically to ensure it's centered
+      const arrowButton = document.querySelector('.journal-arrow-button');
+      if (arrowButton instanceof HTMLElement) {
+        console.log('Resetting arrow button position after tutorial cleanup');
+        arrowButton.style.position = 'fixed';
+        arrowButton.style.top = '50%';
+        arrowButton.style.left = '50%';
+        arrowButton.style.transform = 'translate(-50%, -50%)';
+        arrowButton.style.zIndex = '40';
+        arrowButton.style.margin = '0';
+        arrowButton.style.padding = '0';
+        
+        // Also reset the button element inside
+        const buttonElement = arrowButton.querySelector('button');
+        if (buttonElement instanceof HTMLElement) {
+          buttonElement.style.boxShadow = '';
+          buttonElement.style.animation = '';
+          buttonElement.style.border = '';
+          buttonElement.style.transform = '';
+          buttonElement.style.position = '';
+          buttonElement.style.zIndex = '';
+        }
+      }
       
       // Small delay to ensure chat interface re-renders properly
       setTimeout(() => {

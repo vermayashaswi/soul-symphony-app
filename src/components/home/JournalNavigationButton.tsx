@@ -75,7 +75,7 @@ const JournalNavigationButton: React.FC = () => {
     }
   };
 
-  // Enhanced handling for button in tutorial mode with safety checks
+  // Enhanced handling for button in tutorial mode with proper cleanup
   useEffect(() => {
     if (!buttonRef.current || !isMountedRef.current) return;
     
@@ -86,9 +86,11 @@ const JournalNavigationButton: React.FC = () => {
       stepId: steps[currentStep]?.id
     });
     
-    // Apply special styling only when in tutorial step 2
+    const buttonElement = buttonRef.current.querySelector('button');
+    const glowDiv = buttonRef.current.querySelector('.bg-primary\\/30');
+    
     if (isInArrowTutorialStep && isMountedRef.current) {
-      const buttonElement = buttonRef.current.querySelector('button');
+      // Apply tutorial styling
       if (buttonElement) {
         console.log('Applying enhanced tutorial styling to button');
         
@@ -104,16 +106,15 @@ const JournalNavigationButton: React.FC = () => {
       }
       
       // Apply enhanced styles to the glow div
-      const glowDiv = buttonRef.current.querySelector('.bg-primary\\/30');
       if (glowDiv) {
         const glowElement = glowDiv as HTMLElement;
         glowElement.style.filter = "drop-shadow(0 0 25px var(--color-theme))";
         glowElement.style.opacity = "0.95";
       }
     } else if (isMountedRef.current) {
-      // Remove tutorial styling when not in step 2
-      const buttonElement = buttonRef.current.querySelector('button');
+      // IMPORTANT: Remove ALL tutorial styling when not in step 2
       if (buttonElement) {
+        console.log('Removing tutorial styling from button');
         buttonElement.classList.remove('tutorial-button-highlight');
         
         const buttonStyleEl = buttonElement as HTMLElement;
@@ -121,15 +122,58 @@ const JournalNavigationButton: React.FC = () => {
         buttonStyleEl.style.animation = "";
         buttonStyleEl.style.border = "";
         buttonStyleEl.style.transform = "";
+        buttonStyleEl.style.position = "";
+        buttonStyleEl.style.zIndex = "";
       }
       
-      const glowDiv = buttonRef.current.querySelector('.bg-primary\\/30');
       if (glowDiv) {
         const glowElement = glowDiv as HTMLElement;
         glowElement.style.filter = "";
         glowElement.style.opacity = "";
       }
+      
+      // CRITICAL: Reset the container positioning to ensure button stays centered
+      if (buttonRef.current) {
+        const containerEl = buttonRef.current as HTMLElement;
+        containerEl.style.position = 'fixed';
+        containerEl.style.top = '50%';
+        containerEl.style.left = '50%';
+        containerEl.style.transform = 'translate(-50%, -50%)';
+        containerEl.style.zIndex = '40';
+        containerEl.style.margin = '0';
+        containerEl.style.padding = '0';
+      }
     }
+    
+    // Cleanup function to ensure proper reset
+    return () => {
+      if (buttonElement && isMountedRef.current) {
+        buttonElement.classList.remove('tutorial-button-highlight');
+        const buttonStyleEl = buttonElement as HTMLElement;
+        buttonStyleEl.style.boxShadow = "";
+        buttonStyleEl.style.animation = "";
+        buttonStyleEl.style.border = "";
+        buttonStyleEl.style.transform = "";
+        buttonStyleEl.style.position = "";
+        buttonStyleEl.style.zIndex = "";
+      }
+      
+      if (glowDiv && isMountedRef.current) {
+        const glowElement = glowDiv as HTMLElement;
+        glowElement.style.filter = "";
+        glowElement.style.opacity = "";
+      }
+      
+      // Reset container positioning
+      if (buttonRef.current && isMountedRef.current) {
+        const containerEl = buttonRef.current as HTMLElement;
+        containerEl.style.position = 'fixed';
+        containerEl.style.top = '50%';
+        containerEl.style.left = '50%';
+        containerEl.style.transform = 'translate(-50%, -50%)';
+        containerEl.style.zIndex = '40';
+      }
+    };
   }, [isInArrowTutorialStep, isActive, currentStep, steps]);
 
   // Don't render if component should be unmounted
