@@ -122,3 +122,11 @@ export const getChatThread = async (threadId: string, userId: string): Promise<C
     return null;
   }
 };
+
+// Add legacy alias for backward compatibility
+export const fetchChatThreads = getChatThreads;
+export const updateThreadTitle = async (threadId: string, title: string) => {
+  // This function needs a userId parameter now, but we'll handle it via the main service
+  console.warn('updateThreadTitle called without userId - use updateChatThread instead');
+  return false;
+};

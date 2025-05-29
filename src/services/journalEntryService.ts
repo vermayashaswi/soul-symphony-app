@@ -19,7 +19,11 @@ export const createJournalEntry = async (entryData: Partial<JournalEntry>, userI
       return null;
     }
 
-    return data;
+    // Map the database result to match JournalEntry interface
+    return {
+      ...data,
+      content: data['refined text'] || data['transcription text'] || ''
+    } as JournalEntry;
   } catch (error) {
     console.error('Exception creating journal entry:', error);
     return null;
@@ -41,7 +45,11 @@ export const updateJournalEntry = async (entryId: number, entryData: Partial<Jou
       return null;
     }
 
-    return data;
+    // Map the database result to match JournalEntry interface
+    return {
+      ...data,
+      content: data['refined text'] || data['transcription text'] || ''
+    } as JournalEntry;
   } catch (error) {
     console.error('Exception updating journal entry:', error);
     return null;
@@ -91,7 +99,11 @@ export const getJournalEntries = async (userId: string, limit?: number, offset?:
       return [];
     }
 
-    return data || [];
+    // Map the database results to match JournalEntry interface
+    return (data || []).map(entry => ({
+      ...entry,
+      content: entry['refined text'] || entry['transcription text'] || ''
+    })) as JournalEntry[];
   } catch (error) {
     console.error('Exception fetching journal entries:', error);
     return [];

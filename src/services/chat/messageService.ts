@@ -48,7 +48,12 @@ export const createChatMessage = async (
       .eq('id', threadId)
       .eq('user_id', userId);
 
-    return data;
+    // Cast sender to proper type
+    return {
+      ...data,
+      sender: data.sender as 'user' | 'assistant' | 'error',
+      role: data.role as 'user' | 'assistant' | 'error'
+    };
   } catch (error) {
     console.error('Exception creating chat message:', error);
     return null;
@@ -81,7 +86,12 @@ export const getChatMessages = async (threadId: string, userId: string): Promise
       return [];
     }
 
-    return data || [];
+    // Cast sender and role to proper types
+    return (data || []).map(msg => ({
+      ...msg,
+      sender: msg.sender as 'user' | 'assistant' | 'error',
+      role: msg.role as 'user' | 'assistant' | 'error'
+    }));
   } catch (error) {
     console.error('Exception fetching chat messages:', error);
     return [];
@@ -121,7 +131,12 @@ export const updateChatMessage = async (
       return null;
     }
 
-    return data;
+    // Cast sender and role to proper types
+    return {
+      ...data,
+      sender: data.sender as 'user' | 'assistant' | 'error',
+      role: data.role as 'user' | 'assistant' | 'error'
+    };
   } catch (error) {
     console.error('Exception updating chat message:', error);
     return null;
@@ -160,4 +175,36 @@ export const deleteChatMessage = async (messageId: string, userId: string): Prom
     console.error('Exception deleting chat message:', error);
     return false;
   }
+};
+
+// Legacy function aliases for backward compatibility
+export const getThreadMessages = getChatMessages;
+export const saveMessage = async (threadId: string, content: string, sender: 'user' | 'assistant', userId?: string) => {
+  if (!userId) {
+    console.error('User ID is required for saveMessage');
+    return null;
+  }
+  return createChatMessage(threadId, content, sender, userId);
+};
+
+// Thread management functions
+export const createThread = async (userId: string, title: string = "New Conversation") => {
+  const { createChatThread } = await import('./threadService');
+  const thread = await createChatThread(userId, title);
+  return thread?.id || null;
+};
+
+export const getUserChatThreads = async (userId: string) => {
+  const { getChatThreads } = await import('./threadService');
+  return getChatThreads(userId);
+};
+
+export const updateThreadTitle = async (threadId: string, title: string, userId?: string) => {
+  if (!userId) {
+    console.error('User ID is required for updateThreadTitle');
+    return false;
+  }
+  const { updateChatThread } = await import('./threadService');
+  const result = await updateChatThread(threadId, { title }, userId);
+  return !!result;
 };
