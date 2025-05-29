@@ -8,6 +8,7 @@ import { AspectRatio } from '@/components/ui/aspect-ratio';
 import TutorialInfographic from './TutorialInfographic';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { PremiumBadge } from '@/components/onboarding/PremiumBadge';
+import { useViewportAwarePosition } from '@/hooks/useViewportAwarePosition';
 
 interface TutorialStepProps {
   step: TutorialStepType;
@@ -33,6 +34,12 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
   const stepRef = useRef<HTMLDivElement>(null);
   const nextButtonRef = useRef<HTMLButtonElement>(null);
   const [renderKey] = useState(Date.now());
+  
+  // Get viewport-aware position
+  const position = useViewportAwarePosition({
+    stepId: step.id,
+    targetElement: step.targetElement
+  });
   
   // Improved logging for debugging
   useEffect(() => {
@@ -87,9 +94,9 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [onNext, step.id]);
   
-  // Get background color based on step ID - Updated for new step 3
+  // Get background color based on step ID
   const getBackgroundStyle = () => {
-    // Step 6 should be slightly transparent to show chat behind (was step 5)
+    // Step 6 should be slightly transparent to show chat behind
     if (step.id === 6) {
       return {
         backgroundColor: 'rgba(26, 31, 44, 0.95)',
@@ -116,7 +123,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // Steps 4-5 have semi-transparent background with blur (previously steps 3-4)
+    // Steps 4-5 have semi-transparent background with blur
     if (step.id === 4 || step.id === 5) {
       return {
         backgroundColor: 'rgba(26, 31, 44, 0.2)',
@@ -126,7 +133,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // Steps 7-10 (insights steps with infographics) should be fully opaque (was 6-9)
+    // Steps 7-10 (insights steps with infographics) should be fully opaque
     if (step.id >= 7 && step.id <= 10) {
       return {
         backgroundColor: 'rgba(26, 31, 44, 1)',
@@ -144,90 +151,10 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   };
   
-  // Adjust container width if it has an image
-  const getContainerWidth = () => {
-    // Make steps with images wider (steps 7-10, was 6-9)
-    if (step.infographicType && (step.id >= 7 && step.id <= 10)) {
-      return {
-        maxWidth: '350px',
-        width: 'calc(100% - 40px)'
-      };
-    }
-    
-    return {
-      maxWidth: '320px',
-      width: 'calc(100% - 40px)'
-    };
-  };
-  
-  // Improved modal positioning based on step ID - Updated positioning logic
-  const getPositionStyle = () => {
-    // Special positioning for step 2 to move it to the very top so arrow button is visible
-    if (step.id === 2) {
-      return {
-        top: '10%',
-        left: '50%',
-        transform: 'translate(-50%, 0)',
-        position: 'fixed' as const
-      };
-    }
-    
-    // For step 3 (theme strips) - center to show strips around it
-    if (step.id === 3) {
-      return {
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        position: 'fixed' as const,
-        zIndex: 30000
-      };
-    }
-    
-    // For step 6 - position at bottom right to show chat interface behind (was step 5)
-    if (step.id === 6) {
-      return {
-        bottom: '20px',
-        right: '20px',
-        transform: 'none',
-        position: 'fixed' as const,
-        zIndex: 30000
-      };
-    }
-    
-    // For steps with infographics (7-10) - centered to ensure they're visible (was 6-9)
-    if (step.infographicType && (step.id >= 7 && step.id <= 10)) {
-      return {
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        position: 'fixed' as const,
-        zIndex: 30000
-      };
-    }
-    
-    // For steps 4 and 5 - position in center for consistency (was 3 and 4)
-    if (step.id === 4 || step.id === 5) {
-      return {
-        top: '50%',
-        left: '50%',
-        transform: 'translate(-50%, -50%)',
-        position: 'fixed' as const
-      };
-    }
-    
-    // For other steps, attempt to position based on target elements
-    return {
-      top: '50%',
-      left: '50%',
-      transform: 'translate(-50%, -50%)',
-      position: 'fixed' as const
-    };
-  };
-  
-  // Determine whether to show the infographic and which type - Updated step range
+  // Determine whether to show the infographic and which type
   const shouldShowInfographic = !!step.infographicType && step.id >= 7 && step.id <= 10;
   
-  // Determine whether to show premium badge (steps 6-10, was 5-9)
+  // Determine whether to show premium badge
   const shouldShowPremiumBadge = step.id >= 6 && step.id <= 10;
   
   return (
@@ -235,13 +162,20 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       ref={stepRef}
       className="tutorial-step-container rounded-xl p-4"
       style={{
-        ...getPositionStyle(),
+        position: 'fixed',
+        top: position.top,
+        bottom: position.bottom,
+        left: position.left,
+        transform: position.transform,
+        maxWidth: position.maxWidth,
+        maxHeight: position.maxHeight,
+        width: 'auto',
         ...getBackgroundStyle(),
-        ...getContainerWidth(),
         border: '3px solid var(--color-theme)',
         boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)',
         zIndex: 30000,
-        pointerEvents: 'auto'
+        pointerEvents: 'auto',
+        overflow: 'auto'
       }}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
