@@ -22,7 +22,7 @@
   overflow: hidden !important;
 }
 
-/* Tutorial Chat Interface - Full screen chat for step 5 */
+/* Tutorial Chat Interface - Full screen chat for step 6 (was step 5) */
 .tutorial-chat-interface {
   position: fixed !important;
   top: 0 !important;
@@ -91,8 +91,23 @@ body.tutorial-active {
   background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 2 */
 }
 
-/* Step 5: Position at bottom right to show chat interface */
+/* Step 3: Theme strips step - centered with semi-transparent background */
+.tutorial-step-container[data-step="3"] {
+  top: 50% !important;
+  left: 50% !important;
+  transform: translate(-50%, -50%) !important;
+  background-color: rgba(26, 31, 44, 0.85) !important; /* Semi-transparent to show theme strips behind */
+}
+
+/* Steps 4-5: Semi-transparent with blur (previously steps 3-4) */
+.tutorial-step-container[data-step="4"],
 .tutorial-step-container[data-step="5"] {
+  background-color: rgba(26, 31, 44, 0.2) !important;
+  backdrop-filter: blur(2px) !important;
+}
+
+/* Step 6: Position at bottom right to show chat interface (was step 5) */
+.tutorial-step-container[data-step="6"] {
   bottom: 20px !important;
   right: 20px !important;
   top: auto !important;
@@ -101,11 +116,11 @@ body.tutorial-active {
   background-color: rgba(26, 31, 44, 0.95) !important; /* Slightly transparent to show chat behind */
 }
 
-/* Insights steps: Fully opaque background for steps 6-9 with infographics */
-.tutorial-step-container[data-step="6"],
+/* Insights steps: Fully opaque background for steps 7-10 with infographics (was 6-9) */
 .tutorial-step-container[data-step="7"],
 .tutorial-step-container[data-step="8"],
-.tutorial-step-container[data-step="9"] {
+.tutorial-step-container[data-step="9"],
+.tutorial-step-container[data-step="10"] {
   background-color: rgba(26, 31, 44, 1) !important;
   max-width: 350px !important; /* Wider for steps with images */
   transform: translate(-50%, -50%) !important; /* Ensure these are centered properly */
@@ -114,20 +129,13 @@ body.tutorial-active {
 }
 
 /* Ensure infographic containers are properly displayed */
-.tutorial-step-container[data-step="6"] .tutorial-infographic,
 .tutorial-step-container[data-step="7"] .tutorial-infographic,
 .tutorial-step-container[data-step="8"] .tutorial-infographic,
-.tutorial-step-container[data-step="9"] .tutorial-infographic {
+.tutorial-step-container[data-step="9"] .tutorial-infographic,
+.tutorial-step-container[data-step="10"] .tutorial-infographic {
   border-radius: 6px !important;
   overflow: hidden !important;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Steps 3-4: Semi-transparent with blur */
-.tutorial-step-container[data-step="3"],
-.tutorial-step-container[data-step="4"] {
-  background-color: rgba(26, 31, 44, 0.2) !important;
-  backdrop-filter: blur(2px) !important;
 }
 
 /* Step 1: Journal header styling */
@@ -150,6 +158,16 @@ body.tutorial-active {
   opacity: 1 !important;
 }
 
+/* Step 3: Theme strips highlighting */
+.theme-strips-highlight.tutorial-target {
+  z-index: 9998 !important;
+  position: relative !important;
+  border: 3px solid var(--color-theme) !important;
+  border-radius: 12px !important;
+  box-shadow: 0 0 25px 10px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3) !important;
+  animation: theme-strips-pulse 2s infinite alternate !important;
+}
+
 /* Common button highlight styling for both Record Entry and Past Entries buttons */
 .tutorial-button-highlight {
   box-shadow: 0 0 35px 20px var(--color-theme) !important;
@@ -160,7 +178,7 @@ body.tutorial-active {
   z-index: 10000 !important;
 }
 
-/* Steps 3 & 4: Tab highlighting styling - Identical styling for both record and entries tabs */
+/* Steps 4 & 5: Tab highlighting styling - Identical styling for both record and entries tabs (was 3 & 4) */
 .record-entry-tab.tutorial-target,
 .entries-tab.tutorial-target {
   z-index: 10000 !important;
@@ -209,7 +227,7 @@ body.dark [value="record"] span:contains("Record") {
   background-color: white !important; /* Explicit white background */
 }
 
-/* Specific fix for Step 4 text visibility in light mode */
+/* Specific fix for Step 5 text visibility in light mode (was Step 4) */
 body:not(.dark) .entries-tab.tutorial-target span,
 body:not(.dark) .entries-tab.tutorial-target div {
   color: #000 !important; /* Black text for light mode */
@@ -223,7 +241,7 @@ body.dark .entries-tab.tutorial-target div {
   background-color: transparent !important; /* No background in dark mode */
 }
 
-/* Step 5: Chat question highlight styling - Enhanced for maximum visibility in tutorial chat */
+/* Step 6: Chat question highlight styling - Enhanced for maximum visibility in tutorial chat (was Step 5) */
 .chat-question-highlight.tutorial-target {
   z-index: 20000 !important;
   position: relative !important;
@@ -241,7 +259,7 @@ body.dark .entries-tab.tutorial-target div {
   overflow: visible !important;
 }
 
-/* Steps 6-9: Insights pages highlight styling */
+/* Steps 7-10: Insights pages highlight styling (was 6-9) */
 .insights-header-highlight.tutorial-target,
 .emotion-chart-highlight.tutorial-target,
 .mood-calendar-highlight.tutorial-target,
@@ -327,6 +345,11 @@ body.dark .entries-tab.tutorial-target div {
   100% { opacity: 0.6; transform: scale(1.15); }
 }
 
+@keyframes theme-strips-pulse {
+  0% { box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3); }
+  100% { box-shadow: 0 0 30px 15px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.6); }
+}
+
 /* Responsive styling for different screen sizes */
 @media (max-width: 640px) {
   .tutorial-step-container {
@@ -347,8 +370,14 @@ body.dark .entries-tab.tutorial-target div {
     transform: translate(-50%, 0) !important; /* Don't center vertically */
   }
   
-  /* Special positioning for step 5 on mobile - adjust for smaller screens */
-  .tutorial-step-container[data-step="5"] {
+  /* Special positioning for step 3 on mobile - center for theme strips */
+  .tutorial-step-container[data-step="3"] {
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+  
+  /* Special positioning for step 6 on mobile - adjust for smaller screens (was step 5) */
+  .tutorial-step-container[data-step="6"] {
     bottom: 20px !important;
     right: 10px !important;
     left: 10px !important;
@@ -356,11 +385,11 @@ body.dark .entries-tab.tutorial-target div {
     width: auto !important;
   }
   
-  /* Special width override for infographic-containing steps on mobile */
-  .tutorial-step-container[data-step="6"],
+  /* Special width override for infographic-containing steps on mobile (steps 7-10, was 6-9) */
   .tutorial-step-container[data-step="7"],
   .tutorial-step-container[data-step="8"],
-  .tutorial-step-container[data-step="9"] {
+  .tutorial-step-container[data-step="9"],
+  .tutorial-step-container[data-step="10"] {
     max-width: 300px !important;
     width: 90% !important;
     padding: 10px !important;
@@ -395,18 +424,24 @@ body.dark .entries-tab.tutorial-target div {
     top: 10% !important; /* Keep at top on small mobile */
   }
   
-  /* Special override for step 5 on small mobile */
-  .tutorial-step-container[data-step="5"] {
+  /* Special override for step 3 on small mobile - center for theme strips */
+  .tutorial-step-container[data-step="3"] {
+    top: 50% !important;
+    transform: translate(-50%, -50%) !important;
+  }
+  
+  /* Special override for step 6 on small mobile (was step 5) */
+  .tutorial-step-container[data-step="6"] {
     bottom: 10px !important;
     right: 10px !important;
     left: 10px !important;
   }
   
-  /* Adjust size for infographic containers on very small screens */
-  .tutorial-step-container[data-step="6"],
+  /* Adjust size for infographic containers on very small screens (steps 7-10, was 6-9) */
   .tutorial-step-container[data-step="7"],
   .tutorial-step-container[data-step="8"],
-  .tutorial-step-container[data-step="9"] {
+  .tutorial-step-container[data-step="9"],
+  .tutorial-step-container[data-step="10"] {
     padding: 8px !important;
   }
 }

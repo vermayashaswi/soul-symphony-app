@@ -23,6 +23,15 @@ export const ENTRIES_TAB_SELECTORS = [
   '[role="tab"][value="entries"]'
 ];
 
+// All potential selectors for theme strips
+export const THEME_STRIPS_SELECTORS = [
+  '.floating-theme-strips',
+  '.theme-strip',
+  '[data-tutorial-target="theme-strips"]',
+  '.journal-summary-card .floating-theme-strips',
+  '.h-full.w-full .floating-theme-strips'
+];
+
 // All potential selectors for chat question suggestion elements
 export const CHAT_QUESTION_SELECTORS = [
   '.chat-suggestion-button:first-child',
@@ -103,6 +112,25 @@ export const findAndHighlightElement = (
   selectors: string[],
   className: string
 ): boolean => {
+  // Special handling for theme strips to ensure animation continues
+  if (className === 'theme-strips-highlight') {
+    for (const selector of selectors) {
+      const element = document.querySelector(selector);
+      if (element instanceof HTMLElement) {
+        // For theme strips, apply a subtle highlight that doesn't interfere with animation
+        element.classList.add('tutorial-target', className);
+        element.style.border = "3px solid var(--color-theme)";
+        element.style.borderRadius = "12px";
+        element.style.boxShadow = "0 0 25px 10px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.3)";
+        element.style.zIndex = "9999";
+        element.style.position = "relative";
+        
+        console.log(`Applied theme strips highlighting to element using selector: ${selector}`);
+        return true;
+      }
+    }
+  }
+  
   // If this is for chat questions, try to find all elements and select the first one
   if (className === 'chat-question-highlight') {
     // Try to find all chat question elements
@@ -164,7 +192,9 @@ export const logPotentialTutorialElements = (): void => {
     '#past-entries-button',
     '.chat-suggestion-button',
     '.suggestion-button',
-    '.empty-chat-suggestion'
+    '.empty-chat-suggestion',
+    '.floating-theme-strips',
+    '.theme-strip'
   ];
   
   selectors.forEach(selector => {

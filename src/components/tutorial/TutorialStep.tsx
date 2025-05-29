@@ -68,7 +68,6 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     onSkip();
   };
   
-  // Add direct DOM click handler backup
   useEffect(() => {
     if (nextButtonRef.current) {
       const handleDirectClick = (e: Event) => {
@@ -88,41 +87,69 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     }
   }, [onNext, step.id]);
   
-  // Get background color based on step ID
+  // Get background color based on step ID - Updated for new step 3
   const getBackgroundStyle = () => {
-    // All steps should be fully opaque, especially step 5
-    if (step.id === 5) {
+    // Step 6 should be slightly transparent to show chat behind (was step 5)
+    if (step.id === 6) {
       return {
-        backgroundColor: 'rgba(26, 31, 44, 0.95)', // Slightly transparent for step 5 to show chat behind
+        backgroundColor: 'rgba(26, 31, 44, 0.95)',
         color: 'white',
-        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow for readability
+        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)'
       };
     }
     
-    // Step 1 should be fully opaque
-    if (step.id === 1) {
+    // Steps 1 and 2 should be fully opaque
+    if (step.id === 1 || step.id === 2) {
       return {
-        backgroundColor: 'rgba(26, 31, 44, 1)', // Fully opaque background for step 1
+        backgroundColor: 'rgba(26, 31, 44, 1)',
         color: 'white',
-        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow for readability
+        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)'
       };
     }
     
-    // Other steps have semi-transparent background with blur
+    // Step 3 (theme strips) should be semi-transparent to show strips behind
+    if (step.id === 3) {
+      return {
+        backgroundColor: 'rgba(26, 31, 44, 0.85)',
+        color: 'white',
+        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)'
+      };
+    }
+    
+    // Steps 4-5 have semi-transparent background with blur (previously steps 3-4)
+    if (step.id === 4 || step.id === 5) {
+      return {
+        backgroundColor: 'rgba(26, 31, 44, 0.2)',
+        backdropFilter: 'blur(2px)',
+        color: 'white',
+        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)'
+      };
+    }
+    
+    // Steps 7-10 (insights steps with infographics) should be fully opaque (was 6-9)
+    if (step.id >= 7 && step.id <= 10) {
+      return {
+        backgroundColor: 'rgba(26, 31, 44, 1)',
+        color: 'white',
+        textShadow: '0 0 4px rgba(0, 0, 0, 0.8)'
+      };
+    }
+    
+    // Default for any other steps
     return {
-      backgroundColor: 'rgba(26, 31, 44, 0.2)', // Very light background for other steps
-      backdropFilter: 'blur(2px)', // Slight blur to improve text readability
+      backgroundColor: 'rgba(26, 31, 44, 0.2)',
+      backdropFilter: 'blur(2px)',
       color: 'white',
-      textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow to ensure readability
+      textShadow: '0 0 4px rgba(0, 0, 0, 0.8)'
     };
   };
   
   // Adjust container width if it has an image
   const getContainerWidth = () => {
-    // Make steps with images wider
-    if (step.infographicType && (step.id >= 6 && step.id <= 9)) {
+    // Make steps with images wider (steps 7-10, was 6-9)
+    if (step.infographicType && (step.id >= 7 && step.id <= 10)) {
       return {
-        maxWidth: '350px', // Wider for steps with images
+        maxWidth: '350px',
         width: 'calc(100% - 40px)'
       };
     }
@@ -133,31 +160,20 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   };
   
-  // Improved modal positioning based on step ID - use fixed positioning for consistency
+  // Improved modal positioning based on step ID - Updated positioning logic
   const getPositionStyle = () => {
     // Special positioning for step 2 to move it to the very top so arrow button is visible
     if (step.id === 2) {
       return {
-        top: '10%',  // Moved to very top (from 35% to 10%)
+        top: '10%',
         left: '50%',
-        transform: 'translate(-50%, 0)', // Changed from -50% for y to avoid centering
+        transform: 'translate(-50%, 0)',
         position: 'fixed' as const
       };
     }
     
-    // For step 5 - position at bottom right to show chat interface behind
-    if (step.id === 5) {
-      return {
-        bottom: '20px',  // Position at bottom
-        right: '20px',   // Position at right
-        transform: 'none', // No transform needed
-        position: 'fixed' as const,
-        zIndex: 30000
-      };
-    }
-    
-    // For steps with infographics (6-9) - centered to ensure they're visible
-    if (step.infographicType && (step.id >= 6 && step.id <= 9)) {
+    // For step 3 (theme strips) - center to show strips around it
+    if (step.id === 3) {
       return {
         top: '50%',
         left: '50%',
@@ -167,8 +183,30 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // For steps 3 and 4 - position in center for consistency
-    if (step.id === 3 || step.id === 4) {
+    // For step 6 - position at bottom right to show chat interface behind (was step 5)
+    if (step.id === 6) {
+      return {
+        bottom: '20px',
+        right: '20px',
+        transform: 'none',
+        position: 'fixed' as const,
+        zIndex: 30000
+      };
+    }
+    
+    // For steps with infographics (7-10) - centered to ensure they're visible (was 6-9)
+    if (step.infographicType && (step.id >= 7 && step.id <= 10)) {
+      return {
+        top: '50%',
+        left: '50%',
+        transform: 'translate(-50%, -50%)',
+        position: 'fixed' as const,
+        zIndex: 30000
+      };
+    }
+    
+    // For steps 4 and 5 - position in center for consistency (was 3 and 4)
+    if (step.id === 4 || step.id === 5) {
       return {
         top: '50%',
         left: '50%',
@@ -186,11 +224,11 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     };
   };
   
-  // Determine whether to show the infographic and which type
-  const shouldShowInfographic = !!step.infographicType && step.id >= 6 && step.id <= 9;
+  // Determine whether to show the infographic and which type - Updated step range
+  const shouldShowInfographic = !!step.infographicType && step.id >= 7 && step.id <= 10;
   
-  // Determine whether to show premium badge (steps 5-9)
-  const shouldShowPremiumBadge = step.id >= 5 && step.id <= 9;
+  // Determine whether to show premium badge (steps 6-10, was 5-9)
+  const shouldShowPremiumBadge = step.id >= 6 && step.id <= 10;
   
   return (
     <motion.div
@@ -202,16 +240,16 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         ...getContainerWidth(),
         border: '3px solid var(--color-theme)',
         boxShadow: '0 0 30px rgba(0, 0, 0, 0.7)',
-        zIndex: 30000, // Consistently high z-index for all steps
+        zIndex: 30000,
         pointerEvents: 'auto'
       }}
       initial={{ opacity: 0, scale: 0.8 }}
       animate={{ opacity: 1, scale: 1 }}
       exit={{ opacity: 0, scale: 0.8 }}
       transition={{ duration: 0.3 }}
-      onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind
-      data-step={step.id} // Add data attribute for easier CSS targeting
-      key={`step-${step.id}-${renderKey}`} // Add render key for stability
+      onClick={(e) => e.stopPropagation()}
+      data-step={step.id}
+      key={`step-${step.id}-${renderKey}`}
     >
       {/* Step indicator */}
       <div className="flex justify-between items-center mb-2">
@@ -237,7 +275,6 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         </Button>
       </div>
       
-      {/* Title */}
       <h3 className="text-lg font-semibold mb-1 text-white">
         <TranslatableText 
           text={step.title} 
@@ -247,7 +284,6 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         />
       </h3>
       
-      {/* Content */}
       <p className="text-sm text-white/80 mb-4">
         <TranslatableText 
           text={step.content} 
@@ -257,14 +293,12 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
         />
       </p>
       
-      {/* Custom Infographic - only show for steps that include infographics */}
       {shouldShowInfographic && step.infographicType && (
         <div className="mb-4">
           <TutorialInfographic type={step.infographicType} />
         </div>
       )}
       
-      {/* Navigation buttons with enhanced click handling and improved back button contrast */}
       <div className="flex justify-between mt-2 tutorial-buttons">
         {!isFirst && (
           <Button 
@@ -273,8 +307,8 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
             onClick={handlePrev}
             className="flex items-center gap-1 pointer-events-auto bg-gray-800 border-white/50 text-white hover:text-white hover:bg-gray-700"
             style={{
-              color: "#FFFFFF !important", // Ensure text is visible in light mode
-              backgroundColor: "rgba(51,51,51,0.8)",  // More opaque background for all steps
+              color: "#FFFFFF !important",
+              backgroundColor: "rgba(51,51,51,0.8)",
               borderColor: "rgba(255,255,255,0.5)"
             }}
           >
@@ -302,7 +336,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
               position: 'relative', 
               zIndex: 30001,
               backgroundColor: 'var(--color-theme)',
-              opacity: 1  // Ensure buttons remain fully opaque
+              opacity: 1
             }}
           >
             <TranslatableText 
