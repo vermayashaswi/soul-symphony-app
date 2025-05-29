@@ -2,6 +2,7 @@ import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
 import TutorialStep from './TutorialStep';
+import TutorialChatInterface from './TutorialChatInterface';
 import { useLocation } from 'react-router-dom';
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { 
@@ -36,6 +37,9 @@ const TutorialOverlay: React.FC = () => {
   const isAppRouteCurrent = isAppRoute(location.pathname);
   const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted;
   
+  // Check if we're in step 5 (chat interface step)
+  const isStep5 = shouldShowTutorial && steps[currentStep]?.id === 5;
+  
   // Log important state changes
   useEffect(() => {
     console.log('TutorialOverlay state:', {
@@ -44,10 +48,11 @@ const TutorialOverlay: React.FC = () => {
       currentStepId: steps[currentStep]?.id,
       navigationState,
       shouldShowTutorial,
+      isStep5,
       pathname: location.pathname,
       isAppRoute: isAppRouteCurrent
     });
-  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent]);
+  }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, isStep5, location.pathname, isAppRouteCurrent]);
   
   // Enhanced function to completely clean up ALL tutorial highlighting
   const cleanupAllTutorialHighlighting = () => {
@@ -141,47 +146,6 @@ const TutorialOverlay: React.FC = () => {
     
     // Add data attribute for current step to enable more specific CSS targeting
     document.body.setAttribute('data-current-step', String(steps[currentStep]?.id || ''));
-    
-    // Special handling for step 5 - ensure chat background is visible with proper styling
-    if (steps[currentStep]?.id === 5) {
-      // Prepare the chat container for better visibility - Use purple background
-      const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
-      chatContainers.forEach(container => {
-        if (container instanceof HTMLElement) {
-          container.style.backgroundColor = '#1A1F2C'; // Dark purple background
-          container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)'; // Gradient background
-          container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)'; // Inner purple glow
-          container.style.opacity = '1';
-          container.style.visibility = 'visible';
-        }
-      });
-      
-      // Make sure EmptyChatState is visible
-      const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
-      if (emptyChatState && emptyChatState instanceof HTMLElement) {
-        emptyChatState.style.visibility = 'visible';
-        emptyChatState.style.opacity = '1';
-        emptyChatState.style.zIndex = '5000';
-        emptyChatState.style.display = 'flex';
-      }
-      
-      // Run another check after a short delay to catch dynamically loaded elements
-      setTimeout(() => {
-        if (steps[currentStep]?.id === 5) {
-          const chatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
-          chatSuggestions.forEach(suggestion => {
-            if (suggestion instanceof HTMLElement) {
-              suggestion.style.visibility = 'visible';
-              suggestion.style.display = 'block';
-              suggestion.style.opacity = '1';
-              
-              // Add tutorial classes for highlighting
-              suggestion.classList.add('chat-question-highlight', 'tutorial-target');
-            }
-          });
-        }
-      }, 500);
-    }
     
     // Clean up when tutorial is deactivated
     return () => {
@@ -377,128 +341,35 @@ const TutorialOverlay: React.FC = () => {
           console.warn('Past Entries tab element not found with any selector for step 4');
         }
       }
-      // ... keep existing code (steps 5-9 remain the same)
       else if (currentStepData?.id === 5) {
-        console.log('Setting up highlight for chat question (step 5) with purple background');
+        // Step 5: Chat question highlighting - focus on the tutorial chat interface
+        console.log('Setting up highlight for chat question (step 5) with real chat interface');
         
-        // Set purple background for better visibility with opacity
-        const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
-        chatContainers.forEach(container => {
-          if (container instanceof HTMLElement) {
-            container.style.backgroundColor = '#1A1F2C'; // Dark purple background
-            container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)'; // Gradient background
-            container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)'; // Inner purple glow
-            container.style.opacity = '1';
-            container.style.visibility = 'visible';
-            container.style.borderRadius = '10px'; // Rounded corners
-          }
-        });
-        
-        // Make sure EmptyChatState is visible
-        const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
-        if (emptyChatState && emptyChatState instanceof HTMLElement) {
-          emptyChatState.style.visibility = 'visible';
-          emptyChatState.style.opacity = '1';
-          emptyChatState.style.zIndex = '5000';
-          emptyChatState.style.display = 'flex';
-        }
-        
-        // Log all potential targets for debugging
-        logPotentialTutorialElements();
-        
-        // First try to highlight existing chat suggestions in EmptyChatState
-        const emptyChatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
-        if (emptyChatSuggestions.length > 0) {
-          console.log(`Found ${emptyChatSuggestions.length} chat suggestions in EmptyChatState`);
-          emptyChatSuggestions.forEach((element, index) => {
-            if (index === 0) { // Only highlight the first one
-              element.classList.add('chat-question-highlight', 'tutorial-target');
-              
-              // Apply enhanced visibility
-              if (element instanceof HTMLElement) {
-                element.style.display = 'block';
-                element.style.visibility = 'visible';
-                element.style.opacity = '1';
-                element.style.zIndex = '20000';
-                element.style.position = 'relative';
-                element.style.boxShadow = '0 0 40px 25px var(--color-theme)';
-                element.style.animation = 'ultra-strong-pulse 1.5s infinite alternate';
-                element.style.border = '2px solid white';
-                element.style.transform = 'scale(1.1)';
-              }
-              
-              console.log('Applied highlighting to first chat suggestion in EmptyChatState');
-            }
-          });
-        } else {
-          // Try to find and highlight using our helper function
-          const found = findAndHighlightElement(CHAT_QUESTION_SELECTORS, 'chat-question-highlight');
-          
-          if (!found) {
-            console.warn('Failed to find chat question element with any selector');
-            
-            // Create a fallback chat suggestion if none exists
-            const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
-            if (emptyChatState && emptyChatState instanceof HTMLElement) {
-              console.log('Creating fallback chat suggestions');
-              
-              // Check if suggestions container already exists
-              let suggestionsContainer = emptyChatState.querySelector('.mt-8.space-y-3.w-full.max-w-md');
-              
-              if (!suggestionsContainer) {
-                suggestionsContainer = document.createElement('div');
-                suggestionsContainer.className = 'mt-8 space-y-3 w-full max-w-md';
-                emptyChatState.appendChild(suggestionsContainer);
-              }
-              
-              if (suggestionsContainer && suggestionsContainer instanceof HTMLElement) {
-                // If we already have buttons in the container, don't add more
-                const existingButtons = suggestionsContainer.querySelectorAll('button');
-                if (existingButtons.length === 0) {
-                  const suggestionButton = document.createElement('button');
-                  suggestionButton.className = 'w-full justify-start px-4 py-3 h-auto bg-secondary text-secondary-foreground hover:bg-secondary/80 rounded-md chat-question-highlight tutorial-target empty-chat-suggestion';
-                  suggestionButton.textContent = 'How am I feeling today based on my journal entries?';
-                  suggestionButton.style.display = 'block';
-                  suggestionButton.style.visibility = 'visible';
-                  suggestionButton.style.opacity = '1';
-                  
-                  suggestionsContainer.appendChild(suggestionButton);
-                  applyTutorialHighlight(suggestionButton, 'chat-question-highlight');
-                } else {
-                  // Apply highlighting to the first existing button
-                  const firstButton = existingButtons[0];
-                  firstButton.classList.add('chat-question-highlight', 'tutorial-target', 'empty-chat-suggestion');
-                  
-                  if (firstButton instanceof HTMLElement) {
-                    firstButton.style.display = 'block';
-                    firstButton.style.visibility = 'visible';
-                    firstButton.style.opacity = '1';
-                    firstButton.style.zIndex = '20000';
-                    applyTutorialHighlight(firstButton, 'chat-question-highlight');
-                  }
-                }
-              }
-            }
-          }
-        }
-        
-        // Try one more time after a short delay
+        // Wait for the tutorial chat interface to render, then highlight suggestion buttons
         setTimeout(() => {
-          const chatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
-          if (chatSuggestions.length > 0 && currentStepData?.id === 5) {
-            console.log('Found chat suggestions after delay, highlighting first one');
-            const firstSuggestion = chatSuggestions[0];
-            firstSuggestion.classList.add('chat-question-highlight', 'tutorial-target');
-            
-            if (firstSuggestion instanceof HTMLElement) {
-              firstSuggestion.style.display = 'block';
-              firstSuggestion.style.visibility = 'visible';
-              firstSuggestion.style.opacity = '1';
+          const suggestionButtons = document.querySelectorAll('.tutorial-chat-interface .empty-chat-suggestion, .tutorial-chat-interface button');
+          
+          if (suggestionButtons.length > 0) {
+            // Highlight the first suggestion button
+            const firstButton = suggestionButtons[0];
+            if (firstButton) {
+              firstButton.classList.add('chat-question-highlight', 'tutorial-target');
+              
+              if (firstButton instanceof HTMLElement) {
+                firstButton.style.boxShadow = '0 0 40px 25px var(--color-theme)';
+                firstButton.style.animation = 'ultra-strong-pulse 1.5s infinite alternate';
+                firstButton.style.border = '2px solid white';
+                firstButton.style.transform = 'scale(1.1)';
+                firstButton.style.zIndex = '20000';
+                firstButton.style.pointerEvents = 'none'; // Prevent clicks in tutorial
+              }
+              
+              console.log('Applied highlighting to first chat suggestion in tutorial interface');
             }
           }
-        }, 800);
+        }, 500);
       }
-      // NEW: Step 6 - Insights Header Highlight
+      // ... keep existing code (steps 6-9 remain the same)
       else if (currentStepData?.id === 6) {
         console.log('Setting up highlight for insights header (step 6)');
         const found = findAndHighlightElement(INSIGHTS_HEADER_SELECTORS, 'insights-header-highlight');
@@ -507,7 +378,6 @@ const TutorialOverlay: React.FC = () => {
           console.warn('Failed to find insights header with any selector');
         }
       }
-      // NEW: Step 7 - Emotion Chart Highlight
       else if (currentStepData?.id === 7) {
         console.log('Setting up highlight for emotion chart (step 7)');
         const found = findAndHighlightElement(EMOTION_CHART_SELECTORS, 'emotion-chart-highlight');
@@ -516,7 +386,6 @@ const TutorialOverlay: React.FC = () => {
           console.warn('Failed to find emotion chart with any selector');
         }
       }
-      // NEW: Step 8 - Mood Calendar Highlight
       else if (currentStepData?.id === 8) {
         console.log('Setting up highlight for mood calendar (step 8)');
         const found = findAndHighlightElement(MOOD_CALENDAR_SELECTORS, 'mood-calendar-highlight');
@@ -525,7 +394,6 @@ const TutorialOverlay: React.FC = () => {
           console.warn('Failed to find mood calendar with any selector');
         }
       }
-      // NEW: Step 9 - Soul-Net Highlight
       else if (currentStepData?.id === 9) {
         console.log('Setting up highlight for soul-net visualization (step 9)');
         const found = findAndHighlightElement(SOULNET_SELECTORS, 'soul-net-highlight');
@@ -553,11 +421,14 @@ const TutorialOverlay: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[9997] pointer-events-auto">
+      {/* Render actual chat interface for step 5 */}
+      {isStep5 && <TutorialChatInterface />}
+      
       {/* Semi-transparent overlay */}
       <motion.div
         className="tutorial-overlay absolute inset-0"
         initial={{ opacity: 0 }}
-        animate={{ opacity: 0.75 }}
+        animate={{ opacity: isStep5 ? 0.3 : 0.75 }} // Less opacity for step 5 to show chat interface
         exit={{ opacity: 0 }}
         transition={{ duration: 0.3 }}
         onClick={(e) => e.stopPropagation()} // Prevent clicks from reaching elements behind

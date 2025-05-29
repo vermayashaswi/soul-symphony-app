@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Button } from '@/components/ui/button';
@@ -92,7 +93,7 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
     // All steps should be fully opaque, especially step 5
     if (step.id === 5) {
       return {
-        backgroundColor: 'rgba(26, 31, 44, 1)', // Fully opaque for step 5
+        backgroundColor: 'rgba(26, 31, 44, 0.95)', // Slightly transparent for step 5 to show chat behind
         color: 'white',
         textShadow: '0 0 4px rgba(0, 0, 0, 0.8)' // Text shadow for readability
       };
@@ -144,12 +145,12 @@ const TutorialStep: React.FC<TutorialStepProps> = ({
       };
     }
     
-    // For step 5 - position higher to avoid the chat input box at bottom
+    // For step 5 - position at bottom right to show chat interface behind
     if (step.id === 5) {
       return {
-        top: '10%',  // Positioned much higher (changed from 15% to 10%)
-        left: '50%',
-        transform: 'translate(-50%, 0)', // Changed from -50% for y to avoid centering
+        bottom: '20px',  // Position at bottom
+        right: '20px',   // Position at right
+        transform: 'none', // No transform needed
         position: 'fixed' as const,
         zIndex: 30000
       };
