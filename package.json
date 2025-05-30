@@ -46,7 +46,6 @@
     "@react-three/fiber": "^8.18.0",
     "@supabase/supabase-js": "^2.49.1",
     "@tanstack/react-query": "^5.56.2",
-    "@tanstack/react-query-devtools": "^5.79.0",
     "@types/matter-js": "^0.19.6",
     "@types/uuid": "^10.0.0",
     "class-variance-authority": "^0.7.1",

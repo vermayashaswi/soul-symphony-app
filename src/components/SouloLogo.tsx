@@ -34,7 +34,7 @@ const SouloLogo = ({
     small: "w-4 h-4 mx-0.5",
     normal: "w-5 h-5 mx-0.5",
     large: "w-6 h-6 mx-0.5",
-    medium: "w-5.5 h-5.5 mx-0.5",
+    medium: "w-5.5 h-5.5 mx-0.5", // Added medium size
   };
   
   // Apply color theme if useColorTheme is true
@@ -70,19 +70,14 @@ const SouloLogo = ({
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>S</span>
       <span className={animationState === 'none' ? "opacity-0" : "opacity-100 transition-opacity duration-300"}>O</span>
       <span className={cn("relative inline-block", sizeClasses[size], smileyClassName)}>
-        {/* Circular smiley face */}
+        {/* U-shaped character instead of circle */}
         <span className="absolute inset-0 flex items-center justify-center">
           <span className="relative w-full h-full flex items-center justify-center">
-            {/* Main circle */}
-            <div className="w-full h-full border-2 border-current rounded-full relative flex items-center justify-center">
+            {/* U shape */}
+            <div className="w-full h-3/4 border-2 border-current rounded-b-full border-t-0 flex items-end pb-[2px]">
               {/* Eyes */}
-              <span className="absolute top-[30%] left-[30%] w-[12%] h-[12%] rounded-full bg-current"></span>
-              <span className="absolute top-[30%] right-[30%] w-[12%] h-[12%] rounded-full bg-current"></span>
-              
-              {/* Smile */}
-              <div className="absolute bottom-[25%] left-1/2 transform -translate-x-1/2">
-                <div className="w-[40%] h-[20%] border-b-2 border-current rounded-full border-t-0 border-l-0 border-r-0"></div>
-              </div>
+              <span className="absolute top-[25%] left-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
+              <span className="absolute top-[25%] right-[25%] w-[15%] h-[15%] rounded-full bg-current"></span>
             </div>
           </span>
         </span>
