@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -50,9 +51,16 @@ const TutorialOverlay: React.FC = () => {
     });
   }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted]);
   
-  // ENHANCED: Comprehensive cleanup function with specific targeting for Past Entries
+  // ENHANCED: Ultra-comprehensive cleanup function with aggressive targeting
   const cleanupAllTutorialHighlighting = () => {
-    console.log('[TutorialOverlay] Running comprehensive tutorial cleanup');
+    console.log('[TutorialOverlay] Running ultra-comprehensive tutorial cleanup');
+    
+    // Phase 1: Remove all tutorial classes from any element that might have them
+    const allTutorialClasses = [
+      'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
+      'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
+      'mood-calendar-highlight', 'soul-net-highlight', 'empty-chat-suggestion'
+    ];
     
     // Get ALL elements that might have tutorial classes
     const allTutorialElements = document.querySelectorAll(
@@ -62,106 +70,192 @@ const TutorialOverlay: React.FC = () => {
       '[class*="tutorial-"], [data-tutorial-target]'
     );
     
-    console.log(`[TutorialOverlay] Found ${allTutorialElements.length} elements to clean up`);
+    console.log(`[TutorialOverlay] Found ${allTutorialElements.length} elements with tutorial classes`);
     
     allTutorialElements.forEach(el => {
       if (el instanceof HTMLElement) {
         // Remove ALL tutorial-related classes
-        el.classList.remove(
-          'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
-          'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
-          'mood-calendar-highlight', 'soul-net-highlight', 'empty-chat-suggestion'
-        );
+        allTutorialClasses.forEach(className => {
+          el.classList.remove(className);
+        });
         
         // Reset ALL inline styles that might have been applied by tutorial
-        el.style.boxShadow = '';
-        el.style.animation = '';
-        el.style.border = '';
-        el.style.transform = '';
-        el.style.zIndex = '';
-        el.style.position = '';
-        el.style.visibility = '';
-        el.style.opacity = '';
-        el.style.backgroundColor = '';
-        el.style.color = '';
-        el.style.textShadow = '';
-        el.style.top = '';
-        el.style.left = '';
-        el.style.right = '';
-        el.style.bottom = '';
-        el.style.margin = '';
-        el.style.padding = '';
-        el.style.display = '';
-        el.style.backgroundImage = '';
-        el.style.borderRadius = '';
+        const stylesToReset = [
+          'boxShadow', 'animation', 'border', 'transform', 'zIndex', 'position',
+          'visibility', 'opacity', 'backgroundColor', 'color', 'textShadow',
+          'top', 'left', 'right', 'bottom', 'margin', 'padding', 'display',
+          'backgroundImage', 'borderRadius'
+        ];
+        
+        stylesToReset.forEach(style => {
+          el.style[style as any] = '';
+        });
       }
     });
     
-    // ENHANCED: Specific cleanup for Past Entries selectors
-    console.log('[TutorialOverlay] Running specific cleanup for Past Entries elements');
-    ENTRIES_TAB_SELECTORS.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach(el => {
-        if (el instanceof HTMLElement) {
-          console.log(`[TutorialOverlay] Cleaning Past Entries element with selector: ${selector}`);
-          
-          // Remove all tutorial classes
-          el.classList.remove(
-            'tutorial-target', 'tutorial-button-highlight', 'entries-tab',
-            'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
-            'mood-calendar-highlight', 'soul-net-highlight'
-          );
-          
-          // Force reset all tutorial-related styles
-          el.style.boxShadow = '';
-          el.style.animation = '';
-          el.style.border = '';
-          el.style.transform = '';
-          el.style.zIndex = '';
-          el.style.backgroundColor = '';
-          el.style.color = '';
-          
-          // Also reset child text elements that might have inherited styles
-          const textElements = el.querySelectorAll('span, div, p');
-          textElements.forEach(textEl => {
-            if (textEl instanceof HTMLElement) {
-              textEl.style.color = '';
-              textEl.style.textShadow = '';
-              textEl.style.backgroundColor = '';
-            }
-          });
-        }
-      });
-    });
-    
-    // ENHANCED: Also specifically target common button selectors that might be highlighted
-    const commonButtonSelectors = [
-      '[data-value="record"]', '[data-value="entries"]', '[value="record"]', '[value="entries"]',
-      '.record-entry-button', '.entries-tab-button', 'button[role="tab"]'
+    // Phase 2: Aggressive cleanup using all known selectors
+    const allSelectors = [
+      ...RECORD_ENTRY_SELECTORS,
+      ...ENTRIES_TAB_SELECTORS,
+      ...CHAT_QUESTION_SELECTORS,
+      ...INSIGHTS_HEADER_SELECTORS,
+      ...EMOTION_CHART_SELECTORS,
+      ...MOOD_CALENDAR_SELECTORS,
+      ...SOULNET_SELECTORS
     ];
     
-    commonButtonSelectors.forEach(selector => {
-      const elements = document.querySelectorAll(selector);
-      elements.forEach(el => {
-        if (el instanceof HTMLElement) {
-          console.log(`[TutorialOverlay] Cleaning button element with selector: ${selector}`);
-          el.classList.remove(
-            'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
-            'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
-            'mood-calendar-highlight', 'soul-net-highlight'
-          );
-          
-          // Reset styles
-          el.style.boxShadow = '';
-          el.style.animation = '';
-          el.style.border = '';
-          el.style.transform = '';
-          el.style.zIndex = '';
-          el.style.backgroundColor = '';
-          el.style.color = '';
-        }
-      });
+    console.log('[TutorialOverlay] Running aggressive cleanup on all known selectors');
+    
+    allSelectors.forEach(selector => {
+      try {
+        const elements = document.querySelectorAll(selector);
+        elements.forEach(el => {
+          if (el instanceof HTMLElement) {
+            // Remove all tutorial classes
+            allTutorialClasses.forEach(className => {
+              el.classList.remove(className);
+            });
+            
+            // Force reset all tutorial-related styles
+            el.style.boxShadow = '';
+            el.style.animation = '';
+            el.style.border = '';
+            el.style.transform = '';
+            el.style.zIndex = '';
+            el.style.backgroundColor = '';
+            el.style.color = '';
+            el.style.textShadow = '';
+            el.style.opacity = '';
+            el.style.visibility = '';
+            el.style.position = '';
+            
+            // Also reset child text elements that might have inherited styles
+            const childElements = el.querySelectorAll('*');
+            childElements.forEach(child => {
+              if (child instanceof HTMLElement) {
+                child.style.color = '';
+                child.style.textShadow = '';
+                child.style.backgroundColor = '';
+                child.style.boxShadow = '';
+                child.style.animation = '';
+                child.style.border = '';
+                child.style.transform = '';
+              }
+            });
+          }
+        });
+      } catch (error) {
+        console.warn(`[TutorialOverlay] Error cleaning selector ${selector}:`, error);
+      }
     });
+    
+    // Phase 3: Ultra-specific cleanup for button elements that might retain styling
+    console.log('[TutorialOverlay] Running ultra-specific button cleanup');
+    
+    const buttonSelectors = [
+      // Tab buttons
+      'button[role="tab"]',
+      '[data-value="record"]', '[data-value="entries"]',
+      '[value="record"]', '[value="entries"]',
+      // Generic button classes
+      '.record-entry-button', '.entries-tab-button', '.past-entries-button',
+      // Text-based selections
+      'button:contains("Record")', 'button:contains("Past")', 'button:contains("Entries")',
+      // Radix UI tab triggers
+      '[data-radix-collection-item]',
+      '.bg-background', '.text-muted-foreground',
+      // Any button in tabs containers
+      '[role="tablist"] button',
+      '.tabs-trigger'
+    ];
+    
+    buttonSelectors.forEach(selector => {
+      try {
+        let elements: NodeListOf<Element>;
+        
+        // Handle :contains pseudo-selector manually
+        if (selector.includes(':contains(')) {
+          const text = selector.match(/:contains\("([^"]+)"\)/)?.[1];
+          if (text) {
+            elements = document.querySelectorAll('button');
+            elements = Array.from(elements).filter(el => 
+              el.textContent?.toLowerCase().includes(text.toLowerCase())
+            ) as any;
+          } else {
+            elements = document.querySelectorAll(selector.replace(/:contains\([^)]+\)/, ''));
+          }
+        } else {
+          elements = document.querySelectorAll(selector);
+        }
+        
+        elements.forEach(el => {
+          if (el instanceof HTMLElement) {
+            console.log(`[TutorialOverlay] Aggressive cleanup on button: ${selector}, text: "${el.textContent?.trim()}"`);
+            
+            // Remove all possible tutorial classes
+            allTutorialClasses.forEach(className => {
+              el.classList.remove(className);
+            });
+            
+            // Ultra-aggressive style reset
+            const styles = [
+              'boxShadow', 'animation', 'border', 'transform', 'zIndex',
+              'backgroundColor', 'color', 'textShadow', 'opacity', 'visibility',
+              'position', 'top', 'left', 'right', 'bottom', 'margin', 'padding',
+              'display', 'backgroundImage', 'borderRadius'
+            ];
+            
+            styles.forEach(style => {
+              el.style[style as any] = '';
+            });
+            
+            // Reset any child elements
+            const children = el.querySelectorAll('*');
+            children.forEach(child => {
+              if (child instanceof HTMLElement) {
+                styles.forEach(style => {
+                  child.style[style as any] = '';
+                });
+              }
+            });
+          }
+        });
+      } catch (error) {
+        console.warn(`[TutorialOverlay] Error in button cleanup for selector ${selector}:`, error);
+      }
+    });
+    
+    // Phase 4: Force CSS custom properties reset
+    const rootElement = document.documentElement;
+    rootElement.style.removeProperty('--tutorial-highlight-color');
+    rootElement.style.removeProperty('--tutorial-shadow');
+    rootElement.style.removeProperty('--tutorial-animation');
+  };
+
+  // ENHANCED: Multi-stage cleanup with improved timing for step changes
+  const performStaggeredCleanup = () => {
+    console.log('[TutorialOverlay] Starting staggered cleanup process');
+    
+    // Stage 1: Immediate cleanup
+    cleanupAllTutorialHighlighting();
+    
+    // Stage 2: Short delay cleanup (catch any dynamically added elements)
+    setTimeout(() => {
+      console.log('[TutorialOverlay] Stage 2 cleanup');
+      cleanupAllTutorialHighlighting();
+    }, 50);
+    
+    // Stage 3: Medium delay cleanup (ensure everything is clean)
+    setTimeout(() => {
+      console.log('[TutorialOverlay] Stage 3 cleanup');
+      cleanupAllTutorialHighlighting();
+    }, 150);
+    
+    // Stage 4: Final cleanup after potential re-renders
+    setTimeout(() => {
+      console.log('[TutorialOverlay] Final cleanup stage');
+      cleanupAllTutorialHighlighting();
+    }, 300);
   };
   
   // Enhanced scrolling prevention with data attribute for current step
@@ -239,8 +333,8 @@ const TutorialOverlay: React.FC = () => {
       window.scrollTo(0, scrollPos);
       console.log('[TutorialOverlay] Tutorial inactive, restored page scrolling');
       
-      // Run comprehensive cleanup
-      cleanupAllTutorialHighlighting();
+      // Run staggered cleanup
+      performStaggeredCleanup();
       
       // SPECIAL: Reset the arrow button specifically to ensure it's centered
       const arrowButton = document.querySelector('.journal-arrow-button');
@@ -279,35 +373,29 @@ const TutorialOverlay: React.FC = () => {
     };
   }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // ENHANCED: Step-specific element highlighting with improved multi-stage cleanup
+  // ENHANCED: Step-specific element highlighting with ultra-improved cleanup and timing
   useEffect(() => {
     if (!shouldShowTutorial) return;
     
     const currentStepData = steps[currentStep];
     console.log(`[TutorialOverlay] Setting up highlighting for step ${currentStepData?.id}`);
     
-    // CRITICAL: Multiple-stage cleanup with enhanced timing
-    const performCleanup = () => {
-      console.log('[TutorialOverlay] Stage 1: Initial cleanup');
-      cleanupAllTutorialHighlighting();
+    // CRITICAL: Ultra-enhanced cleanup with multiple stages and better timing
+    const performUltraCleanup = () => {
+      console.log('[TutorialOverlay] Ultra cleanup stage 1: Immediate cleanup');
+      performStaggeredCleanup();
       
-      // Stage 2: Additional cleanup after a short delay
+      // Additional stage: Wait for potential re-renders and clean again
       setTimeout(() => {
-        console.log('[TutorialOverlay] Stage 2: Additional cleanup');
+        console.log('[TutorialOverlay] Ultra cleanup stage 2: Post-render cleanup');
         cleanupAllTutorialHighlighting();
-      }, 50);
-      
-      // Stage 3: Final cleanup before applying new highlighting
-      setTimeout(() => {
-        console.log('[TutorialOverlay] Stage 3: Final cleanup before new highlighting');
-        cleanupAllTutorialHighlighting();
-      }, 100);
+      }, 200);
     };
     
-    // Run the multi-stage cleanup
-    performCleanup();
+    // Run the ultra cleanup
+    performUltraCleanup();
     
-    // Apply the appropriate highlighting based on step ID ONLY after cleanup
+    // Apply the appropriate highlighting based on step ID ONLY after thorough cleanup
     const highlightTimeout = setTimeout(() => {
       if (currentStepData?.id === 1) {
         // Step 1: Journal Header
@@ -340,22 +428,53 @@ const TutorialOverlay: React.FC = () => {
         // Step 3: Record Entry Tab - ONLY highlight this, never the Past Entries
         console.log('[TutorialOverlay] Step 3: Applying highlighting ONLY to Record Entry button');
         
-        // ENHANCED: Additional cleanup specifically for Past Entries before highlighting Record Entry
-        console.log('[TutorialOverlay] Step 3: Running additional Past Entries cleanup');
+        // ULTRA-ENHANCED: Aggressive cleanup specifically for Past Entries before highlighting Record Entry
+        console.log('[TutorialOverlay] Step 3: Running ultra-aggressive Past Entries cleanup');
         ENTRIES_TAB_SELECTORS.forEach(selector => {
-          const elements = document.querySelectorAll(selector);
-          elements.forEach(el => {
-            if (el instanceof HTMLElement) {
-              el.classList.remove('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
-              el.style.boxShadow = '';
-              el.style.animation = '';
-              el.style.border = '';
-              el.style.transform = '';
-              el.style.zIndex = '';
-              el.style.backgroundColor = '';
-              el.style.color = '';
-            }
-          });
+          try {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+              if (el instanceof HTMLElement) {
+                // Ultra-aggressive class removal
+                const classesToRemove = [
+                  'tutorial-target', 'entries-tab', 'tutorial-button-highlight',
+                  'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
+                  'mood-calendar-highlight', 'soul-net-highlight', 'record-entry-tab', 'empty-chat-suggestion'
+                ];
+                
+                classesToRemove.forEach(className => {
+                  el.classList.remove(className);
+                });
+                
+                // Ultra-aggressive style reset
+                const stylesToReset = [
+                  'boxShadow', 'animation', 'border', 'transform', 'zIndex',
+                  'backgroundColor', 'color', 'textShadow', 'opacity', 'visibility',
+                  'position', 'top', 'left', 'right', 'bottom', 'margin', 'padding',
+                  'display', 'backgroundImage', 'borderRadius'
+                ];
+                
+                stylesToReset.forEach(style => {
+                  el.style[style as any] = '';
+                });
+                
+                // Also clean child elements
+                const children = el.querySelectorAll('*');
+                children.forEach(child => {
+                  if (child instanceof HTMLElement) {
+                    classesToRemove.forEach(className => {
+                      child.classList.remove(className);
+                    });
+                    stylesToReset.forEach(style => {
+                      child.style[style as any] = '';
+                    });
+                  }
+                });
+              }
+            });
+          } catch (error) {
+            console.warn(`[TutorialOverlay] Error in Past Entries cleanup for selector ${selector}:`, error);
+          }
         });
         
         let foundElement = false;
@@ -395,22 +514,53 @@ const TutorialOverlay: React.FC = () => {
         // Step 4: Past Entries Tab - Enhanced with identical styling as record entry
         console.log('[TutorialOverlay] Step 4: Applying highlighting ONLY to Past Entries button');
         
-        // ENHANCED: Additional cleanup specifically for Record Entry before highlighting Past Entries
-        console.log('[TutorialOverlay] Step 4: Running additional Record Entry cleanup');
+        // ULTRA-ENHANCED: Aggressive cleanup specifically for Record Entry before highlighting Past Entries
+        console.log('[TutorialOverlay] Step 4: Running ultra-aggressive Record Entry cleanup');
         RECORD_ENTRY_SELECTORS.forEach(selector => {
-          const elements = document.querySelectorAll(selector);
-          elements.forEach(el => {
-            if (el instanceof HTMLElement) {
-              el.classList.remove('tutorial-target', 'record-entry-tab', 'tutorial-button-highlight');
-              el.style.boxShadow = '';
-              el.style.animation = '';
-              el.style.border = '';
-              el.style.transform = '';
-              el.style.zIndex = '';
-              el.style.backgroundColor = '';
-              el.style.color = '';
-            }
-          });
+          try {
+            const elements = document.querySelectorAll(selector);
+            elements.forEach(el => {
+              if (el instanceof HTMLElement) {
+                // Ultra-aggressive class removal
+                const classesToRemove = [
+                  'tutorial-target', 'record-entry-tab', 'tutorial-button-highlight',
+                  'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
+                  'mood-calendar-highlight', 'soul-net-highlight', 'entries-tab', 'empty-chat-suggestion'
+                ];
+                
+                classesToRemove.forEach(className => {
+                  el.classList.remove(className);
+                });
+                
+                // Ultra-aggressive style reset
+                const stylesToReset = [
+                  'boxShadow', 'animation', 'border', 'transform', 'zIndex',
+                  'backgroundColor', 'color', 'textShadow', 'opacity', 'visibility',
+                  'position', 'top', 'left', 'right', 'bottom', 'margin', 'padding',
+                  'display', 'backgroundImage', 'borderRadius'
+                ];
+                
+                stylesToReset.forEach(style => {
+                  el.style[style as any] = '';
+                });
+                
+                // Also clean child elements
+                const children = el.querySelectorAll('*');
+                children.forEach(child => {
+                  if (child instanceof HTMLElement) {
+                    classesToRemove.forEach(className => {
+                      child.classList.remove(className);
+                    });
+                    stylesToReset.forEach(style => {
+                      child.style[style as any] = '';
+                    });
+                  }
+                });
+              }
+            });
+          } catch (error) {
+            console.warn(`[TutorialOverlay] Error in Record Entry cleanup for selector ${selector}:`, error);
+          }
         });
         
         let foundElement = false;
@@ -627,14 +777,14 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Failed to find soul-net visualization with any selector');
         }
       }
-    }, 150); // Reduced timeout for faster highlighting after cleanup
+    }, 250); // Increased timeout to allow for more thorough cleanup
     
     // Clean up highlighting when step changes
     return () => {
       clearTimeout(highlightTimeout);
       // Additional cleanup when effect unmounts
       console.log('[TutorialOverlay] Effect cleanup - removing highlighting');
-      cleanupAllTutorialHighlighting();
+      performStaggeredCleanup();
     };
   }, [shouldShowTutorial, currentStep, steps]);
 
