@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -25,25 +26,25 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
-  // Enhanced tutorial status checking for immediate tutorial activation
+  // Enhanced tutorial status checking for proper navigation flow
   useEffect(() => {
-    const ensureTutorialStatus = async () => {
+    const handleTutorialNavigation = async () => {
       if (!user) return;
       
       try {
-        console.log('[Index] Checking tutorial status for user:', user.id);
+        console.log('[Index] Checking user status for tutorial navigation, user:', user.id);
         
-        // First make sure onboarding status is checked
+        // First ensure onboarding status is checked
         await checkOnboardingStatus();
         
-        // Check if user has completed onboarding but not tutorial
+        // Check if user has completed onboarding
         if (onboardingComplete) {
           console.log('[Index] User completed onboarding, checking tutorial status');
           
-          // Now check tutorial completion status
+          // Check tutorial completion status
           const { data: profileData, error } = await supabase
             .from('profiles')
-            .select('tutorial_completed')
+            .select('tutorial_completed, tutorial_step')
             .eq('id', user.id)
             .maybeSingle();
           
@@ -52,42 +53,50 @@ const Index = () => {
             return;
           }
           
-          // If tutorial is not completed, redirect immediately to app home to start tutorial
+          // If tutorial is not completed, let TutorialContext handle the flow
           if (!profileData || profileData.tutorial_completed !== 'YES') {
-            console.log('[Index] User has not completed tutorial, redirecting to app to start tutorial');
+            console.log('[Index] User has not completed tutorial - TutorialContext will handle startup');
             
-            // Set tutorial_completed to 'NO' to ensure it gets picked up
-            const { error: updateError } = await supabase
-              .from('profiles')
-              .update({ tutorial_completed: 'NO', tutorial_step: 0 })
-              .eq('id', user.id);
-              
-            if (updateError) {
-              console.error('[Index] Error updating tutorial status:', updateError);
+            // Ensure tutorial_completed is set to 'NO' for proper detection
+            if (!profileData || profileData.tutorial_completed !== 'NO') {
+              console.log('[Index] Setting tutorial_completed to NO for proper detection');
+              const { error: updateError } = await supabase
+                .from('profiles')
+                .upsert({ 
+                  id: user.id,
+                  tutorial_completed: 'NO',
+                  tutorial_step: profileData?.tutorial_step || 0
+                });
+                
+              if (updateError) {
+                console.error('[Index] Error updating tutorial status:', updateError);
+              }
             }
             
-            // Navigate to app home where tutorial will auto-start
-            navigate('/app/home');
+            // Don't navigate here - let TutorialContext handle navigation and tutorial startup
+            console.log('[Index] Letting TutorialContext handle tutorial startup and navigation');
           } else {
-            console.log('[Index] User has already completed tutorial');
+            console.log('[Index] User has completed tutorial, normal app flow');
           }
+        } else {
+          console.log('[Index] User has not completed onboarding yet');
         }
       } catch (error) {
-        console.error('[Index] Error in ensureTutorialStatus:', error);
+        console.error('[Index] Error in handleTutorialNavigation:', error);
       }
     };
     
-    ensureTutorialStatus();
-  }, [user, checkOnboardingStatus, onboardingComplete, navigate]);
+    handleTutorialNavigation();
+  }, [user, checkOnboardingStatus, onboardingComplete]);
 
-  // Only redirect to app if explicitly requested with a URL parameter
+  // Handle explicit app redirects only
   useEffect(() => {
-    // Only redirect to app features if specifically requested
+    // Only redirect to app if explicitly requested with a URL parameter
     if (urlParams.has('app')) {
-      console.log('Index - User explicitly requested app with ?app parameter');
+      console.log('[Index] User explicitly requested app with ?app parameter');
       
       if (user) {
-        console.log('User is logged in, redirecting to appropriate app page');
+        console.log('[Index] User is logged in, redirecting to appropriate app page');
         if (onboardingComplete) {
           navigate('/app/home');
         } else {
@@ -109,15 +118,15 @@ const Index = () => {
     const preTranslateCommonStrings = async () => {
       if (translate) {
         try {
-          console.log('Index: Pre-translating common strings...');
+          console.log('[Index] Pre-translating common strings...');
           await translate("Welcome to Soul Symphony", "en");
           await translate("We've detected you're on a slow connection. We're loading a lightweight version of our site for better performance.", "en");
           await translate("Loading optimized content...", "en");
           await translate("You're currently offline", "en");
           await translate("Please check your connection to access all features. Some content may still be available from cache.", "en");
-          console.log('Index: Pre-translation complete');
+          console.log('[Index] Pre-translation complete');
         } catch (error) {
-          console.error("Error pre-translating index page strings:", error);
+          console.error("[Index] Error pre-translating index page strings:", error);
         }
       }
     };
@@ -125,11 +134,11 @@ const Index = () => {
     preTranslateCommonStrings();
     
     if (networkStatus.speed === 'slow') {
-      console.log('Slow network detected, optimizing experience...');
+      console.log('[Index] Slow network detected, optimizing experience...');
     }
   }, [networkStatus.speed, translate]);
   
-  console.log('Rendering Index.tsx component, path:', window.location.pathname, {
+  console.log('[Index] Rendering Index.tsx component, path:', window.location.pathname, {
     hasUser: !!user,
     onboardingComplete
   });

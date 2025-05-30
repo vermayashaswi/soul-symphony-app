@@ -16,13 +16,13 @@ const Home = () => {
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
   
-  // Enhanced tutorial startup logic for immediate activation
+  // Tutorial startup logic - let TutorialContext handle the main logic
   useEffect(() => {
-    const checkAndStartTutorial = async () => {
+    const initializeTutorialIfNeeded = async () => {
       if (!user) return;
       
       try {
-        console.log('[Home] Checking tutorial status for immediate startup, user:', user.id);
+        console.log('[Home] Checking if tutorial should be started for user:', user.id);
         
         const { data: profile, error } = await supabase
           .from('profiles')
@@ -35,15 +35,17 @@ const Home = () => {
           return;
         }
         
-        // If user hasn't completed tutorial, start it immediately
-        if (profile && profile.tutorial_completed === 'NO') {
-          console.log('[Home] User has not completed tutorial, starting immediately');
+        // Only assist with tutorial startup if clearly needed and not already handled
+        if (profile && profile.tutorial_completed === 'NO' && !isActive && !navigationState.inProgress) {
+          console.log('[Home] Tutorial needed but not active, requesting startup');
           
-          // Start tutorial without delay
+          // Give TutorialContext a small delay to handle its own logic first
           setTimeout(() => {
-            console.log('[Home] Activating tutorial now');
-            startTutorial();
-          }, 100); // Very short delay to ensure DOM is ready
+            if (!isActive && !navigationState.inProgress) {
+              console.log('[Home] Starting tutorial as backup measure');
+              startTutorial();
+            }
+          }, 200);
         } else if (!profile) {
           // New user without profile - set up tutorial
           console.log('[Home] New user detected, setting up tutorial');
@@ -60,22 +62,28 @@ const Home = () => {
             setTimeout(() => {
               console.log('[Home] Starting tutorial for new user');
               startTutorial();
-            }, 100);
+            }, 200);
           }
         } else {
-          console.log('[Home] User has completed tutorial, tutorial_completed:', profile.tutorial_completed);
+          console.log('[Home] Tutorial status check complete:', {
+            tutorialCompleted: profile.tutorial_completed,
+            isActive,
+            navigationInProgress: navigationState.inProgress
+          });
         }
       } catch (err) {
-        console.error('[Home] Error in tutorial startup logic:', err);
+        console.error('[Home] Error in tutorial initialization logic:', err);
       }
     };
     
-    // Run tutorial check immediately when component mounts
-    checkAndStartTutorial();
-  }, [user, startTutorial]);
+    // Only run if we haven't already started the tutorial
+    if (!isActive && !navigationState.inProgress) {
+      initializeTutorialIfNeeded();
+    }
+  }, [user, startTutorial, isActive, navigationState.inProgress]);
   
   useEffect(() => {
-    console.log('Home component mounted, tutorial state:', {
+    console.log('[Home] Component mounted, tutorial state:', {
       isActive, 
       currentStep, 
       stepId: steps[currentStep]?.id,
