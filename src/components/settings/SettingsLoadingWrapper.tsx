@@ -76,20 +76,19 @@ export const SettingsLoadingSkeleton: React.FC = () => {
 };
 
 interface SettingsLoadingWrapperProps {
-  isInitialLoading: boolean;
+  isLoading: boolean;
   error?: string | null;
   children: React.ReactNode;
 }
 
 export const SettingsLoadingWrapper: React.FC<SettingsLoadingWrapperProps> = ({
-  isInitialLoading,
+  isLoading,
   error,
   children
 }) => {
-  console.log('[SettingsLoadingWrapper] Rendering - isInitialLoading:', isInitialLoading, 'error:', error);
+  console.log('[SettingsLoadingWrapper] Rendering - isLoading:', isLoading, 'error:', error);
 
-  // Only show full loading screen for initial load, not for refreshes
-  if (isInitialLoading) {
+  if (isLoading) {
     return <SettingsLoadingSkeleton />;
   }
 

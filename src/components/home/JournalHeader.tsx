@@ -13,7 +13,7 @@ import { useTutorial } from '@/contexts/TutorialContext';
 const JournalHeader: React.FC = () => {
   const { user } = useAuth();
   const { theme } = useTheme();
-  const { profile } = useUserProfile();
+  const { displayName } = useUserProfile();
   const { translate } = useTranslation();
   const [journalLabel, setJournalLabel] = useState("Journal");
   const [yourJournalLabel, setYourJournalLabel] = useState("Your Journal");
@@ -53,7 +53,6 @@ const JournalHeader: React.FC = () => {
   }, [translate]);
 
   const getJournalName = () => {
-    const displayName = profile?.display_name;
     if (displayName) {
       return displayName.endsWith('s') ? 
         `${displayName}' ${journalLabel}` : 
