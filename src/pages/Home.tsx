@@ -16,17 +16,17 @@ const Home = () => {
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
   
-  // Check if tutorial should be started for new users who haven't completed it
+  // Enhanced tutorial startup logic for immediate activation
   useEffect(() => {
-    const checkUserTutorialStatus = async () => {
+    const checkAndStartTutorial = async () => {
       if (!user) return;
       
       try {
-        console.log('[Home] Checking tutorial status for user:', user.id);
+        console.log('[Home] Checking tutorial status for immediate startup, user:', user.id);
         
         const { data: profile, error } = await supabase
           .from('profiles')
-          .select('tutorial_completed')
+          .select('tutorial_completed, tutorial_step')
           .eq('id', user.id)
           .maybeSingle();
         
@@ -35,17 +35,43 @@ const Home = () => {
           return;
         }
         
-        // Tutorial should start if not completed (explicitly set to NO)
+        // If user hasn't completed tutorial, start it immediately
         if (profile && profile.tutorial_completed === 'NO') {
-          console.log('[Home] User has not completed tutorial, starting tutorial');
-          startTutorial();
+          console.log('[Home] User has not completed tutorial, starting immediately');
+          
+          // Start tutorial without delay
+          setTimeout(() => {
+            console.log('[Home] Activating tutorial now');
+            startTutorial();
+          }, 100); // Very short delay to ensure DOM is ready
+        } else if (!profile) {
+          // New user without profile - set up tutorial
+          console.log('[Home] New user detected, setting up tutorial');
+          
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .upsert({ 
+              id: user.id,
+              tutorial_completed: 'NO',
+              tutorial_step: 0
+            });
+            
+          if (!updateError) {
+            setTimeout(() => {
+              console.log('[Home] Starting tutorial for new user');
+              startTutorial();
+            }, 100);
+          }
+        } else {
+          console.log('[Home] User has completed tutorial, tutorial_completed:', profile.tutorial_completed);
         }
       } catch (err) {
-        console.error('[Home] Error checking user tutorial status:', err);
+        console.error('[Home] Error in tutorial startup logic:', err);
       }
     };
     
-    checkUserTutorialStatus();
+    // Run tutorial check immediately when component mounts
+    checkAndStartTutorial();
   }, [user, startTutorial]);
   
   useEffect(() => {

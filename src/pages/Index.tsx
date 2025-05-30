@@ -1,4 +1,3 @@
-
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
@@ -26,7 +25,7 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
-  // Check tutorial status whenever user logs in to ensure proper initialization
+  // Enhanced tutorial status checking for immediate tutorial activation
   useEffect(() => {
     const ensureTutorialStatus = async () => {
       if (!user) return;
@@ -37,32 +36,41 @@ const Index = () => {
         // First make sure onboarding status is checked
         await checkOnboardingStatus();
         
-        // Now check tutorial completion status
-        const { data: profileData, error } = await supabase
-          .from('profiles')
-          .select('tutorial_completed')
-          .eq('id', user.id)
-          .maybeSingle();
-        
-        if (error) {
-          console.error('[Index] Error checking tutorial status:', error);
-          return;
-        }
-        
-        if (!profileData || profileData.tutorial_completed !== 'YES') {
-          console.log('[Index] User has not completed tutorial, will ensure tutorial_completed is set to NO');
+        // Check if user has completed onboarding but not tutorial
+        if (onboardingComplete) {
+          console.log('[Index] User completed onboarding, checking tutorial status');
           
-          // Make sure tutorial_completed is explicitly set to 'NO'
-          const { error: updateError } = await supabase
+          // Now check tutorial completion status
+          const { data: profileData, error } = await supabase
             .from('profiles')
-            .update({ tutorial_completed: 'NO' })
-            .eq('id', user.id);
-            
-          if (updateError) {
-            console.error('[Index] Error updating tutorial status:', updateError);
+            .select('tutorial_completed')
+            .eq('id', user.id)
+            .maybeSingle();
+          
+          if (error) {
+            console.error('[Index] Error checking tutorial status:', error);
+            return;
           }
-        } else {
-          console.log('[Index] User has already completed tutorial');
+          
+          // If tutorial is not completed, redirect immediately to app home to start tutorial
+          if (!profileData || profileData.tutorial_completed !== 'YES') {
+            console.log('[Index] User has not completed tutorial, redirecting to app to start tutorial');
+            
+            // Set tutorial_completed to 'NO' to ensure it gets picked up
+            const { error: updateError } = await supabase
+              .from('profiles')
+              .update({ tutorial_completed: 'NO', tutorial_step: 0 })
+              .eq('id', user.id);
+              
+            if (updateError) {
+              console.error('[Index] Error updating tutorial status:', updateError);
+            }
+            
+            // Navigate to app home where tutorial will auto-start
+            navigate('/app/home');
+          } else {
+            console.log('[Index] User has already completed tutorial');
+          }
         }
       } catch (error) {
         console.error('[Index] Error in ensureTutorialStatus:', error);
@@ -70,7 +78,7 @@ const Index = () => {
     };
     
     ensureTutorialStatus();
-  }, [user, checkOnboardingStatus]);
+  }, [user, checkOnboardingStatus, onboardingComplete, navigate]);
 
   // Only redirect to app if explicitly requested with a URL parameter
   useEffect(() => {
