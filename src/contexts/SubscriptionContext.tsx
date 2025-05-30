@@ -11,6 +11,7 @@ export interface SubscriptionContextType {
   tier: SubscriptionTier;
   status: SubscriptionStatus;
   isInitialLoading: boolean;
+  isLoading: boolean; // Add this missing property
   error: string | null;
   refreshSubscription: () => Promise<void>;
   isPremium: boolean;
@@ -201,6 +202,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     tier,
     status,
     isInitialLoading,
+    isLoading: isInitialLoading, // Map to existing loading state
     error,
     refreshSubscription,
     isPremium,

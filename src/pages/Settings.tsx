@@ -11,7 +11,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Upload, User, Palette, Bell, Crown, Smartphone } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { LanguageSelector } from '@/components/translation/LanguageSelector';
-import { ColorPicker } from '@/components/settings/ColorPicker';
+import { ColorPickerWrapper } from '@/components/settings/ColorPickerWrapper';
 import { SubscriptionManagement } from '@/components/settings/SubscriptionManagement';
 import { SubscriptionErrorBoundary } from '@/components/settings/SubscriptionErrorBoundary';
 import { SettingsLoadingWrapper } from '@/components/settings/SettingsLoadingWrapper';
@@ -187,7 +187,7 @@ const Settings: React.FC = () => {
                     </CardDescription>
                   </CardHeader>
                   <CardContent className="space-y-6">
-                    <ColorPicker />
+                    <ColorPickerWrapper />
                   </CardContent>
                 </Card>
               </motion.div>
