@@ -24,34 +24,6 @@ export const getRedirectUrl = (): string => {
 };
 
 /**
- * Function to create a user session record in the database
- */
-async function createUserSession(userId: string) {
-  try {
-    // Get device and location info
-    const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
-    
-    // Create session entry
-    const { error } = await supabase
-      .from('user_sessions')
-      .insert({
-        user_id: userId,
-        device_type: deviceType,
-        user_agent: navigator.userAgent,
-        entry_page: window.location.pathname,
-        last_active_page: window.location.pathname,
-        is_active: true
-      });
-    
-    if (error) {
-      console.error('Error creating user session:', error);
-    }
-  } catch (e) {
-    console.error('Exception creating user session:', e);
-  }
-}
-
-/**
  * Sign in with Google
  */
 export const signInWithGoogle = async (): Promise<void> => {
@@ -94,7 +66,7 @@ export const signInWithGoogle = async (): Promise<void> => {
  */
 export const signInWithEmail = async (email: string, password: string): Promise<void> => {
   try {
-    const { error, data } = await supabase.auth.signInWithPassword({
+    const { error } = await supabase.auth.signInWithPassword({
       email,
       password,
     });
@@ -103,10 +75,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
       throw error;
     }
     
-    // Create a user session record after successful sign-in
-    if (data.user) {
-      await createUserSession(data.user.id);
-    }
+    // Session creation will be handled by AuthContext
   } catch (error: any) {
     console.error('Error signing in with email:', error.message);
     toast.error(`Error signing in with email: ${error.message}`);
@@ -119,7 +88,7 @@ export const signInWithEmail = async (email: string, password: string): Promise<
  */
 export const signUp = async (email: string, password: string): Promise<void> => {
   try {
-    const { error, data } = await supabase.auth.signUp({
+    const { error } = await supabase.auth.signUp({
       email,
       password,
     });
@@ -128,10 +97,7 @@ export const signUp = async (email: string, password: string): Promise<void> => 
       throw error;
     }
     
-    // Create a user session record after successful sign-up
-    if (data.user) {
-      await createUserSession(data.user.id);
-    }
+    // Session creation will be handled by AuthContext
   } catch (error: any) {
     console.error('Error signing up:', error.message);
     toast.error(`Error signing up: ${error.message}`);

@@ -631,9 +631,23 @@ export type Database = {
           days_remaining: number
         }[]
       }
+      has_active_session: {
+        Args: { p_user_id: string }
+        Returns: boolean
+      }
       is_trial_eligible: {
         Args: { user_id_param: string }
         Returns: boolean
+      }
+      manage_user_session: {
+        Args: {
+          p_user_id: string
+          p_device_type: string
+          p_user_agent: string
+          p_entry_page: string
+          p_last_active_page: string
+        }
+        Returns: string
       }
       mark_inactive_sessions: {
         Args: Record<PropertyKey, never>

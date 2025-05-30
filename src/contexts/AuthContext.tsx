@@ -32,33 +32,49 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileExistsStatus, setProfileExistsStatus] = useState<boolean | null>(null);
   const [profileCreationComplete, setProfileCreationComplete] = useState(false);
   const [autoRetryTimeoutId, setAutoRetryTimeoutId] = useState<NodeJS.Timeout | null>(null);
+  const [sessionCreated, setSessionCreated] = useState(false);
   const location = useLocation();
 
-  const createUserSession = async (userId: string) => {
+  const createUserSession = async (userId: string): Promise<boolean> => {
     try {
       console.log('Creating user session record for user:', userId);
       
+      // Check if session already exists to prevent duplicates
+      const { data: hasSession, error: checkError } = await supabase
+        .rpc('has_active_session', { p_user_id: userId });
+      
+      if (checkError) {
+        console.error('Error checking for existing session:', checkError);
+        return false;
+      }
+      
+      if (hasSession) {
+        console.log('Active session already exists for user, skipping creation');
+        return true;
+      }
+      
       const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
       
-      const { data, error } = await supabase
-        .from('user_sessions')
-        .insert({
-          user_id: userId,
-          device_type: deviceType,
-          user_agent: navigator.userAgent,
-          entry_page: window.location.pathname,
-          last_active_page: window.location.pathname,
-          is_active: true
+      // Use the new manage_user_session function to handle session creation
+      const { data: sessionId, error } = await supabase
+        .rpc('manage_user_session', {
+          p_user_id: userId,
+          p_device_type: deviceType,
+          p_user_agent: navigator.userAgent,
+          p_entry_page: window.location.pathname,
+          p_last_active_page: window.location.pathname
         });
       
       if (error) {
         console.error('Error creating user session from AuthContext:', error);
-        return;
+        return false;
       }
       
-      console.log('User session created successfully from AuthContext:', data);
+      console.log('User session created successfully from AuthContext with ID:', sessionId);
+      return true;
     } catch (e) {
       console.error('Exception creating user session from AuthContext:', e);
+      return false;
     }
   };
 
@@ -117,7 +133,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
-        await createUserSession(user.id);
+        // Only create session once per auth session
+        if (!sessionCreated) {
+          const sessionSuccess = await createUserSession(user.id);
+          if (sessionSuccess) {
+            setSessionCreated(true);
+          }
+        }
         
         return true;
       } else {
@@ -314,6 +336,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileExistsStatus(true);
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
+        
+        // Only create session once per auth session
+        if (!sessionCreated) {
+          const sessionSuccess = await createUserSession(currentUser.id);
+          if (sessionSuccess) {
+            setSessionCreated(true);
+          }
+        }
+        
         return true;
       } else {
         logAuthError('First attempt to create profile failed, retrying once...', 'AuthContext');
@@ -327,6 +358,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfileExistsStatus(true);
           setProfileCreationComplete(true);
           debugLogger.setLastProfileError(null);
+          
+          // Only create session once per auth session
+          if (!sessionCreated) {
+            const sessionSuccess = await createUserSession(currentUser.id);
+            if (sessionSuccess) {
+              setSessionCreated(true);
+            }
+          }
+          
           return true;
         }
         
@@ -376,13 +416,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setSession(currentSession);
         setUser(currentSession?.user ?? null);
         
-        if (currentSession?.user && (event === 'SIGNED_IN' || event === 'USER_UPDATED')) {
-          setTimeout(() => {
-            createUserSession(currentSession.user.id)
-              .catch(error => {
-                console.error('Error creating user session on auth state change:', error);
-              });
-          }, 0);
+        // Reset session tracking on new session
+        if (event === 'SIGNED_IN' && currentSession?.user) {
+          setSessionCreated(false);
           
           const initialDelay = isMobileDevice ? 1500 : 1000;
           logProfile(`Scheduling profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
@@ -393,16 +429,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
                 logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
               });
           }, initialDelay);
-          
-          setTimeout(() => {
-            if (!profileCreationComplete && !profileCreationInProgress) {
-              logProfile('Executing backup profile creation attempt', 'AuthContext');
-              createOrVerifyProfile(currentSession.user)
-                .catch(error => {
-                  logAuthError(`Error in backup profile creation: ${error.message}`, 'AuthContext', error);
-                });
-            }
-          }, initialDelay + 3000);
         }
         
         setIsLoading(false);
@@ -416,6 +442,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           logInfo('User signed out', 'AuthContext');
           setProfileExistsStatus(null);
           setProfileCreationComplete(false);
+          setSessionCreated(false);
           debugLogger.setLastProfileError(null);
           
           if (autoRetryTimeoutId) {
@@ -436,12 +463,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setUser(currentSession?.user ?? null);
       
       if (currentSession?.user) {
-        setTimeout(() => {
-          createUserSession(currentSession.user.id)
-            .catch(error => {
-              console.error('Error creating user session on initial session check:', error);
-            });
-        }, 0);
+        setSessionCreated(false);
         
         const initialDelay = isMobileDevice ? 1500 : 1000;
         logProfile(`Scheduling initial profile creation in ${initialDelay}ms for platform stability`, 'AuthContext');
@@ -452,16 +474,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
               logAuthError(`Error in initial profile creation: ${error.message}`, 'AuthContext', error);
             });
         }, initialDelay);
-        
-        setTimeout(() => {
-          if (!profileCreationComplete && !profileCreationInProgress) {
-            logProfile('Executing backup initial profile creation attempt', 'AuthContext');
-            createOrVerifyProfile(currentSession.user)
-              .catch(error => {
-                logAuthError(`Error in backup initial profile creation: ${error.message}`, 'AuthContext', error);
-              });
-          }
-        }, initialDelay + 3000);
       }
       
       setIsLoading(false);
