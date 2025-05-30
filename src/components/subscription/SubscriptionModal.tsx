@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState } from 'react';
 import {
   Dialog,
   DialogContent,
@@ -14,51 +14,14 @@ import { Crown, Check, X, Loader2 } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useRevenueCat } from '@/hooks/useRevenueCat';
 import { useSubscription } from '@/contexts/SubscriptionContext';
+import { useLocationPricing } from '@/hooks/useLocationPricing';
 import { toast } from 'sonner';
-import { motion, AnimatePresence } from 'framer-motion';
+import { motion } from 'framer-motion';
 
 interface SubscriptionModalProps {
   isOpen: boolean;
   onClose: () => void;
 }
-
-interface PricingTier {
-  currency: string;
-  price: string;
-  originalPrice?: string;
-  region: string;
-  productId: string;
-}
-
-// Location-based pricing configuration
-const PRICING_TIERS: Record<string, PricingTier> = {
-  IN: { currency: 'INR', price: '₹99', region: 'India', productId: 'premium_monthly_in' },
-  US: { currency: 'USD', price: '$4.99', region: 'United States', productId: 'premium_monthly_us' },
-  GB: { currency: 'GBP', price: '£3.99', region: 'United Kingdom', productId: 'premium_monthly_gb' },
-  CA: { currency: 'CAD', price: '$5.49', region: 'Canada', productId: 'premium_monthly_ca' },
-  AU: { currency: 'AUD', price: '$6.49', region: 'Australia', productId: 'premium_monthly_au' },
-  DE: { currency: 'EUR', price: '€4.99', region: 'Germany', productId: 'premium_monthly_de' },
-  FR: { currency: 'EUR', price: '€4.99', region: 'France', productId: 'premium_monthly_fr' },
-  IT: { currency: 'EUR', price: '€4.99', region: 'Italy', productId: 'premium_monthly_it' },
-  ES: { currency: 'EUR', price: '€4.99', region: 'Spain', productId: 'premium_monthly_es' },
-  NL: { currency: 'EUR', price: '€4.99', region: 'Netherlands', productId: 'premium_monthly_nl' },
-  SE: { currency: 'EUR', price: '€6.49', region: 'Sweden', productId: 'premium_monthly_se' },
-  NO: { currency: 'EUR', price: '€6.49', region: 'Norway', productId: 'premium_monthly_no' },
-  DK: { currency: 'EUR', price: '€6.49', region: 'Denmark', productId: 'premium_monthly_dk' },
-  AE: { currency: 'AED', price: '19.99 AED', region: 'UAE', productId: 'premium_monthly_ae' },
-  SA: { currency: 'SAR', price: '19.99 SAR', region: 'Saudi Arabia', productId: 'premium_monthly_sa' },
-  JP: { currency: 'JPY', price: '¥600', region: 'Japan', productId: 'premium_monthly_jp' },
-  KR: { currency: 'KRW', price: '₩5,900', region: 'South Korea', productId: 'premium_monthly_kr' },
-  SG: { currency: 'USD', price: '$1.49', region: 'Singapore', productId: 'premium_monthly_sg' },
-  MY: { currency: 'USD', price: '$1.49', region: 'Malaysia', productId: 'premium_monthly_my' },
-  TH: { currency: 'USD', price: '$1.49', region: 'Thailand', productId: 'premium_monthly_th' },
-  MX: { currency: 'MXN', price: 'MX$29.99', region: 'Mexico', productId: 'premium_monthly_mx' },
-  BR: { currency: 'BRL', price: 'R$9.99', region: 'Brazil', productId: 'premium_monthly_br' },
-  ZA: { currency: 'USD', price: '$1.49', region: 'South Africa', productId: 'premium_monthly_za' },
-  NG: { currency: 'USD', price: '$0.99', region: 'Nigeria', productId: 'premium_monthly_ng' },
-  // Default fallback
-  DEFAULT: { currency: 'USD', price: '$4.99', region: 'Global', productId: 'premium_monthly_default' }
-};
 
 const PREMIUM_FEATURES = [
   'Unlimited journal entries',
@@ -77,69 +40,22 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
 }) => {
   const { purchaseProduct, isLoading: revenueCatLoading } = useRevenueCat();
   const { isPremium, isTrialActive } = useSubscription();
-  const [currentPricing, setCurrentPricing] = useState<PricingTier>(PRICING_TIERS.DEFAULT);
-  const [isLocationLoading, setIsLocationLoading] = useState(true);
+  const { pricing, isLoading: pricingLoading, error: pricingError } = useLocationPricing();
   const [isPurchasing, setIsPurchasing] = useState(false);
 
-  // Detect user location for pricing
-  useEffect(() => {
-    const detectLocation = async () => {
-      try {
-        setIsLocationLoading(true);
-        
-        // Try to get location from browser geolocation API
-        if (navigator.geolocation) {
-          navigator.geolocation.getCurrentPosition(
-            async (position) => {
-              // Use reverse geocoding service to get country code
-              // For now, we'll use a simple IP-based approach
-              await getLocationFromIP();
-            },
-            async () => {
-              // Fallback to IP-based detection
-              await getLocationFromIP();
-            }
-          );
-        } else {
-          await getLocationFromIP();
-        }
-      } catch (error) {
-        console.error('Location detection failed:', error);
-        setCurrentPricing(PRICING_TIERS.DEFAULT);
-      } finally {
-        setIsLocationLoading(false);
-      }
-    };
-
-    const getLocationFromIP = async () => {
-      try {
-        // Use a free IP geolocation service
-        const response = await fetch('https://ipapi.co/json/');
-        const data = await response.json();
-        
-        if (data.country_code && PRICING_TIERS[data.country_code]) {
-          setCurrentPricing(PRICING_TIERS[data.country_code]);
-        } else {
-          setCurrentPricing(PRICING_TIERS.DEFAULT);
-        }
-      } catch (error) {
-        console.error('IP geolocation failed:', error);
-        setCurrentPricing(PRICING_TIERS.DEFAULT);
-      }
-    };
-
-    if (isOpen) {
-      detectLocation();
-    }
-  }, [isOpen]);
+  console.log('[SubscriptionModal] Current pricing state:', {
+    pricing,
+    isLoading: pricingLoading,
+    error: pricingError
+  });
 
   const handleSubscribe = async () => {
     try {
       setIsPurchasing(true);
       
-      console.log('[SubscriptionModal] Starting subscription for product:', currentPricing.productId);
+      console.log('[SubscriptionModal] Starting subscription for product:', pricing.productId);
       
-      const success = await purchaseProduct(currentPricing.productId);
+      const success = await purchaseProduct(pricing.productId);
       
       if (success) {
         toast.success(
@@ -217,7 +133,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           <Card className="border-2 border-primary/20 bg-gradient-to-br from-primary/5 to-primary/10">
             <CardContent className="p-6">
               <div className="text-center space-y-2">
-                {isLocationLoading ? (
+                {pricingLoading ? (
                   <div className="flex items-center justify-center gap-2">
                     <Loader2 className="h-4 w-4 animate-spin" />
                     <span className="text-sm text-muted-foreground">
@@ -227,10 +143,10 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                 ) : (
                   <>
                     <Badge variant="secondary" className="mb-2">
-                      {currentPricing.region}
+                      {pricing.country}
                     </Badge>
                     <div className="text-3xl font-bold text-primary">
-                      {currentPricing.price}
+                      {pricing.price}
                     </div>
                     <div className="text-sm text-muted-foreground">
                       <TranslatableText text="per month" />
@@ -239,6 +155,11 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
                       <Badge variant="outline" className="bg-blue-50 dark:bg-blue-950/20">
                         <TranslatableText text="Currently in 7-day free trial" />
                       </Badge>
+                    )}
+                    {pricingError && (
+                      <div className="text-xs text-yellow-600 dark:text-yellow-400">
+                        <TranslatableText text="Using default pricing due to location detection issues" />
+                      </div>
                     )}
                   </>
                 )}
@@ -273,7 +194,7 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
           <div className="space-y-3">
             <Button
               onClick={handleSubscribe}
-              disabled={isPurchasing || revenueCatLoading || isLocationLoading}
+              disabled={isPurchasing || revenueCatLoading || pricingLoading}
               className="w-full bg-gradient-to-r from-yellow-400 to-orange-500 hover:from-yellow-500 hover:to-orange-600 text-white border-0"
               size="lg"
             >
