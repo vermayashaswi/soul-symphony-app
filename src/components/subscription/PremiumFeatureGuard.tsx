@@ -28,7 +28,8 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     daysRemainingInTrial,
     isLoading,
     tier,
-    status
+    status,
+    isTrialEligible
   } = useSubscription();
   const navigate = useNavigate();
 
@@ -49,12 +50,13 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     tier,
     status,
     trialEndDate: trialEndDate?.toISOString(),
-    daysRemaining: daysRemainingInTrial
+    daysRemaining: daysRemainingInTrial,
+    isTrialEligible
   });
 
   // Allow access if user has active subscription or active trial
   if (hasActiveSubscription) {
-    console.log('[PremiumFeatureGuard] Access granted - user has active subscription');
+    console.log('[PremiumFeatureGuard] Access granted - user has active subscription or trial');
     return <>{children}</>;
   }
 
@@ -75,6 +77,11 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     navigate('/app/settings?tab=subscription');
   };
 
+  const handleStartTrial = () => {
+    // For now, redirect to settings. In the future, this could directly start a trial
+    navigate('/app/settings?tab=subscription&action=start-trial');
+  };
+
   console.log('[PremiumFeatureGuard] Access blocked - showing upgrade prompt');
 
   return (
@@ -92,7 +99,7 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Trial Status Information - only show if trial has ended */}
+          {/* Trial Status Information - show if trial has ended or if eligible for trial */}
           {trialEndDate && !isTrialActive && (
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
@@ -104,6 +111,19 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
                 <span className="font-medium">
                   {format(trialEndDate, 'MMM dd, yyyy')}
                 </span>
+              </p>
+            </div>
+          )}
+
+          {/* Trial Eligibility Information */}
+          {isTrialEligible && !trialEndDate && (
+            <div className="bg-blue-50 dark:bg-blue-950/20 rounded-lg p-4 space-y-2">
+              <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                <Clock className="h-4 w-4" />
+                <TranslatableText text="Start your 7-day free trial" />
+              </div>
+              <p className="text-sm text-blue-600 dark:text-blue-400">
+                <TranslatableText text="Get full access to all premium features for 7 days" />
               </p>
             </div>
           )}
@@ -121,23 +141,39 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
             </ul>
           </div>
 
-          {/* Upgrade Button */}
-          <Button 
-            onClick={handleUpgrade}
-            className="w-full bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700"
-          >
-            <TranslatableText text="Upgrade to Premium" />
-            <ArrowRight className="ml-2 h-4 w-4" />
-          </Button>
+          {/* Action Buttons */}
+          <div className="space-y-3">
+            {/* Start Trial Button (if eligible) */}
+            {isTrialEligible && !trialEndDate && (
+              <Button 
+                onClick={handleStartTrial}
+                className="w-full bg-gradient-to-r from-blue-500 to-blue-600 hover:from-blue-600 hover:to-blue-700"
+              >
+                <Clock className="mr-2 h-4 w-4" />
+                <TranslatableText text="Start 7-Day Free Trial" />
+              </Button>
+            )}
 
-          {/* Alternative: Continue with free features */}
-          <Button
-            variant="outline"
-            onClick={() => navigate('/app/journal')}
-            className="w-full"
-          >
-            <TranslatableText text="Continue with Journal" />
-          </Button>
+            {/* Upgrade Button */}
+            <Button 
+              onClick={handleUpgrade}
+              className="w-full bg-gradient-to-r from-orange-500 to-pink-600 hover:from-orange-600 hover:to-pink-700"
+              variant={isTrialEligible && !trialEndDate ? "outline" : "default"}
+            >
+              <Crown className="mr-2 h-4 w-4" />
+              <TranslatableText text="Upgrade to Premium" />
+              <ArrowRight className="ml-2 h-4 w-4" />
+            </Button>
+
+            {/* Alternative: Continue with free features */}
+            <Button
+              variant="outline"
+              onClick={() => navigate('/app/journal')}
+              className="w-full"
+            >
+              <TranslatableText text="Continue with Journal" />
+            </Button>
+          </div>
         </CardContent>
       </Card>
     </div>

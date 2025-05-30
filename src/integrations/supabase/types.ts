@@ -279,6 +279,69 @@ export type Database = {
         }
         Relationships: []
       }
+      profiles_backup: {
+        Row: {
+          avatar_url: string | null
+          created_at: string | null
+          display_name: string | null
+          email: string | null
+          full_name: string | null
+          id: string | null
+          is_premium: boolean | null
+          journal_focus_areas: string[] | null
+          onboarding_completed: boolean | null
+          reminder_settings: Json | null
+          revenuecat_entitlements: Json | null
+          subscription_status: string | null
+          subscription_tier: string | null
+          timezone: string | null
+          trial_ends_at: string | null
+          tutorial_completed: string | null
+          tutorial_step: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_premium?: boolean | null
+          journal_focus_areas?: string[] | null
+          onboarding_completed?: boolean | null
+          reminder_settings?: Json | null
+          revenuecat_entitlements?: Json | null
+          subscription_status?: string | null
+          subscription_tier?: string | null
+          timezone?: string | null
+          trial_ends_at?: string | null
+          tutorial_completed?: string | null
+          tutorial_step?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          avatar_url?: string | null
+          created_at?: string | null
+          display_name?: string | null
+          email?: string | null
+          full_name?: string | null
+          id?: string | null
+          is_premium?: boolean | null
+          journal_focus_areas?: string[] | null
+          onboarding_completed?: boolean | null
+          reminder_settings?: Json | null
+          revenuecat_entitlements?: Json | null
+          subscription_status?: string | null
+          subscription_tier?: string | null
+          timezone?: string | null
+          trial_ends_at?: string | null
+          tutorial_completed?: string | null
+          tutorial_step?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       revenuecat_customers: {
         Row: {
           created_at: string
@@ -556,6 +619,21 @@ export type Database = {
           score: number
           sample_entries: Json
         }[]
+      }
+      get_user_subscription_status: {
+        Args: { user_id_param: string }
+        Returns: {
+          current_status: string
+          current_tier: string
+          is_premium_access: boolean
+          trial_end_date: string
+          is_trial_active: boolean
+          days_remaining: number
+        }[]
+      }
+      is_trial_eligible: {
+        Args: { user_id_param: string }
+        Returns: boolean
       }
       mark_inactive_sessions: {
         Args: Record<PropertyKey, never>

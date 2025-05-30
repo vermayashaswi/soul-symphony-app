@@ -30,7 +30,6 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     return false;
   }
   
-  // Since we now have an improved database trigger, let's first check if the profile was created automatically
   try {
     logProfile(`Checking if profile exists for user: ${user.id}`, 'ProfileService', {
       userEmail: user.email,
@@ -41,7 +40,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     // First check if the profile already exists
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, timezone')
+      .select('id, full_name, avatar_url, timezone, subscription_status, trial_ends_at')
       .eq('id', user.id)
       .maybeSingle();
       
@@ -64,10 +63,14 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         await updateMissingProfileFields(user.id, user);
       }
       
+      // The auto_start_trial trigger should have handled trial setup automatically
+      // No need to manually set trial status here
+      
       return true;
     }
     
-    // If no profile exists, the trigger might have failed - let's create one manually
+    // If no profile exists, this should not happen with the trigger in place
+    // But as a fallback, let's create one manually
     logProfile('Profile not found, creating manually as fallback', 'ProfileService');
     return await createProfileManually(user);
     
@@ -161,7 +164,7 @@ const createProfileManually = async (user: User): Promise<boolean> => {
                    '';
       }
       
-      // Explicit profile data preparation
+      // Profile data preparation - let the auto_start_trial trigger handle subscription setup
       const profileData = {
         id: user.id,
         email,
@@ -276,6 +279,61 @@ export const updateUserProfile = async (user: User | null, metadata: Record<stri
     return true;
   } catch (error: any) {
     logError(`Error updating profile: ${error.message}`, 'ProfileService', error);
+    return false;
+  }
+};
+
+/**
+ * Starts a trial for a user (if eligible)
+ */
+export const startUserTrial = async (userId: string): Promise<boolean> => {
+  try {
+    logProfile('Starting trial for user', 'ProfileService', { userId });
+    
+    // Check eligibility first
+    const { data: isEligible, error: eligibilityError } = await supabase
+      .rpc('is_trial_eligible', {
+        user_id_param: userId
+      });
+
+    if (eligibilityError) {
+      logError(`Error checking trial eligibility: ${eligibilityError.message}`, 'ProfileService', eligibilityError);
+      return false;
+    }
+
+    if (!isEligible) {
+      logProfile('User is not eligible for trial', 'ProfileService');
+      return false;
+    }
+
+    // Start the trial
+    const trialEndDate = new Date();
+    trialEndDate.setDate(trialEndDate.getDate() + 7); // 7 days from now
+
+    const { error: updateError } = await supabase
+      .from('profiles')
+      .update({
+        subscription_status: 'trial',
+        subscription_tier: 'free',
+        is_premium: true,
+        trial_ends_at: trialEndDate.toISOString(),
+        updated_at: new Date().toISOString()
+      })
+      .eq('id', userId);
+
+    if (updateError) {
+      logError(`Error starting trial: ${updateError.message}`, 'ProfileService', updateError);
+      return false;
+    }
+
+    logProfile('Trial started successfully', 'ProfileService', {
+      userId,
+      trialEndDate: trialEndDate.toISOString()
+    });
+    
+    return true;
+  } catch (error: any) {
+    logError(`Error in startUserTrial: ${error.message}`, 'ProfileService', error);
     return false;
   }
 };
