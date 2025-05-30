@@ -30,7 +30,6 @@ export const SettingsLoadingSkeleton: React.FC = () => {
                   <Skeleton className="h-16 rounded-lg" />
                   <Skeleton className="h-16 rounded-lg" />
                 </div>
-                <Skeleton className="h-10 w-24" />
               </div>
             </div>
           </Card>
@@ -61,9 +60,9 @@ export const SettingsLoadingSkeleton: React.FC = () => {
               <div>
                 <Skeleton className="h-4 w-24 mb-2" />
                 <div className="flex flex-wrap gap-3">
-                  {[1, 2, 3, 4, 5].map((i) => (
+                  {[1, 2, 3].map((i) => (
                     <div key={i} className="flex flex-col items-center gap-1.5">
-                      <Skeleton className="h-10 w-10 rounded-full" />
+                      <Skeleton className="h-10 w-16 rounded" />
                       <Skeleton className="h-3 w-12" />
                     </div>
                   ))}
@@ -93,9 +92,8 @@ export const SettingsLoadingWrapper: React.FC<SettingsLoadingWrapperProps> = ({
   showPerformanceAlert = false
 }) => {
   const [showSlowLoadingWarning, setShowSlowLoadingWarning] = useState(false);
-  const [loadStartTime] = useState(Date.now());
 
-  console.log('[SettingsLoadingWrapper] Rendering - isLoading:', isLoading, 'error:', error, 'loadTime:', loadTime);
+  console.log('[SettingsLoadingWrapper] Rendering - isLoading:', isLoading, 'error:', error);
 
   // Show slow loading warning after 3 seconds
   useEffect(() => {
@@ -113,18 +111,6 @@ export const SettingsLoadingWrapper: React.FC<SettingsLoadingWrapperProps> = ({
       if (timer) clearTimeout(timer);
     };
   }, [isLoading]);
-
-  // Performance monitoring
-  useEffect(() => {
-    if (!isLoading && loadTime) {
-      const currentLoadTime = Date.now() - loadStartTime;
-      console.log(`[SettingsLoadingWrapper] Settings loaded in ${currentLoadTime}ms (reported: ${loadTime}ms)`);
-      
-      if (currentLoadTime > 5000) {
-        console.warn('[SettingsLoadingWrapper] Slow settings load detected:', currentLoadTime);
-      }
-    }
-  }, [isLoading, loadTime, loadStartTime]);
 
   if (isLoading) {
     return (

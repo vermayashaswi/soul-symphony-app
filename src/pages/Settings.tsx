@@ -27,13 +27,11 @@ import { useAuth } from '@/contexts/AuthContext';
 import { LanguageSelector } from '@/components/translation/LanguageSelector';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { ProfilePictureUpload } from '@/components/settings/ProfilePictureUpload';
 import { SubscriptionManagement } from '@/components/settings/SubscriptionManagement';
 import { useUserProfile } from '@/hooks/useUserProfile';
 import { SettingsLoadingWrapper } from '@/components/settings/SettingsLoadingWrapper';
 import { useTrialAccess } from '@/hooks/useTrialAccess';
 import { SubscriptionModal } from '@/components/subscription/SubscriptionModal';
-import { ColorPicker } from '@/components/settings/ColorPicker';
 
 const Settings = () => {
   console.log("Rendering Settings page");
@@ -47,8 +45,6 @@ const Settings = () => {
     profile,
     loading: profileLoading,
     error: profileError,
-    updateProfile,
-    refetch: refetchProfile
   } = useUserProfile();
   
   const {
@@ -63,10 +59,6 @@ const Settings = () => {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [totalLoadTime, setTotalLoadTime] = useState<number | null>(null);
-  const [themeColor, setThemeColor] = useState('#3b82f6');
-  
-  // Lazy loading state for non-critical components
-  const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
 
   // Initialize component and track loading
   useEffect(() => {
@@ -97,18 +89,6 @@ const Settings = () => {
     initializeSettings();
   }, [translate, currentLanguage]);
 
-  // Progressive loading of advanced settings
-  useEffect(() => {
-    if (isInitialized && !profileLoading && !trialLoading) {
-      // Load advanced settings after a short delay
-      const timer = setTimeout(() => {
-        setShowAdvancedSettings(true);
-      }, 500);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [isInitialized, profileLoading, trialLoading]);
-
   const themes = [
     { value: 'light', label: 'Light', icon: Sun },
     { value: 'dark', label: 'Dark', icon: Moon },
@@ -124,16 +104,10 @@ const Settings = () => {
   };
 
   const getJournalStats = () => {
-    // This would typically come from a proper stats hook
     return {
       totalEntries: profile?.stats?.totalEntries || 0,
       streak: profile?.stats?.currentStreak || 0
     };
-  };
-
-  const handleColorChange = (color: string) => {
-    setThemeColor(color);
-    // Here you could also save the color preference to the user's profile
   };
 
   const stats = getJournalStats();
@@ -220,11 +194,13 @@ const Settings = () => {
                         </div>
                       </div>
                       
-                      <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                        <Calendar className="h-4 w-4" />
-                        <TranslatableText text="Joined" forceTranslate={true} />
-                        {profile?.created_at && formatJoinDate(profile.created_at)}
-                      </div>
+                      {profile?.created_at && (
+                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
+                          <Calendar className="h-4 w-4" />
+                          <TranslatableText text="Joined" forceTranslate={true} />
+                          {formatJoinDate(profile.created_at)}
+                        </div>
+                      )}
                     </div>
                   </div>
                 </CardContent>
@@ -291,25 +267,6 @@ const Settings = () => {
                       })}
                     </div>
                   </div>
-
-                  {showAdvancedSettings && (
-                    <motion.div
-                      initial={{ opacity: 0, height: 0 }}
-                      animate={{ opacity: 1, height: 'auto' }}
-                      transition={{ duration: 0.3 }}
-                    >
-                      <div>
-                        <Label className="text-sm font-medium mb-3 block">
-                          <TranslatableText text="Custom Theme Color" forceTranslate={true} />
-                        </Label>
-                        <ColorPicker 
-                          value={themeColor}
-                          onChange={handleColorChange}
-                          applyImmediately={true}
-                        />
-                      </div>
-                    </motion.div>
-                  )}
                 </CardContent>
               </Card>
             </motion.div>
@@ -326,7 +283,6 @@ const Settings = () => {
                     <div className="text-xs text-muted-foreground space-y-1">
                       <div>Settings load time: {totalLoadTime}ms</div>
                       {trialLoadTime && <div>Trial check time: {trialLoadTime}ms</div>}
-                      <div>Advanced settings: {showAdvancedSettings ? 'Loaded' : 'Loading...'}</div>
                     </div>
                   </CardContent>
                 </Card>
@@ -335,10 +291,12 @@ const Settings = () => {
           </div>
         </div>
         
-        <SubscriptionModal 
-          isOpen={showSubscriptionModal}
-          onClose={closeSubscriptionModal}
-        />
+        {showSubscriptionModal && (
+          <SubscriptionModal 
+            isOpen={showSubscriptionModal}
+            onClose={closeSubscriptionModal}
+          />
+        )}
       </div>
     </SettingsLoadingWrapper>
   );

@@ -11,8 +11,6 @@ interface TrialAccessState {
   showSubscriptionModal: boolean;
   openSubscriptionModal: () => void;
   closeSubscriptionModal: () => void;
-  
-  // Performance tracking
   loadTime: number | null;
 }
 
@@ -32,9 +30,9 @@ export const useTrialAccess = (): TrialAccessState => {
   const [loadTime, setLoadTime] = useState<number | null>(null);
   const modalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Optimized access computation with memoization
-  const hasAccess = isPremium || hasActiveSubscription || isTrialActive;
-  const isTrialExpired = !isTrialActive && !isPremium && !hasActiveSubscription;
+  // Safely compute access state
+  const hasAccess = Boolean(isPremium || hasActiveSubscription || isTrialActive);
+  const isTrialExpired = Boolean(!isTrialActive && !isPremium && !hasActiveSubscription && user);
   
   const openSubscriptionModal = useCallback(() => {
     console.log('[useTrialAccess] Opening subscription modal');
@@ -80,8 +78,8 @@ export const useTrialAccess = (): TrialAccessState => {
   return {
     hasAccess,
     isTrialExpired,
-    isLoading: subscriptionLoading,
-    daysRemaining: daysRemainingInTrial,
+    isLoading: subscriptionLoading || false,
+    daysRemaining: daysRemainingInTrial || 0,
     showSubscriptionModal,
     openSubscriptionModal,
     closeSubscriptionModal,
