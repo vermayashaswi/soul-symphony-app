@@ -44,35 +44,19 @@ export const useTrialAccess = (): TrialAccessState => {
     setShowSubscriptionModal(false);
   }, []);
 
-  // Auto-open subscription modal when accessing premium features with expired trial
+  // FIXED: Simplified auto-open logic - removed aggressive modal opening
   useEffect(() => {
-    if (user && isTrialExpired && hasInitialLoadCompleted && !subscriptionLoading) {
-      console.log('[useTrialAccess] Trial expired, scheduling modal open');
-      
-      // Clear any existing timeout
-      if (modalTimeoutRef.current) {
-        clearTimeout(modalTimeoutRef.current);
-      }
-      
-      // Small delay to ensure UI is ready
-      modalTimeoutRef.current = setTimeout(() => {
-        console.log('[useTrialAccess] Auto-opening subscription modal for expired trial');
-        setShowSubscriptionModal(true);
-      }, 100);
+    // Only track performance, don't auto-open modals anymore
+    if (hasInitialLoadCompleted && lastLoadTime) {
+      setLoadTime(lastLoadTime);
     }
     
+    // Clean up timeout on unmount
     return () => {
       if (modalTimeoutRef.current) {
         clearTimeout(modalTimeoutRef.current);
       }
     };
-  }, [user, isTrialExpired, hasInitialLoadCompleted, subscriptionLoading]);
-
-  // Track performance
-  useEffect(() => {
-    if (hasInitialLoadCompleted && lastLoadTime) {
-      setLoadTime(lastLoadTime);
-    }
   }, [hasInitialLoadCompleted, lastLoadTime]);
 
   return {

@@ -10,7 +10,6 @@ import { useNetworkStatus } from '@/utils/network';
 import HomePage from '@/pages/website/HomePage';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
-import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const navigate = useNavigate();
@@ -26,67 +25,31 @@ const Index = () => {
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
 
-  // Enhanced tutorial status checking for proper navigation flow
+  // FIXED: Simplified navigation logic - removed tutorial auto-activation
   useEffect(() => {
-    const handleTutorialNavigation = async () => {
+    const handleNavigation = async () => {
       if (!user) return;
       
       try {
-        console.log('[Index] Checking user status for tutorial navigation, user:', user.id);
+        console.log('[Index] Checking user status for navigation, user:', user.id);
         
         // First ensure onboarding status is checked
         await checkOnboardingStatus();
         
         // Check if user has completed onboarding
         if (onboardingComplete) {
-          console.log('[Index] User completed onboarding, checking tutorial status');
-          
-          // Check tutorial completion status
-          const { data: profileData, error } = await supabase
-            .from('profiles')
-            .select('tutorial_completed, tutorial_step')
-            .eq('id', user.id)
-            .maybeSingle();
-          
-          if (error) {
-            console.error('[Index] Error checking tutorial status:', error);
-            return;
-          }
-          
-          // If tutorial is not completed, let TutorialContext handle the flow
-          if (!profileData || profileData.tutorial_completed !== 'YES') {
-            console.log('[Index] User has not completed tutorial - TutorialContext will handle startup');
-            
-            // Ensure tutorial_completed is set to 'NO' for proper detection
-            if (!profileData || profileData.tutorial_completed !== 'NO') {
-              console.log('[Index] Setting tutorial_completed to NO for proper detection');
-              const { error: updateError } = await supabase
-                .from('profiles')
-                .upsert({ 
-                  id: user.id,
-                  tutorial_completed: 'NO',
-                  tutorial_step: profileData?.tutorial_step || 0
-                });
-                
-              if (updateError) {
-                console.error('[Index] Error updating tutorial status:', updateError);
-              }
-            }
-            
-            // Don't navigate here - let TutorialContext handle navigation and tutorial startup
-            console.log('[Index] Letting TutorialContext handle tutorial startup and navigation');
-          } else {
-            console.log('[Index] User has completed tutorial, normal app flow');
-          }
+          console.log('[Index] User completed onboarding');
+          // Don't auto-navigate - let user decide where to go
+          // Tutorial will be handled manually when user visits app
         } else {
           console.log('[Index] User has not completed onboarding yet');
         }
       } catch (error) {
-        console.error('[Index] Error in handleTutorialNavigation:', error);
+        console.error('[Index] Error in handleNavigation:', error);
       }
     };
     
-    handleTutorialNavigation();
+    handleNavigation();
   }, [user, checkOnboardingStatus, onboardingComplete]);
 
   // Handle explicit app redirects only

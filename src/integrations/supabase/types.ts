@@ -430,27 +430,6 @@ export type Database = {
         }
         Relationships: []
       }
-      "Subscription Status": {
-        Row: {
-          "cancellation date": string | null
-          created_at: string
-          id: number
-          "subscription date": string | null
-        }
-        Insert: {
-          "cancellation date"?: string | null
-          created_at?: string
-          id?: number
-          "subscription date"?: string | null
-        }
-        Update: {
-          "cancellation date"?: string | null
-          created_at?: string
-          id?: number
-          "subscription date"?: string | null
-        }
-        Relationships: []
-      }
       subscription_transactions: {
         Row: {
           created_at: string

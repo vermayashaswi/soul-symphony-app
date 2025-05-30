@@ -66,7 +66,7 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
     );
   }
 
-  // Special handling for the root /app route
+  // FIXED: Special handling for the root /app route - simplified logic
   if (isRootAppRoute) {
     console.log('Root app route detected, user:', !!user);
     // If user is logged in, redirect to home
@@ -74,9 +74,9 @@ const OnboardingCheck: React.FC<OnboardingCheckProps> = ({
       console.log('User is logged in, redirecting to /app/home');
       return <Navigate to="/app/home" replace />;
     } else {
-      // If user is not logged in, redirect to onboarding
-      console.log('User not logged in, redirecting to /app/onboarding');
-      return <Navigate to="/app/onboarding" replace />;
+      // If user is not logged in, redirect to auth (not onboarding)
+      console.log('User not logged in, redirecting to /app/auth');
+      return <Navigate to="/app/auth" replace />;
     }
   }
   
