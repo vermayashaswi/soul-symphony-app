@@ -1,3 +1,4 @@
+
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -13,6 +14,9 @@ import { useIsMobile } from '@/hooks/use-mobile';
 import ErrorBoundary from '@/components/insights/ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { useTrialAccess } from '@/hooks/useTrialAccess';
+import { TrialExpiredBlocker } from '@/components/subscription/TrialExpiredBlocker';
+import SubscriptionModal from '@/components/subscription/SubscriptionModal';
 
 export default function Insights() {
   console.log("Rendering Insights page");
@@ -28,6 +32,16 @@ export default function Insights() {
   
   const { insightsData, loading } = useInsightsData(user?.id, timeRange);
   
+  // Trial access management
+  const {
+    hasAccess,
+    isTrialExpired,
+    isLoading: trialLoading,
+    showSubscriptionModal,
+    openSubscriptionModal,
+    closeSubscriptionModal
+  } = useTrialAccess();
+  
   const timeRanges = [
     { value: 'today', label: 'Day' },
     { value: 'week', label: 'Week' },
@@ -41,6 +55,14 @@ export default function Insights() {
       console.log("Insights page unmounted");
     };
   }, []);
+
+  // Auto-open subscription modal for expired trial users
+  useEffect(() => {
+    if (user && isTrialExpired && !trialLoading) {
+      console.log('[Insights] Trial expired, opening subscription modal');
+      openSubscriptionModal();
+    }
+  }, [user, isTrialExpired, trialLoading, openSubscriptionModal]);
 
   useEffect(() => {
     const handleScroll = () => {
@@ -129,6 +151,32 @@ export default function Insights() {
       }))
       .filter(item => !isNaN(item.sentiment) && !isNaN(item.date.getTime()));
   };
+
+  // Show loading state while checking trial access
+  if (trialLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  // Show trial expired blocker if user doesn't have access
+  if (user && !hasAccess && isTrialExpired) {
+    return (
+      <div className="min-h-screen pb-20 p-4">
+        <TrialExpiredBlocker 
+          feature="Insights Dashboard"
+          onUpgrade={openSubscriptionModal}
+          className="mt-8"
+        />
+        <SubscriptionModal 
+          isOpen={showSubscriptionModal}
+          onClose={closeSubscriptionModal}
+        />
+      </div>
+    );
+  }
 
   return (
     <ErrorBoundary>
@@ -391,6 +439,11 @@ export default function Insights() {
             </>
           )}
         </div>
+        
+        <SubscriptionModal 
+          isOpen={showSubscriptionModal}
+          onClose={closeSubscriptionModal}
+        />
       </div>
     </ErrorBoundary>
   );
