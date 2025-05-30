@@ -107,14 +107,17 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         },
         (payload) => {
           console.log('Profile subscription status changed:', payload);
-          if (payload.new && 'subscription_status' in payload.new) {
-            setSubscriptionInfo(prev => ({
-              ...prev,
-              subscriptionStatus: payload.new.subscription_status,
-              isPremium: payload.new.is_premium || false,
-              trialEndDate: payload.new.trial_ends_at ? new Date(payload.new.trial_ends_at) : null,
-              isTrialActive: payload.new.trial_ends_at ? new Date(payload.new.trial_ends_at) > new Date() : false
-            }));
+          if (payload.new && typeof payload.new === 'object' && payload.new !== null) {
+            const newData = payload.new as Record<string, any>;
+            if ('subscription_status' in newData) {
+              setSubscriptionInfo(prev => ({
+                ...prev,
+                subscriptionStatus: newData.subscription_status,
+                isPremium: newData.is_premium || false,
+                trialEndDate: newData.trial_ends_at ? new Date(newData.trial_ends_at) : null,
+                isTrialActive: newData.trial_ends_at ? new Date(newData.trial_ends_at) > new Date() : false
+              }));
+            }
           }
         }
       )
