@@ -63,6 +63,7 @@ const Settings = () => {
 
   const [isInitialized, setIsInitialized] = useState(false);
   const [totalLoadTime, setTotalLoadTime] = useState<number | null>(null);
+  const [themeColor, setThemeColor] = useState('#3b82f6');
   
   // Lazy loading state for non-critical components
   const [showAdvancedSettings, setShowAdvancedSettings] = useState(false);
@@ -130,6 +131,11 @@ const Settings = () => {
     };
   };
 
+  const handleColorChange = (color: string) => {
+    setThemeColor(color);
+    // Here you could also save the color preference to the user's profile
+  };
+
   const stats = getJournalStats();
   const isLoading = profileLoading || trialLoading || !isInitialized;
   const error = profileError;
@@ -179,15 +185,19 @@ const Settings = () => {
                 </CardHeader>
                 <CardContent>
                   <div className="flex flex-col sm:flex-row gap-6 items-center sm:items-start">
-                    <ProfilePictureUpload 
-                      currentAvatarUrl={profile?.avatar_url}
-                      onUploadComplete={refetchProfile}
-                    />
+                    <div className="h-24 w-24 relative">
+                      <Avatar className="h-24 w-24">
+                        <AvatarImage src={profile?.avatar_url || ''} />
+                        <AvatarFallback className="text-2xl">
+                          {profile?.displayName?.[0] || profile?.full_name?.[0] || user?.email?.[0]?.toUpperCase() || 'U'}
+                        </AvatarFallback>
+                      </Avatar>
+                    </div>
                     
                     <div className="flex-1 space-y-4 text-center sm:text-left">
                       <div>
                         <h3 className="text-xl font-semibold">
-                          {profile?.display_name || profile?.full_name || user?.email?.split('@')[0] || 'User'}
+                          {profile?.displayName || profile?.full_name || user?.email?.split('@')[0] || 'User'}
                         </h3>
                         <p className="text-muted-foreground">{user?.email}</p>
                       </div>
@@ -227,7 +237,7 @@ const Settings = () => {
               animate={{ opacity: 1, y: 0 }}
               transition={{ duration: 0.3, delay: 0.1 }}
             >
-              <SubscriptionManagement onUpgrade={openSubscriptionModal} />
+              <SubscriptionManagement />
             </motion.div>
 
             {/* Appearance Section */}
@@ -288,7 +298,16 @@ const Settings = () => {
                       animate={{ opacity: 1, height: 'auto' }}
                       transition={{ duration: 0.3 }}
                     >
-                      <ColorPicker />
+                      <div>
+                        <Label className="text-sm font-medium mb-3 block">
+                          <TranslatableText text="Custom Theme Color" forceTranslate={true} />
+                        </Label>
+                        <ColorPicker 
+                          value={themeColor}
+                          onChange={handleColorChange}
+                          applyImmediately={true}
+                        />
+                      </div>
                     </motion.div>
                   )}
                 </CardContent>

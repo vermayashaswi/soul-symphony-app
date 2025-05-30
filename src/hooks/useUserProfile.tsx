@@ -6,71 +6,66 @@ import { supabase } from '@/integrations/supabase/client';
 export interface UserProfileData {
   displayName: string | null;
   timezone: string | null;
+  full_name?: string | null;
+  avatar_url?: string | null;
+  created_at?: string | null;
+  stats?: {
+    totalEntries: number;
+    currentStreak: number;
+  };
 }
 
-export const useUserProfile = (): UserProfileData & { 
-  updateDisplayName: (name: string) => Promise<void>,
-  updateTimezone: (timezone: string) => Promise<void>
-} => {
+export const useUserProfile = () => {
   const { user } = useAuth();
-  const [displayName, setDisplayName] = useState<string | null>(null);
-  const [timezone, setTimezone] = useState<string | null>(null);
+  const [profile, setProfile] = useState<UserProfileData | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  useEffect(() => {
-    const fetchUserProfile = async () => {
-      if (!user) return;
+  const fetchProfile = async () => {
+    if (!user) {
+      setProfile(null);
+      setLoading(false);
+      return;
+    }
 
-      try {
-        const localName = localStorage.getItem('user_display_name');
-
-        const { data, error } = await supabase
-          .from('profiles')
-          .select('display_name, full_name, timezone')
-          .eq('id', user.id)
-          .single();
-
-        if (error && error.code !== 'PGRST116') {
-          console.error('Error fetching profile', error);
-          return;
-        }
-
-        if (localName && (!data || !data.display_name)) {
-          await updateDisplayName(localName);
-          setDisplayName(localName);
-          localStorage.removeItem('user_display_name');
-        } else if (data && data.display_name) {
-          setDisplayName(data.display_name);
-        } else if (data && data.full_name) {
-          setDisplayName(data.full_name);
-        }
-
-        // Set timezone from profile data
-        if (data && data.timezone) {
-          setTimezone(data.timezone);
-        } else if (user) {
-          // If profile exists but no timezone, update with browser timezone
-          const browserTimezone = getBrowserTimezone();
-          if (browserTimezone) {
-            await updateTimezone(browserTimezone);
-            setTimezone(browserTimezone);
-          }
-        }
-      } catch (error) {
-        console.error('Error in profile fetching', error);
-      }
-    };
-
-    fetchUserProfile();
-  }, [user]);
-
-  const getBrowserTimezone = (): string | null => {
     try {
-      return Intl.DateTimeFormat().resolvedOptions().timeZone;
-    } catch (error) {
-      console.error('Error detecting timezone:', error);
-      return null;
+      setLoading(true);
+      setError(null);
+
+      const { data, error: fetchError } = await supabase
+        .from('profiles')
+        .select('display_name, full_name, timezone, avatar_url, created_at')
+        .eq('id', user.id)
+        .single();
+
+      if (fetchError && fetchError.code !== 'PGRST116') {
+        throw fetchError;
+      }
+
+      const profileData: UserProfileData = {
+        displayName: data?.display_name || null,
+        timezone: data?.timezone || null,
+        full_name: data?.full_name || null,
+        avatar_url: data?.avatar_url || null,
+        created_at: data?.created_at || null,
+        stats: {
+          totalEntries: 0, // This would come from actual journal entries count
+          currentStreak: 0 // This would come from actual streak calculation
+        }
+      };
+
+      setProfile(profileData);
+    } catch (err) {
+      console.error('Error fetching profile:', err);
+      setError(err instanceof Error ? err.message : 'Failed to fetch profile');
+    } finally {
+      setLoading(false);
     }
   };
+
+  useEffect(() => {
+    fetchProfile();
+  }, [user]);
 
   const updateDisplayName = async (name: string) => {
     if (!user) return;
@@ -88,9 +83,10 @@ export const useUserProfile = (): UserProfileData & {
         throw error;
       }
       
-      setDisplayName(name);
+      setProfile(prev => prev ? { ...prev, displayName: name } : null);
     } catch (error) {
       console.error('Error updating display name', error);
+      throw error;
     }
   };
 
@@ -110,11 +106,49 @@ export const useUserProfile = (): UserProfileData & {
         throw error;
       }
       
-      setTimezone(tz);
+      setProfile(prev => prev ? { ...prev, timezone: tz } : null);
     } catch (error) {
       console.error('Error updating timezone', error);
+      throw error;
     }
   };
 
-  return { displayName, timezone, updateDisplayName, updateTimezone };
+  const updateProfile = async (updates: Partial<UserProfileData>) => {
+    if (!user) return;
+
+    try {
+      const { error } = await supabase
+        .from('profiles')
+        .update({
+          ...updates,
+          updated_at: new Date().toISOString()
+        })
+        .eq('id', user.id);
+
+      if (error) {
+        throw error;
+      }
+      
+      setProfile(prev => prev ? { ...prev, ...updates } : null);
+    } catch (error) {
+      console.error('Error updating profile', error);
+      throw error;
+    }
+  };
+
+  const refetch = () => {
+    fetchProfile();
+  };
+
+  return { 
+    profile,
+    loading,
+    error,
+    displayName: profile?.displayName,
+    timezone: profile?.timezone,
+    updateDisplayName,
+    updateTimezone,
+    updateProfile,
+    refetch
+  };
 };
