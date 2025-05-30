@@ -1,91 +1,55 @@
 
-import React, { useEffect, useState } from 'react';
-import AppRoutes from './routes/AppRoutes';
-import { Toaster } from "@/components/ui/toaster";
-import { Toaster as SonnerToaster } from "sonner";
+import { BrowserRouter as Router } from 'react-router-dom';
+import { QueryClient, QueryClientProvider } from '@tanstack/react-query';
+import { ReactQueryDevtools } from '@tanstack/react-query-devtools';
+import { Toaster } from '@/components/ui/sonner';
+import { TooltipProvider } from '@/components/ui/tooltip';
+import { AuthProvider } from '@/contexts/AuthContext';
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
-import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
-import { JournalProcessingInitializer } from './app/journal-processing-init';
-import { TutorialProvider } from './contexts/TutorialContext';
-import TutorialOverlay from './components/tutorial/TutorialOverlay';
-import ErrorBoundary from './components/insights/ErrorBoundary';
-import { preloadCriticalImages } from './utils/imagePreloader';
-import { toast } from 'sonner';
-import './styles/emoji.css';
-import './styles/tutorial.css';
+import { TutorialProvider } from '@/contexts/TutorialContext';
+import { useSessionTracking } from '@/hooks/useSessionTracking';
+import { debugLogger } from '@/components/debug/DebugPanel';
+import AppRoutes from '@/routes/AppRoutes';
+import './i18n/i18n';
+import './App.css';
 
-const App: React.FC = () => {
-  const [isInitialized, setIsInitialized] = useState(false);
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+    },
+  },
+});
 
-  useEffect(() => {
-    console.log('[App] App mounted, current path:', window.location.pathname);
-    
-    // Clean up any malformed paths
-    const currentPath = window.location.pathname;
-    
-    // Fix incorrectly formatted URLs that have domains or https in the path
-    if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      console.log('[App] Fixing malformed URL path:', currentPath);
-      window.history.replaceState(null, '', '/');
-    }
-    
-    // Apply a CSS class to the document body for theme-specific overrides
-    document.body.classList.add('app-initialized');
-    
-    // Preload critical images including the chat avatar
-    try {
-      preloadCriticalImages();
-      console.log('[App] Critical images preloaded successfully');
-    } catch (error) {
-      console.warn('[App] Failed to preload some images:', error);
-      // Non-critical error, continue app initialization
-    }
+// Component to initialize session tracking
+function SessionTracker() {
+  useSessionTracking();
+  return null;
+}
 
-    // Mark app as initialized after a brief delay to ensure smooth startup
-    setTimeout(() => {
-      setIsInitialized(true);
-      console.log('[App] App marked as fully initialized');
-    }, 500);
-  }, []);
-
-  const handleAppError = (error: Error, errorInfo: any) => {
-    console.error('[App] Application-level error:', error, errorInfo);
-    
-    // Log critical app errors for debugging
-    const errorData = {
-      message: error.message,
-      stack: error.stack,
-      componentStack: errorInfo.componentStack,
-      timestamp: new Date().toISOString(),
-      userAgent: navigator.userAgent,
-      url: window.location.href
-    };
-    
-    console.error('[App] Detailed error info:', errorData);
-
-    // Show user-friendly error notification
-    toast.error('Something went wrong. The app will try to recover automatically.');
-
-    // Allow the app to continue functioning despite errors
-  };
-
+function App() {
   return (
-    <ErrorBoundary onError={handleAppError}>
-      <TranslationProvider>
-        <SubscriptionProvider>
-          <TutorialProvider>
-            <TranslationLoadingOverlay />
-            <JournalProcessingInitializer />
-            <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-            <TutorialOverlay />
-            <Toaster />
-            <SonnerToaster position="top-right" />
-          </TutorialProvider>
-        </SubscriptionProvider>
-      </TranslationProvider>
-    </ErrorBoundary>
+    <QueryClientProvider client={queryClient}>
+      <Router>
+        <TooltipProvider>
+          <TranslationProvider>
+            <AuthProvider>
+              <SubscriptionProvider>
+                <TutorialProvider>
+                  <SessionTracker />
+                  <AppRoutes />
+                  <Toaster />
+                  <ReactQueryDevtools initialIsOpen={false} />
+                </TutorialProvider>
+              </SubscriptionProvider>
+            </AuthProvider>
+          </TranslationProvider>
+        </TooltipProvider>
+      </Router>
+    </QueryClientProvider>
   );
-};
+}
 
 export default App;

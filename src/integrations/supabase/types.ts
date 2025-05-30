@@ -501,10 +501,13 @@ export type Database = {
           id: string
           ip_address: string | null
           is_active: boolean | null
+          language: string | null
           last_active_page: string | null
           last_activity: string | null
           location: string | null
+          page_views: number | null
           referrer: string | null
+          session_duration: unknown | null
           session_end: string | null
           session_start: string
           user_agent: string | null
@@ -517,10 +520,13 @@ export type Database = {
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
+          language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
           location?: string | null
+          page_views?: number | null
           referrer?: string | null
+          session_duration?: unknown | null
           session_end?: string | null
           session_start?: string
           user_agent?: string | null
@@ -533,10 +539,13 @@ export type Database = {
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
+          language?: string | null
           last_active_page?: string | null
           last_activity?: string | null
           location?: string | null
+          page_views?: number | null
           referrer?: string | null
+          session_duration?: unknown | null
           session_end?: string | null
           session_start?: string
           user_agent?: string | null
@@ -563,6 +572,19 @@ export type Database = {
       cleanup_expired_trials: {
         Args: Record<PropertyKey, never>
         Returns: undefined
+      }
+      enhanced_manage_user_session: {
+        Args: {
+          p_user_id: string
+          p_device_type: string
+          p_user_agent: string
+          p_entry_page: string
+          p_last_active_page: string
+          p_language?: string
+          p_referrer?: string
+          p_ip_address?: string
+        }
+        Returns: string
       }
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
@@ -792,6 +814,10 @@ export type Database = {
       table_exists: {
         Args: { table_name: string }
         Returns: boolean
+      }
+      update_session_activity: {
+        Args: { p_session_id: string; p_page?: string; p_language?: string }
+        Returns: undefined
       }
     }
     Enums: {

@@ -12,6 +12,7 @@ import {
   signOut as signOutService,
   refreshSession as refreshSessionService
 } from '@/services/authService';
+import { createEnhancedUserSession, getDeviceType, getCurrentPage, getBrowserLanguage } from '@/services/sessionService';
 import { debugLogger, logInfo, logError, logAuthError, logProfile, logAuth } from '@/components/debug/DebugPanel';
 import { isAppRoute } from '@/routes/RouteHelpers';
 import { useLocation } from 'react-router-dom';
@@ -37,43 +38,33 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const createUserSession = async (userId: string): Promise<boolean> => {
     try {
-      console.log('Creating user session record for user:', userId);
+      console.log('Creating enhanced user session record for user:', userId);
       
-      // Check if session already exists to prevent duplicates
-      const { data: hasSession, error: checkError } = await supabase
-        .rpc('has_active_session', { p_user_id: userId });
+      const deviceType = getDeviceType();
+      const currentPage = getCurrentPage();
+      const browserLanguage = getBrowserLanguage();
       
-      if (checkError) {
-        console.error('Error checking for existing session:', checkError);
-        return false;
-      }
+      // Get current language from i18n if available, fallback to browser language
+      const currentLanguage = (window as any).i18next?.language || browserLanguage;
       
-      if (hasSession) {
-        console.log('Active session already exists for user, skipping creation');
+      const sessionId = await createEnhancedUserSession(userId, {
+        deviceType,
+        userAgent: navigator.userAgent,
+        entryPage: currentPage,
+        lastActivePage: currentPage,
+        language: currentLanguage,
+        referrer: document.referrer
+      });
+      
+      if (sessionId) {
+        console.log('Enhanced user session created successfully with ID:', sessionId);
         return true;
-      }
-      
-      const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
-      
-      // Use the new manage_user_session function to handle session creation
-      const { data: sessionId, error } = await supabase
-        .rpc('manage_user_session', {
-          p_user_id: userId,
-          p_device_type: deviceType,
-          p_user_agent: navigator.userAgent,
-          p_entry_page: window.location.pathname,
-          p_last_active_page: window.location.pathname
-        });
-      
-      if (error) {
-        console.error('Error creating user session from AuthContext:', error);
+      } else {
+        console.error('Failed to create enhanced user session');
         return false;
       }
-      
-      console.log('User session created successfully from AuthContext with ID:', sessionId);
-      return true;
     } catch (e) {
-      console.error('Exception creating user session from AuthContext:', e);
+      console.error('Exception creating enhanced user session:', e);
       return false;
     }
   };
@@ -337,7 +328,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         setProfileCreationComplete(true);
         debugLogger.setLastProfileError(null);
         
-        // Only create session once per auth session
+        // Create enhanced session once per auth session
         if (!sessionCreated) {
           const sessionSuccess = await createUserSession(currentUser.id);
           if (sessionSuccess) {
@@ -359,7 +350,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           setProfileCreationComplete(true);
           debugLogger.setLastProfileError(null);
           
-          // Only create session once per auth session
+          // Create enhanced session once per auth session
           if (!sessionCreated) {
             const sessionSuccess = await createUserSession(currentUser.id);
             if (sessionSuccess) {
