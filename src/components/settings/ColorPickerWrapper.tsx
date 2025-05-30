@@ -5,18 +5,22 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTheme } from '@/hooks/use-theme';
 
 export const ColorPickerWrapper: React.FC = () => {
-  const { themeColor, setThemeColor } = useTheme();
-  const [currentColor, setCurrentColor] = useState(themeColor || '#3b82f6');
+  const { customColor, setCustomColor, colorTheme, setColorTheme } = useTheme();
+  const [currentColor, setCurrentColor] = useState(customColor || '#3b82f6');
 
   useEffect(() => {
-    if (themeColor) {
-      setCurrentColor(themeColor);
+    if (customColor) {
+      setCurrentColor(customColor);
     }
-  }, [themeColor]);
+  }, [customColor]);
 
   const handleColorChange = (color: string) => {
     setCurrentColor(color);
-    setThemeColor(color);
+    setCustomColor(color);
+    // Also set the color theme to Custom when a custom color is selected
+    if (colorTheme !== 'Custom') {
+      setColorTheme('Custom');
+    }
   };
 
   return (
