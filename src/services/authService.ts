@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { isAppRoute } from '@/routes/RouteHelpers';
@@ -236,9 +237,7 @@ export const handleAuthCallback = async () => {
       
       if (data.session?.user) {
         console.log('User authenticated in callback handler');
-        // Create a user session record
-        await createUserSession(data.session.user.id);
-        
+        // Session creation will be handled by AuthContext
         return data.session;
       }
     }
