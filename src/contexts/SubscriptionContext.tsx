@@ -1,7 +1,9 @@
 
-import React, { createContext, useContext, useEffect, useState } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useRevenueCat } from '@/hooks/useRevenueCat';
+import { getSubscriptionInfo, SubscriptionInfo } from '@/services/subscriptionService';
+import { ensureProfileExists } from '@/services/profileService';
 import { supabase } from '@/integrations/supabase/client';
 
 interface SubscriptionContextValue {
@@ -11,6 +13,7 @@ interface SubscriptionContextValue {
   daysRemainingInTrial: number;
   subscriptionStatus: string | null;
   isLoading: boolean;
+  error: string | null;
   refreshSubscriptionStatus: () => Promise<void>;
 }
 
@@ -39,45 +42,61 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     refreshPurchaserInfo
   } = useRevenueCat();
 
-  const [subscriptionStatus, setSubscriptionStatus] = useState<string | null>(null);
-  const [profileLoading, setProfileLoading] = useState(true);
+  const [subscriptionInfo, setSubscriptionInfo] = useState<SubscriptionInfo>({
+    isPremium: false,
+    isTrialActive: false,
+    trialEndDate: null,
+    subscriptionStatus: 'free'
+  });
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
   // Fetch subscription status from user profile
-  const fetchProfileSubscriptionStatus = async () => {
+  const fetchSubscriptionInfo = useCallback(async () => {
     if (!user?.id) {
-      setProfileLoading(false);
+      setSubscriptionInfo({
+        isPremium: false,
+        isTrialActive: false,
+        trialEndDate: null,
+        subscriptionStatus: 'free'
+      });
+      setIsLoading(false);
+      setError(null);
       return;
     }
 
     try {
-      const { data: profile, error } = await supabase
-        .from('profiles')
-        .select('subscription_status, is_premium')
-        .eq('id', user.id)
-        .single();
+      setIsLoading(true);
+      setError(null);
 
-      if (error) {
-        console.error('Error fetching profile subscription status:', error);
-      } else {
-        setSubscriptionStatus(profile?.subscription_status || 'free');
+      // First ensure the profile exists
+      const profileExists = await ensureProfileExists(user);
+      if (!profileExists) {
+        console.warn('Failed to ensure profile exists for user:', user.id);
+        setError('Profile setup failed');
       }
+
+      // Get subscription info
+      const info = await getSubscriptionInfo(user);
+      setSubscriptionInfo(info);
     } catch (error) {
-      console.error('Error in fetchProfileSubscriptionStatus:', error);
+      console.error('Error in fetchSubscriptionInfo:', error);
+      setError('Failed to load subscription information');
     } finally {
-      setProfileLoading(false);
+      setIsLoading(false);
     }
-  };
+  }, [user]);
 
   useEffect(() => {
-    fetchProfileSubscriptionStatus();
-  }, [user?.id]);
+    fetchSubscriptionInfo();
+  }, [fetchSubscriptionInfo]);
 
   // Set up real-time subscription updates
   useEffect(() => {
     if (!user?.id) return;
 
     const channel = supabase
-      .channel('subscription-changes')
+      .channel(`subscription-changes-${user.id}`)
       .on(
         'postgres_changes',
         {
@@ -89,11 +108,19 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         (payload) => {
           console.log('Profile subscription status changed:', payload);
           if (payload.new && 'subscription_status' in payload.new) {
-            setSubscriptionStatus(payload.new.subscription_status);
+            setSubscriptionInfo(prev => ({
+              ...prev,
+              subscriptionStatus: payload.new.subscription_status,
+              isPremium: payload.new.is_premium || false,
+              trialEndDate: payload.new.trial_ends_at ? new Date(payload.new.trial_ends_at) : null,
+              isTrialActive: payload.new.trial_ends_at ? new Date(payload.new.trial_ends_at) > new Date() : false
+            }));
           }
         }
       )
-      .subscribe();
+      .subscribe((status) => {
+        console.log('Subscription channel status:', status);
+      });
 
     return () => {
       supabase.removeChannel(channel);
@@ -102,23 +129,29 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
   const refreshSubscriptionStatus = async () => {
     await Promise.all([
-      fetchProfileSubscriptionStatus(),
+      fetchSubscriptionInfo(),
       refreshPurchaserInfo()
     ]);
   };
 
   // Combine RevenueCat data with profile data for final status
-  const isPremium = revenueCatIsPremium || ['active', 'trial'].includes(subscriptionStatus || '');
-  const isTrialActive = revenueCatIsTrialActive || subscriptionStatus === 'trial';
-  const isLoading = revenueCatLoading || profileLoading;
+  const isPremium = revenueCatIsPremium || subscriptionInfo.isPremium;
+  const isTrialActive = revenueCatIsTrialActive || subscriptionInfo.isTrialActive;
+  const trialEndDate = revenueCatTrialEndDate || subscriptionInfo.trialEndDate;
+  const finalIsLoading = revenueCatLoading || isLoading;
+
+  const daysRemainingInTrial = trialEndDate 
+    ? Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+    : revenueCatDaysRemaining;
 
   const value: SubscriptionContextValue = {
     isPremium,
     isTrialActive,
-    trialEndDate: revenueCatTrialEndDate,
-    daysRemainingInTrial: revenueCatDaysRemaining,
-    subscriptionStatus,
-    isLoading,
+    trialEndDate,
+    daysRemainingInTrial,
+    subscriptionStatus: subscriptionInfo.subscriptionStatus,
+    isLoading: finalIsLoading,
+    error,
     refreshSubscriptionStatus
   };
 

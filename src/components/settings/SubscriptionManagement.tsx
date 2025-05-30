@@ -2,11 +2,12 @@
 import React from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Crown, Clock, Calendar, RefreshCw } from 'lucide-react';
+import { Crown, Clock, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { motion } from 'framer-motion';
 import { toast } from 'sonner';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const SubscriptionManagement: React.FC = () => {
   const {
@@ -16,6 +17,7 @@ export const SubscriptionManagement: React.FC = () => {
     daysRemainingInTrial,
     subscriptionStatus,
     isLoading,
+    error,
     refreshSubscriptionStatus
   } = useSubscription();
 
@@ -78,6 +80,15 @@ export const SubscriptionManagement: React.FC = () => {
           </Button>
         </div>
 
+        {error && (
+          <Alert className="mb-4">
+            <AlertCircle className="h-4 w-4" />
+            <AlertDescription>
+              <TranslatableText text="There was an issue loading your subscription information. Please try refreshing." />
+            </AlertDescription>
+          </Alert>
+        )}
+
         <div className="space-y-4">
           <div className="flex flex-col space-y-2">
             <div className="flex items-center justify-between">
@@ -129,7 +140,7 @@ export const SubscriptionManagement: React.FC = () => {
               </div>
             )}
 
-            {!isPremium && (
+            {!isPremium && !error && (
               <div className="bg-muted/50 rounded-lg p-3 border">
                 <p className="text-sm text-muted-foreground mb-3">
                   <TranslatableText text="Upgrade to Premium for unlimited journaling, advanced insights, and more features." />
@@ -143,7 +154,7 @@ export const SubscriptionManagement: React.FC = () => {
               </div>
             )}
 
-            {isPremium && !isTrialActive && (
+            {isPremium && !isTrialActive && !error && (
               <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
                 <p className="text-sm text-green-700 dark:text-green-300">
                   <TranslatableText text="You have access to all Premium features. Thank you for your support!" />
