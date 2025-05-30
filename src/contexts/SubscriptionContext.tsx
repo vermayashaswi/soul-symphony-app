@@ -1,5 +1,5 @@
 
-import React, { createContext, useContext, useState, useEffect, ReactNode, useCallback, useRef } from 'react';
+import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
 import { subscriptionErrorHandler } from '@/services/subscriptionErrorHandler';
@@ -24,24 +24,9 @@ export interface SubscriptionContextType {
   subscriptionStatus: SubscriptionStatus;
   refreshSubscriptionStatus: () => Promise<void>;
   hasInitialLoadCompleted: boolean;
-  
-  // Performance monitoring
-  lastLoadTime: number | null;
-  cacheTimestamp: number | null;
-}
-
-interface CachedSubscriptionData {
-  tier: SubscriptionTier;
-  status: SubscriptionStatus;
-  trialEndDate: Date | null;
-  timestamp: number;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
-
-// Cache duration: 2 minutes
-const CACHE_DURATION = 2 * 60 * 1000;
-const LOAD_TIMEOUT = 8000; // 8 second timeout
 
 export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ children }) => {
   const { user } = useAuth();
@@ -51,20 +36,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [error, setError] = useState<string | null>(null);
   const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false);
   const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
-  const [lastLoadTime, setLastLoadTime] = useState<number | null>(null);
-  const [cacheTimestamp, setCacheTimestamp] = useState<number | null>(null);
-  
-  const cacheRef = useRef<CachedSubscriptionData | null>(null);
-  const loadingRef = useRef<boolean>(false);
-  const timeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Progressive loading with cache
-  const fetchSubscriptionData = useCallback(async (forceRefresh = false): Promise<void> => {
-    const startTime = Date.now();
-    
-    // Prevent concurrent loads
-    if (loadingRef.current) return;
-    
+  const fetchSubscriptionData = async (): Promise<void> => {
     if (!user) {
       setTier('free');
       setStatus('unknown');
@@ -72,55 +45,20 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       setError(null);
       setHasInitialLoadCompleted(true);
       setTrialEndDate(null);
-      setLastLoadTime(Date.now() - startTime);
-      return;
-    }
-
-    // Use cache if available and fresh
-    const now = Date.now();
-    const cache = cacheRef.current;
-    
-    if (!forceRefresh && cache && (now - cache.timestamp) < CACHE_DURATION) {
-      console.log('[SubscriptionContext] Using cached subscription data');
-      setTier(cache.tier);
-      setStatus(cache.status);
-      setTrialEndDate(cache.trialEndDate);
-      setIsLoading(false);
-      setError(null);
-      setHasInitialLoadCompleted(true);
-      setCacheTimestamp(cache.timestamp);
-      setLastLoadTime(Date.now() - startTime);
       return;
     }
 
     try {
-      loadingRef.current = true;
       setIsLoading(true);
       setError(null);
       
-      console.log('[SubscriptionContext] Fetching fresh subscription data for user:', user.id);
+      console.log('[SubscriptionContext] Fetching subscription data for user:', user.id);
       
-      // Set up timeout
-      const timeoutPromise = new Promise<never>((_, reject) => {
-        timeoutRef.current = setTimeout(() => {
-          reject(new Error('Subscription fetch timeout'));
-        }, LOAD_TIMEOUT);
-      });
-      
-      // Race between fetch and timeout
-      const fetchPromise = supabase
+      const { data, error: supabaseError } = await supabase
         .from('profiles')
-        .select('subscription_tier, subscription_status, trial_ends_at, is_premium')
+        .select('subscription_tier, subscription_status, trial_ends_at')
         .eq('id', user.id)
         .maybeSingle();
-      
-      const { data, error: supabaseError } = await Promise.race([fetchPromise, timeoutPromise]);
-      
-      // Clear timeout
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
 
       if (supabaseError) {
         throw supabaseError;
@@ -131,16 +69,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         const userStatus = (data.subscription_status as SubscriptionStatus) || 'unknown';
         const userTrialEndDate = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
         
-        // Update cache
-        const cacheData: CachedSubscriptionData = {
-          tier: userTier,
-          status: userStatus,
-          trialEndDate: userTrialEndDate,
-          timestamp: now
-        };
-        cacheRef.current = cacheData;
-        setCacheTimestamp(now);
-        
         setTier(userTier);
         setStatus(userStatus);
         setTrialEndDate(userTrialEndDate);
@@ -148,21 +76,10 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         console.log('[SubscriptionContext] Updated subscription:', {
           tier: userTier,
           status: userStatus,
-          trialEndDate: userTrialEndDate,
-          isPremium: data.is_premium,
-          cached: false
+          trialEndDate: userTrialEndDate
         });
       } else {
         // User profile doesn't exist yet, default to free
-        const defaultData: CachedSubscriptionData = {
-          tier: 'free',
-          status: 'unknown',
-          trialEndDate: null,
-          timestamp: now
-        };
-        cacheRef.current = defaultData;
-        setCacheTimestamp(now);
-        
         setTier('free');
         setStatus('unknown');
         setTrialEndDate(null);
@@ -170,12 +87,6 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       }
     } catch (err) {
       console.error('[SubscriptionContext] Error fetching subscription:', err);
-      
-      // Clear timeout on error
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-        timeoutRef.current = null;
-      }
       
       // Use the error handler to categorize and potentially show the error
       const handledError = subscriptionErrorHandler.handleError(err, 'Subscription');
@@ -185,35 +96,23 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
         setError(handledError.message);
       }
       
-      // If we have cached data and this is a network error, use cache
-      const cache = cacheRef.current;
-      if (cache && handledError.type === 'network') {
-        console.log('[SubscriptionContext] Using stale cache due to network error');
-        setTier(cache.tier);
-        setStatus(cache.status);
-        setTrialEndDate(cache.trialEndDate);
-        setCacheTimestamp(cache.timestamp);
-      } else {
-        // Default to free tier on error
-        setTier('free');
-        setStatus('unknown');
-        setTrialEndDate(null);
-      }
+      // Default to free tier on error
+      setTier('free');
+      setStatus('unknown');
+      setTrialEndDate(null);
     } finally {
-      loadingRef.current = false;
       setIsLoading(false);
       setHasInitialLoadCompleted(true);
-      setLastLoadTime(Date.now() - startTime);
     }
-  }, [user]);
+  };
 
-  const refreshSubscription = useCallback(async (): Promise<void> => {
-    await fetchSubscriptionData(true);
-  }, [fetchSubscriptionData]);
+  const refreshSubscription = async (): Promise<void> => {
+    await fetchSubscriptionData();
+  };
 
-  const refreshSubscriptionStatus = useCallback(async (): Promise<void> => {
-    await fetchSubscriptionData(true);
-  }, [fetchSubscriptionData]);
+  const refreshSubscriptionStatus = async (): Promise<void> => {
+    await fetchSubscriptionData();
+  };
 
   // Fetch subscription data when user changes
   useEffect(() => {
@@ -223,14 +122,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     if (user) {
       subscriptionErrorHandler.reset();
     }
-    
-    // Cleanup timeout on unmount
-    return () => {
-      if (timeoutRef.current) {
-        clearTimeout(timeoutRef.current);
-      }
-    };
-  }, [user, fetchSubscriptionData]);
+  }, [user]);
 
   // Computed properties
   const isPremium = tier === 'premium' || tier === 'premium_plus';
@@ -259,11 +151,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     daysRemainingInTrial,
     subscriptionStatus: status, // Alias for status
     refreshSubscriptionStatus,
-    hasInitialLoadCompleted,
-    
-    // Performance monitoring
-    lastLoadTime,
-    cacheTimestamp
+    hasInitialLoadCompleted
   };
 
   return (

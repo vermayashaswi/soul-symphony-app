@@ -1,10 +1,8 @@
 
-import React, { useState, useEffect } from 'react';
+import React from 'react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TranslatableText } from '@/components/translation/TranslatableText';
-import { AlertCircle, Clock } from 'lucide-react';
-import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const SettingsLoadingSkeleton: React.FC = () => {
   return (
@@ -30,6 +28,7 @@ export const SettingsLoadingSkeleton: React.FC = () => {
                   <Skeleton className="h-16 rounded-lg" />
                   <Skeleton className="h-16 rounded-lg" />
                 </div>
+                <Skeleton className="h-10 w-24" />
               </div>
             </div>
           </Card>
@@ -60,9 +59,9 @@ export const SettingsLoadingSkeleton: React.FC = () => {
               <div>
                 <Skeleton className="h-4 w-24 mb-2" />
                 <div className="flex flex-wrap gap-3">
-                  {[1, 2, 3].map((i) => (
+                  {[1, 2, 3, 4, 5].map((i) => (
                     <div key={i} className="flex flex-col items-center gap-1.5">
-                      <Skeleton className="h-10 w-16 rounded" />
+                      <Skeleton className="h-10 w-10 rounded-full" />
                       <Skeleton className="h-3 w-12" />
                     </div>
                   ))}
@@ -80,61 +79,23 @@ interface SettingsLoadingWrapperProps {
   isLoading: boolean;
   error?: string | null;
   children: React.ReactNode;
-  loadTime?: number | null;
-  showPerformanceAlert?: boolean;
 }
 
 export const SettingsLoadingWrapper: React.FC<SettingsLoadingWrapperProps> = ({
   isLoading,
   error,
-  children,
-  loadTime,
-  showPerformanceAlert = false
+  children
 }) => {
-  const [showSlowLoadingWarning, setShowSlowLoadingWarning] = useState(false);
-
   console.log('[SettingsLoadingWrapper] Rendering - isLoading:', isLoading, 'error:', error);
 
-  // Show slow loading warning after 3 seconds
-  useEffect(() => {
-    let timer: NodeJS.Timeout | null = null;
-    
-    if (isLoading) {
-      timer = setTimeout(() => {
-        setShowSlowLoadingWarning(true);
-      }, 3000);
-    } else {
-      setShowSlowLoadingWarning(false);
-    }
-    
-    return () => {
-      if (timer) clearTimeout(timer);
-    };
-  }, [isLoading]);
-
   if (isLoading) {
-    return (
-      <div className="min-h-screen pb-20">
-        {showSlowLoadingWarning && (
-          <div className="max-w-3xl mx-auto px-4 pt-2 mb-4">
-            <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
-              <Clock className="h-4 w-4 text-yellow-600" />
-              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
-                <TranslatableText text="Settings are taking longer than usual to load. Please wait..." />
-              </AlertDescription>
-            </Alert>
-          </div>
-        )}
-        <SettingsLoadingSkeleton />
-      </div>
-    );
+    return <SettingsLoadingSkeleton />;
   }
 
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md p-6 text-center">
-          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-lg font-semibold mb-2 text-destructive">
             <TranslatableText text="Loading Error" />
           </h2>
@@ -147,29 +108,10 @@ export const SettingsLoadingWrapper: React.FC<SettingsLoadingWrapperProps> = ({
           >
             <TranslatableText text="Try refreshing the page" />
           </button>
-          {loadTime && (
-            <p className="text-xs text-muted-foreground mt-2">
-              Load time: {loadTime}ms
-            </p>
-          )}
         </Card>
       </div>
     );
   }
 
-  return (
-    <>
-      {showPerformanceAlert && loadTime && loadTime > 3000 && (
-        <div className="max-w-3xl mx-auto px-4 pt-2 mb-4">
-          <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
-            <AlertCircle className="h-4 w-4 text-blue-600" />
-            <AlertDescription className="text-blue-800 dark:text-blue-200">
-              <TranslatableText text={`Settings loaded in ${loadTime}ms. Consider refreshing if performance seems slow.`} />
-            </AlertDescription>
-          </Alert>
-        </div>
-      )}
-      {children}
-    </>
-  );
+  return <>{children}</>;
 };
