@@ -10,7 +10,7 @@ export type SubscriptionStatus = 'active' | 'canceled' | 'expired' | 'trial' | '
 export interface SubscriptionContextType {
   tier: SubscriptionTier;
   status: SubscriptionStatus;
-  isLoading: boolean;
+  isInitialLoading: boolean;
   error: string | null;
   refreshSubscription: () => Promise<void>;
   isPremium: boolean;
@@ -33,17 +33,17 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const { user } = useAuth();
   const [tier, setTier] = useState<SubscriptionTier>('free');
   const [status, setStatus] = useState<SubscriptionStatus>('unknown');
-  const [isLoading, setIsLoading] = useState(true);
+  const [isInitialLoading, setIsInitialLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false);
   const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
   const [isTrialEligible, setIsTrialEligible] = useState(false);
 
-  const fetchSubscriptionData = async (): Promise<void> => {
+  const fetchSubscriptionData = async (isRefresh: boolean = false): Promise<void> => {
     if (!user) {
       setTier('free');
       setStatus('unknown');
-      setIsLoading(false);
+      setIsInitialLoading(false);
       setError(null);
       setHasInitialLoadCompleted(true);
       setTrialEndDate(null);
@@ -52,10 +52,13 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     }
 
     try {
-      setIsLoading(true);
+      // Only show initial loading on first load, not on refresh
+      if (!isRefresh) {
+        setIsInitialLoading(true);
+      }
       setError(null);
       
-      console.log('[SubscriptionContext] Fetching subscription data for user:', user.id);
+      console.log('[SubscriptionContext] Fetching subscription data for user:', user.id, 'isRefresh:', isRefresh);
       
       // First call the cleanup function to ensure expired trials are processed
       const { error: cleanupError } = await supabase.rpc('cleanup_expired_trials');
@@ -157,22 +160,22 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       setTrialEndDate(null);
       setIsTrialEligible(false);
     } finally {
-      setIsLoading(false);
+      setIsInitialLoading(false);
       setHasInitialLoadCompleted(true);
     }
   };
 
   const refreshSubscription = async (): Promise<void> => {
-    await fetchSubscriptionData();
+    await fetchSubscriptionData(true);
   };
 
   const refreshSubscriptionStatus = async (): Promise<void> => {
-    await fetchSubscriptionData();
+    await fetchSubscriptionData(true);
   };
 
   // Fetch subscription data when user changes
   useEffect(() => {
-    fetchSubscriptionData();
+    fetchSubscriptionData(false);
     
     // Reset error handler when user changes
     if (user) {
@@ -197,7 +200,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const contextValue: SubscriptionContextType = {
     tier,
     status,
-    isLoading,
+    isInitialLoading,
     error,
     refreshSubscription,
     isPremium,

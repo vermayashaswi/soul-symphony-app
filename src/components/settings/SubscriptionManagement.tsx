@@ -19,27 +19,27 @@ export const SubscriptionManagement: React.FC = () => {
     trialEndDate,
     daysRemainingInTrial,
     subscriptionStatus,
-    isLoading,
+    isInitialLoading,
     error,
     refreshSubscriptionStatus,
     hasInitialLoadCompleted
   } = useSubscription();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [isLocalRefreshing, setIsLocalRefreshing] = useState(false);
 
   console.log('[SubscriptionManagement] Subscription state:', {
     isPremium,
     isTrialActive,
     subscriptionStatus,
-    isLoading,
+    isInitialLoading,
     error,
     hasInitialLoadCompleted
   });
 
   const handleRefreshStatus = async () => {
     console.log('[SubscriptionManagement] Refreshing subscription status...');
-    setIsRefreshing(true);
+    setIsLocalRefreshing(true);
     try {
       await refreshSubscriptionStatus();
       toast.success(<TranslatableText text="Subscription status refreshed" forceTranslate={true} />);
@@ -47,7 +47,7 @@ export const SubscriptionManagement: React.FC = () => {
       console.error('[SubscriptionManagement] Failed to refresh status:', error);
       toast.error(<TranslatableText text="Failed to refresh status. Please check your connection." forceTranslate={true} />);
     } finally {
-      setIsRefreshing(false);
+      setIsLocalRefreshing(false);
     }
   };
 
@@ -65,8 +65,9 @@ export const SubscriptionManagement: React.FC = () => {
     }).format(date);
   };
 
-  if (isLoading) {
-    console.log('[SubscriptionManagement] Showing loading state');
+  // Show loading skeleton only during initial load
+  if (isInitialLoading && !hasInitialLoadCompleted) {
+    console.log('[SubscriptionManagement] Showing initial loading state');
     return (
       <Card className="p-6">
         <div className="animate-pulse">
@@ -101,19 +102,29 @@ export const SubscriptionManagement: React.FC = () => {
               variant="outline" 
               size="sm"
               onClick={handleRefreshStatus}
-              disabled={isRefreshing}
+              disabled={isLocalRefreshing}
               className="flex items-center gap-1"
             >
-              {isRefreshing ? (
+              {isLocalRefreshing ? (
                 <RefreshCw className="h-3 w-3 animate-spin" />
               ) : (
                 <RefreshCw className="h-3 w-3" />
               )}
-              <TranslatableText text={isRefreshing ? "Refreshing..." : "Refresh"} />
+              <TranslatableText text={isLocalRefreshing ? "Refreshing..." : "Refresh"} />
             </Button>
           </div>
 
-          {error && (
+          {/* Show local refreshing state */}
+          {isLocalRefreshing && (
+            <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-950/20 rounded-lg border border-blue-200 dark:border-blue-800">
+              <div className="flex items-center gap-2 text-sm text-blue-700 dark:text-blue-300">
+                <RefreshCw className="h-4 w-4 animate-spin" />
+                <TranslatableText text="Updating subscription status..." />
+              </div>
+            </div>
+          )}
+
+          {error && !isLocalRefreshing && (
             <Alert className="mb-4 bg-yellow-50 border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-700">
               <div className="flex items-center gap-2">
                 <WifiOff className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
@@ -126,6 +137,7 @@ export const SubscriptionManagement: React.FC = () => {
                   variant="outline" 
                   size="sm" 
                   onClick={handleRefreshStatus}
+                  disabled={isLocalRefreshing}
                   className="text-xs border-yellow-400 dark:border-yellow-600 text-yellow-700 dark:text-yellow-400"
                 >
                   <Wifi className="h-3 w-3 mr-1" />
@@ -186,7 +198,7 @@ export const SubscriptionManagement: React.FC = () => {
                 </div>
               )}
 
-              {!isPremium && !error && (
+              {!isPremium && !error && !isLocalRefreshing && (
                 <div className="bg-muted/50 rounded-lg p-3 border">
                   <p className="text-sm text-muted-foreground mb-3">
                     <TranslatableText text="Upgrade to Premium for unlimited journaling, advanced insights, and more features." />
@@ -201,7 +213,7 @@ export const SubscriptionManagement: React.FC = () => {
                 </div>
               )}
 
-              {isPremium && !isTrialActive && !error && (
+              {isPremium && !isTrialActive && !error && !isLocalRefreshing && (
                 <div className="bg-green-50 dark:bg-green-950/20 rounded-lg p-3 border border-green-200 dark:border-green-800">
                   <p className="text-sm text-green-700 dark:text-green-300">
                     <TranslatableText text="You have access to all Premium features. Thank you for your support!" />
