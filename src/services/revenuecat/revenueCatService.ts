@@ -1,4 +1,3 @@
-
 import { supabase } from '@/integrations/supabase/client';
 
 export interface RevenueCatProduct {
@@ -8,6 +7,7 @@ export interface RevenueCatProduct {
   price: number;
   priceString: string;
   currencyCode: string;
+  region?: string;
   introPrice?: {
     price: number;
     priceString: string;
@@ -50,13 +50,53 @@ export interface RevenueCatTransaction {
   purchaseDate: string;
 }
 
+// Regional product configurations for Google Play
+const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
+  'premium_monthly_in': {
+    identifier: 'premium_monthly_in',
+    description: 'Premium features with 7-day free trial',
+    title: 'Soulo Premium Monthly (India)',
+    price: 99,
+    priceString: '₹99',
+    currencyCode: 'INR',
+    region: 'India'
+  },
+  'premium_monthly_us': {
+    identifier: 'premium_monthly_us',
+    description: 'Premium features with 7-day free trial',
+    title: 'Soulo Premium Monthly (US)',
+    price: 4.99,
+    priceString: '$4.99',
+    currencyCode: 'USD',
+    region: 'United States'
+  },
+  'premium_monthly_gb': {
+    identifier: 'premium_monthly_gb',
+    description: 'Premium features with 7-day free trial',
+    title: 'Soulo Premium Monthly (UK)',
+    price: 3.99,
+    priceString: '£3.99',
+    currencyCode: 'GBP',
+    region: 'United Kingdom'
+  },
+  'premium_monthly_default': {
+    identifier: 'premium_monthly_default',
+    description: 'Premium features with 7-day free trial',
+    title: 'Soulo Premium Monthly',
+    price: 4.99,
+    priceString: '$4.99',
+    currencyCode: 'USD',
+    region: 'Global'
+  }
+};
+
 class RevenueCatService {
   private isInitialized = false;
   private currentUserId: string | null = null;
 
   async initialize(userId: string): Promise<void> {
     try {
-      console.log('Initializing RevenueCat for user:', userId);
+      console.log('[RevenueCatService] Initializing RevenueCat for user:', userId);
       
       // In a real implementation, you would configure the RevenueCat SDK here
       // For now, we'll simulate the initialization
@@ -66,9 +106,9 @@ class RevenueCatService {
       // Create or update RevenueCat customer record
       await this.createOrUpdateCustomer(userId);
       
-      console.log('RevenueCat initialized successfully');
+      console.log('[RevenueCatService] RevenueCat initialized successfully');
     } catch (error) {
-      console.error('Failed to initialize RevenueCat:', error);
+      console.error('[RevenueCatService] Failed to initialize RevenueCat:', error);
       throw error;
     }
   }
@@ -92,12 +132,12 @@ class RevenueCatService {
           });
 
         if (error) {
-          console.error('Error creating RevenueCat customer:', error);
+          console.error('[RevenueCatService] Error creating RevenueCat customer:', error);
           throw error;
         }
       }
     } catch (error) {
-      console.error('Error in createOrUpdateCustomer:', error);
+      console.error('[RevenueCatService] Error in createOrUpdateCustomer:', error);
       throw error;
     }
   }
@@ -107,25 +147,18 @@ class RevenueCatService {
       throw new Error('RevenueCat not initialized');
     }
 
-    // In a real implementation, this would fetch from RevenueCat SDK
-    // For now, return a mock product for the 7-day trial
-    return [
-      {
-        identifier: 'soulo_premium_monthly',
-        description: 'Premium features with 7-day free trial',
-        title: 'Soulo Premium Monthly',
-        price: 9.99,
-        priceString: '$9.99',
-        currencyCode: 'USD',
-        introPrice: {
-          price: 0,
-          priceString: 'Free',
-          period: 'P1W', // 1 week
-          cycles: 1,
-          periodUnit: 'week'
-        }
-      }
-    ];
+    console.log('[RevenueCatService] Fetching products...');
+    
+    // Return all regional products for now
+    // In a real implementation, this would fetch from Google Play Store
+    return Object.values(REGIONAL_PRODUCTS);
+  }
+
+  async getProductByRegion(region: string): Promise<RevenueCatProduct | null> {
+    const products = await this.getProducts();
+    return products.find(product => product.region === region) || 
+           products.find(product => product.identifier === 'premium_monthly_default') || 
+           null;
   }
 
   async purchaseProduct(productId: string): Promise<RevenueCatTransaction> {
@@ -134,9 +167,15 @@ class RevenueCatService {
     }
 
     try {
-      console.log('Attempting to purchase product:', productId);
+      console.log('[RevenueCatService] Attempting to purchase product:', productId);
       
-      // In a real implementation, this would trigger the RevenueCat purchase flow
+      // Validate product exists
+      const product = REGIONAL_PRODUCTS[productId];
+      if (!product) {
+        throw new Error(`Product ${productId} not found`);
+      }
+
+      // In a real implementation, this would trigger the Google Play purchase flow
       // For now, we'll simulate a successful trial subscription
       const transaction: RevenueCatTransaction = {
         transactionIdentifier: `trial_${Date.now()}`,
@@ -155,7 +194,7 @@ class RevenueCatService {
         .single();
 
       if (customer) {
-        await supabase
+        const { error: subscriptionError } = await supabase
           .from('revenuecat_subscriptions')
           .insert({
             customer_id: customer.id,
@@ -169,13 +208,35 @@ class RevenueCatService {
             is_sandbox: true, // Set to false in production
             auto_renew_status: true,
             price_in_purchased_currency: 0,
-            currency: 'USD'
+            currency: product.currencyCode
           });
+
+        if (subscriptionError) {
+          console.error('[RevenueCatService] Error creating subscription:', subscriptionError);
+          throw subscriptionError;
+        }
+
+        // Update user profile to reflect premium status
+        const { error: profileError } = await supabase
+          .from('profiles')
+          .update({
+            is_premium: true,
+            trial_ends_at: trialExpiresAt.toISOString(),
+            subscription_status: 'trial',
+            updated_at: new Date().toISOString()
+          })
+          .eq('id', this.currentUserId);
+
+        if (profileError) {
+          console.error('[RevenueCatService] Error updating profile:', profileError);
+          // Don't throw here as the subscription was created successfully
+        }
       }
 
+      console.log('[RevenueCatService] Purchase completed successfully:', transaction);
       return transaction;
     } catch (error) {
-      console.error('Error purchasing product:', error);
+      console.error('[RevenueCatService] Error purchasing product:', error);
       throw error;
     }
   }
@@ -224,7 +285,7 @@ class RevenueCatService {
           latestPurchaseDate: sub.purchase_date || sub.created_at,
           originalPurchaseDate: sub.original_purchase_date || sub.created_at,
           expirationDate: sub.expires_date || undefined,
-          store: 'app_store', // or 'play_store' depending on platform
+          store: 'play_store',
           productIdentifier: sub.product_id,
           isSandbox: sub.is_sandbox || false,
           unsubscribeDetectedAt: sub.unsubscribe_detected_at || undefined,
@@ -246,7 +307,7 @@ class RevenueCatService {
         }
       };
     } catch (error) {
-      console.error('Error restoring purchases:', error);
+      console.error('[RevenueCatService] Error restoring purchases:', error);
       return null;
     }
   }
@@ -274,7 +335,7 @@ class RevenueCatService {
 
       return !previousTrials || previousTrials.length === 0;
     } catch (error) {
-      console.error('Error checking trial eligibility:', error);
+      console.error('[RevenueCatService] Error checking trial eligibility:', error);
       return false;
     }
   }
