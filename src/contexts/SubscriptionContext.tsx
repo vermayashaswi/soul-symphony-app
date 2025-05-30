@@ -16,6 +16,14 @@ export interface SubscriptionContextType {
   isPremium: boolean;
   isPremiumPlus: boolean;
   hasActiveSubscription: boolean;
+  
+  // Additional properties for trial and subscription management
+  isTrialActive: boolean;
+  trialEndDate: Date | null;
+  daysRemainingInTrial: number;
+  subscriptionStatus: SubscriptionStatus;
+  refreshSubscriptionStatus: () => Promise<void>;
+  hasInitialLoadCompleted: boolean;
 }
 
 const SubscriptionContext = createContext<SubscriptionContextType | undefined>(undefined);
@@ -26,6 +34,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const [status, setStatus] = useState<SubscriptionStatus>('unknown');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [hasInitialLoadCompleted, setHasInitialLoadCompleted] = useState(false);
+  const [trialEndDate, setTrialEndDate] = useState<Date | null>(null);
 
   const fetchSubscriptionData = async (): Promise<void> => {
     if (!user) {
@@ -33,6 +43,8 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       setStatus('unknown');
       setIsLoading(false);
       setError(null);
+      setHasInitialLoadCompleted(true);
+      setTrialEndDate(null);
       return;
     }
 
@@ -44,7 +56,7 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       
       const { data, error: supabaseError } = await supabase
         .from('profiles')
-        .select('subscription_tier, subscription_status')
+        .select('subscription_tier, subscription_status, trial_ends_at')
         .eq('id', user.id)
         .maybeSingle();
 
@@ -55,18 +67,22 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       if (data) {
         const userTier = (data.subscription_tier as SubscriptionTier) || 'free';
         const userStatus = (data.subscription_status as SubscriptionStatus) || 'unknown';
+        const userTrialEndDate = data.trial_ends_at ? new Date(data.trial_ends_at) : null;
         
         setTier(userTier);
         setStatus(userStatus);
+        setTrialEndDate(userTrialEndDate);
         
         console.log('[SubscriptionContext] Updated subscription:', {
           tier: userTier,
-          status: userStatus
+          status: userStatus,
+          trialEndDate: userTrialEndDate
         });
       } else {
         // User profile doesn't exist yet, default to free
         setTier('free');
         setStatus('unknown');
+        setTrialEndDate(null);
         console.log('[SubscriptionContext] No profile found, defaulting to free tier');
       }
     } catch (err) {
@@ -83,12 +99,18 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
       // Default to free tier on error
       setTier('free');
       setStatus('unknown');
+      setTrialEndDate(null);
     } finally {
       setIsLoading(false);
+      setHasInitialLoadCompleted(true);
     }
   };
 
   const refreshSubscription = async (): Promise<void> => {
+    await fetchSubscriptionData();
+  };
+
+  const refreshSubscriptionStatus = async (): Promise<void> => {
     await fetchSubscriptionData();
   };
 
@@ -106,6 +128,12 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
   const isPremium = tier === 'premium' || tier === 'premium_plus';
   const isPremiumPlus = tier === 'premium_plus';
   const hasActiveSubscription = status === 'active' || status === 'trial';
+  
+  // Trial-related computed properties
+  const isTrialActive = status === 'trial' && trialEndDate && trialEndDate > new Date();
+  const daysRemainingInTrial = trialEndDate && isTrialActive 
+    ? Math.max(0, Math.ceil((trialEndDate.getTime() - new Date().getTime()) / (1000 * 60 * 60 * 24)))
+    : 0;
 
   const contextValue: SubscriptionContextType = {
     tier,
@@ -115,7 +143,15 @@ export const SubscriptionProvider: React.FC<{ children: ReactNode }> = ({ childr
     refreshSubscription,
     isPremium,
     isPremiumPlus,
-    hasActiveSubscription
+    hasActiveSubscription,
+    
+    // Additional properties
+    isTrialActive,
+    trialEndDate,
+    daysRemainingInTrial,
+    subscriptionStatus: status, // Alias for status
+    refreshSubscriptionStatus,
+    hasInitialLoadCompleted
   };
 
   return (
