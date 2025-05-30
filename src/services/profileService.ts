@@ -40,7 +40,7 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     // First check if the profile already exists
     const { data, error } = await supabase
       .from('profiles')
-      .select('id, full_name, avatar_url, timezone, subscription_status, trial_ends_at')
+      .select('id, full_name, avatar_url, timezone, subscription_status, subscription_tier, is_premium, trial_ends_at')
       .eq('id', user.id)
       .maybeSingle();
       
@@ -314,7 +314,7 @@ export const startUserTrial = async (userId: string): Promise<boolean> => {
       .from('profiles')
       .update({
         subscription_status: 'trial',
-        subscription_tier: 'free',
+        subscription_tier: 'premium', // Fixed: Set to premium during trial
         is_premium: true,
         trial_ends_at: trialEndDate.toISOString(),
         updated_at: new Date().toISOString()
