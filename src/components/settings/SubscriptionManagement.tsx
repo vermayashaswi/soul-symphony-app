@@ -10,6 +10,8 @@ import { toast } from 'sonner';
 import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const SubscriptionManagement: React.FC = () => {
+  console.log('[SubscriptionManagement] Rendering component');
+  
   const {
     isPremium,
     isTrialActive,
@@ -21,11 +23,21 @@ export const SubscriptionManagement: React.FC = () => {
     refreshSubscriptionStatus
   } = useSubscription();
 
+  console.log('[SubscriptionManagement] Subscription state:', {
+    isPremium,
+    isTrialActive,
+    subscriptionStatus,
+    isLoading,
+    error
+  });
+
   const handleRefreshStatus = async () => {
+    console.log('[SubscriptionManagement] Refreshing subscription status...');
     try {
       await refreshSubscriptionStatus();
       toast.success(<TranslatableText text="Subscription status refreshed" forceTranslate={true} />);
     } catch (error) {
+      console.error('[SubscriptionManagement] Failed to refresh status:', error);
       toast.error(<TranslatableText text="Failed to refresh status" forceTranslate={true} />);
     }
   };
@@ -40,6 +52,7 @@ export const SubscriptionManagement: React.FC = () => {
   };
 
   if (isLoading) {
+    console.log('[SubscriptionManagement] Showing loading state');
     return (
       <Card className="p-6">
         <div className="animate-pulse">
@@ -85,6 +98,9 @@ export const SubscriptionManagement: React.FC = () => {
             <AlertCircle className="h-4 w-4" />
             <AlertDescription>
               <TranslatableText text="There was an issue loading your subscription information. Please try refreshing." />
+              <div className="text-xs mt-1 text-muted-foreground">
+                Error: {error}
+              </div>
             </AlertDescription>
           </Alert>
         )}

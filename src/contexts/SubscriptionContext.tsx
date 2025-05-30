@@ -75,12 +75,27 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       setIsLoading(true);
       setError(null);
 
+      // Test database connectivity first
+      console.log('[SubscriptionProvider] Testing database connectivity...');
+      const { data: testData, error: testError } = await supabase
+        .from('profiles')
+        .select('id')
+        .eq('id', user.id)
+        .maybeSingle();
+
+      if (testError) {
+        console.error('[SubscriptionProvider] Database connectivity test failed:', testError);
+        throw new Error(`Database connection failed: ${testError.message}`);
+      }
+
+      console.log('[SubscriptionProvider] Database connectivity test result:', testData);
+
       // First ensure the profile exists
       console.log('[SubscriptionProvider] Ensuring profile exists...');
       const profileExists = await ensureProfileExists(user);
       if (!profileExists) {
         console.warn('[SubscriptionProvider] Failed to ensure profile exists for user:', user.id);
-        setError('Profile setup failed');
+        throw new Error('Profile setup failed');
       }
 
       // Get subscription info
@@ -90,7 +105,16 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
       setSubscriptionInfo(info);
     } catch (error) {
       console.error('[SubscriptionProvider] Error in fetchSubscriptionInfo:', error);
-      setError('Failed to load subscription information');
+      const errorMessage = error instanceof Error ? error.message : 'Failed to load subscription information';
+      setError(errorMessage);
+      
+      // Set default subscription info on error
+      setSubscriptionInfo({
+        isPremium: false,
+        isTrialActive: false,
+        trialEndDate: null,
+        subscriptionStatus: 'free'
+      });
     } finally {
       console.log('[SubscriptionProvider] fetchSubscriptionInfo completed');
       setIsLoading(false);
@@ -150,10 +174,15 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
   const refreshSubscriptionStatus = async () => {
     console.log('[SubscriptionProvider] refreshSubscriptionStatus called');
-    await Promise.all([
-      fetchSubscriptionInfo(),
-      refreshPurchaserInfo()
-    ]);
+    try {
+      await Promise.all([
+        fetchSubscriptionInfo(),
+        refreshPurchaserInfo()
+      ]);
+    } catch (error) {
+      console.error('[SubscriptionProvider] Error refreshing subscription status:', error);
+      throw error;
+    }
   };
 
   // Combine RevenueCat data with profile data for final status
