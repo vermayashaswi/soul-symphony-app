@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect } from "react";
 import { Mic, Square } from "lucide-react";
 import { Button } from "@/components/ui/button";
@@ -34,14 +33,15 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
   const { toast } = useToast();
   const { isInStep, tutorialCompleted, isActive } = useTutorial();
   
-  // Check if we're in tutorial step 5
+  // Check if we're in tutorial step 5 (chat) - hide the component
   const isInTutorialStep5 = isActive && isInStep(5);
   
-  // Only show glow when in tutorial step 3 AND tutorial is not completed
+  // Only show tutorial styling when in tutorial step 3 AND tutorial is not completed
   const shouldAddTutorialClass = isInStep(3) && !tutorialCompleted;
   
-  // If we're in tutorial step 5, don't render the component at all
+  // Enhanced check: If we're in tutorial step 5, don't render at all
   if (isInTutorialStep5) {
+    console.log('[VoiceRecordingButton] Hidden during tutorial step 5 (chat)');
     return null;
   }
   
@@ -113,16 +113,14 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
             duration: (blob as any).duration || 'unknown'
           });
           
-          // Verify the blob is valid
           if (blob.size < 100) {
             throw new Error("Recording produced an empty or invalid audio file");
           }
           
-          // Add duration property to blob if missing
           if (!('duration' in blob)) {
             try {
               Object.defineProperty(blob, 'duration', {
-                value: recordingTime / 1000, // Convert ms to seconds
+                value: recordingTime / 1000,
                 writable: false
               });
               console.log("[VoiceRecordingButton] Added duration property to blob:", recordingTime / 1000);
@@ -185,7 +183,7 @@ const VoiceRecordingButton: React.FC<VoiceRecordingButtonProps> = ({
           height: size === "sm" ? "48px" : "64px",
           transition: "all 0.3s ease",
           boxShadow: shouldAddTutorialClass ? "0 0 20px 10px var(--color-theme)" : undefined,
-          backgroundColor: "#000000" // Ensure black background
+          backgroundColor: "#000000"
         }}
         data-tutorial-target={shouldAddTutorialClass ? "record-entry" : undefined}
       >
