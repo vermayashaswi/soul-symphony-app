@@ -30,55 +30,115 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
     return false;
   }
   
+  // Since we now have an improved database trigger, let's first check if the profile was created automatically
+  try {
+    logProfile(`Checking if profile exists for user: ${user.id}`, 'ProfileService', {
+      userEmail: user.email,
+      authProvider: user.app_metadata?.provider,
+      hasMetadata: !!user.user_metadata
+    });
+    
+    // First check if the profile already exists
+    const { data, error } = await supabase
+      .from('profiles')
+      .select('id, full_name, avatar_url, timezone')
+      .eq('id', user.id)
+      .maybeSingle();
+      
+    if (error && error.code !== 'PGRST116') {
+      logError(`Error checking if profile exists: ${error.message}`, 'ProfileService', error);
+      return false;
+    }
+    
+    // If profile exists, check if we need to update any missing fields
+    if (data) {
+      logProfile(`Profile exists: ${data.id}`, 'ProfileService');
+      
+      // Check if we need to update any missing fields
+      const needsUpdate = (!data.timezone && getUserTimezone() !== 'UTC') || 
+                         (!data.full_name && user.user_metadata?.full_name) ||
+                         (!data.avatar_url && user.user_metadata?.avatar_url);
+      
+      if (needsUpdate) {
+        logProfile('Profile exists but needs updates', 'ProfileService');
+        await updateMissingProfileFields(user.id, user);
+      }
+      
+      return true;
+    }
+    
+    // If no profile exists, the trigger might have failed - let's create one manually
+    logProfile('Profile not found, creating manually as fallback', 'ProfileService');
+    return await createProfileManually(user);
+    
+  } catch (err) {
+    console.error('[ProfileService] Error in ensureProfileExists:', err);
+    logError(`Error in ensureProfileExists: ${err}`, 'ProfileService', err);
+    return false;
+  }
+};
+
+/**
+ * Updates missing fields in an existing profile
+ */
+const updateMissingProfileFields = async (userId: string, user: User): Promise<boolean> => {
+  try {
+    const timezone = getUserTimezone();
+    const updateData: any = {
+      updated_at: new Date().toISOString()
+    };
+    
+    // Add timezone if missing
+    if (timezone !== 'UTC') {
+      updateData.timezone = timezone;
+    }
+    
+    // Add full_name if available and missing
+    if (user.user_metadata?.full_name) {
+      updateData.full_name = user.user_metadata.full_name;
+    } else if (user.user_metadata?.name) {
+      updateData.full_name = user.user_metadata.name;
+    }
+    
+    // Add avatar_url if available and missing
+    if (user.user_metadata?.avatar_url) {
+      updateData.avatar_url = user.user_metadata.avatar_url;
+    } else if (user.user_metadata?.picture) {
+      updateData.avatar_url = user.user_metadata.picture;
+    }
+    
+    const { error } = await supabase
+      .from('profiles')
+      .update(updateData)
+      .eq('id', userId);
+      
+    if (error) {
+      logError(`Error updating profile fields: ${error.message}`, 'ProfileService', error);
+      return false;
+    }
+    
+    logProfile('Profile fields updated successfully', 'ProfileService', updateData);
+    return true;
+  } catch (error: any) {
+    logError(`Error in updateMissingProfileFields: ${error.message}`, 'ProfileService', error);
+    return false;
+  }
+};
+
+/**
+ * Manually creates a profile as fallback when the trigger fails
+ */
+const createProfileManually = async (user: User): Promise<boolean> => {
   // Implement retry logic
   for (let attempt = 1; attempt <= MAX_PROFILE_CREATION_RETRIES; attempt++) {
     try {
-      logProfile(`Attempt ${attempt}/${MAX_PROFILE_CREATION_RETRIES}: Checking if profile exists for user: ${user.id}`, 'ProfileService', {
-        userEmail: user.email,
-        authProvider: user.app_metadata?.provider,
-        hasMetadata: !!user.user_metadata
-      });
-      
-      // First check if the profile already exists - use maybeSingle to prevent errors if not found
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-      if (error && error.code !== 'PGRST116') {
-        logError(`Error checking if profile exists (attempt ${attempt}): ${error.message}`, 'ProfileService', error);
-        // If not the last attempt, wait before retrying
-        if (attempt < MAX_PROFILE_CREATION_RETRIES) {
-          logProfile(`Waiting before retry ${attempt + 1}...`, 'ProfileService');
-          await new Promise(resolve => setTimeout(resolve, 500 * attempt)); // Increasing backoff
-          continue;
-        }
-        return false;
-      }
-      
-      // If profile already exists, return true immediately
-      if (data) {
-        logProfile(`Profile already exists: ${data.id}`, 'ProfileService');
-        // Update timezone if missing
-        await updateProfileTimezone(user.id);
-        return true;
-      }
-      
-      logProfile(`Profile not found, creating new profile (attempt ${attempt})`, 'ProfileService');
+      logProfile(`Manual profile creation attempt ${attempt}/${MAX_PROFILE_CREATION_RETRIES}`, 'ProfileService');
       
       // Extract user metadata - handle different metadata formats for different auth providers
       let fullName = '';
       let avatarUrl = '';
       const email = user.email || '';
       const timezone = getUserTimezone();
-      
-      // Log all metadata to help debug
-      logProfile('User metadata received', 'ProfileService', {
-        userMetadata: user.user_metadata,
-        authProvider: user.app_metadata?.provider,
-        detectedTimezone: timezone
-      });
       
       // Handle different authentication providers' metadata formats
       if (user.app_metadata?.provider === 'google') {
@@ -90,8 +150,6 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         avatarUrl = user.user_metadata?.picture || 
                    user.user_metadata?.avatar_url || 
                    '';
-        
-        logProfile('Extracted Google metadata', 'ProfileService', { fullName, avatarUrl });
       } else {
         // Default metadata extraction for email or other providers
         fullName = user.user_metadata?.full_name || 
@@ -101,22 +159,20 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         avatarUrl = user.user_metadata?.avatar_url || 
                    user.user_metadata?.picture || 
                    '';
-                   
-        logProfile('Extracted default metadata', 'ProfileService', { fullName, avatarUrl });
       }
       
-      // Explicit profile data preparation - ensure field names match exactly with the database schema
+      // Explicit profile data preparation
       const profileData = {
         id: user.id,
         email,
-        full_name: fullName,
-        avatar_url: avatarUrl, 
+        full_name: fullName || null,
+        avatar_url: avatarUrl || null, 
         timezone: timezone,
         onboarding_completed: false,
         updated_at: new Date().toISOString()
       };
       
-      logProfile(`Creating profile with data (attempt ${attempt})`, 'ProfileService', profileData);
+      logProfile(`Creating profile manually with data (attempt ${attempt})`, 'ProfileService', profileData);
       
       // Try upsert with explicit conflict handling
       const { error: upsertError } = await supabase
@@ -130,52 +186,30 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
         logError(`Error upserting profile (attempt ${attempt}): ${upsertError.message}`, 'ProfileService', upsertError);
         
         // If error code is for a duplicate, that means the profile actually exists
-        if (upsertError.code === '23505') { // Duplicate key value violates unique constraint
+        if (upsertError.code === '23505') {
           logProfile('Profile already exists (detected via constraint error)', 'ProfileService');
-          // Still update timezone if needed
-          await updateProfileTimezone(user.id);
           return true;
         }
         
         // If not the last attempt, wait before retrying
         if (attempt < MAX_PROFILE_CREATION_RETRIES) {
           logProfile(`Waiting before retry ${attempt + 1}...`, 'ProfileService');
-          await new Promise(resolve => setTimeout(resolve, 500 * attempt)); // Increasing backoff
+          await new Promise(resolve => setTimeout(resolve, 500 * attempt));
           continue;
         }
         
-        return false;
-      }
-      
-      // Verify profile was actually created with a recheck
-      const { data: verifyData, error: verifyError } = await supabase
-        .from('profiles')
-        .select('id')
-        .eq('id', user.id)
-        .maybeSingle();
-        
-      if (verifyError) {
-        logError(`Error verifying profile creation: ${verifyError.message}`, 'ProfileService', verifyError);
-      } else if (verifyData) {
-        logProfile('Profile creation verified successfully', 'ProfileService');
-      } else {
-        logError('Profile creation could not be verified', 'ProfileService');
-        // Continue with next attempt if available
-        if (attempt < MAX_PROFILE_CREATION_RETRIES) {
-          continue;
-        }
         return false;
       }
       
       logProfile('Profile created successfully', 'ProfileService');
       return true;
     } catch (error: any) {
-      logError(`Error ensuring profile exists (attempt ${attempt}): ${error.message}`, 'ProfileService', error);
+      logError(`Error in manual profile creation (attempt ${attempt}): ${error.message}`, 'ProfileService', error);
       
       // If not the last attempt, wait before retrying
       if (attempt < MAX_PROFILE_CREATION_RETRIES) {
         logProfile(`Waiting before retry ${attempt + 1}...`, 'ProfileService');
-        await new Promise(resolve => setTimeout(resolve, 500 * attempt)); // Increasing backoff
+        await new Promise(resolve => setTimeout(resolve, 500 * attempt));
         continue;
       }
       
@@ -184,54 +218,8 @@ export const ensureProfileExists = async (user: User | null): Promise<boolean> =
   }
   
   // If we get here, all retries failed
-  logError(`Profile creation failed after ${MAX_PROFILE_CREATION_RETRIES} attempts`, 'ProfileService');
+  logError(`Manual profile creation failed after ${MAX_PROFILE_CREATION_RETRIES} attempts`, 'ProfileService');
   return false;
-};
-
-/**
- * Updates the timezone in the user's profile if it's not already set
- */
-const updateProfileTimezone = async (userId: string): Promise<boolean> => {
-  try {
-    // First check if timezone is already set
-    const { data, error } = await supabase
-      .from('profiles')
-      .select('timezone')
-      .eq('id', userId)
-      .maybeSingle();
-      
-    if (error) {
-      logError(`Error checking profile timezone: ${error.message}`, 'ProfileService', error);
-      return false;
-    }
-    
-    // If no timezone or empty timezone, update it
-    if (!data || !data.timezone) {
-      const timezone = getUserTimezone();
-      logProfile(`Updating missing timezone to: ${timezone}`, 'ProfileService');
-      
-      const { error: updateError } = await supabase
-        .from('profiles')
-        .update({ 
-          timezone, 
-          updated_at: new Date().toISOString() 
-        })
-        .eq('id', userId);
-        
-      if (updateError) {
-        logError(`Error updating timezone: ${updateError.message}`, 'ProfileService', updateError);
-        return false;
-      }
-      
-      logProfile(`Timezone updated successfully to: ${timezone}`, 'ProfileService');
-      return true;
-    }
-    
-    return true;
-  } catch (error: any) {
-    logError(`Error in updateProfileTimezone: ${error.message}`, 'ProfileService', error);
-    return false;
-  }
 };
 
 /**

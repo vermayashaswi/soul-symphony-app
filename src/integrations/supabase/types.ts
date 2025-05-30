@@ -430,65 +430,6 @@ export type Database = {
         }
         Relationships: []
       }
-      subscription_transactions: {
-        Row: {
-          created_at: string
-          currency: string | null
-          expiration_date: string | null
-          id: string
-          is_trial_period: boolean | null
-          original_purchase_date: string | null
-          price: number | null
-          product_id: string
-          purchase_date: string
-          store: string | null
-          transaction_id: string
-          transaction_reason: string | null
-          updated_at: string
-          user_id: string
-        }
-        Insert: {
-          created_at?: string
-          currency?: string | null
-          expiration_date?: string | null
-          id?: string
-          is_trial_period?: boolean | null
-          original_purchase_date?: string | null
-          price?: number | null
-          product_id: string
-          purchase_date: string
-          store?: string | null
-          transaction_id: string
-          transaction_reason?: string | null
-          updated_at?: string
-          user_id: string
-        }
-        Update: {
-          created_at?: string
-          currency?: string | null
-          expiration_date?: string | null
-          id?: string
-          is_trial_period?: boolean | null
-          original_purchase_date?: string | null
-          price?: number | null
-          product_id?: string
-          purchase_date?: string
-          store?: string | null
-          transaction_id?: string
-          transaction_reason?: string | null
-          updated_at?: string
-          user_id?: string
-        }
-        Relationships: [
-          {
-            foreignKeyName: "subscription_transactions_user_id_fkey"
-            columns: ["user_id"]
-            isOneToOne: false
-            referencedRelation: "profiles"
-            referencedColumns: ["id"]
-          },
-        ]
-      }
       user_sessions: {
         Row: {
           created_at: string
