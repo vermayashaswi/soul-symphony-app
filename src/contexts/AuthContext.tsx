@@ -35,6 +35,39 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [sessionCreated, setSessionCreated] = useState(false);
   const location = useLocation();
 
+  const detectUserLanguage = (): string => {
+    // Try to get language from various sources in order of preference
+    const browserLanguage = navigator.language || navigator.languages?.[0] || 'en';
+    
+    // Extract the language code (e.g., 'en' from 'en-US')
+    const languageCode = browserLanguage.split('-')[0].toLowerCase();
+    
+    // Map to supported languages or default to 'en'
+    const supportedLanguages = ['en', 'es', 'fr', 'de', 'it', 'pt', 'ru', 'zh', 'ja', 'ko', 'ar', 'hi', 'bn'];
+    
+    return supportedLanguages.includes(languageCode) ? languageCode : 'en';
+  };
+
+  const getReferrer = (): string | null => {
+    // Get referrer, but exclude same-domain referrers
+    const referrer = document.referrer;
+    if (!referrer) return null;
+    
+    try {
+      const referrerUrl = new URL(referrer);
+      const currentUrl = new URL(window.location.href);
+      
+      // Only return external referrers
+      if (referrerUrl.hostname !== currentUrl.hostname) {
+        return referrer;
+      }
+    } catch (error) {
+      console.warn('Error parsing referrer URL:', error);
+    }
+    
+    return null;
+  };
+
   const createUserSession = async (userId: string): Promise<boolean> => {
     try {
       console.log('Creating user session record for user:', userId);
@@ -54,15 +87,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       }
       
       const deviceType = /mobile|android|iphone|ipad|ipod/i.test(navigator.userAgent) ? 'mobile' : 'desktop';
+      const userLanguage = detectUserLanguage();
+      const referrer = getReferrer();
       
-      // Use the new manage_user_session function to handle session creation
+      console.log('Session creation data:', {
+        deviceType,
+        userLanguage,
+        referrer,
+        entryPage: window.location.pathname,
+        userAgent: navigator.userAgent.substring(0, 100) // Truncate for logging
+      });
+      
+      // Use the enhanced manage_user_session function with all parameters
       const { data: sessionId, error } = await supabase
-        .rpc('manage_user_session', {
+        .rpc('enhanced_manage_user_session', {
           p_user_id: userId,
           p_device_type: deviceType,
           p_user_agent: navigator.userAgent,
           p_entry_page: window.location.pathname,
-          p_last_active_page: window.location.pathname
+          p_last_active_page: window.location.pathname,
+          p_language: userLanguage,
+          p_referrer: referrer,
+          // Note: IP address will be captured server-side for security
+          p_ip_address: null
         });
       
       if (error) {
