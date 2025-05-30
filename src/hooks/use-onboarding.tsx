@@ -7,7 +7,7 @@ export function useOnboarding() {
   const [loading, setLoading] = useState(true);
   const [displayName, setDisplayName] = useState<string | null>(null);
 
-  useEffect(() => {
+  const checkOnboardingStatus = () => {
     // Check if onboarding is complete
     const isComplete = localStorage.getItem('onboardingComplete') === 'true';
     setOnboardingComplete(isComplete);
@@ -19,6 +19,10 @@ export function useOnboarding() {
     }
     
     setLoading(false);
+  };
+
+  useEffect(() => {
+    checkOnboardingStatus();
   }, []);
 
   const completeOnboarding = () => {
@@ -61,6 +65,7 @@ export function useOnboarding() {
     displayName,
     completeOnboarding,
     resetOnboarding,
-    saveNameToProfile
+    saveNameToProfile,
+    checkOnboardingStatus
   };
 }

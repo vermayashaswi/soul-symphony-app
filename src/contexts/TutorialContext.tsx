@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -43,6 +42,7 @@ interface TutorialContextType {
   skipTutorial: () => void;
   completeTutorial: () => void;
   resetTutorial: () => void;
+  startTutorial: () => void;
   tutorialCompleted: boolean;
   isInStep: (stepId: number) => boolean;
   navigationState: {
@@ -192,6 +192,19 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
       navigationState
     });
   }, [isActive, currentStep, steps, location.pathname, navigationState]);
+  
+  // Function to manually start the tutorial
+  const startTutorial = () => {
+    console.log('Starting tutorial manually');
+    setCurrentStep(0);
+    setIsActive(true);
+    setTutorialCompleted(false);
+    
+    // Navigate to home if not already there
+    if (location.pathname !== '/app/home') {
+      navigate('/app/home');
+    }
+  };
   
   // Check if tutorial should be active based on user's profile and current route
   useEffect(() => {
@@ -655,6 +668,7 @@ export const TutorialProvider: React.FC<{ children: ReactNode }> = ({ children }
     skipTutorial,
     completeTutorial,
     resetTutorial,
+    startTutorial,
     tutorialCompleted,
     isInStep: (stepId: number) => isActive && steps[currentStep]?.id === stepId,
     navigationState
