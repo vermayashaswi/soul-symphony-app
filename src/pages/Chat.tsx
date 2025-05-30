@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import SmartChatInterface from '@/components/chat/SmartChatInterface';
 import { useAuth } from '@/contexts/AuthContext';
@@ -14,7 +13,7 @@ import { format } from 'date-fns';
 import { formatInTimeZone, toZonedTime } from 'date-fns-tz';
 import { useTrialAccess } from '@/hooks/useTrialAccess';
 import { TrialExpiredBlocker } from '@/components/subscription/TrialExpiredBlocker';
-import SubscriptionModal from '@/components/subscription/SubscriptionModal';
+import { SubscriptionModal } from '@/components/subscription/SubscriptionModal';
 
 const Chat = () => {
   const { user } = useAuth();

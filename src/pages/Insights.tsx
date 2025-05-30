@@ -1,4 +1,3 @@
-
 import { useState, useEffect, useRef } from 'react';
 import { motion } from 'framer-motion';
 import { Calendar, Filter, TrendingUp, ArrowUp, ArrowDown, Activity, Award } from 'lucide-react';
@@ -16,7 +15,7 @@ import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { useTrialAccess } from '@/hooks/useTrialAccess';
 import { TrialExpiredBlocker } from '@/components/subscription/TrialExpiredBlocker';
-import SubscriptionModal from '@/components/subscription/SubscriptionModal';
+import { SubscriptionModal } from '@/components/subscription/SubscriptionModal';
 
 export default function Insights() {
   console.log("Rendering Insights page");
