@@ -50,7 +50,7 @@ const TutorialOverlay: React.FC = () => {
     });
   }, [isActive, currentStep, steps, navigationState, shouldShowTutorial, location.pathname, isAppRouteCurrent, tutorialCompleted]);
   
-  // Enhanced function to completely clean up ALL tutorial highlighting
+  // ENHANCED: Comprehensive cleanup function with specific targeting for Past Entries
   const cleanupAllTutorialHighlighting = () => {
     console.log('[TutorialOverlay] Running comprehensive tutorial cleanup');
     
@@ -97,7 +97,44 @@ const TutorialOverlay: React.FC = () => {
       }
     });
     
-    // Also specifically target common button selectors that might be highlighted
+    // ENHANCED: Specific cleanup for Past Entries selectors
+    console.log('[TutorialOverlay] Running specific cleanup for Past Entries elements');
+    ENTRIES_TAB_SELECTORS.forEach(selector => {
+      const elements = document.querySelectorAll(selector);
+      elements.forEach(el => {
+        if (el instanceof HTMLElement) {
+          console.log(`[TutorialOverlay] Cleaning Past Entries element with selector: ${selector}`);
+          
+          // Remove all tutorial classes
+          el.classList.remove(
+            'tutorial-target', 'tutorial-button-highlight', 'entries-tab',
+            'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
+            'mood-calendar-highlight', 'soul-net-highlight'
+          );
+          
+          // Force reset all tutorial-related styles
+          el.style.boxShadow = '';
+          el.style.animation = '';
+          el.style.border = '';
+          el.style.transform = '';
+          el.style.zIndex = '';
+          el.style.backgroundColor = '';
+          el.style.color = '';
+          
+          // Also reset child text elements that might have inherited styles
+          const textElements = el.querySelectorAll('span, div, p');
+          textElements.forEach(textEl => {
+            if (textEl instanceof HTMLElement) {
+              textEl.style.color = '';
+              textEl.style.textShadow = '';
+              textEl.style.backgroundColor = '';
+            }
+          });
+        }
+      });
+    });
+    
+    // ENHANCED: Also specifically target common button selectors that might be highlighted
     const commonButtonSelectors = [
       '[data-value="record"]', '[data-value="entries"]', '[value="record"]', '[value="entries"]',
       '.record-entry-button', '.entries-tab-button', 'button[role="tab"]'
@@ -107,6 +144,7 @@ const TutorialOverlay: React.FC = () => {
       const elements = document.querySelectorAll(selector);
       elements.forEach(el => {
         if (el instanceof HTMLElement) {
+          console.log(`[TutorialOverlay] Cleaning button element with selector: ${selector}`);
           el.classList.remove(
             'tutorial-target', 'tutorial-button-highlight', 'record-entry-tab', 'entries-tab',
             'chat-question-highlight', 'insights-header-highlight', 'emotion-chart-highlight',
@@ -241,15 +279,33 @@ const TutorialOverlay: React.FC = () => {
     };
   }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // Enhanced step-specific element highlighting with improved cleanup
+  // ENHANCED: Step-specific element highlighting with improved multi-stage cleanup
   useEffect(() => {
     if (!shouldShowTutorial) return;
     
     const currentStepData = steps[currentStep];
     console.log(`[TutorialOverlay] Setting up highlighting for step ${currentStepData?.id}`);
     
-    // CRITICAL: Always clean up ALL tutorial highlighting first before applying new highlighting
-    cleanupAllTutorialHighlighting();
+    // CRITICAL: Multiple-stage cleanup with enhanced timing
+    const performCleanup = () => {
+      console.log('[TutorialOverlay] Stage 1: Initial cleanup');
+      cleanupAllTutorialHighlighting();
+      
+      // Stage 2: Additional cleanup after a short delay
+      setTimeout(() => {
+        console.log('[TutorialOverlay] Stage 2: Additional cleanup');
+        cleanupAllTutorialHighlighting();
+      }, 50);
+      
+      // Stage 3: Final cleanup before applying new highlighting
+      setTimeout(() => {
+        console.log('[TutorialOverlay] Stage 3: Final cleanup before new highlighting');
+        cleanupAllTutorialHighlighting();
+      }, 100);
+    };
+    
+    // Run the multi-stage cleanup
+    performCleanup();
     
     // Apply the appropriate highlighting based on step ID ONLY after cleanup
     const highlightTimeout = setTimeout(() => {
@@ -280,10 +336,27 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Arrow button not found');
         }
       }
-      // ... keep existing code (steps 3-9 remain the same)
       else if (currentStepData?.id === 3) {
         // Step 3: Record Entry Tab - ONLY highlight this, never the Past Entries
         console.log('[TutorialOverlay] Step 3: Applying highlighting ONLY to Record Entry button');
+        
+        // ENHANCED: Additional cleanup specifically for Past Entries before highlighting Record Entry
+        console.log('[TutorialOverlay] Step 3: Running additional Past Entries cleanup');
+        ENTRIES_TAB_SELECTORS.forEach(selector => {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(el => {
+            if (el instanceof HTMLElement) {
+              el.classList.remove('tutorial-target', 'entries-tab', 'tutorial-button-highlight');
+              el.style.boxShadow = '';
+              el.style.animation = '';
+              el.style.border = '';
+              el.style.transform = '';
+              el.style.zIndex = '';
+              el.style.backgroundColor = '';
+              el.style.color = '';
+            }
+          });
+        });
         
         let foundElement = false;
         
@@ -321,6 +394,24 @@ const TutorialOverlay: React.FC = () => {
       else if (currentStepData?.id === 4) {
         // Step 4: Past Entries Tab - Enhanced with identical styling as record entry
         console.log('[TutorialOverlay] Step 4: Applying highlighting ONLY to Past Entries button');
+        
+        // ENHANCED: Additional cleanup specifically for Record Entry before highlighting Past Entries
+        console.log('[TutorialOverlay] Step 4: Running additional Record Entry cleanup');
+        RECORD_ENTRY_SELECTORS.forEach(selector => {
+          const elements = document.querySelectorAll(selector);
+          elements.forEach(el => {
+            if (el instanceof HTMLElement) {
+              el.classList.remove('tutorial-target', 'record-entry-tab', 'tutorial-button-highlight');
+              el.style.boxShadow = '';
+              el.style.animation = '';
+              el.style.border = '';
+              el.style.transform = '';
+              el.style.zIndex = '';
+              el.style.backgroundColor = '';
+              el.style.color = '';
+            }
+          });
+        });
         
         let foundElement = false;
         
@@ -379,6 +470,7 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Past Entries tab element not found with any selector for step 4');
         }
       }
+      // ... keep existing code (steps 5-9 remain the same)
       else if (currentStepData?.id === 5) {
         console.log('[TutorialOverlay] Setting up highlight for chat question (step 5) with purple background');
         
@@ -535,11 +627,14 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Failed to find soul-net visualization with any selector');
         }
       }
-    }, 300);
+    }, 150); // Reduced timeout for faster highlighting after cleanup
     
     // Clean up highlighting when step changes
     return () => {
       clearTimeout(highlightTimeout);
+      // Additional cleanup when effect unmounts
+      console.log('[TutorialOverlay] Effect cleanup - removing highlighting');
+      cleanupAllTutorialHighlighting();
     };
   }, [shouldShowTutorial, currentStep, steps]);
 
