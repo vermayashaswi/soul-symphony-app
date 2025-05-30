@@ -27,7 +27,8 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     trialEndDate, 
     daysRemainingInTrial,
     isLoading,
-    tier
+    tier,
+    status
   } = useSubscription();
   const navigate = useNavigate();
 
@@ -40,8 +41,20 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     );
   }
 
+  // Debug logging for troubleshooting
+  console.log('[PremiumFeatureGuard] Subscription check:', {
+    feature,
+    hasActiveSubscription,
+    isTrialActive,
+    tier,
+    status,
+    trialEndDate: trialEndDate?.toISOString(),
+    daysRemaining: daysRemainingInTrial
+  });
+
   // Allow access if user has active subscription or active trial
-  if (hasActiveSubscription || isTrialActive) {
+  if (hasActiveSubscription) {
+    console.log('[PremiumFeatureGuard] Access granted - user has active subscription');
     return <>{children}</>;
   }
 
@@ -62,6 +75,8 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
     navigate('/app/settings?tab=subscription');
   };
 
+  console.log('[PremiumFeatureGuard] Access blocked - showing upgrade prompt');
+
   return (
     <div className="min-h-screen pb-20 flex items-center justify-center p-4">
       <Card className="w-full max-w-md">
@@ -77,8 +92,8 @@ export const PremiumFeatureGuard: React.FC<PremiumFeatureGuardProps> = ({
           </CardDescription>
         </CardHeader>
         <CardContent className="space-y-4">
-          {/* Trial Status Information */}
-          {trialEndDate && (
+          {/* Trial Status Information - only show if trial has ended */}
+          {trialEndDate && !isTrialActive && (
             <div className="bg-muted/50 rounded-lg p-4 space-y-2">
               <div className="flex items-center gap-2 text-sm text-muted-foreground">
                 <Clock className="h-4 w-4" />

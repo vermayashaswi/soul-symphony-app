@@ -556,6 +556,10 @@ export type Database = {
         Args: Record<PropertyKey, never>
         Returns: undefined
       }
+      cleanup_expired_trials: {
+        Args: Record<PropertyKey, never>
+        Returns: undefined
+      }
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
         Returns: Json
