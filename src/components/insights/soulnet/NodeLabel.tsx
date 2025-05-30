@@ -80,8 +80,20 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   
-  // Simplified visibility - always show labels when shouldShowLabel is true
+  // Enhanced visibility logic - always show labels when shouldShowLabel is true
   const isVisible = shouldShowLabel && !!id;
+  
+  // Debug logging for label visibility
+  useEffect(() => {
+    console.log(`[NodeLabel] ${id} visibility check:`, {
+      shouldShowLabel,
+      hasId: !!id,
+      isVisible,
+      position,
+      type,
+      cameraZoom
+    });
+  }, [id, shouldShowLabel, isVisible, position, type, cameraZoom]);
   
   // Handle translation when the label should be displayed
   useEffect(() => {
@@ -113,9 +125,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         isNonLatin.current = containsNonLatinScript(result);
         isDevanagari.current = containsDevanagari(result);
         
-        console.log(`Translated node label "${id}" to "${result}"`);
+        console.log(`[NodeLabel] Translated "${id}" to "${result}"`);
       } catch (error) {
-        console.error(`Failed to translate node label "${id}":`, error);
+        console.error(`[NodeLabel] Failed to translate "${id}":`, error);
       } finally {
         setIsTranslating(false);
       }
@@ -145,47 +157,57 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Increased base size for better visibility
-    const baseSize = (0.35 + Math.max(0, (26 - z) * 0.012)) * 0.9;
+    // Significantly increased base size for better visibility
+    const baseSize = (0.5 + Math.max(0, (26 - z) * 0.015)) * 1.2;
     
     // Adjust size for non-Latin scripts
-    const sizeAdjustment = isDevanagari.current ? 0.08 : 
-                          isNonLatin.current ? 0.04 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.1 : 
+                          isNonLatin.current ? 0.06 : 0;
     
-    // Ensure minimum readable size
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.6), 0.25);
+    // Ensure minimum readable size with higher minimum
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), 0.35);
   }, [cameraZoom]);
 
   // Don't render if not visible or no text
   if (!isVisible || !formattedText) {
-    console.log(`NodeLabel not rendering: visible=${isVisible}, text="${formattedText}", id="${id}"`);
+    console.log(`[NodeLabel] Not rendering: visible=${isVisible}, text="${formattedText}", id="${id}"`);
     return null;
   }
 
-  // Simplified vertical positioning - closer to nodes for better visibility
-  const verticalPosition = type === 'entity' ? 1.8 : 1.8;
-  const labelPosition: [number, number, number] = [0, verticalPosition, 0];
+  // Enhanced vertical positioning - closer to nodes and more differentiated
+  const verticalOffset = type === 'entity' ? 2.2 : 2.0;
+  const labelPosition: [number, number, number] = [
+    position[0], // Use exact node X position
+    position[1] + verticalOffset, // Position above the node
+    position[2]  // Use exact node Z position
+  ];
 
-  // Determine text color based on theme and type
+  // Enhanced text color logic with better contrast
   const textColor = type === 'entity' 
-    ? (theme === 'light' ? '#000000' : '#ffffff')
+    ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
     : themeHex;
 
-  console.log(`Rendering NodeLabel for "${id}" (${type}) at position:`, labelPosition, 'with text:', formattedText);
+  // Enhanced outline for better visibility
+  const outlineWidth = isHighlighted ? 0.012 : 0.008;
+  const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
+
+  console.log(`[NodeLabel] Rendering "${id}" (${type}) at labelPosition:`, labelPosition, 'nodePosition:', position, 'with text:', formattedText);
 
   return (
-    <ThreeDimensionalText
-      text={formattedText}
-      position={labelPosition}
-      color={textColor}
-      size={dynamicFontSize}
-      bold={isHighlighted}
-      visible={true} // Always visible when component renders
-      skipTranslation={true} // We handle translation here
-      outlineWidth={0.008} // Stronger outline for better visibility
-      outlineColor="#000000"
-      renderOrder={10} // High render order to ensure text appears on top
-    />
+    <group position={labelPosition}>
+      <ThreeDimensionalText
+        text={formattedText}
+        position={[0, 0, 0]} // Position relative to group
+        color={textColor}
+        size={dynamicFontSize}
+        bold={isHighlighted}
+        visible={true}
+        skipTranslation={true}
+        outlineWidth={outlineWidth}
+        outlineColor={outlineColor}
+        renderOrder={15} // Higher render order to ensure text appears on top
+      />
+    </group>
   );
 };
 

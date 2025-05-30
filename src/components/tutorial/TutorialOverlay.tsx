@@ -472,14 +472,60 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Failed to find mood calendar with any selector');
         }
       }
-      // NEW: Step 9 - Soul-Net Highlight
+      // ENHANCED: Step 9 - Soul-Net Highlight with label visibility debugging
       else if (currentStepData?.id === 9) {
         console.log('[TutorialOverlay] Setting up highlight for soul-net visualization (step 9)');
+        
+        // First highlight the Soul-Net container
         const found = findAndHighlightElement(SOULNET_SELECTORS, 'soul-net-highlight');
         
         if (!found) {
           console.warn('[TutorialOverlay] Failed to find soul-net visualization with any selector');
+        } else {
+          console.log('[TutorialOverlay] Successfully highlighted Soul-Net visualization for step 9');
         }
+        
+        // Add specific debugging for Soul-Net labels after a delay
+        setTimeout(() => {
+          console.log('[TutorialOverlay] Step 9: Debugging Soul-Net label visibility');
+          
+          // Check if Soul-Net canvas is present and visible
+          const soulnetContainer = document.querySelector('[class*="soul-net"], [class*="soulnet"], .bg-background.rounded-xl.shadow-sm.border.w-full');
+          if (soulnetContainer) {
+            console.log('[TutorialOverlay] Found Soul-Net container:', soulnetContainer);
+            
+            // Look for canvas element
+            const canvas = soulnetContainer.querySelector('canvas');
+            if (canvas) {
+              console.log('[TutorialOverlay] Found Soul-Net canvas:', canvas.style);
+              
+              // Force canvas to be visible and properly sized
+              canvas.style.display = 'block';
+              canvas.style.visibility = 'visible';
+              canvas.style.opacity = '1';
+              canvas.style.width = '100%';
+              canvas.style.height = '500px';
+              
+              // Trigger a resize event to ensure proper rendering
+              window.dispatchEvent(new Event('resize'));
+              
+              console.log('[TutorialOverlay] Applied visibility fixes to Soul-Net canvas');
+            } else {
+              console.warn('[TutorialOverlay] No canvas found in Soul-Net container');
+            }
+          } else {
+            console.warn('[TutorialOverlay] No Soul-Net container found for step 9');
+          }
+          
+          // Additional debugging for Three.js text elements
+          console.log('[TutorialOverlay] Checking for Three.js text rendering in Soul-Net');
+          
+          // Dispatch custom event to force Soul-Net to show labels
+          window.dispatchEvent(new CustomEvent('tutorial-soul-net-debug', {
+            detail: { step: 9, forceShowLabels: true }
+          }));
+          
+        }, 1000);
       }
     }, 300); // Increased timeout for better cleanup
     

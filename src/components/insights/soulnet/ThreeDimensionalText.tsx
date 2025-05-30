@@ -65,19 +65,21 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   const isNonLatinScript = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   
-  // Simplified billboarding with better stability
+  // Enhanced billboarding with improved stability and performance
   useFrame(() => {
     if (textRef.current && camera && visible) {
       const distanceMoved = camera.position.distanceTo(lastCameraPosition.current);
       
-      // Update orientation if camera moved enough
-      if (distanceMoved > 0.1) {
+      // Update orientation if camera moved significantly
+      if (distanceMoved > 0.05) {
         textRef.current.quaternion.copy(camera.quaternion);
         lastCameraPosition.current.copy(camera.position);
       }
       
-      // Apply render order
-      if (textRef.current) {
+      // Apply render order consistently
+      if (textRef.current && textRef.current.material) {
+        (textRef.current.material as any).depthTest = false;
+        (textRef.current.material as any).depthWrite = false;
         textRef.current.renderOrder = renderOrder;
       }
     }
@@ -99,9 +101,9 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         isNonLatinScript.current = containsNonLatinScript(result);
         isDevanagari.current = containsDevanagari(result);
         
-        console.log(`ThreeDimensionalText translated "${text}" to "${result}"`);
+        console.log(`[ThreeDimensionalText] Translated "${text}" to "${result}"`);
       } catch (e) {
-        console.error('Translation error:', e);
+        console.error('[ThreeDimensionalText] Translation error:', e);
         setTranslatedText(text);
       }
     };
@@ -110,63 +112,72 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   }, [text, currentLanguage, translate, skipTranslation]);
 
   if (!visible || !text) {
-    console.log(`ThreeDimensionalText not rendering: visible=${visible}, text="${text}"`);
+    console.log(`[ThreeDimensionalText] Not rendering: visible=${visible}, text="${text}"`);
     return null;
   }
 
-  // Increased effective size for better visibility
-  const effectiveSize = size * 3.0;
+  // Significantly increased effective size for much better visibility
+  const effectiveSize = size * 4.0;
   
-  // Calculate appropriate max width
+  // Enhanced text configuration for better readability
   const getMaxWidth = () => {
     if (isDevanagari.current) {
-      return 60;
+      return 80;
     } else if (isNonLatinScript.current) {
-      return 45;
+      return 60;
     }
-    return 20;
+    return 25;
   };
 
   const getLetterSpacing = () => {
     if (isDevanagari.current) {
-      return 0.1;
+      return 0.15;
     } else if (isNonLatinScript.current) {
-      return 0.05;
+      return 0.08;
     }
-    return 0;
+    return 0.02;
   };
 
-  console.log(`Rendering ThreeDimensionalText: "${translatedText}" at position:`, position, 'size:', effectiveSize);
+  const getLineHeight = () => {
+    if (isDevanagari.current) {
+      return 2.0;
+    } else if (isNonLatinScript.current) {
+      return 1.8;
+    }
+    return 1.4;
+  };
+
+  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize);
   
   return (
-    <group>
-      <Text
-        ref={textRef}
-        position={position}
-        color={color}
-        fontSize={effectiveSize}
-        fontWeight={bold ? 700 : 400}
-        anchorX="center"
-        anchorY="middle"
-        outlineWidth={outlineWidth}
-        outlineColor={outlineColor}
-        maxWidth={getMaxWidth()}
-        overflowWrap="normal"
-        whiteSpace="normal"
-        textAlign="center"
-        letterSpacing={getLetterSpacing()}
-        sdfGlyphSize={isDevanagari.current ? 128 : 64}
-        renderOrder={renderOrder}
-        lineHeight={isDevanagari.current ? 1.8 : (isNonLatinScript.current ? 1.6 : 1.3)}
-        // Force material properties for better visibility
-        material-transparent={true}
-        material-opacity={opacity}
-        material-toneMapped={false}
-        material-side={THREE.DoubleSide} // Render both sides for better visibility
-      >
-        {translatedText}
-      </Text>
-    </group>
+    <Text
+      ref={textRef}
+      position={position}
+      color={color}
+      fontSize={effectiveSize}
+      fontWeight={bold ? 700 : 500}
+      anchorX="center"
+      anchorY="middle"
+      outlineWidth={outlineWidth}
+      outlineColor={outlineColor}
+      maxWidth={getMaxWidth()}
+      overflowWrap="normal"
+      whiteSpace="normal"
+      textAlign="center"
+      letterSpacing={getLetterSpacing()}
+      sdfGlyphSize={isDevanagari.current ? 256 : 128}
+      renderOrder={renderOrder}
+      lineHeight={getLineHeight()}
+      // Enhanced material properties for maximum visibility
+      material-transparent={true}
+      material-opacity={opacity}
+      material-toneMapped={false}
+      material-side={THREE.DoubleSide}
+      material-depthTest={false}
+      material-depthWrite={false}
+    >
+      {translatedText}
+    </Text>
   );
 };
 
