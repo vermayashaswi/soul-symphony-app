@@ -2,7 +2,6 @@
 import React, { useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useAuth } from '@/contexts/AuthContext';
-import { useTheme } from '@/hooks/use-theme';
 import { useIsMobile } from '@/hooks/use-mobile';
 import { useOnboarding } from '@/hooks/use-onboarding';
 import NetworkAwareContent from '@/components/NetworkAwareContent';
@@ -14,47 +13,17 @@ import { useTranslation } from '@/contexts/TranslationContext';
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
-  const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
+  const { onboardingComplete } = useOnboarding();
   const networkStatus = useNetworkStatus();
   const { translate } = useTranslation();
 
   const urlParams = new URLSearchParams(window.location.search);
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
-  
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
-
-  // FIXED: Simplified navigation logic - removed tutorial auto-activation
-  useEffect(() => {
-    const handleNavigation = async () => {
-      if (!user) return;
-      
-      try {
-        console.log('[Index] Checking user status for navigation, user:', user.id);
-        
-        // First ensure onboarding status is checked
-        await checkOnboardingStatus();
-        
-        // Check if user has completed onboarding
-        if (onboardingComplete) {
-          console.log('[Index] User completed onboarding');
-          // Don't auto-navigate - let user decide where to go
-          // Tutorial will be handled manually when user visits app
-        } else {
-          console.log('[Index] User has not completed onboarding yet');
-        }
-      } catch (error) {
-        console.error('[Index] Error in handleNavigation:', error);
-      }
-    };
-    
-    handleNavigation();
-  }, [user, checkOnboardingStatus, onboardingComplete]);
 
   // Handle explicit app redirects only
   useEffect(() => {
-    // Only redirect to app if explicitly requested with a URL parameter
     if (urlParams.has('app')) {
       console.log('[Index] User explicitly requested app with ?app parameter');
       
@@ -106,7 +75,6 @@ const Index = () => {
     onboardingComplete
   });
 
-  // Always render the website homepage component when at root URL
   return (
     <>
       <NetworkAwareContent

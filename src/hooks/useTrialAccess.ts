@@ -1,5 +1,5 @@
 
-import { useState, useEffect, useCallback, useRef } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
@@ -28,7 +28,6 @@ export const useTrialAccess = (): TrialAccessState => {
   
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
   const [loadTime, setLoadTime] = useState<number | null>(null);
-  const modalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
   // Safely compute access state
   const hasAccess = Boolean(isPremium || hasActiveSubscription || isTrialActive);
@@ -44,19 +43,11 @@ export const useTrialAccess = (): TrialAccessState => {
     setShowSubscriptionModal(false);
   }, []);
 
-  // FIXED: Simplified auto-open logic - removed aggressive modal opening
+  // Track performance only
   useEffect(() => {
-    // Only track performance, don't auto-open modals anymore
     if (hasInitialLoadCompleted && lastLoadTime) {
       setLoadTime(lastLoadTime);
     }
-    
-    // Clean up timeout on unmount
-    return () => {
-      if (modalTimeoutRef.current) {
-        clearTimeout(modalTimeoutRef.current);
-      }
-    };
   }, [hasInitialLoadCompleted, lastLoadTime]);
 
   return {

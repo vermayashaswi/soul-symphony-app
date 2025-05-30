@@ -3,11 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { motion } from 'framer-motion';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
-import { 
-  User, 
-  Palette
-} from 'lucide-react';
-import { useTheme } from '@/hooks/use-theme';
+import { Palette } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
 import { LanguageSelector } from '@/components/translation/LanguageSelector';
 import { TranslatableText } from '@/components/translation/TranslatableText';
@@ -24,14 +20,14 @@ const Settings = () => {
   const [error, setError] = useState<string | null>(null);
   const [loadTime, setLoadTime] = useState<number | null>(null);
 
-  // Simple initialization without complex dependencies
+  // Simplified initialization
   useEffect(() => {
     const initializeSettings = async () => {
       const startTime = Date.now();
       console.log('[Settings] Starting initialization');
       
       try {
-        // Simple delay to simulate initialization
+        // Simple delay for initialization
         await new Promise(resolve => setTimeout(resolve, 100));
         
         setLoadTime(Date.now() - startTime);
