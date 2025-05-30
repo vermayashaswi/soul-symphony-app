@@ -32,6 +32,8 @@ interface SubscriptionProviderProps {
 }
 
 export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ children }) => {
+  console.log('[SubscriptionProvider] Rendering');
+  
   const { user } = useAuth();
   const {
     isPremium: revenueCatIsPremium,
@@ -53,7 +55,10 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
 
   // Fetch subscription status from user profile
   const fetchSubscriptionInfo = useCallback(async () => {
+    console.log('[SubscriptionProvider] fetchSubscriptionInfo called, user:', user?.id);
+    
     if (!user?.id) {
+      console.log('[SubscriptionProvider] No user, setting default info');
       setSubscriptionInfo({
         isPremium: false,
         isTrialActive: false,
@@ -66,34 +71,45 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     }
 
     try {
+      console.log('[SubscriptionProvider] Starting subscription info fetch for user:', user.id);
       setIsLoading(true);
       setError(null);
 
       // First ensure the profile exists
+      console.log('[SubscriptionProvider] Ensuring profile exists...');
       const profileExists = await ensureProfileExists(user);
       if (!profileExists) {
-        console.warn('Failed to ensure profile exists for user:', user.id);
+        console.warn('[SubscriptionProvider] Failed to ensure profile exists for user:', user.id);
         setError('Profile setup failed');
       }
 
       // Get subscription info
+      console.log('[SubscriptionProvider] Getting subscription info...');
       const info = await getSubscriptionInfo(user);
+      console.log('[SubscriptionProvider] Subscription info received:', info);
       setSubscriptionInfo(info);
     } catch (error) {
-      console.error('Error in fetchSubscriptionInfo:', error);
+      console.error('[SubscriptionProvider] Error in fetchSubscriptionInfo:', error);
       setError('Failed to load subscription information');
     } finally {
+      console.log('[SubscriptionProvider] fetchSubscriptionInfo completed');
       setIsLoading(false);
     }
   }, [user]);
 
   useEffect(() => {
+    console.log('[SubscriptionProvider] Effect triggered for fetchSubscriptionInfo');
     fetchSubscriptionInfo();
   }, [fetchSubscriptionInfo]);
 
   // Set up real-time subscription updates
   useEffect(() => {
-    if (!user?.id) return;
+    if (!user?.id) {
+      console.log('[SubscriptionProvider] No user for realtime setup');
+      return;
+    }
+
+    console.log('[SubscriptionProvider] Setting up realtime subscription for user:', user.id);
 
     const channel = supabase
       .channel(`subscription-changes-${user.id}`)
@@ -106,10 +122,11 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
           filter: `id=eq.${user.id}`
         },
         (payload) => {
-          console.log('Profile subscription status changed:', payload);
+          console.log('[SubscriptionProvider] Profile subscription status changed:', payload);
           if (payload.new && typeof payload.new === 'object' && payload.new !== null) {
             const newData = payload.new as Record<string, any>;
             if ('subscription_status' in newData) {
+              console.log('[SubscriptionProvider] Updating subscription info from realtime');
               setSubscriptionInfo(prev => ({
                 ...prev,
                 subscriptionStatus: newData.subscription_status,
@@ -122,15 +139,17 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
         }
       )
       .subscribe((status) => {
-        console.log('Subscription channel status:', status);
+        console.log('[SubscriptionProvider] Subscription channel status:', status);
       });
 
     return () => {
+      console.log('[SubscriptionProvider] Cleaning up realtime subscription');
       supabase.removeChannel(channel);
     };
   }, [user?.id]);
 
   const refreshSubscriptionStatus = async () => {
+    console.log('[SubscriptionProvider] refreshSubscriptionStatus called');
     await Promise.all([
       fetchSubscriptionInfo(),
       refreshPurchaserInfo()
@@ -157,6 +176,14 @@ export const SubscriptionProvider: React.FC<SubscriptionProviderProps> = ({ chil
     error,
     refreshSubscriptionStatus
   };
+
+  console.log('[SubscriptionProvider] Providing context value:', {
+    isPremium,
+    isTrialActive,
+    subscriptionStatus: subscriptionInfo.subscriptionStatus,
+    isLoading: finalIsLoading,
+    error
+  });
 
   return (
     <SubscriptionContext.Provider value={value}>

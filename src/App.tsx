@@ -8,20 +8,21 @@ import { TranslationLoadingOverlay } from '@/components/translation/TranslationL
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
 import TutorialOverlay from './components/tutorial/TutorialOverlay';
+import ErrorBoundary from './components/insights/ErrorBoundary';
 import { preloadCriticalImages } from './utils/imagePreloader';
 import './styles/emoji.css';
-import './styles/tutorial.css'; // Ensure tutorial styles are imported
+import './styles/tutorial.css';
 
 const App: React.FC = () => {
   useEffect(() => {
-    console.log('App mounted, current path:', window.location.pathname);
+    console.log('[App] App mounted, current path:', window.location.pathname);
     
     // Clean up any malformed paths
     const currentPath = window.location.pathname;
     
     // Fix incorrectly formatted URLs that have domains or https in the path
     if (currentPath.includes('https://') || currentPath.includes('soulo.online')) {
-      console.log('Fixing malformed URL path:', currentPath);
+      console.log('[App] Fixing malformed URL path:', currentPath);
       window.history.replaceState(null, '', '/');
     }
     
@@ -32,18 +33,35 @@ const App: React.FC = () => {
     preloadCriticalImages();
   }, []);
 
+  const handleAppError = (error: Error, errorInfo: any) => {
+    console.error('[App] Application-level error:', error, errorInfo);
+    
+    // Log critical app errors for debugging
+    const errorData = {
+      message: error.message,
+      stack: error.stack,
+      componentStack: errorInfo.componentStack,
+      timestamp: new Date().toISOString(),
+      userAgent: navigator.userAgent,
+      url: window.location.href
+    };
+    
+    console.error('[App] Detailed error info:', errorData);
+  };
+
   return (
-    <TranslationProvider>
-      <TutorialProvider>
-        <TranslationLoadingOverlay />
-        <JournalProcessingInitializer />
-        <AppRoutes />
-        {/* TutorialOverlay has internal logic to only render on app routes */}
-        <TutorialOverlay />
-        <Toaster />
-        <SonnerToaster position="top-right" />
-      </TutorialProvider>
-    </TranslationProvider>
+    <ErrorBoundary onError={handleAppError}>
+      <TranslationProvider>
+        <TutorialProvider>
+          <TranslationLoadingOverlay />
+          <JournalProcessingInitializer />
+          <AppRoutes />
+          <TutorialOverlay />
+          <Toaster />
+          <SonnerToaster position="top-right" />
+        </TutorialProvider>
+      </TranslationProvider>
+    </ErrorBoundary>
   );
 };
 
