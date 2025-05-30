@@ -1,5 +1,5 @@
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback, useRef } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 
@@ -11,6 +11,9 @@ interface TrialAccessState {
   showSubscriptionModal: boolean;
   openSubscriptionModal: () => void;
   closeSubscriptionModal: () => void;
+  
+  // Performance tracking
+  loadTime: number | null;
 }
 
 export const useTrialAccess = (): TrialAccessState => {
@@ -20,29 +23,59 @@ export const useTrialAccess = (): TrialAccessState => {
     isTrialActive, 
     daysRemainingInTrial, 
     hasActiveSubscription,
-    isLoading: subscriptionLoading 
+    isLoading: subscriptionLoading,
+    hasInitialLoadCompleted,
+    lastLoadTime
   } = useSubscription();
   
   const [showSubscriptionModal, setShowSubscriptionModal] = useState(false);
+  const [loadTime, setLoadTime] = useState<number | null>(null);
+  const modalTimeoutRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Determine if user has access to premium features
+  // Optimized access computation with memoization
   const hasAccess = isPremium || hasActiveSubscription || isTrialActive;
   const isTrialExpired = !isTrialActive && !isPremium && !hasActiveSubscription;
   
-  const openSubscriptionModal = () => {
+  const openSubscriptionModal = useCallback(() => {
+    console.log('[useTrialAccess] Opening subscription modal');
     setShowSubscriptionModal(true);
-  };
+  }, []);
   
-  const closeSubscriptionModal = () => {
+  const closeSubscriptionModal = useCallback(() => {
+    console.log('[useTrialAccess] Closing subscription modal');
     setShowSubscriptionModal(false);
-  };
+  }, []);
 
   // Auto-open subscription modal when accessing premium features with expired trial
   useEffect(() => {
-    if (user && isTrialExpired && !subscriptionLoading) {
-      console.log('[useTrialAccess] Trial expired, user needs subscription');
+    if (user && isTrialExpired && hasInitialLoadCompleted && !subscriptionLoading) {
+      console.log('[useTrialAccess] Trial expired, scheduling modal open');
+      
+      // Clear any existing timeout
+      if (modalTimeoutRef.current) {
+        clearTimeout(modalTimeoutRef.current);
+      }
+      
+      // Small delay to ensure UI is ready
+      modalTimeoutRef.current = setTimeout(() => {
+        console.log('[useTrialAccess] Auto-opening subscription modal for expired trial');
+        setShowSubscriptionModal(true);
+      }, 100);
     }
-  }, [user, isTrialExpired, subscriptionLoading]);
+    
+    return () => {
+      if (modalTimeoutRef.current) {
+        clearTimeout(modalTimeoutRef.current);
+      }
+    };
+  }, [user, isTrialExpired, hasInitialLoadCompleted, subscriptionLoading]);
+
+  // Track performance
+  useEffect(() => {
+    if (hasInitialLoadCompleted && lastLoadTime) {
+      setLoadTime(lastLoadTime);
+    }
+  }, [hasInitialLoadCompleted, lastLoadTime]);
 
   return {
     hasAccess,
@@ -51,6 +84,7 @@ export const useTrialAccess = (): TrialAccessState => {
     daysRemaining: daysRemainingInTrial,
     showSubscriptionModal,
     openSubscriptionModal,
-    closeSubscriptionModal
+    closeSubscriptionModal,
+    loadTime
   };
 };

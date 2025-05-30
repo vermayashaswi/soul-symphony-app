@@ -1,8 +1,10 @@
 
-import React from 'react';
+import React, { useState, useEffect } from 'react';
 import { Card } from '@/components/ui/card';
 import { Skeleton } from '@/components/ui/skeleton';
 import { TranslatableText } from '@/components/translation/TranslatableText';
+import { AlertCircle, Clock } from 'lucide-react';
+import { Alert, AlertDescription } from '@/components/ui/alert';
 
 export const SettingsLoadingSkeleton: React.FC = () => {
   return (
@@ -79,23 +81,74 @@ interface SettingsLoadingWrapperProps {
   isLoading: boolean;
   error?: string | null;
   children: React.ReactNode;
+  loadTime?: number | null;
+  showPerformanceAlert?: boolean;
 }
 
 export const SettingsLoadingWrapper: React.FC<SettingsLoadingWrapperProps> = ({
   isLoading,
   error,
-  children
+  children,
+  loadTime,
+  showPerformanceAlert = false
 }) => {
-  console.log('[SettingsLoadingWrapper] Rendering - isLoading:', isLoading, 'error:', error);
+  const [showSlowLoadingWarning, setShowSlowLoadingWarning] = useState(false);
+  const [loadStartTime] = useState(Date.now());
+
+  console.log('[SettingsLoadingWrapper] Rendering - isLoading:', isLoading, 'error:', error, 'loadTime:', loadTime);
+
+  // Show slow loading warning after 3 seconds
+  useEffect(() => {
+    let timer: NodeJS.Timeout | null = null;
+    
+    if (isLoading) {
+      timer = setTimeout(() => {
+        setShowSlowLoadingWarning(true);
+      }, 3000);
+    } else {
+      setShowSlowLoadingWarning(false);
+    }
+    
+    return () => {
+      if (timer) clearTimeout(timer);
+    };
+  }, [isLoading]);
+
+  // Performance monitoring
+  useEffect(() => {
+    if (!isLoading && loadTime) {
+      const currentLoadTime = Date.now() - loadStartTime;
+      console.log(`[SettingsLoadingWrapper] Settings loaded in ${currentLoadTime}ms (reported: ${loadTime}ms)`);
+      
+      if (currentLoadTime > 5000) {
+        console.warn('[SettingsLoadingWrapper] Slow settings load detected:', currentLoadTime);
+      }
+    }
+  }, [isLoading, loadTime, loadStartTime]);
 
   if (isLoading) {
-    return <SettingsLoadingSkeleton />;
+    return (
+      <div className="min-h-screen pb-20">
+        {showSlowLoadingWarning && (
+          <div className="max-w-3xl mx-auto px-4 pt-2 mb-4">
+            <Alert className="border-yellow-200 bg-yellow-50 dark:bg-yellow-950/20">
+              <Clock className="h-4 w-4 text-yellow-600" />
+              <AlertDescription className="text-yellow-800 dark:text-yellow-200">
+                <TranslatableText text="Settings are taking longer than usual to load. Please wait..." />
+              </AlertDescription>
+            </Alert>
+          </div>
+        )}
+        <SettingsLoadingSkeleton />
+      </div>
+    );
   }
 
   if (error) {
     return (
       <div className="min-h-screen flex items-center justify-center p-4">
         <Card className="w-full max-w-md p-6 text-center">
+          <AlertCircle className="h-12 w-12 text-destructive mx-auto mb-4" />
           <h2 className="text-lg font-semibold mb-2 text-destructive">
             <TranslatableText text="Loading Error" />
           </h2>
@@ -108,10 +161,29 @@ export const SettingsLoadingWrapper: React.FC<SettingsLoadingWrapperProps> = ({
           >
             <TranslatableText text="Try refreshing the page" />
           </button>
+          {loadTime && (
+            <p className="text-xs text-muted-foreground mt-2">
+              Load time: {loadTime}ms
+            </p>
+          )}
         </Card>
       </div>
     );
   }
 
-  return <>{children}</>;
+  return (
+    <>
+      {showPerformanceAlert && loadTime && loadTime > 3000 && (
+        <div className="max-w-3xl mx-auto px-4 pt-2 mb-4">
+          <Alert className="border-blue-200 bg-blue-50 dark:bg-blue-950/20">
+            <AlertCircle className="h-4 w-4 text-blue-600" />
+            <AlertDescription className="text-blue-800 dark:text-blue-200">
+              <TranslatableText text={`Settings loaded in ${loadTime}ms. Consider refreshing if performance seems slow.`} />
+            </AlertDescription>
+          </Alert>
+        </div>
+      )}
+      {children}
+    </>
+  );
 };

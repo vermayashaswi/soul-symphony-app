@@ -1,5 +1,5 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import { useLocation, Link } from 'react-router-dom';
 import { motion } from 'framer-motion';
 import { Home, MessageCircle, BookOpen, BarChart2, Settings, Lock } from 'lucide-react';
@@ -118,18 +118,23 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
   }
   
   // Check if a route requires premium access
-  const isPremiumRoute = (path: string) => {
+  const isPremiumRoute = useCallback((path: string) => {
     return path === '/app/smart-chat' || path === '/app/insights';
-  };
+  }, []);
 
-  // Handle navigation for premium routes
-  const handleNavigation = (path: string, e: React.MouseEvent) => {
-    if (isPremiumRoute(path) && !hasAccess && isTrialExpired) {
+  // Optimized navigation handler with immediate modal trigger
+  const handleNavigation = useCallback((path: string, e: React.MouseEvent) => {
+    const needsUpgrade = isPremiumRoute(path) && !hasAccess && isTrialExpired;
+    
+    if (needsUpgrade) {
       e.preventDefault();
+      console.log('[MobileNavigation] Blocking navigation to premium route, opening modal');
+      
+      // Immediate modal open without delay
       openSubscriptionModal();
       return;
     }
-  };
+  }, [isPremiumRoute, hasAccess, isTrialExpired, openSubscriptionModal]);
   
   // Navigation items with English text for translation
   const navItems = [
@@ -140,9 +145,9 @@ const MobileNavigation: React.FC<MobileNavigationProps> = ({ onboardingComplete 
     { path: '/app/settings', icon: Settings, label: 'Settings', requiresPremium: false },
   ];
 
-  const getActiveStatus = (path: string) => {
+  const getActiveStatus = useCallback((path: string) => {
     return location.pathname.startsWith(path);
-  };
+  }, [location.pathname]);
   
   console.log('MobileNavigation: Rendering with language:', currentLanguage, 'renderKey:', renderKey);
   
