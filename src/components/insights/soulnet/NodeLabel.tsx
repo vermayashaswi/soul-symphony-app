@@ -174,13 +174,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return null;
   }
 
-  // Enhanced vertical positioning - closer to nodes and more differentiated
+  // FIXED: Calculate the vertical offset from the node position
   const verticalOffset = type === 'entity' ? 2.2 : 2.0;
-  const labelPosition: [number, number, number] = [
-    position[0], // Use exact node X position
-    position[1] + verticalOffset, // Position above the node
-    position[2]  // Use exact node Z position
-  ];
 
   // Enhanced text color logic with better contrast
   const textColor = type === 'entity' 
@@ -191,23 +186,21 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const outlineWidth = isHighlighted ? 0.012 : 0.008;
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
-  console.log(`[NodeLabel] Rendering "${id}" (${type}) at labelPosition:`, labelPosition, 'nodePosition:', position, 'with text:', formattedText);
+  console.log(`[NodeLabel] Rendering "${id}" (${type}) at position:`, position, 'with text:', formattedText, 'verticalOffset:', verticalOffset);
 
   return (
-    <group position={labelPosition}>
-      <ThreeDimensionalText
-        text={formattedText}
-        position={[0, 0, 0]} // Position relative to group
-        color={textColor}
-        size={dynamicFontSize}
-        bold={isHighlighted}
-        visible={true}
-        skipTranslation={true}
-        outlineWidth={outlineWidth}
-        outlineColor={outlineColor}
-        renderOrder={15} // Higher render order to ensure text appears on top
-      />
-    </group>
+    <ThreeDimensionalText
+      text={formattedText}
+      position={[position[0], position[1] + verticalOffset, position[2]]} // Apply offset directly to position
+      color={textColor}
+      size={dynamicFontSize}
+      bold={isHighlighted}
+      visible={true}
+      skipTranslation={true}
+      outlineWidth={outlineWidth}
+      outlineColor={outlineColor}
+      renderOrder={15} // Higher render order to ensure text appears on top
+    />
   );
 };
 

@@ -15,6 +15,7 @@ import ErrorBoundary from './ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface NodeData {
   id: string;
@@ -45,6 +46,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
+  const { isInStep } = useTutorial();
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
 
@@ -60,7 +62,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     onDemandTranslationCache.clearLanguage(currentLanguage);
   }, [currentLanguage]);
 
-  // Enhanced tutorial debugging listener
+  // Enhanced tutorial debugging listener with step 9 specific handling
   useEffect(() => {
     const handleTutorialDebug = (event: CustomEvent) => {
       const { step, forceShowLabels: shouldForceShowLabels } = event.detail;
@@ -70,9 +72,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
         console.log('[SoulNet] Forcing labels to be visible for tutorial step 9');
         setForceShowLabels(true);
         
-        // Also trigger a canvas refresh
+        // Also trigger a canvas refresh to ensure labels are properly positioned
         setTimeout(() => {
           window.dispatchEvent(new Event('resize'));
+          console.log('[SoulNet] Canvas refresh triggered for tutorial step 9');
         }, 100);
       }
     };
@@ -83,6 +86,22 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
       window.removeEventListener('tutorial-soul-net-debug', handleTutorialDebug as EventListener);
     };
   }, []);
+
+  // Automatically force show labels when in tutorial step 9
+  useEffect(() => {
+    if (isInStep(9)) {
+      console.log('[SoulNet] Tutorial step 9 detected, forcing labels to show');
+      setForceShowLabels(true);
+      
+      // Trigger canvas refresh for step 9
+      setTimeout(() => {
+        window.dispatchEvent(new Event('resize'));
+      }, 200);
+    } else if (forceShowLabels && !isInStep(9)) {
+      console.log('[SoulNet] Exiting tutorial step 9, resetting forced labels');
+      setForceShowLabels(false);
+    }
+  }, [isInStep, forceShowLabels]);
 
   useEffect(() => {
     if (!userId) return;
@@ -173,8 +192,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Enhanced shouldShowLabels logic that includes tutorial debugging
-  const shouldShowLabels = forceShowLabels || isFullScreen || selectedEntity !== null;
+  // Enhanced shouldShowLabels logic that includes tutorial debugging and step 9
+  const shouldShowLabels = forceShowLabels || isFullScreen || selectedEntity !== null || isInStep(9);
 
   return (
     <div className={cn(
@@ -250,10 +269,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <p className="text-xs text-muted-foreground">
             {getInstructions()}
           </p>
-          {/* Debug info for tutorial step 9 */}
-          {forceShowLabels && (
+          {/* Enhanced debug info for tutorial */}
+          {(forceShowLabels || isInStep(9)) && (
             <p className="text-xs text-blue-500 mt-1">
-              Tutorial Mode: Labels Force Enabled
+              Tutorial Mode: Labels Force Enabled {isInStep(9) ? '(Step 9)' : ''}
             </p>
           )}
         </div>
