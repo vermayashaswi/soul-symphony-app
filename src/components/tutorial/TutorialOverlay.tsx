@@ -1,3 +1,4 @@
+
 import React, { useEffect } from 'react';
 import { motion, AnimatePresence } from 'framer-motion';
 import { useTutorial } from '@/contexts/TutorialContext';
@@ -358,12 +359,12 @@ const TutorialOverlay: React.FC = () => {
             if (index === 0) { // Only highlight the first one
               element.classList.add('chat-question-highlight', 'tutorial-target');
               
-              // Apply enhanced visibility
+              // Apply enhanced visibility with LOWER z-index to stay behind modal
               if (element instanceof HTMLElement) {
                 element.style.display = 'block';
                 element.style.visibility = 'visible';
                 element.style.opacity = '1';
-                element.style.zIndex = '20000';
+                element.style.zIndex = '8000'; // Lower than tutorial modal
                 element.style.position = 'relative';
                 element.style.boxShadow = '0 0 40px 25px var(--color-theme)';
                 element.style.animation = 'ultra-strong-pulse 1.5s infinite alternate';
@@ -405,6 +406,7 @@ const TutorialOverlay: React.FC = () => {
                   suggestionButton.style.display = 'block';
                   suggestionButton.style.visibility = 'visible';
                   suggestionButton.style.opacity = '1';
+                  suggestionButton.style.zIndex = '8000'; // Lower than tutorial modal
                   
                   suggestionsContainer.appendChild(suggestionButton);
                   applyTutorialHighlight(suggestionButton, 'chat-question-highlight');
@@ -417,7 +419,7 @@ const TutorialOverlay: React.FC = () => {
                     firstButton.style.display = 'block';
                     firstButton.style.visibility = 'visible';
                     firstButton.style.opacity = '1';
-                    firstButton.style.zIndex = '20000';
+                    firstButton.style.zIndex = '8000'; // Lower than tutorial modal
                     applyTutorialHighlight(firstButton, 'chat-question-highlight');
                   }
                 }
@@ -438,6 +440,7 @@ const TutorialOverlay: React.FC = () => {
               firstSuggestion.style.display = 'block';
               firstSuggestion.style.visibility = 'visible';
               firstSuggestion.style.opacity = '1';
+              firstSuggestion.style.zIndex = '8000'; // Lower than tutorial modal
             }
           }
         }, 800);
@@ -498,7 +501,7 @@ const TutorialOverlay: React.FC = () => {
   const isLastStep = currentStep === totalSteps - 1;
 
   return (
-    <div className="fixed inset-0 z-[9997] pointer-events-auto">
+    <div className="fixed inset-0 z-[50000] pointer-events-auto">
       {/* Semi-transparent overlay */}
       <motion.div
         className="tutorial-overlay absolute inset-0"

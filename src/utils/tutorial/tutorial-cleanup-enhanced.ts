@@ -105,7 +105,7 @@ const cleanupSpecificElements = () => {
     }
   });
   
-  // Clean up chat elements
+  // Clean up chat elements with proper z-index reset
   const chatElements = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
   chatElements.forEach(element => {
     if (element instanceof HTMLElement) {
@@ -115,6 +115,17 @@ const cleanupSpecificElements = () => {
       TUTORIAL_STYLE_PROPERTIES.forEach(style => {
         element.style[style as any] = '';
       });
+      
+      // Specifically reset z-index for chat elements to prevent modal overlap
+      element.style.zIndex = '';
+    }
+  });
+  
+  // Reset all chat containers z-index
+  const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
+  chatContainers.forEach(container => {
+    if (container instanceof HTMLElement) {
+      container.style.zIndex = '';
     }
   });
 };
