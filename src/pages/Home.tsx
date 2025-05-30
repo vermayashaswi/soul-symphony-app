@@ -5,13 +5,48 @@ import JournalHeader from '@/components/home/JournalHeader';
 import JournalNavigationButton from '@/components/home/JournalNavigationButton';
 import JournalContent from '@/components/home/JournalContent';
 import BackgroundElements from '@/components/home/BackgroundElements';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 
 const Home = () => {
-  const { isActive, currentStep, steps, navigationState } = useTutorial();
+  const { isActive, currentStep, steps, navigationState, startTutorial } = useTutorial();
+  const { user } = useAuth();
   
   // Check if we're in specific tutorial steps
   const isInWelcomeTutorialStep = isActive && steps[currentStep]?.id === 1;
   const isInArrowTutorialStep = isActive && steps[currentStep]?.id === 2;
+  
+  // Check if tutorial should be started for new users who haven't completed it
+  useEffect(() => {
+    const checkUserTutorialStatus = async () => {
+      if (!user) return;
+      
+      try {
+        console.log('[Home] Checking tutorial status for user:', user.id);
+        
+        const { data: profile, error } = await supabase
+          .from('profiles')
+          .select('tutorial_completed')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('[Home] Error checking tutorial status:', error);
+          return;
+        }
+        
+        // Tutorial should start if not completed (explicitly set to NO)
+        if (profile && profile.tutorial_completed === 'NO') {
+          console.log('[Home] User has not completed tutorial, starting tutorial');
+          startTutorial();
+        }
+      } catch (err) {
+        console.error('[Home] Error checking user tutorial status:', err);
+      }
+    };
+    
+    checkUserTutorialStatus();
+  }, [user, startTutorial]);
   
   useEffect(() => {
     console.log('Home component mounted, tutorial state:', {

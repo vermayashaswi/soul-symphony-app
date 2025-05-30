@@ -41,51 +41,83 @@ export const useLocationPricing = () => {
   const [pricing, setPricing] = useState<LocationPricing>(PRICING_MAP.DEFAULT);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [attemptCount, setAttemptCount] = useState(0);
+  const maxAttempts = 3;
 
   useEffect(() => {
     const detectLocation = async () => {
       try {
         setIsLoading(true);
         setError(null);
-
-        // Try IP-based geolocation first
-        const response = await fetch('https://ipapi.co/json/');
         
-        if (!response.ok) {
-          throw new Error('Failed to fetch location');
-        }
+        console.log('[useLocationPricing] Detecting location, attempt:', attemptCount + 1);
 
-        const data = await response.json();
+        // Try IP-based geolocation with timeout protection
+        const controller = new AbortController();
+        const signal = controller.signal;
         
-        if (data.error) {
-          throw new Error(data.reason || 'Location detection failed');
-        }
-
-        const countryCode = data.country_code;
+        // Set timeout for the fetch
+        const timeoutId = setTimeout(() => {
+          controller.abort();
+          throw new Error('Location detection timed out');
+        }, 5000);
         
-        if (countryCode && PRICING_MAP[countryCode]) {
-          setPricing(PRICING_MAP[countryCode]);
-        } else {
-          setPricing(PRICING_MAP.DEFAULT);
-        }
+        try {
+          const response = await fetch('https://ipapi.co/json/', { signal });
+          clearTimeout(timeoutId);
+          
+          if (!response.ok) {
+            throw new Error(`Failed to fetch location: ${response.status}`);
+          }
 
-        console.log('[useLocationPricing] Detected location:', {
-          country: data.country_name,
-          countryCode,
-          pricing: PRICING_MAP[countryCode] || PRICING_MAP.DEFAULT
-        });
+          const data = await response.json();
+          
+          if (data.error) {
+            throw new Error(data.reason || 'Location detection failed');
+          }
+
+          const countryCode = data.country_code;
+          
+          if (countryCode && PRICING_MAP[countryCode]) {
+            setPricing(PRICING_MAP[countryCode]);
+          } else {
+            setPricing(PRICING_MAP.DEFAULT);
+          }
+
+          console.log('[useLocationPricing] Detected location:', {
+            country: data.country_name,
+            countryCode,
+            pricing: PRICING_MAP[countryCode] || PRICING_MAP.DEFAULT
+          });
+          
+          // Reset attempt count on success
+          setAttemptCount(0);
+        } catch (fetchError) {
+          clearTimeout(timeoutId);
+          throw fetchError;
+        }
 
       } catch (err) {
         console.error('[useLocationPricing] Location detection failed:', err);
-        setError(err instanceof Error ? err.message : 'Location detection failed');
+        
+        const errorMessage = err instanceof Error ? err.message : 'Location detection failed';
+        setError(errorMessage);
+        
+        // Use default pricing
         setPricing(PRICING_MAP.DEFAULT);
+        
+        // Implement retry logic if we haven't exceeded max attempts
+        if (attemptCount < maxAttempts - 1) {
+          setAttemptCount(prev => prev + 1);
+          // Will retry on next effect run
+        }
       } finally {
         setIsLoading(false);
       }
     };
 
     detectLocation();
-  }, []);
+  }, [attemptCount]);
 
   return {
     pricing,
@@ -94,8 +126,7 @@ export const useLocationPricing = () => {
     refreshLocation: () => {
       setIsLoading(true);
       setError(null);
-      // Re-trigger the effect by clearing and setting pricing
-      setPricing(PRICING_MAP.DEFAULT);
+      setAttemptCount(0);  // Reset attempt count to trigger a fresh attempt
     }
   };
 };

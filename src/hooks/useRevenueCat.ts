@@ -26,57 +26,109 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
   const [purchaserInfo, setPurchaserInfo] = useState<RevenueCatPurchaserInfo | null>(null);
   const [products, setProducts] = useState<RevenueCatProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
+  const [initializationAttempts, setInitializationAttempts] = useState(0);
+  const maxInitializationAttempts = 3;
 
   const initializeRevenueCat = useCallback(async () => {
     if (!user?.id) return;
 
     try {
       setIsLoading(true);
-      await revenueCatService.initialize(user.id);
-      setIsInitialized(true);
+      
+      // Track initialization attempts
+      setInitializationAttempts(prev => prev + 1);
+      console.log(`[useRevenueCat] Initializing RevenueCat, attempt ${initializationAttempts + 1}/${maxInitializationAttempts}`);
 
-      // Load products and purchaser info
-      const [productsData, purchaserData] = await Promise.all([
+      // Initialize with timeout protection
+      await Promise.race([
+        revenueCatService.initialize(user.id),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error("RevenueCat initialization timeout")), 10000)
+        )
+      ]);
+
+      setIsInitialized(true);
+      setInitializationAttempts(0); // Reset counter on success
+
+      // Load products and purchaser info with timeouts
+      const productsPromise = Promise.race([
         revenueCatService.getProducts(),
-        revenueCatService.getPurchaserInfo()
+        new Promise<RevenueCatProduct[]>((_, reject) => 
+          setTimeout(() => reject(new Error("Products fetch timeout")), 5000)
+        )
+      ]);
+
+      const purchaserPromise = Promise.race([
+        revenueCatService.getPurchaserInfo(),
+        new Promise<RevenueCatPurchaserInfo | null>((resolve) => 
+          setTimeout(() => resolve(null), 5000) // Use null instead of rejection for purchaser info
+        )
+      ]);
+
+      const [productsData, purchaserData] = await Promise.all([
+        productsPromise.catch(() => [] as RevenueCatProduct[]), // Fallback to empty array
+        purchaserPromise
       ]);
 
       setProducts(productsData);
       setPurchaserInfo(purchaserData);
+      
     } catch (error) {
-      console.error('Failed to initialize RevenueCat:', error);
-      toast({
-        title: 'Subscription Error',
-        description: 'Failed to load subscription information. Please try again.',
-        variant: 'destructive'
-      });
+      console.error('[useRevenueCat] Failed to initialize RevenueCat:', error);
+      
+      if (initializationAttempts >= maxInitializationAttempts) {
+        console.warn('[useRevenueCat] Max initialization attempts reached, using fallback mode');
+        setIsInitialized(true); // Treat as initialized to prevent further attempts
+        
+        toast({
+          title: 'Subscription Services Limited',
+          description: 'Some premium features may not be available. Please check your connection.',
+          variant: 'default'
+        });
+      } else {
+        // Will retry on next render due to dependency change
+        console.log(`[useRevenueCat] Will retry initialization later, attempts so far: ${initializationAttempts + 1}/${maxInitializationAttempts}`);
+      }
     } finally {
       setIsLoading(false);
     }
-  }, [user?.id, toast]);
+  }, [user?.id, toast, initializationAttempts]);
 
   useEffect(() => {
-    if (user?.id && !isInitialized) {
+    if (user?.id && !isInitialized && initializationAttempts < maxInitializationAttempts) {
       initializeRevenueCat();
     }
-  }, [user?.id, isInitialized, initializeRevenueCat]);
+  }, [user?.id, isInitialized, initializeRevenueCat, initializationAttempts]);
 
   const refreshPurchaserInfo = useCallback(async () => {
     if (!isInitialized) return;
 
     try {
-      const purchaserData = await revenueCatService.getPurchaserInfo();
-      setPurchaserInfo(purchaserData);
+      setIsLoading(true);
+      
+      const purchaserData = await Promise.race([
+        revenueCatService.getPurchaserInfo(),
+        new Promise<null>((resolve) => 
+          setTimeout(() => resolve(null), 5000)
+        )
+      ]);
+      
+      // Only update if we got actual data
+      if (purchaserData) {
+        setPurchaserInfo(purchaserData);
+      }
     } catch (error) {
-      console.error('Failed to refresh purchaser info:', error);
+      console.error('[useRevenueCat] Failed to refresh purchaser info:', error);
+    } finally {
+      setIsLoading(false);
     }
   }, [isInitialized]);
 
   const purchaseProduct = useCallback(async (productId: string): Promise<boolean> => {
     if (!isInitialized) {
       toast({
-        title: 'Error',
-        description: 'Subscription service not initialized',
+        title: 'Service Unavailable',
+        description: 'Subscription service not initialized. Please try again later.',
         variant: 'destructive'
       });
       return false;
@@ -97,10 +149,10 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
       
       return true;
     } catch (error) {
-      console.error('Purchase failed:', error);
+      console.error('[useRevenueCat] Purchase failed:', error);
       toast({
         title: 'Purchase Failed',
-        description: 'Failed to start your trial. Please try again.',
+        description: 'Failed to start your trial. Please try again later.',
         variant: 'destructive'
       });
       return false;
@@ -115,9 +167,11 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
     try {
       setIsLoading(true);
       const restored = await revenueCatService.restorePurchases();
-      setPurchaserInfo(restored);
       
+      // Only update if we got actual data
       if (restored) {
+        setPurchaserInfo(restored);
+        
         toast({
           title: 'Purchases Restored',
           description: 'Your subscription has been restored successfully.',
@@ -133,10 +187,10 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
         return false;
       }
     } catch (error) {
-      console.error('Restore failed:', error);
+      console.error('[useRevenueCat] Restore failed:', error);
       toast({
         title: 'Restore Failed',
-        description: 'Failed to restore purchases. Please try again.',
+        description: 'Failed to restore purchases. Please try again later.',
         variant: 'destructive'
       });
       return false;
@@ -151,14 +205,14 @@ export const useRevenueCat = (): UseRevenueCatReturn => {
     try {
       return await revenueCatService.checkTrialEligibility(productId);
     } catch (error) {
-      console.error('Failed to check trial eligibility:', error);
+      console.error('[useRevenueCat] Failed to check trial eligibility:', error);
       return false;
     }
   }, [isInitialized]);
 
-  // Computed values
-  const isPremium = revenueCatService.isUserPremium(purchaserInfo);
-  const trialEndDate = revenueCatService.getTrialEndDate(purchaserInfo);
+  // Computed values with graceful degradation
+  const isPremium = purchaserInfo ? revenueCatService.isUserPremium(purchaserInfo) : false;
+  const trialEndDate = purchaserInfo ? revenueCatService.getTrialEndDate(purchaserInfo) : null;
   const isTrialActive = trialEndDate ? trialEndDate > new Date() : false;
   
   const daysRemainingInTrial = trialEndDate 

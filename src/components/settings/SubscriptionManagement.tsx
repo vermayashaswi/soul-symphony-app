@@ -2,7 +2,7 @@
 import React, { useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
-import { Crown, Clock, Calendar, RefreshCw, AlertCircle } from 'lucide-react';
+import { Crown, Clock, Calendar, RefreshCw, AlertCircle, Wifi, WifiOff } from 'lucide-react';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { motion } from 'framer-motion';
@@ -21,27 +21,33 @@ export const SubscriptionManagement: React.FC = () => {
     subscriptionStatus,
     isLoading,
     error,
-    refreshSubscriptionStatus
+    refreshSubscriptionStatus,
+    hasInitialLoadCompleted
   } = useSubscription();
 
   const [isModalOpen, setIsModalOpen] = useState(false);
+  const [isRefreshing, setIsRefreshing] = useState(false);
 
   console.log('[SubscriptionManagement] Subscription state:', {
     isPremium,
     isTrialActive,
     subscriptionStatus,
     isLoading,
-    error
+    error,
+    hasInitialLoadCompleted
   });
 
   const handleRefreshStatus = async () => {
     console.log('[SubscriptionManagement] Refreshing subscription status...');
+    setIsRefreshing(true);
     try {
       await refreshSubscriptionStatus();
       toast.success(<TranslatableText text="Subscription status refreshed" forceTranslate={true} />);
     } catch (error) {
       console.error('[SubscriptionManagement] Failed to refresh status:', error);
-      toast.error(<TranslatableText text="Failed to refresh status" forceTranslate={true} />);
+      toast.error(<TranslatableText text="Failed to refresh status. Please check your connection." forceTranslate={true} />);
+    } finally {
+      setIsRefreshing(false);
     }
   };
 
@@ -95,22 +101,37 @@ export const SubscriptionManagement: React.FC = () => {
               variant="outline" 
               size="sm"
               onClick={handleRefreshStatus}
+              disabled={isRefreshing}
               className="flex items-center gap-1"
             >
-              <RefreshCw className="h-3 w-3" />
-              <TranslatableText text="Refresh" />
+              {isRefreshing ? (
+                <RefreshCw className="h-3 w-3 animate-spin" />
+              ) : (
+                <RefreshCw className="h-3 w-3" />
+              )}
+              <TranslatableText text={isRefreshing ? "Refreshing..." : "Refresh"} />
             </Button>
           </div>
 
           {error && (
-            <Alert className="mb-4">
-              <AlertCircle className="h-4 w-4" />
-              <AlertDescription>
-                <TranslatableText text="There was an issue loading your subscription information. Please try refreshing." />
-                <div className="text-xs mt-1 text-muted-foreground">
-                  Error: {error}
-                </div>
-              </AlertDescription>
+            <Alert className="mb-4 bg-yellow-50 border-yellow-300 dark:bg-yellow-900/20 dark:border-yellow-700">
+              <div className="flex items-center gap-2">
+                <WifiOff className="h-4 w-4 text-yellow-600 dark:text-yellow-400" />
+                <AlertDescription className="text-sm text-yellow-800 dark:text-yellow-300">
+                  <TranslatableText text="Subscription information may be limited due to connectivity issues." />
+                </AlertDescription>
+              </div>
+              <div className="mt-2 flex items-center">
+                <Button 
+                  variant="outline" 
+                  size="sm" 
+                  onClick={handleRefreshStatus}
+                  className="text-xs border-yellow-400 dark:border-yellow-600 text-yellow-700 dark:text-yellow-400"
+                >
+                  <Wifi className="h-3 w-3 mr-1" />
+                  <TranslatableText text="Try again" />
+                </Button>
+              </div>
             </Alert>
           )}
 

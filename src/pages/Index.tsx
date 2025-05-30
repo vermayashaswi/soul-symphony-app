@@ -10,13 +10,14 @@ import { useNetworkStatus } from '@/utils/network';
 import HomePage from '@/pages/website/HomePage';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { supabase } from '@/integrations/supabase/client';
 
 const Index = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { colorTheme } = useTheme();
   const isMobile = useIsMobile();
-  const { onboardingComplete } = useOnboarding();
+  const { onboardingComplete, checkOnboardingStatus } = useOnboarding();
   const networkStatus = useNetworkStatus();
   const { translate } = useTranslation();
 
@@ -24,6 +25,52 @@ const Index = () => {
   const mobileDemo = urlParams.get('mobileDemo') === 'true';
   
   const shouldRenderMobile = isMobile.isMobile || mobileDemo;
+
+  // Check tutorial status whenever user logs in to ensure proper initialization
+  useEffect(() => {
+    const ensureTutorialStatus = async () => {
+      if (!user) return;
+      
+      try {
+        console.log('[Index] Checking tutorial status for user:', user.id);
+        
+        // First make sure onboarding status is checked
+        await checkOnboardingStatus();
+        
+        // Now check tutorial completion status
+        const { data: profileData, error } = await supabase
+          .from('profiles')
+          .select('tutorial_completed')
+          .eq('id', user.id)
+          .maybeSingle();
+        
+        if (error) {
+          console.error('[Index] Error checking tutorial status:', error);
+          return;
+        }
+        
+        if (!profileData || profileData.tutorial_completed !== 'YES') {
+          console.log('[Index] User has not completed tutorial, will ensure tutorial_completed is set to NO');
+          
+          // Make sure tutorial_completed is explicitly set to 'NO'
+          const { error: updateError } = await supabase
+            .from('profiles')
+            .update({ tutorial_completed: 'NO' })
+            .eq('id', user.id);
+            
+          if (updateError) {
+            console.error('[Index] Error updating tutorial status:', updateError);
+          }
+        } else {
+          console.log('[Index] User has already completed tutorial');
+        }
+      } catch (error) {
+        console.error('[Index] Error in ensureTutorialStatus:', error);
+      }
+    };
+    
+    ensureTutorialStatus();
+  }, [user, checkOnboardingStatus]);
 
   // Only redirect to app if explicitly requested with a URL parameter
   useEffect(() => {

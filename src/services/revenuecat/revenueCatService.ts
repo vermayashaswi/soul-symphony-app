@@ -1,3 +1,4 @@
+
 import { supabase } from '@/integrations/supabase/client';
 
 export interface RevenueCatProduct {
@@ -93,64 +94,117 @@ const REGIONAL_PRODUCTS: Record<string, RevenueCatProduct> = {
 class RevenueCatService {
   private isInitialized = false;
   private currentUserId: string | null = null;
+  private initializationAttempts = 0;
+  private maxInitializationAttempts = 3;
 
   async initialize(userId: string): Promise<void> {
     try {
       console.log('[RevenueCatService] Initializing RevenueCat for user:', userId);
       
+      // Reset attempts for new user
+      if (this.currentUserId !== userId) {
+        this.initializationAttempts = 0;
+      }
+      
+      this.initializationAttempts++;
+      
+      if (this.initializationAttempts > this.maxInitializationAttempts) {
+        console.warn('[RevenueCatService] Max initialization attempts reached, using fallback mode');
+        this.isInitialized = true;
+        this.currentUserId = userId;
+        return;
+      }
+      
       // In a real implementation, you would configure the RevenueCat SDK here
-      // For now, we'll simulate the initialization
+      // For now, we'll simulate the initialization with better error handling
       this.currentUserId = userId;
+      
+      // Create or update RevenueCat customer record with timeout
+      await Promise.race([
+        this.createOrUpdateCustomer(userId),
+        new Promise((_, reject) => 
+          setTimeout(() => reject(new Error('Customer creation timeout')), 5000)
+        )
+      ]);
+      
       this.isInitialized = true;
-      
-      // Create or update RevenueCat customer record
-      await this.createOrUpdateCustomer(userId);
-      
       console.log('[RevenueCatService] RevenueCat initialized successfully');
     } catch (error) {
       console.error('[RevenueCatService] Failed to initialize RevenueCat:', error);
-      throw error;
+      
+      // Still mark as initialized in fallback mode to prevent blocking the app
+      this.isInitialized = true;
+      this.currentUserId = userId;
+      
+      // Only throw if this is a critical error and we're not in fallback mode
+      if (this.initializationAttempts <= 1) {
+        throw error;
+      }
     }
   }
 
   private async createOrUpdateCustomer(userId: string): Promise<void> {
     try {
-      const { data: existingCustomer } = await supabase
+      console.log('[RevenueCatService] Creating/updating customer for user:', userId);
+      
+      // Test database connectivity with a simple query first
+      const { error: connectivityError } = await supabase
+        .from('profiles')
+        .select('id')
+        .limit(1);
+
+      if (connectivityError) {
+        console.error('[RevenueCatService] Database connectivity test failed:', connectivityError);
+        throw new Error(`Database connection failed: ${connectivityError.message}`);
+      }
+
+      const { data: existingCustomer, error: fetchError } = await supabase
         .from('revenuecat_customers')
         .select('*')
         .eq('user_id', userId)
-        .single();
+        .maybeSingle();
+
+      if (fetchError) {
+        console.error('[RevenueCatService] Error fetching existing customer:', fetchError);
+        // Don't throw here, just log the error and continue
+        return;
+      }
 
       if (!existingCustomer) {
         // Create new customer record
-        const { error } = await supabase
+        const { error: insertError } = await supabase
           .from('revenuecat_customers')
           .insert({
             user_id: userId,
-            revenuecat_user_id: userId, // Using Supabase user ID as RevenueCat user ID
+            revenuecat_user_id: userId,
             revenuecat_app_user_id: userId
           });
 
-        if (error) {
-          console.error('[RevenueCatService] Error creating RevenueCat customer:', error);
-          throw error;
+        if (insertError) {
+          console.error('[RevenueCatService] Error creating RevenueCat customer:', insertError);
+          // Don't throw here to prevent blocking app initialization
+          return;
         }
+        
+        console.log('[RevenueCatService] Customer created successfully');
+      } else {
+        console.log('[RevenueCatService] Customer already exists');
       }
     } catch (error) {
       console.error('[RevenueCatService] Error in createOrUpdateCustomer:', error);
-      throw error;
+      // Don't re-throw to prevent blocking app initialization
     }
   }
 
   async getProducts(): Promise<RevenueCatProduct[]> {
     if (!this.isInitialized) {
-      throw new Error('RevenueCat not initialized');
+      console.warn('[RevenueCatService] Service not initialized, returning empty products');
+      return [];
     }
 
     console.log('[RevenueCatService] Fetching products...');
     
     // Return all regional products for now
-    // In a real implementation, this would fetch from Google Play Store
     return Object.values(REGIONAL_PRODUCTS);
   }
 
@@ -176,7 +230,6 @@ class RevenueCatService {
       }
 
       // In a real implementation, this would trigger the Google Play purchase flow
-      // For now, we'll simulate a successful trial subscription
       const transaction: RevenueCatTransaction = {
         transactionIdentifier: `trial_${Date.now()}`,
         productIdentifier: productId,
@@ -191,7 +244,7 @@ class RevenueCatService {
         .from('revenuecat_customers')
         .select('id')
         .eq('user_id', this.currentUserId)
-        .single();
+        .maybeSingle();
 
       if (customer) {
         const { error: subscriptionError } = await supabase
@@ -205,7 +258,7 @@ class RevenueCatService {
             purchase_date: transaction.purchaseDate,
             original_purchase_date: transaction.purchaseDate,
             expires_date: trialExpiresAt.toISOString(),
-            is_sandbox: true, // Set to false in production
+            is_sandbox: true,
             auto_renew_status: true,
             price_in_purchased_currency: 0,
             currency: product.currencyCode
@@ -243,12 +296,13 @@ class RevenueCatService {
 
   async restorePurchases(): Promise<RevenueCatPurchaserInfo | null> {
     if (!this.isInitialized || !this.currentUserId) {
-      throw new Error('RevenueCat not initialized or user not set');
+      console.warn('[RevenueCatService] Service not initialized, cannot restore purchases');
+      return null;
     }
 
     try {
       // Fetch user's subscriptions from our database
-      const { data: subscriptions } = await supabase
+      const { data: subscriptions, error } = await supabase
         .from('revenuecat_subscriptions')
         .select(`
           *,
@@ -258,6 +312,11 @@ class RevenueCatService {
           )
         `)
         .eq('revenuecat_customers.user_id', this.currentUserId);
+
+      if (error) {
+        console.error('[RevenueCatService] Error fetching subscriptions:', error);
+        return null;
+      }
 
       if (!subscriptions || subscriptions.length === 0) {
         return null;
@@ -323,7 +382,7 @@ class RevenueCatService {
 
     try {
       // Check if user has already used a trial for this product
-      const { data: previousTrials } = await supabase
+      const { data: previousTrials, error } = await supabase
         .from('revenuecat_subscriptions')
         .select(`
           *,
@@ -332,6 +391,11 @@ class RevenueCatService {
         .eq('revenuecat_customers.user_id', this.currentUserId)
         .eq('product_id', productId)
         .eq('period_type', 'trial');
+
+      if (error) {
+        console.error('[RevenueCatService] Error checking trial eligibility:', error);
+        return false;
+      }
 
       return !previousTrials || previousTrials.length === 0;
     } catch (error) {
