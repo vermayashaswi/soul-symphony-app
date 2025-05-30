@@ -9,12 +9,15 @@ import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
 import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
+import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
 import { useJournalEntries } from '@/hooks/use-journal-entries';
 import { useNavigate } from 'react-router-dom';
 import { useIsMobile } from '@/hooks/use-mobile';
 import SouloLogo from '@/components/SouloLogo';
 import { ColorPicker } from '@/components/settings/ColorPicker';
+import { SubscriptionBadge } from '@/components/settings/SubscriptionBadge';
+import { SubscriptionManagement } from '@/components/settings/SubscriptionManagement';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogDescription } from "@/components/ui/dialog";
 import { ScrollArea } from "@/components/ui/scroll-area";
 import { startOfDay, subDays, isWithinInterval } from 'date-fns';
@@ -63,6 +66,12 @@ export default function Settings() {
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
   const { user, signOut } = useAuth();
+  const { 
+    isPremium, 
+    isTrialActive, 
+    subscriptionStatus, 
+    isLoading: subscriptionLoading 
+  } = useSubscription();
   const [maxStreak, setMaxStreak] = useState(0);
   const { entries } = useJournalEntries(user?.id, 0, !!user);
   const navigate = useNavigate();
@@ -464,11 +473,18 @@ export default function Settings() {
                       </div>
                     </div>
                   ) : (
-                    <div className="flex items-center justify-center sm:justify-start gap-2">
+                    <div className="flex items-center justify-center sm:justify-start gap-2 flex-wrap">
                       <h3 className="text-xl font-semibold text-foreground">
                         {isLoadingProfile ? <TranslatableText text="Loading..." /> : 
                          originalDisplayName || user?.user_metadata?.full_name || <TranslatableText text="User" />}
                       </h3>
+                      <SubscriptionBadge
+                        isPremium={isPremium}
+                        isTrialActive={isTrialActive}
+                        subscriptionStatus={subscriptionStatus}
+                        isLoading={subscriptionLoading}
+                        size="sm"
+                      />
                       <Button 
                         variant="ghost" 
                         size="icon" 
@@ -510,6 +526,8 @@ export default function Settings() {
               </div>
             </div>
           </motion.div>
+          
+          <SubscriptionManagement />
           
           <motion.div
             initial={{ opacity: 0, y: 20 }}
