@@ -495,9 +495,15 @@ export type Database = {
       }
       user_sessions: {
         Row: {
+          attribution_data: Json | null
+          conversion_events: Json | null
+          country_code: string | null
           created_at: string
+          currency: string | null
           device_type: string | null
           entry_page: string | null
+          fbclid: string | null
+          gclid: string | null
           id: string
           ip_address: string | null
           is_active: boolean | null
@@ -512,11 +518,22 @@ export type Database = {
           session_start: string
           user_agent: string | null
           user_id: string
+          utm_campaign: string | null
+          utm_content: string | null
+          utm_medium: string | null
+          utm_source: string | null
+          utm_term: string | null
         }
         Insert: {
+          attribution_data?: Json | null
+          conversion_events?: Json | null
+          country_code?: string | null
           created_at?: string
+          currency?: string | null
           device_type?: string | null
           entry_page?: string | null
+          fbclid?: string | null
+          gclid?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
@@ -531,11 +548,22 @@ export type Database = {
           session_start?: string
           user_agent?: string | null
           user_id: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Update: {
+          attribution_data?: Json | null
+          conversion_events?: Json | null
+          country_code?: string | null
           created_at?: string
+          currency?: string | null
           device_type?: string | null
           entry_page?: string | null
+          fbclid?: string | null
+          gclid?: string | null
           id?: string
           ip_address?: string | null
           is_active?: boolean | null
@@ -550,6 +578,11 @@ export type Database = {
           session_start?: string
           user_agent?: string | null
           user_id?: string
+          utm_campaign?: string | null
+          utm_content?: string | null
+          utm_medium?: string | null
+          utm_source?: string | null
+          utm_term?: string | null
         }
         Relationships: []
       }
@@ -574,21 +607,54 @@ export type Database = {
         Returns: undefined
       }
       enhanced_manage_user_session: {
-        Args: {
-          p_user_id: string
-          p_device_type: string
-          p_user_agent: string
-          p_entry_page: string
-          p_last_active_page: string
-          p_language?: string
-          p_referrer?: string
-          p_ip_address?: string
-        }
+        Args:
+          | {
+              p_user_id: string
+              p_device_type: string
+              p_user_agent: string
+              p_entry_page: string
+              p_last_active_page: string
+              p_language?: string
+              p_referrer?: string
+              p_ip_address?: string
+            }
+          | {
+              p_user_id: string
+              p_device_type: string
+              p_user_agent: string
+              p_entry_page: string
+              p_last_active_page: string
+              p_language?: string
+              p_referrer?: string
+              p_ip_address?: string
+              p_country_code?: string
+              p_currency?: string
+              p_utm_source?: string
+              p_utm_medium?: string
+              p_utm_campaign?: string
+              p_utm_term?: string
+              p_utm_content?: string
+              p_gclid?: string
+              p_fbclid?: string
+              p_attribution_data?: Json
+            }
         Returns: string
       }
       execute_dynamic_query: {
         Args: { query_text: string; param_values?: string[] }
         Returns: Json
+      }
+      get_attribution_analytics: {
+        Args: { p_start_date?: string; p_end_date?: string }
+        Returns: {
+          utm_source: string
+          utm_medium: string
+          utm_campaign: string
+          sessions_count: number
+          unique_users_count: number
+          conversions_count: number
+          top_countries: Json
+        }[]
       }
       get_entries_by_emotion_term: {
         Args: {
@@ -814,6 +880,14 @@ export type Database = {
       table_exists: {
         Args: { table_name: string }
         Returns: boolean
+      }
+      track_conversion_event: {
+        Args: {
+          p_session_id: string
+          p_event_type: string
+          p_event_data?: Json
+        }
+        Returns: undefined
       }
       update_session_activity: {
         Args: { p_session_id: string; p_page?: string; p_language?: string }
