@@ -301,25 +301,32 @@ export function setupJournalReminder(enabled: boolean, frequency: NotificationFr
   });
 }
 
-// Initialize Capacitor notifications (for mobile)
+// Initialize Capacitor notifications (for mobile) - Fixed to handle missing dependency
 export function initializeCapacitorNotifications() {
   console.log('initializeCapacitorNotifications called');
   
   // Check if we're running in Capacitor
   if (typeof window !== 'undefined' && (window as any).Capacitor) {
-    // Import Capacitor plugins dynamically
-    import('@capacitor/local-notifications').then(({ LocalNotifications }) => {
-      // Request permissions
-      LocalNotifications.requestPermissions().then(result => {
-        console.log('Capacitor notification permissions:', result);
-        
-        if (result.display === 'granted') {
-          console.log('Capacitor notifications enabled');
-        }
+    // Try to import Capacitor plugins dynamically, but handle gracefully if not available
+    try {
+      // Only attempt to load if in a Capacitor environment
+      import('@capacitor/local-notifications').then(({ LocalNotifications }) => {
+        // Request permissions
+        LocalNotifications.requestPermissions().then(result => {
+          console.log('Capacitor notification permissions:', result);
+          
+          if (result.display === 'granted') {
+            console.log('Capacitor notifications enabled');
+          }
+        });
+      }).catch(error => {
+        console.log('Capacitor LocalNotifications not available (this is normal for web):', error.message);
       });
-    }).catch(error => {
-      console.log('Capacitor LocalNotifications not available:', error);
-    });
+    } catch (error) {
+      console.log('Error loading Capacitor LocalNotifications (this is normal for web):', error);
+    }
+  } else {
+    console.log('Not running in Capacitor environment, skipping mobile notifications setup');
   }
 }
 
