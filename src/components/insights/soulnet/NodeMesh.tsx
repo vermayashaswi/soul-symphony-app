@@ -44,10 +44,10 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     [type]
   );
 
-  // Safe animation using manual time tracking instead of relying on potentially undefined clock
+  // Enhanced animation with proper null checks for Three.js objects
   useFrame((state, delta) => {
     try {
-      if (!meshRef.current) return;
+      if (!meshRef.current || !meshRef.current.material || !meshRef.current.scale) return;
       
       // Use manual time tracking for reliable animation
       timeRef.current += delta;
@@ -57,7 +57,8 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
         const pulse = Math.sin(timeRef.current * 2.5) * pulseIntensity + 1.1;
         meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
         
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial && 
+            typeof meshRef.current.material.emissiveIntensity !== 'undefined') {
           const emissiveIntensity = isSelected 
             ? 1.0 + Math.sin(timeRef.current * 3) * 0.3
             : 0.7 + (connectionStrength * 0.3) + Math.sin(timeRef.current * 3) * 0.2;
@@ -68,7 +69,8 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
         const targetScale = dimmed ? scale * 0.8 : scale;
         meshRef.current.scale.set(targetScale, targetScale, targetScale);
         
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial &&
+            typeof meshRef.current.material.emissiveIntensity !== 'undefined') {
           meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
         }
       }

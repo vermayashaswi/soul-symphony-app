@@ -135,14 +135,19 @@ export const Edge: React.FC<EdgeProps> = ({
     return theme === 'light' ? 0.25 : 0.08;
   }, [isHighlighted, dimmed, theme]);
 
-  // Safe frame updates with error handling
+  // Enhanced frame updates with null checks for Three.js objects
   useFrame(() => {
     try {
       if (!lineRef.current || !lineRef.current.material) return;
       
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        lineRef.current.material.opacity = getEdgeOpacity;
-        lineRef.current.material.color.set(getEdgeColor);
+        // Additional null checks before setting properties
+        if (typeof lineRef.current.material.opacity !== 'undefined') {
+          lineRef.current.material.opacity = getEdgeOpacity;
+        }
+        if (lineRef.current.material.color && typeof lineRef.current.material.color.set === 'function') {
+          lineRef.current.material.color.set(getEdgeColor);
+        }
       }
     } catch (error) {
       console.error("Error in Edge useFrame:", error);

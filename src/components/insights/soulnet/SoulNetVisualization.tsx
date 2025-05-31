@@ -126,7 +126,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
-  const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
   
   console.log("Rendering SoulNetVisualization component with data:", 
@@ -176,20 +175,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       return new THREE.Vector3(0, 0, 0);
     }
   }, [validData.nodes]);
-
-  useEffect(() => {
-    // Force a re-render after selection changes to ensure visuals update
-    if (selectedNode) {
-      console.log(`Selected node: ${selectedNode}`);
-      // Force multiple updates to ensure the visual changes apply
-      setForceUpdate(prev => prev + 1);
-      const timer = setTimeout(() => {
-        setForceUpdate(prev => prev + 1);
-      }, 100);
-      
-      return () => clearTimeout(timer);
-    }
-  }, [selectedNode]);
 
   // Optimized camera initialization with increased distance for complete view
   useEffect(() => {
@@ -356,7 +341,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           
         return (
           <Edge
-            key={`edge-${index}-${forceUpdate}`}
+            key={`edge-${index}`}
             start={sourceNode.position}
             end={targetNode.position}
             value={relativeStrength}
@@ -409,7 +394,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           
         return (
           <Node
-            key={`node-${node.id}-${forceUpdate}`}
+            key={`node-${node.id}`}
             node={node}
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
