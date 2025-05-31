@@ -24,14 +24,11 @@ interface SubscriptionModalProps {
 }
 
 const PREMIUM_FEATURES = [
-  'Unlimited journal entries',
-  'Advanced emotion insights',
-  'AI-powered themes extraction',
-  'Detailed analytics and trends',
-  'Export your data',
-  'Priority customer support',
-  'Dark mode themes',
-  'Voice recording unlimited'
+  'Unlimited AI chat conversations - Access to the intelligent chat assistant',
+  'Advanced emotional insights & analytics - Deep pattern analysis and trends',
+  'Interactive SoulNet visualization - 3D network of your emotional connections',
+  'Detailed mood tracking & calendar - Comprehensive mood analysis over time',
+  'Priority customer support - Faster response times for help'
 ];
 
 export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
@@ -172,17 +169,17 @@ export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({
             <h4 className="font-semibold text-center">
               <TranslatableText text="Premium Features" />
             </h4>
-            <div className="grid gap-2">
+            <div className="grid gap-3">
               {PREMIUM_FEATURES.map((feature, index) => (
                 <motion.div
                   key={feature}
                   initial={{ opacity: 0, x: -20 }}
                   animate={{ opacity: 1, x: 0 }}
                   transition={{ delay: index * 0.1 }}
-                  className="flex items-center gap-3"
+                  className="flex items-start gap-3"
                 >
-                  <Check className="h-4 w-4 text-green-500 flex-shrink-0" />
-                  <span className="text-sm">
+                  <Check className="h-5 w-5 text-green-500 flex-shrink-0 mt-0.5" />
+                  <span className="text-sm leading-relaxed">
                     <TranslatableText text={feature} />
                   </span>
                 </motion.div>
