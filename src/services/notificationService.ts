@@ -301,30 +301,34 @@ export function setupJournalReminder(enabled: boolean, frequency: NotificationFr
   });
 }
 
-// Initialize Capacitor notifications (for mobile) - Fixed to handle missing dependency
+// Initialize Capacitor notifications (for mobile) - Updated to avoid build-time import resolution
 export function initializeCapacitorNotifications() {
   console.log('initializeCapacitorNotifications called');
   
   // Check if we're running in Capacitor
   if (typeof window !== 'undefined' && (window as any).Capacitor) {
-    // Try to import Capacitor plugins dynamically, but handle gracefully if not available
-    try {
-      // Only attempt to load if in a Capacitor environment
-      import('@capacitor/local-notifications').then(({ LocalNotifications }) => {
+    console.log('Detected Capacitor environment, attempting to load local notifications');
+    
+    // Use eval to prevent Vite from trying to resolve the import at build time
+    const dynamicImport = new Function('specifier', 'return import(specifier)');
+    
+    dynamicImport('@capacitor/local-notifications')
+      .then((module: any) => {
+        const { LocalNotifications } = module;
+        console.log('Successfully loaded Capacitor LocalNotifications');
+        
         // Request permissions
-        LocalNotifications.requestPermissions().then(result => {
+        LocalNotifications.requestPermissions().then((result: any) => {
           console.log('Capacitor notification permissions:', result);
           
           if (result.display === 'granted') {
             console.log('Capacitor notifications enabled');
           }
         });
-      }).catch(error => {
+      })
+      .catch((error: any) => {
         console.log('Capacitor LocalNotifications not available (this is normal for web):', error.message);
       });
-    } catch (error) {
-      console.log('Error loading Capacitor LocalNotifications (this is normal for web):', error);
-    }
   } else {
     console.log('Not running in Capacitor environment, skipping mobile notifications setup');
   }
