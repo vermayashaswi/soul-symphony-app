@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import '@/types/three-reference';
 import * as THREE from 'three';
@@ -94,80 +93,39 @@ export const Node: React.FC<NodeProps> = ({
       : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
   }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
-  // Safe pointer down handler with error boundaries
   const handlePointerDown = useCallback((e: any) => {
-    try {
-      e.stopPropagation();
-      setIsTouching(true);
-      setTouchStartTime(Date.now());
-      setTouchStartPosition({x: e.clientX, y: e.clientY});
-      console.log(`Node pointer down: ${node.id}`);
-    } catch (error) {
-      console.error(`Error in handlePointerDown for node ${node.id}:`, error);
-    }
+    e.stopPropagation();
+    setIsTouching(true);
+    setTouchStartTime(Date.now());
+    setTouchStartPosition({x: e.clientX, y: e.clientY});
+    console.log(`Node pointer down: ${node.id}`);
   }, [node.id]);
 
-  // Safe pointer up handler with error boundaries
   const handlePointerUp = useCallback((e: any) => {
-    try {
-      e.stopPropagation();
-      if (touchStartTime && Date.now() - touchStartTime < 300) {
-        if (touchStartPosition) {
-          const deltaX = Math.abs(e.clientX - touchStartPosition.x);
-          const deltaY = Math.abs(e.clientY - touchStartPosition.y);
-          
-          if (deltaX < 10 && deltaY < 10) {
-            console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
-            onClick(node.id, e);
-            
-            if (navigator.vibrate) {
-              navigator.vibrate(50);
-            }
-          }
-        } else {
-          console.log(`Node clicked (no start position): ${node.id}`);
+    e.stopPropagation();
+    if (touchStartTime && Date.now() - touchStartTime < 300) {
+      if (touchStartPosition) {
+        const deltaX = Math.abs(e.clientX - touchStartPosition.x);
+        const deltaY = Math.abs(e.clientY - touchStartPosition.y);
+        
+        if (deltaX < 10 && deltaY < 10) {
+          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
           onClick(node.id, e);
+          
+          if (navigator.vibrate) {
+            navigator.vibrate(50);
+          }
         }
+      } else {
+        console.log(`Node clicked (no start position): ${node.id}`);
+        onClick(node.id, e);
       }
-      
-      setIsTouching(false);
-      setTouchStartTime(null);
-      setTouchStartPosition(null);
-    } catch (error) {
-      console.error(`Error in handlePointerUp for node ${node.id}:`, error);
-      // Reset state even if there's an error
-      setIsTouching(false);
-      setTouchStartTime(null);
-      setTouchStartPosition(null);
     }
+    
+    setIsTouching(false);
+    setTouchStartTime(null);
+    setTouchStartPosition(null);
   }, [node.id, onClick, touchStartTime, touchStartPosition, isHighlighted]);
-
-  // Safe pointer out handler
-  const handlePointerOut = useCallback(() => {
-    try {
-      setIsTouching(false);
-    } catch (error) {
-      console.error(`Error in handlePointerOut for node ${node.id}:`, error);
-    }
-  }, [node.id]);
-
-  // Safe pointer leave handler
-  const handlePointerLeave = useCallback(() => {
-    try {
-      setIsTouching(false);
-    } catch (error) {
-      console.error(`Error in handlePointerLeave for node ${node.id}:`, error);
-    }
-  }, [node.id]);
-
-  // Safe click handler for the mesh
-  const handleMeshClick = useCallback((e: any) => {
-    try {
-      onClick(node.id, e);
-    } catch (error) {
-      console.error(`Error in handleMeshClick for node ${node.id}:`, error);
-    }
-  }, [node.id, onClick]);
 
   useEffect(() => {
     if (isTouching && touchStartTime) {
@@ -186,12 +144,6 @@ export const Node: React.FC<NodeProps> = ({
   // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
-  // Validate node position before rendering
-  if (!Array.isArray(node.position) || node.position.length !== 3) {
-    console.error(`Invalid node position for ${node.id}:`, node.position);
-    return null;
-  }
-  
   return (
     <group position={node.position}>
       <NodeMesh
@@ -202,11 +154,11 @@ export const Node: React.FC<NodeProps> = ({
         dimmed={dimmed}
         connectionStrength={connectionStrength}
         isSelected={isSelected}
-        onClick={handleMeshClick}
+        onClick={(e) => onClick(node.id, e)}
         onPointerDown={handlePointerDown}
         onPointerUp={handlePointerUp}
-        onPointerOut={handlePointerOut}
-        onPointerLeave={handlePointerLeave}
+        onPointerOut={() => setIsTouching(false)}
+        onPointerLeave={() => setIsTouching(false)}
       />
       
       <NodeLabel

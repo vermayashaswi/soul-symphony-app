@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -126,6 +125,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
   const [cameraZoom, setCameraZoom] = useState<number>(45);
+  const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
   
   console.log("Rendering SoulNetVisualization component with data:", 
@@ -175,6 +175,20 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       return new THREE.Vector3(0, 0, 0);
     }
   }, [validData.nodes]);
+
+  useEffect(() => {
+    // Force a re-render after selection changes to ensure visuals update
+    if (selectedNode) {
+      console.log(`Selected node: ${selectedNode}`);
+      // Force multiple updates to ensure the visual changes apply
+      setForceUpdate(prev => prev + 1);
+      const timer = setTimeout(() => {
+        setForceUpdate(prev => prev + 1);
+      }, 100);
+      
+      return () => clearTimeout(timer);
+    }
+  }, [selectedNode]);
 
   // Optimized camera initialization with increased distance for complete view
   useEffect(() => {
@@ -261,14 +275,10 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   const shouldDim = !!selectedNode;
 
-  // Safe node click handler with error boundaries
+  // Custom node click handler with debugging
   const handleNodeClick = (id: string, e: any) => {
-    try {
-      console.log(`Node clicked in visualization: ${id}`);
-      onNodeClick(id);
-    } catch (error) {
-      console.error(`Error handling node click for ${id}:`, error);
-    }
+    console.log(`Node clicked in visualization: ${id}`);
+    onNodeClick(id);
   };
 
   if (!validData || !validData.nodes || !validData.links) {
@@ -341,7 +351,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           
         return (
           <Edge
-            key={`edge-${index}`}
+            key={`edge-${index}-${forceUpdate}`}
             start={sourceNode.position}
             end={targetNode.position}
             value={relativeStrength}
@@ -363,11 +373,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           return null;
         }
         
-        // Updated label visibility logic - show all labels initially, then selective when node is selected
-        const showLabel = selectedNode 
-          ? (node.id === selectedNode || highlightedNodes.has(node.id))
-          : shouldShowLabels;
-          
+        // Clean label visibility logic - only show when explicitly requested
+        const showLabel = shouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
@@ -394,7 +401,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           
         return (
           <Node
-            key={`node-${node.id}`}
+            key={`node-${node.id}-${forceUpdate}`}
             node={node}
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}

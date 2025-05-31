@@ -34,7 +34,6 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
   onPointerLeave,
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
-  const timeRef = useRef<number>(0);
   
   // Adjusted node sizes to better match reference image proportions
   const Geometry = useMemo(() => 
@@ -44,24 +43,22 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     [type]
   );
 
-  // Enhanced animation with proper null checks for Three.js objects
+  // Fix: Use state for animation instead of relying on clock from RootState
   useFrame((state, delta) => {
     try {
-      if (!meshRef.current || !meshRef.current.material || !meshRef.current.scale) return;
-      
-      // Use manual time tracking for reliable animation
-      timeRef.current += delta;
+      if (!meshRef.current) return;
       
       if (isHighlighted) {
         const pulseIntensity = isSelected ? 0.25 : (connectionStrength * 0.2);
-        const pulse = Math.sin(timeRef.current * 2.5) * pulseIntensity + 1.1;
+        // Use time calculation based on delta directly
+        const time = state.clock ? state.clock.getElapsedTime() : performance.now() / 1000;
+        const pulse = Math.sin(time * 2.5) * pulseIntensity + 1.1;
         meshRef.current.scale.set(scale * pulse, scale * pulse, scale * pulse);
         
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial && 
-            typeof meshRef.current.material.emissiveIntensity !== 'undefined') {
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           const emissiveIntensity = isSelected 
-            ? 1.0 + Math.sin(timeRef.current * 3) * 0.3
-            : 0.7 + (connectionStrength * 0.3) + Math.sin(timeRef.current * 3) * 0.2;
+            ? 1.0 + Math.sin(time * 3) * 0.3
+            : 0.7 + (connectionStrength * 0.3) + Math.sin(time * 3) * 0.2;
           
           meshRef.current.material.emissiveIntensity = emissiveIntensity;
         }
@@ -69,8 +66,7 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
         const targetScale = dimmed ? scale * 0.8 : scale;
         meshRef.current.scale.set(targetScale, targetScale, targetScale);
         
-        if (meshRef.current.material instanceof THREE.MeshStandardMaterial &&
-            typeof meshRef.current.material.emissiveIntensity !== 'undefined') {
+        if (meshRef.current.material instanceof THREE.MeshStandardMaterial) {
           meshRef.current.material.emissiveIntensity = dimmed ? 0 : 0.1;
         }
       }
@@ -87,49 +83,18 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     return dimmed ? 0.4 : 0.85; // Increased normal opacity for better visibility
   }, [isHighlighted, isSelected, dimmed]);
 
-  // Safe click handler with proper error boundaries
-  const handleClick = (e: any) => {
-    try {
-      e.stopPropagation();
-      onClick(e);
-    } catch (error) {
-      console.error("Error in NodeMesh click handler:", error);
-    }
-  };
-
   return (
     <mesh
       ref={meshRef}
       scale={[scale, scale, scale]}
-      onClick={handleClick}
-      onPointerDown={(e) => {
-        try {
-          onPointerDown(e);
-        } catch (error) {
-          console.error("Error in NodeMesh pointer down:", error);
-        }
+      onClick={(e) => {
+        e.stopPropagation();
+        onClick(e);
       }}
-      onPointerUp={(e) => {
-        try {
-          onPointerUp(e);
-        } catch (error) {
-          console.error("Error in NodeMesh pointer up:", error);
-        }
-      }}
-      onPointerOut={() => {
-        try {
-          onPointerOut();
-        } catch (error) {
-          console.error("Error in NodeMesh pointer out:", error);
-        }
-      }}
-      onPointerLeave={() => {
-        try {
-          onPointerLeave();
-        } catch (error) {
-          console.error("Error in NodeMesh pointer leave:", error);
-        }
-      }}
+      onPointerDown={onPointerDown}
+      onPointerUp={onPointerUp}
+      onPointerOut={onPointerOut}
+      onPointerLeave={onPointerLeave}
       renderOrder={1} // Set a lower render order for the node mesh
     >
       {Geometry}
