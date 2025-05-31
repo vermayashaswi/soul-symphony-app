@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
@@ -373,8 +374,11 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           return null;
         }
         
-        // Clean label visibility logic - only show when explicitly requested
-        const showLabel = shouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
+        // Updated label visibility logic - only show for selected/connected nodes when a node is selected
+        const showLabel = selectedNode 
+          ? (node.id === selectedNode || highlightedNodes.has(node.id))
+          : shouldShowLabels;
+          
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
