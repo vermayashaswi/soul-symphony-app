@@ -51,7 +51,7 @@ body.tutorial-active {
   color: white !important;
   opacity: 1 !important;
   visibility: visible !important;
-  text-shadow: 0 0 4px rgba(0, 0, 0, 0.8) !important; /* Text shadow for all steps */
+  text-shadow: 0 0 4px rgba(0,0,0,0.8) !important; /* Text shadow for all steps */
 }
 
 /* Step 1: Special styling for first step - fully opaque */
@@ -64,6 +64,13 @@ body.tutorial-active {
   top: 10% !important; /* Move to very top */
   left: 50% !important;
   transform: translate(-50%, 0) !important; /* Don't center vertically */
+  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 2 */
+}
+
+/* Steps 3 & 4: Fully opaque background for better visibility */
+.tutorial-step-container[data-step="3"],
+.tutorial-step-container[data-step="4"] {
+  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for steps 3 & 4 */
 }
 
 /* Step 5: Fully opaque background for step 5 */
@@ -92,17 +99,6 @@ body.tutorial-active {
   border-radius: 6px !important;
   overflow: hidden !important;
   box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
-}
-
-/* Steps 2-4: Semi-transparent with blur (except step 2 which should be fully opaque for visibility) */
-.tutorial-step-container:not([data-step="1"]):not([data-step="2"]):not([data-step="5"]):not([data-step="6"]):not([data-step="7"]):not([data-step="8"]):not([data-step="9"]) {
-  background-color: rgba(26, 31, 44, 0.2) !important;
-  backdrop-filter: blur(2px) !important;
-}
-
-/* Step 2: Make it fully opaque for better visibility */
-.tutorial-step-container[data-step="2"] {
-  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for step 2 */
 }
 
 /* Step 1: Journal header styling */
@@ -135,67 +131,53 @@ body.tutorial-active {
   z-index: 10000 !important;
 }
 
-/* Steps 3 & 4: Tab highlighting styling - Identical styling for both record and entries tabs */
+/* Steps 3 & 4: Enhanced tab highlighting with maximum brightness and z-index */
 .record-entry-tab.tutorial-target,
 .entries-tab.tutorial-target {
-  z-index: 10000 !important;
+  z-index: 30000 !important; /* Match modal z-index for same layer appearance */
   position: relative !important;
-  box-shadow: 0 0 35px 20px var(--color-theme) !important; 
-  animation: strong-tab-pulse 1.5s infinite alternate !important;
-  outline: 2px solid white !important;
+  box-shadow: 0 0 50px 30px var(--color-theme) !important; /* Increased glow intensity */
+  animation: ultra-bright-pulse 1.5s infinite alternate !important; /* Enhanced animation */
+  outline: 3px solid white !important; /* Thicker outline */
   opacity: 1 !important;
-  transform: translateZ(0) scale(1.05) !important; /* Force a new stacking context and scale */
-  border: 2px solid white !important;
-  background-color: white !important; /* Add explicit white background */
+  transform: translateZ(0) scale(1.1) !important; /* Larger scale for prominence */
+  border: 3px solid white !important; /* Thicker border */
+  background-color: rgba(255, 255, 255, 0.95) !important; /* Brighter background */
+  backdrop-filter: brightness(1.5) !important; /* Brightness filter for extra glow */
 }
 
-/* Fix for Record Entry tab text visibility in both modes */
+/* Enhanced text visibility for Record Entry tab in both light and dark modes */
 .record-entry-tab.tutorial-target * {
-  color: #000 !important; /* Black text for better visibility */
-  text-shadow: none !important; /* Remove text shadow */
-  font-weight: bold !important; /* Make text bold */
-}
-
-/* Special fix for record entry tab span/div elements in dark mode to increase visibility */
-body.dark .record-entry-tab.tutorial-target span,
-body.dark .record-entry-tab.tutorial-target div {
-  color: #ffffff !important; /* Force white in dark mode */
-  text-shadow: 0 1px 2px rgba(0,0,0,0.9) !important; /* Add shadow for contrast */
-  background-color: rgba(26, 31, 44, 0.7) !important; /* Dark semi-transparent background */
-  padding: 2px 5px !important; /* Add padding */
-  border-radius: 4px !important; /* Rounded corners */
-  font-weight: bold !important;
-}
-
-/* Fix specifically for "Record Entry" text label */
-body.dark [value="record"] span:contains("Record") {
-  color: #ffffff !important;
-  background-color: var(--color-theme) !important;
-  padding: 2px 5px !important;
-  border-radius: 4px !important;
-  box-shadow: 0 0 10px rgba(155, 135, 245, 0.6) !important;
+  color: #000 !important; /* Black text for maximum contrast */
   text-shadow: none !important;
   font-weight: bold !important;
+  background-color: rgba(255, 255, 255, 0.9) !important; /* Bright white background */
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 15px rgba(155, 135, 245, 0.8) !important; /* Bright purple glow */
 }
 
-/* Ensure proper text coloring for entries tab in light mode */
-.entries-tab.tutorial-target {
-  color: #000 !important; /* Black text in light mode */
-  background-color: white !important; /* Explicit white background */
+/* Enhanced text visibility for Past Entries tab in both light and dark modes */
+.entries-tab.tutorial-target * {
+  color: #000 !important; /* Black text for maximum contrast */
+  text-shadow: none !important;
+  font-weight: bold !important;
+  background-color: rgba(255, 255, 255, 0.9) !important; /* Bright white background */
+  padding: 2px 6px !important;
+  border-radius: 4px !important;
+  box-shadow: 0 0 15px rgba(155, 135, 245, 0.8) !important; /* Bright purple glow */
 }
 
-/* Specific fix for Step 4 text visibility in light mode */
-body:not(.dark) .entries-tab.tutorial-target span,
-body:not(.dark) .entries-tab.tutorial-target div {
-  color: #000 !important; /* Black text for light mode */
-  text-shadow: none !important; /* Remove text shadow in light mode */
-  background-color: white !important; /* Explicit white background */
-}
-
+/* Dark mode specific enhancements for maximum visibility */
+body.dark .record-entry-tab.tutorial-target span,
+body.dark .record-entry-tab.tutorial-target div,
 body.dark .entries-tab.tutorial-target span,
 body.dark .entries-tab.tutorial-target div {
-  color: #fff !important; /* White text for dark mode */
-  background-color: transparent !important; /* No background in dark mode */
+  color: #000 !important; /* Force black text even in dark mode */
+  background-color: rgba(255, 255, 255, 0.95) !important; /* Bright white background */
+  text-shadow: none !important;
+  box-shadow: 0 0 20px rgba(155, 135, 245, 1) !important; /* Maximum purple glow */
+  border: 1px solid var(--color-theme) !important; /* Purple border for extra definition */
 }
 
 /* Step 5: Chat question highlight styling - Enhanced for maximum visibility */
@@ -402,6 +384,20 @@ body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
 @keyframes ultra-strong-pulse {
   0% { box-shadow: 0 0 30px 15px var(--color-theme); opacity: 0.8; }
   100% { box-shadow: 0 0 50px 30px var(--color-theme); opacity: 1; }
+}
+
+/* NEW: Ultra bright pulse animation for steps 3 & 4 tab highlighting */
+@keyframes ultra-bright-pulse {
+  0% { 
+    box-shadow: 0 0 40px 25px var(--color-theme); 
+    filter: brightness(1.2) saturate(1.3);
+    opacity: 0.9;
+  }
+  100% { 
+    box-shadow: 0 0 70px 40px var(--color-theme); 
+    filter: brightness(1.5) saturate(1.5);
+    opacity: 1;
+  }
 }
 
 @keyframes chat-pulse {
