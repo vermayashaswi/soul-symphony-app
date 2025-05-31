@@ -24,7 +24,7 @@ class ShareService {
     try {
       const { data: entry, error } = await supabase
         .from('Journal Entries')
-        .select('content, created_at, sentiment, master_themes')
+        .select('"refined text", "transcription text", created_at, sentiment, master_themes')
         .eq('id', entryId)
         .single();
 

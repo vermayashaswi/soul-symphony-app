@@ -8,7 +8,7 @@ import { ShareableContent } from '@/services/shareService';
 interface ShareButtonProps {
   content: ShareableContent;
   variant?: 'default' | 'outline' | 'ghost';
-  size?: 'sm' | 'md' | 'lg';
+  size?: 'default' | 'sm' | 'lg' | 'icon';
   children?: React.ReactNode;
   className?: string;
 }
