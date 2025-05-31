@@ -69,6 +69,11 @@ function SettingsContent() {
   const [notificationFrequency, setNotificationFrequency] = useState<NotificationFrequency>('once');
   const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
+  
+  // Add temporary state for pending notification settings
+  const [pendingNotificationFrequency, setPendingNotificationFrequency] = useState<NotificationFrequency>('once');
+  const [pendingNotificationTimes, setPendingNotificationTimes] = useState<NotificationTime[]>(['evening']);
+  
   const { user, signOut } = useAuth();
   const { 
     isPremium, 
@@ -234,6 +239,7 @@ function SettingsContent() {
     
     if (frequency && ['once', 'twice', 'thrice'].includes(frequency)) {
       setNotificationFrequency(frequency);
+      setPendingNotificationFrequency(frequency);
     }
     
     if (times) {
@@ -241,6 +247,7 @@ function SettingsContent() {
         const parsedTimes = JSON.parse(times) as NotificationTime[];
         if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
           setNotificationTimes(parsedTimes);
+          setPendingNotificationTimes(parsedTimes);
         }
       } catch (e) {
         console.error('Error parsing notification times from localStorage', e);
@@ -327,12 +334,15 @@ function SettingsContent() {
   };
   
   const handleToggleNotifications = (checked: boolean) => {
-    setNotificationsEnabled(checked);
-    
     if (checked) {
+      // Don't enable notifications immediately, just open the settings modal
+      setPendingNotificationFrequency(notificationFrequency);
+      setPendingNotificationTimes(notificationTimes);
       setShowNotificationSettings(true);
       toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
     } else {
+      // Disable notifications immediately
+      setNotificationsEnabled(false);
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
       if (typeof window !== 'undefined') {
         localStorage.removeItem('notification_enabled');
@@ -342,8 +352,8 @@ function SettingsContent() {
     }
   };
   
-  const handleTimeChange = (time: NotificationTime) => {
-    setNotificationTimes(prev => {
+  const handlePendingTimeChange = (time: NotificationTime) => {
+    setPendingNotificationTimes(prev => {
       if (prev.includes(time)) {
         return prev.filter(t => t !== time);
       }
@@ -352,14 +362,14 @@ function SettingsContent() {
   };
   
   const applyNotificationSettings = () => {
-    if (notificationTimes.length === 0) {
+    if (pendingNotificationTimes.length === 0) {
       toast.error(<TranslatableText text="Please select at least one time for notifications" forceTranslate={true} />);
       return;
     }
     
-    let limitedTimes = [...notificationTimes];
-    const maxTimes = notificationFrequency === 'once' ? 1 : 
-                    notificationFrequency === 'twice' ? 2 : 3;
+    let limitedTimes = [...pendingNotificationTimes];
+    const maxTimes = pendingNotificationFrequency === 'once' ? 1 : 
+                    pendingNotificationFrequency === 'twice' ? 2 : 3;
     
     if (limitedTimes.length > maxTimes) {
       limitedTimes = limitedTimes.slice(0, maxTimes);
@@ -367,8 +377,20 @@ function SettingsContent() {
       toast.info(<TranslatableText text={message} forceTranslate={true} />);
     }
     
-    setupJournalReminder(true, notificationFrequency, limitedTimes);
+    // Only now enable notifications and apply the settings
+    setNotificationsEnabled(true);
+    setNotificationFrequency(pendingNotificationFrequency);
+    setNotificationTimes(limitedTimes);
+    setupJournalReminder(true, pendingNotificationFrequency, limitedTimes);
+    
     toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
+    setShowNotificationSettings(false);
+  };
+
+  const cancelNotificationSettings = () => {
+    // Reset pending settings to current settings
+    setPendingNotificationFrequency(notificationFrequency);
+    setPendingNotificationTimes(notificationTimes);
     setShowNotificationSettings(false);
   };
   
@@ -705,7 +727,11 @@ function SettingsContent() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => setShowNotificationSettings(true)}
+                        onClick={() => {
+                          setPendingNotificationFrequency(notificationFrequency);
+                          setPendingNotificationTimes(notificationTimes);
+                          setShowNotificationSettings(true);
+                        }}
                       >
                         <TranslatableText text="Customize" />
                       </Button>
@@ -1037,7 +1063,9 @@ function SettingsContent() {
         <Dialog
           open={showNotificationSettings}
           onOpenChange={(open) => {
-            setShowNotificationSettings(open);
+            if (!open) {
+              cancelNotificationSettings();
+            }
           }}
         >
           <DialogContent className="max-w-md">
@@ -1056,8 +1084,8 @@ function SettingsContent() {
                   <TranslatableText text="Frequency" />
                 </h3>
                 <RadioGroup 
-                  value={notificationFrequency} 
-                  onValueChange={(value) => setNotificationFrequency(value as NotificationFrequency)}
+                  value={pendingNotificationFrequency} 
+                  onValueChange={(value) => setPendingNotificationFrequency(value as NotificationFrequency)}
                   className="flex flex-col space-y-2"
                 >
                   {frequencyOptions.map(option => (
@@ -1077,9 +1105,9 @@ function SettingsContent() {
                     <TranslatableText text="Time of Day" />
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    {notificationFrequency === 'once' ? (
+                    {pendingNotificationFrequency === 'once' ? (
                       <TranslatableText text="Select 1 time" />
-                    ) : notificationFrequency === 'twice' ? (
+                    ) : pendingNotificationFrequency === 'twice' ? (
                       <TranslatableText text="Select up to 2 times" />
                     ) : (
                       <TranslatableText text="Select up to 3 times" />
@@ -1093,15 +1121,15 @@ function SettingsContent() {
                       key={option.value} 
                       className={cn(
                         "border rounded-md px-3 py-2 flex items-center space-x-2 cursor-pointer",
-                        notificationTimes.includes(option.value) 
+                        pendingNotificationTimes.includes(option.value) 
                           ? "border-primary bg-primary/10" 
                           : "border-input"
                       )}
-                      onClick={() => handleTimeChange(option.value)}
+                      onClick={() => handlePendingTimeChange(option.value)}
                     >
                       <Checkbox 
-                        checked={notificationTimes.includes(option.value)} 
-                        onCheckedChange={() => handleTimeChange(option.value)}
+                        checked={pendingNotificationTimes.includes(option.value)} 
+                        onCheckedChange={() => handlePendingTimeChange(option.value)}
                         id={`time-${option.value}`}
                       />
                       <Label 
@@ -1119,13 +1147,13 @@ function SettingsContent() {
             <div className="flex justify-end gap-3">
               <Button 
                 variant="outline" 
-                onClick={() => setShowNotificationSettings(false)}
+                onClick={cancelNotificationSettings}
               >
                 <TranslatableText text="Cancel" />
               </Button>
               <Button 
                 onClick={applyNotificationSettings}
-                disabled={notificationTimes.length === 0}
+                disabled={pendingNotificationTimes.length === 0}
               >
                 <TranslatableText text="Apply Settings" />
               </Button>
