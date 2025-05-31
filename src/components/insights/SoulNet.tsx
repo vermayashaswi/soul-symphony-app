@@ -236,7 +236,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               transition: 'all 0.3s ease-in-out',
             }}
             camera={{ 
-              position: [0, 0, isFullScreen ? 22 : 26], // Restored original camera positioning
+              position: [0, 0, isFullScreen ? 20 : 24], // Adjusted to match reference positioning
               near: 1, 
               far: 1000,
               fov: isFullScreen ? 60 : 50 // Maintained the same FOV

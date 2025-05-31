@@ -30,27 +30,41 @@ const containsDevanagari = (text: string): boolean => {
   return devanagariPattern.test(text);
 };
 
-// Format entity node text to display on two lines
+// Improved entity text formatting for better visual balance
 const formatEntityText = (text: string): string => {
-  if (!text || text.length <= 3) return text;
+  if (!text || text.length <= 4) return text;
   
-  // Split text in approximately half to create two lines
-  const halfLength = Math.ceil(text.length / 2);
-  let splitIndex = halfLength;
+  // For longer entity names, create balanced two-line display
+  const words = text.trim().split(/\s+/);
   
-  // Look for natural break points like spaces near the middle
-  const spaceIndices = [...text.matchAll(/\s/g)].map(match => match.index as number);
-  if (spaceIndices.length > 0) {
-    // Find the space closest to the middle
-    const nearestSpace = spaceIndices.reduce((closest, current) => {
-      return Math.abs(current - halfLength) < Math.abs(closest - halfLength) ? current : closest;
-    }, spaceIndices[0]);
+  if (words.length === 1) {
+    // Single word - split at natural break point
+    const word = words[0];
+    if (word.length <= 8) return word;
     
-    splitIndex = nearestSpace;
+    const midPoint = Math.ceil(word.length / 2);
+    return word.substring(0, midPoint) + '\n' + word.substring(midPoint);
   }
   
-  // Create two-line text with line break
-  return text.substring(0, splitIndex) + '\n' + text.substring(splitIndex).trim();
+  if (words.length === 2) {
+    // Two words - keep on separate lines
+    return words.join('\n');
+  }
+  
+  // Multiple words - group for balanced lines
+  const totalLength = text.length;
+  const targetFirstLineLength = Math.ceil(totalLength / 2);
+  
+  let firstLine = '';
+  let wordIndex = 0;
+  
+  while (wordIndex < words.length && (firstLine + words[wordIndex]).length <= targetFirstLineLength) {
+    firstLine += (firstLine ? ' ' : '') + words[wordIndex];
+    wordIndex++;
+  }
+  
+  const secondLine = words.slice(wordIndex).join(' ');
+  return firstLine + '\n' + secondLine;
 };
 
 interface NodeLabelProps {
@@ -160,20 +174,21 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return translatedText || id;
   }, [id, type, translatedText]);
 
+  // Enhanced font sizing to match reference image
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Restored original font sizing with proper scaling
-    const baseSize = 0.5 + Math.max(0, (26 - z) * 0.015);
+    // Increased base font size to match reference image prominence
+    const baseSize = 0.8 + Math.max(0, (26 - z) * 0.02);
     
     // Adjust size for non-Latin scripts
-    const sizeAdjustment = isDevanagari.current ? 0.1 : 
-                          isNonLatin.current ? 0.06 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.15 : 
+                          isNonLatin.current ? 0.1 : 0;
     
-    // Minimum readable size
-    const minSize = 0.35;
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), minSize);
+    // Higher minimum size for better readability
+    const minSize = 0.6;
+    return Math.max(Math.min(baseSize + sizeAdjustment, 1.2), minSize);
   }, [cameraZoom]);
 
   // Don't render if not visible or no text
@@ -184,9 +199,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return null;
   }
 
-  // Restored original vertical offset for proper positioning
+  // Reduced vertical offset to bring labels closer to nodes (matching reference)
   const verticalOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 2.2 : 2.0;
+    const baseOffset = type === 'entity' ? 1.6 : 1.4; // Reduced from 2.2/2.0
     return baseOffset;
   }, [type]);
 
@@ -199,12 +214,12 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   // Outline for better visibility
   const outlineWidth = useMemo(() => {
-    return isHighlighted ? 0.012 : 0.008;
+    return isHighlighted ? 0.015 : 0.01; // Slightly increased for better definition
   }, [isHighlighted]);
   
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
-  // Calculate final position with proper offset
+  // Calculate final position with reduced offset
   const finalPosition: [number, number, number] = [
     position[0], 
     position[1] + verticalOffset, 

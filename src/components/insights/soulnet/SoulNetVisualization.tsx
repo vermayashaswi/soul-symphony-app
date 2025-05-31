@@ -126,7 +126,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
-  const [cameraZoom, setCameraZoom] = useState<number>(26); // Restored original camera zoom
+  const [cameraZoom, setCameraZoom] = useState<number>(24); // Adjusted from 26 to 24 to match reference zoom
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const { isInStep } = useTutorial();
@@ -208,13 +208,14 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [selectedNode]);
 
+  // Optimized camera initialization to match reference image positioning
   useEffect(() => {
     if (camera && validData.nodes?.length > 0 && !isInitialized) {
-      console.log("Initializing camera position");
+      console.log("Initializing camera position to match reference");
       try {
         const centerX = centerPosition.x;
         const centerY = centerPosition.y;
-        camera.position.set(centerX, centerY, 26); // Restored original camera position
+        camera.position.set(centerX, centerY, 24); // Adjusted from 26 to 24
         camera.lookAt(centerX, centerY, 0);
         setIsInitialized(true);
       } catch (error) {
@@ -261,9 +262,9 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     if (controlsRef.current) {
       controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
       
-      // Restore original distance limits
-      controlsRef.current.minDistance = isFullScreen ? 4 : 5;
-      controlsRef.current.maxDistance = isFullScreen ? 40 : 30;
+      // Adjusted distance limits to match reference image zoom range
+      controlsRef.current.minDistance = isFullScreen ? 4 : 6;
+      controlsRef.current.maxDistance = isFullScreen ? 40 : 32;
     }
   }, [isFullScreen]);
 
@@ -298,8 +299,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         enableDamping
         dampingFactor={isFullScreen ? 0.08 : 0.05}
         rotateSpeed={0.5}
-        minDistance={isFullScreen ? 4 : 5} // Restored original distance limits
-        maxDistance={isFullScreen ? 40 : 30}
+        minDistance={isFullScreen ? 4 : 6} // Adjusted to match reference zoom
+        maxDistance={isFullScreen ? 40 : 32}
         target={centerPosition}
         onChange={() => {
           if (camera) {

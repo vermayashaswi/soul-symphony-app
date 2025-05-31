@@ -35,11 +35,11 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
 }) => {
   const meshRef = useRef<THREE.Mesh>(null);
   
-  // Decrease circle and square node sizes
+  // Adjusted node sizes to better match reference image proportions
   const Geometry = useMemo(() => 
     type === 'entity'
-      ? <sphereGeometry args={[1.25, 32, 32]} /> // Decreased from 2.25 to 1.25 (1x reduction)
-      : <boxGeometry args={[2.3, 2.3, 2.3]} />, // Decreased from 2.7 to 2.3 (0.4x reduction)
+      ? <sphereGeometry args={[1.4, 32, 32]} /> // Increased from 1.25 to 1.4 for better visibility
+      : <boxGeometry args={[2.1, 2.1, 2.1]} />, // Slightly reduced from 2.3 to 2.1 for better balance
     [type]
   );
 
@@ -75,14 +75,12 @@ export const NodeMesh: React.FC<NodeMeshProps> = ({
     }
   });
 
-  // Calculate opacity based on highlight state
-  // Make highlighted but non-selected nodes 30% opacity (70% transparent)
-  // Keep selected node at higher opacity
+  // Enhanced opacity settings to match reference image clarity
   const nodeOpacity = useMemo(() => {
     if (isHighlighted) {
-      return isSelected ? 0.8 : 0.3; // Selected node is 80% opaque, highlighted nodes are 30% opaque
+      return isSelected ? 0.9 : 0.4; // Increased selected opacity, adjusted highlighted
     }
-    return dimmed ? 0.5 : 0.8; // Normal state: dimmed is 50% opaque, regular is 80% opaque
+    return dimmed ? 0.4 : 0.85; // Increased normal opacity for better visibility
   }, [isHighlighted, isSelected, dimmed]);
 
   return (
