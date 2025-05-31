@@ -1,3 +1,4 @@
+
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -112,11 +113,11 @@ const initialTutorialSteps: TutorialStep[] = [
     navigateTo: '/app/chat',
     waitForElement: true
   },
-  // Enhanced steps 6-9 with custom infographics
+  // Enhanced steps 6-9 with refined content and custom infographics
   {
     id: 6,
     title: 'Your Emotional Insights',
-    content: 'Welcome to the Insights page! Here you\'ll find visual representations of your emotional journey and patterns over time.',
+    content: 'Here you\'ll find visual representations of your emotional journey and patterns over time.',
     targetElement: '.insights-container h1',
     alternativeSelectors: INSIGHTS_HEADER_SELECTORS,
     position: 'bottom',
@@ -129,7 +130,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 7,
     title: 'Emotion Trends',
-    content: 'This chart shows how your emotions trend over time. See which emotions appear most frequently in your journal and how they change.',
+    content: 'See which emotions appear most frequently in your journal and how they change over time.',
     targetElement: '.recharts-responsive-container',
     alternativeSelectors: EMOTION_CHART_SELECTORS,
     position: 'top',
@@ -142,7 +143,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 8,
     title: 'Mood Calendar',
-    content: 'The Mood Calendar visualizes your daily sentiment changes. Spot patterns in how your mood fluctuates throughout weeks and months.',
+    content: 'Visualize your daily sentiment changes and spot patterns in how your mood fluctuates throughout weeks and months.',
     targetElement: '[class*="MoodCalendar"]',
     alternativeSelectors: MOOD_CALENDAR_SELECTORS,
     position: 'top',
@@ -155,7 +156,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 9,
     title: 'Soul-Net Visualization',
-    content: 'This neural visualization shows connections between life areas and emotions. Explore how different aspects of your life influence your emotional state.',
+    content: 'Explore neural connections between life areas and emotions to see how different aspects of your life influence your emotional state.',
     targetElement: 'canvas',
     alternativeSelectors: SOULNET_SELECTORS,
     position: 'top',
