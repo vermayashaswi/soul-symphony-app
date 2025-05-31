@@ -1,4 +1,3 @@
-
 import React, { createContext, useContext, useState, useEffect, ReactNode } from 'react';
 import { useAuth } from './AuthContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -80,7 +79,7 @@ const initialTutorialSteps: TutorialStep[] = [
   {
     id: 3,
     title: 'Multilingual Recording',
-    content: 'The New Entry button lets you speak in any language. Our AI understands and transcribes your entries, no matter which language you speak!',
+    content: 'Speak in any language you feel comfortable with. Our AI understands and transcribes your entries, no matter which language you speak!',
     targetElement: '.tutorial-record-entry-button',
     alternativeSelectors: RECORD_ENTRY_SELECTORS,
     position: 'bottom',
