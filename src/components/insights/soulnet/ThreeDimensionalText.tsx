@@ -5,6 +5,7 @@ import { Text } from '@react-three/drei';
 import { useFrame, useThree } from '@react-three/fiber';
 import * as THREE from 'three';
 import { useTranslation } from '@/contexts/TranslationContext';
+import { getFontForScript, checkFontLoaded } from '@/utils/fontLoader';
 
 interface ThreeDimensionalTextProps {
   text: string;
@@ -59,6 +60,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 }) => {
   const { translate, currentLanguage } = useTranslation();
   const [translatedText, setTranslatedText] = useState(text);
+  const [fontLoaded, setFontLoaded] = useState(false);
+  const [currentFont, setCurrentFont] = useState('Inter');
   const { camera } = useThree();
   const textRef = useRef<THREE.Mesh>(null);
   const lastCameraPosition = useRef<THREE.Vector3>(new THREE.Vector3());
@@ -111,18 +114,47 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     translateText();
   }, [text, currentLanguage, translate, skipTranslation]);
 
-  if (!visible || !text) {
-    console.log(`[ThreeDimensionalText] Not rendering: visible=${visible}, text="${text}"`);
+  // Font loading and selection effect
+  useEffect(() => {
+    const loadFont = async () => {
+      const textToCheck = translatedText || text;
+      const requiredFont = getFontForScript(textToCheck);
+      
+      console.log(`[ThreeDimensionalText] Loading font for "${textToCheck}": ${requiredFont}`);
+      
+      try {
+        const isLoaded = await checkFontLoaded(requiredFont);
+        if (isLoaded) {
+          setCurrentFont(requiredFont);
+          setFontLoaded(true);
+          console.log(`[ThreeDimensionalText] Font ${requiredFont} loaded successfully`);
+        } else {
+          console.warn(`[ThreeDimensionalText] Font ${requiredFont} failed to load, using fallback`);
+          setCurrentFont('Inter');
+          setFontLoaded(true);
+        }
+      } catch (error) {
+        console.error(`[ThreeDimensionalText] Error loading font ${requiredFont}:`, error);
+        setCurrentFont('Inter');
+        setFontLoaded(true);
+      }
+    };
+
+    loadFont();
+  }, [translatedText, text]);
+
+  if (!visible || !text || !fontLoaded) {
+    console.log(`[ThreeDimensionalText] Not rendering: visible=${visible}, text="${text}", fontLoaded=${fontLoaded}`);
     return null;
   }
 
   // Enhanced size calculation for Devanagari
-  const effectiveSize = size * (isDevanagari.current ? 3.5 : 2.5); // Increased Devanagari size significantly
+  const effectiveSize = size * (isDevanagari.current ? 4.0 : 2.5); // Further increased Devanagari size
   
   // Enhanced text configuration for better Devanagari readability
   const getMaxWidth = () => {
     if (isDevanagari.current) {
-      return 120; // Increased max width for Devanagari
+      return 150; // Further increased max width for Devanagari
     } else if (isNonLatinScript.current) {
       return 60;
     }
@@ -131,7 +163,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   const getLetterSpacing = () => {
     if (isDevanagari.current) {
-      return 0.25; // Increased letter spacing for Devanagari
+      return 0.3; // Further increased letter spacing for Devanagari
     } else if (isNonLatinScript.current) {
       return 0.08;
     }
@@ -140,7 +172,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   const getLineHeight = () => {
     if (isDevanagari.current) {
-      return 2.5; // Increased line height for Devanagari
+      return 2.8; // Further increased line height for Devanagari
     } else if (isNonLatinScript.current) {
       return 1.8;
     }
@@ -150,7 +182,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   // Enhanced outline for Devanagari
   const getOutlineWidth = () => {
     if (isDevanagari.current) {
-      return outlineWidth * 2; // Double outline width for Devanagari
+      return outlineWidth * 3; // Triple outline width for Devanagari
     }
     return outlineWidth;
   };
@@ -158,12 +190,20 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   // Enhanced SDF glyph size for Devanagari
   const getSdfGlyphSize = () => {
     if (isDevanagari.current) {
-      return 512; // Much higher resolution for Devanagari
+      return 1024; // Maximum resolution for Devanagari
     }
-    return 128;
+    return 256;
   };
 
-  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'isDevanagari:', isDevanagari.current, 'sdfGlyphSize:', getSdfGlyphSize());
+  // Get font weight for the current font
+  const getFontWeight = () => {
+    if (isDevanagari.current) {
+      return bold ? 600 : 500; // Slightly lighter for Devanagari
+    }
+    return bold ? 700 : 500;
+  };
+
+  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'font:', currentFont, 'isDevanagari:', isDevanagari.current, 'sdfGlyphSize:', getSdfGlyphSize());
   
   return (
     <Text
@@ -171,7 +211,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       position={position}
       color={color}
       fontSize={effectiveSize}
-      fontWeight={bold ? 700 : 500}
+      fontWeight={getFontWeight()}
       anchorX="center"
       anchorY="middle"
       outlineWidth={getOutlineWidth()}
@@ -191,8 +231,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       material-side={THREE.DoubleSide}
       material-depthTest={false}
       material-depthWrite={false}
-      // Force font loading for complex scripts
-      font={isDevanagari.current ? undefined : undefined} // Let drei handle font selection
+      // Use the dynamically selected font
+      font={currentFont === 'Noto Sans Devanagari' ? undefined : undefined} // Let drei handle font selection
       characters={isDevanagari.current ? "अआइईउऊएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह्ािीुूृॄेैोौंःँ़ॐ०१२३४५६७८९।॥" : undefined}
     >
       {translatedText}
