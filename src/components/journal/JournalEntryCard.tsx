@@ -17,7 +17,6 @@ import { ThumbsUp, ThumbsDown } from 'lucide-react';
 import { JournalEntry as JournalEntryType } from '@/types/journal';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { textWillOverflow } from '@/utils/textUtils';
-import { ShareEntryButton } from './entry-card/ShareEntryButton';
 
 export interface JournalEntry {
   id: number;
@@ -550,12 +549,6 @@ export function JournalEntryCard({
               <FloatingDotsToggle 
                 onClick={toggleThemes} 
                 isExpanded={showThemes}
-              />
-              <ShareEntryButton
-                entryId={safeEntry.id}
-                entryContent={safeEntry.content}
-                entryDate={safeEntry.created_at}
-                themes={initialThemes}
               />
               <EditEntryButton 
                 entryId={safeEntry.id}
