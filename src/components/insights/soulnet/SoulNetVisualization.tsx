@@ -276,10 +276,14 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   const shouldDim = !!selectedNode;
 
-  // Custom node click handler with debugging
+  // Safe node click handler with error boundaries
   const handleNodeClick = (id: string, e: any) => {
-    console.log(`Node clicked in visualization: ${id}`);
-    onNodeClick(id);
+    try {
+      console.log(`Node clicked in visualization: ${id}`);
+      onNodeClick(id);
+    } catch (error) {
+      console.error(`Error handling node click for ${id}:`, error);
+    }
   };
 
   if (!validData || !validData.nodes || !validData.links) {

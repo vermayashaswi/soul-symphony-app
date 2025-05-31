@@ -25,13 +25,18 @@ const calculateSurfacePoint = (
   nodeType: 'entity' | 'emotion', 
   scale: number = 1
 ): THREE.Vector3 => {
-  // Base radius for different node types
-  const baseRadius = nodeType === 'entity' ? 0.7 : 0.55;
-  const actualRadius = baseRadius * scale;
-  
-  // Normalize direction and scale by radius
-  const normalizedDirection = direction.clone().normalize();
-  return center.clone().add(normalizedDirection.multiplyScalar(actualRadius));
+  try {
+    // Base radius for different node types
+    const baseRadius = nodeType === 'entity' ? 0.7 : 0.55;
+    const actualRadius = baseRadius * scale;
+    
+    // Normalize direction and scale by radius
+    const normalizedDirection = direction.clone().normalize();
+    return center.clone().add(normalizedDirection.multiplyScalar(actualRadius));
+  } catch (error) {
+    console.error("Error calculating surface point:", error);
+    return center.clone();
+  }
 };
 
 export const Edge: React.FC<EdgeProps> = ({ 
@@ -48,11 +53,22 @@ export const Edge: React.FC<EdgeProps> = ({
 }) => {
   const { theme } = useTheme();
   const ref = useRef<THREE.Group>(null);
-  // Change the ref type to match what react-three-fiber expects
-  const lineRef = useRef<THREE.Mesh>(null);
+  const lineRef = useRef<THREE.Line>(null);
 
-  const points = useMemo(() => {
+  const { points, geometry } = useMemo(() => {
     try {
+      // Validate input arrays
+      if (!Array.isArray(start) || start.length !== 3 || !Array.isArray(end) || end.length !== 3) {
+        console.error("Invalid start/end positions for edge:", start, end);
+        return {
+          points: [new THREE.Vector3(0, 0, 0), new THREE.Vector3(0, 0.1, 0)],
+          geometry: new THREE.BufferGeometry().setFromPoints([
+            new THREE.Vector3(0, 0, 0), 
+            new THREE.Vector3(0, 0.1, 0)
+          ])
+        };
+      }
+
       const startVec = new THREE.Vector3(...start);
       const endVec = new THREE.Vector3(...end);
       
@@ -74,21 +90,23 @@ export const Edge: React.FC<EdgeProps> = ({
         midPoint,
         endSurface
       );
-      return curve.getPoints(30);
+      
+      const curvePoints = curve.getPoints(30);
+      const geometry = new THREE.BufferGeometry().setFromPoints(curvePoints);
+      
+      return { points: curvePoints, geometry };
     } catch (error) {
-      console.error("Error creating edge points:", error);
-      return [
+      console.error("Error creating edge geometry:", error);
+      const fallbackPoints = [
         new THREE.Vector3(0, 0, 0),
         new THREE.Vector3(0, 0.1, 0)
       ];
+      return {
+        points: fallbackPoints,
+        geometry: new THREE.BufferGeometry().setFromPoints(fallbackPoints)
+      };
     }
   }, [start, end, startNodeType, endNodeType, startNodeScale, endNodeScale]);
-
-  // Create line geometry once
-  const lineGeometry = useMemo(() => {
-    const geometry = new THREE.BufferGeometry().setFromPoints(points);
-    return geometry;
-  }, [points]);
 
   // Improved color scheme based on theme
   const getEdgeColor = useMemo(() => {
@@ -117,6 +135,7 @@ export const Edge: React.FC<EdgeProps> = ({
     return theme === 'light' ? 0.25 : 0.08;
   }, [isHighlighted, dimmed, theme]);
 
+  // Safe frame updates with error handling
   useFrame(() => {
     try {
       if (!lineRef.current || !lineRef.current.material) return;
@@ -136,20 +155,44 @@ export const Edge: React.FC<EdgeProps> = ({
   
   // Create material with appropriate properties
   const material = useMemo(() => {
-    return new THREE.LineBasicMaterial({
-      color: getEdgeColor,
-      transparent: true,
-      opacity: getEdgeOpacity,
-      linewidth: thickness,
-      depthWrite: false, // Prevent z-fighting
-      depthTest: true,   // Maintain proper depth testing
-    });
+    try {
+      return new THREE.LineBasicMaterial({
+        color: getEdgeColor,
+        transparent: true,
+        opacity: getEdgeOpacity,
+        linewidth: thickness,
+        depthWrite: false, // Prevent z-fighting
+        depthTest: true,   // Maintain proper depth testing
+      });
+    } catch (error) {
+      console.error("Error creating edge material:", error);
+      return new THREE.LineBasicMaterial({
+        color: '#ffffff',
+        transparent: true,
+        opacity: 0.5
+      });
+    }
   }, [getEdgeColor, getEdgeOpacity, thickness]);
+
+  // Safe line creation with error handling
+  const line = useMemo(() => {
+    try {
+      return new THREE.Line(geometry, material);
+    } catch (error) {
+      console.error("Error creating line object:", error);
+      const fallbackGeometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(0, 0, 0),
+        new THREE.Vector3(0, 0.1, 0)
+      ]);
+      const fallbackMaterial = new THREE.LineBasicMaterial({ color: '#ffffff' });
+      return new THREE.Line(fallbackGeometry, fallbackMaterial);
+    }
+  }, [geometry, material]);
 
   return (
     <group ref={ref}>
       <primitive 
-        object={new THREE.Line(lineGeometry, material)} 
+        object={line} 
         ref={lineRef}
         renderOrder={10} // Render edges before nodes
       />
