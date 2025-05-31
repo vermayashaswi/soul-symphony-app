@@ -1,4 +1,3 @@
-
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -200,9 +199,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return null;
   }
 
-  // Reduced vertical offset to bring labels closer to nodes (matching reference)
+  // Significantly reduced vertical offset to bring labels much closer to nodes
   const verticalOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 1.6 : 1.4; // Reduced from 2.2/2.0
+    const baseOffset = type === 'entity' ? 0.8 : 0.6; // Reduced from 1.6/1.4 to 0.8/0.6
     return baseOffset;
   }, [type]);
 
