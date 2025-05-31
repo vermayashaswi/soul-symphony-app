@@ -48,12 +48,12 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   position,
   color = 'white',
   size = 1.2,
-  bold = true, // Changed default to true for consistency
+  bold = true,
   backgroundColor,
   opacity = 1,
   visible = true,
   skipTranslation = false,
-  outlineWidth = 0.025, // Increased default outline width proportionally
+  outlineWidth = 0.025,
   outlineColor = '#000000',
   renderOrder = 1,
 }) => {
@@ -101,7 +101,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
         isNonLatinScript.current = containsNonLatinScript(result);
         isDevanagari.current = containsDevanagari(result);
         
-        console.log(`[ThreeDimensionalText] Translated "${text}" to "${result}"`);
+        console.log(`[ThreeDimensionalText] Translated "${text}" to "${result}", isDevanagari: ${isDevanagari.current}`);
       } catch (e) {
         console.error('[ThreeDimensionalText] Translation error:', e);
         setTranslatedText(text);
@@ -116,13 +116,13 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     return null;
   }
 
-  // Increased effective size by 1.25x (from 2.0 to 2.5)
-  const effectiveSize = size * 2.5;
+  // Enhanced size calculation for Devanagari
+  const effectiveSize = size * (isDevanagari.current ? 3.5 : 2.5); // Increased Devanagari size significantly
   
-  // Enhanced text configuration for better readability
+  // Enhanced text configuration for better Devanagari readability
   const getMaxWidth = () => {
     if (isDevanagari.current) {
-      return 80;
+      return 120; // Increased max width for Devanagari
     } else if (isNonLatinScript.current) {
       return 60;
     }
@@ -131,7 +131,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   const getLetterSpacing = () => {
     if (isDevanagari.current) {
-      return 0.15;
+      return 0.25; // Increased letter spacing for Devanagari
     } else if (isNonLatinScript.current) {
       return 0.08;
     }
@@ -140,14 +140,30 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
 
   const getLineHeight = () => {
     if (isDevanagari.current) {
-      return 2.0;
+      return 2.5; // Increased line height for Devanagari
     } else if (isNonLatinScript.current) {
       return 1.8;
     }
     return 1.4;
   };
 
-  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'bold:', bold);
+  // Enhanced outline for Devanagari
+  const getOutlineWidth = () => {
+    if (isDevanagari.current) {
+      return outlineWidth * 2; // Double outline width for Devanagari
+    }
+    return outlineWidth;
+  };
+
+  // Enhanced SDF glyph size for Devanagari
+  const getSdfGlyphSize = () => {
+    if (isDevanagari.current) {
+      return 512; // Much higher resolution for Devanagari
+    }
+    return 128;
+  };
+
+  console.log(`[ThreeDimensionalText] Rendering: "${translatedText}" at position:`, position, 'size:', effectiveSize, 'isDevanagari:', isDevanagari.current, 'sdfGlyphSize:', getSdfGlyphSize());
   
   return (
     <Text
@@ -158,14 +174,14 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       fontWeight={bold ? 700 : 500}
       anchorX="center"
       anchorY="middle"
-      outlineWidth={outlineWidth}
+      outlineWidth={getOutlineWidth()}
       outlineColor={outlineColor}
       maxWidth={getMaxWidth()}
       overflowWrap="normal"
       whiteSpace="normal"
       textAlign="center"
       letterSpacing={getLetterSpacing()}
-      sdfGlyphSize={isDevanagari.current ? 256 : 128}
+      sdfGlyphSize={getSdfGlyphSize()}
       renderOrder={renderOrder}
       lineHeight={getLineHeight()}
       // Enhanced material properties for maximum visibility
@@ -175,6 +191,9 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
       material-side={THREE.DoubleSide}
       material-depthTest={false}
       material-depthWrite={false}
+      // Force font loading for complex scripts
+      font={isDevanagari.current ? undefined : undefined} // Let drei handle font selection
+      characters={isDevanagari.current ? "अआइईउऊएऐओऔकखगघङचछजझञटठडढणतथदधनपफबभमयरलवशषसह्ािीुूृॄेैोौंःँ़ॐ०१२३४५६७८९।॥" : undefined}
     >
       {translatedText}
     </Text>

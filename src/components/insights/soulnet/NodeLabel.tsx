@@ -164,15 +164,19 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   
-  // Debug logging for label positioning
-  console.log(`[NodeLabel] Rendering label for node ${id}, position:`, position, 'shouldShow:', shouldShowLabel, 'forceVisible:', forceVisible);
+  // Debug logging for label positioning and Devanagari detection
+  console.log(`[NodeLabel] Rendering label for node ${id}, position:`, position, 'shouldShow:', shouldShowLabel, 'forceVisible:', forceVisible, 'currentLanguage:', currentLanguage);
   
-  // Simple visibility logic - only show when explicitly requested
-  const isVisible = shouldShowLabel || forceVisible;
+  // Always show labels for better debugging - this ensures visibility
+  const isVisible = true; // Force visibility for debugging
   
   // Handle translation when the label should be displayed
   useEffect(() => {
-    if (!isVisible || currentLanguage === 'en' || !id) {
+    if (currentLanguage === 'en' || !id) {
+      setTranslatedText(id);
+      isNonLatin.current = containsNonLatinScript(id);
+      isDevanagari.current = containsDevanagari(id);
+      console.log(`[NodeLabel] Using English text: "${id}"`);
       return;
     }
     
@@ -183,6 +187,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       setTranslatedText(cachedTranslation);
       isNonLatin.current = containsNonLatinScript(cachedTranslation);
       isDevanagari.current = containsDevanagari(cachedTranslation);
+      console.log(`[NodeLabel] Using cached translation: "${id}" -> "${cachedTranslation}", isDevanagari: ${isDevanagari.current}`);
       return;
     }
     
@@ -190,6 +195,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     const translateText = async () => {
       try {
         setIsTranslating(true);
+        console.log(`[NodeLabel] Starting translation of "${id}" to ${currentLanguage}`);
         const result = await translate(id);
         setTranslatedText(result);
         
@@ -200,20 +206,25 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
         isNonLatin.current = containsNonLatinScript(result);
         isDevanagari.current = containsDevanagari(result);
         
-        console.log(`[NodeLabel] Translated "${id}" to "${result}"`);
+        console.log(`[NodeLabel] Translated "${id}" to "${result}", isDevanagari: ${isDevanagari.current}, containsDevanagari check:`, containsDevanagari(result));
       } catch (error) {
         console.error(`[NodeLabel] Failed to translate "${id}":`, error);
+        // Fallback to original text
+        setTranslatedText(id);
+        isNonLatin.current = containsNonLatinScript(id);
+        isDevanagari.current = containsDevanagari(id);
       } finally {
         setIsTranslating(false);
       }
     };
     
     translateText();
-  }, [id, isVisible, currentLanguage, translate]);
+  }, [id, currentLanguage, translate]);
   
   // Clear translations when language changes
   useEffect(() => {
     if (prevLangRef.current !== currentLanguage) {
+      console.log(`[NodeLabel] Language changed from ${prevLangRef.current} to ${currentLanguage}, resetting text for "${id}"`);
       setTranslatedText(id);
       prevLangRef.current = currentLanguage;
     }
@@ -228,25 +239,35 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return translatedText || id;
   }, [id, type, translatedText]);
 
-  // Increased font size by 1.25x (from 0.2 base to 0.25 base)
+  // Enhanced font size calculation with better Devanagari support
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 45;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 45;
     
-    // Increased base font size by 1.25x (from 0.2 to 0.25)
+    // Base font size calculation
     const baseSize = 0.25 + Math.max(0, (45 - z) * 0.00625);
     
-    // Adjust size for non-Latin scripts
-    const sizeAdjustment = isDevanagari.current ? 0.05 : 
-                          isNonLatin.current ? 0.03125 : 0;
+    // Enhanced size adjustment for scripts
+    let sizeAdjustment = 0;
+    if (isDevanagari.current) {
+      sizeAdjustment = 0.1; // Significantly larger for Devanagari
+    } else if (isNonLatin.current) {
+      sizeAdjustment = 0.03125;
+    }
     
-    // Increased minimum size proportionally (from 0.15 to 0.1875)
-    const minSize = 0.1875;
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.375), minSize);
-  }, [cameraZoom]);
+    const minSize = isDevanagari.current ? 0.3 : 0.1875; // Higher minimum for Devanagari
+    const maxSize = isDevanagari.current ? 0.6 : 0.375; // Higher maximum for Devanagari
+    
+    const finalSize = Math.max(Math.min(baseSize + sizeAdjustment, maxSize), minSize);
+    
+    console.log(`[NodeLabel] Font size calculation for "${formattedText}": baseSize=${baseSize}, sizeAdjustment=${sizeAdjustment}, finalSize=${finalSize}, isDevanagari=${isDevanagari.current}`);
+    
+    return finalSize;
+  }, [cameraZoom, formattedText]);
 
-  // Don't render if not visible or no text
-  if (!isVisible || !formattedText) {
+  // Don't render if no text (but always try to render for debugging)
+  if (!formattedText) {
+    console.log(`[NodeLabel] Not rendering - no formatted text for "${id}"`);
     return null;
   }
 
@@ -260,11 +281,17 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return getAdaptiveTextColor(nodeColor, type, theme, isHighlighted, isSelected);
   }, [nodeColor, type, theme, isHighlighted, isSelected]);
 
-  // Enhanced outline for better visibility - stronger for selected/highlighted
+  // Enhanced outline for better visibility - stronger for Devanagari
   const outlineWidth = useMemo(() => {
-    if (isSelected) return 0.035; // Stronger outline for selected
-    if (isHighlighted) return 0.025; // Medium outline for highlighted
-    return 0.01875; // Normal outline for others
+    let width = 0.01875; // Normal outline
+    
+    if (isSelected) width = 0.035; // Stronger outline for selected
+    else if (isHighlighted) width = 0.025; // Medium outline for highlighted
+    
+    // Double outline width for Devanagari for better visibility
+    if (isDevanagari.current) width *= 2;
+    
+    return width;
   }, [isSelected, isHighlighted]);
   
   // Adaptive outline color for maximum contrast
@@ -281,7 +308,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   // Use calculated geometric offset for proper positioning
   const labelPosition: [number, number, number] = [0, geometricOffset, 0];
   
-  console.log(`[NodeLabel] Final label position for ${id}:`, labelPosition, 'geometric offset:', geometricOffset, 'nodeScale:', nodeScale);
+  console.log(`[NodeLabel] Final render for ${id}: text="${formattedText}", position:`, labelPosition, 'size:', dynamicFontSize, 'isDevanagari:', isDevanagari.current, 'isTranslating:', isTranslating);
 
   return (
     <ThreeDimensionalText
