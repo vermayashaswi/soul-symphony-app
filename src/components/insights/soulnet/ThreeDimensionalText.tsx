@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useRef } from 'react';
 import '@/types/three-reference';
 import { Text } from '@react-three/drei';
@@ -52,7 +53,7 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
   opacity = 1,
   visible = true,
   skipTranslation = false,
-  outlineWidth = 0.02, // Increased default outline width
+  outlineWidth = 0.025, // Increased default outline width proportionally
   outlineColor = '#000000',
   renderOrder = 1,
 }) => {
@@ -115,8 +116,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     return null;
   }
 
-  // Restored original effective size calculation
-  const effectiveSize = size * 2.0;
+  // Increased effective size by 1.25x (from 2.0 to 2.5)
+  const effectiveSize = size * 2.5;
   
   // Enhanced text configuration for better readability
   const getMaxWidth = () => {

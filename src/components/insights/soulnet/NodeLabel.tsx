@@ -1,4 +1,5 @@
 
+
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -66,6 +67,22 @@ const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion',
   return theme === 'light' ? '#1a1a1a' : '#ffffff';
 };
 
+// Calculate proper geometric distance for label positioning
+const calculateLabelOffset = (nodeType: 'entity' | 'emotion', nodeScale: number): number => {
+  if (nodeType === 'entity') {
+    // For entity nodes (spheres): radius × scale × 1.25
+    // Sphere radius is 1.4 from NodeMesh.tsx
+    const sphereRadius = 1.4;
+    return sphereRadius * nodeScale * 1.25;
+  } else {
+    // For emotion nodes (cubes): corner distance × scale × 1.25
+    // Cube size is 2.1, so corner distance is sqrt(3) * (2.1/2) ≈ 1.82
+    const cubeSize = 2.1;
+    const cornerDistance = Math.sqrt(3) * (cubeSize / 2);
+    return cornerDistance * nodeScale * 1.25;
+  }
+};
+
 // Improved entity text formatting for better visual balance
 const formatEntityText = (text: string): string => {
   if (!text || text.length <= 4) return text;
@@ -113,7 +130,7 @@ interface NodeLabelProps {
   themeHex: string;
   forceVisible?: boolean;
   nodeColor?: string;
-  nodeScale?: number; // Added the missing nodeScale prop
+  nodeScale?: number;
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
@@ -126,7 +143,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   themeHex,
   forceVisible = false,
   nodeColor = '#ffffff',
-  nodeScale = 1 // Added default value
+  nodeScale = 1
 }) => {
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
@@ -200,21 +217,21 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return translatedText || id;
   }, [id, type, translatedText]);
 
-  // Reduced font sizing by 75% to match user request
+  // Increased font size by 1.25x (from 0.2 base to 0.25 base)
   const dynamicFontSize = useMemo(() => {
     let z = cameraZoom !== undefined ? cameraZoom : 45;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 45;
     
-    // Reduced base font size by 75% (from 0.8 to 0.2)
-    const baseSize = 0.2 + Math.max(0, (45 - z) * 0.005);
+    // Increased base font size by 1.25x (from 0.2 to 0.25)
+    const baseSize = 0.25 + Math.max(0, (45 - z) * 0.00625);
     
     // Adjust size for non-Latin scripts
-    const sizeAdjustment = isDevanagari.current ? 0.04 : 
-                          isNonLatin.current ? 0.025 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.05 : 
+                          isNonLatin.current ? 0.03125 : 0;
     
-    // Reduced minimum size proportionally (from 0.6 to 0.15)
-    const minSize = 0.15;
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.3), minSize);
+    // Increased minimum size proportionally (from 0.15 to 0.1875)
+    const minSize = 0.1875;
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.375), minSize);
   }, [cameraZoom]);
 
   // Don't render if not visible or no text
@@ -222,11 +239,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return null;
   }
 
-  // FIXED: Increased vertical offset to prevent label overlap
-  const verticalOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 0.22 : 0.18; // Increased from 0.15/0.1
-    return baseOffset;
-  }, [type]);
+  // Calculate proper geometric distance for label positioning
+  const geometricOffset = useMemo(() => {
+    return calculateLabelOffset(type, nodeScale);
+  }, [type, nodeScale]);
 
   // Adaptive text color based on node color and type
   const textColor = useMemo(() => {
@@ -235,7 +251,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   // Enhanced outline for better visibility
   const outlineWidth = useMemo(() => {
-    return isHighlighted ? 0.02 : 0.015; // Increased outline width
+    return isHighlighted ? 0.025 : 0.01875; // Increased proportionally
   }, [isHighlighted]);
   
   // Adaptive outline color for maximum contrast
@@ -244,10 +260,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return textLuminance > 0.5 ? '#000000' : '#ffffff';
   }, [textColor]);
 
-  // FIXED: Use relative positioning instead of absolute world position
-  const labelPosition: [number, number, number] = [0, verticalOffset, 0];
+  // Use calculated geometric offset for proper positioning
+  const labelPosition: [number, number, number] = [0, geometricOffset, 0];
   
-  console.log(`[NodeLabel] Final label position for ${id}:`, labelPosition, 'offset:', verticalOffset);
+  console.log(`[NodeLabel] Final label position for ${id}:`, labelPosition, 'geometric offset:', geometricOffset, 'nodeScale:', nodeScale);
 
   return (
     <ThreeDimensionalText
