@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { Canvas } from '@react-three/fiber';
@@ -16,7 +15,6 @@ import ErrorBoundary from './ErrorBoundary';
 import { TranslatableText } from '@/components/translation/TranslatableText';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-import { useTutorial } from '@/contexts/TutorialContext';
 
 interface NodeData {
   id: string;
@@ -41,13 +39,11 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   const [graphData, setGraphData] = useState<{nodes: NodeData[], links: LinkData[]}>({ nodes: [], links: [] });
   const [loading, setLoading] = useState(true);
   const [isFullScreen, setIsFullScreen] = useState(false);
-  const [forceShowLabels, setForceShowLabels] = useState(false);
   const isMobile = useIsMobile();
   const themeHex = useUserColorThemeHex();
   const [selectedEntity, setSelectedEntity] = useState<string | null>(null);
   const [error, setError] = useState<Error | null>(null);
   const { currentLanguage } = useTranslation();
-  const { isInStep } = useTutorial();
 
   console.log("Rendering SoulNet component with userId:", userId, "and timeRange:", timeRange);
 
@@ -62,47 +58,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
   useEffect(() => {
     onDemandTranslationCache.clearLanguage(currentLanguage);
   }, [currentLanguage]);
-
-  // Enhanced tutorial debugging listener with step 9 specific handling
-  useEffect(() => {
-    const handleTutorialDebug = (event: CustomEvent) => {
-      const { step, forceShowLabels: shouldForceShowLabels } = event.detail;
-      console.log('[SoulNet] Tutorial debug event:', { step, shouldForceShowLabels });
-      
-      if (step === 9 && shouldForceShowLabels) {
-        console.log('[SoulNet] Forcing labels to be visible for tutorial step 9');
-        setForceShowLabels(true);
-        
-        // Also trigger a canvas refresh to ensure labels are properly positioned
-        setTimeout(() => {
-          window.dispatchEvent(new Event('resize'));
-          console.log('[SoulNet] Canvas refresh triggered for tutorial step 9');
-        }, 100);
-      }
-    };
-
-    window.addEventListener('tutorial-soul-net-debug', handleTutorialDebug as EventListener);
-    
-    return () => {
-      window.removeEventListener('tutorial-soul-net-debug', handleTutorialDebug as EventListener);
-    };
-  }, []);
-
-  // Automatically force show labels when in tutorial step 9
-  useEffect(() => {
-    if (isInStep(9)) {
-      console.log('[SoulNet] Tutorial step 9 detected, forcing labels to show');
-      setForceShowLabels(true);
-      
-      // Trigger canvas refresh for step 9
-      setTimeout(() => {
-        window.dispatchEvent(new Event('resize'));
-      }, 200);
-    } else if (forceShowLabels && !isInStep(9)) {
-      console.log('[SoulNet] Exiting tutorial step 9, resetting forced labels');
-      setForceShowLabels(false);
-    }
-  }, [isInStep, forceShowLabels]);
 
   useEffect(() => {
     if (!userId) return;
@@ -193,8 +148,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Enhanced shouldShowLabels logic that includes tutorial debugging and step 9
-  const shouldShowLabels = forceShowLabels || isFullScreen || selectedEntity !== null || isInStep(9);
+  // Clean shouldShowLabels logic - only show when node is selected or in fullscreen
+  const shouldShowLabels = isFullScreen || selectedEntity !== null;
 
   return (
     <div className={cn(
@@ -236,10 +191,10 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               transition: 'all 0.3s ease-in-out',
             }}
             camera={{ 
-              position: [0, 0, isFullScreen ? 40 : 45], // Increased from 20/24 to 40/45 for complete view
+              position: [0, 0, isFullScreen ? 40 : 45],
               near: 1, 
               far: 1000,
-              fov: isFullScreen ? 60 : 50 // Maintained the same FOV
+              fov: isFullScreen ? 60 : 50
             }}
             onPointerMissed={() => setSelectedEntity(null)}
             gl={{ 
@@ -250,7 +205,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               depth: true,
               stencil: false,
               precision: isMobile ? 'mediump' : 'highp',
-              logarithmicDepthBuffer: true // Maintain logarithmic depth buffer for better z-sorting
+              logarithmicDepthBuffer: true
             }}
           >
             <SoulNetVisualization
@@ -270,12 +225,6 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
           <p className="text-xs text-muted-foreground">
             {getInstructions()}
           </p>
-          {/* Enhanced debug info for tutorial */}
-          {(forceShowLabels || isInStep(9)) && (
-            <p className="text-xs text-blue-500 mt-1">
-              Tutorial Mode: Labels Force Enabled {isInStep(9) ? '(Step 9)' : ''}
-            </p>
-          )}
         </div>
       )}
     </div>

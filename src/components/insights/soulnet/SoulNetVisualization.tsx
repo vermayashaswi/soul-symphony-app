@@ -1,12 +1,11 @@
 
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import '@/types/three-reference';  // Fixed import path
+import '@/types/three-reference';
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import Node from './Node';
 import Edge from './Edge';
 import * as THREE from 'three';
-import { useTutorial } from '@/contexts/TutorialContext';
 
 interface NodeData {
   id: string;
@@ -126,16 +125,12 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
-  const [cameraZoom, setCameraZoom] = useState<number>(45); // Increased from 24 to 45 for better default view
+  const [cameraZoom, setCameraZoom] = useState<number>(45);
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
-  const { isInStep } = useTutorial();
-  
-  // Enhanced tutorial step 9 detection
-  const isTutorialStep9 = isInStep(9);
   
   console.log("Rendering SoulNetVisualization component with data:", 
-    data?.nodes?.length, "nodes and", data?.links?.length, "links, fullscreen:", isFullScreen, "tutorial step 9:", isTutorialStep9);
+    data?.nodes?.length, "nodes and", data?.links?.length, "links, fullscreen:", isFullScreen);
   
   useEffect(() => {
     console.log("SoulNetVisualization mounted");
@@ -143,18 +138,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       console.log("SoulNetVisualization unmounted");
     };
   }, []);
-
-  // Enhanced tutorial step 9 logging
-  useEffect(() => {
-    if (isTutorialStep9) {
-      console.log('[SoulNetVisualization] Tutorial Step 9 detected:', {
-        nodesCount: data?.nodes?.length,
-        shouldShowLabels,
-        isFullScreen,
-        forceShowLabels: true
-      });
-    }
-  }, [isTutorialStep9, data?.nodes?.length, shouldShowLabels, isFullScreen]);
   
   // Ensure data is valid
   const validData = useMemo(() => {
@@ -215,7 +198,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       try {
         const centerX = centerPosition.x;
         const centerY = centerPosition.y;
-        camera.position.set(centerX, centerY, 45); // Increased from 24 to 45 for complete view
+        camera.position.set(centerX, centerY, 45);
         camera.lookAt(centerX, centerY, 0);
         setIsInitialized(true);
       } catch (error) {
@@ -264,7 +247,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       
       // Increased distance limits to allow complete visualization view
       controlsRef.current.minDistance = isFullScreen ? 8 : 10;
-      controlsRef.current.maxDistance = isFullScreen ? 80 : 60; // Significantly increased for complete view
+      controlsRef.current.maxDistance = isFullScreen ? 80 : 60;
     }
   }, [isFullScreen]);
 
@@ -275,9 +258,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     console.log(`Node clicked in visualization: ${id}`);
     onNodeClick(id);
   };
-
-  // Enhanced label visibility logic for tutorial step 9
-  const enhancedShouldShowLabels = isTutorialStep9 || shouldShowLabels;
 
   if (!validData || !validData.nodes || !validData.links) {
     console.error("SoulNetVisualization: Data is missing or invalid", validData);
@@ -300,7 +280,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         dampingFactor={isFullScreen ? 0.08 : 0.05}
         rotateSpeed={0.5}
         minDistance={isFullScreen ? 8 : 10}
-        maxDistance={isFullScreen ? 80 : 60} // Increased for complete view
+        maxDistance={isFullScreen ? 80 : 60}
         target={centerPosition}
         onChange={() => {
           if (camera) {
@@ -367,8 +347,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           return null;
         }
         
-        // Enhanced label visibility logic that prioritizes tutorial step 9
-        const showLabel = enhancedShouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
+        // Clean label visibility logic - only show when explicitly requested
+        const showLabel = shouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
@@ -392,16 +372,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           console.warn(`Node ${node.id} has invalid position:`, node.position);
           return null;
         }
-
-        // Enhanced debug logging for tutorial step 9
-        if (isTutorialStep9) {
-          console.log(`[SoulNetVisualization] Tutorial Step 9 - Node ${node.id} (${node.type}):`, {
-            position: node.position,
-            showLabel,
-            enhancedShouldShowLabels,
-            forceShowLabels: isTutorialStep9
-          });
-        }
           
         return (
           <Node
@@ -419,7 +389,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             connectionStrength={connectionStrength}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
-            forceShowLabels={isTutorialStep9} // Pass tutorial state
+            forceShowLabels={false}
           />
         );
       })}

@@ -1,11 +1,11 @@
+
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import '@/types/three-reference';  // Fixed import path
+import '@/types/three-reference';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
-import { useTutorial } from '@/contexts/TutorialContext';
 
 interface NodeData {
   id: string;
@@ -29,7 +29,7 @@ interface NodeProps {
   connectionStrength?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
-  forceShowLabels?: boolean; // New prop for tutorial mode
+  forceShowLabels?: boolean;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -49,7 +49,6 @@ export const Node: React.FC<NodeProps> = ({
   forceShowLabels = false
 }) => {
   const { theme } = useTheme();
-  const { isInStep } = useTutorial();
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
@@ -57,24 +56,8 @@ export const Node: React.FC<NodeProps> = ({
   const prevSelectedRef = useRef<boolean>(isSelected);
   const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
   
-  // Enhanced label visibility for tutorial step 9
-  const isTutorialStep9 = isInStep(9);
-  const shouldShowLabel = isTutorialStep9 || forceShowLabels || showLabel || isHighlighted || isSelected;
-  
-  // Enhanced debug logging for tutorial step 9
-  useEffect(() => {
-    if (isTutorialStep9) {
-      console.log(`[Node] Tutorial Step 9 - ${node.id} (${node.type}):`, {
-        position: node.position,
-        shouldShowLabel,
-        showLabel,
-        forceShowLabels,
-        isHighlighted,
-        isSelected,
-        isTutorialStep9
-      });
-    }
-  }, [node.id, node.type, node.position, shouldShowLabel, showLabel, forceShowLabels, isHighlighted, isSelected, isTutorialStep9]);
+  // Clean label visibility logic - only show for selected/highlighted nodes
+  const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
   
   // Track state changes that might cause flickering
   useEffect(() => {
@@ -184,10 +167,9 @@ export const Node: React.FC<NodeProps> = ({
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
-        forceVisible={isTutorialStep9 || forceShowLabels} // Pass tutorial state
+        forceVisible={forceShowLabels}
       />
 
-      {/* Place the percentage display in front of the node */}
       <ConnectionPercentage
         position={node.position}
         percentage={connectionPercentage}

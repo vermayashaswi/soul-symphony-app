@@ -3,7 +3,6 @@ import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
-import { useTutorial } from '@/contexts/TutorialContext';
 
 // Helper function to detect non-Latin script
 const containsNonLatinScript = (text: string): boolean => {
@@ -75,7 +74,7 @@ interface NodeLabelProps {
   shouldShowLabel: boolean;
   cameraZoom?: number;
   themeHex: string;
-  forceVisible?: boolean; // New prop for tutorial mode
+  forceVisible?: boolean;
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
@@ -90,31 +89,14 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 }) => {
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
-  const { isInStep } = useTutorial();
   const [translatedText, setTranslatedText] = useState<string>(id);
   const [isTranslating, setIsTranslating] = useState(false);
   const prevLangRef = useRef<string>(currentLanguage);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   
-  // Enhanced visibility logic - prioritize tutorial step 9 and forceVisible
-  const isTutorialStep9 = isInStep(9);
-  const isVisible = isTutorialStep9 || forceVisible || shouldShowLabel;
-  
-  // Enhanced debug logging for tutorial step 9
-  useEffect(() => {
-    if (isTutorialStep9) {
-      console.log(`[NodeLabel] Tutorial Step 9 - ${id} (${type}):`, {
-        position,
-        isVisible,
-        shouldShowLabel,
-        forceVisible,
-        isTutorialStep9,
-        isHighlighted,
-        cameraZoom
-      });
-    }
-  }, [id, type, position, isVisible, shouldShowLabel, forceVisible, isTutorialStep9, isHighlighted, cameraZoom]);
+  // Simple visibility logic - only show when explicitly requested
+  const isVisible = shouldShowLabel || forceVisible;
   
   // Handle translation when the label should be displayed
   useEffect(() => {
@@ -176,11 +158,11 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   // Reduced font sizing by 75% to match user request
   const dynamicFontSize = useMemo(() => {
-    let z = cameraZoom !== undefined ? cameraZoom : 45; // Updated default from 26 to 45
+    let z = cameraZoom !== undefined ? cameraZoom : 45;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 45;
     
     // Reduced base font size by 75% (from 0.8 to 0.2)
-    const baseSize = 0.2 + Math.max(0, (45 - z) * 0.005); // Adjusted scaling factor
+    const baseSize = 0.2 + Math.max(0, (45 - z) * 0.005);
     
     // Adjust size for non-Latin scripts
     const sizeAdjustment = isDevanagari.current ? 0.04 : 
@@ -188,20 +170,17 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     
     // Reduced minimum size proportionally (from 0.6 to 0.15)
     const minSize = 0.15;
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.3), minSize); // Reduced max size from 1.2 to 0.3
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.3), minSize);
   }, [cameraZoom]);
 
   // Don't render if not visible or no text
   if (!isVisible || !formattedText) {
-    if (isTutorialStep9) {
-      console.log(`[NodeLabel] Tutorial Step 9 - Not rendering ${id}: visible=${isVisible}, text="${formattedText}"`);
-    }
     return null;
   }
 
-  // Significantly reduced vertical offset to bring labels much closer to nodes
+  // Much closer vertical offset - labels should be very close to nodes
   const verticalOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 0.8 : 0.6; // Reduced from 1.6/1.4 to 0.8/0.6
+    const baseOffset = type === 'entity' ? 0.4 : 0.3; // Further reduced from 0.8/0.6
     return baseOffset;
   }, [type]);
 
@@ -214,21 +193,17 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   // Outline for better visibility
   const outlineWidth = useMemo(() => {
-    return isHighlighted ? 0.015 : 0.01; // Slightly increased for better definition
+    return isHighlighted ? 0.015 : 0.01;
   }, [isHighlighted]);
   
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
-  // Calculate final position with reduced offset
+  // Calculate final position with much closer offset
   const finalPosition: [number, number, number] = [
     position[0], 
     position[1] + verticalOffset, 
     position[2]
   ];
-
-  if (isTutorialStep9) {
-    console.log(`[NodeLabel] Tutorial Step 9 - Rendering "${id}" (${type}) at position:`, finalPosition, 'with text:', formattedText);
-  }
 
   return (
     <ThreeDimensionalText
