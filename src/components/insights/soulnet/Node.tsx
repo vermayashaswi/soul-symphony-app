@@ -166,12 +166,13 @@ export const Node: React.FC<NodeProps> = ({
         type={node.type}
         position={[0, 0, 0]}
         isHighlighted={isHighlighted}
+        isSelected={isSelected}
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
         forceVisible={forceShowLabels}
         nodeColor={displayColor}
-        nodeScale={scale} // Pass the calculated scale for dynamic positioning
+        nodeScale={scale}
       />
 
       <ConnectionPercentage

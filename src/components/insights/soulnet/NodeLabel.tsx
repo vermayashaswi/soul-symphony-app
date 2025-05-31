@@ -1,5 +1,3 @@
-
-
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -50,21 +48,32 @@ const calculateLuminance = (color: string): number => {
   return 0.2126 * rLinear + 0.7152 * gLinear + 0.0722 * bLinear;
 };
 
-// Get adaptive text color based on node color and type
-const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean): string => {
-  if (nodeType === 'emotion') {
-    // For emotion nodes, use the theme color but ensure contrast
-    const luminance = calculateLuminance(nodeColor);
-    return luminance > 0.5 ? '#000000' : '#ffffff';
-  }
-  
-  // For entity nodes (typically white/gray)
-  if (isHighlighted) {
+// Enhanced adaptive text color with distinct colors for different node states
+const getAdaptiveTextColor = (nodeColor: string, nodeType: 'entity' | 'emotion', theme: string, isHighlighted: boolean, isSelected: boolean): string => {
+  // Selected node gets bright, high-contrast color
+  if (isSelected) {
     return theme === 'light' ? '#000000' : '#ffffff';
   }
   
-  // For non-highlighted entity nodes, use high contrast
-  return theme === 'light' ? '#1a1a1a' : '#ffffff';
+  // Connected/highlighted nodes get secondary accent color
+  if (isHighlighted) {
+    if (nodeType === 'emotion') {
+      // For emotion nodes, use a bright accent color
+      return theme === 'light' ? '#2563eb' : '#60a5fa'; // Blue accent
+    } else {
+      // For entity nodes, use a contrasting accent
+      return theme === 'light' ? '#dc2626' : '#f87171'; // Red accent
+    }
+  }
+  
+  // Non-highlighted nodes use muted colors (existing logic)
+  if (nodeType === 'emotion') {
+    const luminance = calculateLuminance(nodeColor);
+    return luminance > 0.5 ? '#666666' : '#999999';
+  }
+  
+  // For non-highlighted entity nodes, use muted contrast
+  return theme === 'light' ? '#666666' : '#999999';
 };
 
 // Calculate proper geometric distance for label positioning
@@ -125,6 +134,7 @@ interface NodeLabelProps {
   type: 'entity' | 'emotion';
   position: [number, number, number];
   isHighlighted: boolean;
+  isSelected: boolean;
   shouldShowLabel: boolean;
   cameraZoom?: number;
   themeHex: string;
@@ -138,6 +148,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   type,
   position,
   isHighlighted,
+  isSelected,
   shouldShowLabel,
   cameraZoom,
   themeHex,
@@ -244,21 +255,28 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return calculateLabelOffset(type, nodeScale);
   }, [type, nodeScale]);
 
-  // Adaptive text color based on node color and type
+  // Enhanced adaptive text color with distinct colors for different states
   const textColor = useMemo(() => {
-    return getAdaptiveTextColor(nodeColor, type, theme, isHighlighted);
-  }, [nodeColor, type, theme, isHighlighted]);
+    return getAdaptiveTextColor(nodeColor, type, theme, isHighlighted, isSelected);
+  }, [nodeColor, type, theme, isHighlighted, isSelected]);
 
-  // Enhanced outline for better visibility
+  // Enhanced outline for better visibility - stronger for selected/highlighted
   const outlineWidth = useMemo(() => {
-    return isHighlighted ? 0.025 : 0.01875; // Increased proportionally
-  }, [isHighlighted]);
+    if (isSelected) return 0.035; // Stronger outline for selected
+    if (isHighlighted) return 0.025; // Medium outline for highlighted
+    return 0.01875; // Normal outline for others
+  }, [isSelected, isHighlighted]);
   
   // Adaptive outline color for maximum contrast
   const outlineColor = useMemo(() => {
-    const textLuminance = calculateLuminance(textColor);
-    return textLuminance > 0.5 ? '#000000' : '#ffffff';
-  }, [textColor]);
+    if (isSelected || isHighlighted) {
+      // For selected/highlighted, use stronger contrast
+      const textLuminance = calculateLuminance(textColor);
+      return textLuminance > 0.5 ? '#000000' : '#ffffff';
+    }
+    // For normal nodes, use softer outline
+    return theme === 'light' ? '#000000' : '#ffffff';
+  }, [textColor, isSelected, isHighlighted, theme]);
 
   // Use calculated geometric offset for proper positioning
   const labelPosition: [number, number, number] = [0, geometricOffset, 0];
@@ -271,7 +289,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       position={labelPosition}
       color={textColor}
       size={dynamicFontSize}
-      bold={isHighlighted}
+      bold={isHighlighted || isSelected}
       visible={true}
       skipTranslation={true}
       outlineWidth={outlineWidth}
