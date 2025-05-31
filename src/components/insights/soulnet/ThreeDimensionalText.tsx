@@ -116,8 +116,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     return null;
   }
 
-  // Significantly increased effective size for much better visibility
-  const effectiveSize = size * 4.0;
+  // Reduced font size multiplier from 4.0 to 1.2 for better proportion
+  const effectiveSize = size * 1.2;
   
   // Enhanced text configuration for better readability
   const getMaxWidth = () => {

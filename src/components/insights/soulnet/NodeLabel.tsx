@@ -1,4 +1,3 @@
-
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -165,16 +164,16 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Significantly increased base size for better visibility, especially in tutorial
-    const baseSize = (0.5 + Math.max(0, (26 - z) * 0.015)) * (isTutorialStep9 ? 1.5 : 1.2);
+    // Reduced base size from 0.5 to 0.12 and adjusted zoom scaling
+    const baseSize = (0.12 + Math.max(0, (26 - z) * 0.004)) * (isTutorialStep9 ? 1.2 : 1.0);
     
     // Adjust size for non-Latin scripts
-    const sizeAdjustment = isDevanagari.current ? 0.1 : 
-                          isNonLatin.current ? 0.06 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.02 : 
+                          isNonLatin.current ? 0.015 : 0;
     
-    // Ensure minimum readable size with higher minimum for tutorial
-    const minSize = isTutorialStep9 ? 0.4 : 0.35;
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), minSize);
+    // Reduced minimum size for better proportion
+    const minSize = isTutorialStep9 ? 0.1 : 0.08;
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.2), minSize);
   }, [cameraZoom, isTutorialStep9]);
 
   // Don't render if not visible or no text
@@ -185,11 +184,11 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return null;
   }
 
-  // Enhanced vertical offset calculation for better positioning
+  // Significantly reduced vertical offset for better positioning
   const verticalOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 2.2 : 2.0;
-    // Add extra offset in tutorial mode for better visibility
-    return isTutorialStep9 ? baseOffset + 0.3 : baseOffset;
+    const baseOffset = type === 'entity' ? 0.8 : 0.7; // Reduced from 2.2/2.0 to 0.8/0.7
+    // Reduced extra offset for tutorial mode
+    return isTutorialStep9 ? baseOffset + 0.1 : baseOffset;
   }, [type, isTutorialStep9]);
 
   // Enhanced text color logic with better contrast for tutorial
@@ -207,8 +206,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
 
   // Enhanced outline for better visibility, especially in tutorial
   const outlineWidth = useMemo(() => {
-    if (isTutorialStep9) return 0.015; // Thicker outline in tutorial
-    return isHighlighted ? 0.012 : 0.008;
+    if (isTutorialStep9) return 0.008; // Reduced from 0.015
+    return isHighlighted ? 0.006 : 0.004; // Reduced from 0.012/0.008
   }, [isHighlighted, isTutorialStep9]);
   
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
