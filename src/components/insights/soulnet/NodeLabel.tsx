@@ -182,9 +182,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return null;
   }
 
-  // FIXED: Much closer vertical offset with relative positioning
+  // FIXED: Increased vertical offset to prevent label overlap
   const verticalOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 0.15 : 0.1; // Much closer to nodes
+    const baseOffset = type === 'entity' ? 0.22 : 0.18; // Increased from 0.15/0.1
     return baseOffset;
   }, [type]);
 

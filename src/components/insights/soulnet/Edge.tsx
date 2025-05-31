@@ -3,6 +3,7 @@ import React, { useRef, useMemo } from 'react';
 import * as THREE from 'three';
 import '@/types/three-reference';  // Fixed import path
 import { useFrame } from '@react-three/fiber';
+import { useTheme } from '@/hooks/use-theme';
 
 interface EdgeProps {
   start: [number, number, number];
@@ -21,6 +22,7 @@ export const Edge: React.FC<EdgeProps> = ({
   dimmed,
   maxThickness = 5
 }) => {
+  const { theme } = useTheme();
   const ref = useRef<THREE.Group>(null);
   // Change the ref type to match what react-three-fiber expects
   const lineRef = useRef<THREE.Mesh>(null);
@@ -53,18 +55,40 @@ export const Edge: React.FC<EdgeProps> = ({
     return geometry;
   }, [points]);
 
+  // Improved color scheme based on theme
+  const getEdgeColor = useMemo(() => {
+    if (isHighlighted) {
+      return '#ffffff';
+    }
+    
+    if (dimmed) {
+      return theme === 'light' ? '#666666' : '#444444';
+    }
+    
+    // Better visibility for non-highlighted edges in light theme
+    return theme === 'light' ? '#555555' : '#888888';
+  }, [isHighlighted, dimmed, theme]);
+
+  const getEdgeOpacity = useMemo(() => {
+    if (isHighlighted) {
+      return 0.9;
+    }
+    
+    if (dimmed) {
+      return theme === 'light' ? 0.15 : 0.03;
+    }
+    
+    // Better visibility for non-highlighted edges
+    return theme === 'light' ? 0.25 : 0.08;
+  }, [isHighlighted, dimmed, theme]);
+
   useFrame(() => {
     try {
       if (!lineRef.current || !lineRef.current.material) return;
       
       if (lineRef.current.material instanceof THREE.LineBasicMaterial) {
-        if (isHighlighted) {
-          lineRef.current.material.opacity = 0.9;
-          lineRef.current.material.color.set('#ffffff');
-        } else {
-          lineRef.current.material.opacity = dimmed ? 0.03 : 0.08;
-          lineRef.current.material.color.set(dimmed ? '#444' : "#888");
-        }
+        lineRef.current.material.opacity = getEdgeOpacity;
+        lineRef.current.material.color.set(getEdgeColor);
       }
     } catch (error) {
       console.error("Error in Edge useFrame:", error);
@@ -78,12 +102,12 @@ export const Edge: React.FC<EdgeProps> = ({
   // Create material with appropriate properties
   const material = useMemo(() => {
     return new THREE.LineBasicMaterial({
-      color: isHighlighted ? "#ffffff" : (dimmed ? '#444' : "#888"),
+      color: getEdgeColor,
       transparent: true,
-      opacity: isHighlighted ? 0.9 : (dimmed ? 0.03 : 0.08),
+      opacity: getEdgeOpacity,
       linewidth: thickness,
     });
-  }, [isHighlighted, dimmed, thickness]);
+  }, [getEdgeColor, getEdgeOpacity, thickness]);
 
   return (
     <group ref={ref}>
