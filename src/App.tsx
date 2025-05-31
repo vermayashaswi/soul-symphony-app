@@ -1,4 +1,3 @@
-
 import React, { useEffect, useState } from 'react';
 import { BrowserRouter } from 'react-router-dom';
 import AppRoutes from './routes/AppRoutes';
@@ -7,6 +6,7 @@ import { Toaster as SonnerToaster } from "sonner";
 import { TranslationProvider } from '@/contexts/TranslationContext';
 import { AuthProvider } from '@/contexts/AuthContext';
 import { SubscriptionProvider } from '@/contexts/SubscriptionContext';
+import { ThemeProvider } from '@/hooks/use-theme';
 import { TranslationLoadingOverlay } from '@/components/translation/TranslationLoadingOverlay';
 import { JournalProcessingInitializer } from './app/journal-processing-init';
 import { TutorialProvider } from './contexts/TutorialContext';
@@ -74,22 +74,24 @@ const App: React.FC = () => {
 
   return (
     <ErrorBoundary onError={handleAppError}>
-      <BrowserRouter>
-        <AuthProvider>
-          <TranslationProvider>
-            <SubscriptionProvider>
-              <TutorialProvider>
-                <TranslationLoadingOverlay />
-                <JournalProcessingInitializer />
-                <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
-                <TutorialOverlay />
-                <Toaster />
-                <SonnerToaster position="top-right" />
-              </TutorialProvider>
-            </SubscriptionProvider>
-          </TranslationProvider>
-        </AuthProvider>
-      </BrowserRouter>
+      <ThemeProvider>
+        <BrowserRouter>
+          <AuthProvider>
+            <TranslationProvider>
+              <SubscriptionProvider>
+                <TutorialProvider>
+                  <TranslationLoadingOverlay />
+                  <JournalProcessingInitializer />
+                  <AppRoutes key={isInitialized ? 'initialized' : 'initializing'} />
+                  <TutorialOverlay />
+                  <Toaster />
+                  <SonnerToaster position="top-right" />
+                </TutorialProvider>
+              </SubscriptionProvider>
+            </TranslationProvider>
+          </AuthProvider>
+        </BrowserRouter>
+      </ThemeProvider>
     </ErrorBoundary>
   );
 };
