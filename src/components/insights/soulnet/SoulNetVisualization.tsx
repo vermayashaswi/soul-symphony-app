@@ -217,7 +217,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   const shouldDim = !!selectedNode;
 
-  // Global label visibility (tutorial step 9 OR fullscreen OR force show)
+  // Simplified global label visibility logic
   const globalShouldShowLabels = isTutorialStep9 || isFullScreen || shouldShowLabels;
 
   const handleNodeClick = (id: string, e: any) => {
@@ -330,7 +330,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={false} // Individual showLabel is now handled by the hook
+            showLabel={true}
             dimmed={dimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}

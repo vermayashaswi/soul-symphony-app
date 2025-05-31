@@ -55,11 +55,8 @@ export const Node: React.FC<NodeProps> = ({
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
-  const prevHighlightedRef = useRef<boolean>(isHighlighted);
-  const prevSelectedRef = useRef<boolean>(isSelected);
-  const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
   
-  // Use the consolidated label visibility hook
+  // Use the simplified label visibility hook
   const {
     shouldShowLabel,
     isTutorialStep9,
@@ -75,34 +72,23 @@ export const Node: React.FC<NodeProps> = ({
     globalShouldShowLabels: globalShouldShowLabels || showLabel
   });
   
-  // Track state changes that might cause flickering
-  useEffect(() => {
-    if (prevHighlightedRef.current !== isHighlighted || prevSelectedRef.current !== isSelected) {
-      prevHighlightedRef.current = isHighlighted;
-      prevSelectedRef.current = isSelected;
-      
-      nodeRef.current.isAnimating = true;
-      
-      setTimeout(() => {
-        nodeRef.current.isAnimating = false;
-      }, 300);
-    }
-  }, [isHighlighted, isSelected]);
-  
-  // Calculate node scale with tutorial adjustments
+  // Simplified node scale calculation
   const baseScale = node.type === 'entity' ? 0.7 : 0.55;
   const tutorialScaleBoost = isTutorialStep9 ? 1.1 : 1;
-  const scale = (isHighlighted 
-    ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
-    : baseScale * (0.8 + node.value * 0.5)) * tutorialScaleBoost;
+  const highlightScale = isHighlighted ? 1.3 : 1;
+  const scale = baseScale * tutorialScaleBoost * highlightScale;
 
+  // Simplified color calculation
   const displayColor = useMemo(() => {
     if (isHighlighted) {
       return node.type === 'entity' ? '#ffffff' : themeHex;
     }
-    return node.type === 'entity'
-      ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
-      : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
+    
+    if (dimmed) {
+      return theme === 'dark' ? '#555555' : '#999999';
+    }
+    
+    return node.type === 'entity' ? '#cccccc' : themeHex;
   }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
   const handlePointerDown = useCallback((e: any) => {

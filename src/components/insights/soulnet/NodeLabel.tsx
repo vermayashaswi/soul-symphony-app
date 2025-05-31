@@ -29,21 +29,16 @@ const containsDevanagari = (text: string): boolean => {
 
 // Format entity node text to display on two lines
 const formatEntityText = (text: string): string => {
-  if (!text || text.length <= 3) return text;
+  if (!text || text.length <= 6) return text;
   
-  const halfLength = Math.ceil(text.length / 2);
-  let splitIndex = halfLength;
+  const words = text.split(' ');
+  if (words.length === 1) return text;
   
-  const spaceIndices = [...text.matchAll(/\s/g)].map(match => match.index as number);
-  if (spaceIndices.length > 0) {
-    const nearestSpace = spaceIndices.reduce((closest, current) => {
-      return Math.abs(current - halfLength) < Math.abs(closest - halfLength) ? current : closest;
-    }, spaceIndices[0]);
-    
-    splitIndex = nearestSpace;
-  }
+  const midPoint = Math.ceil(words.length / 2);
+  const firstLine = words.slice(0, midPoint).join(' ');
+  const secondLine = words.slice(midPoint).join(' ');
   
-  return text.substring(0, splitIndex) + '\n' + text.substring(splitIndex).trim();
+  return firstLine + '\n' + secondLine;
 };
 
 interface NodeLabelProps {
@@ -132,28 +127,29 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return translatedText || id;
   }, [id, type, translatedText]);
 
-  // Calculate font size with script adjustments
+  // Simplified font size calculation
   const finalFontSize = useMemo(() => {
     let size = dynamicProps.fontSize;
     
-    const sizeAdjustment = isDevanagari.current ? 0.1 : 
-                          isNonLatin.current ? 0.06 : 0;
-    
-    const minSize = isTutorialMode ? 0.4 : 0.35;
-    return Math.max(Math.min(size + sizeAdjustment, 0.8), minSize);
-  }, [dynamicProps.fontSize, isTutorialMode]);
-
-  // Calculate text color with tutorial enhancement
-  const textColor = useMemo(() => {
-    if (isTutorialMode) {
-      return type === 'entity' 
-        ? (theme === 'light' ? '#000000' : '#ffffff')
-        : themeHex;
+    // Small adjustment for non-Latin scripts
+    if (isDevanagari.current) {
+      size += 0.05;
+    } else if (isNonLatin.current) {
+      size += 0.03;
     }
-    return type === 'entity' 
-      ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
-      : themeHex;
-  }, [type, theme, themeHex, isTutorialMode]);
+    
+    // Ensure reasonable bounds
+    return Math.max(Math.min(size, 0.6), 0.25);
+  }, [dynamicProps.fontSize]);
+
+  // Simplified text color calculation
+  const textColor = useMemo(() => {
+    if (type === 'entity') {
+      return theme === 'light' ? '#1a1a1a' : '#ffffff';
+    } else {
+      return themeHex;
+    }
+  }, [type, theme, themeHex]);
   
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 

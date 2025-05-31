@@ -28,57 +28,51 @@ export const useSoulNetLabelVisibility = ({
   // Tutorial step 9 detection
   const isTutorialStep9 = isInStep(9);
   
-  // Consolidated visibility logic with clear priority
+  // Simplified visibility logic
   const shouldShowLabel = useMemo(() => {
-    // Priority 1: Tutorial step 9 - always show all labels
+    // Always show in tutorial step 9
     if (isTutorialStep9) {
       return true;
     }
     
-    // Priority 2: Global force show (fullscreen, etc.)
+    // Show if globally forced (fullscreen, etc.)
     if (globalShouldShowLabels) {
       return true;
     }
     
-    // Priority 3: Node is selected
-    if (isSelected) {
+    // Show if selected or highlighted
+    if (isSelected || isHighlighted) {
       return true;
     }
     
-    // Priority 4: Node is highlighted (connected to selected)
-    if (isHighlighted && selectedNodeId) {
+    // Show by default when no selection is active
+    if (!selectedNodeId) {
       return true;
     }
     
-    // Priority 5: No selection active and not in fullscreen
-    if (!selectedNodeId && !isFullScreen) {
-      return false;
-    }
-    
-    // Default: show in fullscreen when no specific selection
-    return isFullScreen;
+    // Hide when something else is selected
+    return false;
   }, [
     isTutorialStep9,
     globalShouldShowLabels,
     isSelected,
     isHighlighted,
-    selectedNodeId,
-    isFullScreen
+    selectedNodeId
   ]);
   
-  // Calculate dynamic properties based on state
+  // Simplified dynamic properties
   const dynamicProps = useMemo(() => {
-    const baseSize = nodeType === 'entity' ? 0.45 : 0.4;
-    const tutorialBoost = isTutorialStep9 ? 1.3 : 1.0;
-    const highlightBoost = isHighlighted ? 1.1 : 1.0;
+    const baseSize = nodeType === 'entity' ? 0.35 : 0.3;
+    const tutorialBoost = isTutorialStep9 ? 1.2 : 1.0;
+    const highlightBoost = (isSelected || isHighlighted) ? 1.1 : 1.0;
     
     return {
       fontSize: baseSize * tutorialBoost * highlightBoost,
-      verticalOffset: nodeType === 'entity' ? 2.2 : 2.0,
+      verticalOffset: nodeType === 'entity' ? 1.8 : 1.6,
       renderOrder: isTutorialStep9 ? 25 : (isHighlighted ? 20 : 15),
-      outlineWidth: isTutorialStep9 ? 0.018 : (isHighlighted ? 0.012 : 0.008)
+      outlineWidth: isTutorialStep9 ? 0.015 : (isHighlighted ? 0.01 : 0.008)
     };
-  }, [nodeType, isTutorialStep9, isHighlighted]);
+  }, [nodeType, isTutorialStep9, isSelected, isHighlighted]);
   
   return {
     shouldShowLabel,
