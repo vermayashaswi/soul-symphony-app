@@ -134,9 +134,8 @@ body.tutorial-active {
   z-index: 10000 !important;
 }
 
-/* Steps 3 & 4 - Enhanced tab highlighting - GLOBAL */
-.record-entry-tab.tutorial-target,
-.entries-tab.tutorial-target {
+/* Step 3: Record Entry Tab - Enhanced highlighting with glow */
+.record-entry-tab.tutorial-target {
   z-index: 30000 !important;
   position: relative !important;
   box-shadow: 0 0 50px 30px var(--color-theme) !important;
@@ -148,6 +147,27 @@ body.tutorial-active {
   background-color: rgba(26, 31, 44, 0.98) !important;
   backdrop-filter: brightness(1.3) !important;
   border-radius: 8px !important;
+}
+
+/* Step 4: Past Entries Tab - Minimal styling WITHOUT glow effect */
+.entries-tab.tutorial-target {
+  z-index: 30000 !important;
+  position: relative !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  outline: 2px solid white !important;
+  border: 2px solid white !important;
+  background-color: white !important;
+  border-radius: 8px !important;
+  /* Removed: box-shadow, animation, transform scale, backdrop-filter */
+}
+
+/* Ensure Past Entries tab text is readable in light mode */
+.entries-tab.tutorial-target,
+.entries-tab.tutorial-target span,
+.entries-tab.tutorial-target div {
+  color: #000 !important;
+  text-shadow: none !important;
 }
 
 /* Step 5: Chat question highlight styling - GLOBAL enhanced visibility */
