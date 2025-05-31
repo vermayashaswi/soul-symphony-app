@@ -7,15 +7,7 @@ import { Separator } from "@/components/ui/separator";
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 import { useTheme } from '@/hooks/use-theme';
-import { 
-  setupJournalReminder, 
-  initializeCapacitorNotifications, 
-  NotificationTime,
-  checkNotificationPermissions,
-  requestNotificationPermissions,
-  getTimeOptions,
-  getNotificationConfiguration
-} from '@/services/notificationService';
+import { setupJournalReminder, initializeCapacitorNotifications, NotificationFrequency, NotificationTime } from '@/services/notificationService';
 import { useAuth } from '@/contexts/AuthContext';
 import { useSubscription } from '@/contexts/SubscriptionContext';
 import { supabase } from '@/integrations/supabase/client';
@@ -33,6 +25,7 @@ import { ScrollArea } from "@/components/ui/scroll-area";
 import { startOfDay, subDays, isWithinInterval } from 'date-fns';
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
+import { RadioGroup, RadioGroupItem } from "@/components/ui/radio-group";
 import { Label } from "@/components/ui/label";
 import { Card } from "@/components/ui/card";
 import { Checkbox } from "@/components/ui/checkbox";
@@ -73,13 +66,9 @@ function SettingsContent() {
   
   const { theme, setTheme, colorTheme, setColorTheme, customColor, setCustomColor, systemTheme } = useTheme();
   const [notificationsEnabled, setNotificationsEnabled] = useState(false);
-  const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>([]);
+  const [notificationFrequency, setNotificationFrequency] = useState<NotificationFrequency>('once');
+  const [notificationTimes, setNotificationTimes] = useState<NotificationTime[]>(['evening']);
   const [showNotificationSettings, setShowNotificationSettings] = useState(false);
-  const [hasNotificationPermission, setHasNotificationPermission] = useState(false);
-  
-  // Add temporary state for pending notification settings
-  const [pendingNotificationTimes, setPendingNotificationTimes] = useState<NotificationTime[]>([]);
-  
   const { user, signOut } = useAuth();
   const { 
     isPremium, 
@@ -115,30 +104,33 @@ function SettingsContent() {
     { name: 'Focus', color: 'bg-emerald-400' },
   ];
 
+  const timeOptions: { label: string; value: NotificationTime }[] = [
+    { label: 'Morning (8:00 AM)', value: 'morning' },
+    { label: 'Afternoon (2:00 PM)', value: 'afternoon' },
+    { label: 'Evening (7:00 PM)', value: 'evening' },
+    { label: 'Night (10:00 PM)', value: 'night' },
+  ];
+
+  const frequencyOptions: { label: string; value: NotificationFrequency }[] = [
+    { label: 'Once a day', value: 'once' },
+    { label: 'Twice a day', value: 'twice' },
+    { label: 'Three times a day', value: 'thrice' },
+  ];
+
   const { resetTutorial } = useTutorial();
 
-  // Initialize notification state and permissions
+  // Debug state logging
   useEffect(() => {
-    const initializeNotifications = async () => {
-      try {
-        // Check permissions
-        const hasPermission = await checkNotificationPermissions();
-        setHasNotificationPermission(hasPermission);
-
-        // Load configuration
-        const config = getNotificationConfiguration();
-        setNotificationsEnabled(config.enabled);
-        setNotificationTimes(config.times);
-        setPendingNotificationTimes(config.times);
-
-        console.log('Notification state initialized:', { hasPermission, config });
-      } catch (error) {
-        console.error('Error initializing notifications:', error);
-      }
-    };
-
-    initializeNotifications();
-  }, []);
+    console.log('[Settings] State update:', {
+      user: user?.id,
+      subscriptionLoading,
+      subscriptionError,
+      isLoadingProfile,
+      entriesCount: entries.length,
+      theme,
+      colorTheme
+    });
+  }, [user, subscriptionLoading, subscriptionError, isLoadingProfile, entries.length, theme, colorTheme]);
 
   useEffect(() => {
     const calculateMaxStreak = async () => {
@@ -231,6 +223,41 @@ function SettingsContent() {
     fetchUserProfile();
   }, [user]);
 
+  useEffect(() => {
+    const enabled = localStorage.getItem('notification_enabled') === 'true';
+    const frequency = localStorage.getItem('notification_frequency') as NotificationFrequency;
+    const times = localStorage.getItem('notification_times');
+    
+    if (enabled) {
+      setNotificationsEnabled(true);
+    }
+    
+    if (frequency && ['once', 'twice', 'thrice'].includes(frequency)) {
+      setNotificationFrequency(frequency);
+    }
+    
+    if (times) {
+      try {
+        const parsedTimes = JSON.parse(times) as NotificationTime[];
+        if (Array.isArray(parsedTimes) && parsedTimes.length > 0) {
+          setNotificationTimes(parsedTimes);
+        }
+      } catch (e) {
+        console.error('Error parsing notification times from localStorage', e);
+      }
+    }
+  }, []);
+
+  useEffect(() => {
+    if (notificationsEnabled) {
+      setupJournalReminder(true, notificationFrequency, notificationTimes);
+      if (typeof window !== 'undefined' && !('Notification' in window) || 
+          (window.Notification && window.Notification.permission !== 'granted')) {
+        initializeCapacitorNotifications();
+      }
+    }
+  }, [notificationsEnabled, notificationFrequency, notificationTimes]);
+
   const handleContactSupport = () => {
     const subject = encodeURIComponent("Help me, I don't want to be SOuLO right now");
     const mailtoLink = `mailto:support@soulo.online?subject=${subject}`;
@@ -299,32 +326,24 @@ function SettingsContent() {
     setNameError(null);
   };
   
-  const handleToggleNotifications = async (checked: boolean) => {
+  const handleToggleNotifications = (checked: boolean) => {
+    setNotificationsEnabled(checked);
+    
     if (checked) {
-      // Check permissions first
-      if (!hasNotificationPermission) {
-        const granted = await requestNotificationPermissions();
-        if (!granted) {
-          toast.error(<TranslatableText text="Notification permissions are required" forceTranslate={true} />);
-          return;
-        }
-        setHasNotificationPermission(true);
-      }
-
-      // Show settings modal to choose times
-      setPendingNotificationTimes(notificationTimes.length > 0 ? notificationTimes : ['evening']);
       setShowNotificationSettings(true);
+      toast.success(<TranslatableText text="Customize your notification settings" forceTranslate={true} />);
     } else {
-      // Disable notifications immediately
-      setNotificationsEnabled(false);
-      setNotificationTimes([]);
-      await setupJournalReminder(false, []);
       toast.info(<TranslatableText text="Notifications disabled" forceTranslate={true} />);
+      if (typeof window !== 'undefined') {
+        localStorage.removeItem('notification_enabled');
+        localStorage.removeItem('notification_frequency');
+        localStorage.removeItem('notification_times');
+      }
     }
   };
   
-  const handlePendingTimeChange = (time: NotificationTime) => {
-    setPendingNotificationTimes(prev => {
+  const handleTimeChange = (time: NotificationTime) => {
+    setNotificationTimes(prev => {
       if (prev.includes(time)) {
         return prev.filter(t => t !== time);
       }
@@ -332,44 +351,40 @@ function SettingsContent() {
     });
   };
   
-  const applyNotificationSettings = async () => {
-    if (pendingNotificationTimes.length === 0) {
+  const applyNotificationSettings = () => {
+    if (notificationTimes.length === 0) {
       toast.error(<TranslatableText text="Please select at least one time for notifications" forceTranslate={true} />);
       return;
     }
     
-    try {
-      // Setup notifications with selected times
-      const success = await setupJournalReminder(true, pendingNotificationTimes);
-      
-      if (success) {
-        setNotificationsEnabled(true);
-        setNotificationTimes(pendingNotificationTimes);
-        toast.success(<TranslatableText text="Notification reminders set up successfully!" forceTranslate={true} />);
-        setShowNotificationSettings(false);
-      } else {
-        toast.error(<TranslatableText text="Failed to set up notifications. Please try again." forceTranslate={true} />);
-      }
-    } catch (error) {
-      console.error('Error applying notification settings:', error);
-      toast.error(<TranslatableText text="Something went wrong setting up notifications" forceTranslate={true} />);
+    let limitedTimes = [...notificationTimes];
+    const maxTimes = notificationFrequency === 'once' ? 1 : 
+                    notificationFrequency === 'twice' ? 2 : 3;
+    
+    if (limitedTimes.length > maxTimes) {
+      limitedTimes = limitedTimes.slice(0, maxTimes);
+      const message = `Limited to ${maxTimes} time${maxTimes > 1 ? 's' : ''} based on frequency`;
+      toast.info(<TranslatableText text={message} forceTranslate={true} />);
     }
-  };
-
-  const cancelNotificationSettings = () => {
-    setPendingNotificationTimes(notificationTimes);
+    
+    setupJournalReminder(true, notificationFrequency, limitedTimes);
+    toast.success(<TranslatableText text="Notification settings saved" forceTranslate={true} />);
     setShowNotificationSettings(false);
   };
   
   const getNotificationSummary = () => {
-    if (!notificationsEnabled || notificationTimes.length === 0) {
-      return <TranslatableText text="Disabled" />;
-    }
+    if (!notificationsEnabled) return <TranslatableText text="Disabled" />;
+    
+    const frequencyText = {
+      'once': 'Once',
+      'twice': 'Twice',
+      'thrice': 'Three times'
+    }[notificationFrequency];
     
     const timeLabels = notificationTimes.map(time => {
       return {
         'morning': 'Morning',
-        'afternoon': 'Afternoon', 
+        'afternoon': 'Afternoon',
         'evening': 'Evening',
         'night': 'Night'
       }[time];
@@ -377,9 +392,9 @@ function SettingsContent() {
     
     return (
       <div className="flex flex-wrap items-center gap-1">
-        <span className="text-xs text-muted-foreground">
-          {notificationTimes.length === 1 ? 'Daily at' : 'Daily at'}: 
-        </span>
+        <TranslatableText text={frequencyText} />
+        <TranslatableText text="daily" />
+        <span>: </span>
         <TranslatableText text={timeLabels} />
       </div>
     );
@@ -391,6 +406,12 @@ function SettingsContent() {
     toast.success(<TranslatableText text="Custom color applied" forceTranslate={true} />);
     setShowColorPicker(false);
   };
+
+  console.log('[Settings] About to render with loading states:', {
+    subscriptionLoading,
+    isLoadingProfile,
+    subscriptionError
+  });
 
   return (
     <SettingsLoadingWrapper 
@@ -409,7 +430,6 @@ function SettingsContent() {
           </div>
           
           <div className="space-y-6">
-            {/* Profile Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -526,7 +546,6 @@ function SettingsContent() {
             
             <SubscriptionManagement />
             
-            {/* Appearance Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -657,7 +676,6 @@ function SettingsContent() {
               </div>
             </motion.div>
             
-            {/* Preferences Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -671,11 +689,11 @@ function SettingsContent() {
               <div className="space-y-3 divide-y">
                 <SettingItem
                   icon={Bell}
-                  title="Daily Reminders"
+                  title="Notifications"
                   description={
                     notificationsEnabled 
-                      ? "Get notifications to remind you to journal"
-                      : "Set up daily reminders to stay consistent with journaling"
+                      ? ""
+                      : "Get reminders to journal and stay on track"
                   }
                 >
                   <div className="flex items-center gap-2">
@@ -687,10 +705,7 @@ function SettingsContent() {
                       <Button 
                         variant="outline" 
                         size="sm"
-                        onClick={() => {
-                          setPendingNotificationTimes(notificationTimes);
-                          setShowNotificationSettings(true);
-                        }}
+                        onClick={() => setShowNotificationSettings(true)}
                       >
                         <TranslatableText text="Customize" />
                       </Button>
@@ -706,7 +721,6 @@ function SettingsContent() {
               </div>
             </motion.div>
             
-            {/* Help & Support Section */}
             <motion.div
               initial={{ opacity: 0, y: 20 }}
               animate={{ opacity: 1, y: 0 }}
@@ -794,7 +808,6 @@ function SettingsContent() {
           </div>
         </div>
         
-        {/* FAQ Dialog */}
         <Dialog 
           open={showFAQ} 
           onOpenChange={(open) => {
@@ -906,7 +919,6 @@ function SettingsContent() {
           </DialogContent>
         </Dialog>
         
-        {/* Privacy Policy Dialog */}
         <Dialog 
           open={showPrivacyPolicy} 
           onOpenChange={(open) => {
@@ -1022,75 +1034,84 @@ function SettingsContent() {
           </DialogContent>
         </Dialog>
         
-        {/* Notification Settings Dialog */}
         <Dialog
           open={showNotificationSettings}
           onOpenChange={(open) => {
-            if (!open) {
-              cancelNotificationSettings();
-            }
+            setShowNotificationSettings(open);
           }}
         >
           <DialogContent className="max-w-md">
             <DialogHeader>
               <DialogTitle>
-                <TranslatableText text="Daily Reminder Times" />
+                <TranslatableText text="Notification Settings" />
               </DialogTitle>
               <DialogDescription>
-                <TranslatableText text="Choose when you want to receive your journal reminders" />
+                <TranslatableText text="Customize when you want to receive journal reminders" />
               </DialogDescription>
             </DialogHeader>
             
             <div className="space-y-6 py-4">
               <div className="space-y-4">
+                <h3 className="font-medium text-sm">
+                  <TranslatableText text="Frequency" />
+                </h3>
+                <RadioGroup 
+                  value={notificationFrequency} 
+                  onValueChange={(value) => setNotificationFrequency(value as NotificationFrequency)}
+                  className="flex flex-col space-y-2"
+                >
+                  {frequencyOptions.map(option => (
+                    <div key={option.value} className="flex items-center space-x-2">
+                      <RadioGroupItem value={option.value} id={`frequency-${option.value}`} />
+                      <Label htmlFor={`frequency-${option.value}`} className="cursor-pointer">
+                        <TranslatableText text={option.label} />
+                      </Label>
+                    </div>
+                  ))}
+                </RadioGroup>
+              </div>
+              
+              <div className="space-y-4">
                 <div className="flex justify-between items-center">
                   <h3 className="font-medium text-sm">
-                    <TranslatableText text="Select Times" />
+                    <TranslatableText text="Time of Day" />
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    <TranslatableText text="Choose one or more times" />
+                    {notificationFrequency === 'once' ? (
+                      <TranslatableText text="Select 1 time" />
+                    ) : notificationFrequency === 'twice' ? (
+                      <TranslatableText text="Select up to 2 times" />
+                    ) : (
+                      <TranslatableText text="Select up to 3 times" />
+                    )}
                   </p>
                 </div>
                 
-                <div className="grid grid-cols-1 gap-3">
-                  {getTimeOptions().map(option => (
+                <div className="grid grid-cols-2 gap-3">
+                  {timeOptions.map(option => (
                     <div 
                       key={option.value} 
                       className={cn(
-                        "border rounded-md px-3 py-3 flex items-center space-x-3 cursor-pointer transition-colors",
-                        pendingNotificationTimes.includes(option.value) 
+                        "border rounded-md px-3 py-2 flex items-center space-x-2 cursor-pointer",
+                        notificationTimes.includes(option.value) 
                           ? "border-primary bg-primary/10" 
-                          : "border-input hover:border-muted-foreground"
+                          : "border-input"
                       )}
-                      onClick={() => handlePendingTimeChange(option.value)}
+                      onClick={() => handleTimeChange(option.value)}
                     >
                       <Checkbox 
-                        checked={pendingNotificationTimes.includes(option.value)} 
-                        onCheckedChange={() => handlePendingTimeChange(option.value)}
+                        checked={notificationTimes.includes(option.value)} 
+                        onCheckedChange={() => handleTimeChange(option.value)}
                         id={`time-${option.value}`}
                       />
                       <Label 
                         htmlFor={`time-${option.value}`} 
-                        className="flex-1 cursor-pointer text-sm font-medium"
+                        className="flex-1 cursor-pointer text-sm"
                       >
                         <TranslatableText text={option.label} />
                       </Label>
                     </div>
                   ))}
-                </div>
-                
-                <div className="bg-muted/30 rounded-lg p-3 mt-4">
-                  <div className="flex items-start gap-2">
-                    <Bell className="h-4 w-4 text-muted-foreground mt-0.5 flex-shrink-0" />
-                    <div className="text-xs text-muted-foreground">
-                      <p className="font-medium mb-1">
-                        <TranslatableText text="About Notifications" />
-                      </p>
-                      <p>
-                        <TranslatableText text="You'll receive gentle reminders at your selected times to help maintain your journaling habit. Notifications can be turned off anytime." />
-                      </p>
-                    </div>
-                  </div>
                 </div>
               </div>
             </div>
@@ -1098,22 +1119,20 @@ function SettingsContent() {
             <div className="flex justify-end gap-3">
               <Button 
                 variant="outline" 
-                onClick={cancelNotificationSettings}
+                onClick={() => setShowNotificationSettings(false)}
               >
                 <TranslatableText text="Cancel" />
               </Button>
               <Button 
                 onClick={applyNotificationSettings}
-                disabled={pendingNotificationTimes.length === 0}
-                className="bg-theme hover:bg-theme/90"
+                disabled={notificationTimes.length === 0}
               >
-                <TranslatableText text="Save Reminders" />
+                <TranslatableText text="Apply Settings" />
               </Button>
             </div>
           </DialogContent>
         </Dialog>
         
-        {/* Custom Color Picker Dialog */}
         <Dialog
           open={showColorPicker}
           onOpenChange={(open) => {

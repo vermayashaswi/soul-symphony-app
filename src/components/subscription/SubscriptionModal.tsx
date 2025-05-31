@@ -1,3 +1,4 @@
+
 import React, { useState } from 'react';
 import {
   Dialog,
@@ -23,11 +24,14 @@ interface SubscriptionModalProps {
 }
 
 const PREMIUM_FEATURES = [
-  'Unlimited AI chat conversations - Access to the intelligent chat assistant',
-  'Advanced emotional insights & analytics - Deep pattern analysis and trends',
-  'Interactive SoulNet visualization - 3D network of your emotional connections',
-  'Detailed mood tracking & calendar - Comprehensive mood analysis over time',
-  'Priority customer support - Faster response times for help'
+  'Unlimited journal entries',
+  'Advanced emotion insights',
+  'AI-powered themes extraction',
+  'Detailed analytics and trends',
+  'Export your data',
+  'Priority customer support',
+  'Dark mode themes',
+  'Voice recording unlimited'
 ];
 
 export const SubscriptionModal: React.FC<SubscriptionModalProps> = ({

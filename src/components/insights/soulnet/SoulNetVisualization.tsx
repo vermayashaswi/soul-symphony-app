@@ -1,6 +1,6 @@
 
 import React, { useRef, useEffect, useMemo, useState } from 'react';
-import '@/types/three-reference';
+import '@/types/three-reference';  // Fixed import path
 import { OrbitControls } from '@react-three/drei';
 import { useThree } from '@react-three/fiber';
 import Node from './Node';
@@ -29,6 +29,7 @@ interface SoulNetVisualizationProps {
   themeHex: string;
   isFullScreen?: boolean;
   shouldShowLabels?: boolean;
+  translatedLabels?: Map<string, string>;
 }
 
 function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
@@ -44,13 +45,17 @@ function getConnectedNodes(nodeId: string, links: LinkData[]): Set<string> {
   return connected;
 }
 
+// Calculate relative connection strength within connected nodes
 function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<string, number> {
+  // Safety check for invalid inputs
   if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
   
+  // Get all links associated with this node
   const nodeLinks = links.filter(link => 
     link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
   );
   
+  // Find min and max values
   let minValue = Infinity;
   let maxValue = -Infinity;
   
@@ -59,14 +64,17 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
     if (link.value > maxValue) maxValue = link.value;
   });
 
+  // Create normalized strength map
   const strengthMap = new Map<string, number>();
   
+  // If all values are the same, use a default value
   if (maxValue === minValue || maxValue - minValue < 0.001) {
     nodeLinks.forEach(link => {
       const connectedNodeId = link.source === nodeId ? link.target : link.source;
-      strengthMap.set(connectedNodeId, 0.8);
+      strengthMap.set(connectedNodeId, 0.8); // Higher default value for better visibility
     });
   } else {
+    // Normalize values to 0.3-1.0 range for better visibility
     nodeLinks.forEach(link => {
       const connectedNodeId = link.source === nodeId ? link.target : link.source;
       const normalizedValue = 0.3 + (0.7 * (link.value - minValue) / (maxValue - minValue));
@@ -74,20 +82,27 @@ function calculateRelativeStrengths(nodeId: string, links: LinkData[]): Map<stri
     });
   }
   
+  // Log the calculated strengths for debugging
+  console.log(`Connection strengths for ${nodeId}:`, Object.fromEntries(strengthMap));
   return strengthMap;
 }
 
+// Calculate percentage distribution of connection strengths
 function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<string, number> {
+  // Safety check for invalid inputs
   if (!nodeId || !links || !Array.isArray(links)) return new Map<string, number>();
   
+  // Get all links associated with this node
   const nodeLinks = links.filter(link => 
     link && typeof link === 'object' && (link.source === nodeId || link.target === nodeId)
   );
   
+  // Calculate total value of all connections
   const totalValue = nodeLinks.reduce((sum, link) => sum + link.value, 0);
   
   if (totalValue === 0) return new Map<string, number>();
   
+  // Create percentage map
   const percentageMap = new Map<string, number>();
   
   nodeLinks.forEach(link => {
@@ -96,6 +111,8 @@ function calculateConnectionPercentages(nodeId: string, links: LinkData[]): Map<
     percentageMap.set(connectedNodeId, percentage);
   });
   
+  // Log the calculated percentages for debugging
+  console.log(`Connection percentages for ${nodeId}:`, Object.fromEntries(percentageMap));
   return percentageMap;
 }
 
@@ -109,22 +126,49 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
-  const [cameraZoom, setCameraZoom] = useState<number>(52);
+  const [cameraZoom, setCameraZoom] = useState<number>(52); // Doubled from 26 to zoom out 2x
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const { isInStep } = useTutorial();
   
+  // Enhanced tutorial step 9 detection
   const isTutorialStep9 = isInStep(9);
+  
+  console.log("Rendering SoulNetVisualization component with data:", 
+    data?.nodes?.length, "nodes and", data?.links?.length, "links, fullscreen:", isFullScreen, "tutorial step 9:", isTutorialStep9);
+  
+  useEffect(() => {
+    console.log("SoulNetVisualization mounted");
+    return () => {
+      console.log("SoulNetVisualization unmounted");
+    };
+  }, []);
+
+  // Enhanced tutorial step 9 logging
+  useEffect(() => {
+    if (isTutorialStep9) {
+      console.log('[SoulNetVisualization] Tutorial Step 9 detected:', {
+        nodesCount: data?.nodes?.length,
+        shouldShowLabels,
+        isFullScreen,
+        forceShowLabels: true
+      });
+    }
+  }, [isTutorialStep9, data?.nodes?.length, shouldShowLabels, isFullScreen]);
   
   // Ensure data is valid
   const validData = useMemo(() => {
     if (!data || !data.nodes || !Array.isArray(data.nodes) || !data.links || !Array.isArray(data.links)) {
-      return { nodes: [], links: [] };
+      console.error("Invalid SoulNetVisualization data:", data);
+      return {
+        nodes: [],
+        links: []
+      };
     }
     return data;
   }, [data]);
   
-  // Calculate center position
+  // Use memoization to prevent recalculation of center position on every render
   const centerPosition = useMemo(() => {
     if (!validData.nodes || validData.nodes.length === 0) {
       return new THREE.Vector3(0, 0, 0);
@@ -151,7 +195,10 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
   }, [validData.nodes]);
 
   useEffect(() => {
+    // Force a re-render after selection changes to ensure visuals update
     if (selectedNode) {
+      console.log(`Selected node: ${selectedNode}`);
+      // Force multiple updates to ensure the visual changes apply
       setForceUpdate(prev => prev + 1);
       const timer = setTimeout(() => {
         setForceUpdate(prev => prev + 1);
@@ -163,10 +210,11 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   useEffect(() => {
     if (camera && validData.nodes?.length > 0 && !isInitialized) {
+      console.log("Initializing camera position");
       try {
         const centerX = centerPosition.x;
         const centerY = centerPosition.y;
-        camera.position.set(centerX, centerY, 52);
+        camera.position.set(centerX, centerY, 52); // Doubled from 26 to zoom out 2x
         camera.lookAt(centerX, centerY, 0);
         setIsInitialized(true);
       } catch (error) {
@@ -175,7 +223,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [camera, validData.nodes, centerPosition, isInitialized]);
 
-  // Track camera zoom with throttling
+  // Track camera zoom with throttling to improve performance
   useEffect(() => {
     const updateCameraDistance = () => {
       if (camera) {
@@ -190,38 +238,48 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return () => clearInterval(intervalId);
   }, [camera, cameraZoom]);
 
-  // Memoize connected nodes and calculations
+  // Memoize connected nodes to prevent unnecessary recalculations
   const highlightedNodes = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Set<string>();
     return getConnectedNodes(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
+  // Calculate relative strength of connections for the selected node
   const connectionStrengths = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
     return calculateRelativeStrengths(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
+  // Calculate percentage distribution of connections for the selected node
   const connectionPercentages = useMemo(() => {
     if (!selectedNode || !validData || !validData.links) return new Map<string, number>();
     return calculateConnectionPercentages(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // Adjust controls based on fullscreen mode
+  // Adjust controls dampingFactor based on fullscreen mode
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
-      controlsRef.current.minDistance = isFullScreen ? 8 : 10;
-      controlsRef.current.maxDistance = isFullScreen ? 80 : 60;
+      
+      // Adjust limits for better fullscreen experience
+      controlsRef.current.minDistance = isFullScreen ? 8 : 10; // Doubled from 4 and 5
+      controlsRef.current.maxDistance = isFullScreen ? 80 : 60; // Doubled from 40 and 30
     }
   }, [isFullScreen]);
 
   const shouldDim = !!selectedNode;
 
+  // Custom node click handler with debugging
   const handleNodeClick = (id: string, e: any) => {
+    console.log(`Node clicked in visualization: ${id}`);
     onNodeClick(id);
   };
 
+  // Enhanced label visibility logic for tutorial step 9
+  const enhancedShouldShowLabels = isTutorialStep9 || shouldShowLabels;
+
   if (!validData || !validData.nodes || !validData.links) {
+    console.error("SoulNetVisualization: Data is missing or invalid", validData);
     return null;
   }
 
@@ -240,8 +298,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         enableDamping
         dampingFactor={isFullScreen ? 0.08 : 0.05}
         rotateSpeed={0.5}
-        minDistance={isFullScreen ? 8 : 10}
-        maxDistance={isFullScreen ? 80 : 60}
+        minDistance={isFullScreen ? 8 : 10} // Doubled from 4 and 5
+        maxDistance={isFullScreen ? 80 : 60} // Doubled from 40 and 30
         target={centerPosition}
         onChange={() => {
           if (camera) {
@@ -256,6 +314,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       {/* Display edges */}
       {validData.links.map((link, index) => {
         if (!link || typeof link !== 'object') {
+          console.warn(`Invalid link at index ${index}`, link);
           return null;
         }
         
@@ -263,21 +322,26 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         const targetNode = validData.nodes.find(n => n && n.id === link.target);
         
         if (!sourceNode || !targetNode) {
+          console.warn(`Missing source or target node for link: ${link.source} -> ${link.target}`);
           return null;
         }
         
         const isHighlight = selectedNode &&
           (link.source === selectedNode || link.target === selectedNode);
           
-        let relativeStrength = 0.3;
+        // Get relative strength for this connection if it's highlighted
+        let relativeStrength = 0.3; // default lower value
         
         if (isHighlight && selectedNode) {
           const connectedNodeId = link.source === selectedNode ? link.target : link.source;
+          // Use higher base value for highlighted connections
           relativeStrength = connectionStrengths.get(connectedNodeId) || 0.7;
         } else {
+          // Use original link value, but scaled down for non-highlighted links
           relativeStrength = link.value * 0.5;
         }
         
+        // Skip rendering this edge if positions aren't valid
         if (!Array.isArray(sourceNode.position) || !Array.isArray(targetNode.position)) {
           return null;
         }
@@ -298,26 +362,44 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
       {/* Display nodes */}
       {validData.nodes.map(node => {
         if (!node || typeof node !== 'object' || !node.id) {
+          console.warn("Invalid node:", node);
           return null;
         }
         
+        // Enhanced label visibility logic that prioritizes tutorial step 9
+        const showLabel = enhancedShouldShowLabels || !selectedNode || node.id === selectedNode || highlightedNodes.has(node.id);
         const dimmed = shouldDim && !(selectedNode === node.id || highlightedNodes.has(node.id));
         const isHighlighted = selectedNode === node.id || highlightedNodes.has(node.id);
         
+        // Calculate connection strength if this is a connected node
         const connectionStrength = selectedNode && highlightedNodes.has(node.id) 
           ? connectionStrengths.get(node.id) || 0.5
           : 0.5;
           
+        // Get percentage for this connection if node is highlighted but not selected
         const connectionPercentage = selectedNode && highlightedNodes.has(node.id)
           ? connectionPercentages.get(node.id) || 0
           : 0;
           
+        // Determine if we should show the percentage
         const showPercentage = selectedNode !== null && 
                               highlightedNodes.has(node.id) && 
                               node.id !== selectedNode;
         
+        // Skip rendering this node if position isn't valid
         if (!Array.isArray(node.position)) {
+          console.warn(`Node ${node.id} has invalid position:`, node.position);
           return null;
+        }
+
+        // Enhanced debug logging for tutorial step 9
+        if (isTutorialStep9) {
+          console.log(`[SoulNetVisualization] Tutorial Step 9 - Node ${node.id} (${node.type}):`, {
+            position: node.position,
+            showLabel,
+            enhancedShouldShowLabels,
+            forceShowLabels: isTutorialStep9
+          });
         }
           
         return (
@@ -327,7 +409,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={shouldShowLabels}
+            showLabel={showLabel}
             dimmed={dimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
@@ -336,7 +418,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             connectionStrength={connectionStrength}
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
-            isFullScreen={isFullScreen}
+            forceShowLabels={isTutorialStep9} // Pass tutorial state
           />
         );
       })}

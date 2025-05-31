@@ -1,5 +1,5 @@
 
-/* Tutorial Overlay Styles - Simplified and consolidated */
+/* Tutorial Overlay Styles - Enhanced for all screen sizes with mobile-specific adjustments */
 
 /* Base Tutorial Classes */
 .tutorial-target {
@@ -11,7 +11,7 @@
   opacity: 1 !important;
 }
 
-/* Tutorial Overlay */
+/* Tutorial Overlay - Better background interaction blocking */
 .tutorial-overlay {
   position: fixed;
   inset: 0;
@@ -22,7 +22,7 @@
   overflow: hidden !important;
 }
 
-/* Enhanced body style when tutorial is active */
+/* Enhanced body style when tutorial is active - stronger scroll prevention */
 body.tutorial-active {
   overflow: hidden !important;
   touch-action: none !important;
@@ -31,7 +31,7 @@ body.tutorial-active {
   height: 100% !important;
 }
 
-/* Tutorial step container - GLOBAL styling */
+/* Tutorial step container - GLOBAL styling for all screen sizes */
 .tutorial-step-container {
   position: fixed !important;
   z-index: 30000 !important;
@@ -41,12 +41,12 @@ body.tutorial-active {
   border: 3px solid var(--color-theme) !important;
   box-shadow: 0 0 30px rgba(0, 0, 0, 0.7) !important;
   pointer-events: auto !important;
-  background-color: rgba(26, 31, 44, 1) !important;
+  background-color: rgba(26, 31, 44, 1) !important; /* Fully opaque for all steps on all devices */
   border-radius: 8px !important;
   padding: 16px !important;
 }
 
-/* Force all tutorial step content to be visible */
+/* Force all tutorial step content to be visible - GLOBAL */
 .tutorial-step-container h3,
 .tutorial-step-container p,
 .tutorial-step-container span,
@@ -57,7 +57,7 @@ body.tutorial-active {
   text-shadow: 0 0 4px rgba(0,0,0,0.8) !important;
 }
 
-/* GLOBAL positioning for steps */
+/* GLOBAL positioning for steps - applies to all screen sizes */
 .tutorial-step-container[data-step="1"] {
   top: 50% !important;
   left: 50% !important;
@@ -83,7 +83,7 @@ body.tutorial-active {
   transform: translate(-50%, 0) !important;
 }
 
-/* Insights steps: GLOBAL positioning and sizing for steps 6-9 */
+/* Insights steps: GLOBAL positioning and sizing for steps 6-9 with infographics */
 .tutorial-step-container[data-step="6"],
 .tutorial-step-container[data-step="7"],
 .tutorial-step-container[data-step="8"],
@@ -94,7 +94,17 @@ body.tutorial-active {
   transform: translate(-50%, -50%) !important;
 }
 
-/* Step highlighting styles */
+/* Ensure infographic containers are properly displayed - GLOBAL */
+.tutorial-step-container[data-step="6"] .tutorial-infographic,
+.tutorial-step-container[data-step="7"] .tutorial-infographic,
+.tutorial-step-container[data-step="8"] .tutorial-infographic,
+.tutorial-step-container[data-step="9"] .tutorial-infographic {
+  border-radius: 6px !important;
+  overflow: hidden !important;
+  box-shadow: 0 0 10px rgba(0, 0, 0, 0.3) !important;
+}
+
+/* Step 1: Journal header styling - GLOBAL */
 .journal-header-container.tutorial-target {
   z-index: 9999 !important;
   position: relative !important;
@@ -103,6 +113,7 @@ body.tutorial-active {
   box-shadow: 0 0 15px 5px rgba(var(--primary-h), var(--primary-s), var(--primary-l), 0.5) !important;
 }
 
+/* Step 2: Arrow button styling - GLOBAL enhanced visibility */
 .journal-arrow-button.tutorial-target {
   position: fixed !important;
   top: 50% !important;
@@ -113,6 +124,7 @@ body.tutorial-active {
   opacity: 1 !important;
 }
 
+/* Common button highlight styling - GLOBAL for all devices */
 .tutorial-button-highlight {
   box-shadow: 0 0 35px 20px var(--color-theme) !important;
   animation: button-pulse 1.5s infinite alternate !important;
@@ -122,7 +134,7 @@ body.tutorial-active {
   z-index: 10000 !important;
 }
 
-/* Step 3: Record Entry Tab - Enhanced highlighting */
+/* Step 3: Record Entry Tab - Enhanced highlighting with glow */
 .record-entry-tab.tutorial-target {
   z-index: 30000 !important;
   position: relative !important;
@@ -137,7 +149,7 @@ body.tutorial-active {
   border-radius: 8px !important;
 }
 
-/* Step 4: Past Entries Tab - Minimal styling */
+/* Step 4: Past Entries Tab - Minimal styling WITHOUT glow effect */
 .entries-tab.tutorial-target {
   z-index: 30000 !important;
   position: relative !important;
@@ -147,8 +159,10 @@ body.tutorial-active {
   border: 2px solid white !important;
   background-color: white !important;
   border-radius: 8px !important;
+  /* Removed: box-shadow, animation, transform scale, backdrop-filter */
 }
 
+/* Ensure Past Entries tab text is readable in light mode */
 .entries-tab.tutorial-target,
 .entries-tab.tutorial-target span,
 .entries-tab.tutorial-target div {
@@ -156,7 +170,7 @@ body.tutorial-active {
   text-shadow: none !important;
 }
 
-/* Step 5: Chat question highlight styling */
+/* Step 5: Chat question highlight styling - GLOBAL enhanced visibility */
 .chat-question-highlight.tutorial-target {
   z-index: 10000 !important;
   position: relative !important;
@@ -174,7 +188,7 @@ body.tutorial-active {
   overflow: visible !important;
 }
 
-/* Steps 6-9: Insights pages highlight styling */
+/* Steps 6-9: Insights pages highlight styling - GLOBAL */
 .insights-header-highlight.tutorial-target,
 .emotion-chart-highlight.tutorial-target,
 .mood-calendar-highlight.tutorial-target,
@@ -190,7 +204,19 @@ body.tutorial-active {
   pointer-events: none !important;
 }
 
-/* Chat suggestions visibility */
+/* Special additional highlight for chat questions - GLOBAL */
+.chat-question-highlight.tutorial-target::before {
+  content: '';
+  position: absolute;
+  inset: -8px;
+  border-radius: inherit;
+  background: radial-gradient(circle, var(--color-theme) 0%, transparent 70%);
+  opacity: 0.5;
+  animation: chat-pulse 2s infinite alternate;
+  z-index: -1;
+}
+
+/* Make chat suggestions visible during tutorial - GLOBAL */
 .tutorial-active .chat-question-highlight,
 body.tutorial-active .empty-chat-suggestion,
 body.tutorial-active .chat-suggestion-button {
@@ -200,7 +226,7 @@ body.tutorial-active .chat-suggestion-button {
   pointer-events: auto !important;
 }
 
-/* Step 5 specific enhancements */
+/* Enhanced styling for step 5 - GLOBAL enhanced visibility */
 .tutorial-active[data-current-step="5"] .chat-question-highlight,
 body.tutorial-active[data-current-step="5"] .chat-suggestion-button,
 body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
@@ -211,7 +237,7 @@ body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
   transform: translateZ(0) scale(1.1) !important;
 }
 
-/* Tutorial navigation buttons */
+/* Tutorial navigation buttons - GLOBAL */
 .tutorial-buttons {
   z-index: 30001 !important;
   pointer-events: auto !important;
@@ -224,6 +250,7 @@ body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
   cursor: pointer !important;
 }
 
+/* Button styling with good contrast - GLOBAL */
 .tutorial-buttons button[variant="outline"] {
   color: white !important;
   background-color: rgba(51,51,51,0.8) !important;
@@ -239,7 +266,26 @@ body.tutorial-active[data-current-step="5"] .empty-chat-suggestion {
   text-shadow: 0 0 2px rgba(0,0,0,0.5) !important;
 }
 
-/* Step 5 chat styling */
+/* Navigation bar styling during active tutorial - GLOBAL */
+.mobile-navigation-bar.tutorial-active {
+  opacity: 0.3 !important;
+  pointer-events: none !important;
+  touch-action: none !important;
+}
+
+/* Step 5 input hiding - GLOBAL but less aggressive */
+body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,
+body.tutorial-active[data-current-step="5"] form,
+body.tutorial-active[data-current-step="5"] input,
+body.tutorial-active[data-current-step="5"] textarea,
+body.tutorial-active[data-current-step="5"] button[type="submit"],
+body.tutorial-active[data-current-step="5"] button:has(.lucide-mic) {
+  opacity: 0.15 !important;
+  pointer-events: none !important;
+  cursor: default !important;
+}
+
+/* Chat UI styling for step 5 - GLOBAL with enhanced visibility */
 body.tutorial-active[data-current-step="5"] .chat-messages-container {
   opacity: 1 !important;
   background-color: #1A1F2C !important;
@@ -254,19 +300,37 @@ body.tutorial-active[data-current-step="5"] .smart-chat-container {
   background-color: transparent !important;
 }
 
-/* Hide input elements in step 5 */
-body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border,
-body.tutorial-active[data-current-step="5"] form,
-body.tutorial-active[data-current-step="5"] input,
-body.tutorial-active[data-current-step="5"] textarea,
-body.tutorial-active[data-current-step="5"] button[type="submit"],
-body.tutorial-active[data-current-step="5"] button:has(.lucide-mic) {
-  opacity: 0.15 !important;
-  pointer-events: none !important;
-  cursor: default !important;
+body.tutorial-active[data-current-step="5"] .flex.flex-col.items-center.justify-center.p-6.text-center.h-full {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  z-index: 5000 !important;
 }
 
-/* Animation keyframes */
+/* Hide chat input container in step 5 - GLOBAL */
+body.tutorial-active[data-current-step="5"] .chat-input-container,
+body.tutorial-active[data-current-step="5"] [class*="chat"] form,
+body.tutorial-active[data-current-step="5"] .relative.flex.items-center.w-full,
+body.tutorial-active[data-current-step="5"] .w-full.relative div[ref="inputContainerRef"] {
+  background-color: transparent !important; 
+  border: none !important;
+  box-shadow: none !important;
+  opacity: 0 !important;
+  height: 0 !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  pointer-events: none !important;
+}
+
+body.tutorial-active[data-current-step="5"] .flex-1.p-4.relative > div:last-child,
+body.tutorial-active[data-current-step="5"] .p-2.border-t.border-border {
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
+}
+
+/* Animation keyframes - GLOBAL animations */
 @keyframes button-pulse {
   0% { box-shadow: 0 0 25px 12px var(--color-theme); }
   100% { box-shadow: 0 0 45px 20px var(--color-theme); }
@@ -295,7 +359,12 @@ body.tutorial-active[data-current-step="5"] button:has(.lucide-mic) {
   }
 }
 
-/* Mobile responsive adjustments */
+@keyframes chat-pulse {
+  0% { opacity: 0.3; transform: scale(1); }
+  100% { opacity: 0.6; transform: scale(1.15); }
+}
+
+/* MOBILE-SPECIFIC RESPONSIVE ADJUSTMENTS - size and positioning only */
 @media (max-width: 640px) {
   .tutorial-step-container {
     max-width: 280px;
@@ -309,6 +378,7 @@ body.tutorial-active[data-current-step="5"] button:has(.lucide-mic) {
     margin-bottom: 0.75rem !important;
   }
   
+  /* Mobile positioning adjustments */
   .tutorial-step-container[data-step="2"],
   .tutorial-step-container[data-step="5"] {
     top: 10% !important;

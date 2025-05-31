@@ -1,6 +1,6 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import '@/types/three-reference';
+import '@/types/three-reference';  // Fixed import path
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
@@ -30,7 +30,7 @@ interface NodeProps {
   connectionStrength?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
-  isFullScreen?: boolean;
+  forceShowLabels?: boolean; // New prop for tutorial mode
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -47,63 +47,67 @@ export const Node: React.FC<NodeProps> = ({
   connectionStrength = 0.5,
   connectionPercentage = 0,
   showPercentage = false,
-  isFullScreen = false
+  forceShowLabels = false
 }) => {
   const { theme } = useTheme();
   const { isInStep } = useTutorial();
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
+  const prevHighlightedRef = useRef<boolean>(isHighlighted);
+  const prevSelectedRef = useRef<boolean>(isSelected);
+  const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
   
+  // Enhanced label visibility for tutorial step 9
   const isTutorialStep9 = isInStep(9);
+  const shouldShowLabel = isTutorialStep9 || forceShowLabels || showLabel || isHighlighted || isSelected;
   
-  // Original label visibility logic
-  const shouldShowLabel = useMemo(() => {
-    // Always show in tutorial step 9
+  // Enhanced debug logging for tutorial step 9
+  useEffect(() => {
     if (isTutorialStep9) {
-      return true;
+      console.log(`[Node] Tutorial Step 9 - ${node.id} (${node.type}):`, {
+        position: node.position,
+        shouldShowLabel,
+        showLabel,
+        forceShowLabels,
+        isHighlighted,
+        isSelected,
+        isTutorialStep9
+      });
     }
-    
-    // Show if this is the selected node
-    if (isSelected) {
-      return true;
-    }
-    
-    // Show if this node is highlighted (connected to selected node)
-    if (isHighlighted) {
-      return true;
-    }
-    
-    // Show if no node is selected and showLabel is true
-    if (!selectedNodeId && showLabel) {
-      return true;
-    }
-    
-    // Show in fullscreen mode
-    if (isFullScreen) {
-      return true;
-    }
-    
-    return false;
-  }, [isTutorialStep9, isSelected, isHighlighted, selectedNodeId, showLabel, isFullScreen]);
+  }, [node.id, node.type, node.position, shouldShowLabel, showLabel, forceShowLabels, isHighlighted, isSelected, isTutorialStep9]);
   
-  // Original node scale calculation
+  // Track state changes that might cause flickering
+  useEffect(() => {
+    if (prevHighlightedRef.current !== isHighlighted || prevSelectedRef.current !== isSelected) {
+      console.log(`Node ${node.id}: State change - highlighted: ${prevHighlightedRef.current} → ${isHighlighted}, selected: ${prevSelectedRef.current} → ${isSelected}`);
+      prevHighlightedRef.current = isHighlighted;
+      prevSelectedRef.current = isSelected;
+      
+      // Mark node as animating to stabilize transitions
+      nodeRef.current.isAnimating = true;
+      
+      // Reset animation flag after transition period
+      setTimeout(() => {
+        nodeRef.current.isAnimating = false;
+      }, 300);
+    }
+  }, [isHighlighted, isSelected, node.id]);
+  
+  // Enhanced scale calculation with tutorial mode adjustments
   const baseScale = node.type === 'entity' ? 0.7 : 0.55;
-  const tutorialScaleBoost = isTutorialStep9 ? 1.1 : 1;
-  const highlightScale = isHighlighted ? 1.3 : 1;
-  const scale = baseScale * tutorialScaleBoost * highlightScale;
+  const tutorialScaleBoost = isTutorialStep9 ? 1.1 : 1; // Slightly larger nodes in tutorial
+  const scale = (isHighlighted 
+    ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
+    : baseScale * (0.8 + node.value * 0.5)) * tutorialScaleBoost;
 
-  // Original color calculation
   const displayColor = useMemo(() => {
     if (isHighlighted) {
       return node.type === 'entity' ? '#ffffff' : themeHex;
     }
-    
-    if (dimmed) {
-      return theme === 'dark' ? '#555555' : '#999999';
-    }
-    
-    return node.type === 'entity' ? '#cccccc' : themeHex;
+    return node.type === 'entity'
+      ? (dimmed ? (theme === 'dark' ? '#555' : '#999') : '#ccc') 
+      : (dimmed ? (theme === 'dark' ? '#555' : '#999') : themeHex);
   }, [node.type, dimmed, theme, themeHex, isHighlighted]);
 
   const handlePointerDown = useCallback((e: any) => {
@@ -111,7 +115,8 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(true);
     setTouchStartTime(Date.now());
     setTouchStartPosition({x: e.clientX, y: e.clientY});
-  }, []);
+    console.log(`Node pointer down: ${node.id}`);
+  }, [node.id]);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
@@ -121,6 +126,7 @@ export const Node: React.FC<NodeProps> = ({
         const deltaY = Math.abs(e.clientY - touchStartPosition.y);
         
         if (deltaX < 10 && deltaY < 10) {
+          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
           onClick(node.id, e);
           
           if (navigator.vibrate) {
@@ -128,6 +134,7 @@ export const Node: React.FC<NodeProps> = ({
           }
         }
       } else {
+        console.log(`Node clicked (no start position): ${node.id}`);
         onClick(node.id, e);
       }
     }
@@ -135,7 +142,7 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(false);
     setTouchStartTime(null);
     setTouchStartPosition(null);
-  }, [node.id, onClick, touchStartTime, touchStartPosition]);
+  }, [node.id, onClick, touchStartTime, touchStartPosition, isHighlighted]);
 
   useEffect(() => {
     if (isTouching && touchStartTime) {
@@ -151,6 +158,7 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
+  // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
   return (
@@ -174,14 +182,14 @@ export const Node: React.FC<NodeProps> = ({
         id={node.id}
         type={node.type}
         position={node.position}
-        shouldShowLabel={shouldShowLabel}
-        isTutorialMode={isTutorialStep9}
-        themeHex={themeHex}
         isHighlighted={isHighlighted}
+        shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
-        isFullScreen={isFullScreen}
+        themeHex={themeHex}
+        forceVisible={isTutorialStep9 || forceShowLabels} // Pass tutorial state
       />
 
+      {/* Place the percentage display in front of the node */}
       <ConnectionPercentage
         position={node.position}
         percentage={connectionPercentage}

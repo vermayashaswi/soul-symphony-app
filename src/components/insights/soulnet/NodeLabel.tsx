@@ -4,23 +4,27 @@ import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 // Helper function to detect non-Latin script
 const containsNonLatinScript = (text: string): boolean => {
   if (!text) return false;
   
+  // Regex patterns for different script ranges
   const patterns = {
-    devanagari: /[\u0900-\u097F]/,
-    arabic: /[\u0600-\u06FF]/,
-    chinese: /[\u4E00-\u9FFF]/,
-    japanese: /[\u3040-\u309F\u30A0-\u30FF]/,
-    korean: /[\uAC00-\uD7AF]/,
-    cyrillic: /[\u0400-\u04FF]/
+    devanagari: /[\u0900-\u097F]/,  // Hindi, Sanskrit, etc.
+    arabic: /[\u0600-\u06FF]/,      // Arabic
+    chinese: /[\u4E00-\u9FFF]/,     // Chinese
+    japanese: /[\u3040-\u309F\u30A0-\u30FF]/,  // Japanese Hiragana and Katakana
+    korean: /[\uAC00-\uD7AF]/,      // Korean Hangul
+    cyrillic: /[\u0400-\u04FF]/     // Russian and other Cyrillic
   };
   
+  // Check if text contains any non-Latin script
   return Object.values(patterns).some(pattern => pattern.test(text));
 };
 
+// Specifically detect Devanagari script (Hindi)
 const containsDevanagari = (text: string): boolean => {
   if (!text) return false;
   const devanagariPattern = /[\u0900-\u097F]/;
@@ -29,55 +33,83 @@ const containsDevanagari = (text: string): boolean => {
 
 // Format entity node text to display on two lines
 const formatEntityText = (text: string): string => {
-  if (!text || text.length <= 6) return text;
+  if (!text || text.length <= 3) return text;
   
-  const words = text.split(' ');
-  if (words.length === 1) return text;
+  // Split text in approximately half to create two lines
+  const halfLength = Math.ceil(text.length / 2);
+  let splitIndex = halfLength;
   
-  const midPoint = Math.ceil(words.length / 2);
-  const firstLine = words.slice(0, midPoint).join(' ');
-  const secondLine = words.slice(midPoint).join(' ');
+  // Look for natural break points like spaces near the middle
+  const spaceIndices = [...text.matchAll(/\s/g)].map(match => match.index as number);
+  if (spaceIndices.length > 0) {
+    // Find the space closest to the middle
+    const nearestSpace = spaceIndices.reduce((closest, current) => {
+      return Math.abs(current - halfLength) < Math.abs(closest - halfLength) ? current : closest;
+    }, spaceIndices[0]);
+    
+    splitIndex = nearestSpace;
+  }
   
-  return firstLine + '\n' + secondLine;
+  // Create two-line text with line break
+  return text.substring(0, splitIndex) + '\n' + text.substring(splitIndex).trim();
 };
 
 interface NodeLabelProps {
   id: string;
   type: 'entity' | 'emotion';
   position: [number, number, number];
-  shouldShowLabel: boolean;
-  isTutorialMode: boolean;
-  themeHex: string;
   isHighlighted: boolean;
+  shouldShowLabel: boolean;
   cameraZoom?: number;
-  isFullScreen?: boolean;
+  themeHex: string;
+  forceVisible?: boolean; // New prop for tutorial mode
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
   id,
   type,
   position,
-  shouldShowLabel,
-  isTutorialMode,
-  themeHex,
   isHighlighted,
-  cameraZoom = 52,
-  isFullScreen = false
+  shouldShowLabel,
+  cameraZoom,
+  themeHex,
+  forceVisible = false
 }) => {
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
+  const { isInStep } = useTutorial();
   const [translatedText, setTranslatedText] = useState<string>(id);
   const [isTranslating, setIsTranslating] = useState(false);
   const prevLangRef = useRef<string>(currentLanguage);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   
+  // Enhanced visibility logic - prioritize tutorial step 9 and forceVisible
+  const isTutorialStep9 = isInStep(9);
+  const isVisible = isTutorialStep9 || forceVisible || shouldShowLabel;
+  
+  // Enhanced debug logging for tutorial step 9
+  useEffect(() => {
+    if (isTutorialStep9) {
+      console.log(`[NodeLabel] Tutorial Step 9 - ${id} (${type}):`, {
+        position,
+        isVisible,
+        shouldShowLabel,
+        forceVisible,
+        isTutorialStep9,
+        isHighlighted,
+        cameraZoom
+      });
+    }
+  }, [id, type, position, isVisible, shouldShowLabel, forceVisible, isTutorialStep9, isHighlighted, cameraZoom]);
+  
   // Handle translation when the label should be displayed
   useEffect(() => {
-    if (!shouldShowLabel || currentLanguage === 'en' || !id) {
+    if (!isVisible || currentLanguage === 'en' || !id) {
       return;
     }
     
+    // Check cache first
     const cachedTranslation = onDemandTranslationCache.getTranslation(id, currentLanguage);
     
     if (cachedTranslation) {
@@ -87,16 +119,21 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       return;
     }
     
+    // Translate without debouncing for immediate display
     const translateText = async () => {
       try {
         setIsTranslating(true);
         const result = await translate(id);
         setTranslatedText(result);
         
+        // Cache the result
         onDemandTranslationCache.setTranslation(id, result, currentLanguage);
         
+        // Update script detection
         isNonLatin.current = containsNonLatinScript(result);
         isDevanagari.current = containsDevanagari(result);
+        
+        console.log(`[NodeLabel] Translated "${id}" to "${result}"`);
       } catch (error) {
         console.error(`[NodeLabel] Failed to translate "${id}":`, error);
       } finally {
@@ -105,7 +142,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     };
     
     translateText();
-  }, [id, shouldShowLabel, currentLanguage, translate]);
+  }, [id, isVisible, currentLanguage, translate]);
   
   // Clear translations when language changes
   useEffect(() => {
@@ -115,7 +152,7 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     }
   }, [currentLanguage, id]);
   
-  // Format text for display
+  // Format entity text for display - always apply for entity type
   const formattedText = useMemo(() => {
     if (type === 'entity') {
       const textToFormat = translatedText || id;
@@ -124,54 +161,67 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return translatedText || id;
   }, [id, type, translatedText]);
 
-  // Original font size calculation based on camera zoom and node type
-  const fontSize = useMemo(() => {
-    const baseSize = type === 'entity' ? 0.35 : 0.3;
-    const zoomFactor = Math.max(0.8, Math.min(1.2, 52 / cameraZoom));
-    const tutorialBoost = isTutorialMode ? 1.2 : 1.0;
-    const highlightBoost = isHighlighted ? 1.1 : 1.0;
-    const fullscreenBoost = isFullScreen ? 1.1 : 1.0;
+  const dynamicFontSize = useMemo(() => {
+    let z = cameraZoom !== undefined ? cameraZoom : 26;
+    if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    let size = baseSize * zoomFactor * tutorialBoost * highlightBoost * fullscreenBoost;
+    // Significantly increased base size for better visibility, especially in tutorial
+    const baseSize = (0.5 + Math.max(0, (26 - z) * 0.015)) * (isTutorialStep9 ? 1.5 : 1.2);
     
-    // Adjust for non-Latin scripts
-    if (isDevanagari.current) {
-      size += 0.05;
-    } else if (isNonLatin.current) {
-      size += 0.03;
-    }
+    // Adjust size for non-Latin scripts
+    const sizeAdjustment = isDevanagari.current ? 0.1 : 
+                          isNonLatin.current ? 0.06 : 0;
     
-    return Math.max(Math.min(size, 0.6), 0.25);
-  }, [type, cameraZoom, isTutorialMode, isHighlighted, isFullScreen]);
+    // Ensure minimum readable size with higher minimum for tutorial
+    const minSize = isTutorialStep9 ? 0.4 : 0.35;
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), minSize);
+  }, [cameraZoom, isTutorialStep9]);
 
-  // Original text color calculation
-  const textColor = useMemo(() => {
-    if (type === 'entity') {
-      return theme === 'light' ? '#1a1a1a' : '#ffffff';
-    } else {
-      return themeHex;
+  // Don't render if not visible or no text
+  if (!isVisible || !formattedText) {
+    if (isTutorialStep9) {
+      console.log(`[NodeLabel] Tutorial Step 9 - Not rendering ${id}: visible=${isVisible}, text="${formattedText}"`);
     }
-  }, [type, theme, themeHex]);
+    return null;
+  }
+
+  // Enhanced vertical offset calculation for better positioning
+  const verticalOffset = useMemo(() => {
+    const baseOffset = type === 'entity' ? 2.2 : 2.0;
+    // Add extra offset in tutorial mode for better visibility
+    return isTutorialStep9 ? baseOffset + 0.3 : baseOffset;
+  }, [type, isTutorialStep9]);
+
+  // Enhanced text color logic with better contrast for tutorial
+  const textColor = useMemo(() => {
+    if (isTutorialStep9) {
+      // Force high contrast colors in tutorial mode
+      return type === 'entity' 
+        ? (theme === 'light' ? '#000000' : '#ffffff')
+        : themeHex;
+    }
+    return type === 'entity' 
+      ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
+      : themeHex;
+  }, [type, theme, themeHex, isTutorialStep9]);
+
+  // Enhanced outline for better visibility, especially in tutorial
+  const outlineWidth = useMemo(() => {
+    if (isTutorialStep9) return 0.015; // Thicker outline in tutorial
+    return isHighlighted ? 0.012 : 0.008;
+  }, [isHighlighted, isTutorialStep9]);
   
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
-  // Original position calculation with proper offset
-  const verticalOffset = type === 'entity' ? 1.8 : 1.6;
+  // Calculate final position with proper offset
   const finalPosition: [number, number, number] = [
     position[0], 
     position[1] + verticalOffset, 
     position[2]
   ];
 
-  // Original render order calculation
-  const renderOrder = isTutorialMode ? 25 : (isHighlighted ? 20 : 15);
-  
-  // Original outline width calculation
-  const outlineWidth = isTutorialMode ? 0.015 : (isHighlighted ? 0.01 : 0.008);
-
-  // Don't render if not visible or no text
-  if (!shouldShowLabel || !formattedText) {
-    return null;
+  if (isTutorialStep9) {
+    console.log(`[NodeLabel] Tutorial Step 9 - Rendering "${id}" (${type}) at position:`, finalPosition, 'with text:', formattedText);
   }
 
   return (
@@ -179,13 +229,13 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       text={formattedText}
       position={finalPosition}
       color={textColor}
-      size={fontSize}
-      bold={isHighlighted || isTutorialMode}
+      size={dynamicFontSize}
+      bold={isHighlighted || isTutorialStep9}
       visible={true}
       skipTranslation={true}
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
-      renderOrder={renderOrder}
+      renderOrder={isTutorialStep9 ? 20 : 15} // Higher render order in tutorial mode
     />
   );
 };
