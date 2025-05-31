@@ -217,9 +217,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 
   const shouldDim = !!selectedNode;
 
-  // Simplified global label visibility logic
-  const globalShouldShowLabels = isTutorialStep9 || isFullScreen || shouldShowLabels;
-
   const handleNodeClick = (id: string, e: any) => {
     onNodeClick(id);
   };
@@ -330,7 +327,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             isSelected={selectedNode === node.id}
             onClick={handleNodeClick}
             highlightedNodes={highlightedNodes}
-            showLabel={true}
+            showLabel={shouldShowLabels}
             dimmed={dimmed}
             themeHex={themeHex}
             selectedNodeId={selectedNode}
@@ -340,7 +337,6 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
             connectionPercentage={connectionPercentage}
             showPercentage={showPercentage}
             isFullScreen={isFullScreen}
-            globalShouldShowLabels={globalShouldShowLabels}
           />
         );
       })}

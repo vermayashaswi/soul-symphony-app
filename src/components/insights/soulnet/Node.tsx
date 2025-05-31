@@ -6,7 +6,7 @@ import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
-import { useSoulNetLabelVisibility } from '@/hooks/use-soul-net-label-visibility';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface NodeData {
   id: string;
@@ -31,7 +31,6 @@ interface NodeProps {
   connectionPercentage?: number;
   showPercentage?: boolean;
   isFullScreen?: boolean;
-  globalShouldShowLabels?: boolean;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -48,37 +47,53 @@ export const Node: React.FC<NodeProps> = ({
   connectionStrength = 0.5,
   connectionPercentage = 0,
   showPercentage = false,
-  isFullScreen = false,
-  globalShouldShowLabels = false
+  isFullScreen = false
 }) => {
   const { theme } = useTheme();
+  const { isInStep } = useTutorial();
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   
-  // Use the simplified label visibility hook
-  const {
-    shouldShowLabel,
-    isTutorialStep9,
-    dynamicProps
-  } = useSoulNetLabelVisibility({
-    nodeId: node.id,
-    nodeType: node.type,
-    isSelected,
-    isHighlighted,
-    isFullScreen,
-    selectedNodeId,
-    highlightedNodes,
-    globalShouldShowLabels: globalShouldShowLabels || showLabel
-  });
+  const isTutorialStep9 = isInStep(9);
   
-  // Simplified node scale calculation
+  // Original label visibility logic
+  const shouldShowLabel = useMemo(() => {
+    // Always show in tutorial step 9
+    if (isTutorialStep9) {
+      return true;
+    }
+    
+    // Show if this is the selected node
+    if (isSelected) {
+      return true;
+    }
+    
+    // Show if this node is highlighted (connected to selected node)
+    if (isHighlighted) {
+      return true;
+    }
+    
+    // Show if no node is selected and showLabel is true
+    if (!selectedNodeId && showLabel) {
+      return true;
+    }
+    
+    // Show in fullscreen mode
+    if (isFullScreen) {
+      return true;
+    }
+    
+    return false;
+  }, [isTutorialStep9, isSelected, isHighlighted, selectedNodeId, showLabel, isFullScreen]);
+  
+  // Original node scale calculation
   const baseScale = node.type === 'entity' ? 0.7 : 0.55;
   const tutorialScaleBoost = isTutorialStep9 ? 1.1 : 1;
   const highlightScale = isHighlighted ? 1.3 : 1;
   const scale = baseScale * tutorialScaleBoost * highlightScale;
 
-  // Simplified color calculation
+  // Original color calculation
   const displayColor = useMemo(() => {
     if (isHighlighted) {
       return node.type === 'entity' ? '#ffffff' : themeHex;
@@ -161,9 +176,10 @@ export const Node: React.FC<NodeProps> = ({
         position={node.position}
         shouldShowLabel={shouldShowLabel}
         isTutorialMode={isTutorialStep9}
-        dynamicProps={dynamicProps}
         themeHex={themeHex}
         isHighlighted={isHighlighted}
+        cameraZoom={cameraZoom}
+        isFullScreen={isFullScreen}
       />
 
       <ConnectionPercentage

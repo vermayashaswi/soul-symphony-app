@@ -47,14 +47,10 @@ interface NodeLabelProps {
   position: [number, number, number];
   shouldShowLabel: boolean;
   isTutorialMode: boolean;
-  dynamicProps: {
-    fontSize: number;
-    verticalOffset: number;
-    renderOrder: number;
-    outlineWidth: number;
-  };
   themeHex: string;
   isHighlighted: boolean;
+  cameraZoom?: number;
+  isFullScreen?: boolean;
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
@@ -63,9 +59,10 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   position,
   shouldShowLabel,
   isTutorialMode,
-  dynamicProps,
   themeHex,
-  isHighlighted
+  isHighlighted,
+  cameraZoom = 52,
+  isFullScreen = false
 }) => {
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
@@ -127,22 +124,27 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return translatedText || id;
   }, [id, type, translatedText]);
 
-  // Simplified font size calculation
-  const finalFontSize = useMemo(() => {
-    let size = dynamicProps.fontSize;
+  // Original font size calculation based on camera zoom and node type
+  const fontSize = useMemo(() => {
+    const baseSize = type === 'entity' ? 0.35 : 0.3;
+    const zoomFactor = Math.max(0.8, Math.min(1.2, 52 / cameraZoom));
+    const tutorialBoost = isTutorialMode ? 1.2 : 1.0;
+    const highlightBoost = isHighlighted ? 1.1 : 1.0;
+    const fullscreenBoost = isFullScreen ? 1.1 : 1.0;
     
-    // Small adjustment for non-Latin scripts
+    let size = baseSize * zoomFactor * tutorialBoost * highlightBoost * fullscreenBoost;
+    
+    // Adjust for non-Latin scripts
     if (isDevanagari.current) {
       size += 0.05;
     } else if (isNonLatin.current) {
       size += 0.03;
     }
     
-    // Ensure reasonable bounds
     return Math.max(Math.min(size, 0.6), 0.25);
-  }, [dynamicProps.fontSize]);
+  }, [type, cameraZoom, isTutorialMode, isHighlighted, isFullScreen]);
 
-  // Simplified text color calculation
+  // Original text color calculation
   const textColor = useMemo(() => {
     if (type === 'entity') {
       return theme === 'light' ? '#1a1a1a' : '#ffffff';
@@ -153,12 +155,19 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
-  // Calculate final position with offset
+  // Original position calculation with proper offset
+  const verticalOffset = type === 'entity' ? 1.8 : 1.6;
   const finalPosition: [number, number, number] = [
     position[0], 
-    position[1] + dynamicProps.verticalOffset, 
+    position[1] + verticalOffset, 
     position[2]
   ];
+
+  // Original render order calculation
+  const renderOrder = isTutorialMode ? 25 : (isHighlighted ? 20 : 15);
+  
+  // Original outline width calculation
+  const outlineWidth = isTutorialMode ? 0.015 : (isHighlighted ? 0.01 : 0.008);
 
   // Don't render if not visible or no text
   if (!shouldShowLabel || !formattedText) {
@@ -170,13 +179,13 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       text={formattedText}
       position={finalPosition}
       color={textColor}
-      size={finalFontSize}
+      size={fontSize}
       bold={isHighlighted || isTutorialMode}
       visible={true}
       skipTranslation={true}
-      outlineWidth={dynamicProps.outlineWidth}
+      outlineWidth={outlineWidth}
       outlineColor={outlineColor}
-      renderOrder={dynamicProps.renderOrder}
+      renderOrder={renderOrder}
     />
   );
 };

@@ -192,8 +192,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Enhanced shouldShowLabels logic that includes tutorial debugging and step 9
-  const shouldShowLabels = forceShowLabels || isFullScreen || selectedEntity !== null || isInStep(9);
+  // Simplified shouldShowLabels logic - just pass it through to visualization
+  const shouldShowLabels = forceShowLabels || isFullScreen;
 
   return (
     <div className={cn(
