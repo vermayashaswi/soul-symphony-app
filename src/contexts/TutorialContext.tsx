@@ -59,7 +59,7 @@ const TutorialContext = createContext<TutorialContextType | undefined>(undefined
 const initialTutorialSteps: TutorialStep[] = [
   {
     id: 1,
-    title: 'Welcome to Soul Symphony',
+    title: 'Welcome to SOuLO',
     content: 'Let\'s take a quick tour to help you get started with your journaling journey.',
     targetElement: '.journal-header-container', // Target the journal header
     position: 'center',
