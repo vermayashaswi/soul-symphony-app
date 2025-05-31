@@ -6,6 +6,7 @@ import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 interface NodeData {
   id: string;
@@ -29,6 +30,7 @@ interface NodeProps {
   connectionStrength?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
+  forceShowLabels?: boolean; // New prop for tutorial mode
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -44,42 +46,39 @@ export const Node: React.FC<NodeProps> = ({
   isHighlighted = false,
   connectionStrength = 0.5,
   connectionPercentage = 0,
-  showPercentage = false
+  showPercentage = false,
+  forceShowLabels = false
 }) => {
   const { theme } = useTheme();
+  const { isInStep } = useTutorial();
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
   const prevHighlightedRef = useRef<boolean>(isHighlighted);
   const prevSelectedRef = useRef<boolean>(isSelected);
   const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
-  const stableLabelVisibilityRef = useRef<boolean>(showLabel || isHighlighted || isSelected);
   
-  // Stabilize label visibility transitions to prevent flickering
-  useEffect(() => {
-    const newVisibility = showLabel || isHighlighted || isSelected;
-    
-    // Only update if there's a change, with a small delay when hiding to prevent flicker
-    if (newVisibility !== stableLabelVisibilityRef.current) {
-      if (newVisibility) {
-        // Show immediately
-        stableLabelVisibilityRef.current = true;
-      } else {
-        // Hide with delay
-        setTimeout(() => {
-          stableLabelVisibilityRef.current = newVisibility;
-        }, 100);
-      }
-    }
-  }, [showLabel, isHighlighted, isSelected]);
+  // Enhanced label visibility for tutorial step 9
+  const isTutorialStep9 = isInStep(9);
+  const shouldShowLabel = isTutorialStep9 || forceShowLabels || showLabel || isHighlighted || isSelected;
   
-  // Debug log for visibility with more informative details
+  // Enhanced debug logging for tutorial step 9
   useEffect(() => {
-    if (isHighlighted || isSelected) {
-      console.log(`Node ${node.id}: highlighted=${isHighlighted}, selected=${isSelected}, showPercentage=${showPercentage}, percentage=${connectionPercentage}`);
+    if (isTutorialStep9) {
+      console.log(`[Node] Tutorial Step 9 - ${node.id} (${node.type}):`, {
+        position: node.position,
+        shouldShowLabel,
+        showLabel,
+        forceShowLabels,
+        isHighlighted,
+        isSelected,
+        isTutorialStep9
+      });
     }
-    
-    // Track state changes that might cause flickering
+  }, [node.id, node.type, node.position, shouldShowLabel, showLabel, forceShowLabels, isHighlighted, isSelected, isTutorialStep9]);
+  
+  // Track state changes that might cause flickering
+  useEffect(() => {
     if (prevHighlightedRef.current !== isHighlighted || prevSelectedRef.current !== isSelected) {
       console.log(`Node ${node.id}: State change - highlighted: ${prevHighlightedRef.current} → ${isHighlighted}, selected: ${prevSelectedRef.current} → ${isSelected}`);
       prevHighlightedRef.current = isHighlighted;
@@ -93,13 +92,14 @@ export const Node: React.FC<NodeProps> = ({
         nodeRef.current.isAnimating = false;
       }, 300);
     }
-  }, [isHighlighted, isSelected, showPercentage, node.id, connectionPercentage]);
+  }, [isHighlighted, isSelected, node.id]);
   
-  // Further increase the base scale for all nodes by 1.5x for nodes, as requested
-  const baseScale = node.type === 'entity' ? 0.7 : 0.55; // Adjusted values for smaller nodes
-  const scale = isHighlighted 
+  // Enhanced scale calculation with tutorial mode adjustments
+  const baseScale = node.type === 'entity' ? 0.7 : 0.55;
+  const tutorialScaleBoost = isTutorialStep9 ? 1.1 : 1; // Slightly larger nodes in tutorial
+  const scale = (isHighlighted 
     ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
-    : baseScale * (0.8 + node.value * 0.5);
+    : baseScale * (0.8 + node.value * 0.5)) * tutorialScaleBoost;
 
   const displayColor = useMemo(() => {
     if (isHighlighted) {
@@ -158,18 +158,8 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
-  // Ensure label visibility - use explicit visibility for both NodeLabel and ConnectionPercentage
-  const shouldShowLabel = stableLabelVisibilityRef.current;
-  
   // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
-  
-  // Log when percentage should be displayed
-  useEffect(() => {
-    if (shouldShowPercentage) {
-      console.log(`Should show percentage for node ${node.id}: ${connectionPercentage}%`);
-    }
-  }, [shouldShowPercentage, node.id, connectionPercentage]);
   
   return (
     <group position={node.position}>
@@ -196,6 +186,7 @@ export const Node: React.FC<NodeProps> = ({
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
         themeHex={themeHex}
+        forceVisible={isTutorialStep9 || forceShowLabels} // Pass tutorial state
       />
 
       {/* Place the percentage display in front of the node */}
@@ -203,7 +194,7 @@ export const Node: React.FC<NodeProps> = ({
         position={node.position}
         percentage={connectionPercentage}
         isVisible={shouldShowPercentage}
-        offsetY={0} // No offset needed since we're using z-positioning
+        offsetY={0}
         nodeType={node.type}
       />
     </group>

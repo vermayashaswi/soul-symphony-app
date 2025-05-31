@@ -4,6 +4,7 @@ import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
 import { useTranslation } from '@/contexts/TranslationContext';
 import { onDemandTranslationCache } from '@/utils/website-translations';
+import { useTutorial } from '@/contexts/TutorialContext';
 
 // Helper function to detect non-Latin script
 const containsNonLatinScript = (text: string): boolean => {
@@ -61,6 +62,7 @@ interface NodeLabelProps {
   shouldShowLabel: boolean;
   cameraZoom?: number;
   themeHex: string;
+  forceVisible?: boolean; // New prop for tutorial mode
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
@@ -70,30 +72,36 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   isHighlighted,
   shouldShowLabel,
   cameraZoom,
-  themeHex
+  themeHex,
+  forceVisible = false
 }) => {
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
+  const { isInStep } = useTutorial();
   const [translatedText, setTranslatedText] = useState<string>(id);
   const [isTranslating, setIsTranslating] = useState(false);
   const prevLangRef = useRef<string>(currentLanguage);
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   
-  // Enhanced visibility logic - always show labels when shouldShowLabel is true
-  const isVisible = shouldShowLabel && !!id;
+  // Enhanced visibility logic - prioritize tutorial step 9 and forceVisible
+  const isTutorialStep9 = isInStep(9);
+  const isVisible = isTutorialStep9 || forceVisible || shouldShowLabel;
   
-  // Debug logging for label visibility
+  // Enhanced debug logging for tutorial step 9
   useEffect(() => {
-    console.log(`[NodeLabel] ${id} visibility check:`, {
-      shouldShowLabel,
-      hasId: !!id,
-      isVisible,
-      position,
-      type,
-      cameraZoom
-    });
-  }, [id, shouldShowLabel, isVisible, position, type, cameraZoom]);
+    if (isTutorialStep9) {
+      console.log(`[NodeLabel] Tutorial Step 9 - ${id} (${type}):`, {
+        position,
+        isVisible,
+        shouldShowLabel,
+        forceVisible,
+        isTutorialStep9,
+        isHighlighted,
+        cameraZoom
+      });
+    }
+  }, [id, type, position, isVisible, shouldShowLabel, forceVisible, isTutorialStep9, isHighlighted, cameraZoom]);
   
   // Handle translation when the label should be displayed
   useEffect(() => {
@@ -157,49 +165,77 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Significantly increased base size for better visibility
-    const baseSize = (0.5 + Math.max(0, (26 - z) * 0.015)) * 1.2;
+    // Significantly increased base size for better visibility, especially in tutorial
+    const baseSize = (0.5 + Math.max(0, (26 - z) * 0.015)) * (isTutorialStep9 ? 1.5 : 1.2);
     
     // Adjust size for non-Latin scripts
     const sizeAdjustment = isDevanagari.current ? 0.1 : 
                           isNonLatin.current ? 0.06 : 0;
     
-    // Ensure minimum readable size with higher minimum
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), 0.35);
-  }, [cameraZoom]);
+    // Ensure minimum readable size with higher minimum for tutorial
+    const minSize = isTutorialStep9 ? 0.4 : 0.35;
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), minSize);
+  }, [cameraZoom, isTutorialStep9]);
 
   // Don't render if not visible or no text
   if (!isVisible || !formattedText) {
-    console.log(`[NodeLabel] Not rendering: visible=${isVisible}, text="${formattedText}", id="${id}"`);
+    if (isTutorialStep9) {
+      console.log(`[NodeLabel] Tutorial Step 9 - Not rendering ${id}: visible=${isVisible}, text="${formattedText}"`);
+    }
     return null;
   }
 
-  // FIXED: Calculate the vertical offset from the node position
-  const verticalOffset = type === 'entity' ? 2.2 : 2.0;
+  // Enhanced vertical offset calculation for better positioning
+  const verticalOffset = useMemo(() => {
+    const baseOffset = type === 'entity' ? 2.2 : 2.0;
+    // Add extra offset in tutorial mode for better visibility
+    return isTutorialStep9 ? baseOffset + 0.3 : baseOffset;
+  }, [type, isTutorialStep9]);
 
-  // Enhanced text color logic with better contrast
-  const textColor = type === 'entity' 
-    ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
-    : themeHex;
+  // Enhanced text color logic with better contrast for tutorial
+  const textColor = useMemo(() => {
+    if (isTutorialStep9) {
+      // Force high contrast colors in tutorial mode
+      return type === 'entity' 
+        ? (theme === 'light' ? '#000000' : '#ffffff')
+        : themeHex;
+    }
+    return type === 'entity' 
+      ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
+      : themeHex;
+  }, [type, theme, themeHex, isTutorialStep9]);
 
-  // Enhanced outline for better visibility
-  const outlineWidth = isHighlighted ? 0.012 : 0.008;
+  // Enhanced outline for better visibility, especially in tutorial
+  const outlineWidth = useMemo(() => {
+    if (isTutorialStep9) return 0.015; // Thicker outline in tutorial
+    return isHighlighted ? 0.012 : 0.008;
+  }, [isHighlighted, isTutorialStep9]);
+  
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
-  console.log(`[NodeLabel] Rendering "${id}" (${type}) at position:`, position, 'with text:', formattedText, 'verticalOffset:', verticalOffset);
+  // Calculate final position with proper offset
+  const finalPosition: [number, number, number] = [
+    position[0], 
+    position[1] + verticalOffset, 
+    position[2]
+  ];
+
+  if (isTutorialStep9) {
+    console.log(`[NodeLabel] Tutorial Step 9 - Rendering "${id}" (${type}) at position:`, finalPosition, 'with text:', formattedText);
+  }
 
   return (
     <ThreeDimensionalText
       text={formattedText}
-      position={[position[0], position[1] + verticalOffset, position[2]]} // Apply offset directly to position
+      position={finalPosition}
       color={textColor}
       size={dynamicFontSize}
-      bold={isHighlighted}
+      bold={isHighlighted || isTutorialStep9}
       visible={true}
       skipTranslation={true}
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
-      renderOrder={15} // Higher render order to ensure text appears on top
+      renderOrder={isTutorialStep9 ? 20 : 15} // Higher render order in tutorial mode
     />
   );
 };
