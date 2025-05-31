@@ -1,4 +1,5 @@
-import { LocalNotifications, ScheduleOptions } from '@capacitor/local-notifications';
+
+import { LocalNotifications, LocalNotificationSchema } from '@capacitor/local-notifications';
 import { Capacitor } from '@capacitor/core';
 import { toast } from 'sonner';
 
@@ -117,7 +118,6 @@ export async function ensureAllToastsCleared() {
 }
 
 // Notification types
-export type NotificationFrequency = 'once' | 'twice' | 'thrice';
 export type NotificationTime = 'morning' | 'afternoon' | 'evening' | 'night';
 
 interface NotificationConfig {
@@ -220,7 +220,7 @@ class NotificationService {
     }
   }
 
-  async setupNotifications(enabled: boolean, frequency: NotificationFrequency, times: NotificationTime[]): Promise<boolean> {
+  async setupNotifications(enabled: boolean, times: NotificationTime[]): Promise<boolean> {
     try {
       // Update configuration
       this.config = { enabled, times };
@@ -253,7 +253,7 @@ class NotificationService {
   }
 
   private async scheduleNotifications(times: NotificationTime[]): Promise<void> {
-    const notifications: ScheduleOptions[] = [];
+    const notifications: LocalNotificationSchema[] = [];
     
     // Schedule notifications for the next 30 days
     const today = new Date();
@@ -367,9 +367,9 @@ class NotificationService {
 // Create singleton instance
 const notificationService = new NotificationService();
 
-// Export main functions
-export function setupJournalReminder(enabled: boolean, frequency: NotificationFrequency, times: NotificationTime[]): Promise<boolean> {
-  return notificationService.setupNotifications(enabled, frequency, times);
+// Export main functions - Updated to match expected signature
+export function setupJournalReminder(enabled: boolean, times: NotificationTime[]): Promise<boolean> {
+  return notificationService.setupNotifications(enabled, times);
 }
 
 export function initializeCapacitorNotifications(): Promise<boolean> {
