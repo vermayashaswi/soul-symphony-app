@@ -1,4 +1,3 @@
-
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { OrbitControls } from '@react-three/drei';
@@ -257,14 +256,14 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return calculateConnectionPercentages(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // Adjust controls dampingFactor based on fullscreen mode
+  // Adjust controls dampingFactor based on fullscreen mode with reduced max zoom distances
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
       
-      // Adjusted distance limits to match reference image zoom range
+      // Reduced distance limits to 60% of previous values
       controlsRef.current.minDistance = isFullScreen ? 4 : 6;
-      controlsRef.current.maxDistance = isFullScreen ? 40 : 32;
+      controlsRef.current.maxDistance = isFullScreen ? 24 : 19.2; // 40 * 0.6 = 24, 32 * 0.6 = 19.2
     }
   }, [isFullScreen]);
 
@@ -299,8 +298,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         enableDamping
         dampingFactor={isFullScreen ? 0.08 : 0.05}
         rotateSpeed={0.5}
-        minDistance={isFullScreen ? 4 : 6} // Adjusted to match reference zoom
-        maxDistance={isFullScreen ? 40 : 32}
+        minDistance={isFullScreen ? 4 : 6}
+        maxDistance={isFullScreen ? 24 : 19.2} // Reduced to 60% of previous values
         target={centerPosition}
         onChange={() => {
           if (camera) {
