@@ -9,9 +9,7 @@ const config: CapacitorConfig = {
     url: 'https://soulo.online?forceHideBadge=true',
     cleartext: true
   },
-  // Ensure proper permissions for iOS and Android
   plugins: {
-    // Add specific iOS-related configurations
     SplashScreen: {
       launchAutoHide: false,
       backgroundColor: "#FFFFFF",
@@ -22,14 +20,20 @@ const config: CapacitorConfig = {
       splashFullScreen: true,
       splashImmersive: true
     },
-    // Handle keyboard properly
     Keyboard: {
       resize: "body",
       style: "dark",
       resizeOnFullScreen: true
+    },
+    LocalNotifications: {
+      smallIcon: "ic_stat_icon_config_sample",
+      iconColor: "#8b5cf6",
+      sound: "beep.wav",
+    },
+    PushNotifications: {
+      presentationOptions: ["badge", "sound", "alert"]
     }
   },
-  // iOS-specific configuration
   ios: {
     contentInset: "always",
     allowsLinkPreview: false,
@@ -38,7 +42,6 @@ const config: CapacitorConfig = {
     limitsNavigationsToAppBoundDomains: true,
     backgroundColor: "#FFFFFF"
   },
-  // Android-specific configuration
   android: {
     allowMixedContent: true,
     captureInput: true,
