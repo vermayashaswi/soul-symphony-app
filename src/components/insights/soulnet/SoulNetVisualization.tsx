@@ -374,7 +374,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
           return null;
         }
         
-        // Updated label visibility logic - only show for selected/connected nodes when a node is selected
+        // Updated label visibility logic - show all labels initially, then selective when node is selected
         const showLabel = selectedNode 
           ? (node.id === selectedNode || highlightedNodes.has(node.id))
           : shouldShowLabels;

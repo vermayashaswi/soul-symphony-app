@@ -148,8 +148,8 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
     return <TranslatableText text="Drag to rotate • Scroll to zoom • Click a node to highlight connections" forceTranslate={true} />;
   };
 
-  // Clean shouldShowLabels logic - only show when node is selected or in fullscreen
-  const shouldShowLabels = isFullScreen || selectedEntity !== null;
+  // Clean shouldShowLabels logic - show all labels initially, then selective behavior when node is selected
+  const shouldShowLabels = true; // Always show labels, SoulNetVisualization will handle selective display
 
   return (
     <div className={cn(
