@@ -1,3 +1,4 @@
+
 import React, { useRef, useEffect, useMemo, useState } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { OrbitControls } from '@react-three/drei';
@@ -125,7 +126,7 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
 }) => {
   const { camera, size } = useThree();
   const controlsRef = useRef<any>(null);
-  const [cameraZoom, setCameraZoom] = useState<number>(24); // Adjusted from 26 to 24 to match reference zoom
+  const [cameraZoom, setCameraZoom] = useState<number>(45); // Increased from 24 to 45 for better default view
   const [forceUpdate, setForceUpdate] = useState<number>(0);
   const [isInitialized, setIsInitialized] = useState(false);
   const { isInStep } = useTutorial();
@@ -207,14 +208,14 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     }
   }, [selectedNode]);
 
-  // Optimized camera initialization to match reference image positioning
+  // Optimized camera initialization with increased distance for complete view
   useEffect(() => {
     if (camera && validData.nodes?.length > 0 && !isInitialized) {
-      console.log("Initializing camera position to match reference");
+      console.log("Initializing camera position for complete visualization view");
       try {
         const centerX = centerPosition.x;
         const centerY = centerPosition.y;
-        camera.position.set(centerX, centerY, 24); // Adjusted from 26 to 24
+        camera.position.set(centerX, centerY, 45); // Increased from 24 to 45 for complete view
         camera.lookAt(centerX, centerY, 0);
         setIsInitialized(true);
       } catch (error) {
@@ -256,14 +257,14 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
     return calculateConnectionPercentages(selectedNode, validData.links);
   }, [selectedNode, validData?.links]);
 
-  // Adjust controls dampingFactor based on fullscreen mode with reduced max zoom distances
+  // Adjust controls with increased max zoom-out distances for complete view
   useEffect(() => {
     if (controlsRef.current) {
       controlsRef.current.dampingFactor = isFullScreen ? 0.08 : 0.05;
       
-      // Reduced distance limits to 60% of previous values
-      controlsRef.current.minDistance = isFullScreen ? 4 : 6;
-      controlsRef.current.maxDistance = isFullScreen ? 24 : 19.2; // 40 * 0.6 = 24, 32 * 0.6 = 19.2
+      // Increased distance limits to allow complete visualization view
+      controlsRef.current.minDistance = isFullScreen ? 8 : 10;
+      controlsRef.current.maxDistance = isFullScreen ? 80 : 60; // Significantly increased for complete view
     }
   }, [isFullScreen]);
 
@@ -298,8 +299,8 @@ export const SoulNetVisualization: React.FC<SoulNetVisualizationProps> = ({
         enableDamping
         dampingFactor={isFullScreen ? 0.08 : 0.05}
         rotateSpeed={0.5}
-        minDistance={isFullScreen ? 4 : 6}
-        maxDistance={isFullScreen ? 24 : 19.2} // Reduced to 60% of previous values
+        minDistance={isFullScreen ? 8 : 10}
+        maxDistance={isFullScreen ? 80 : 60} // Increased for complete view
         target={centerPosition}
         onChange={() => {
           if (camera) {

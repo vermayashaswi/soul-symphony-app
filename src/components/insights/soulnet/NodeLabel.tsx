@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -174,21 +175,21 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return translatedText || id;
   }, [id, type, translatedText]);
 
-  // Enhanced font sizing to match reference image
+  // Reduced font sizing by 75% to match user request
   const dynamicFontSize = useMemo(() => {
-    let z = cameraZoom !== undefined ? cameraZoom : 26;
-    if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
+    let z = cameraZoom !== undefined ? cameraZoom : 45; // Updated default from 26 to 45
+    if (typeof z !== 'number' || Number.isNaN(z)) z = 45;
     
-    // Increased base font size to match reference image prominence
-    const baseSize = 0.8 + Math.max(0, (26 - z) * 0.02);
+    // Reduced base font size by 75% (from 0.8 to 0.2)
+    const baseSize = 0.2 + Math.max(0, (45 - z) * 0.005); // Adjusted scaling factor
     
     // Adjust size for non-Latin scripts
-    const sizeAdjustment = isDevanagari.current ? 0.15 : 
-                          isNonLatin.current ? 0.1 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.04 : 
+                          isNonLatin.current ? 0.025 : 0;
     
-    // Higher minimum size for better readability
-    const minSize = 0.6;
-    return Math.max(Math.min(baseSize + sizeAdjustment, 1.2), minSize);
+    // Reduced minimum size proportionally (from 0.6 to 0.15)
+    const minSize = 0.15;
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.3), minSize); // Reduced max size from 1.2 to 0.3
   }, [cameraZoom]);
 
   // Don't render if not visible or no text
