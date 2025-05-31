@@ -33,11 +33,9 @@ const TutorialOverlay: React.FC = () => {
   
   const location = useLocation();
   
-  // Enhanced route checking for tutorial display
   const isAppRouteCurrent = isAppRoute(location.pathname);
   const shouldShowTutorial = isActive && isAppRouteCurrent && !tutorialCompleted && !navigationState.inProgress;
   
-  // Log important state changes
   useEffect(() => {
     console.log('[TutorialOverlay] State update:', {
       isActive,
@@ -57,32 +55,27 @@ const TutorialOverlay: React.FC = () => {
     
     console.log('[TutorialOverlay] Tutorial active, disabling page scrolling');
     
-    // Save current scroll position
     const scrollPos = window.scrollY;
     
-    // Add classes to the body to prevent scrolling
     document.body.classList.add('tutorial-active');
     document.body.style.overflow = 'hidden';
     document.body.style.touchAction = 'none';
     
-    // Add data attribute for current step to enable more specific CSS targeting
     document.body.setAttribute('data-current-step', String(steps[currentStep]?.id || ''));
     
-    // Special handling for step 5 - ensure chat background is visible with proper styling
+    // Special handling for step 5 - chat background styling
     if (steps[currentStep]?.id === 5) {
-      // Prepare the chat container for better visibility - Use purple background
       const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
       chatContainers.forEach(container => {
         if (container instanceof HTMLElement) {
-          container.style.backgroundColor = '#1A1F2C'; // Dark purple background
-          container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)'; // Gradient background
-          container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)'; // Inner purple glow
+          container.style.backgroundColor = '#1A1F2C';
+          container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)';
+          container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)';
           container.style.opacity = '1';
           container.style.visibility = 'visible';
         }
       });
       
-      // Make sure EmptyChatState is visible
       const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
       if (emptyChatState && emptyChatState instanceof HTMLElement) {
         emptyChatState.style.visibility = 'visible';
@@ -91,7 +84,6 @@ const TutorialOverlay: React.FC = () => {
         emptyChatState.style.display = 'flex';
       }
       
-      // Run another check after a short delay to catch dynamically loaded elements
       setTimeout(() => {
         if (steps[currentStep]?.id === 5) {
           const chatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
@@ -100,8 +92,6 @@ const TutorialOverlay: React.FC = () => {
               suggestion.style.visibility = 'visible';
               suggestion.style.display = 'block';
               suggestion.style.opacity = '1';
-              
-              // Add tutorial classes for highlighting
               suggestion.classList.add('chat-question-highlight', 'tutorial-target');
             }
           });
@@ -109,11 +99,9 @@ const TutorialOverlay: React.FC = () => {
       }, 500);
     }
     
-    // Clean up when tutorial is deactivated
     return () => {
       console.log('[TutorialOverlay] Cleaning up tutorial styles');
       
-      // Enhanced cleanup for body element
       document.body.classList.remove('tutorial-active');
       document.body.style.overflow = '';
       document.body.style.touchAction = '';
@@ -122,14 +110,12 @@ const TutorialOverlay: React.FC = () => {
       document.body.style.height = '';
       document.body.removeAttribute('data-current-step');
       
-      // Restore scroll position
       window.scrollTo(0, scrollPos);
       console.log('[TutorialOverlay] Tutorial inactive, restored page scrolling');
       
-      // Run enhanced staggered cleanup
       performStaggeredCleanup();
       
-      // SPECIAL: Reset the arrow button specifically to ensure it's centered
+      // Reset arrow button specifically
       const arrowButton = document.querySelector('.journal-arrow-button');
       if (arrowButton instanceof HTMLElement) {
         console.log('[TutorialOverlay] Resetting arrow button position after tutorial cleanup');
@@ -141,7 +127,6 @@ const TutorialOverlay: React.FC = () => {
         arrowButton.style.margin = '0';
         arrowButton.style.padding = '0';
         
-        // Also reset the button element inside
         const buttonElement = arrowButton.querySelector('button');
         if (buttonElement instanceof HTMLElement) {
           buttonElement.style.boxShadow = '';
@@ -153,11 +138,9 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       
-      // Small delay to ensure chat interface re-renders properly
       setTimeout(() => {
         window.dispatchEvent(new Event('resize'));
         
-        // Force chat interface to refresh
         if (location.pathname === '/app/chat') {
           console.log('[TutorialOverlay] Triggering chat refresh after tutorial');
           window.dispatchEvent(new CustomEvent('chatRefreshNeeded'));
@@ -166,42 +149,29 @@ const TutorialOverlay: React.FC = () => {
     };
   }, [shouldShowTutorial, currentStep, steps, location.pathname]);
 
-  // Enhanced step-specific element highlighting with improved cleanup
+  // Simplified step-specific element highlighting
   useEffect(() => {
     if (!shouldShowTutorial) return;
     
     const currentStepData = steps[currentStep];
     console.log(`[TutorialOverlay] Setting up highlighting for step ${currentStepData?.id}`);
     
-    // Run comprehensive cleanup before applying new highlighting
-    const performEnhancedCleanup = () => {
-      console.log('[TutorialOverlay] Enhanced cleanup before highlighting');
-      performStaggeredCleanup();
-    };
+    performStaggeredCleanup();
     
-    performEnhancedCleanup();
-    
-    // Apply highlighting after cleanup with improved timing
     const highlightTimeout = setTimeout(() => {
       if (currentStepData?.id === 1) {
-        // Step 1: Journal Header
         const journalHeader = document.querySelector('.journal-header-container');
         if (journalHeader) {
           journalHeader.classList.add('tutorial-target');
           console.log('[TutorialOverlay] Applied highlighting to journal header');
-        } else {
-          console.warn('[TutorialOverlay] Journal header element not found');
         }
       } 
       else if (currentStepData?.id === 2) {
-        // Step 2: Arrow Button - Let ButtonStateManager handle this
         console.log('[TutorialOverlay] Step 2: ButtonStateManager will handle arrow button highlighting');
       }
       else if (currentStepData?.id === 3) {
-        // Step 3: Record Entry Tab - Enhanced highlighting WITH glow effect
         console.log('[TutorialOverlay] Step 3: Applying enhanced highlighting to Record Entry button');
         
-        // Clean up any Past Entries highlighting first
         ENTRIES_TAB_SELECTORS.forEach(selector => {
           try {
             const elements = document.querySelectorAll(selector);
@@ -220,7 +190,6 @@ const TutorialOverlay: React.FC = () => {
         for (const selector of RECORD_ENTRY_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            // Double-check this is the Record Entry button
             const elementText = element.textContent?.toLowerCase().trim();
             const isRecordEntry = elementText?.includes('record') || elementText?.includes('new') || elementText?.includes('entry');
             const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history');
@@ -239,10 +208,8 @@ const TutorialOverlay: React.FC = () => {
         }
       }
       else if (currentStepData?.id === 4) {
-        // Step 4: Past Entries Tab - Minimal styling WITHOUT glow effect
         console.log('[TutorialOverlay] Step 4: Applying minimal highlighting to Past Entries button (no glow)');
         
-        // Clean up any Record Entry highlighting first
         RECORD_ENTRY_SELECTORS.forEach(selector => {
           try {
             const elements = document.querySelectorAll(selector);
@@ -261,7 +228,6 @@ const TutorialOverlay: React.FC = () => {
         for (const selector of ENTRIES_TAB_SELECTORS) {
           const element = document.querySelector(selector);
           if (element) {
-            // Double-check this is the Past Entries button
             const elementText = element.textContent?.toLowerCase().trim();
             const isPastEntries = elementText?.includes('past') || elementText?.includes('entries') || elementText?.includes('history') || selector.includes('entries');
             const isRecordEntry = elementText?.includes('record') || elementText?.includes('new');
@@ -279,24 +245,22 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Past Entries tab element not found with any selector for step 4');
         }
       }
-      // ... keep existing code (steps 5-9 remain the same)
+      // ... keep existing code (steps 5-9 remain the same for chat and insights highlighting)
       else if (currentStepData?.id === 5) {
         console.log('[TutorialOverlay] Setting up highlight for chat question (step 5)');
         
-        // Set purple background for better visibility with opacity
         const chatContainers = document.querySelectorAll('.smart-chat-container, .mobile-chat-interface, .chat-messages-container');
         chatContainers.forEach(container => {
           if (container instanceof HTMLElement) {
-            container.style.backgroundColor = '#1A1F2C'; // Dark purple background
-            container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)'; // Gradient background
-            container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)'; // Inner purple glow
+            container.style.backgroundColor = '#1A1F2C';
+            container.style.backgroundImage = 'linear-gradient(to bottom, #1A1F2C, #2D243A)';
+            container.style.boxShadow = 'inset 0 0 25px rgba(155, 135, 245, 0.15)';
             container.style.opacity = '1';
             container.style.visibility = 'visible';
-            container.style.borderRadius = '10px'; // Rounded corners
+            container.style.borderRadius = '10px';
           }
         });
         
-        // Make sure EmptyChatState is visible
         const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
         if (emptyChatState && emptyChatState instanceof HTMLElement) {
           emptyChatState.style.visibility = 'visible';
@@ -305,23 +269,20 @@ const TutorialOverlay: React.FC = () => {
           emptyChatState.style.display = 'flex';
         }
         
-        // Log all potential targets for debugging
         logPotentialTutorialElements();
         
-        // First try to highlight existing chat suggestions in EmptyChatState
         const emptyChatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
         if (emptyChatSuggestions.length > 0) {
           console.log(`[TutorialOverlay] Found ${emptyChatSuggestions.length} chat suggestions in EmptyChatState`);
           emptyChatSuggestions.forEach((element, index) => {
-            if (index === 0) { // Only highlight the first one
+            if (index === 0) {
               element.classList.add('chat-question-highlight', 'tutorial-target');
               
-              // Apply enhanced visibility with LOWER z-index to stay behind modal
               if (element instanceof HTMLElement) {
                 element.style.display = 'block';
                 element.style.visibility = 'visible';
                 element.style.opacity = '1';
-                element.style.zIndex = '8000'; // Lower than tutorial modal
+                element.style.zIndex = '8000';
                 element.style.position = 'relative';
                 element.style.boxShadow = '0 0 40px 25px var(--color-theme)';
                 element.style.animation = 'ultra-strong-pulse 1.5s infinite alternate';
@@ -333,18 +294,15 @@ const TutorialOverlay: React.FC = () => {
             }
           });
         } else {
-          // Try to find and highlight using our helper function
           const found = findAndHighlightElement(CHAT_QUESTION_SELECTORS, 'chat-question-highlight');
           
           if (!found) {
             console.warn('[TutorialOverlay] Failed to find chat question element with any selector');
             
-            // Create a fallback chat suggestion if none exists
             const emptyChatState = document.querySelector('.flex.flex-col.items-center.justify-center.p-6.text-center.h-full');
             if (emptyChatState && emptyChatState instanceof HTMLElement) {
               console.log('[TutorialOverlay] Creating fallback chat suggestions');
               
-              // Check if suggestions container already exists
               let suggestionsContainer = emptyChatState.querySelector('.mt-8.space-y-3.w-full.max-w-md');
               
               if (!suggestionsContainer) {
@@ -354,7 +312,6 @@ const TutorialOverlay: React.FC = () => {
               }
               
               if (suggestionsContainer && suggestionsContainer instanceof HTMLElement) {
-                // If we already have buttons in the container, don't add more
                 const existingButtons = suggestionsContainer.querySelectorAll('button');
                 if (existingButtons.length === 0) {
                   const suggestionButton = document.createElement('button');
@@ -363,12 +320,11 @@ const TutorialOverlay: React.FC = () => {
                   suggestionButton.style.display = 'block';
                   suggestionButton.style.visibility = 'visible';
                   suggestionButton.style.opacity = '1';
-                  suggestionButton.style.zIndex = '8000'; // Lower than tutorial modal
+                  suggestionButton.style.zIndex = '8000';
                   
                   suggestionsContainer.appendChild(suggestionButton);
                   applyTutorialHighlight(suggestionButton, 'chat-question-highlight');
                 } else {
-                  // Apply highlighting to the first existing button
                   const firstButton = existingButtons[0];
                   firstButton.classList.add('chat-question-highlight', 'tutorial-target', 'empty-chat-suggestion');
                   
@@ -376,7 +332,7 @@ const TutorialOverlay: React.FC = () => {
                     firstButton.style.display = 'block';
                     firstButton.style.visibility = 'visible';
                     firstButton.style.opacity = '1';
-                    firstButton.style.zIndex = '8000'; // Lower than tutorial modal
+                    firstButton.style.zIndex = '8000';
                     applyTutorialHighlight(firstButton, 'chat-question-highlight');
                   }
                 }
@@ -385,7 +341,6 @@ const TutorialOverlay: React.FC = () => {
           }
         }
         
-        // Try one more time after a short delay
         setTimeout(() => {
           const chatSuggestions = document.querySelectorAll('.empty-chat-suggestion, .chat-suggestion-button');
           if (chatSuggestions.length > 0 && currentStepData?.id === 5) {
@@ -397,12 +352,11 @@ const TutorialOverlay: React.FC = () => {
               firstSuggestion.style.display = 'block';
               firstSuggestion.style.visibility = 'visible';
               firstSuggestion.style.opacity = '1';
-              firstSuggestion.style.zIndex = '8000'; // Lower than tutorial modal
+              firstSuggestion.style.zIndex = '8000';
             }
           }
         }, 800);
       }
-      // NEW: Step 6 - Insights Header Highlight
       else if (currentStepData?.id === 6) {
         console.log('[TutorialOverlay] Setting up highlight for insights header (step 6)');
         const found = findAndHighlightElement(INSIGHTS_HEADER_SELECTORS, 'insights-header-highlight');
@@ -411,7 +365,6 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Failed to find insights header with any selector');
         }
       }
-      // NEW: Step 7 - Emotion Chart Highlight
       else if (currentStepData?.id === 7) {
         console.log('[TutorialOverlay] Setting up highlight for emotion chart (step 7)');
         const found = findAndHighlightElement(EMOTION_CHART_SELECTORS, 'emotion-chart-highlight');
@@ -420,7 +373,6 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Failed to find emotion chart with any selector');
         }
       }
-      // NEW: Step 8 - Mood Calendar Highlight
       else if (currentStepData?.id === 8) {
         console.log('[TutorialOverlay] Setting up highlight for mood calendar (step 8)');
         const found = findAndHighlightElement(MOOD_CALENDAR_SELECTORS, 'mood-calendar-highlight');
@@ -429,11 +381,9 @@ const TutorialOverlay: React.FC = () => {
           console.warn('[TutorialOverlay] Failed to find mood calendar with any selector');
         }
       }
-      // ENHANCED: Step 9 - Soul-Net Highlight with label visibility debugging
       else if (currentStepData?.id === 9) {
         console.log('[TutorialOverlay] Setting up highlight for soul-net visualization (step 9)');
         
-        // First highlight the Soul-Net container
         const found = findAndHighlightElement(SOULNET_SELECTORS, 'soul-net-highlight');
         
         if (!found) {
@@ -442,28 +392,23 @@ const TutorialOverlay: React.FC = () => {
           console.log('[TutorialOverlay] Successfully highlighted Soul-Net visualization for step 9');
         }
         
-        // Add specific debugging for Soul-Net labels after a delay
         setTimeout(() => {
           console.log('[TutorialOverlay] Step 9: Debugging Soul-Net label visibility');
           
-          // Check if Soul-Net canvas is present and visible
           const soulnetContainer = document.querySelector('[class*="soul-net"], [class*="soulnet"], .bg-background.rounded-xl.shadow-sm.border.w-full');
           if (soulnetContainer) {
             console.log('[TutorialOverlay] Found Soul-Net container:', soulnetContainer);
             
-            // Look for canvas element
             const canvas = soulnetContainer.querySelector('canvas');
             if (canvas) {
               console.log('[TutorialOverlay] Found Soul-Net canvas:', canvas.style);
               
-              // Force canvas to be visible and properly sized
               canvas.style.display = 'block';
               canvas.style.visibility = 'visible';
               canvas.style.opacity = '1';
               canvas.style.width = '100%';
               canvas.style.height = '500px';
               
-              // Trigger a resize event to ensure proper rendering
               window.dispatchEvent(new Event('resize'));
               
               console.log('[TutorialOverlay] Applied visibility fixes to Soul-Net canvas');
@@ -474,19 +419,16 @@ const TutorialOverlay: React.FC = () => {
             console.warn('[TutorialOverlay] No Soul-Net container found for step 9');
           }
           
-          // Additional debugging for Three.js text elements
           console.log('[TutorialOverlay] Checking for Three.js text rendering in Soul-Net');
           
-          // Dispatch custom event to force Soul-Net to show labels
           window.dispatchEvent(new CustomEvent('tutorial-soul-net-debug', {
             detail: { step: 9, forceShowLabels: true }
           }));
           
         }, 1000);
       }
-    }, 300); // Increased timeout for better cleanup
+    }, 300);
     
-    // Enhanced cleanup when effect unmounts
     return () => {
       clearTimeout(highlightTimeout);
       console.log('[TutorialOverlay] Effect cleanup - removing highlighting');
@@ -494,7 +436,6 @@ const TutorialOverlay: React.FC = () => {
     };
   }, [shouldShowTutorial, currentStep, steps]);
 
-  // If tutorial should not be shown, don't render anything
   if (!shouldShowTutorial) {
     return null;
   }
@@ -505,7 +446,6 @@ const TutorialOverlay: React.FC = () => {
 
   return (
     <div className="fixed inset-0 z-[50000] pointer-events-auto">
-      {/* Semi-transparent overlay */}
       <motion.div
         className="tutorial-overlay absolute inset-0"
         initial={{ opacity: 0 }}
@@ -515,7 +455,6 @@ const TutorialOverlay: React.FC = () => {
         onClick={(e) => e.stopPropagation()}
       />
 
-      {/* Tutorial step */}
       <AnimatePresence mode="wait">
         {currentTutorialStep && (
           <TutorialStep

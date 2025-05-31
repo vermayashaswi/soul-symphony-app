@@ -1,12 +1,12 @@
 
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
-import '@/types/three-reference';  // Fixed import path
+import '@/types/three-reference';
 import * as THREE from 'three';
 import { NodeMesh } from './NodeMesh';
 import { NodeLabel } from './NodeLabel';
 import { ConnectionPercentage } from './ConnectionPercentage';
 import { useTheme } from '@/hooks/use-theme';
-import { useTutorial } from '@/contexts/TutorialContext';
+import { useSoulNetLabelVisibility } from '@/hooks/use-soul-net-label-visibility';
 
 interface NodeData {
   id: string;
@@ -30,7 +30,8 @@ interface NodeProps {
   connectionStrength?: number;
   connectionPercentage?: number;
   showPercentage?: boolean;
-  forceShowLabels?: boolean; // New prop for tutorial mode
+  isFullScreen?: boolean;
+  globalShouldShowLabels?: boolean;
 }
 
 export const Node: React.FC<NodeProps> = ({
@@ -47,10 +48,10 @@ export const Node: React.FC<NodeProps> = ({
   connectionStrength = 0.5,
   connectionPercentage = 0,
   showPercentage = false,
-  forceShowLabels = false
+  isFullScreen = false,
+  globalShouldShowLabels = false
 }) => {
   const { theme } = useTheme();
-  const { isInStep } = useTutorial();
   const [isTouching, setIsTouching] = useState(false);
   const [touchStartTime, setTouchStartTime] = useState<number | null>(null);
   const [touchStartPosition, setTouchStartPosition] = useState<{x: number, y: number} | null>(null);
@@ -58,45 +59,39 @@ export const Node: React.FC<NodeProps> = ({
   const prevSelectedRef = useRef<boolean>(isSelected);
   const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
   
-  // Enhanced label visibility for tutorial step 9
-  const isTutorialStep9 = isInStep(9);
-  const shouldShowLabel = isTutorialStep9 || forceShowLabels || showLabel || isHighlighted || isSelected;
-  
-  // Enhanced debug logging for tutorial step 9
-  useEffect(() => {
-    if (isTutorialStep9) {
-      console.log(`[Node] Tutorial Step 9 - ${node.id} (${node.type}):`, {
-        position: node.position,
-        shouldShowLabel,
-        showLabel,
-        forceShowLabels,
-        isHighlighted,
-        isSelected,
-        isTutorialStep9
-      });
-    }
-  }, [node.id, node.type, node.position, shouldShowLabel, showLabel, forceShowLabels, isHighlighted, isSelected, isTutorialStep9]);
+  // Use the consolidated label visibility hook
+  const {
+    shouldShowLabel,
+    isTutorialStep9,
+    dynamicProps
+  } = useSoulNetLabelVisibility({
+    nodeId: node.id,
+    nodeType: node.type,
+    isSelected,
+    isHighlighted,
+    isFullScreen,
+    selectedNodeId,
+    highlightedNodes,
+    globalShouldShowLabels: globalShouldShowLabels || showLabel
+  });
   
   // Track state changes that might cause flickering
   useEffect(() => {
     if (prevHighlightedRef.current !== isHighlighted || prevSelectedRef.current !== isSelected) {
-      console.log(`Node ${node.id}: State change - highlighted: ${prevHighlightedRef.current} → ${isHighlighted}, selected: ${prevSelectedRef.current} → ${isSelected}`);
       prevHighlightedRef.current = isHighlighted;
       prevSelectedRef.current = isSelected;
       
-      // Mark node as animating to stabilize transitions
       nodeRef.current.isAnimating = true;
       
-      // Reset animation flag after transition period
       setTimeout(() => {
         nodeRef.current.isAnimating = false;
       }, 300);
     }
-  }, [isHighlighted, isSelected, node.id]);
+  }, [isHighlighted, isSelected]);
   
-  // Enhanced scale calculation with tutorial mode adjustments
+  // Calculate node scale with tutorial adjustments
   const baseScale = node.type === 'entity' ? 0.7 : 0.55;
-  const tutorialScaleBoost = isTutorialStep9 ? 1.1 : 1; // Slightly larger nodes in tutorial
+  const tutorialScaleBoost = isTutorialStep9 ? 1.1 : 1;
   const scale = (isHighlighted 
     ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
     : baseScale * (0.8 + node.value * 0.5)) * tutorialScaleBoost;
@@ -115,8 +110,7 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(true);
     setTouchStartTime(Date.now());
     setTouchStartPosition({x: e.clientX, y: e.clientY});
-    console.log(`Node pointer down: ${node.id}`);
-  }, [node.id]);
+  }, []);
 
   const handlePointerUp = useCallback((e: any) => {
     e.stopPropagation();
@@ -126,7 +120,6 @@ export const Node: React.FC<NodeProps> = ({
         const deltaY = Math.abs(e.clientY - touchStartPosition.y);
         
         if (deltaX < 10 && deltaY < 10) {
-          console.log(`Node clicked: ${node.id}, isHighlighted: ${isHighlighted}`);
           onClick(node.id, e);
           
           if (navigator.vibrate) {
@@ -134,7 +127,6 @@ export const Node: React.FC<NodeProps> = ({
           }
         }
       } else {
-        console.log(`Node clicked (no start position): ${node.id}`);
         onClick(node.id, e);
       }
     }
@@ -142,7 +134,7 @@ export const Node: React.FC<NodeProps> = ({
     setIsTouching(false);
     setTouchStartTime(null);
     setTouchStartPosition(null);
-  }, [node.id, onClick, touchStartTime, touchStartPosition, isHighlighted]);
+  }, [node.id, onClick, touchStartTime, touchStartPosition]);
 
   useEffect(() => {
     if (isTouching && touchStartTime) {
@@ -158,7 +150,6 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isTouching, touchStartTime]);
 
-  // Show percentages for all highlighted nodes that aren't selected and have a non-zero percentage
   const shouldShowPercentage = showPercentage && isHighlighted && connectionPercentage > 0;
   
   return (
@@ -182,14 +173,13 @@ export const Node: React.FC<NodeProps> = ({
         id={node.id}
         type={node.type}
         position={node.position}
-        isHighlighted={isHighlighted}
         shouldShowLabel={shouldShowLabel}
-        cameraZoom={cameraZoom}
+        isTutorialMode={isTutorialStep9}
+        dynamicProps={dynamicProps}
         themeHex={themeHex}
-        forceVisible={isTutorialStep9 || forceShowLabels} // Pass tutorial state
+        isHighlighted={isHighlighted}
       />
 
-      {/* Place the percentage display in front of the node */}
       <ConnectionPercentage
         position={node.position}
         percentage={connectionPercentage}
