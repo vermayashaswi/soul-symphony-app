@@ -164,17 +164,17 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     let z = cameraZoom !== undefined ? cameraZoom : 26;
     if (typeof z !== 'number' || Number.isNaN(z)) z = 26;
     
-    // Reduced base size from 0.5 to 0.12 and adjusted zoom scaling
-    const baseSize = (0.12 + Math.max(0, (26 - z) * 0.004)) * (isTutorialStep9 ? 1.2 : 1.0);
+    // Restored original font sizing with proper scaling
+    const baseSize = 0.5 + Math.max(0, (26 - z) * 0.015);
     
     // Adjust size for non-Latin scripts
-    const sizeAdjustment = isDevanagari.current ? 0.02 : 
-                          isNonLatin.current ? 0.015 : 0;
+    const sizeAdjustment = isDevanagari.current ? 0.1 : 
+                          isNonLatin.current ? 0.06 : 0;
     
-    // Reduced minimum size for better proportion
-    const minSize = isTutorialStep9 ? 0.1 : 0.08;
-    return Math.max(Math.min(baseSize + sizeAdjustment, 0.2), minSize);
-  }, [cameraZoom, isTutorialStep9]);
+    // Minimum readable size
+    const minSize = 0.35;
+    return Math.max(Math.min(baseSize + sizeAdjustment, 0.8), minSize);
+  }, [cameraZoom]);
 
   // Don't render if not visible or no text
   if (!isVisible || !formattedText) {
@@ -184,31 +184,23 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return null;
   }
 
-  // Significantly reduced vertical offset for better positioning
+  // Restored original vertical offset for proper positioning
   const verticalOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 0.8 : 0.7; // Reduced from 2.2/2.0 to 0.8/0.7
-    // Reduced extra offset for tutorial mode
-    return isTutorialStep9 ? baseOffset + 0.1 : baseOffset;
-  }, [type, isTutorialStep9]);
+    const baseOffset = type === 'entity' ? 2.2 : 2.0;
+    return baseOffset;
+  }, [type]);
 
-  // Enhanced text color logic with better contrast for tutorial
+  // Text color logic with good contrast
   const textColor = useMemo(() => {
-    if (isTutorialStep9) {
-      // Force high contrast colors in tutorial mode
-      return type === 'entity' 
-        ? (theme === 'light' ? '#000000' : '#ffffff')
-        : themeHex;
-    }
     return type === 'entity' 
       ? (theme === 'light' ? '#1a1a1a' : '#ffffff')
       : themeHex;
-  }, [type, theme, themeHex, isTutorialStep9]);
+  }, [type, theme, themeHex]);
 
-  // Enhanced outline for better visibility, especially in tutorial
+  // Outline for better visibility
   const outlineWidth = useMemo(() => {
-    if (isTutorialStep9) return 0.008; // Reduced from 0.015
-    return isHighlighted ? 0.006 : 0.004; // Reduced from 0.012/0.008
-  }, [isHighlighted, isTutorialStep9]);
+    return isHighlighted ? 0.012 : 0.008;
+  }, [isHighlighted]);
   
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
@@ -229,12 +221,12 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
       position={finalPosition}
       color={textColor}
       size={dynamicFontSize}
-      bold={isHighlighted || isTutorialStep9}
+      bold={isHighlighted}
       visible={true}
       skipTranslation={true}
       outlineWidth={outlineWidth}
       outlineColor={outlineColor}
-      renderOrder={isTutorialStep9 ? 20 : 15} // Higher render order in tutorial mode
+      renderOrder={15}
     />
   );
 };

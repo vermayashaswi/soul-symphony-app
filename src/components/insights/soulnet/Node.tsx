@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import * as THREE from 'three';
@@ -94,12 +93,11 @@ export const Node: React.FC<NodeProps> = ({
     }
   }, [isHighlighted, isSelected, node.id]);
   
-  // Enhanced scale calculation with tutorial mode adjustments
+  // Restored original scale calculation for better proportions
   const baseScale = node.type === 'entity' ? 0.7 : 0.55;
-  const tutorialScaleBoost = isTutorialStep9 ? 1.1 : 1; // Slightly larger nodes in tutorial
-  const scale = (isHighlighted 
+  const scale = isHighlighted 
     ? baseScale * (1.2 + (isSelected ? 0.3 : connectionStrength * 0.5))
-    : baseScale * (0.8 + node.value * 0.5)) * tutorialScaleBoost;
+    : baseScale * (0.8 + node.value * 0.5);
 
   const displayColor = useMemo(() => {
     if (isHighlighted) {

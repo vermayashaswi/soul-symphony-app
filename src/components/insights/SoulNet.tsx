@@ -1,3 +1,4 @@
+
 import React, { useState, useEffect, useCallback } from 'react';
 import '@/types/three-reference';  // Fixed import path
 import { Canvas } from '@react-three/fiber';
@@ -235,7 +236,7 @@ const SoulNet: React.FC<SoulNetProps> = ({ userId, timeRange }) => {
               transition: 'all 0.3s ease-in-out',
             }}
             camera={{ 
-              position: [0, 0, isFullScreen ? 44 : 52], // Doubled from 22 and 26 to zoom out 2x
+              position: [0, 0, isFullScreen ? 22 : 26], // Restored original camera positioning
               near: 1, 
               far: 1000,
               fov: isFullScreen ? 60 : 50 // Maintained the same FOV

@@ -1,4 +1,3 @@
-
 import React, { useState, useEffect, useRef } from 'react';
 import '@/types/three-reference';
 import { Text } from '@react-three/drei';
@@ -116,8 +115,8 @@ export const ThreeDimensionalText: React.FC<ThreeDimensionalTextProps> = ({
     return null;
   }
 
-  // Reduced font size multiplier from 4.0 to 1.2 for better proportion
-  const effectiveSize = size * 1.2;
+  // Restored original effective size calculation
+  const effectiveSize = size * 2.0;
   
   // Enhanced text configuration for better readability
   const getMaxWidth = () => {
