@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -95,6 +96,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   const isNonLatin = useRef<boolean>(false);
   const isDevanagari = useRef<boolean>(false);
   
+  // Debug logging for label positioning
+  console.log(`[NodeLabel] Rendering label for node ${id}, position:`, position, 'shouldShow:', shouldShowLabel, 'forceVisible:', forceVisible);
+  
   // Simple visibility logic - only show when explicitly requested
   const isVisible = shouldShowLabel || forceVisible;
   
@@ -178,9 +182,9 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
     return null;
   }
 
-  // Much closer vertical offset - labels should be very close to nodes
+  // FIXED: Much closer vertical offset with relative positioning
   const verticalOffset = useMemo(() => {
-    const baseOffset = type === 'entity' ? 0.4 : 0.3; // Further reduced from 0.8/0.6
+    const baseOffset = type === 'entity' ? 0.15 : 0.1; // Much closer to nodes
     return baseOffset;
   }, [type]);
 
@@ -198,17 +202,15 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   
   const outlineColor = theme === 'light' ? '#ffffff' : '#000000';
 
-  // Calculate final position with much closer offset
-  const finalPosition: [number, number, number] = [
-    position[0], 
-    position[1] + verticalOffset, 
-    position[2]
-  ];
+  // FIXED: Use relative positioning instead of absolute world position
+  const labelPosition: [number, number, number] = [0, verticalOffset, 0];
+  
+  console.log(`[NodeLabel] Final label position for ${id}:`, labelPosition, 'offset:', verticalOffset);
 
   return (
     <ThreeDimensionalText
       text={formattedText}
-      position={finalPosition}
+      position={labelPosition}
       color={textColor}
       size={dynamicFontSize}
       bold={isHighlighted}

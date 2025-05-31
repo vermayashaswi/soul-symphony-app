@@ -1,4 +1,3 @@
-
 import React, { useState, useCallback, useEffect, useMemo, useRef } from 'react';
 import '@/types/three-reference';
 import * as THREE from 'three';
@@ -55,6 +54,9 @@ export const Node: React.FC<NodeProps> = ({
   const prevHighlightedRef = useRef<boolean>(isHighlighted);
   const prevSelectedRef = useRef<boolean>(isSelected);
   const nodeRef = useRef<{ isAnimating: boolean }>({ isAnimating: false });
+  
+  // Debug logging for node rendering
+  console.log(`[Node] Rendering node ${node.id} at position:`, node.position, 'isHighlighted:', isHighlighted, 'showLabel:', showLabel);
   
   // Clean label visibility logic - only show for selected/highlighted nodes
   const shouldShowLabel = forceShowLabels || showLabel || isHighlighted || isSelected;
@@ -162,7 +164,7 @@ export const Node: React.FC<NodeProps> = ({
       <NodeLabel
         id={node.id}
         type={node.type}
-        position={node.position}
+        position={[0, 0, 0]}
         isHighlighted={isHighlighted}
         shouldShowLabel={shouldShowLabel}
         cameraZoom={cameraZoom}
