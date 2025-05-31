@@ -1,3 +1,4 @@
+
 import React, { useMemo, useRef, useEffect, useState } from 'react';
 import ThreeDimensionalText from './ThreeDimensionalText';
 import { useTheme } from '@/hooks/use-theme';
@@ -112,6 +113,7 @@ interface NodeLabelProps {
   themeHex: string;
   forceVisible?: boolean;
   nodeColor?: string;
+  nodeScale?: number; // Added the missing nodeScale prop
 }
 
 export const NodeLabel: React.FC<NodeLabelProps> = ({
@@ -123,7 +125,8 @@ export const NodeLabel: React.FC<NodeLabelProps> = ({
   cameraZoom,
   themeHex,
   forceVisible = false,
-  nodeColor = '#ffffff'
+  nodeColor = '#ffffff',
+  nodeScale = 1 // Added default value
 }) => {
   const { theme } = useTheme();
   const { currentLanguage, translate } = useTranslation();
